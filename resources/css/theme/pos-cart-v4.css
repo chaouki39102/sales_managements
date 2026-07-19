@@ -809,7 +809,7 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  padding: 13px;
+  padding: 16px;
   border-radius: var(--r2);
   border: none;
   background: var(--em);
@@ -830,17 +830,6 @@
 }
 .cart-sell-btn:active:not(:disabled) { transform: translateY(0) scale(.98); }
 .cart-sell-btn:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
-.sell-kbd {
-  position: absolute;
-  left: 10px;
-  font-size: var(--fs-2xs);
-  font-family: monospace;
-  background: rgba(255,255,255,.2);
-  border-radius: 3px;
-  padding: 2px 5px;
-  opacity: .7;
-}
-
 /* ══════════════════════════════════════════
    12. PRODUCT CARD — تحسينات إضافية
 ══════════════════════════════════════════ */

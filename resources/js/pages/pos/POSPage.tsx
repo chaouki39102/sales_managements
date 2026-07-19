@@ -184,13 +184,13 @@ function POSPage() {
     prevSlugRef.current = slug;
   }, [slug]);
 
-  // ── Default client: "Client Cash" on mount ────────────────────────
+  // ── Default client: "Client Cash" on mount / after clearCart ──────
   const { data: cashClient } = useCashClient();
   useEffect(() => {
     if (cashClient && !posRef.current.client) {
       pos.setClient(cashClient);
     }
-  }, [cashClient]);
+  }, [cashClient, pos.client]);
 
   const [view,       setView]       = useState<ViewMode>(settings.defaultView);
   const [gridSize,   setGridSize]   = useState<GridSize>(settings.defaultGridSize);
@@ -333,6 +333,15 @@ function POSPage() {
 
   const isQtyCmd = /^\*\d*$/.test(pos.searchQuery.trim());
   const queryFamilyId   = pos.selectedCategory ?? undefined;
+
+  // ── Focus search whenever any modal closes ──
+  const prevModalRef = useRef(modal);
+  useEffect(() => {
+    if (prevModalRef.current !== 'none' && modal === 'none') {
+      setTimeout(() => searchRef.current?.focus(), 100);
+    }
+    prevModalRef.current = modal;
+  }, [modal]);
 
   // ═══════════════════════════════════════════════════════════════════════
   // البحث الفوري (client-side) — بدون debounce وبدون رحلة شبكة لكل ضغطة مفتاح
@@ -1203,7 +1212,7 @@ const handleCompleteSale = useCallback(async (params: {
       if (added) cartApiRef.current?.scrollToItemId(added.id);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => searchRef.current?.focus());
+          requestAnimationFrame(() => { searchRef.current?.focus(); searchRef.current?.select(); });
         });
       });
     });

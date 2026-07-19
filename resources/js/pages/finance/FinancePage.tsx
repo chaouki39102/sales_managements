@@ -98,11 +98,15 @@ function useTreasuryAccountTypes() {
     });
 }
 
-function useTreasuryAccounts(slug: string) {
+function useTreasuryAccounts(slug: string, yearId: number | null) {
     return useQuery({
-        queryKey: [slug, 'treasury-accounts'],
-        queryFn:  () => apiGet<any>('/treasury-accounts').then(r => r?.data ?? []),
+        queryKey: [slug, 'treasury-accounts', yearId],
+        queryFn:  () => apiGet<any>('/treasury-accounts', {
+            fiscal_year_id: yearId ?? undefined,
+        }),
         enabled:  !!slug,
+        select: (data: any) => Array.isArray(data) ? data
+            : Array.isArray(data?.data) ? data.data : [],
     });
 }
 
@@ -173,7 +177,7 @@ export default function FinancePage() {
     const accountTypes: any[]       = rawAccountTypes ?? [];
 
     const { data: rawAccounts, isLoading: loadingAccounts, error: accountsError }
-        = useTreasuryAccounts(slug);
+        = useTreasuryAccounts(slug, selectedYear?.id ?? null);
 
     const { data: rawModes, isLoading: loadingModes }
         = usePaymentModes(slug);
@@ -616,7 +620,53 @@ function PaymentsTab({ slug, selectedYearId, accounts, paymentModes: _paymentMod
     }), [debouncedSearch, statusFilter, accountFilter]);
 
     const { data, isLoading } = usePayments(slug, selectedYearId, activeFilters);
-    const payments: any[] = data?.items ?? [];
+    const rawPayments: any[] = data?.items ?? [];
+
+    // ── Sorting ──────────────────────────────────────────────────────────────
+    type SortKey = 'id' | 'payment_number' | 'payment_date' | 'party' | 'direction' | 'amount' | 'status';
+    const [sortKey, setSortKey] = useState<SortKey>('id');
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+    const toggleSort = (key: SortKey) => {
+        if (sortKey === key) {
+            setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortKey(key);
+            setSortDir(key === 'payment_number' || key === 'id' ? 'desc' : 'asc');
+        }
+    };
+
+    const payments = useMemo(() => {
+        const arr = [...rawPayments];
+        arr.sort((a, b) => {
+            let cmp = 0;
+            switch (sortKey) {
+                case 'id':
+                    cmp = (a.id ?? 0) - (b.id ?? 0);
+                    break;
+                case 'payment_number':
+                    cmp = (a.payment_number ?? `#${a.id}`).localeCompare(b.payment_number ?? `#${b.id}`, undefined, { numeric: true });
+                    break;
+                case 'payment_date':
+                    cmp = (a.payment_date ?? '').localeCompare(b.payment_date ?? '');
+                    break;
+                case 'party':
+                    cmp = (a.party?.name ?? '').localeCompare(b.party?.name ?? '', 'ar');
+                    break;
+                case 'direction':
+                    cmp = (a.direction ?? '').localeCompare(b.direction ?? '');
+                    break;
+                case 'amount':
+                    cmp = Number(a.amount_local || a.amount || 0) - Number(b.amount_local || b.amount || 0);
+                    break;
+                case 'status':
+                    cmp = (a.status ?? '').localeCompare(b.status ?? '');
+                    break;
+            }
+            return sortDir === 'asc' ? cmp : -cmp;
+        });
+        return arr;
+    }, [rawPayments, sortKey, sortDir]);
 
     // ── KPIs ────────────────────────────────────────────────────────────────
     const kpiConfirmed  = payments.filter(p => p.status === 'confirmed');
@@ -697,15 +747,27 @@ function PaymentsTab({ slug, selectedYearId, accounts, paymentModes: _paymentMod
                         <table>
                             <thead>
                                 <tr>
-                                    <th>الرقم</th>
-                                    <th>التاريخ</th>
-                                    <th>المتعامل</th>
-                                    <th>الاتجاه</th>
+                                    {([
+                                        ['payment_number', 'الرقم'],
+                                        ['payment_date',   'التاريخ'],
+                                        ['party',          'المتعامل'],
+                                        ['direction',      'الاتجاه'],
+                                        ['amount',         'المبلغ'],
+                                        ['status',         'الحالة'],
+                                    ] as [SortKey, string][]).map(([key, label]) => (
+                                        <th key={key}
+                                            onClick={() => toggleSort(key)}
+                                            style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                            {label}
+                                            {sortKey === key && (
+                                                <i className={`ti ti-arrow-${sortDir === 'asc' ? 'up' : 'down'}`}
+                                                    style={{ marginLeft: 4, fontSize: 11, opacity: 0.6 }}/>
+                                            )}
+                                        </th>
+                                    ))}
                                     <th>طريقة الدفع</th>
                                     <th>الحساب</th>
-                                    <th>المبلغ</th>
                                     <th>مرجع</th>
-                                    <th>الحالة</th>
                                     <th>مسوَّاة</th>
                                     <th></th>
                                 </tr>
@@ -735,12 +797,6 @@ function PaymentsTab({ slug, selectedYearId, accounts, paymentModes: _paymentMod
                                                 {p.direction === 'in' ? 'مقبوض' : 'مدفوع'}
                                             </Badge>
                                         </td>
-                                        <td style={{ fontSize: 12, color: 'var(--t3)' }}>
-                                            {p.payment_mode?.name || '—'}
-                                        </td>
-                                        <td style={{ fontSize: 12, color: 'var(--t3)' }}>
-                                            {p.treasury_account?.name || '—'}
-                                        </td>
                                         <td className="e" style={{
                                             color: p.direction === 'in' ? 'var(--em)' : 'var(--red)',
                                             fontWeight: 700,
@@ -748,13 +804,19 @@ function PaymentsTab({ slug, selectedYearId, accounts, paymentModes: _paymentMod
                                             {p.direction === 'out' ? '−' : '+'}
                                             {fmt(Number(p.amount_local || p.amount || 0))} دج
                                         </td>
-                                        <td className="m" style={{ fontSize: 11, color: 'var(--t4)' }}>
-                                            {p.reference || p.bank_reference || '—'}
-                                        </td>
                                         <td>
                                             <Badge variant={STATUS_VARIANT[p.status] ?? 'gray'}>
                                                 {STATUS_LABEL[p.status] ?? p.status}
                                             </Badge>
+                                        </td>
+                                        <td style={{ fontSize: 12, color: 'var(--t3)' }}>
+                                            {p.payment_mode?.name || '—'}
+                                        </td>
+                                        <td style={{ fontSize: 12, color: 'var(--t3)' }}>
+                                            {p.treasury_account?.name || '—'}
+                                        </td>
+                                        <td className="m" style={{ fontSize: 11, color: 'var(--t4)' }}>
+                                            {p.reference || p.bank_reference || '—'}
                                         </td>
                                         <td>
                                             {p.is_reconciled
@@ -812,8 +874,8 @@ function OpeningBalancesTab({ slug, selectedYear }: {
     const { data: partiesData, isLoading: loadParties } = useOpeningParties(slug, yearId);
     const { data: treasuryData, isLoading: loadTreasury } = useOpeningTreasury(slug, yearId);
 
-    const partyRows: any[]   = partiesData  ?? [];
-    const treasuryRows: any[] = treasuryData ?? [];
+    const partyRows: any[]   = Array.isArray(partiesData)  ? partiesData  : [];
+    const treasuryRows: any[] = Array.isArray(treasuryData) ? treasuryData : [];
 
     const totalDebit  = partyRows.filter(r => r.balance_type === 'debit')
                             .reduce((s, r) => s + Number(r.opening_balance || 0), 0);
@@ -828,7 +890,10 @@ function OpeningBalancesTab({ slug, selectedYear }: {
         enabled: !!slug,
         staleTime: 60_000,
     });
-    const accounts: any[] = Array.isArray(rawAccounts) ? rawAccounts : Array.isArray((rawAccounts as any)?.data) ? (rawAccounts as any).data : [];
+    const accounts: any[] = Array.isArray(rawAccounts) ? rawAccounts
+        : Array.isArray((rawAccounts as any)?.data) ? (rawAccounts as any).data
+        : Array.isArray((rawAccounts as any)?.data?.data) ? (rawAccounts as any).data.data
+        : [];
 
     const { data: rawParties } = useQuery({
         queryKey: [slug, 'parties', 'select'],
@@ -836,7 +901,10 @@ function OpeningBalancesTab({ slug, selectedYear }: {
         enabled: !!slug,
         staleTime: 60_000,
     });
-    const allParties: any[] = Array.isArray(rawParties) ? rawParties : Array.isArray((rawParties as any)?.data) ? (rawParties as any).data : [];
+    const allParties: any[] = Array.isArray(rawParties) ? rawParties
+        : Array.isArray((rawParties as any)?.data) ? (rawParties as any).data
+        : Array.isArray((rawParties as any)?.data?.data) ? (rawParties as any).data.data
+        : [];
 
     // ── Draft rows ───────────────────────────────────────────────────────────
     interface TreasuryDraft { treasury_account_id: number | ''; opening_balance: string; }
@@ -1594,7 +1662,9 @@ function PaymentModeModal({ open, mode, slug, onClose }: {
         enabled:  open && !!slug,
         staleTime: 60_000,
     });
-    const accounts: any[] = rawAccounts ?? [];
+    const accounts: any[] = Array.isArray(rawAccounts) ? rawAccounts
+        : Array.isArray((rawAccounts as any)?.data) ? (rawAccounts as any).data
+        : [];
 
     const emptyForm = {
         name: '', code: '', description: '',
@@ -1759,10 +1829,10 @@ function PaymentModal({ open, payment, accounts, paymentModes, selectedYearId, s
     const [form, setForm]   = useState(emptyForm);
     const [error, setError] = useState('');
 
-    // جلب المتعاملين للاختيار
+    // جلب المتعاملين للاختيار (مع partyType للكشف التلقائي عن الاتجاه)
     const { data: rawParties } = useQuery({
         queryKey: [slug, 'parties', 'select'],
-        queryFn:  () => apiGet<any>('/parties', { per_page: 200, active: 1 }),
+        queryFn:  () => apiGet<any>('/parties', { per_page: 200, active: 1, include: 'partyType' }),
         enabled:  open && !!slug,
         select:   (data: any) =>
             Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [],
@@ -1794,6 +1864,18 @@ function PaymentModal({ open, payment, accounts, paymentModes, selectedYearId, s
         }
         setError('');
     }, [open, payment, selectedYearId]);
+
+    // تصحيح تلقائي للاتجاه عند تعديل الدفعة حسب نوع المتعامل
+    useEffect(() => {
+        if (!open || !payment || !parties.length || !form.party_id) return;
+        const p = parties.find((pp: any) => String(pp.id) === String(form.party_id));
+        const typeName = p?.party_type?.name;
+        if (typeName === 'supplier' && form.direction !== 'out') {
+            set('direction', 'out');
+        } else if (typeName === 'client' && form.direction !== 'in') {
+            set('direction', 'in');
+        }
+    }, [open, payment, parties, form.party_id]);
 
     const set = (k: string, v: any) => { setForm(f => ({ ...f, [k]: v })); setError(''); };
 
@@ -1941,11 +2023,27 @@ function PaymentModal({ open, payment, accounts, paymentModes, selectedYearId, s
                 <div className="fg">
                     <label>المتعامل (اختياري)</label>
                     <select value={form.party_id as string}
-                        onChange={e => set('party_id', e.target.value)}>
+                        onChange={e => {
+                            const pid = e.target.value;
+                            set('party_id', pid);
+                            // كشف تلقائي للاتجاه حسب نوع المتعامل
+                            if (pid) {
+                                const p = parties.find((pp: any) => String(pp.id) === String(pid));
+                                const typeName = p?.party_type?.name;
+                                if (typeName === 'supplier') {
+                                    set('direction', 'out');
+                                } else if (typeName === 'client') {
+                                    set('direction', 'in');
+                                }
+                                // 'both' → لا يتغير، يبقى ما اختاره المستخدم
+                            }
+                        }}>
                         <option value="">— بدون متعامل —</option>
-                        {parties.map((p: any) => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
+                        {parties.map((p: any) => {
+                            const typeName = p.party_type?.name;
+                            const tag = typeName === 'supplier' ? ' مورد' : typeName === 'client' ? ' زبون' : '';
+                            return <option key={p.id} value={p.id}>{p.name}{tag}</option>;
+                        })}
                     </select>
                 </div>
 

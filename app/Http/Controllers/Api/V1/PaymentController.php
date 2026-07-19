@@ -30,9 +30,16 @@ class PaymentController extends BaseApiController
         return Payment::class;
     }
 
+    protected function getListConfig(): array
+    {
+        return ['relations' => Payment::$allowedIncludes];
+    }
+
     protected function getValidatedData(Request $request, $id = null): array
     {
-        $rules = $id ? (new UpdatePaymentRequest())->rules() : (new StorePaymentRequest())->rules();
+        $rules = $id
+            ? (new UpdatePaymentRequest())->rulesWithId((int) $id)
+            : (new StorePaymentRequest())->rules();
         return $request->validate($rules);
     }
 

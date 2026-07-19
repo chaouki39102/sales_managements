@@ -44,6 +44,9 @@ class StorePaymentRequest extends FormRequest
             'bank_reference'      => 'nullable|string|max:150',
             'notes'               => 'nullable|string|max:1000',
 
+            // اتجاه الدفعة (in = مقبوض / out = مدفوع)
+            'direction'           => ['nullable', 'string', Rule::in(['in', 'out'])],
+
             // الحالة
             'status'              => ['nullable', 'string', Rule::in(['confirmed', 'pending', 'cancelled'])],
 
@@ -64,6 +67,7 @@ class StorePaymentRequest extends FormRequest
             'fiscal_year_id.required'      => 'السنة المالية مطلوبة',
             'payment_number.unique'        => 'رقم الدفعة مستخدم بالفعل',
             'status.in'                    => 'الحالة يجب أن تكون: confirmed أو pending أو cancelled',
+            'direction.in'                 => 'الاتجاه يجب أن يكون: in (مقبوض) أو out (مدفوع)',
         ];
     }
 }

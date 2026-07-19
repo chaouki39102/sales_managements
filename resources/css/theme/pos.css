@@ -1155,12 +1155,12 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  padding: 11px;
+  padding: 14px;
   border-radius: var(--r2);
   border: none;
   background: var(--em);
   color: #fff;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 800;
   cursor: pointer;
   font-family: 'Tajawal', sans-serif;
@@ -1171,16 +1171,6 @@
 .cart-sell-btn:hover:not(:disabled) { background: var(--em2); box-shadow: var(--emglow2); transform: translateY(-1px); }
 .cart-sell-btn:active { transform: none; }
 .cart-sell-btn:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
-.sell-kbd {
-  position: absolute;
-  left: 10px;
-  font-size: 9px;
-  font-family: monospace;
-  background: rgba(255,255,255,.2);
-  border-radius: 4px;
-  padding: 2px 6px;
-  opacity: .8;
-}
 
 /* ── Keyboard shortcut indicator on POS buttons ── */
 .pos-kbd {

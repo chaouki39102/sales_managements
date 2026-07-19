@@ -182,7 +182,7 @@ export default function ProfessionalPaymentModal({
   const firstAmountRef = useRef<HTMLInputElement>(null);
 
   // ── Focus first amount field on open ────────────────────────────────────────
-  useEffect(() => { firstAmountRef.current?.focus(); }, []);
+  useEffect(() => { const t = setTimeout(() => { const el = firstAmountRef.current; if (el) { el.focus(); el.select(); } }, 60); return () => clearTimeout(t); }, []);
 
   // ── State ──────────────────────────────────────────────────────────────────
   const defaultMode = paymentModes.find(m =>

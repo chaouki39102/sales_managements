@@ -139,6 +139,7 @@ class PaymentSynchronizer
                     'treasury_account_id' => isset($paymentData['treasury_account_id'])
                         ? (int) $paymentData['treasury_account_id'] : null,
                     'amount'              => $amount,
+                    'direction'           => $direction,
                     'payment_date'        => $paymentData['payment_date'] ?? $document->document_date,
                     'reference'           => $paymentData['reference'] ?? null,
                     'notes'               => $paymentData['notes'] ?? null,

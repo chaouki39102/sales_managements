@@ -12,7 +12,16 @@ class UpdatePaymentRequest extends FormRequest
 
     public function rules(): array
     {
-        $id        = $this->route('payment');
+        return $this->buildRules($this->route('payment'));
+    }
+
+    public function rulesWithId(int $id): array
+    {
+        return $this->buildRules($id);
+    }
+
+    private function buildRules($id): array
+    {
         $companyId = $this->user()?->company_id
             ?? app(\App\Services\CompanyContextService::class)->get();
 
@@ -31,6 +40,7 @@ class UpdatePaymentRequest extends FormRequest
             'reference'           => 'nullable|string|max:100',
             'bank_reference'      => 'nullable|string|max:150',
             'notes'               => 'nullable|string|max:1000',
+            'direction'           => ['nullable', 'string', Rule::in(['in', 'out'])],
             'status'              => ['nullable', 'string', Rule::in(['confirmed', 'pending', 'cancelled'])],
             'document_ids'        => 'nullable|array',
             'document_ids.*'      => 'integer|exists:commercial_documents,id',
@@ -43,6 +53,7 @@ class UpdatePaymentRequest extends FormRequest
             'amount.min'              => 'مبلغ الدفعة يجب أن يكون أكبر من الصفر',
             'payment_number.unique'   => 'رقم الدفعة مستخدم بالفعل',
             'status.in'               => 'الحالة يجب أن تكون: confirmed أو pending أو cancelled',
+            'direction.in'            => 'الاتجاه يجب أن يكون: in (مقبوض) أو out (مدفوع)',
         ];
     }
 }

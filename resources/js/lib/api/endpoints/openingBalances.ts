@@ -3,6 +3,16 @@ import { useQuery } from '@tanstack/react-query';
 import { apiGet, apiPost, apiPut, apiDelete } from '../core/client';
 import { tenantKeys } from '../core/queryKeys';
 
+// ✅ يتعامل مع أي شكل استجابة محتمل: مصفوفة مباشرة، {data:[...]}, {data:{data:[...]}}, {items:[...]}
+function toArray(data: any): any[] {
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === 'object') {
+        if (Array.isArray(data.data)) return data.data;
+        if (data.data && typeof data.data === 'object' && Array.isArray(data.data.data)) return data.data.data;
+        if (Array.isArray(data.items)) return data.items;
+    }
+    return [];
+}
 
 export const openingBalancesApi = {
     getParties: (fiscalYearId: number) =>
@@ -30,8 +40,7 @@ export function useOpeningParties(slug: string, yearId: number | null) {
         queryKey: tenantKeys.openingBalances.parties(slug, yearId!),
         queryFn: () => openingBalancesApi.getParties(yearId!),
         enabled: !!slug && !!yearId,
-        select: (data: any) =>
-            Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [],
+        select: toArray,
     });
 }
 
@@ -40,7 +49,6 @@ export function useOpeningTreasury(slug: string, yearId: number | null) {
         queryKey: tenantKeys.openingBalances.treasury(slug, yearId!),
         queryFn: () => openingBalancesApi.getTreasury(yearId!),
         enabled: !!slug && !!yearId,
-        select: (data: any) =>
-            Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [],
+        select: toArray,
     });
 }

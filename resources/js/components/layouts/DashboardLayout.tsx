@@ -28,7 +28,7 @@ const NAV_GROUPS = [
       { name: 'طلبيات الزبائن',        href: 'documents/BCC', icon: 'ti-clipboard-list'         },
       { name: 'وصل التسليم ',        href: 'documents/BL',  icon: 'ti-truck'                  },
       { name: 'فواتير البيع',          href: 'documents/FV',  icon: 'ti-file-invoice', badge: 3 },
-      { name: 'مبيعات POS',            href: 'documents/POS', icon: 'ti-point-of-sale'          },
+      { name: 'مبيعات POS',            href: 'documents/POS', icon: 'ti-cash-register'          },
       { name: 'مرتجعات البيع',         href: 'documents/AV',  icon: 'ti-corner-up-left'         },
     ],
   },

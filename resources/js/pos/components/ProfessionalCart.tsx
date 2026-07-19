@@ -252,9 +252,9 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
               >
                 <i className={`ti ${density === 'compact' ? 'ti-list-details' : 'ti-list'}`} />
               </button>
-              <button className="btn btn-xs pos-sc" onClick={onHeld} title="الفواتير المعلقة">
+              <button className="btn btn-xs" onClick={onHeld} title="الفواتير المعلقة">
                 <i className="ti ti-clock-pause" />
-                {kb('heldCarts') && <kbd>{kb('heldCarts')}</kbd>}
+                {kb('heldCarts') && <span className="tb-txt"> {kb('heldCarts')}</span>}
               </button>
               <button
                 className={`btn btn-xs ${note ? 'btn-p' : ''}`}
@@ -273,13 +273,13 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                 {undoClearSecondsLeft > 0 && <span className="undo-ct">{undoClearSecondsLeft}</span>}
               </button>
               <button
-                className="btn btn-xs btn-r pos-sc"
+                className="btn btn-xs btn-r"
                 onClick={onClear}
                 disabled={isEmpty}
                 title="مسح السلة"
               >
                 <i className="ti ti-trash" />
-                {kb('clearCart') && <kbd>{kb('clearCart')}</kbd>}
+                {kb('clearCart') && <span className="tb-txt"> {kb('clearCart')}</span>}
               </button>
             </div>
           </div>
@@ -512,7 +512,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
             title="تعليق الفاتورة"
           >
             <i className="ti ti-clock-pause" /> تعليق
-            {kb('holdCart') && <kbd className="pos-kbd">{kb('holdCart')}</kbd>}
+            {kb('holdCart') && <span className="tb-txt"> {kb('holdCart')}</span>}
           </button>
           <button
             className="cart-sell-btn"
@@ -528,7 +528,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                   : `دفع — ${formatDZD(remainingToPay)}`
               )}
             </span>
-            {kb('payment') && <kbd className="sell-kbd">{kb('payment')}</kbd>}
+            {kb('payment') && <span className="tb-txt" style={{ fontSize: 13 }}> {kb('payment')}</span>}
           </button>
         </div>
       </div>
