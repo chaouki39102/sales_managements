@@ -64,132 +64,229 @@ export interface TaxesReportParams extends ReportBaseParams {
 
 // ─── Report Response Types ────────────────────────────────────────────────────
 
+export interface SalesReportDocument {
+  id:                number;
+  document_number:   string;
+  date:              string;
+  party_name:        string;
+  total_ht:          number;
+  total_tva:         number;
+  total_ttc:         number;
+  paid_amount:       number;
+  remaining_amount:  number;
+  doc_cost_ht:       number;
+  margin_value:      number;
+  status:            string;
+}
+
+export interface SalesProductRecapItem {
+  product_id:     number;
+  product_name:   string;
+  product_ref:    string;
+  total_qty:      number;
+  total_ht:       number;
+  total_cost:     number;
+  total_ttc:      number;
+  total_tva:      number;
+  total_discount: number;
+  margin_value:   number;
+  margin_pct:     number;
+}
+
 export interface SalesReportData {
   summary: {
-    total_ht:         number;
-    total_tva:        number;
-    total_ttc:        number;
-    total_discount:   number;
-    documents_count:  number;
-    paid_count:       number;
-    unpaid_count:     number;
-    cancelled_count:  number;
+    total_ht:          number;
+    total_tva:         number;
+    total_ttc:         number;
+    total_cost:        number;
+    total_margin:      number;
+    margin_pct:        number;
+    total_paid:        number;
+    total_remaining:   number;
+    count:             number;
+    unpaid_count:      number;
   };
-  by_month: Array<{
-    month:     string;   // YYYY-MM
-    total_ht:  number;
-    total_ttc: number;
-    count:     number;
-  }>;
-  by_document_type: Array<{
-    code:      string;
-    name:      string;
-    total_ttc: number;
-    count:     number;
-  }>;
-  documents: CommercialDocument[];
+  product_recap: SalesProductRecapItem[];
+  documents: SalesReportDocument[];
+}
+
+export interface PurchasesReportDocument {
+  id:               number;
+  document_number:  string;
+  date:             string;
+  party_name:       string;
+  total_ht:         number;
+  total_tva:        number;
+  total_ttc:        number;
+  paid_amount:      number;
+  remaining_amount: number;
+  status:           string;
+}
+
+export interface PurchasesProductRecapItem {
+  product_id:   number;
+  product_name: string;
+  product_ref:  string;
+  total_qty:    number;
+  total_ht:     number;
+  total_ttc:    number;
 }
 
 export interface PurchasesReportData {
   summary: {
-    total_ht:        number;
-    total_tva:       number;
-    total_ttc:       number;
-    documents_count: number;
-    paid_count:      number;
-    unpaid_count:    number;
+    total_ht:          number;
+    total_tva:         number;
+    total_ttc:         number;
+    total_paid:        number;
+    total_remaining:   number;
+    count:             number;
+    unpaid_count:      number;
   };
-  by_month: Array<{
-    month:     string;
-    total_ht:  number;
-    total_ttc: number;
-    count:     number;
-  }>;
-  documents: CommercialDocument[];
+  product_recap: PurchasesProductRecapItem[];
+  documents: PurchasesReportDocument[];
 }
 
-export interface PartyReportRow {
-  party:            Pick<Party, 'id' | 'name' | 'code' | 'phone'>;
-  total_purchases:  number;
-  total_payments:   number;
-  balance:          number;
-  documents_count:  number;
-  last_transaction?: string | null;
+export interface CustomersReportRow {
+  id:               number;
+  code:             string;
+  name:             string;
+  activity:         string | null;
+  phone:            string | null;
+  email:            string | null;
+  wilaya:           string | null;
+  created_at:       string;
+  doc_count:        number;
+  total_ht:         number;
+  total_ttc:        number;
+  total_paid:       number;
+  total_remaining:  number;
 }
 
-export interface PartyReportData {
+export interface CustomersReportData {
   summary: {
-    total_balance:    number;
-    debtors_count:    number;
-    creditors_count:  number;
+    total_customers:  number;
+    total_ht:         number;
+    total_ttc:        number;
+    total_remaining:  number;
   };
-  rows: PartyReportRow[];
+  customers: CustomersReportRow[];
 }
 
-export interface ProductsReportRow {
-  product:       Pick<Product, 'id' | 'name' | 'slug'>;
-  variant:       Pick<ProductVariant, 'id' | 'ref' | 'variant_name'>;
-  quantity_sold: number;
-  total_ht:      number;
-  total_ttc:     number;
-  profit?:       number;
+export interface SuppliersReportRow {
+  id:               number;
+  code:             string;
+  name:             string;
+  activity:         string | null;
+  phone:            string | null;
+  email:            string | null;
+  wilaya:           string | null;
+  nif:              string | null;
+  nis:              string | null;
+  ai:               string | null;
+  created_at:       string;
+  doc_count:        number;
+  total_ht:         number;
+  total_ttc:        number;
+  total_paid:       number;
+  total_remaining:  number;
 }
 
-export interface ProductsReportData {
+export interface SuppliersReportData {
   summary: {
-    total_ht:      number;
-    total_ttc:     number;
-    items_count:   number;
-    products_count:number;
+    total_suppliers:  number;
+    total_ht:         number;
+    total_ttc:        number;
+    total_remaining:  number;
   };
-  rows: ProductsReportRow[];
-}
-
-export interface InventoryReportRow {
-  product:       Pick<Product, 'id' | 'name' | 'slug'>;
-  variant:       Pick<ProductVariant, 'id' | 'ref' | 'variant_name'>;
-  warehouse:     { id: number; name: string };
-  current_stock: number;
-  average_cost:  number;
-  total_value:   number;
-  min_alert:     number;
-  is_low_stock:  boolean;
-  is_out:        boolean;
-}
-
-export interface InventoryReportData {
-  summary: {
-    total_value:    number;
-    total_items:    number;
-    low_stock:      number;
-    out_of_stock:   number;
-  };
-  rows: InventoryReportRow[];
+  suppliers: SuppliersReportRow[];
 }
 
 export interface PaymentsReportData {
   summary: {
-    total_confirmed: number;
-    total_pending:   number;
-    total_cancelled: number;
-    count:           number;
+    total_amount: number;
+    count:        number;
   };
   by_mode: Array<{
-    mode_name: string;
-    mode_code: string;
-    total:     number;
-    count:     number;
+    mode:   string;
+    count:  number;
+    total:  number;
   }>;
   payments: Payment[];
 }
 
-export interface TvaReportLine {
-  tva_rate:          number;
-  base_ht_sales:     number;
-  tva_collected:     number;
-  base_ht_purchases: number;
-  tva_deductible:    number;
-  tva_due:           number;
+export interface TaxesReportSummary {
+  tva_collected:   number;
+  tva_deductible:  number;
+  tva_balance:     number;
+}
+
+export interface TaxesReportSide {
+  total_ht:     number;
+  total_tva:    number;
+  total_stamp:  number;
+  total_ttc:    number;
+  count:        number;
+}
+
+export interface TaxesReportData {
+  sales:     TaxesReportSide;
+  purchases: TaxesReportSide;
+  summary:   TaxesReportSummary;
+}
+
+export interface ProductsReportRow {
+  id:                  number;
+  ref:                 string;
+  name:                string;
+  family:              string | null;
+  brand:               string | null;
+  unit:                string | null;
+  purchase_price_ht:   number;
+  current_cost_price:  number;
+  tva_rate:            number | null;
+  stock_quantity:      number;
+  min_stock_alert:     number;
+  stock_value:         number;
+  total_sold:          number;
+  sales_ht:            number;
+  sales_cost:          number;
+  margin_value:        number;
+  margin_pct:          number;
+}
+
+export interface ProductsReportData {
+  summary: {
+    total_products:     number;
+    total_stock_value:  number;
+    total_sold:         number;
+    total_sales_ht:     number;
+  };
+  products: ProductsReportRow[];
+}
+
+export interface InventoryReportRow {
+  id:                  number;
+  ref:                 string;
+  name:                string;
+  family:              string | null;
+  brand:               string | null;
+  stock_quantity:      number;
+  min_stock_alert:     number;
+  purchase_price_ht:   number;
+  current_cost_price:  number;
+  stock_value:         number;
+  status:              string;
+}
+
+export interface InventoryReportData {
+  summary: {
+    total_products:    number;
+    total_quantity:    number;
+    total_value:       number;
+    low_stock_count:   number;
+    out_of_stock_count: number;
+  };
+  products: InventoryReportRow[];
 }
 
 // ─── Velocity Report (سرعة البيع) ──────────────────────────────────────────────
@@ -265,20 +362,231 @@ export interface AgingReportData {
   buckets: AgingBucket[];
 }
 
-export interface TaxesReportData {
-  period: { from: string; to: string };
-  summary: {
-    total_tva_collected:  number;
-    total_tva_deductible: number;
-    total_tva_due:        number;
+// ─── Creative Report (التقرير الشامل) ──────────────────────────────────────
+
+export interface CreativeReportOverview {
+  total_sales_ht:       number;
+  total_sales_ttc:      number;
+  total_sales_cost:     number;
+  total_sales_margin:   number;
+  sales_margin_pct:     number;
+  total_purchases_ht:   number;
+  total_purchases_ttc:  number;
+  total_payments:       number;
+  total_receivable:     number;
+  total_payable:        number;
+  sales_count:          number;
+  purchases_count:      number;
+  unpaid_sales_count:   number;
+}
+
+export interface CreativeTopProduct {
+  product_name:  string;
+  product_ref:   string;
+  total_qty:     number;
+  total_ht:      number;
+  total_cost:    number;
+  margin_value:  number;
+  margin_pct:    number;
+}
+
+export interface CreativeTopCustomer {
+  party_name: string;
+  total_ttc:  number;
+  doc_count:  number;
+}
+
+export interface CreativeReportData {
+  overview:       CreativeReportOverview;
+  top_products:   CreativeTopProduct[];
+  top_customers:  CreativeTopCustomer[];
+  cash_flow: {
+    collected:       number;
+    outstanding:     number;
+    collection_rate: number;
   };
-  by_rate:  TvaReportLine[];
-  by_month: Array<{
-    month:           string;
-    tva_collected:   number;
-    tva_deductible:  number;
-    tva_due:         number;
+}
+
+// ─── Daily Report ─────────────────────────────────────────────────────────────
+
+export interface DailyReportParams {
+  date?: string;   // YYYY-MM-DD
+}
+
+export interface DailyDoc {
+  id:               number;
+  document_number:  string;
+  document_type:    string;
+  document_type_name: string;
+  party_name:       string | null;
+  total_ht:         number;
+  total_tva:        number;
+  total_ttc:        number;
+  payment_status:   string;
+}
+
+export interface DailyReportData {
+  date:      string;
+  documents: DailyDoc[];
+  summary: {
+    total_docs:        number;
+    sales_count:       number;
+    purchases_count:   number;
+    sales_ht:          number;
+    sales_ttc:         number;
+    purchases_ht:      number;
+    purchases_ttc:     number;
+    payments_received: number;
+    payment_count:     number;
+  };
+}
+
+// ─── Product Movement Report ──────────────────────────────────────────────────
+
+export interface ProductMovementParams {
+  product_id?: number;
+  from_date?:  string;
+  to_date?:    string;
+}
+
+export interface ProductMovementItem {
+  product_id:    number;
+  product_name:  string;
+  product_ref:   string;
+  sales_qty:     number;
+  sales_ht:      number;
+  purchase_qty:  number;
+  purchase_ht:   number;
+  net_qty:       number;
+}
+
+export interface ProductMovementData {
+  items:   ProductMovementItem[];
+  summary: {
+    total_products:     number;
+    total_sales_qty:    number;
+    total_sales_ht:     number;
+    total_purchase_qty: number;
+    total_purchase_ht:  number;
+  };
+}
+
+// ─── Profit & Loss Report ─────────────────────────────────────────────────────
+
+export interface ProfitLossParams {
+  year_id?: number;
+}
+
+export interface ProfitLossData {
+  revenue: {
+    sales_ht:         number;
+    sales_tva:        number;
+    sales_ttc:        number;
+    sales_cost:       number;
+    gross_margin:     number;
+    gross_margin_pct: number;
+  };
+  purchases: {
+    purchase_ht:  number;
+    purchase_tva: number;
+  };
+  expenses: {
+    total_expenses: number;
+    by_category:    { category_name: string | null; total: number }[];
+  };
+  result: {
+    gross_margin: number;
+    net_result:   number;
+  };
+}
+
+// ─── Returns Report ───────────────────────────────────────────────────────────
+
+export interface ReturnsReportParams extends ReportBaseParams {}
+
+export interface ReturnsReportData {
+  documents: Array<{
+    id: number; document_number: string; document_type: string;
+    date: string; party_name: string | null;
+    total_ht: number; total_ttc: number; reason: string | null;
   }>;
+  product_recap: Array<{
+    product_id: number; product_name: string; product_ref: string;
+    total_qty: number; total_ht: number; total_ttc: number;
+  }>;
+  summary: {
+    total_returns: number; sale_returns: number; purchase_returns: number;
+    total_ht: number; total_ttc: number;
+    sale_returns_ht: number; purchase_returns_ht: number;
+  };
+}
+
+// ─── Cash Flow Report ─────────────────────────────────────────────────────────
+
+export interface CashFlowParams extends ReportBaseParams {}
+
+export interface CashFlowData {
+  daily: Array<{ date: string; count: number; amount: number }>;
+  monthly: Array<{ month: string; count: number; amount: number }>;
+  by_mode: Array<{ mode: string; count: number; total: number }>;
+  summary: {
+    total_amount: number; count: number;
+    avg_amount: number; days_with_movements: number;
+  };
+}
+
+// ─── Expenses Report ──────────────────────────────────────────────────────────
+
+export interface ExpensesReportParams extends ReportBaseParams {}
+
+export interface ExpensesReportData {
+  expenses: Array<{
+    id: number; expense_number: string; date: string;
+    amount: number; category_name: string | null;
+    description: string | null; status: string;
+  }>;
+  by_category: Array<{ category_name: string; total: number; count: number }>;
+  monthly: Array<{ month: string; total: number; count: number }>;
+  summary: { total_expenses: number; count: number };
+}
+
+// ─── Sales Trend Report ───────────────────────────────────────────────────────
+
+export interface SalesTrendParams extends ReportBaseParams {}
+
+export interface SalesTrendData {
+  daily: Array<{ date: string; count: number; total_ht: number; total_ttc: number }>;
+  weekly: Array<{ week: string; count: number; total_ht: number; total_ttc: number }>;
+  monthly: Array<{ month: string; count: number; total_ht: number; total_ttc: number }>;
+  by_type: Array<{ code: string; count: number; total_ht: number; total_ttc: number }>;
+  summary: {
+    total_docs: number; total_ht: number; total_ttc: number;
+    avg_ht: number; days_with_sales: number;
+  };
+}
+
+// ─── Stock Movements Report ───────────────────────────────────────────────────
+
+export interface StockMovementsParams {
+  product_id?: number;
+  warehouse_id?: number;
+  from_date?: string;
+  to_date?: string;
+}
+
+export interface StockMovementsData {
+  movements: Array<{
+    id: number; movement_date: string | null;
+    product_name: string; product_ref: string;
+    warehouse_name: string | null; type_label: string | null;
+    direction: number; quantity: number;
+    unit_price: number; total_price: number;
+    reason: string | null; lot_number: string | null;
+  }>;
+  summary: {
+    total_in: number; total_out: number;
+    total_adjustment: number; movement_count: number;
+  };
 }
 
 // ─── API functions ────────────────────────────────────────────────────────────
@@ -286,8 +594,8 @@ export interface TaxesReportData {
 export const reportsApi = {
   sales:     (p?: SalesReportParams)     => apiGet<SalesReportData>    ('/reports/sales',     p),
   purchases: (p?: PurchasesReportParams) => apiGet<PurchasesReportData>('/reports/purchases', p),
-  customers: (p?: PartyReportParams)     => apiGet<PartyReportData>    ('/reports/customers', p),
-  suppliers: (p?: PartyReportParams)     => apiGet<PartyReportData>    ('/reports/suppliers', p),
+  customers: (p?: PartyReportParams)     => apiGet<CustomersReportData>('/reports/customers', p),
+  suppliers: (p?: PartyReportParams)     => apiGet<SuppliersReportData>('/reports/suppliers', p),
   products:  (p?: ProductsReportParams)  => apiGet<ProductsReportData> ('/reports/products',  p),
   inventory: (p?: InventoryReportParams) => apiGet<InventoryReportData>('/reports/inventory', p),
   payments:  (p?: PaymentsReportParams)  => apiGet<PaymentsReportData> ('/reports/payments',  p),
@@ -295,6 +603,15 @@ export const reportsApi = {
   velocity:  (p?: ReportBaseParams)      => apiGet<VelocityReportData> ('/reports/velocity',  p),
   margin:    (p?: ReportBaseParams)      => apiGet<MarginReportData>   ('/reports/margin',    p),
   aging:     (p?: ReportBaseParams)      => apiGet<AgingReportData>    ('/reports/aging',     p),
+  creative:  (p?: ReportBaseParams)      => apiGet<CreativeReportData> ('/reports/creative',  p),
+  daily:     (p?: DailyReportParams)    => apiGet<DailyReportData>    ('/reports/daily',     p),
+  productMovement: (p?: ProductMovementParams) => apiGet<ProductMovementData>('/reports/product-movement', p),
+  profitLoss:(p?: ProfitLossParams)     => apiGet<ProfitLossData>     ('/reports/profit-loss', p),
+  returns:    (p?: ReturnsReportParams)     => apiGet<ReturnsReportData>    ('/reports/returns',         p),
+  cashFlow:   (p?: CashFlowParams)          => apiGet<CashFlowData>         ('/reports/cash-flow',       p),
+  expenses:   (p?: ExpensesReportParams)    => apiGet<ExpensesReportData>   ('/reports/expenses',        p),
+  salesTrend: (p?: SalesTrendParams)        => apiGet<SalesTrendData>       ('/reports/sales-trend',     p),
+  stockMovements: (p?: StockMovementsParams) => apiGet<StockMovementsData>  ('/reports/stock-movements',  p),
 } as const;
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
@@ -427,6 +744,102 @@ export function useDebtsReport() {
     queryKey:  [slug, 'reports', 'debts', yearId],
     queryFn:   () => reportsApi.customers({ year_id: yearId ?? undefined, with_balance: true }),
     enabled:   !!slug && !!yearId,
+    staleTime: 3 * 60_000,
+  });
+}
+
+export function useCreativeReport(params?: ReportBaseParams) {
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'creative', yearId, params],
+    queryFn:   () => reportsApi.creative({ year_id: yearId ?? undefined, ...params }),
+    enabled:   !!slug && !!yearId,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useDailyReport(params?: DailyReportParams) {
+  const slug = useActiveSlug();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'daily', params?.date],
+    queryFn:   () => reportsApi.daily(params),
+    enabled:   !!slug,
+    staleTime: 2 * 60_000,
+  });
+}
+
+export function useProductMovementReport(params?: ProductMovementParams) {
+  const slug = useActiveSlug();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'product-movement', params],
+    queryFn:   () => reportsApi.productMovement(params),
+    enabled:   !!slug,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useProfitLossReport(params?: ProfitLossParams) {
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'profit-loss', yearId],
+    queryFn:   () => reportsApi.profitLoss({ year_id: yearId ?? undefined, ...params }),
+    enabled:   !!slug && !!yearId,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useReturnsReport(params?: ReturnsReportParams) {
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'returns', yearId, params],
+    queryFn:   () => reportsApi.returns({ year_id: yearId ?? undefined, ...params }),
+    enabled:   !!slug && !!yearId,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useCashFlowReport(params?: CashFlowParams) {
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'cash-flow', yearId, params],
+    queryFn:   () => reportsApi.cashFlow({ year_id: yearId ?? undefined, ...params }),
+    enabled:   !!slug && !!yearId,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useExpensesReport(params?: ExpensesReportParams) {
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'expenses', yearId, params],
+    queryFn:   () => reportsApi.expenses({ year_id: yearId ?? undefined, ...params }),
+    enabled:   !!slug && !!yearId,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useSalesTrendReport(params?: SalesTrendParams) {
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'sales-trend', yearId, params],
+    queryFn:   () => reportsApi.salesTrend({ year_id: yearId ?? undefined, ...params }),
+    enabled:   !!slug && !!yearId,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useStockMovementsReport(params?: StockMovementsParams) {
+  const slug = useActiveSlug();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'stock-movements', params],
+    queryFn:   () => reportsApi.stockMovements(params),
+    enabled:   !!slug,
     staleTime: 3 * 60_000,
   });
 }

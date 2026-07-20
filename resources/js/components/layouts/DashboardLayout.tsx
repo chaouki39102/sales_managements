@@ -514,13 +514,16 @@ export default function DashboardLayout() {
   const navigate                        = useNavigate();
   const { dark, toggle: toggleTheme }   = useTheme();
   const [drawerOpen, setDrawerOpen]     = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('sidebar_collapsed') === 'true'; } catch { return false; }
+  });
   // ✅ يحفظ آخر اختيار يدوي للمستخدم (طي/توسيع) بمعزل عن الطي التلقائي لصفحات التحرير
-  const manualSidebarPref = useRef(false);
+  const manualSidebarPref = useRef(sidebarCollapsed);
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed(c => {
       const next = !c;
       manualSidebarPref.current = next;
+      try { localStorage.setItem('sidebar_collapsed', String(next)); } catch { /* localStorage full */ }
       return next;
     });
   }, []);

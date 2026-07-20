@@ -77,6 +77,8 @@ export function usePartyBalanceHistory(partyId: number | null, date?: string) {
                         document_amount: Number(t.document_amount ?? 0),
                         payment_amount:  Number(t.payment_amount ?? 0),
                         remaining:       Number(t.remaining ?? 0),
+                        doc_cost_ht:     Number(t.doc_cost_ht ?? 0),
+                        margin_value:    Number(t.margin_value ?? 0),
                     })),
                 };
             }
@@ -118,6 +120,10 @@ export function usePartyProductRecap(partyId: number | null, date?: string) {
                         total_tva:       Number(p.total_tva ?? 0),
                         total_discount:  Number(p.total_discount ?? 0),
                         doc_count:       Number(p.doc_count ?? 0),
+                        effective_cost_price: Number(p.effective_cost_price ?? 0),
+                        cost_ht:         Number(p.cost_ht ?? 0),
+                        margin_value:    Number(p.margin_value ?? 0),
+                        margin_pct:      Number(p.margin_pct ?? 0),
                     })),
                     summary: {
                         product_count:      Number(summary.product_count ?? 0),
@@ -125,10 +131,13 @@ export function usePartyProductRecap(partyId: number | null, date?: string) {
                         total_sale_ttc:     Number(summary.total_sale_ttc ?? 0),
                         total_purchase_ht:  Number(summary.total_purchase_ht ?? 0),
                         total_purchase_ttc: Number(summary.total_purchase_ttc ?? 0),
+                        total_cost_ht:      Number(summary.total_cost_ht ?? 0),
+                        total_margin_value: Number(summary.total_margin_value ?? 0),
+                        total_margin_pct:   Number(summary.total_margin_pct ?? 0),
                     },
                 };
             }
-            return { products: [], summary: { product_count: 0, total_sale_ht: 0, total_sale_ttc: 0, total_purchase_ht: 0, total_purchase_ttc: 0 } };
+            return { products: [], summary: { product_count: 0, total_sale_ht: 0, total_sale_ttc: 0, total_purchase_ht: 0, total_purchase_ttc: 0, total_cost_ht: 0, total_margin_value: 0, total_margin_pct: 0 } };
         },
     });
 }
@@ -159,6 +168,8 @@ export function usePartyDetailedHistory(partyId: number | null, date?: string) {
                         document_amount: Number(t.document_amount ?? 0),
                         payment_amount:  Number(t.payment_amount ?? 0),
                         remaining:       Number(t.remaining ?? 0),
+                        doc_cost_ht:     Number(t.doc_cost_ht ?? 0),
+                        margin_value:    Number(t.margin_value ?? 0),
                         lines: Array.isArray(t.lines) ? (t.lines as Record<string, unknown>[]).map(l => ({
                             product_name:  String(l.product_name ?? ''),
                             product_ref:   String(l.product_ref ?? ''),
@@ -170,6 +181,9 @@ export function usePartyDetailedHistory(partyId: number | null, date?: string) {
                             total_tva:     Number(l.total_tva ?? 0),
                             total_ttc:     Number(l.total_ttc ?? 0),
                             tva_rate:      Number(l.tva_rate ?? 0),
+                            cost_price_ht: Number(l.cost_price_ht ?? 0),
+                            line_cost_ht:  Number(l.line_cost_ht ?? 0),
+                            line_margin:   Number(l.line_margin ?? 0),
                         })) : [],
                     })) as DetailedTransaction[],
                 };

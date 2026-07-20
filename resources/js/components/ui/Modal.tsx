@@ -144,12 +144,13 @@ export default function Modal({
             onMouseDown={onMouseDown}
             style={{
               position: 'absolute', bottom: 0, right: 0,
-              width: 18, height: 18, cursor: 'nwse-resize',
+              width: 28, height: 28, cursor: 'nwse-resize',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--color-text-tertiary)', fontSize: 10, opacity: 0.6,
-              zIndex: 10,
+              color: 'var(--color-text-tertiary)', fontSize: 14,
+              zIndex: 10, userSelect: 'none',
             }}
-            title="سحب للتغيير"
+            className="modal-resize-handle"
+            title="سحب لتغيير الحجم"
           >
             <i className="ti ti-grip-vertical" style={{ transform: 'rotate(-45deg)' }} />
           </div>

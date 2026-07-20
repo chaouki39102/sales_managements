@@ -51,6 +51,26 @@ const SubsidizedProductsPage = lazy(() => import('@/pages/fiscal/SubsidizedProdu
 const G50DeclarationPage    = lazy(() => import('@/pages/fiscal/G50DeclarationPage'));
 const IFUDeclarationPage    = lazy(() => import('@/pages/fiscal/IFUDeclarationPage'));
 const ReportsPage           = lazy(() => import('@/pages/reports/ReportsPage'));
+const SalesReportPage       = lazy(() => import('@/pages/reports/SalesReportPage'));
+const PurchasesReportPage   = lazy(() => import('@/pages/reports/PurchasesReportPage'));
+const CustomersReportPage   = lazy(() => import('@/pages/reports/CustomersReportPage'));
+const SuppliersReportPage   = lazy(() => import('@/pages/reports/SuppliersReportPage'));
+const ProductsReportPage    = lazy(() => import('@/pages/reports/ProductsReportPage'));
+const InventoryReportPage   = lazy(() => import('@/pages/reports/InventoryReportPage'));
+const PaymentsReportPage    = lazy(() => import('@/pages/reports/PaymentsReportPage'));
+const TaxesReportPage       = lazy(() => import('@/pages/reports/TaxesReportPage'));
+const VelocityReportPage    = lazy(() => import('@/pages/reports/VelocityReportPage'));
+const MarginReportPage      = lazy(() => import('@/pages/reports/MarginReportPage'));
+const AgingReportPage       = lazy(() => import('@/pages/reports/AgingReportPage'));
+const CreativeReportPage    = lazy(() => import('@/pages/reports/CreativeReportPage'));
+const DailyReportPage       = lazy(() => import('@/pages/reports/DailyReportPage'));
+const ProductMovementPage   = lazy(() => import('@/pages/reports/ProductMovementPage'));
+const ProfitLossPage        = lazy(() => import('@/pages/reports/ProfitLossPage'));
+const ReturnsReportPage     = lazy(() => import('@/pages/reports/ReturnsReportPage'));
+const CashFlowReportPage    = lazy(() => import('@/pages/reports/CashFlowReportPage'));
+const ExpensesReportPage    = lazy(() => import('@/pages/reports/ExpensesReportPage'));
+const SalesTrendReportPage  = lazy(() => import('@/pages/reports/SalesTrendReportPage'));
+const StockMovementsReportPage = lazy(() => import('@/pages/reports/StockMovementsReportPage'));
 
 // â”€â”€ Notifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const NotificationsPage = lazy(() => import('@/pages/notifications/NotificationsPage'));
@@ -236,7 +256,29 @@ export function AppRoutes() {
           <Route path="fiscal/ifu"       element={<IFUDeclarationPage />} />
 
           {/* Reports */}
-          <Route path="reports" element={<ReportsPage />} />
+          <Route path="reports">
+            <Route index element={<ReportsPage />} />
+            <Route path="sales" element={<SalesReportPage />} />
+            <Route path="purchases" element={<PurchasesReportPage />} />
+            <Route path="customers" element={<CustomersReportPage />} />
+            <Route path="suppliers" element={<SuppliersReportPage />} />
+            <Route path="products" element={<ProductsReportPage />} />
+            <Route path="inventory" element={<InventoryReportPage />} />
+            <Route path="payments" element={<PaymentsReportPage />} />
+            <Route path="taxes" element={<TaxesReportPage />} />
+            <Route path="velocity" element={<VelocityReportPage />} />
+            <Route path="margin" element={<MarginReportPage />} />
+            <Route path="aging" element={<AgingReportPage />} />
+            <Route path="creative" element={<CreativeReportPage />} />
+            <Route path="daily" element={<DailyReportPage />} />
+            <Route path="product-movement" element={<ProductMovementPage />} />
+            <Route path="profit-loss" element={<ProfitLossPage />} />
+            <Route path="returns" element={<ReturnsReportPage />} />
+            <Route path="cash-flow" element={<CashFlowReportPage />} />
+            <Route path="expenses" element={<ExpensesReportPage />} />
+            <Route path="sales-trend" element={<SalesTrendReportPage />} />
+            <Route path="stock-movements" element={<StockMovementsReportPage />} />
+          </Route>
 
           {/* HR */}
           <Route path="employees" element={<EmployeesPage />} />

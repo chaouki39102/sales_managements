@@ -25,6 +25,8 @@ class Permission extends SpatiePermission
     public static array $allowedIncludes = ['roles'];
     public static string $defaultSort = 'name';
     public static ?int $cacheTtl = 3600;
+    public static int $defaultPerPage = 200;
+    public static int $perPageLimit = 500;
     public static array $cacheTags = ['permissions'];
 
     public function scopeByGroup($query, string $group)

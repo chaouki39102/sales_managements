@@ -652,6 +652,11 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 )
                 : (float) $line->unit_price_ht;
 
+            // Store cost price on the document line for margin reporting
+            if ($costPrice > 0) {
+                $line->update(['cost_price_ht' => $costPrice]);
+            }
+
             StockMovement::create([
                 'company_id'                  => $document->company_id,
                 'fiscal_year_id'              => $document->fiscal_year_id,

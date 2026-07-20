@@ -760,6 +760,8 @@ export interface PartyTransaction {
   document_amount: number;
   payment_amount:  number;
   remaining:       number;
+  doc_cost_ht:     number;
+  margin_value:    number;
 }
 
 export interface PartyBalanceHistory {
@@ -778,6 +780,9 @@ export interface DetailedLine {
   total_tva:     number;
   total_ttc:     number;
   tva_rate:      number;
+  cost_price_ht: number;
+  line_cost_ht:  number;
+  line_margin:   number;
 }
 
 export interface DetailedTransaction extends PartyTransaction {
@@ -790,24 +795,28 @@ export interface DetailedBalanceHistory {
 }
 
 export interface ProductRecapItem {
-  product_id:      number;
-  product_name:    string;
-  product_ref:     string;
-  unit_name:       string;
-  brand_name:      string;
-  family_name:     string;
-  sale_qty:        number;
-  sale_ht:         number;
-  sale_ttc:        number;
-  purchase_qty:    number;
-  purchase_ht:     number;
-  purchase_ttc:    number;
-  total_qty:       number;
-  total_ht:        number;
-  total_ttc:       number;
-  total_tva:       number;
-  total_discount:  number;
-  doc_count:       number;
+  product_id:          number;
+  product_name:        string;
+  product_ref:         string;
+  unit_name:           string;
+  brand_name:          string;
+  family_name:         string;
+  sale_qty:            number;
+  sale_ht:             number;
+  sale_ttc:            number;
+  purchase_qty:        number;
+  purchase_ht:         number;
+  purchase_ttc:        number;
+  total_qty:           number;
+  total_ht:            number;
+  total_ttc:           number;
+  total_tva:           number;
+  total_discount:      number;
+  doc_count:           number;
+  effective_cost_price: number;
+  cost_ht:             number;
+  margin_value:        number;
+  margin_pct:          number;
 }
 
 export interface ProductRecapSummary {
@@ -816,6 +825,9 @@ export interface ProductRecapSummary {
   total_sale_ttc:     number;
   total_purchase_ht:  number;
   total_purchase_ttc: number;
+  total_cost_ht:      number;
+  total_margin_value: number;
+  total_margin_pct:   number;
 }
 
 export interface ProductRecapResponse {

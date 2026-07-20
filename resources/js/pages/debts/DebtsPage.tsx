@@ -21,12 +21,14 @@ function getDatePresets(fyEnd: string) {
     const now = new Date();
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
     const yearEnd = now.getFullYear() + '-12-31';
-    return [
-        { label: 'اليوم',           value: today },
-        { label: 'نهاية الشهر',     value: monthEnd },
-        { label: 'نهاية السنة',     value: yearEnd > fyEnd ? fyEnd : yearEnd },
+    const all = [
+        { label: 'اليوم',               value: today },
+        { label: 'نهاية الشهر',         value: monthEnd },
+        { label: 'نهاية السنة',         value: yearEnd > fyEnd ? fyEnd : yearEnd },
         { label: 'نهاية الفترة المالية', value: fyEnd },
     ];
+    const seen = new Set<string>();
+    return all.filter(p => { if (seen.has(p.value)) return false; seen.add(p.value); return true; });
 }
 
 export default function DebtsPage() {
@@ -240,12 +242,6 @@ export default function DebtsPage() {
                         {p.label}
                     </button>
                 ))}
-                {date && (
-                    <span style={{ marginRight: 'auto', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
-                        <i className="ti ti-clock" style={{ marginLeft: 4 }} />
-                        {fmtDate(date)}
-                    </span>
-                )}
             </div>
 
             <div className="kpis" style={{ marginBottom: 20 }}>
@@ -414,16 +410,12 @@ function TransactionHistoryModal({
     const { data: detailedData, isLoading: detailedLoading } = usePartyDetailedHistory(partyId, date);
     const [txFilter, setTxFilter] = useState<TxTypeFilter>('all');
     const [modalTab, setModalTab] = useState<ModalTab>('transactions');
-    const [fromDate, setFromDate] = useState('');
     const [expandedDocs, setExpandedDocs] = useState<Set<number>>(new Set());
 
     const openingBalance = data?.opening_balance ?? 0;
     const allTransactions = data?.transactions ?? [];
 
-    const filteredTransactions = useMemo(() => {
-        if (!fromDate) return allTransactions;
-        return allTransactions.filter(t => t.date >= fromDate);
-    }, [allTransactions, fromDate]);
+    const filteredTransactions = allTransactions;
 
     const toggleDoc = useCallback((docId: number) => {
         setExpandedDocs(prev => {
@@ -448,17 +440,21 @@ function TransactionHistoryModal({
         return filteredTransactions.filter(t => t.type === txFilter);
     }, [filteredTransactions, txFilter]);
 
-    // Running balance = opening + Σdocs - Σpayments
+    // Running balance = opening + Σdocs - Σpayments, running margin = Σmargin
     const txWithBalance = useMemo(() => {
         let running = openingBalance;
+        let runningMargin = 0;
         return transactions.map(tx => {
             running = running + tx.document_amount - tx.payment_amount;
-            return { ...tx, running_balance: Math.round(running * 100) / 100 };
+            runningMargin += tx.margin_value;
+            return { ...tx, running_balance: Math.round(running * 100) / 100, running_margin: Math.round(runningMargin * 100) / 100 };
         });
     }, [transactions, openingBalance]);
 
     const totalDocs   = useMemo(() => filteredTransactions.reduce((s, t) => s + t.document_amount, 0), [filteredTransactions]);
     const totalPays   = useMemo(() => filteredTransactions.reduce((s, t) => s + t.payment_amount, 0), [filteredTransactions]);
+    const totalMargin = useMemo(() => filteredTransactions.reduce((s, t) => s + t.margin_value, 0), [filteredTransactions]);
+    const totalCost   = useMemo(() => filteredTransactions.reduce((s, t) => s + t.doc_cost_ht, 0), [filteredTransactions]);
     const finalBalance = openingBalance + totalDocs - totalPays;
 
     // Excel export columns
@@ -468,6 +464,8 @@ function TransactionHistoryModal({
         { key: 'reference',      header: 'المرجع',          width: 140 },
         { key: 'label',          header: 'البيان',          width: 140 },
         { key: 'doc_amount',     header: 'المستندات',       width: 120, align: 'center' },
+        { key: 'doc_cost',       header: 'التكلفة',         width: 120, align: 'center' },
+        { key: 'margin',         header: 'الهامش',          width: 120, align: 'center' },
         { key: 'pay_amount',     header: 'الدفعات',         width: 120, align: 'center' },
         { key: 'running_balance',header: 'الرصيد',          width: 140, align: 'center' },
     ], []);
@@ -479,14 +477,16 @@ function TransactionHistoryModal({
             reference:        tx.reference || '—',
             label:            tx.type === 'document' ? tx.label : tx.label,
             doc_amount:       tx.document_amount || '',
+            doc_cost:         tx.doc_cost_ht || '',
+            margin:           tx.margin_value || '',
             pay_amount:       tx.payment_amount || '',
             running_balance:  tx.running_balance,
         }));
 
         const allRows = [
-            { '#': '', date: '', reference: '', label: `الرصيد الافتتاحي: ${fmtNumber(openingBalance)} دج`, doc_amount: '', pay_amount: '', running_balance: openingBalance },
+            { '#': '', date: '', reference: '', label: `الرصيد الافتتاحي: ${fmtNumber(openingBalance)} دج`, doc_amount: '', doc_cost: '', margin: '', pay_amount: '', running_balance: openingBalance },
             ...rows,
-            { '#': '', date: '', reference: '', label: `الإجمالي: المستندات ${fmtNumber(totalDocs)} | الدفعات ${fmtNumber(totalPays)}`, doc_amount: totalDocs, pay_amount: totalPays, running_balance: finalBalance },
+            { '#': '', date: '', reference: '', label: `الإجمالي: المستندات ${fmtNumber(totalDocs)} | الدفعات ${fmtNumber(totalPays)} | الهامش ${fmtNumber(totalMargin)}`, doc_amount: totalDocs, doc_cost: totalCost, margin: totalMargin, pay_amount: totalPays, running_balance: finalBalance },
         ];
 
         const { exportToExcelAdvanced } = await import('@/components/ui/DataTable/excelExportAdvanced');
@@ -564,9 +564,7 @@ function TransactionHistoryModal({
 
     // Detailed export
     const detailedAll = detailedData?.transactions ?? [];
-    const filteredDetailed = fromDate
-        ? detailedAll.filter(t => t.date >= fromDate)
-        : detailedAll;
+    const filteredDetailed = detailedAll;
 
     const detailedExcelColumns: Column<Record<string, unknown>>[] = useMemo(() => [
         { key: '#',              header: '#',               width: 50 },
@@ -574,6 +572,8 @@ function TransactionHistoryModal({
         { key: 'reference',      header: 'المرجع',          width: 140 },
         { key: 'label',          header: 'البيان',          width: 120 },
         { key: 'doc_amount',     header: 'المستندات',       width: 120, align: 'center' },
+        { key: 'doc_cost',       header: 'التكلفة',         width: 120, align: 'center' },
+        { key: 'margin',         header: 'الهامش',          width: 120, align: 'center' },
         { key: 'pay_amount',     header: 'الدفعات',         width: 120, align: 'center' },
         { key: 'remaining',      header: 'المتبقي',         width: 120, align: 'center' },
         { key: 'running_balance',header: 'الرصيد',          width: 120, align: 'center' },
@@ -585,6 +585,8 @@ function TransactionHistoryModal({
         { key: 'line_discount',  header: 'الخصم',           width: 80,  align: 'center' },
         { key: 'line_tva_rate',  header: 'ض.ق.م %',        width: 80,  align: 'center' },
         { key: 'line_ttc',       header: 'المبلغ TTC',      width: 120, align: 'center' },
+        { key: 'line_cost',      header: 'التكلفة',         width: 120, align: 'center' },
+        { key: 'line_margin',    header: 'الهامش',          width: 120, align: 'center' },
     ], []);
 
     const handleExportDetailedExcel = useCallback(async () => {
@@ -595,9 +597,9 @@ function TransactionHistoryModal({
         // Opening row
         rows.push({
             '#': '', date: '', reference: '', label: `الرصيد الافتتاحي: ${fmtNumber(detOpening)} دج`,
-            doc_amount: '', pay_amount: '', remaining: '', running_balance: detOpening,
+            doc_amount: '', doc_cost: '', margin: '', pay_amount: '', remaining: '', running_balance: detOpening,
             product_name: '', product_ref: '', unit_name: '', quantity: '',
-            line_ht: '', line_discount: '', line_tva_rate: '', line_ttc: '',
+            line_ht: '', line_discount: '', line_tva_rate: '', line_ttc: '', line_cost: '', line_margin: '',
         });
 
         for (const tx of filteredDetailed) {
@@ -612,6 +614,8 @@ function TransactionHistoryModal({
                         reference:        li === 0 ? (tx.reference || '—') : '',
                         label:            li === 0 ? tx.label : '',
                         doc_amount:       li === 0 ? (tx.document_amount || '') : '',
+                        doc_cost:         li === 0 ? (tx.doc_cost_ht || '') : '',
+                        margin:           li === 0 ? (tx.margin_value || '') : '',
                         pay_amount:       '',
                         remaining:        li === 0 ? (tx.remaining || '') : '',
                         running_balance:  li === 0 ? runBal : '',
@@ -623,6 +627,8 @@ function TransactionHistoryModal({
                         line_discount:    line.discount_pct > 0 ? `${line.discount_pct}%` : '',
                         line_tva_rate:    `${line.tva_rate}%`,
                         line_ttc:         line.total_ttc,
+                        line_cost:        line.line_cost_ht || '',
+                        line_margin:      line.line_margin || '',
                     });
                 });
             } else {
@@ -632,6 +638,8 @@ function TransactionHistoryModal({
                     reference:        tx.reference || '—',
                     label:            tx.label,
                     doc_amount:       tx.document_amount || '',
+                    doc_cost:         tx.doc_cost_ht || '',
+                    margin:           tx.margin_value || '',
                     pay_amount:       tx.payment_amount || '',
                     remaining:        tx.remaining || '',
                     running_balance:  runBal,
@@ -643,6 +651,8 @@ function TransactionHistoryModal({
                     line_discount:    '',
                     line_tva_rate:    '',
                     line_ttc:         '',
+                    line_cost:        '',
+                    line_margin:      '',
                 });
             }
         }
@@ -652,13 +662,15 @@ function TransactionHistoryModal({
         const detPays = filteredDetailed.filter(t => t.type === 'payment');
         const detTotalDocs = detDocs.reduce((s, t) => s + t.document_amount, 0);
         const detTotalPays = detPays.reduce((s, t) => s + t.payment_amount, 0);
+        const detTotalCost = filteredDetailed.reduce((s, t) => s + t.doc_cost_ht, 0);
+        const detTotalMargin = filteredDetailed.reduce((s, t) => s + t.margin_value, 0);
         rows.push({
             '#': '', date: '', reference: '',
-            label: `الإجمالي: المستندات ${fmtNumber(detTotalDocs)} | الدفعات ${fmtNumber(detTotalPays)}`,
-            doc_amount: detTotalDocs, pay_amount: detTotalPays, remaining: '',
+            label: `الإجمالي: المستندات ${fmtNumber(detTotalDocs)} | الدفعات ${fmtNumber(detTotalPays)} | الهامش ${fmtNumber(detTotalMargin)}`,
+            doc_amount: detTotalDocs, doc_cost: detTotalCost, margin: detTotalMargin, pay_amount: detTotalPays, remaining: '',
             running_balance: detOpening + detTotalDocs - detTotalPays,
             product_name: '', product_ref: '', unit_name: '', quantity: '',
-            line_ht: '', line_discount: '', line_tva_rate: '', line_ttc: '',
+            line_ht: '', line_discount: '', line_tva_rate: '', line_ttc: '', line_cost: '', line_margin: '',
         });
 
         const { exportToExcelAdvanced } = await import('@/components/ui/DataTable/excelExportAdvanced');
@@ -780,60 +792,13 @@ function TransactionHistoryModal({
                     {/* ── Transactions tab ─────────────────────────── */}
                     {modalTab === 'transactions' && (
                         <>
-                            {/* Date range filter */}
-                            <div style={{
-                                display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center',
-                                padding: '8px 12px', background: 'var(--color-background-secondary)',
-                                borderRadius: 8, border: '1px solid var(--color-border-tertiary)',
-                            }} className="no-print">
-                                <i className="ti ti-filter" style={{ fontSize: 14, color: 'var(--color-text-secondary)' }} />
-                                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>من:</span>
-                                <div style={{ width: 150 }}>
-                                    <DatePicker
-                                        value={fromDate}
-                                        onChange={setFromDate}
-                                        max={date}
-                                        clearable
-                                        placeholder="كل التواريخ"
-                                    />
-                                </div>
-                                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>إلى:</span>
-                                <div style={{ width: 150 }}>
-                                    <input
-                                        type="text"
-                                        value={fmtDate(date)}
-                                        readOnly
-                                        style={{
-                                            padding: '6px 10px', borderRadius: 6, border: '1px solid var(--color-border-tertiary)',
-                                            background: 'var(--color-background-primary)', fontSize: 12,
-                                            color: 'var(--color-text-secondary)', width: '100%',
-                                        }}
-                                    />
-                                </div>
-                                {fromDate && (
-                                    <button
-                                        onClick={() => setFromDate('')}
-                                        style={{
-                                            padding: '4px 10px', borderRadius: 6, border: 'none',
-                                            background: 'var(--red)', color: '#fff',
-                                            fontSize: 11, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
-                                            fontWeight: 600,
-                                        }}
-                                    >
-                                        مسح الفلتر
-                                    </button>
-                                )}
-                                <span style={{ marginRight: 'auto', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
-                                    {filteredTransactions.length} من {allTransactions.length} معاملة
-                                </span>
-                            </div>
-
                             {/* Summary cards */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
                                 <SummaryCard label="الرصيد الافتتاحي" value={openingBalance} color="var(--color-text-primary)" icon="ti-building-bank" />
                                 <SummaryCard label="المستندات" value={totalDocs} color="var(--em)" icon="ti-file-invoice" />
                                 <SummaryCard label="الدفعات" value={totalPays} color="var(--red)" icon="ti-wallet" />
-                                <SummaryCard label="الرصيد النهائي" value={finalBalance} color={finalBalance >= 0 ? 'var(--red)' : 'var(--green)'} icon="ti-calculator" bold />
+                                <SummaryCard label="التكلفة" value={totalCost} color="var(--red)" icon="ti-arrow-down-circle" />
+                                <SummaryCard label="الهامش" value={totalMargin} color={totalMargin >= 0 ? 'var(--em)' : 'var(--red)'} icon="ti-chart-bar" />
                             </div>
 
                             {/* Filter chips */}
@@ -871,6 +836,8 @@ function TransactionHistoryModal({
                                             <th style={thStyle}>التاريخ والوقت</th>
                                             <th style={thStyle}>البيان</th>
                                             <th style={{ ...thStyle, textAlign: 'center' }}>المستندات</th>
+                                            <th style={{ ...thStyle, textAlign: 'center' }}>التكلفة</th>
+                                            <th style={{ ...thStyle, textAlign: 'center' }}>الهامش</th>
                                             <th style={{ ...thStyle, textAlign: 'center' }}>الدفعات</th>
                                             <th style={{ ...thStyle, textAlign: 'center' }}>الرصيد</th>
                                         </tr>
@@ -884,6 +851,8 @@ function TransactionHistoryModal({
                                                 <i className="ti ti-building-bank" style={{ marginLeft: 4 }} />
                                                 رصيد افتتاحي
                                             </td>
+                                            <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
+                                            <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
                                             <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
                                             <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
                                             <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>
@@ -967,6 +936,25 @@ function TransactionHistoryModal({
                                                             </span>
                                                         ) : '—'}
                                                     </td>
+                                                    <td style={{ ...tdStyle, textAlign: 'center', fontSize: 12 }}>
+                                                        {tx.doc_cost_ht > 0 ? (
+                                                            <span style={{ color: 'var(--color-text-secondary)' }}>
+                                                                {fmtNumber(tx.doc_cost_ht)} دج
+                                                            </span>
+                                                        ) : '—'}
+                                                    </td>
+                                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                                        {tx.margin_value !== 0 ? (
+                                                            <span style={{
+                                                                display: 'inline-block', padding: '2px 8px', borderRadius: 10,
+                                                                fontSize: 11, fontWeight: 600,
+                                                                background: tx.margin_value >= 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                                                                color: tx.margin_value >= 0 ? 'var(--em)' : 'var(--red)',
+                                                            }}>
+                                                                {fmtNumber(tx.margin_value)} دج
+                                                            </span>
+                                                        ) : '—'}
+                                                    </td>
                                                     <td style={{ ...tdStyle, textAlign: 'center', fontWeight: tx.payment_amount > 0 ? 600 : undefined }}>
                                                         {tx.payment_amount > 0 ? (
                                                             <span style={{ color: 'var(--red)' }}>
@@ -1013,6 +1001,19 @@ function TransactionHistoryModal({
                                             <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--em)', fontWeight: 700 }}>
                                                 {fmtNumber(totalDocs)} دج
                                             </td>
+                                            <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>
+                                                {fmtNumber(totalCost)} دج
+                                            </td>
+                                            <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                                <span style={{
+                                                    display: 'inline-block', padding: '2px 8px', borderRadius: 10,
+                                                    fontSize: 11, fontWeight: 600,
+                                                    background: totalMargin >= 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                                                    color: totalMargin >= 0 ? 'var(--em)' : 'var(--red)',
+                                                }}>
+                                                    {fmtNumber(totalMargin)} دج
+                                                </span>
+                                            </td>
                                             <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--red)', fontWeight: 700 }}>
                                                 {fmtNumber(totalPays)} دج
                                             </td>
@@ -1044,54 +1045,39 @@ function TransactionHistoryModal({
                                 </div>
                             ) : (() => {
                                 const detailedAll = detailedData?.transactions ?? [];
-                                const filteredDetailed = fromDate
-                                    ? detailedAll.filter(t => t.date >= fromDate)
-                                    : detailedAll;
                                 const detOpening = detailedData?.opening_balance ?? 0;
                                 const detDocs = filteredDetailed.filter(t => t.type === 'document');
                                 const detPays = filteredDetailed.filter(t => t.type === 'payment');
                                 const detTotalDocs = detDocs.reduce((s, t) => s + t.document_amount, 0);
                                 const detTotalPays = detPays.reduce((s, t) => s + t.payment_amount, 0);
+                                const detTotalCost = filteredDetailed.reduce((s, t) => s + t.doc_cost_ht, 0);
+                                const detTotalMargin = filteredDetailed.reduce((s, t) => s + t.margin_value, 0);
                                 let detRunning = detOpening;
+                                let detRunningMargin = 0;
 
                                 return (
                                     <>
                                         {/* Summary cards */}
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
                                             <SummaryCard label="الرصيد الافتتاحي" value={detOpening} color="var(--color-text-primary)" icon="ti-building-bank" />
                                             <SummaryCard label="المستندات" value={detTotalDocs} color="var(--em)" icon="ti-file-invoice" />
                                             <SummaryCard label="الدفعات" value={detTotalPays} color="var(--red)" icon="ti-wallet" />
-                                            <SummaryCard label="الرصيد النهائي" value={detOpening + detTotalDocs - detTotalPays} color={detOpening + detTotalDocs - detTotalPays >= 0 ? 'var(--red)' : 'var(--green)'} icon="ti-calculator" bold />
+                                            <SummaryCard label="التكلفة" value={detTotalCost} color="var(--red)" icon="ti-arrow-down-circle" />
+                                            <SummaryCard label="الهامش" value={detTotalMargin} color={detTotalMargin >= 0 ? 'var(--em)' : 'var(--red)'} icon="ti-chart-bar" />
                                         </div>
 
-                                        {/* Date range filter */}
-                                        <div style={{
-                                            display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center',
-                                            padding: '8px 12px', background: 'var(--color-background-secondary)',
-                                            borderRadius: 8, border: '1px solid var(--color-border-tertiary)',
-                                        }} className="no-print">
-                                            <i className="ti ti-filter" style={{ fontSize: 14, color: 'var(--color-text-secondary)' }} />
-                                            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>من:</span>
-                                            <div style={{ width: 150 }}>
-                                                <DatePicker value={fromDate} onChange={setFromDate} max={date} clearable placeholder="كل التواريخ" />
-                                            </div>
-                                            {fromDate && (
-                                                <button onClick={() => setFromDate('')} style={{
-                                                    padding: '4px 10px', borderRadius: 6, border: 'none',
-                                                    background: 'var(--red)', color: '#fff',
-                                                    fontSize: 11, cursor: 'pointer', fontWeight: 600,
-                                                }}>مسح الفلتر</button>
-                                            )}
+                                        {/* Toolbar */}
+                                        <div className="no-print" style={{ display: 'flex', gap: 6, marginBottom: 12, alignItems: 'center' }}>
                                             <button onClick={expandAllDocs} style={{
                                                 padding: '4px 10px', borderRadius: 6, border: '1px solid var(--color-border-tertiary)',
                                                 background: 'var(--color-background-primary)', color: 'var(--color-text-secondary)',
                                                 fontSize: 11, cursor: 'pointer', fontWeight: 600,
-                                                fontFamily: 'Tajawal, sans-serif', marginLeft: 'auto',
+                                                fontFamily: 'Tajawal, sans-serif',
                                             }}>
                                                 <i className={`ti ti-${expandedDocs.size === detDocs.length ? 'layout-grid' : 'layout-list'}`} style={{ marginLeft: 4 }} />
                                                 {expandedDocs.size === detDocs.length ? 'طي الكل' : 'توسيع الكل'}
                                             </button>
-                                            <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+                                            <span style={{ marginRight: 'auto', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
                                                 {filteredDetailed.length} معاملة
                                             </span>
                                         </div>
@@ -1106,6 +1092,8 @@ function TransactionHistoryModal({
                                                         <th style={thStyle}>التاريخ والوقت</th>
                                                         <th style={thStyle}>البيان</th>
                                                         <th style={{ ...thStyle, textAlign: 'center' }}>المستندات</th>
+                                                        <th style={{ ...thStyle, textAlign: 'center' }}>التكلفة</th>
+                                                        <th style={{ ...thStyle, textAlign: 'center' }}>الهامش</th>
                                                         <th style={{ ...thStyle, textAlign: 'center' }}>الدفعات</th>
                                                         <th style={{ ...thStyle, textAlign: 'center' }}>الرصيد</th>
                                                     </tr>
@@ -1122,6 +1110,8 @@ function TransactionHistoryModal({
                                                         </td>
                                                         <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
                                                         <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
                                                         <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>
                                                             {fmtNumber(detOpening)} دج
                                                         </td>
@@ -1129,7 +1119,9 @@ function TransactionHistoryModal({
 
                                                     {filteredDetailed.map((tx, i) => {
                                                         detRunning = detRunning + tx.document_amount - tx.payment_amount;
+                                                        detRunningMargin += tx.margin_value;
                                                         const running = Math.round(detRunning * 100) / 100;
+                                                        const runMargin = Math.round(detRunningMargin * 100) / 100;
                                                         const isDoc = tx.type === 'document';
                                                         const hasLines = isDoc && tx.lines.length > 0;
                                                         const isExpanded = expandedDocs.has(tx.id);
@@ -1225,6 +1217,25 @@ function TransactionHistoryModal({
                                                                             </span>
                                                                         ) : '—'}
                                                                     </td>
+                                                                    <td style={{ ...tdStyle, textAlign: 'center', fontSize: 12 }}>
+                                                                        {tx.doc_cost_ht > 0 ? (
+                                                                            <span style={{ color: 'var(--color-text-secondary)' }}>
+                                                                                {fmtNumber(tx.doc_cost_ht)} دج
+                                                                            </span>
+                                                                        ) : '—'}
+                                                                    </td>
+                                                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                                                        {tx.margin_value !== 0 ? (
+                                                                            <span style={{
+                                                                                display: 'inline-block', padding: '2px 8px', borderRadius: 10,
+                                                                                fontSize: 11, fontWeight: 600,
+                                                                                background: tx.margin_value >= 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                                                                                color: tx.margin_value >= 0 ? 'var(--em)' : 'var(--red)',
+                                                                            }}>
+                                                                                {fmtNumber(tx.margin_value)} دج
+                                                                            </span>
+                                                                        ) : '—'}
+                                                                    </td>
                                                                     <td style={{ ...tdStyle, textAlign: 'center', fontWeight: tx.payment_amount > 0 ? 600 : undefined }}>
                                                                         {tx.payment_amount > 0 ? (
                                                                             <span style={{ color: 'var(--red)' }}>
@@ -1257,37 +1268,52 @@ function TransactionHistoryModal({
                                                                         <td style={{ ...tdStyle, fontSize: 10, color: 'var(--color-text-tertiary)' }}>
                                                                             {tx.seq}.{li + 1}
                                                                         </td>
-                                                                        <td colSpan={2} style={{ ...tdStyle, padding: '4px 12px 4px 36px' }}>
-                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                                                <i className="ti ti-package" style={{ fontSize: 11, color: 'var(--text-info, #3b82f6)', opacity: 0.6 }} />
-                                                                                <span style={{ fontWeight: 600, fontSize: 12 }}>{line.product_name}</span>
-                                                                                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'monospace' }}>
-                                                                                    ({line.product_ref})
+                                                                        <td colSpan={7} style={{ ...tdStyle, padding: '4px 12px 4px 36px' }}>
+                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 180 }}>
+                                                                                    <i className="ti ti-package" style={{ fontSize: 11, color: 'var(--text-info, #3b82f6)', opacity: 0.6 }} />
+                                                                                    <span style={{ fontWeight: 600, fontSize: 12 }}>{line.product_name}</span>
+                                                                                    <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'monospace' }}>
+                                                                                        ({line.product_ref})
+                                                                                    </span>
+                                                                                    {line.unit_name && (
+                                                                                        <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', padding: '1px 5px', borderRadius: 4, background: 'var(--color-background-secondary)' }}>
+                                                                                            {line.unit_name}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                                {line.quantity > 0 && (
+                                                                                    <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
+                                                                                        {fmtNumber(line.quantity)} × {fmtNumber(line.unit_price_ht)} دج
+                                                                                    </span>
+                                                                                )}
+                                                                                {line.discount_pct > 0 && (
+                                                                                    <span style={{ fontSize: 10, color: 'var(--red)' }}>
+                                                                                        −{line.discount_pct}%
+                                                                                    </span>
+                                                                                )}
+                                                                                <span style={{ fontSize: 11, fontWeight: 600 }}>
+                                                                                    {fmtNumber(line.total_ttc)} دج
+                                                                                    <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginInlineStart: 4 }}>
+                                                                                        (HT: {fmtNumber(line.total_ht)} + TVA {line.tva_rate}%)
+                                                                                    </span>
                                                                                 </span>
-                                                                                {line.unit_name && (
-                                                                                    <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', padding: '1px 5px', borderRadius: 4, background: 'var(--color-background-secondary)' }}>
-                                                                                        {line.unit_name}
+                                                                                {line.cost_price_ht > 0 && (
+                                                                                    <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>
+                                                                                        تكلفة: {fmtNumber(line.line_cost_ht)} دج
+                                                                                    </span>
+                                                                                )}
+                                                                                {line.line_margin !== 0 && (
+                                                                                    <span style={{
+                                                                                        display: 'inline-block', padding: '1px 6px', borderRadius: 8,
+                                                                                        fontSize: 10, fontWeight: 600,
+                                                                                        background: line.line_margin >= 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                                                                                        color: line.line_margin >= 0 ? 'var(--em)' : 'var(--red)',
+                                                                                    }}>
+                                                                                        هامش: {fmtNumber(line.line_margin)} دج
                                                                                     </span>
                                                                                 )}
                                                                             </div>
-                                                                        </td>
-                                                                        <td style={{ ...tdStyle, textAlign: 'center', fontSize: 12 }}>
-                                                                            {line.quantity > 0 ? (
-                                                                                <span>{fmtNumber(line.quantity)}</span>
-                                                                            ) : '—'}
-                                                                        </td>
-                                                                        <td style={{ ...tdStyle, textAlign: 'center', fontSize: 12 }}>
-                                                                            {line.discount_pct > 0 && (
-                                                                                <span style={{ fontSize: 10, color: 'var(--red)' }}>
-                                                                                    −{line.discount_pct}%
-                                                                                </span>
-                                                                            )}
-                                                                        </td>
-                                                                        <td style={{ ...tdStyle, textAlign: 'center', fontSize: 12, fontWeight: 600 }}>
-                                                                            {fmtNumber(line.total_ttc)} دج
-                                                                            <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', display: 'block' }}>
-                                                                                HT: {fmtNumber(line.total_ht)} + TVA {line.tva_rate}%
-                                                                            </span>
                                                                         </td>
                                                                     </tr>
                                                                 ))}
@@ -1309,6 +1335,19 @@ function TransactionHistoryModal({
                                                         </td>
                                                         <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--em)', fontWeight: 700 }}>
                                                             {fmtNumber(detTotalDocs)} دج
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>
+                                                            {fmtNumber(detTotalCost)} دج
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                                            <span style={{
+                                                                display: 'inline-block', padding: '2px 8px', borderRadius: 10,
+                                                                fontSize: 11, fontWeight: 600,
+                                                                background: detTotalMargin >= 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                                                                color: detTotalMargin >= 0 ? 'var(--em)' : 'var(--red)',
+                                                            }}>
+                                                                {fmtNumber(detTotalMargin)} دج
+                                                            </span>
                                                         </td>
                                                         <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--red)', fontWeight: 700 }}>
                                                             {fmtNumber(detTotalPays)} دج
@@ -1346,10 +1385,11 @@ function TransactionHistoryModal({
                                 <>
                                     {/* Summary cards for products */}
                                     {recapSummary && (
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
                                             <SummaryCard label="عدد المنتجات" value={recapSummary.product_count} color="var(--text-info, #3b82f6)" icon="ti-package" />
                                             <SummaryCard label="مبيعات HT" value={recapSummary.total_sale_ht} color="var(--em)" icon="ti-arrow-up-circle" />
-                                            <SummaryCard label="مشتريات HT" value={recapSummary.total_purchase_ht} color="var(--red)" icon="ti-arrow-down-circle" />
+                                            <SummaryCard label="تكلفة الشراء" value={recapSummary.total_cost_ht} color="var(--red)" icon="ti-arrow-down-circle" />
+                                            <SummaryCard label="الهامش" value={recapSummary.total_margin_value} color={recapSummary.total_margin_value >= 0 ? 'var(--em)' : 'var(--red)'} icon="ti-chart-bar" subtitle={`${recapSummary.total_margin_pct}%`} />
                                             <SummaryCard label="إجمالي TTC" value={recapSummary.total_sale_ttc + recapSummary.total_purchase_ttc} color="var(--text-info, #3b82f6)" icon="ti-calculator" bold />
                                         </div>
                                     )}
@@ -1369,7 +1409,10 @@ function TransactionHistoryModal({
                                                     <th style={{ ...thStyle, textAlign: 'center' }}>مبيعات HT</th>
                                                     <th style={{ ...thStyle, textAlign: 'center' }}>كمية الشراء</th>
                                                     <th style={{ ...thStyle, textAlign: 'center' }}>مشتريات HT</th>
+                                                    <th style={{ ...thStyle, textAlign: 'center' }}>التكلفة</th>
                                                     <th style={{ ...thStyle, textAlign: 'center' }}>الإجمالي TTC</th>
+                                                    <th style={{ ...thStyle, textAlign: 'center' }}>الهامش</th>
+                                                    <th style={{ ...thStyle, textAlign: 'center' }}>نسبة الهامش</th>
                                                     <th style={{ ...thStyle, textAlign: 'center' }}>المستندات</th>
                                                 </tr>
                                             </thead>
@@ -1414,8 +1457,28 @@ function TransactionHistoryModal({
                                                                 <span style={{ color: 'var(--red)' }}>{fmtNumber(p.purchase_ht)} دج</span>
                                                             ) : '—'}
                                                         </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+                                                            {p.cost_ht > 0 ? (
+                                                                <span>{fmtNumber(p.cost_ht)} دج</span>
+                                                            ) : '—'}
+                                                        </td>
                                                         <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>
                                                             {fmtNumber(p.total_ttc)} دج
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 600 }}>
+                                                            <span style={{ color: p.margin_value >= 0 ? 'var(--em)' : 'var(--red)' }}>
+                                                                {fmtNumber(p.margin_value)} دج
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                                            <span style={{
+                                                                display: 'inline-block', padding: '2px 8px', borderRadius: 10,
+                                                                fontSize: 11, fontWeight: 600,
+                                                                background: p.margin_value >= 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                                                                color: p.margin_value >= 0 ? 'var(--em)' : 'var(--red)',
+                                                            }}>
+                                                                {p.margin_pct}%
+                                                            </span>
                                                         </td>
                                                         <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-secondary)' }}>
                                                             {p.doc_count}
@@ -1448,8 +1511,26 @@ function TransactionHistoryModal({
                                                         <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--red)', fontWeight: 700 }}>
                                                             {fmtNumber(recapSummary.total_purchase_ht)} دج
                                                         </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>
+                                                            {fmtNumber(recapSummary.total_cost_ht)} دج
+                                                        </td>
                                                         <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 800, fontSize: 14, color: 'var(--text-info, #3b82f6)' }}>
                                                             {fmtNumber(recapSummary.total_sale_ttc + recapSummary.total_purchase_ttc)} دج
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>
+                                                            <span style={{ color: recapSummary.total_margin_value >= 0 ? 'var(--em)' : 'var(--red)' }}>
+                                                                {fmtNumber(recapSummary.total_margin_value)} دج
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                                            <span style={{
+                                                                display: 'inline-block', padding: '2px 8px', borderRadius: 10,
+                                                                fontSize: 11, fontWeight: 600,
+                                                                background: recapSummary.total_margin_value >= 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                                                                color: recapSummary.total_margin_value >= 0 ? 'var(--em)' : 'var(--red)',
+                                                            }}>
+                                                                {recapSummary.total_margin_pct}%
+                                                            </span>
                                                         </td>
                                                         <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
                                                     </tr>
@@ -1468,8 +1549,8 @@ function TransactionHistoryModal({
 }
 
 // ─── SummaryCard ─────────────────────────────────────────────────────────────
-function SummaryCard({ label, value, color, icon, bold }: {
-    label: string; value: number; color: string; icon: string; bold?: boolean;
+function SummaryCard({ label, value, color, icon, bold, subtitle }: {
+    label: string; value: number; color: string; icon: string; bold?: boolean; subtitle?: string;
 }) {
     return (
         <div style={{
@@ -1482,6 +1563,9 @@ function SummaryCard({ label, value, color, icon, bold }: {
                 <div style={{ fontSize: bold ? 16 : 15, fontWeight: bold ? 800 : 700, color }}>
                     {fmtNumber(value)} دج
                 </div>
+                {subtitle && (
+                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 1 }}>{subtitle}</div>
+                )}
             </div>
         </div>
     );

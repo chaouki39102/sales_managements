@@ -1931,7 +1931,8 @@ export default function UsersPage() {
 
     const { data: roles = [], isLoading: rolesLoading } = useRoles();
 
-    const { data: permissions = [], isLoading: permsLoading } = usePermissions();
+    const { data: permsData, isLoading: permsLoading } = usePermissions();
+    const permissions = Array.isArray(permsData) ? permsData : [];
 
     // ─── Mutations ─────────────────────────────────
     const deleteUser = useTenantMutation(

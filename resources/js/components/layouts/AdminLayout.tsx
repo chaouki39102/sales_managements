@@ -60,7 +60,9 @@ export default function AdminLayout() {
   const location            = useLocation();
   const { data: stats }     = useAdminDashboard();
   const { dark, toggle: toggleTheme } = useTheme();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem('admin_sidebar_collapsed') === 'true'; } catch { return false; }
+  });
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
@@ -207,7 +209,7 @@ export default function AdminLayout() {
 
         <div style={{ padding: '10px 6px', borderTop: '1px solid var(--b2)', flexShrink: 0 }}>
           <button
-            onClick={() => setCollapsed(c => !c)}
+            onClick={() => setCollapsed(c => { const next = !c; try { localStorage.setItem('admin_sidebar_collapsed', String(next)); } catch {}; return next; })}
             style={{
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '8px 10px', borderRadius: 8, border: 'none',

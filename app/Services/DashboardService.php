@@ -20,12 +20,12 @@ class DashboardService
 
         $salesTotal = CommercialDocument::whereYear('document_date', $currentYear)
             ->whereMonth('document_date', $currentMonth)
-            ->whereHas('documentType', fn($q) => $q->where('code', 'invoice'))
+            ->whereHas('documentType', fn($q) => $q->whereIn('code', ['FV', 'AV', 'POS']))
             ->sum('total_ttc');
 
         $purchasesTotal = CommercialDocument::whereYear('document_date', $currentYear)
             ->whereMonth('document_date', $currentMonth)
-            ->whereHas('documentType', fn($q) => $q->where('code', 'purchase_invoice'))
+            ->whereHas('documentType', fn($q) => $q->whereIn('code', ['FA', 'AA']))
             ->sum('total_ttc');
 
         $customersCount = Party::where('party_type_id', 1)->count();
@@ -33,7 +33,7 @@ class DashboardService
         $productsCount = Product::count();
 
         $unpaidInvoices = CommercialDocument::where('remaining_amount', '>', 0)
-            ->whereHas('documentType', fn($q) => $q->where('code', 'invoice'))
+            ->whereHas('documentType', fn($q) => $q->whereIn('code', ['FV', 'AV', 'POS']))
             ->count();
 
         $overdueInvoices = CommercialDocument::where('due_date', '<', Carbon::now())
@@ -59,7 +59,7 @@ class DashboardService
             for ($month = 1; $month <= 12; $month++) {
                 $total = CommercialDocument::whereYear('document_date', Carbon::now()->year)
                     ->whereMonth('document_date', $month)
-                    ->whereHas('documentType', fn($q) => $q->where('code', 'invoice'))
+                    ->whereHas('documentType', fn($q) => $q->whereIn('code', ['FV', 'AV', 'POS']))
                     ->sum('total_ttc');
                 $data[] = [
                     'month' => $month,
@@ -71,7 +71,7 @@ class DashboardService
             for ($i = 29; $i >= 0; $i--) {
                 $date = Carbon::now()->subDays($i);
                 $total = CommercialDocument::whereDate('document_date', $date)
-                    ->whereHas('documentType', fn($q) => $q->where('code', 'invoice'))
+                    ->whereHas('documentType', fn($q) => $q->whereIn('code', ['FV', 'AV', 'POS']))
                     ->sum('total_ttc');
                 $data[] = [
                     'date' => $date->format('Y-m-d'),
@@ -86,8 +86,8 @@ class DashboardService
 
     public function getTopProducts(int $limit = 10): array
     {
-        return CommercialDocumentLine::select('product_id', DB::raw('SUM(quantity) as total_qty'), DB::raw('SUM(total) as total_amount'))
-            ->whereHas('commercialDocument', fn($q) => $q->whereHas('documentType', fn($q) => $q->where('code', 'invoice')))
+        return CommercialDocumentLine::select('product_id', DB::raw('SUM(quantity) as total_qty'), DB::raw('SUM(total_ht) as total_amount'))
+            ->whereHas('commercialDocument', fn($q) => $q->whereHas('documentType', fn($q) => $q->whereIn('code', ['FV', 'AV', 'POS'])))
             ->groupBy('product_id')
             ->orderByDesc('total_amount')
             ->limit($limit)
@@ -104,7 +104,7 @@ class DashboardService
     public function getTopCustomers(int $limit = 10): array
     {
         return CommercialDocument::select('party_id', DB::raw('SUM(total_ttc) as total_amount'))
-            ->whereHas('documentType', fn($q) => $q->where('code', 'invoice'))
+            ->whereHas('documentType', fn($q) => $q->whereIn('code', ['FV', 'AV', 'POS']))
             ->whereYear('document_date', Carbon::now()->year)
             ->groupBy('party_id')
             ->orderByDesc('total_amount')

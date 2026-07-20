@@ -252,7 +252,38 @@ class PartyBalanceService
                 'remaining'       => round((float) $doc->remaining_amount, 2),
             ]);
 
-        // 2. الدفعات
+        // 2. تكلفة المستندات (from line-level cost_price_ht — sale only)
+        $docIds = $documents->pluck('id');
+        $costMap = [];
+        if ($docIds->isNotEmpty()) {
+            $costRows = DB::table('commercial_document_lines as cdl')
+                ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+                ->join('document_types as dt', 'cd.document_type_id', '=', 'dt.id')
+                ->where('dt.document_base_operation_id', 1) // sale only
+                ->whereIn('cdl.commercial_document_id', $docIds)
+                ->whereNull('cd.deleted_at')
+                ->select(
+                    'cdl.commercial_document_id',
+                    DB::raw('SUM(cdl.quantity * cdl.cost_price_ht) as doc_cost_ht')
+                )
+                ->groupBy('cdl.commercial_document_id')
+                ->get()
+                ->keyBy('commercial_document_id');
+
+            foreach ($costRows as $cr) {
+                $costMap[$cr->commercial_document_id] = (float) $cr->doc_cost_ht;
+            }
+        }
+
+        // Attach cost + margin to documents
+        $documents = $documents->map(function ($doc) use ($costMap) {
+            $docCost = $costMap[$doc['id']] ?? 0;
+            $doc['doc_cost_ht'] = round($docCost, 2);
+            $doc['margin_value'] = round($doc['document_amount'] - $docCost, 2);
+            return $doc;
+        });
+
+        // 3. الدفعات
         $payments = DB::table('payments')
             ->leftJoin('payment_modes as pm', 'payments.payment_mode_id', '=', 'pm.id')
             ->where('payments.company_id', $companyId)
@@ -283,11 +314,12 @@ class PartyBalanceService
                 'document_amount' => 0,
                 'payment_amount'  => round((float) $p->amount, 2),
                 'remaining'       => 0,
+                'doc_cost_ht'     => 0,
+                'margin_value'    => 0,
             ]);
 
-        // 3. الدمج وترتيب بالتاريخ ثم الرقم
+        // 4. الدمج وترتيب بالتاريخ ثم الرقم
         $all = $documents->merge($payments)->values()->all();
-        // Sort by date, then by datetime (creation timestamp), then by id
         usort($all, function ($a, $b) {
             $cmp = strcmp($a['date'], $b['date']);
             if ($cmp !== 0) return $cmp;
@@ -394,13 +426,75 @@ class PartyBalanceService
 
         $products = array_values($productMap);
 
+        $productIds = array_column($products, 'product_id');
+
+        // Compute cost from line-level cost_price_ht (stored at document creation time)
+        foreach ($products as &$p) {
+            $p['effective_cost_price'] = 0;
+            $p['cost_ht'] = 0;
+            $p['margin_value'] = 0;
+            $p['margin_pct'] = 0;
+        }
+        unset($p);
+
+        if (!empty($productIds)) {
+            $costLines = DB::table('commercial_document_lines as cdl')
+                ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+                ->join('document_types as dt', 'cd.document_type_id', '=', 'dt.id')
+                ->where('cd.company_id', $companyId)
+                ->where('cd.party_id', $partyId)
+                ->where('cd.fiscal_year_id', $fiscalYearId)
+                ->where('dt.affects_accounting', true)
+                ->whereDate('cd.document_date', '<=', $date)
+                ->whereNull('cd.deleted_at')
+                ->where('dt.document_base_operation_id', 1) // sale only
+                ->where('cdl.cost_price_ht', '>', 0)
+                ->select(
+                    'cdl.product_id',
+                    DB::raw('SUM(cdl.quantity) as sale_qty'),
+                    DB::raw('SUM(cdl.quantity * cdl.cost_price_ht) as cost_ht')
+                )
+                ->groupBy('cdl.product_id')
+                ->get()
+                ->keyBy('product_id');
+
+            $costMap = [];
+            foreach ($costLines as $cl) {
+                $costMap[$cl->product_id] = [
+                    'sale_qty' => (float) $cl->sale_qty,
+                    'cost_ht'  => (float) $cl->cost_ht,
+                ];
+            }
+
+            foreach ($products as &$p) {
+                if (isset($costMap[$p['product_id']]) && $costMap[$p['product_id']]['sale_qty'] > 0) {
+                    $effectiveCost = $costMap[$p['product_id']]['cost_ht'] / $costMap[$p['product_id']]['sale_qty'];
+                    $p['effective_cost_price'] = round($effectiveCost, 4);
+                } else {
+                    $effectiveCost = 0;
+                }
+                $p['cost_ht'] = round($p['sale_qty'] * $effectiveCost, 4);
+                $p['margin_value'] = round($p['sale_ht'] - $p['cost_ht'], 4);
+                $p['margin_pct'] = $p['sale_ht'] > 0
+                    ? round(($p['margin_value'] / $p['sale_ht']) * 100, 2)
+                    : 0;
+            }
+            unset($p);
+        }
+
         $summary = [
-            'product_count'   => count($products),
-            'total_sale_ht'   => round(array_sum(array_column($products, 'sale_ht')), 2),
-            'total_sale_ttc'  => round(array_sum(array_column($products, 'sale_ttc')), 2),
+            'product_count'      => count($products),
+            'total_sale_ht'      => round(array_sum(array_column($products, 'sale_ht')), 2),
+            'total_sale_ttc'     => round(array_sum(array_column($products, 'sale_ttc')), 2),
             'total_purchase_ht'  => round(array_sum(array_column($products, 'purchase_ht')), 2),
             'total_purchase_ttc' => round(array_sum(array_column($products, 'purchase_ttc')), 2),
+            'total_cost_ht'      => round(array_sum(array_column($products, 'cost_ht')), 2),
+            'total_margin_value' => round(array_sum(array_column($products, 'margin_value')), 2),
+            'total_margin_pct'   => 0,
         ];
+        $summary['total_margin_pct'] = $summary['total_sale_ht'] > 0
+            ? round(($summary['total_margin_value'] / $summary['total_sale_ht']) * 100, 2)
+            : 0;
 
         return [
             'products' => $products,
@@ -454,6 +548,7 @@ class PartyBalanceService
         // 2. بنود المستندات
         $docIds = $documents->pluck('id');
         $linesMap = [];
+        $docCostMap = [];
         if ($docIds->isNotEmpty()) {
             $lines = DB::table('commercial_document_lines as cdl')
                 ->join('products as p', 'p.id', '=', 'cdl.product_id')
@@ -470,7 +565,8 @@ class PartyBalanceService
                     'cdl.total_ht',
                     'cdl.total_tva',
                     'cdl.total_ttc',
-                    'cdl.tva_rate'
+                    'cdl.tva_rate',
+                    'cdl.cost_price_ht'
                 )
                 ->orderBy('cdl.line_order', 'asc')
                 ->get();
@@ -479,18 +575,27 @@ class PartyBalanceService
                 $docId = $line->commercial_document_id;
                 if (!isset($linesMap[$docId])) {
                     $linesMap[$docId] = [];
+                    $docCostMap[$docId] = 0;
                 }
+                $qty = (float) $line->quantity;
+                $cost = (float) $line->cost_price_ht;
+                $lineCost = $qty * $cost;
+                $docCostMap[$docId] += $lineCost;
+
                 $linesMap[$docId][] = [
                     'product_name'    => $line->product_name,
                     'product_ref'     => $line->product_ref,
                     'unit_name'       => $line->unit_name,
-                    'quantity'        => round((float) $line->quantity, 3),
+                    'quantity'        => round($qty, 3),
                     'unit_price_ht'   => round((float) $line->unit_price_ht, 4),
                     'discount_pct'    => round((float) $line->discount_percentage, 2),
                     'total_ht'        => round((float) $line->total_ht, 2),
                     'total_tva'       => round((float) $line->total_tva, 2),
                     'total_ttc'       => round((float) $line->total_ttc, 2),
                     'tva_rate'        => round((float) $line->tva_rate, 2),
+                    'cost_price_ht'   => round($cost, 4),
+                    'line_cost_ht'    => round($lineCost, 2),
+                    'line_margin'     => round((float) $line->total_ht - $lineCost, 2),
                 ];
             }
         }
@@ -508,6 +613,11 @@ class PartyBalanceService
                 : -round((float) $doc->net_to_pay, 2),
             'payment_amount'  => 0,
             'remaining'       => round((float) $doc->remaining_amount, 2),
+            'doc_cost_ht'     => round($docCostMap[$doc->id] ?? 0, 2),
+            'margin_value'    => round(
+                ($doc->operation === 'sale' ? (float) $doc->net_to_pay : -(float) $doc->net_to_pay)
+                - ($docCostMap[$doc->id] ?? 0), 2
+            ),
             'lines'           => $linesMap[$doc->id] ?? [],
         ]);
 
@@ -542,6 +652,8 @@ class PartyBalanceService
                 'document_amount' => 0,
                 'payment_amount'  => round((float) $p->amount, 2),
                 'remaining'       => 0,
+                'doc_cost_ht'     => 0,
+                'margin_value'    => 0,
                 'lines'           => [],
             ]);
 

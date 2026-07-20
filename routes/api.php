@@ -220,6 +220,15 @@ Route::prefix('v1')->group(function () {
                 Route::get('velocity',  [ReportController::class, 'velocity']);
                 Route::get('margin',    [ReportController::class, 'margin']);
                 Route::get('aging',     [ReportController::class, 'aging']);
+                Route::get('creative',  [ReportController::class, 'creative']);
+                Route::get('daily',     [ReportController::class, 'daily']);
+                Route::get('product-movement', [ReportController::class, 'productMovement']);
+                Route::get('profit-loss', [ReportController::class, 'profitLoss']);
+                Route::get('returns', [ReportController::class, 'returns']);
+                Route::get('cash-flow', [ReportController::class, 'cashFlow']);
+                Route::get('expenses', [ReportController::class, 'expenses']);
+                Route::get('sales-trend', [ReportController::class, 'salesTrend']);
+                Route::get('stock-movements', [ReportController::class, 'stockMovements']);
             });
 
             // جداول مرجعية — endpoint مجمّع للمنتجات ( families + brands + units + tvas + ... )

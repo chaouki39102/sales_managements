@@ -9,14 +9,15 @@ interface CardProps {
   style?: React.CSSProperties;
   padding?: string | number;
   noHeader?: boolean;
+  onClick?: React.MouseEventHandler<HTMLDivElement>;
 }
 
 function Card({
-  title, subtitle, actions, children, style, padding, noHeader = false,
+  title, subtitle, actions, children, style, padding, noHeader = false, onClick,
 }: CardProps) {
   const hasHeader = !noHeader && (title || subtitle || actions);
   return (
-    <div className="card" style={{ ...(padding !== undefined ? { padding } : {}), ...style }}>
+    <div className="card" onClick={onClick} style={{ ...(padding !== undefined ? { padding } : {}), ...style }}>
       {hasHeader && (
         <div className="card-hd">
           <div>

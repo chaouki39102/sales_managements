@@ -27,4 +27,6 @@ class Role extends SpatieRole
     public static ?int $cacheTtl = 3600;
     public static array $cacheTags = ['roles', 'permissions'];
     public static array $scopes = [];
+    public static int $defaultPerPage = 100;
+    public static int $perPageLimit = 200;
 }
