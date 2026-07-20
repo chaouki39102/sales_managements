@@ -40,10 +40,12 @@ class ReportService
         $costMap = [];
         if ($docIds->isNotEmpty()) {
             $costRows = DB::table('commercial_document_lines as cdl')
+                ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+                ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
                 ->whereIn('cdl.commercial_document_id', $docIds)
                 ->select(
                     'cdl.commercial_document_id',
-                    DB::raw('SUM(cdl.quantity * cdl.cost_price_ht) as doc_cost_ht')
+                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity * cdl.cost_price_ht ELSE cdl.quantity * cdl.cost_price_ht END) as doc_cost_ht")
                 )
                 ->groupBy('cdl.commercial_document_id')
                 ->get()
@@ -58,17 +60,19 @@ class ReportService
         if ($docIds->isNotEmpty()) {
             $lineRows = DB::table('commercial_document_lines as cdl')
                 ->join('products as p', 'p.id', '=', 'cdl.product_id')
+                ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+                ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
                 ->whereIn('cdl.commercial_document_id', $docIds)
                 ->select(
                     'cdl.product_id',
                     'p.name as product_name',
                     'p.ref as product_ref',
-                    DB::raw('SUM(cdl.quantity) as total_qty'),
-                    DB::raw('SUM(cdl.total_ht) as total_ht'),
-                    DB::raw('SUM(cdl.quantity * cdl.cost_price_ht) as total_cost'),
-                    DB::raw('SUM(cdl.total_ttc) as total_ttc'),
-                    DB::raw('SUM(cdl.total_tva) as total_tva'),
-                    DB::raw('SUM(cdl.total_discount_amount) as total_discount')
+                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity ELSE cdl.quantity END) as total_qty"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.total_ht ELSE cdl.total_ht END) as total_ht"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity * cdl.cost_price_ht ELSE cdl.quantity * cdl.cost_price_ht END) as total_cost"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.total_ttc ELSE cdl.total_ttc END) as total_ttc"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.total_tva ELSE cdl.total_tva END) as total_tva"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.total_discount_amount ELSE cdl.total_discount_amount END) as total_discount")
                 )
                 ->groupBy('cdl.product_id', 'p.name', 'p.ref')
                 ->orderByDesc('total_ht')
@@ -170,15 +174,17 @@ class ReportService
         if ($docIds->isNotEmpty()) {
             $lineRows = DB::table('commercial_document_lines as cdl')
                 ->join('products as p', 'p.id', '=', 'cdl.product_id')
+                ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+                ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
                 ->whereIn('cdl.commercial_document_id', $docIds)
                 ->select(
                     'cdl.product_id',
                     'p.name as product_name',
                     'p.ref as product_ref',
-                    DB::raw('SUM(cdl.quantity) as total_qty'),
-                    DB::raw('SUM(cdl.total_ht) as total_ht'),
-                    DB::raw('SUM(cdl.total_ttc) as total_ttc'),
-                    DB::raw('SUM(cdl.total_tva) as total_tva')
+                    DB::raw("SUM(CASE WHEN dt.code = 'AA' THEN -cdl.quantity ELSE cdl.quantity END) as total_qty"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AA' THEN -cdl.total_ht ELSE cdl.total_ht END) as total_ht"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AA' THEN -cdl.total_ttc ELSE cdl.total_ttc END) as total_ttc"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AA' THEN -cdl.total_tva ELSE cdl.total_tva END) as total_tva")
                 )
                 ->groupBy('cdl.product_id', 'p.name', 'p.ref')
                 ->orderByDesc('total_ht')
@@ -245,18 +251,22 @@ class ReportService
         $partyIds = $parties->pluck('id');
         $partyStats = [];
         if ($partyIds->isNotEmpty()) {
-            $stats = DB::table('commercial_documents as cd')
+            $statsQuery = DB::table('commercial_documents as cd')
+                ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
                 ->whereIn('cd.party_id', $partyIds)
-                ->whereHas('documentType', fn($q) => $q->whereIn('code', self::SALE_CODES))
-                ->select(
-                    'party_id',
+                ->whereIn('dt.code', self::SALE_CODES);
+            if (!empty($filters['fiscal_year_id'])) {
+                $statsQuery->where('cd.fiscal_year_id', $filters['fiscal_year_id']);
+            }
+            $stats = $statsQuery->select(
+                    'cd.party_id',
                     DB::raw('COUNT(*) as doc_count'),
-                    DB::raw('SUM(total_ht) as total_ht'),
-                    DB::raw('SUM(total_ttc) as total_ttc'),
-                    DB::raw('SUM(paid_amount) as total_paid'),
-                    DB::raw('SUM(remaining_amount) as total_remaining')
+                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cd.total_ht ELSE cd.total_ht END) as total_ht"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cd.total_ttc ELSE cd.total_ttc END) as total_ttc"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cd.paid_amount ELSE cd.paid_amount END) as total_paid"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cd.remaining_amount ELSE cd.remaining_amount END) as total_remaining")
                 )
-                ->groupBy('party_id')
+                ->groupBy('cd.party_id')
                 ->get()
                 ->keyBy('party_id');
 
@@ -315,18 +325,22 @@ class ReportService
         $partyIds = $parties->pluck('id');
         $partyStats = [];
         if ($partyIds->isNotEmpty()) {
-            $stats = DB::table('commercial_documents as cd')
+            $statsQuery = DB::table('commercial_documents as cd')
+                ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
                 ->whereIn('cd.party_id', $partyIds)
-                ->whereHas('documentType', fn($q) => $q->whereIn('code', self::PURCHASE_CODES))
-                ->select(
-                    'party_id',
+                ->whereIn('dt.code', self::PURCHASE_CODES);
+            if (!empty($filters['fiscal_year_id'])) {
+                $statsQuery->where('cd.fiscal_year_id', $filters['fiscal_year_id']);
+            }
+            $stats = $statsQuery->select(
+                    'cd.party_id',
                     DB::raw('COUNT(*) as doc_count'),
-                    DB::raw('SUM(total_ht) as total_ht'),
-                    DB::raw('SUM(total_ttc) as total_ttc'),
-                    DB::raw('SUM(paid_amount) as total_paid'),
-                    DB::raw('SUM(remaining_amount) as total_remaining')
+                    DB::raw("SUM(CASE WHEN dt.code = 'AA' THEN -cd.total_ht ELSE cd.total_ht END) as total_ht"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AA' THEN -cd.total_ttc ELSE cd.total_ttc END) as total_ttc"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AA' THEN -cd.paid_amount ELSE cd.paid_amount END) as total_paid"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AA' THEN -cd.remaining_amount ELSE cd.remaining_amount END) as total_remaining")
                 )
-                ->groupBy('party_id')
+                ->groupBy('cd.party_id')
                 ->get()
                 ->keyBy('party_id');
 
@@ -388,15 +402,19 @@ class ReportService
         $productIds = $products->pluck('id');
         $salesStats = [];
         if ($productIds->isNotEmpty()) {
-            $stats = DB::table('commercial_document_lines as cdl')
+            $statsQuery = DB::table('commercial_document_lines as cdl')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+                ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
                 ->whereIn('cdl.product_id', $productIds)
-                ->whereHas('cd.documentType', fn($q) => $q->whereIn('code', self::SALE_CODES))
-                ->select(
+                ->whereIn('dt.code', self::SALE_CODES);
+            if (!empty($filters['fiscal_year_id'])) {
+                $statsQuery->where('cd.fiscal_year_id', $filters['fiscal_year_id']);
+            }
+            $stats = $statsQuery->select(
                     'cdl.product_id',
-                    DB::raw('SUM(cdl.quantity) as total_sold'),
-                    DB::raw('SUM(cdl.total_ht) as sales_ht'),
-                    DB::raw('SUM(cdl.quantity * cdl.cost_price_ht) as sales_cost')
+                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity ELSE cdl.quantity END) as total_sold"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.total_ht ELSE cdl.total_ht END) as sales_ht"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity * cdl.cost_price_ht ELSE cdl.quantity * cdl.cost_price_ht END) as sales_cost")
                 )
                 ->groupBy('cdl.product_id')
                 ->get()
@@ -495,6 +513,9 @@ class ReportService
         if (!empty($filters['payment_mode_id'])) {
             $query->where('payment_mode_id', $filters['payment_mode_id']);
         }
+        if (!empty($filters['fiscal_year_id'])) {
+            $query->whereHas('commercialDocuments', fn($q) => $q->where('fiscal_year_id', $filters['fiscal_year_id']));
+        }
 
         $payments = $query->orderBy('payment_date', 'desc')->get();
 
@@ -528,19 +549,23 @@ class ReportService
     {
         $from = $filters['from_date'] ?? now()->subMonth(3)->toDateString();
         $to   = $filters['to_date']   ?? now()->toDateString();
+        $fyId = $filters['fiscal_year_id'] ?? null;
 
-        $rows = CommercialDocumentLine::select(
-            'product_id',
-            DB::raw('SUM(quantity) as total_qty'),
-            DB::raw('COUNT(DISTINCT commercial_document_id) as doc_count'),
-            DB::raw('AVG(unit_price_ht) as avg_price'),
-        )
-            ->whereHas('commercialDocument', fn($q) => $q
-                ->whereHas('documentType', fn($t) => $t->whereIn('code', array_merge(self::SALE_CODES, ['BL', 'BCC'])))
-                ->whereDate('document_date', '>=', $from)
-                ->whereDate('document_date', '<=', $to)
-            )
-            ->groupBy('product_id')
+        $rows = DB::table('commercial_document_lines as cdl')
+            ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+            ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->whereDate('cd.document_date', '>=', $from)
+            ->whereDate('cd.document_date', '<=', $to)
+            ->whereIn('dt.code', array_merge(self::SALE_CODES, ['BL', 'BCC']))
+            ->select(
+                'cdl.product_id',
+                DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity ELSE cdl.quantity END) as total_qty"),
+                DB::raw('COUNT(DISTINCT cdl.commercial_document_id) as doc_count'),
+                DB::raw('AVG(cdl.unit_price_ht) as avg_price'),
+            );
+        if ($fyId) $rows->where('cd.fiscal_year_id', $fyId);
+
+        $rows = $rows->groupBy('cdl.product_id')
             ->orderByDesc('total_qty')
             ->limit(50)
             ->get();
@@ -575,18 +600,22 @@ class ReportService
     {
         $from = $filters['from_date'] ?? now()->startOfYear()->toDateString();
         $to   = $filters['to_date']   ?? now()->toDateString();
+        $fyId = $filters['fiscal_year_id'] ?? null;
 
-        $rows = CommercialDocumentLine::select(
-            'product_id',
-            DB::raw('SUM(quantity) as total_qty'),
-            DB::raw('SUM(total_ht) as total_ht'),
-        )
-            ->whereHas('commercialDocument', fn($q) => $q
-                ->whereHas('documentType', fn($t) => $t->whereIn('code', array_merge(self::SALE_CODES, ['BL', 'BCC'])))
-                ->whereDate('document_date', '>=', $from)
-                ->whereDate('document_date', '<=', $to)
-            )
-            ->groupBy('product_id')
+        $rows = DB::table('commercial_document_lines as cdl')
+            ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+            ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->whereDate('cd.document_date', '>=', $from)
+            ->whereDate('cd.document_date', '<=', $to)
+            ->whereIn('dt.code', array_merge(self::SALE_CODES, ['BL', 'BCC']))
+            ->select(
+                'cdl.product_id',
+                DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity ELSE cdl.quantity END) as total_qty"),
+                DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.total_ht ELSE cdl.total_ht END) as total_ht"),
+            );
+        if ($fyId) $rows->where('cd.fiscal_year_id', $fyId);
+
+        $rows = $rows->groupBy('cdl.product_id')
             ->orderByDesc('total_ht')
             ->limit(50)
             ->get();
@@ -696,25 +725,30 @@ class ReportService
         if (!empty($filters['to_date'])) {
             $query->whereDate('document_date', '<=', $filters['to_date']);
         }
+        if (!empty($filters['fiscal_year_id'])) {
+            $query->where('fiscal_year_id', $filters['fiscal_year_id']);
+        }
 
         $documents = $query->get();
 
         $salesInvoices = $documents->filter(fn($d) => in_array($d->documentType?->code, self::SALE_CODES));
         $purchaseInvoices = $documents->filter(fn($d) => in_array($d->documentType?->code, self::PURCHASE_CODES));
 
+        $negate = fn($docs, $code, $field) => $docs->reduce(fn($sum, $d) => $sum + ($d->documentType?->code === $code ? -$d->{$field} : $d->{$field}), 0);
+
         return [
             'sales' => [
-                'total_ht'     => round($salesInvoices->sum('total_ht'), 2),
-                'total_tva'    => round($salesInvoices->sum('total_tva'), 2),
-                'total_stamp'  => round($salesInvoices->sum('total_stamp'), 2),
-                'total_ttc'    => round($salesInvoices->sum('total_ttc'), 2),
+                'total_ht'     => round($negate($salesInvoices, 'AV', 'total_ht'), 2),
+                'total_tva'    => round($negate($salesInvoices, 'AV', 'total_tva'), 2),
+                'total_stamp'  => round($negate($salesInvoices, 'AV', 'total_stamp'), 2),
+                'total_ttc'    => round($negate($salesInvoices, 'AV', 'total_ttc'), 2),
                 'count'        => $salesInvoices->count(),
             ],
             'purchases' => [
-                'total_ht'     => round($purchaseInvoices->sum('total_ht'), 2),
-                'total_tva'    => round($purchaseInvoices->sum('total_tva'), 2),
-                'total_stamp'  => round($purchaseInvoices->sum('total_stamp'), 2),
-                'total_ttc'    => round($purchaseInvoices->sum('total_ttc'), 2),
+                'total_ht'     => round($negate($purchaseInvoices, 'AA', 'total_ht'), 2),
+                'total_tva'    => round($negate($purchaseInvoices, 'AA', 'total_tva'), 2),
+                'total_stamp'  => round($negate($purchaseInvoices, 'AA', 'total_stamp'), 2),
+                'total_ttc'    => round($negate($purchaseInvoices, 'AA', 'total_ttc'), 2),
                 'count'        => $purchaseInvoices->count(),
             ],
             'summary' => [
@@ -837,9 +871,12 @@ class ReportService
     {
         $date = $filters['date'] ?? now()->toDateString();
 
-        $docs = CommercialDocument::with(['documentType', 'party'])
-            ->whereDate('document_date', $date)
-            ->orderBy('created_at')
+        $docsQuery = CommercialDocument::with(['documentType', 'party'])
+            ->whereDate('document_date', $date);
+        if (!empty($filters['fiscal_year_id'])) {
+            $docsQuery->where('fiscal_year_id', $filters['fiscal_year_id']);
+        }
+        $docs = $docsQuery->orderBy('created_at')
             ->get();
 
         $payments = Payment::whereDate('payment_date', $date)->where('status', 'confirmed')->get();
@@ -881,6 +918,7 @@ class ReportService
         $productId = $filters['product_id'] ?? null;
         $from = $filters['from_date'] ?? now()->startOfYear()->toDateString();
         $to   = $filters['to_date']   ?? now()->toDateString();
+        $fyId = $filters['fiscal_year_id'] ?? null;
 
         $query = DB::table('commercial_document_lines as cdl')
             ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
@@ -890,6 +928,9 @@ class ReportService
 
         if ($productId) {
             $query->where('cdl.product_id', $productId);
+        }
+        if ($fyId) {
+            $query->where('cd.fiscal_year_id', $fyId);
         }
 
         $rows = $query->select(
@@ -966,19 +1007,21 @@ class ReportService
         $salesDocs = $salesQuery->get();
         $purchaseDocs = $purchaseQuery->get();
 
-        $salesHt = $salesDocs->sum('total_ht');
-        $salesTva = $salesDocs->sum('total_tva');
-        $salesTtc = $salesDocs->sum('total_ttc');
+        $salesHt = $salesDocs->reduce(fn($sum, $d) => $sum + ($d->documentType?->code === 'AV' ? -$d->total_ht : $d->total_ht), 0);
+        $salesTva = $salesDocs->reduce(fn($sum, $d) => $sum + ($d->documentType?->code === 'AV' ? -$d->total_tva : $d->total_tva), 0);
+        $salesTtc = $salesDocs->reduce(fn($sum, $d) => $sum + ($d->documentType?->code === 'AV' ? -$d->total_ttc : $d->total_ttc), 0);
 
-        $purchaseHt = $purchaseDocs->sum('total_ht');
-        $purchaseTva = $purchaseDocs->sum('total_tva');
+        $purchaseHt = $purchaseDocs->reduce(fn($sum, $d) => $sum + ($d->documentType?->code === 'AA' ? -$d->total_ht : $d->total_ht), 0);
+        $purchaseTva = $purchaseDocs->reduce(fn($sum, $d) => $sum + ($d->documentType?->code === 'AA' ? -$d->total_tva : $d->total_tva), 0);
 
         $salesCost = 0;
         $salesIds = $salesDocs->pluck('id');
         if ($salesIds->isNotEmpty()) {
-            $salesCost = DB::table('commercial_document_lines')
-                ->whereIn('commercial_document_id', $salesIds)
-                ->selectRaw('COALESCE(SUM(quantity * cost_price_ht), 0) as total')
+            $salesCost = DB::table('commercial_document_lines as cdl')
+                ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+                ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->whereIn('cdl.commercial_document_id', $salesIds)
+                ->selectRaw("COALESCE(SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity * cdl.cost_price_ht ELSE cdl.quantity * cdl.cost_price_ht END), 0) as total")
                 ->value('total') ?? 0;
         }
 

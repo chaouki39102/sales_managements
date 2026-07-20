@@ -47,7 +47,11 @@ class ReportController extends Controller
 
     public function customers(Request $request): JsonResponse
     {
-        $filters = $request->only(['from_date', 'to_date']);
+        $filters = $request->only(['from_date', 'to_date', 'fiscal_year_id', 'year_id']);
+        if (!empty($filters['year_id']) && empty($filters['fiscal_year_id'])) {
+            $filters['fiscal_year_id'] = $filters['year_id'];
+        }
+        unset($filters['year_id']);
         $data = $this->reportService->customersReport($filters);
         
         return response()->json([
@@ -59,7 +63,11 @@ class ReportController extends Controller
 
     public function suppliers(Request $request): JsonResponse
     {
-        $filters = $request->only(['from_date', 'to_date']);
+        $filters = $request->only(['from_date', 'to_date', 'fiscal_year_id', 'year_id']);
+        if (!empty($filters['year_id']) && empty($filters['fiscal_year_id'])) {
+            $filters['fiscal_year_id'] = $filters['year_id'];
+        }
+        unset($filters['year_id']);
         $data = $this->reportService->suppliersReport($filters);
         
         return response()->json([
@@ -71,7 +79,11 @@ class ReportController extends Controller
 
     public function products(Request $request): JsonResponse
     {
-        $filters = $request->only(['family_id', 'brand_id']);
+        $filters = $request->only(['family_id', 'brand_id', 'fiscal_year_id', 'year_id']);
+        if (!empty($filters['year_id']) && empty($filters['fiscal_year_id'])) {
+            $filters['fiscal_year_id'] = $filters['year_id'];
+        }
+        unset($filters['year_id']);
         $data = $this->reportService->productsReport($filters);
         
         return response()->json([
@@ -83,7 +95,12 @@ class ReportController extends Controller
 
     public function inventory(Request $request): JsonResponse
     {
-        $data = $this->reportService->inventoryReport();
+        $filters = $request->only(['family_id', 'fiscal_year_id', 'year_id']);
+        if (!empty($filters['year_id']) && empty($filters['fiscal_year_id'])) {
+            $filters['fiscal_year_id'] = $filters['year_id'];
+        }
+        unset($filters['year_id']);
+        $data = $this->reportService->inventoryReport($filters);
         
         return response()->json([
             'success' => true,
@@ -94,7 +111,11 @@ class ReportController extends Controller
 
     public function payments(Request $request): JsonResponse
     {
-        $filters = $request->only(['from_date', 'to_date', 'payment_mode_id']);
+        $filters = $request->only(['from_date', 'to_date', 'payment_mode_id', 'fiscal_year_id', 'year_id']);
+        if (!empty($filters['year_id']) && empty($filters['fiscal_year_id'])) {
+            $filters['fiscal_year_id'] = $filters['year_id'];
+        }
+        unset($filters['year_id']);
         $data = $this->reportService->paymentsReport($filters);
         
         return response()->json([
@@ -106,7 +127,11 @@ class ReportController extends Controller
 
     public function velocity(Request $request): JsonResponse
     {
-        $filters = $request->only(['from_date', 'to_date']);
+        $filters = $request->only(['from_date', 'to_date', 'fiscal_year_id', 'year_id']);
+        if (!empty($filters['year_id']) && empty($filters['fiscal_year_id'])) {
+            $filters['fiscal_year_id'] = $filters['year_id'];
+        }
+        unset($filters['year_id']);
         $data = $this->reportService->velocityReport($filters);
         return response()->json([
             'success' => true,
@@ -117,7 +142,11 @@ class ReportController extends Controller
 
     public function margin(Request $request): JsonResponse
     {
-        $filters = $request->only(['from_date', 'to_date']);
+        $filters = $request->only(['from_date', 'to_date', 'fiscal_year_id', 'year_id']);
+        if (!empty($filters['year_id']) && empty($filters['fiscal_year_id'])) {
+            $filters['fiscal_year_id'] = $filters['year_id'];
+        }
+        unset($filters['year_id']);
         $data = $this->reportService->marginReport($filters);
         return response()->json([
             'success' => true,
@@ -139,7 +168,11 @@ class ReportController extends Controller
 
     public function taxes(Request $request): JsonResponse
     {
-        $filters = $request->only(['from_date', 'to_date']);
+        $filters = $request->only(['from_date', 'to_date', 'fiscal_year_id', 'year_id']);
+        if (!empty($filters['year_id']) && empty($filters['fiscal_year_id'])) {
+            $filters['fiscal_year_id'] = $filters['year_id'];
+        }
+        unset($filters['year_id']);
         $data = $this->reportService->taxesReport($filters);
         
         return response()->json([
@@ -167,7 +200,11 @@ class ReportController extends Controller
 
     public function daily(Request $request): JsonResponse
     {
-        $filters = $request->only(['date']);
+        $filters = $request->only(['date', 'fiscal_year_id', 'year_id']);
+        if (!empty($filters['year_id']) && empty($filters['fiscal_year_id'])) {
+            $filters['fiscal_year_id'] = $filters['year_id'];
+        }
+        unset($filters['year_id']);
         $data = $this->reportService->dailyReport($filters);
         return response()->json([
             'success' => true,
@@ -178,7 +215,11 @@ class ReportController extends Controller
 
     public function productMovement(Request $request): JsonResponse
     {
-        $filters = $request->only(['product_id', 'from_date', 'to_date']);
+        $filters = $request->only(['product_id', 'from_date', 'to_date', 'fiscal_year_id', 'year_id']);
+        if (!empty($filters['year_id']) && empty($filters['fiscal_year_id'])) {
+            $filters['fiscal_year_id'] = $filters['year_id'];
+        }
+        unset($filters['year_id']);
         $data = $this->reportService->productMovementReport($filters);
         return response()->json([
             'success' => true,
