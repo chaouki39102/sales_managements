@@ -564,12 +564,6 @@
 .pcard:active { transform: translateY(0) scale(.985); transition-duration: .06s; }
 .pcard.pcard-out { opacity: .55; cursor: not-allowed; }
 .pcard.pcard-out:hover { transform: none; border-color: var(--b2); box-shadow: 0 1px 3px rgba(0,0,0,.04); }
-.pcard.pcard-hl {
-  outline: 2.5px solid var(--em);
-  outline-offset: -2.5px;
-  box-shadow: 0 0 0 4px var(--emb),
-              0 8px 25px -5px var(--emb);
-}
 .pcard.pcard-incart {
   border-color: var(--b1);
   background: var(--bg2);
@@ -914,6 +908,99 @@
 .pgrid--sm .pcard-ttc { font-size: var(--fs-md); padding: 2px 7px; border-radius: 7px; }
 .pgrid--sm .pcard-ht  { display: none; }
 .pgrid--sm .pcard-name { min-height: calc(1.35em * 2); }
+
+/* ── Search highlight text ── */
+.pcard-hl-text {
+  background: rgba(10,138,92,.2);
+  color: var(--em);
+  font-weight: 900;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+/* ── Barcode scan flash ── */
+@keyframes scanFlash {
+  0%   { box-shadow: 0 0 0 0 var(--gold); }
+  30%  { box-shadow: 0 0 0 6px var(--gold), 0 8px 25px -5px var(--gold); }
+  100% { box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+}
+.pcard-flash {
+  animation: scanFlash 1.2s ease-out !important;
+  border-color: var(--gold) !important;
+  z-index: 10;
+}
+
+/* ── Multi-variant pill ── */
+.pcard-variant-badge {
+  position: absolute;
+  bottom: 6px; left: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(100,116,139,.85);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.4;
+  pointer-events: none;
+  z-index: 2;
+  box-shadow: 0 1px 4px rgba(0,0,0,.12);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.pgrid--xs .pcard-variant-badge { display: none; }
+
+/* ── Keyboard focus ring (pulsing) ── */
+@keyframes focusPulse {
+  0%   { outline-color: var(--em); }
+  50%  { outline-color: var(--em2); }
+  100% { outline-color: var(--em); }
+}
+.pcard.pcard-hl {
+  outline: 2.5px solid var(--em);
+  outline-offset: -2.5px;
+  animation: focusPulse 1.5s ease-in-out infinite;
+  box-shadow: 0 0 0 4px var(--emb),
+              0 8px 25px -5px var(--emb);
+}
+
+/* ── Long-press info popover ── */
+.pcard-info-popover {
+  position: absolute;
+  bottom: 46px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg2);
+  border: 1px solid var(--b2);
+  border-radius: 10px;
+  padding: 8px 12px;
+  min-width: 180px;
+  max-width: 240px;
+  z-index: 20;
+  box-shadow: 0 8px 24px rgba(0,0,0,.15);
+  font-size: 11px;
+  color: var(--t2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: popIn .15s ease-out;
+}
+@keyframes popIn {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(4px) scale(.95); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+.pcard-info-row { display: flex; gap: 4px; align-items: baseline; }
+.pcard-info-label { font-weight: 800; color: var(--t1); white-space: nowrap; }
+.pcard-info-desc {
+  font-size: 10.5px;
+  color: var(--t4);
+  line-height: 1.4;
+  max-height: 3em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
 
 /* ════════════════════════════════════════════════════
    LIST VIEW

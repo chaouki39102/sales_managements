@@ -312,6 +312,7 @@ function POSPage() {
   const [filterPerPage, setFilterPerPage] = useState(120);
 
   const [barcodeBuffer, setBarcodeBuffer] = useState('');
+  const [scannedId, setScannedId] = useState<number | null>(null);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
 
   const searchRef    = useRef<HTMLInputElement>(null);
@@ -796,6 +797,7 @@ function POSPage() {
         const variant = allVariants.find(v => v.barcode === buf);
         if (variant && !isVariantOutOfStock(variant, allowNegSetting)) {
           posRef.current.addItem(variant);
+          setScannedId(variant.id);
           const items = useCartStore.getState().items;
           const added = items.find(i => i.variant_id === variant.id);
           if (added) { setSelectedCartItemId(added.id); requestAnimationFrame(() => cartApiRef.current?.scrollToItemId(added.id)); }
@@ -1416,6 +1418,8 @@ const handleCompleteSale = useCallback(async (params: {
                 else pos.updateQty(item.id, qty);
               }
             }}
+            searchQuery={rawQuery}
+            scannedId={scannedId}
           />
           <PanelResizer onMouseDown={handleResizerMouseDown} />
         </div>

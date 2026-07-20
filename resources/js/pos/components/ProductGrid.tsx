@@ -24,6 +24,8 @@ interface ProductGridProps {
   highlightedIndex?: number;
   onHighlightIndexChange?: (idx: number) => void;
   onQty?: (variantId: number, newQty: number) => void;
+  searchQuery?: string;
+  scannedId?: number | null;
 }
 
 /** أقل عرض للبطاقة حسب حجم الشبكة */
@@ -54,10 +56,20 @@ export default function ProductGrid({
   onPin, isPinned, priceLevels, selectedPriceLevelId, cartItems, allowNegativeStock,
   showStock = true, priceDisplayMode = 'ttc',
   highlightedIndex, onHighlightIndexChange, onQty,
+  searchQuery = '', scannedId,
 }: ProductGridProps) {
   const inCartQty = useCallback((variantId: number) => {
     return cartItems.find(i => i.variant_id === variantId)?.quantity ?? 0;
   }, [cartItems]);
+
+  const variantCountByProduct = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const v of variants) {
+      const pid = v.product_id;
+      map.set(pid, (map.get(pid) ?? 0) + 1);
+    }
+    return map;
+  }, [variants]);
 
   // ── Grid view (virtualised) ──────────────────────────────────────────────
   // Column calculation: keep cards between min‑width and max comfortable cols
@@ -158,12 +170,21 @@ export default function ProductGrid({
   if (!variants.length) return (
     <div className="pos-grid-area">
       <div className="pos-empty">
-        <div className="pos-empty-ico"><i className="ti ti-package-off" /></div>
-        <div className="pos-empty-ttl">لا توجد منتجات</div>
-        <div className="pos-empty-sub">جرّب البحث بكلمة أخرى أو أضف منتجاً يدوياً</div>
-        <button className="btn btn-sm" onClick={onAddManual}>
-          <i className="ti ti-plus" /> إضافة يدوية
-        </button>
+        <div className="pos-empty-ico">
+          <i className={`ti ${searchQuery ? 'ti-search' : 'ti-package-off'}`} />
+        </div>
+        <div className="pos-empty-ttl">{searchQuery ? 'لا توجد نتائج' : 'لا توجد منتجات'}</div>
+        <div className="pos-empty-sub">
+          {searchQuery
+            ? <>لا توجد منتجات تطابق "<strong>{searchQuery}</strong>"</>
+            : 'جرّب البحث بكلمة أخرى أو أضف منتجاً يدوياً'
+          }
+        </div>
+        {!searchQuery && (
+          <button className="btn btn-sm" onClick={onAddManual}>
+            <i className="ti ti-plus" /> إضافة يدوية
+          </button>
+        )}
       </div>
     </div>
   );
@@ -315,6 +336,9 @@ export default function ProductGrid({
                     onPin={onPin}
                     onHighlight={onHighlightIndexChange}
                     onQty={onQty}
+                    searchQuery={searchQuery}
+                    scannedId={scannedId}
+                    variantCount={variantCountByProduct.get(item.variant.product_id)}
                   />
                 </div>
               ))}
