@@ -55,4 +55,38 @@ class PartyBalanceController extends BaseApiController
     }
 
     // لا نحتاج store/update/destroy لأن الأرصدة تُحسب تلقائياً أو تُعدّل عبر نقاط أخرى
+
+    /**
+     * GET /{company}/party-balances/{partyId}/history
+     * سجل المعاملات (مستندات + دفعات) لطرف محدد حتى تاريخ معين
+     */
+    public function history($id): JsonResponse
+    {
+        try {
+            $this->authorizeAction('view', \App\Models\Party::class);
+            $partyId = $this->extractId($id);
+            $date    = request()->input('date', now()->toDateString());
+            $history = $this->balanceService->getHistory($partyId, $date);
+            return $this->successResponse($history, 'تم جلب سجل المعاملات بنجاح');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'history');
+        }
+    }
+
+    /**
+     * GET /{company}/party-balances/{partyId}/product-recap
+     * ملخص المنتجات التي تعاملت معها الجهة حتى تاريخ معين
+     */
+    public function productRecap($id): JsonResponse
+    {
+        try {
+            $this->authorizeAction('view', \App\Models\Party::class);
+            $partyId = $this->extractId($id);
+            $date    = request()->input('date', now()->toDateString());
+            $recap   = $this->balanceService->getProductRecap($partyId, $date);
+            return $this->successResponse($recap, 'تم جلب ملخص المنتجات بنجاح');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'productRecap');
+        }
+    }
 }

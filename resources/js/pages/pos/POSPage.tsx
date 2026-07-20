@@ -1409,6 +1409,13 @@ const handleCompleteSale = useCallback(async (params: {
             cartItems={pos.items} allowNegativeStock={allowNegSetting}
             showStock={settings.showStockOnCard}
             priceDisplayMode={settings.priceDisplayMode}
+            onQty={(variantId, qty) => {
+              const item = pos.items.find(i => i.variant_id === variantId);
+              if (item) {
+                if (qty <= 0) pos.removeItem(item.id);
+                else pos.updateQty(item.id, qty);
+              }
+            }}
           />
           <PanelResizer onMouseDown={handleResizerMouseDown} />
         </div>

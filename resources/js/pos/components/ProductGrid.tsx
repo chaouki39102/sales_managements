@@ -23,6 +23,7 @@ interface ProductGridProps {
   priceDisplayMode?: 'ttc' | 'ht';
   highlightedIndex?: number;
   onHighlightIndexChange?: (idx: number) => void;
+  onQty?: (variantId: number, newQty: number) => void;
 }
 
 /** أقل عرض للبطاقة حسب حجم الشبكة */
@@ -52,7 +53,7 @@ export default function ProductGrid({
   variants, view, gridSize, loading, onAdd, onAddManual,
   onPin, isPinned, priceLevels, selectedPriceLevelId, cartItems, allowNegativeStock,
   showStock = true, priceDisplayMode = 'ttc',
-  highlightedIndex, onHighlightIndexChange,
+  highlightedIndex, onHighlightIndexChange, onQty,
 }: ProductGridProps) {
   const inCartQty = useCallback((variantId: number) => {
     return cartItems.find(i => i.variant_id === variantId)?.quantity ?? 0;
@@ -313,6 +314,7 @@ export default function ProductGrid({
                     onAdd={onAdd}
                     onPin={onPin}
                     onHighlight={onHighlightIndexChange}
+                    onQty={onQty}
                   />
                 </div>
               ))}

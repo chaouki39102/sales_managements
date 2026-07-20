@@ -479,10 +479,13 @@ Route::prefix('v1')->group(function () {
                 Route::get('treasury-accounts/cash-accounts', [TreasuryAccountController::class, 'cashAccounts']);
                 Route::get('treasury-accounts/default',       [TreasuryAccountController::class, 'default']);
                 Route::apiResource('treasury-accounts', TreasuryAccountController::class);
-
                 Route::get('party-balances', [PartyBalanceController::class, 'index']);
-                Route::get('party-balances/{partyId}', [PartyBalanceController::class, 'show']);
 
+                Route::get('party-balances/{partyId}/history', [PartyBalanceController::class, 'history']);
+
+                Route::get('party-balances/{partyId}/product-recap', [PartyBalanceController::class, 'productRecap']);
+
+                Route::get('party-balances/{partyId}', [PartyBalanceController::class, 'show']);
                 // ✅ expenses: المسارات المحددة قبل apiResource
                 Route::get('expenses/paid',   [ExpenseController::class, 'paid']);
                 Route::get('expenses/unpaid', [ExpenseController::class, 'unpaid']);

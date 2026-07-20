@@ -537,38 +537,44 @@
 .pgrid--sm { }
 .pgrid--lg { }
 
-/* Product Card */
+/* Product Card — Modern Design */
 .pcard {
   display: flex;
   flex-direction: column;
-  /* الغلاف المحيط بكل بطاقة (في ProductGrid.tsx) يتمدد تلقائياً
-     (flex align-items:stretch الافتراضي) ليطابق أطول بطاقة بنفس
-     الصف. بدون height:100% هنا، البطاقات الأقصر تبقى بحجمها الطبيعي
-     وسط غلاف أطول (فراغ غير مرئي تحتها) بينما أي بطاقة محتواها أطول
-     (اختلاف نسبة صورة حقيقية مثلاً) تبقى تبان أطول فعلياً وتدفع
-     الصف التالي لتحت — فتظهر البطاقات "غير متساوية". بهذا نضمن أن
-     كل بطاقة تملأ نفس ارتفاع الصف دائماً، و.pcard-body (flex:1)
-     يدفع زر الإضافة لأسفل بشكل موحّد داخل كل بطاقة. */
   height: 100%;
-  border-radius: var(--r2);
+  border-radius: 14px;
   border: 1.5px solid var(--b1);
   background: var(--bg2);
   overflow: hidden;
   cursor: pointer;
-  transition: border-color .15s, box-shadow .15s, transform .12s;
+  transition: transform .22s cubic-bezier(.4,0,.2,1),
+              box-shadow .22s cubic-bezier(.4,0,.2,1),
+              border-color .18s ease,
+              background .18s ease;
   position: relative;
   user-select: none;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
 }
 .pcard:hover {
   border-color: var(--embo);
-  box-shadow: 0 4px 16px var(--emb);
-  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -5px var(--emb),
+              0 3px 10px -3px rgba(0,0,0,.06);
+  transform: translateY(-3px);
 }
-.pcard:active { transform: translateY(0); }
+.pcard:active { transform: translateY(0) scale(.985); transition-duration: .06s; }
 .pcard.pcard-out { opacity: .55; cursor: not-allowed; }
-.pcard.pcard-out:hover { transform: none; border-color: var(--b2); box-shadow: none; }
-.pcard.pcard-hl { outline: 2.5px solid var(--em); outline-offset: -2.5px; box-shadow: 0 0 0 4px var(--emb); }
-.pcard.pcard-incart { border-color: var(--embo); background: var(--emb); }
+.pcard.pcard-out:hover { transform: none; border-color: var(--b2); box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+.pcard.pcard-hl {
+  outline: 2.5px solid var(--em);
+  outline-offset: -2.5px;
+  box-shadow: 0 0 0 4px var(--emb),
+              0 8px 25px -5px var(--emb);
+}
+.pcard.pcard-incart {
+  border-color: var(--b1);
+  background: var(--bg2);
+  border-left: 3.5px solid var(--em);
+}
 
 .pcard-img {
   aspect-ratio: 1;
@@ -578,53 +584,71 @@
   justify-content: center;
   position: relative;
   overflow: hidden;
-  /* أبيض ثابت (وليس مرتبطاً بالثيم) — صور المنتجات مصوَّرة على خلفية
-     بيضاء أو شفافة دائماً، فالأبيض الثابت هو الوحيد الذي يندمج بدون
-     أن يظهر أي تدرّج/لون من خلف الأجزاء الشفافة في الصورة. */
   background: #ffffff;
 }
+.pcard-img::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 30%;
+  background: linear-gradient(to top, rgba(0,0,0,.04), transparent);
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity .3s;
+}
+.pcard-img:has(img) ::after { opacity: 1; }
 .pcard-img::before {
-  /* أيقونة صندوق خفيفة تظهر فقط عند غياب <img> فوقها */
   content: '';
   position: absolute;
   inset: 0;
   margin: auto;
   width: 34%;
   height: 34%;
-  opacity: .35;
+  opacity: .25;
   background-color: var(--t4);
   -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='M21 8v13H3V8'/><path d='M1 3h22v5H1z'/><path d='M10 12h4'/></svg>") center / contain no-repeat;
   mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='M21 8v13H3V8'/><path d='M1 3h22v5H1z'/><path d='M10 12h4'/></svg>") center / contain no-repeat;
+  transition: opacity .2s;
 }
+.pcard:hover .pcard-img::before { opacity: .4; }
 .pcard-img img {
-  /* absolute + !important: يمنع الارتفاع الطبيعي للصورة (أو أي inline
-     style يحقنه مكوّن التحميل مثل next/image) من التأثير على ارتفاع
-     .pcard-img أصلاً — الحاوية (aspect-ratio:1) هي الوحيدة المتحكّمة
-     بالارتفاع دائماً، والصورة تُقصّ لتملأها بغض النظر عن نسبتها
-     الحقيقية (بذلك تتساوى الصفوف اللي فيها صور مع اللي بدون صور). */
   position: absolute !important;
   inset: 0 !important;
   width: 100% !important;
   height: 100% !important;
   object-fit: cover !important;
   z-index: 1;
+  transition: transform .35s cubic-bezier(.4,0,.2,1);
+}
+.pcard:hover .pcard-img img {
+  transform: scale(1.08);
 }
 
-/* نبضة تأكيد بصرية سريعة عند نجاح الإضافة للسلة.
-   ملاحظة تنفيذية: تحتاج مكوّن ProductGrid لإضافة هذا الصنف على البطاقة
-   لبضع مئات المللي ثانية بعد onAdd (setTimeout) ثم إزالته — لا يمكن
-   تفعيله من CSS وحده لأنه حدث لحظي وليس حالة دائمة كـ pcard-incart. */
 @keyframes pcardAddPulse {
   0%   { box-shadow: 0 0 0 0 var(--emb); }
   40%  { box-shadow: 0 0 0 8px var(--emb); }
   100% { box-shadow: 0 0 0 0 rgba(0,0,0,0); }
 }
 .pcard.pcard-just-added { animation: pcardAddPulse .5s ease-out; }
+
+/* ── Qty in-cart badge (top-right) ── */
+@keyframes badgeScaleIn {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes badgePulse {
+  0%   { box-shadow: 2px 1px 6px rgba(0,0,0,.15), 0 0 0 0 var(--embo); }
+  50%  { box-shadow: 2px 1px 6px rgba(0,0,0,.15), 0 0 0 5px transparent; }
+  100% { box-shadow: 2px 1px 6px rgba(0,0,0,.15), 0 0 0 0 transparent; }
+}
 .pcard-in-cart {
   position: absolute;
-  top: 6px; right: 6px;
-  width: 24px; height: 24px;
-  border-radius: 50%;
+  top: 8px; right: 8px;
+  min-width: 26px; height: 26px;
+  padding: 0 6px;
+  border-radius: 13px;
   background: var(--em);
   color: #fff;
   font-size: 11px;
@@ -632,8 +656,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--bg2);
-  box-shadow: 0 1px 4px rgba(0,0,0,.15);
+  border: 2.5px solid var(--bg2);
+  box-shadow: 2px 1px 6px rgba(0,0,0,.15);
+  z-index: 3;
+  animation: badgeScaleIn .25s cubic-bezier(.4,0,.2,1);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  line-height: 1;
 }
 .pcard-out-badge {
   position: absolute;
@@ -641,62 +670,80 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0,0,0,.45);
+  background: rgba(0,0,0,.5);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   color: #fff;
   font-size: 13px;
   font-weight: 800;
   letter-spacing: 1px;
+  z-index: 2;
 }
 .pcard-low-badge {
   position: absolute;
-  bottom: 4px; left: 4px;
+  bottom: 6px; left: 6px;
   background: var(--gold);
   color: #fff;
   font-size: 10px;
   font-weight: 800;
-  padding: 2px 7px;
-  border-radius: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.12);
+  z-index: 2;
 }
-.pcard-body { padding: 10px 10px 6px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+/* ── Stock badge (bottom-right overlay on image) ── */
+.pcard-stock-badge {
+  position: absolute;
+  bottom: 6px; right: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.4;
+  pointer-events: none;
+  z-index: 2;
+  box-shadow: 0 1px 4px rgba(0,0,0,.12);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.pcard-stock-badge.ok  { background: rgba(34,139,87,.85); color: #fff; }
+.pcard-stock-badge.low { background: rgba(202,138,4,.85);  color: #fff; }
+.pcard-stock-badge.out { background: rgba(220,53,69,.85);  color: #fff; }
+.pcard-stock-badge.na  { background: var(--bg4); color: var(--t4); }
+.pcard-body {
+  padding: 10px 10px 6px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 .pcard-name {
   font-size: var(--fs-base);
   font-weight: 700;
   color: var(--t1);
-  line-height: 1.3;
+  line-height: 1.35;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  /* ارتفاع ثابت = سطرين دائماً، سواء كان الاسم سطراً واحداً أو سطرين،
-     وإلا تختلف ارتفاعات البطاقات حسب طول كل اسم (كان هذا سبب عدم
-     تساوي البطاقات في حجم S تحديداً). */
-  min-height: calc(1.3em * 2);
+  min-height: calc(1.35em * 2);
+  transition: color .15s;
 }
+.pcard:hover .pcard-name { color: var(--em); }
 .pcard-bc   { font-size: var(--fs-2xs); color: var(--t4); font-family: monospace; direction: ltr; text-align: right; }
 .pcard-prices { display: flex; align-items: baseline; gap: 6px; margin-top: 4px; }
 .pcard-ttc {
-  /* السعر هو أهم معلومة على البطاقة أثناء البيع السريع — يجب أن يتصدّر بصرياً بوضوح */
   font-size: 18px;
   font-weight: 900;
-  color: var(--em);
-  background: var(--emb);
-  padding: 3px 9px;
-  border-radius: var(--r1);
+  color: #fff;
+  background: linear-gradient(135deg, var(--em), var(--em2));
+  padding: 3px 10px;
+  border-radius: 8px;
   display: inline-block;
   line-height: 1.3;
+  box-shadow: 0 1px 3px rgba(10,138,92,.18);
 }
 .pcard-ht  { font-size: var(--fs-2xs); color: var(--t4); opacity: .85; }
-.pcard-stock {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  margin-top: 2px;
-}
-.pcard-stock.ok  { color: var(--green); }
-.pcard-stock.low { color: var(--gold);  }
-.pcard-stock.out { color: var(--red);   }
 
 .pcard-actions {
   display: flex;
@@ -706,60 +753,167 @@
   gap: 6px;
 }
 .pcard-pin {
-  width: 28px; height: 28px;
+  width: 30px; height: 30px;
   display: flex; align-items: center; justify-content: center;
-  background: none;
-  border: 1px solid var(--b2);
-  border-radius: var(--r1);
+  background: var(--bg3);
+  border: 1.5px solid var(--b2);
+  border-radius: 10px;
   color: var(--t4);
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
-  transition: .12s;
+  transition: all .15s cubic-bezier(.4,0,.2,1);
   flex-shrink: 0;
 }
-.pcard-pin:hover, .pcard-pin.on { color: var(--gold); border-color: var(--goldbo); background: var(--goldb); }
+.pcard-pin:hover { color: var(--gold); border-color: var(--goldbo); background: var(--goldb); transform: scale(1.08); }
+.pcard-pin.on { color: var(--gold); border-color: var(--goldbo); background: var(--goldb); }
 .pcard-add {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 6px 10px;
-  border-radius: var(--r1);
+  padding: 7px 12px;
+  border-radius: 10px;
   border: none;
-  background: var(--em);
+  background: linear-gradient(135deg, var(--em), var(--em2));
   color: #fff;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   font-family: 'Tajawal', sans-serif;
-  transition: .12s;
+  transition: all .18s cubic-bezier(.4,0,.2,1);
+  box-shadow: 0 2px 6px rgba(10,138,92,.2);
 }
-.pcard-add:hover { background: var(--em2); }
-.pcard-add:disabled { opacity: .4; cursor: not-allowed; }
+.pcard-add:hover { background: linear-gradient(135deg, var(--em2), var(--em3)); transform: translateY(-1px); box-shadow: 0 4px 10px rgba(10,138,92,.25); }
+.pcard-add:active { transform: translateY(0) scale(.97); transition-duration: .06s; }
+.pcard-add:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; }
+
+/* ── Add button checkmark feedback ── */
+@keyframes addCheckPop {
+  0%   { transform: scale(0.6); }
+  50%  { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+.pcard-add .ti-check { animation: addCheckPop .3s ease-out; color: #fff; }
+
+/* ── Favourite pinned glow ── */
+@keyframes starGlow {
+  0%   { filter: drop-shadow(0 0 0 var(--gold)); }
+  50%  { filter: drop-shadow(0 0 4px var(--gold)); }
+  100% { filter: drop-shadow(0 0 0 var(--gold)); }
+}
+.pcard.pcard-pinned { border-top: 2.5px solid var(--gold); }
+.pcard.pcard-pinned .pcard-pin.on { animation: starGlow 2s ease-in-out infinite; }
+
+/* ── Category color strip (top of image) ── */
+.pcard-family-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  z-index: 2;
+  opacity: .7;
+}
+.pgrid--xs .pcard-family-bar { height: 2px; }
+
+/* ── Qty +/- controls (replaces add button when in cart) ── */
+.pcard-qty-ctrl {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1.5px solid var(--embo);
+  background: var(--emb);
+  height: 34px;
+}
+.pcard-qty-btn {
+  width: 34px; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  background: none;
+  border: none;
+  color: var(--em);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background .12s;
+  flex-shrink: 0;
+}
+.pcard-qty-btn:hover { background: var(--embo); }
+.pcard-qty-btn:active { background: var(--em); color: #fff; transition-duration: .04s; }
+.pcard-qty-btn:disabled { opacity: .35; cursor: not-allowed; }
+.pcard-qty-val {
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--em);
+  min-width: 28px;
+  text-align: center;
+  border-left: 1px solid var(--embo);
+  border-right: 1px solid var(--embo);
+  line-height: 34px;
+}
+@keyframes qtyBump {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+.pcard-qty-val { animation: qtyBump .18s ease-out; }
+.pgrid--xs .pcard-qty-ctrl { height: 28px; border-radius: 8px; }
+.pgrid--xs .pcard-qty-btn { width: 28px; font-size: 12px; }
+.pgrid--xs .pcard-qty-val { font-size: 12px; min-width: 22px; line-height: 28px; }
+
+/* ── Image skeleton shimmer ── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.pcard-img-loading {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%) !important;
+  background-size: 200% 100% !important;
+  animation: shimmer 1.5s infinite !important;
+}
+
+/* ── Negative stock badge ── */
+.pcard-neg-badge {
+  position: absolute;
+  top: 6px; left: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(220,53,69,.85);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.4;
+  pointer-events: none;
+  z-index: 2;
+  box-shadow: 0 1px 4px rgba(0,0,0,.12);
+}
+.pcard-stock-badge.neg { background: rgba(220,53,69,.85); color: #fff; }
 
 /* ── حجم xs و sm: أيقونة فقط ── */
 .pgrid--xs .pcard-img  { min-height: 55px; }
 .pgrid--xs .pcard-body { padding: 6px; }
-.pgrid--xs .pcard-name { font-size: var(--fs-xs); -webkit-line-clamp: 1; min-height: calc(1.3em * 1); }
+.pgrid--xs .pcard-name { font-size: var(--fs-xs); -webkit-line-clamp: 1; min-height: calc(1.35em * 1); }
 .pgrid--xs .pcard-bc   { display: none; }
 .pgrid--xs .pcard-ht   { display: none; }
-/* لا نُخفي حالة المخزون بالكامل — مهمة لمنع بيع صنف نافد بالخطأ في الوضع المضغوط.
-   نستبدلها بنقطة لونية صغيرة فوق الصورة بدل السطر النصي الكامل. */
-.pgrid--xs .pcard-stock {
-  position: absolute; top: 6px; left: 6px;
+.pgrid--xs .pcard-in-cart { min-width: 20px; height: 20px; font-size: 9px; border-width: 2px; top: 4px; right: 4px; border-radius: 10px; }
+.pgrid--xs .pcard-stock-badge {
   font-size: 0; width: 9px; height: 9px; padding: 0; margin: 0;
-  border-radius: 50%; border: 1.5px solid var(--bg2);
-  z-index: 2;
+  border-radius: 50%; bottom: 4px; right: 4px;
+  border: 1.5px solid var(--bg2); backdrop-filter: none;
 }
-.pgrid--xs .pcard-stock.ok  { background: var(--green); }
-.pgrid--xs .pcard-stock.low { background: var(--gold); }
-.pgrid--xs .pcard-stock.out { background: var(--red); }
+.pgrid--xs .pcard-stock-badge.ok  { background: var(--green); }
+.pgrid--xs .pcard-stock-badge.low { background: var(--gold); }
+.pgrid--xs .pcard-stock-badge.out { background: var(--red); }
+.pgrid--xs .pcard-stock-badge.na  { background: var(--t4); }
 .pgrid--xs .pcard-actions { padding: 4px 6px 6px; }
-.pgrid--xs .pcard-pin { width: 22px; height: 22px; font-size: var(--fs-2xs); }
-.pgrid--xs .pcard-ttc { font-size: var(--fs-base); padding: 1px 5px; }
-.pgrid--sm .pcard-ttc { font-size: var(--fs-md); padding: 1px 6px; }
+.pgrid--xs .pcard-pin { width: 22px; height: 22px; font-size: var(--fs-2xs); border-radius: 7px; }
+.pgrid--xs .pcard-ttc { font-size: var(--fs-base); padding: 1px 5px; border-radius: 6px; }
+.pgrid--xs .pcard-add { padding: 4px 8px; font-size: var(--fs-2xs); border-radius: 7px; box-shadow: none; }
+.pgrid--sm .pcard-in-cart { min-width: 22px; height: 22px; font-size: 10px; border-width: 2px; }
+.pgrid--sm .pcard-ttc { font-size: var(--fs-md); padding: 2px 7px; border-radius: 7px; }
 .pgrid--sm .pcard-ht  { display: none; }
+.pgrid--sm .pcard-name { min-height: calc(1.35em * 2); }
 
 /* ════════════════════════════════════════════════════
    LIST VIEW

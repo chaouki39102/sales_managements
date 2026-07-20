@@ -58,6 +58,14 @@ const DatePicker: React.FC<DatePickerProps> = ({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  useEffect(() => {
+    if (value) {
+      const [y, m] = value.split('-').map(Number);
+      setViewYear(y);
+      setViewMonth(m - 1);
+    }
+  }, [value]);
+
   const prevMonth = () => {
     if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
     else setViewMonth(m => m - 1);
@@ -152,7 +160,7 @@ const DatePicker: React.FC<DatePickerProps> = ({
       )}
 
       <style>{`
-        .dp-wrapper { position: relative; display: flex; flex-direction: column; gap: 4px; }
+        .dp-wrapper { position: relative; display: flex; flex-direction: column; gap: 4px; z-index: 2000; }
         .dp-label { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); }
         .dp-trigger {
           display: flex; align-items: center; gap: 8px;

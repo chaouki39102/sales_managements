@@ -771,10 +771,11 @@ body.dark .al-p { background: var(--purb);  border-color: var(--purbo);  color: 
   transform: scale(.94) translateY(10px);
   transition: transform .24s cubic-bezier(.34,1.4,.64,1);
   max-height: 90vh; display: flex; flex-direction: column;
+  position: relative;
 }
 .ov.on .modal { transform: scale(1) translateY(0); }
 .modal-lg { max-width: 720px; }
-.modal-xl { max-width: 900px; }
+.modal-xl { max-width: 1100px; }
 .modal-sm { max-width: 440px; }
 .m-hd {
   padding: 16px 20px; border-bottom: 1px solid var(--b2);

@@ -747,3 +747,54 @@ export interface PartyBalance {
     party_type?: { name: string };
   };
 }
+
+export interface PartyTransaction {
+  type:            'document' | 'payment';
+  id:              number;
+  seq:             number;
+  date:            string;
+  datetime:        string | null;
+  reference:       string;
+  label:           string;
+  type_code:       string | null;
+  document_amount: number;
+  payment_amount:  number;
+  remaining:       number;
+}
+
+export interface PartyBalanceHistory {
+  opening_balance: number;
+  transactions:    PartyTransaction[];
+}
+
+export interface ProductRecapItem {
+  product_id:      number;
+  product_name:    string;
+  product_ref:     string;
+  unit_name:       string;
+  sale_qty:        number;
+  sale_ht:         number;
+  sale_ttc:        number;
+  purchase_qty:    number;
+  purchase_ht:     number;
+  purchase_ttc:    number;
+  total_qty:       number;
+  total_ht:        number;
+  total_ttc:       number;
+  total_tva:       number;
+  total_discount:  number;
+  doc_count:       number;
+}
+
+export interface ProductRecapSummary {
+  product_count:      number;
+  total_sale_ht:      number;
+  total_sale_ttc:     number;
+  total_purchase_ht:  number;
+  total_purchase_ttc: number;
+}
+
+export interface ProductRecapResponse {
+  products: ProductRecapItem[];
+  summary:  ProductRecapSummary;
+}
