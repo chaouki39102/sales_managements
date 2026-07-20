@@ -407,4 +407,160 @@ class PartyBalanceService
             'summary'  => $summary,
         ];
     }
+
+    /**
+     * سجل المعاملات التفصيلي مع بنود كل مستند
+     */
+    public function getDetailedHistory(int $partyId, string $date): array
+    {
+        $companyId    = $this->companyContext->get();
+        $date         = substr($date, 0, 10);
+        $fiscalYearId = $this->resolveFiscalYearId($companyId, $date);
+
+        // 0. الرصيد الافتتاحي
+        $opening = OpeningBalanceParty::query()
+            ->where('company_id', $companyId)
+            ->where('party_id', $partyId)
+            ->where('fiscal_year_id', $fiscalYearId)
+            ->first();
+
+        $openingAmount = $opening?->signedAmount() ?? 0.0;
+
+        // 1. المستندات مع بنودها
+        $documents = DB::table('commercial_documents as cd')
+            ->join('document_types as dt', 'cd.document_type_id', '=', 'dt.id')
+            ->join('document_base_operations as dbo', 'dt.document_base_operation_id', '=', 'dbo.id')
+            ->where('cd.company_id', $companyId)
+            ->where('cd.party_id', $partyId)
+            ->where('dt.affects_accounting', true)
+            ->whereDate('cd.document_date', '<=', $date)
+            ->whereNull('cd.deleted_at')
+            ->select(
+                'cd.id',
+                'cd.document_number',
+                'cd.document_date',
+                'cd.net_to_pay',
+                'cd.paid_amount',
+                'cd.remaining_amount',
+                'cd.created_at',
+                'dt.name as type_name',
+                'dt.code as type_code',
+                'dbo.name as operation'
+            )
+            ->orderBy('cd.document_date', 'asc')
+            ->orderBy('cd.id', 'asc')
+            ->get();
+
+        // 2. بنود المستندات
+        $docIds = $documents->pluck('id');
+        $linesMap = [];
+        if ($docIds->isNotEmpty()) {
+            $lines = DB::table('commercial_document_lines as cdl')
+                ->join('products as p', 'p.id', '=', 'cdl.product_id')
+                ->leftJoin('units as u', 'u.id', '=', 'p.unit_id')
+                ->whereIn('cdl.commercial_document_id', $docIds)
+                ->select(
+                    'cdl.commercial_document_id',
+                    'p.name as product_name',
+                    'p.ref as product_ref',
+                    'u.name as unit_name',
+                    'cdl.quantity',
+                    'cdl.unit_price_ht',
+                    'cdl.discount_percentage',
+                    'cdl.total_ht',
+                    'cdl.total_tva',
+                    'cdl.total_ttc',
+                    'cdl.tva_rate'
+                )
+                ->orderBy('cdl.line_order', 'asc')
+                ->get();
+
+            foreach ($lines as $line) {
+                $docId = $line->commercial_document_id;
+                if (!isset($linesMap[$docId])) {
+                    $linesMap[$docId] = [];
+                }
+                $linesMap[$docId][] = [
+                    'product_name'    => $line->product_name,
+                    'product_ref'     => $line->product_ref,
+                    'unit_name'       => $line->unit_name,
+                    'quantity'        => round((float) $line->quantity, 3),
+                    'unit_price_ht'   => round((float) $line->unit_price_ht, 4),
+                    'discount_pct'    => round((float) $line->discount_percentage, 2),
+                    'total_ht'        => round((float) $line->total_ht, 2),
+                    'total_tva'       => round((float) $line->total_tva, 2),
+                    'total_ttc'       => round((float) $line->total_ttc, 2),
+                    'tva_rate'        => round((float) $line->tva_rate, 2),
+                ];
+            }
+        }
+
+        $documents = $documents->map(fn ($doc) => [
+            'type'            => 'document',
+            'id'              => $doc->id,
+            'date'            => $doc->document_date,
+            'datetime'        => $doc->created_at,
+            'reference'       => $doc->document_number,
+            'label'           => $doc->type_name,
+            'type_code'       => $doc->type_code,
+            'document_amount' => $doc->operation === 'sale'
+                ? round((float) $doc->net_to_pay, 2)
+                : -round((float) $doc->net_to_pay, 2),
+            'payment_amount'  => 0,
+            'remaining'       => round((float) $doc->remaining_amount, 2),
+            'lines'           => $linesMap[$doc->id] ?? [],
+        ]);
+
+        // 3. الدفعات
+        $payments = DB::table('payments')
+            ->leftJoin('payment_modes as pm', 'payments.payment_mode_id', '=', 'pm.id')
+            ->where('payments.company_id', $companyId)
+            ->where('payments.party_id', $partyId)
+            ->where('payments.status', 'confirmed')
+            ->whereDate('payments.payment_date', '<=', $date)
+            ->whereNull('payments.deleted_at')
+            ->select(
+                'payments.id',
+                'payments.payment_number',
+                'payments.payment_date',
+                'payments.amount',
+                'payments.direction',
+                'payments.created_at',
+                'pm.name as mode_name'
+            )
+            ->orderBy('payments.payment_date', 'asc')
+            ->orderBy('payments.id', 'asc')
+            ->get()
+            ->map(fn ($p) => [
+                'type'            => 'payment',
+                'id'              => $p->id,
+                'date'            => $p->payment_date,
+                'datetime'        => $p->created_at,
+                'reference'       => $p->payment_number,
+                'label'           => $p->mode_name ?: 'دفعة',
+                'type_code'       => null,
+                'document_amount' => 0,
+                'payment_amount'  => round((float) $p->amount, 2),
+                'remaining'       => 0,
+                'lines'           => [],
+            ]);
+
+        // 4. الدمج والترتيب
+        $all = $documents->merge($payments)->values()->all();
+        usort($all, function ($a, $b) {
+            $cmp = strcmp($a['date'], $b['date']);
+            if ($cmp !== 0) return $cmp;
+            $cmp = strcmp($a['datetime'] ?? '', $b['datetime'] ?? '');
+            return $cmp !== 0 ? $cmp : $a['id'] - $b['id'];
+        });
+        foreach ($all as $i => &$item) {
+            $item['seq'] = $i + 1;
+        }
+        unset($item);
+
+        return [
+            'opening_balance' => round($openingAmount, 2),
+            'transactions'    => $all,
+        ];
+    }
 }

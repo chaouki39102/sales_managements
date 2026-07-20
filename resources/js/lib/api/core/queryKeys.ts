@@ -172,6 +172,7 @@ export const tenantKeys = {
         detail: (slug: string, partyId: number, date?: string) => [slug, 'party-balance', partyId, date] as const,
         history: (slug: string, partyId: number, date?: string) => [slug, 'party-balance', partyId, 'history', date] as const,
         productRecap: (slug: string, partyId: number, date?: string) => [slug, 'party-balance', partyId, 'product-recap', date] as const,
+        detailedHistory: (slug: string, partyId: number, date?: string) => [slug, 'party-balance', partyId, 'detailed-history', date] as const,
     },
     openingBalances: {
         parties:  (slug: string, yearId: number) => [slug, 'opening-balances', 'parties', yearId] as const,

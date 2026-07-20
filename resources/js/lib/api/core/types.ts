@@ -767,6 +767,28 @@ export interface PartyBalanceHistory {
   transactions:    PartyTransaction[];
 }
 
+export interface DetailedLine {
+  product_name:  string;
+  product_ref:   string;
+  unit_name:     string;
+  quantity:      number;
+  unit_price_ht: number;
+  discount_pct:  number;
+  total_ht:      number;
+  total_tva:     number;
+  total_ttc:     number;
+  tva_rate:      number;
+}
+
+export interface DetailedTransaction extends PartyTransaction {
+  lines: DetailedLine[];
+}
+
+export interface DetailedBalanceHistory {
+  opening_balance: number;
+  transactions:    DetailedTransaction[];
+}
+
 export interface ProductRecapItem {
   product_id:      number;
   product_name:    string;

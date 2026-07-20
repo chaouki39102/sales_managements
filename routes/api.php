@@ -485,6 +485,8 @@ Route::prefix('v1')->group(function () {
 
                 Route::get('party-balances/{partyId}/product-recap', [PartyBalanceController::class, 'productRecap']);
 
+                Route::get('party-balances/{partyId}/detailed-history', [PartyBalanceController::class, 'detailedHistory']);
+
                 Route::get('party-balances/{partyId}', [PartyBalanceController::class, 'show']);
                 // ✅ expenses: المسارات المحددة قبل apiResource
                 Route::get('expenses/paid',   [ExpenseController::class, 'paid']);

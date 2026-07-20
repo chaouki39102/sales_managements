@@ -89,4 +89,21 @@ class PartyBalanceController extends BaseApiController
             return $this->handleError($e, 'productRecap');
         }
     }
+
+    /**
+     * GET /{company}/party-balances/{partyId}/detailed-history
+     * سجل المعاملات التفصيلي مع بنود كل مستند
+     */
+    public function detailedHistory($id): JsonResponse
+    {
+        try {
+            $this->authorizeAction('view', \App\Models\Party::class);
+            $partyId = $this->extractId($id);
+            $date    = request()->input('date', now()->toDateString());
+            $history = $this->balanceService->getDetailedHistory($partyId, $date);
+            return $this->successResponse($history, 'تم جلب السجل التفصيلي بنجاح');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'detailedHistory');
+        }
+    }
 }

@@ -3,7 +3,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useModal } from '@/hooks/useModal';
 import { useFiscalYear } from '@/context/FiscalYearContext';
-import { usePartyBalances, usePartyBalanceHistory, usePartyProductRecap } from '@/lib/api/endpoints/partyBalances';
+import { usePartyBalances, usePartyBalanceHistory, usePartyProductRecap, usePartyDetailedHistory } from '@/lib/api/endpoints/partyBalances';
 import { DataTable, type Column } from '@/components/ui/DataTable/DataTable';
 import KpiCard from '@/components/ui/KpiCard';
 import Badge from '@/components/ui/Badge';
@@ -13,7 +13,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import Avatar from '@/components/ui/Avatar';
 import DatePicker from '@/components/ui/DatePicker';
 import { fmtNumber, fmtDate } from '@/lib/utils';
-import type { PartyBalance, PartyTransaction } from '@/lib/api/core/types';
+import type { PartyBalance, PartyTransaction, DetailedTransaction } from '@/lib/api/core/types';
 
 // ─── Date presets ────────────────────────────────────────────────────────────
 function getDatePresets(fyEnd: string) {
@@ -392,7 +392,7 @@ function BalanceDetailModal({
 
 // ─── TransactionHistoryModal ─────────────────────────────────────────────────
 type TxTypeFilter = 'all' | 'document' | 'payment';
-type ModalTab = 'transactions' | 'products';
+type ModalTab = 'transactions' | 'products' | 'detailed';
 
 function TransactionHistoryModal({
     open,
@@ -411,9 +411,11 @@ function TransactionHistoryModal({
 }) {
     const { data, isLoading } = usePartyBalanceHistory(partyId, date);
     const { data: recapData, isLoading: recapLoading } = usePartyProductRecap(partyId, date);
+    const { data: detailedData, isLoading: detailedLoading } = usePartyDetailedHistory(partyId, date);
     const [txFilter, setTxFilter] = useState<TxTypeFilter>('all');
     const [modalTab, setModalTab] = useState<ModalTab>('transactions');
     const [fromDate, setFromDate] = useState('');
+    const [expandedDocs, setExpandedDocs] = useState<Set<number>>(new Set());
 
     const openingBalance = data?.opening_balance ?? 0;
     const allTransactions = data?.transactions ?? [];
@@ -422,6 +424,24 @@ function TransactionHistoryModal({
         if (!fromDate) return allTransactions;
         return allTransactions.filter(t => t.date >= fromDate);
     }, [allTransactions, fromDate]);
+
+    const toggleDoc = useCallback((docId: number) => {
+        setExpandedDocs(prev => {
+            const next = new Set(prev);
+            if (next.has(docId)) next.delete(docId);
+            else next.add(docId);
+            return next;
+        });
+    }, []);
+
+    const expandAllDocs = useCallback(() => {
+        const detailedAll = detailedData?.transactions ?? [];
+        if (expandedDocs.size === detailedAll.filter(t => t.type === 'document').length) {
+            setExpandedDocs(new Set());
+        } else {
+            setExpandedDocs(new Set(detailedAll.filter(t => t.type === 'document').map(t => t.id)));
+        }
+    }, [detailedData, expandedDocs.size]);
 
     const transactions = useMemo(() => {
         if (txFilter === 'all') return filteredTransactions;
@@ -542,6 +562,119 @@ function TransactionHistoryModal({
         );
     }, [recapProducts, recapSummary, partyName, date, recapExcelColumns]);
 
+    // Detailed export
+    const detailedAll = detailedData?.transactions ?? [];
+    const filteredDetailed = fromDate
+        ? detailedAll.filter(t => t.date >= fromDate)
+        : detailedAll;
+
+    const detailedExcelColumns: Column<Record<string, unknown>>[] = useMemo(() => [
+        { key: '#',              header: '#',               width: 50 },
+        { key: 'date',           header: 'التاريخ',         width: 120 },
+        { key: 'reference',      header: 'المرجع',          width: 140 },
+        { key: 'label',          header: 'البيان',          width: 120 },
+        { key: 'doc_amount',     header: 'المستندات',       width: 120, align: 'center' },
+        { key: 'pay_amount',     header: 'الدفعات',         width: 120, align: 'center' },
+        { key: 'remaining',      header: 'المتبقي',         width: 120, align: 'center' },
+        { key: 'running_balance',header: 'الرصيد',          width: 120, align: 'center' },
+        { key: 'product_name',   header: 'المنتج',          width: 180 },
+        { key: 'product_ref',    header: 'مرجع المنتج',     width: 120 },
+        { key: 'unit_name',      header: 'الوحدة',          width: 80,  align: 'center' },
+        { key: 'quantity',       header: 'الكمية',          width: 100, align: 'center' },
+        { key: 'line_ht',        header: 'السعر HT',        width: 120, align: 'center' },
+        { key: 'line_discount',  header: 'الخصم',           width: 80,  align: 'center' },
+        { key: 'line_tva_rate',  header: 'ض.ق.م %',        width: 80,  align: 'center' },
+        { key: 'line_ttc',       header: 'المبلغ TTC',      width: 120, align: 'center' },
+    ], []);
+
+    const handleExportDetailedExcel = useCallback(async () => {
+        const detOpening = detailedData?.opening_balance ?? 0;
+        let running = detOpening;
+        const rows: Record<string, unknown>[] = [];
+
+        // Opening row
+        rows.push({
+            '#': '', date: '', reference: '', label: `الرصيد الافتتاحي: ${fmtNumber(detOpening)} دج`,
+            doc_amount: '', pay_amount: '', remaining: '', running_balance: detOpening,
+            product_name: '', product_ref: '', unit_name: '', quantity: '',
+            line_ht: '', line_discount: '', line_tva_rate: '', line_ttc: '',
+        });
+
+        for (const tx of filteredDetailed) {
+            running = running + tx.document_amount - tx.payment_amount;
+            const runBal = Math.round(running * 100) / 100;
+
+            if (tx.type === 'document' && tx.lines.length > 0) {
+                tx.lines.forEach((line, li) => {
+                    rows.push({
+                        '#':              li === 0 ? tx.seq : '',
+                        date:             li === 0 ? fmtDate(tx.date) : '',
+                        reference:        li === 0 ? (tx.reference || '—') : '',
+                        label:            li === 0 ? tx.label : '',
+                        doc_amount:       li === 0 ? (tx.document_amount || '') : '',
+                        pay_amount:       '',
+                        remaining:        li === 0 ? (tx.remaining || '') : '',
+                        running_balance:  li === 0 ? runBal : '',
+                        product_name:     line.product_name,
+                        product_ref:      line.product_ref,
+                        unit_name:        line.unit_name,
+                        quantity:         line.quantity,
+                        line_ht:          line.unit_price_ht,
+                        line_discount:    line.discount_pct > 0 ? `${line.discount_pct}%` : '',
+                        line_tva_rate:    `${line.tva_rate}%`,
+                        line_ttc:         line.total_ttc,
+                    });
+                });
+            } else {
+                rows.push({
+                    '#':              tx.seq,
+                    date:             fmtDate(tx.date),
+                    reference:        tx.reference || '—',
+                    label:            tx.label,
+                    doc_amount:       tx.document_amount || '',
+                    pay_amount:       tx.payment_amount || '',
+                    remaining:        tx.remaining || '',
+                    running_balance:  runBal,
+                    product_name:     '',
+                    product_ref:      '',
+                    unit_name:        '',
+                    quantity:         '',
+                    line_ht:          '',
+                    line_discount:    '',
+                    line_tva_rate:    '',
+                    line_ttc:         '',
+                });
+            }
+        }
+
+        // Summary row
+        const detDocs = filteredDetailed.filter(t => t.type === 'document');
+        const detPays = filteredDetailed.filter(t => t.type === 'payment');
+        const detTotalDocs = detDocs.reduce((s, t) => s + t.document_amount, 0);
+        const detTotalPays = detPays.reduce((s, t) => s + t.payment_amount, 0);
+        rows.push({
+            '#': '', date: '', reference: '',
+            label: `الإجمالي: المستندات ${fmtNumber(detTotalDocs)} | الدفعات ${fmtNumber(detTotalPays)}`,
+            doc_amount: detTotalDocs, pay_amount: detTotalPays, remaining: '',
+            running_balance: detOpening + detTotalDocs - detTotalPays,
+            product_name: '', product_ref: '', unit_name: '', quantity: '',
+            line_ht: '', line_discount: '', line_tva_rate: '', line_ttc: '',
+        });
+
+        const { exportToExcelAdvanced } = await import('@/components/ui/DataTable/excelExportAdvanced');
+        await exportToExcelAdvanced(
+            rows,
+            detailedExcelColumns as never[],
+            {
+                fileName: `كشف_تفصيلي_${partyName}_${date}`,
+                title: `كشف حساب تفصيلي – ${partyName}`,
+                sheetName: 'الحركات التفصيلية',
+                documentInfo: { party: partyName, date },
+                showAggregates: false,
+            },
+        );
+    }, [filteredDetailed, detailedData, partyName, date, detailedExcelColumns]);
+
     return (
         <Modal
             open={open}
@@ -561,8 +694,16 @@ function TransactionHistoryModal({
                         size="sm"
                         variant="gray"
                         icon={<i className="ti ti-file-spreadsheet" />}
-                        onClick={modalTab === 'products' ? handleExportRecapExcel : handleExportExcel}
-                        disabled={isLoading || (modalTab === 'transactions' ? allTransactions.length === 0 : recapProducts.length === 0)}
+                        onClick={
+                            modalTab === 'products' ? handleExportRecapExcel
+                            : modalTab === 'detailed' ? handleExportDetailedExcel
+                            : handleExportExcel
+                        }
+                        disabled={
+                            modalTab === 'transactions' ? (isLoading || allTransactions.length === 0)
+                            : modalTab === 'detailed' ? (detailedLoading || filteredDetailed.length === 0)
+                            : (isLoading || recapProducts.length === 0)
+                        }
                     >
                         Excel
                     </Button>
@@ -571,7 +712,11 @@ function TransactionHistoryModal({
                         variant="gray"
                         icon={<i className="ti ti-printer" />}
                         onClick={() => window.print()}
-                        disabled={isLoading || (modalTab === 'transactions' ? allTransactions.length === 0 : recapProducts.length === 0)}
+                        disabled={
+                            modalTab === 'transactions' ? (isLoading || allTransactions.length === 0)
+                            : modalTab === 'detailed' ? (detailedLoading || filteredDetailed.length === 0)
+                            : (isLoading || recapProducts.length === 0)
+                        }
                     >
                         طباعة
                     </Button>
@@ -600,6 +745,7 @@ function TransactionHistoryModal({
                     <div className="no-print" style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid var(--color-border-secondary)' }}>
                         {([
                             { key: 'transactions' as ModalTab, label: 'المعاملات', icon: 'ti-list', count: allTransactions.length },
+                            { key: 'detailed' as ModalTab, label: 'الحركات التفصيلية', icon: 'ti-list-detail', count: allTransactions.filter(t => t.type === 'document').length },
                             { key: 'products' as ModalTab, label: 'المنتجات', icon: 'ti-package', count: recapProducts.length },
                         ]).map(tab => (
                             <button
@@ -880,6 +1026,306 @@ function TransactionHistoryModal({
                                     </tbody>
                                 </table>
                             </div>
+                        </>
+                    )}
+
+                    {/* ── Detailed transactions tab ──────────────── */}
+                    {modalTab === 'detailed' && (
+                        <>
+                            {detailedLoading ? (
+                                <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-secondary)' }}>
+                                    <i className="ti ti-loader-2" style={{ fontSize: 28, animation: 'spin 1s linear infinite' }} />
+                                    <div style={{ marginTop: 8 }}>جاري تحميل السجل التفصيلي...</div>
+                                </div>
+                            ) : (detailedData?.transactions ?? []).length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-tertiary)' }}>
+                                    <i className="ti ti-folder-open" style={{ fontSize: 36, display: 'block', marginBottom: 8 }} />
+                                    لا توجد معاملات قبل هذا التاريخ
+                                </div>
+                            ) : (() => {
+                                const detailedAll = detailedData?.transactions ?? [];
+                                const filteredDetailed = fromDate
+                                    ? detailedAll.filter(t => t.date >= fromDate)
+                                    : detailedAll;
+                                const detOpening = detailedData?.opening_balance ?? 0;
+                                const detDocs = filteredDetailed.filter(t => t.type === 'document');
+                                const detPays = filteredDetailed.filter(t => t.type === 'payment');
+                                const detTotalDocs = detDocs.reduce((s, t) => s + t.document_amount, 0);
+                                const detTotalPays = detPays.reduce((s, t) => s + t.payment_amount, 0);
+                                let detRunning = detOpening;
+
+                                return (
+                                    <>
+                                        {/* Summary cards */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
+                                            <SummaryCard label="الرصيد الافتتاحي" value={detOpening} color="var(--color-text-primary)" icon="ti-building-bank" />
+                                            <SummaryCard label="المستندات" value={detTotalDocs} color="var(--em)" icon="ti-file-invoice" />
+                                            <SummaryCard label="الدفعات" value={detTotalPays} color="var(--red)" icon="ti-wallet" />
+                                            <SummaryCard label="الرصيد النهائي" value={detOpening + detTotalDocs - detTotalPays} color={detOpening + detTotalDocs - detTotalPays >= 0 ? 'var(--red)' : 'var(--green)'} icon="ti-calculator" bold />
+                                        </div>
+
+                                        {/* Date range filter */}
+                                        <div style={{
+                                            display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center',
+                                            padding: '8px 12px', background: 'var(--color-background-secondary)',
+                                            borderRadius: 8, border: '1px solid var(--color-border-tertiary)',
+                                        }} className="no-print">
+                                            <i className="ti ti-filter" style={{ fontSize: 14, color: 'var(--color-text-secondary)' }} />
+                                            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>من:</span>
+                                            <div style={{ width: 150 }}>
+                                                <DatePicker value={fromDate} onChange={setFromDate} max={date} clearable placeholder="كل التواريخ" />
+                                            </div>
+                                            {fromDate && (
+                                                <button onClick={() => setFromDate('')} style={{
+                                                    padding: '4px 10px', borderRadius: 6, border: 'none',
+                                                    background: 'var(--red)', color: '#fff',
+                                                    fontSize: 11, cursor: 'pointer', fontWeight: 600,
+                                                }}>مسح الفلتر</button>
+                                            )}
+                                            <button onClick={expandAllDocs} style={{
+                                                padding: '4px 10px', borderRadius: 6, border: '1px solid var(--color-border-tertiary)',
+                                                background: 'var(--color-background-primary)', color: 'var(--color-text-secondary)',
+                                                fontSize: 11, cursor: 'pointer', fontWeight: 600,
+                                                fontFamily: 'Tajawal, sans-serif', marginLeft: 'auto',
+                                            }}>
+                                                <i className={`ti ti-${expandedDocs.size === detDocs.length ? 'layout-grid' : 'layout-list'}`} style={{ marginLeft: 4 }} />
+                                                {expandedDocs.size === detDocs.length ? 'طي الكل' : 'توسيع الكل'}
+                                            </button>
+                                            <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+                                                {filteredDetailed.length} معاملة
+                                            </span>
+                                        </div>
+
+                                        {/* Detailed table */}
+                                        <div style={{ overflowX: 'auto', maxHeight: '55vh', overflowY: 'auto' }}>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                                <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
+                                                    <tr style={{ borderBottom: '2px solid var(--color-border-secondary)', background: 'var(--color-background-primary)' }}>
+                                                        <th style={thStyle}></th>
+                                                        <th style={thStyle}>#</th>
+                                                        <th style={thStyle}>التاريخ والوقت</th>
+                                                        <th style={thStyle}>البيان</th>
+                                                        <th style={{ ...thStyle, textAlign: 'center' }}>المستندات</th>
+                                                        <th style={{ ...thStyle, textAlign: 'center' }}>الدفعات</th>
+                                                        <th style={{ ...thStyle, textAlign: 'center' }}>الرصيد</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {/* Opening balance */}
+                                                    <tr style={{ background: 'var(--color-background-secondary)', fontWeight: 600 }}>
+                                                        <td style={tdStyle}></td>
+                                                        <td style={tdStyle}>—</td>
+                                                        <td style={tdStyle}>—</td>
+                                                        <td style={tdStyle}>
+                                                            <i className="ti ti-building-bank" style={{ marginLeft: 4 }} />
+                                                            رصيد افتتاحي
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>
+                                                            {fmtNumber(detOpening)} دج
+                                                        </td>
+                                                    </tr>
+
+                                                    {filteredDetailed.map((tx, i) => {
+                                                        detRunning = detRunning + tx.document_amount - tx.payment_amount;
+                                                        const running = Math.round(detRunning * 100) / 100;
+                                                        const isDoc = tx.type === 'document';
+                                                        const hasLines = isDoc && tx.lines.length > 0;
+                                                        const isExpanded = expandedDocs.has(tx.id);
+                                                        const isOverdue = isDoc && tx.remaining > 0;
+                                                        const txDate = new Date(tx.date);
+                                                        const now = new Date();
+                                                        const daysOld = Math.floor((now.getTime() - txDate.getTime()) / 86400000);
+
+                                                        let agingColor = 'var(--color-text-tertiary)';
+                                                        let agingBg = 'transparent';
+                                                        let agingLabel = '';
+                                                        if (isOverdue && tx.remaining > 0) {
+                                                            if (daysOld > 90) { agingColor = '#dc2626'; agingBg = 'rgba(220,38,38,0.08)'; agingLabel = `${daysOld} يوم`; }
+                                                            else if (daysOld > 60) { agingColor = '#ea580c'; agingBg = 'rgba(234,88,12,0.08)'; agingLabel = `${daysOld} يوم`; }
+                                                            else if (daysOld > 30) { agingColor = '#d97706'; agingBg = 'rgba(217,119,6,0.08)'; agingLabel = `${daysOld} يوم`; }
+                                                            else if (daysOld > 0) { agingColor = 'var(--color-text-secondary)'; agingLabel = `${daysOld} يوم`; }
+                                                        }
+
+                                                        return (
+                                                            <React.Fragment key={`${tx.type}-${tx.id}`}>
+                                                                <tr
+                                                                    style={{
+                                                                        borderBottom: isExpanded && hasLines ? 'none' : '1px solid var(--color-border-tertiary)',
+                                                                        background: isOverdue && daysOld > 90
+                                                                            ? 'rgba(220, 38, 38, 0.04)'
+                                                                            : i % 2 === 0 ? 'transparent' : 'var(--color-background-secondary)',
+                                                                        cursor: hasLines ? 'pointer' : 'default',
+                                                                    }}
+                                                                    onClick={hasLines ? () => toggleDoc(tx.id) : undefined}
+                                                                >
+                                                                    <td style={{ ...tdStyle, width: 32, textAlign: 'center' }}>
+                                                                        {hasLines ? (
+                                                                            <i className={`ti ti-chevron-${isExpanded ? 'down' : 'left'}`} style={{
+                                                                                fontSize: 12, color: 'var(--color-text-secondary)',
+                                                                                transition: 'transform .15s',
+                                                                                transform: isExpanded ? 'rotate(0)' : 'rotate(0)',
+                                                                            }} />
+                                                                        ) : isDoc ? (
+                                                                            <span style={{ width: 12 }} />
+                                                                        ) : (
+                                                                            <i className="ti ti-wallet" style={{ fontSize: 12, color: 'var(--em)' }} />
+                                                                        )}
+                                                                    </td>
+                                                                    <td style={{ ...tdStyle, color: 'var(--color-text-tertiary)', fontSize: 11 }}>
+                                                                        {tx.seq}
+                                                                    </td>
+                                                                    <td style={tdStyle}>
+                                                                        <div style={{ lineHeight: 1.3 }}>
+                                                                            <div>{fmtDate(tx.date)}</div>
+                                                                            {tx.datetime && (
+                                                                                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                                                                                    {new Date(tx.datetime).toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' })}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td style={tdStyle}>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                            {isDoc && tx.type_code ? (
+                                                                                <button
+                                                                                    onClick={(e) => { e.stopPropagation(); navigate(`/documents/${tx.type_code}/${tx.id}/edit`); onClose(); }}
+                                                                                    style={{
+                                                                                        background: 'none', border: 'none', cursor: 'pointer',
+                                                                                        fontFamily: 'monospace', fontSize: 12,
+                                                                                        color: 'var(--text-info, #3b82f6)', textDecoration: 'underline',
+                                                                                        padding: 0,
+                                                                                    }}
+                                                                                >
+                                                                                    {tx.reference}
+                                                                                </button>
+                                                                            ) : (
+                                                                                <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                                                                                    {tx.reference || '—'}
+                                                                                </span>
+                                                                            )}
+                                                                            <Badge variant={isDoc ? 'danger' : 'success'} style={{ fontSize: 11 }}>
+                                                                                {tx.label}
+                                                                            </Badge>
+                                                                            {isOverdue && tx.remaining > 0 && (
+                                                                                <span style={{
+                                                                                    fontSize: 10, padding: '1px 6px', borderRadius: 8,
+                                                                                    background: agingBg, color: agingColor, fontWeight: 600,
+                                                                                }}>
+                                                                                    {agingLabel}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: tx.document_amount > 0 ? 600 : undefined }}>
+                                                                        {tx.document_amount !== 0 ? (
+                                                                            <span style={{ color: tx.document_amount > 0 ? 'var(--em)' : 'var(--red)' }}>
+                                                                                {fmtNumber(tx.document_amount)} دج
+                                                                            </span>
+                                                                        ) : '—'}
+                                                                    </td>
+                                                                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: tx.payment_amount > 0 ? 600 : undefined }}>
+                                                                        {tx.payment_amount > 0 ? (
+                                                                            <span style={{ color: 'var(--red)' }}>
+                                                                                {fmtNumber(tx.payment_amount)} دج
+                                                                            </span>
+                                                                        ) : '—'}
+                                                                    </td>
+                                                                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>
+                                                                        <span style={{ color: running >= 0 ? 'var(--red)' : 'var(--green)' }}>
+                                                                            {fmtNumber(running)} دج
+                                                                        </span>
+                                                                        {tx.remaining > 0 && (
+                                                                            <div style={{ fontSize: 10, color: 'var(--red)', marginTop: 1 }}>
+                                                                                متبقي {fmtNumber(tx.remaining)}
+                                                                            </div>
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+
+                                                                {/* Product lines sub-rows */}
+                                                                {isExpanded && hasLines && tx.lines.map((line, li) => (
+                                                                    <tr
+                                                                        key={`line-${tx.id}-${li}`}
+                                                                        style={{
+                                                                            borderBottom: '1px solid var(--color-border-tertiary)',
+                                                                            background: 'rgba(59, 130, 246, 0.03)',
+                                                                        }}
+                                                                    >
+                                                                        <td style={tdStyle}></td>
+                                                                        <td style={{ ...tdStyle, fontSize: 10, color: 'var(--color-text-tertiary)' }}>
+                                                                            {tx.seq}.{li + 1}
+                                                                        </td>
+                                                                        <td colSpan={2} style={{ ...tdStyle, padding: '4px 12px 4px 36px' }}>
+                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                                                <i className="ti ti-package" style={{ fontSize: 11, color: 'var(--text-info, #3b82f6)', opacity: 0.6 }} />
+                                                                                <span style={{ fontWeight: 600, fontSize: 12 }}>{line.product_name}</span>
+                                                                                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'monospace' }}>
+                                                                                    ({line.product_ref})
+                                                                                </span>
+                                                                                {line.unit_name && (
+                                                                                    <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', padding: '1px 5px', borderRadius: 4, background: 'var(--color-background-secondary)' }}>
+                                                                                        {line.unit_name}
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        </td>
+                                                                        <td style={{ ...tdStyle, textAlign: 'center', fontSize: 12 }}>
+                                                                            {line.quantity > 0 ? (
+                                                                                <span>{fmtNumber(line.quantity)}</span>
+                                                                            ) : '—'}
+                                                                        </td>
+                                                                        <td style={{ ...tdStyle, textAlign: 'center', fontSize: 12 }}>
+                                                                            {line.discount_pct > 0 && (
+                                                                                <span style={{ fontSize: 10, color: 'var(--red)' }}>
+                                                                                    −{line.discount_pct}%
+                                                                                </span>
+                                                                            )}
+                                                                        </td>
+                                                                        <td style={{ ...tdStyle, textAlign: 'center', fontSize: 12, fontWeight: 600 }}>
+                                                                            {fmtNumber(line.total_ttc)} دج
+                                                                            <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', display: 'block' }}>
+                                                                                HT: {fmtNumber(line.total_ht)} + TVA {line.tva_rate}%
+                                                                            </span>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </React.Fragment>
+                                                        );
+                                                    })}
+
+                                                    {/* Footer summary */}
+                                                    <tr style={{
+                                                        fontWeight: 700,
+                                                        background: 'var(--color-background-secondary)',
+                                                        borderTop: '2px solid var(--color-border-secondary)',
+                                                    }}>
+                                                        <td style={tdStyle}></td>
+                                                        <td style={tdStyle} colSpan={2}>—</td>
+                                                        <td style={tdStyle}>
+                                                            <i className="ti ti-calculator" style={{ marginLeft: 4 }} />
+                                                            الإجمالي ({filteredDetailed.length} معاملة)
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--em)', fontWeight: 700 }}>
+                                                            {fmtNumber(detTotalDocs)} دج
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--red)', fontWeight: 700 }}>
+                                                            {fmtNumber(detTotalPays)} دج
+                                                        </td>
+                                                        <td style={{
+                                                            ...tdStyle, textAlign: 'center', fontWeight: 800,
+                                                            fontSize: 14, color: (detOpening + detTotalDocs - detTotalPays) >= 0 ? 'var(--red)' : 'var(--green)',
+                                                        }}>
+                                                            {fmtNumber(detOpening + detTotalDocs - detTotalPays)} دج
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </>
+                                );
+                            })()}
                         </>
                     )}
 

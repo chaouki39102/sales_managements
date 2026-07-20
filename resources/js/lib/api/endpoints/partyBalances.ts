@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../core/client';
 import { tenantKeys } from '../core/queryKeys';
 import { useActiveSlug, useSelectedYearId } from '@/lib/store/appStore';
-import type { PartyBalance, PartyBalanceHistory, PartyTransaction, ProductRecapResponse } from '../core/types';
+import type { PartyBalance, PartyBalanceHistory, PartyTransaction, ProductRecapResponse, DetailedBalanceHistory, DetailedTransaction } from '../core/types';
 
 export const partyBalancesApi = {
     getAll: (params?: { date?: string; party_type_id?: number; search?: string }) =>
@@ -17,6 +17,9 @@ export const partyBalancesApi = {
 
     getProductRecap: (partyId: number, date?: string) =>
         apiGet<ProductRecapResponse>(`/party-balances/${partyId}/product-recap`, date ? { date } : undefined),
+
+    getDetailedHistory: (partyId: number, date?: string) =>
+        apiGet<DetailedBalanceHistory>(`/party-balances/${partyId}/detailed-history`, date ? { date } : undefined),
 };
 
 export function usePartyBalances(params?: { date?: string; party_type_id?: number; search?: string }) {
@@ -126,6 +129,52 @@ export function usePartyProductRecap(partyId: number | null, date?: string) {
                 };
             }
             return { products: [], summary: { product_count: 0, total_sale_ht: 0, total_sale_ttc: 0, total_purchase_ht: 0, total_purchase_ttc: 0 } };
+        },
+    });
+}
+
+export function usePartyDetailedHistory(partyId: number | null, date?: string) {
+    const slug = useActiveSlug();
+
+    return useQuery({
+        queryKey: tenantKeys.partyBalances.detailedHistory(slug ?? '', partyId ?? 0, date),
+        queryFn:  () => partyBalancesApi.getDetailedHistory(partyId!, date),
+        enabled:  !!slug && !!partyId,
+        staleTime: 30_000,
+        select: (data: unknown): DetailedBalanceHistory => {
+            if (data && typeof data === 'object' && 'transactions' in data) {
+                const d = data as Record<string, unknown>;
+                const txns = Array.isArray(d.transactions) ? d.transactions : [];
+                return {
+                    opening_balance: Number(d.opening_balance ?? 0),
+                    transactions: (txns as Record<string, unknown>[]).map(t => ({
+                        type:            String(t.type ?? 'document') as 'document' | 'payment',
+                        id:              Number(t.id ?? 0),
+                        seq:             Number(t.seq ?? 0),
+                        date:            String(t.date ?? ''),
+                        datetime:        (t.datetime as string) ?? null,
+                        reference:       String(t.reference ?? ''),
+                        label:           String(t.label ?? ''),
+                        type_code:       (t.type_code as string) ?? null,
+                        document_amount: Number(t.document_amount ?? 0),
+                        payment_amount:  Number(t.payment_amount ?? 0),
+                        remaining:       Number(t.remaining ?? 0),
+                        lines: Array.isArray(t.lines) ? (t.lines as Record<string, unknown>[]).map(l => ({
+                            product_name:  String(l.product_name ?? ''),
+                            product_ref:   String(l.product_ref ?? ''),
+                            unit_name:     String(l.unit_name ?? ''),
+                            quantity:      Number(l.quantity ?? 0),
+                            unit_price_ht: Number(l.unit_price_ht ?? 0),
+                            discount_pct:  Number(l.discount_pct ?? 0),
+                            total_ht:      Number(l.total_ht ?? 0),
+                            total_tva:     Number(l.total_tva ?? 0),
+                            total_ttc:     Number(l.total_ttc ?? 0),
+                            tva_rate:      Number(l.tva_rate ?? 0),
+                        })) : [],
+                    })) as DetailedTransaction[],
+                };
+            }
+            return { opening_balance: 0, transactions: [] };
         },
     });
 }
