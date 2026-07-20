@@ -1,25 +1,46 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ReportShell from './ReportShell';
+import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY } from './helpers';
 import { useProductsReport } from '@/lib/api/endpoints/reports';
+import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+
+const def = { from: new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) };
 
 export default function ProductsReportPage() {
-  const { data, isLoading, isError, refetch } = useProductsReport();
-  return <ReportShell title="تقرير المنتجات" isLoading={isLoading} isError={isError} refetch={refetch} reportId="products">
+  const [fromDate, setFromDate] = useState(def.from);
+  const [toDate, setToDate] = useState(def.to);
+  const { data, isLoading, isError, refetch } = useProductsReport({ from_date: fromDate || undefined, to_date: toDate || undefined });
+
+  const handleExport = async () => {
+    if (!data) return;
+    await exportToExcel([{
+      name: 'المنتجات',
+      headers: ['#', 'المنتج', 'المرجع', 'العائلة', 'المخزون', 'التكلفة', 'المباع', 'المبيعات HT', 'الهامش', 'النسبة %'],
+      rows: data.products.map((r, i) => [i + 1, r.name, r.ref, r.family ?? '—', r.stock_quantity, r.sales_cost, r.total_sold, r.sales_ht, r.margin_value, r.margin_pct]),
+    }], `تقرير المنتجات ${fromDate}-${toDate}`);
+  };
+
+  return <ReportShell title="تقرير المنتجات" subtitle={`${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="products">
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+      <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
+      <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
+    </div>
     {data && (
       <>
         <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
-          <KpiCard variant="teal"  icon="ti-building-warehouse" label="قيمة المخزون"   value={MONEY(data.summary.total_stock_value)}/>
-          <KpiCard variant="green" icon="ti-package"            label="عدد المنتجات"   value={data.summary.total_products}/>
-          <KpiCard variant="blue"  icon="ti-shopping-cart"      label="إجمالي المباع"  value={data.summary.total_sold}/>
-          <KpiCard variant="purple" icon="ti-trending-up"       label="إجمالي المبيعات HT" value={MONEY(data.summary.total_sales_ht)}/>
+          <KpiCard variant="teal"   icon="ti-building-warehouse" label="قيمة المخزون"      value={MONEY(data.summary.total_stock_value)}/>
+          <KpiCard variant="green"  icon="ti-package"            label="عدد المنتجات"      value={data.summary.total_products}/>
+          <KpiCard variant="blue"   icon="ti-shopping-cart"      label="إجمالي المباع"     value={data.summary.total_sold}/>
+          <KpiCard variant="purple" icon="ti-trending-up"        label="إجمالي المبيعات HT" value={MONEY(data.summary.total_sales_ht)}/>
         </div>
         <Card noHeader style={{ padding: 0, marginTop: 16 }}>
           <div className="tw">
             <table>
-              <thead><tr><th>#</th><th>المنتج</th><th>المرجع</th><th>العائلة</th><th>المخزون</th><th>الcost</th><th>المباع</th><th>المبيعات HT</th><th>الهامش</th><th>%</th></tr></thead>
+              <thead><tr><th>#</th><th>المنتج</th><th>المرجع</th><th>العائلة</th><th>المخزون</th><th>التكلفة</th><th>المباع</th><th>المبيعات HT</th><th>الهامش</th><th>%</th></tr></thead>
               <tbody>
                 {data.products.map((row, i) => (
                   <tr key={row.id}>
@@ -42,8 +63,7 @@ export default function ProductsReportPage() {
                   <td></td>
                   <td>{data.products.reduce((s, r) => s + r.total_sold, 0)}</td>
                   <td>{FMT(data.summary.total_sales_ht)}</td>
-                  <td></td>
-                  <td></td>
+                  <td></td><td></td>
                 </tr>
               </tfoot>
             </table>

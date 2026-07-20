@@ -1,20 +1,41 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ReportShell from './ReportShell';
+import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY } from './helpers';
 import { useMarginReport } from '@/lib/api/endpoints/reports';
+import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+
+const def = { from: new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) };
 
 export default function MarginReportPage() {
-  const { data, isLoading, isError, refetch } = useMarginReport();
-  return <ReportShell title="تقرير الهوامش" isLoading={isLoading} isError={isError} refetch={refetch} reportId="margin">
+  const [fromDate, setFromDate] = useState(def.from);
+  const [toDate, setToDate] = useState(def.to);
+  const { data, isLoading, isError, refetch } = useMarginReport({ from_date: fromDate || undefined, to_date: toDate || undefined });
+
+  const handleExport = async () => {
+    if (!data) return;
+    await exportToExcel([{
+      name: 'الهوامش',
+      headers: ['#', 'المنتج', 'المرجع', 'الكمية', 'إيراد HT', 'التكلفة', 'الهامش', 'النسبة %'],
+      rows: data.items.map((r, i) => [i + 1, r.product_name, r.product_ref, r.total_qty, r.total_ht, r.cost_total, r.margin_amount, r.margin_pct]),
+    }], `تقرير الهوامش ${fromDate}-${toDate}`);
+  };
+
+  return <ReportShell title="تقرير الهوامش" subtitle={`${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="margin">
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+      <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
+      <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
+    </div>
     {data && (
       <>
         <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
-          <KpiCard variant="green"  icon="ti-trending-up"   label="إجمالي المبيعات"  value={MONEY(data.summary.total_ht)}/>
-          <KpiCard variant="blue"   icon="ti-trending-down" label="إجمالي التكلفة"   value={MONEY(data.summary.total_cost)}/>
-          <KpiCard variant="gold"   icon="ti-coin"          label="إجمالي الهامش"    value={MONEY(data.summary.total_margin)}/>
-          <KpiCard variant="purple" icon="ti-percentage"    label="نسبة الهامش"      value={`${data.summary.margin_pct}%`}/>
+          <KpiCard variant="green"  icon="ti-trending-up"   label="إجمالي المبيعات" value={MONEY(data.summary.total_ht)}/>
+          <KpiCard variant="blue"   icon="ti-trending-down" label="إجمالي التكلفة"  value={MONEY(data.summary.total_cost)}/>
+          <KpiCard variant="gold"   icon="ti-coin"          label="إجمالي الهامش"   value={MONEY(data.summary.total_margin)}/>
+          <KpiCard variant="purple" icon="ti-percentage"    label="نسبة الهامش"     value={`${data.summary.margin_pct}%`}/>
         </div>
         <Card noHeader style={{ padding: 0, marginTop: 16 }}>
           <div className="tw">

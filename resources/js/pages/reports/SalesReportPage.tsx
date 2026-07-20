@@ -1,26 +1,65 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import ReportShell from './ReportShell';
+import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY } from './helpers';
 import { useSalesReport } from '@/lib/api/endpoints/reports';
+import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 
 export default function SalesReportPage() {
-  const { data, isLoading, isError, refetch } = useSalesReport();
+  const fy = useFiscalYearRaw();
+  const [fromDate, setFromDate] = useState(fy.from);
+  const [toDate, setToDate] = useState(fy.to);
   const [tab, setTab] = useState<'docs' | 'products'>('docs');
+  const { data, isLoading, isError, refetch } = useSalesReport({ from_date: fromDate || undefined, to_date: toDate || undefined });
 
-  return <ReportShell title="تقرير المبيعات" isLoading={isLoading} isError={isError} refetch={refetch} reportId="sales">
+  const handleExport = async () => {
+    if (!data) return;
+    const sheets = [];
+    sheets.push({
+      name: 'الوثائق',
+      headers: ['#', 'رقم الوثيقة', 'التاريخ', 'الزبون', 'HT', 'TVA', 'الختم', 'TTC', 'المدفوع', 'المتبقي', 'التكلفة', 'الهامش', 'الحالة'],
+      rows: data.documents.map((doc, i) => [
+        i + 1, doc.document_number, doc.date, doc.party_name ?? '—',
+        doc.total_ht, doc.total_tva, doc.total_tva > 0 ? Math.round(doc.total_ht * 0.01) : 0,
+        doc.total_ttc, doc.paid_amount, doc.remaining_amount,
+        doc.doc_cost_ht, doc.margin_value,
+        doc.remaining_amount > 0.01 ? 'غير مسددة' : 'مسددة',
+      ]),
+    });
+    if (data.product_recap.length > 0) {
+      sheets.push({
+        name: 'ملخص المنتجات',
+        headers: ['#', 'المنتج', 'المرجع', 'الكمية', 'م.الوحدة', 'HT', 'الخصم', 'التكلفة', 'الهامش', 'TTC', '%'],
+        rows: data.product_recap.map((item, i) => [
+          i + 1, item.product_name, item.product_ref, item.total_qty,
+          item.total_qty > 0 ? Math.round((item.total_ht + item.total_discount) / item.total_qty) : 0,
+          item.total_ht, item.total_discount, item.total_cost,
+          item.margin_value, item.total_ttc, `${item.margin_pct}%`,
+        ]),
+      });
+    }
+    await exportToExcel(sheets, `report-exports/تقرير المبيعات ${fromDate ?? 'الكل'}-${toDate ?? 'الكل'}`);
+  };
+
+  return <ReportShell title="تقرير المبيعات" subtitle={fromDate && toDate ? `${fromDate} → ${toDate}` : 'سنة مالية كاملة'} isLoading={isLoading} isError={isError} refetch={refetch} reportId="sales">
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+      <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
+      <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
+    </div>
     {data && (
       <>
-        <div className="kpis" style={{ gridTemplateColumns: 'repeat(6,1fr)' }}>
-          <KpiCard variant="green"  icon="ti-trending-up"   label="إجمالي HT"     value={MONEY(data.summary.total_ht)}/>
-          <KpiCard variant="blue"   icon="ti-receipt"       label="إجمالي TTC"    value={MONEY(data.summary.total_ttc)}/>
+        <div className="kpis" style={{ gridTemplateColumns: 'repeat(7,1fr)' }}>
+          <KpiCard variant="green"  icon="ti-trending-up"   label="إجمالي HT"      value={MONEY(data.summary.total_ht)}/>
+          <KpiCard variant="blue"   icon="ti-receipt"       label="إجمالي TTC"     value={MONEY(data.summary.total_ttc)}/>
+          <KpiCard variant="orange" icon="ti-discount"      label="الخصومات"       value={MONEY(data.summary.total_discount)}/>
           <KpiCard variant="teal"   icon="ti-trending-down"  label="التكلفة"       value={MONEY(data.summary.total_cost)}/>
-          <KpiCard variant="gold"   icon="ti-coin"          label="الهامش"        value={MONEY(data.summary.total_margin)} sub={`${data.summary.margin_pct}%`}/>
-          <KpiCard variant="purple" icon="ti-file-text"     label="الوثائق"       value={data.summary.count}/>
-          <KpiCard variant="red"    icon="ti-clock"         label="غير مسددة"     value={data.summary.unpaid_count} sub={`${MONEY(data.summary.total_remaining)}`}/>
+          <KpiCard variant="gold"   icon="ti-coin"          label="الهامش"         value={MONEY(data.summary.total_margin)} sub={`${data.summary.margin_pct}%`}/>
+          <KpiCard variant="purple" icon="ti-file-text"     label="الوثائق"        value={data.summary.count}/>
+          <KpiCard variant="red"    icon="ti-clock"         label="غير مسددة"      value={data.summary.unpaid_count} sub={`${MONEY(data.summary.total_remaining)}`}/>
         </div>
         <div style={{ display: 'flex', gap: 8, margin: '16px 0 8px' }}>
           <Button size="xs" variant={tab === 'docs' ? 'primary' : 'ghost'} onClick={() => setTab('docs')}>الوثائق ({data.summary.count})</Button>
@@ -30,7 +69,7 @@ export default function SalesReportPage() {
           <Card noHeader style={{ padding: 0 }}>
             <div className="tw">
               <table>
-                <thead><tr><th>#</th><th>الوثيقة</th><th>التاريخ</th><th>الزبون</th><th>HT</th><th>التكلفة</th><th>الهامش</th><th>TTC</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th></tr></thead>
+                <thead><tr><th>#</th><th>الوثيقة</th><th>التاريخ</th><th>الزبون</th><th>HT</th><th>TVA</th><th>التكلفة</th><th>الهامش</th><th>TTC</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th></tr></thead>
                 <tbody>
                   {data.documents.map((doc, i) => (
                     <tr key={doc.id}>
@@ -39,6 +78,7 @@ export default function SalesReportPage() {
                       <td>{doc.date}</td>
                       <td>{doc.party_name ?? '—'}</td>
                       <td>{FMT(doc.total_ht)}</td>
+                      <td>{FMT(doc.total_tva)}</td>
                       <td>{FMT(doc.doc_cost_ht)}</td>
                       <td style={{ color: doc.margin_value >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(doc.margin_value)}</td>
                       <td>{FMT(doc.total_ttc)}</td>
@@ -52,6 +92,7 @@ export default function SalesReportPage() {
                   <tr style={{ fontWeight: 800, background: 'var(--bg2)' }}>
                     <td colSpan={4}>الإجمالي ({data.summary.count})</td>
                     <td>{FMT(data.summary.total_ht)}</td>
+                    <td>{FMT(data.summary.total_tva)}</td>
                     <td>{FMT(data.summary.total_cost)}</td>
                     <td style={{ color: data.summary.total_margin >= 0 ? 'var(--em)' : 'var(--red)' }}>{FMT(data.summary.total_margin)}</td>
                     <td>{FMT(data.summary.total_ttc)}</td>
@@ -104,4 +145,9 @@ export default function SalesReportPage() {
       </>
     )}
   </ReportShell>;
+}
+
+function useFiscalYearRaw() {
+  const now = new Date();
+  return { from: `${now.getFullYear()}-01-01`, to: now.toISOString().slice(0, 10) };
 }

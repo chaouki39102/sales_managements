@@ -861,6 +861,15 @@
 /* ══════════════════════════════════════════
    RESPONSIVE
 ══════════════════════════════════════════ */
+/* Portal popup — rendered in document.body via createPortal */
+.cr-popup--portal {
+  position: fixed;
+  z-index: 9999;
+  overflow: visible;
+}
+.cr-popup--portal .cr-popup-arrow {
+  display: none;
+}
 @media (max-width: 860px) {
   .cr-popup {
     right: auto;

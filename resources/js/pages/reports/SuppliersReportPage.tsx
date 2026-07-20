@@ -1,13 +1,34 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ReportShell from './ReportShell';
+import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY } from './helpers';
 import { useSuppliersReport } from '@/lib/api/endpoints/reports';
+import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+
+const def = { from: new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) };
 
 export default function SuppliersReportPage() {
-  const { data, isLoading, isError, refetch } = useSuppliersReport();
-  return <ReportShell title="تقرير الموردين" isLoading={isLoading} isError={isError} refetch={refetch} reportId="suppliers">
+  const [fromDate, setFromDate] = useState(def.from);
+  const [toDate, setToDate] = useState(def.to);
+  const { data, isLoading, isError, refetch } = useSuppliersReport({ from_date: fromDate || undefined, to_date: toDate || undefined });
+
+  const handleExport = async () => {
+    if (!data) return;
+    await exportToExcel([{
+      name: 'الموردين',
+      headers: ['#', 'الاسم', 'الكود', 'NIF', 'الهاتف', 'الولاية', 'عدد الوثائق', 'المشتريات HT', 'المدفوع', 'المتبقي'],
+      rows: data.suppliers.map((r, i) => [i + 1, r.name, r.code ?? '—', r.nif ?? '—', r.phone ?? '—', r.wilaya ?? '—', r.doc_count, r.total_ht, r.total_paid, r.total_remaining]),
+    }], `تقرير الموردين ${fromDate}-${toDate}`);
+  };
+
+  return <ReportShell title="تقرير الموردين" subtitle={`${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="suppliers">
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+      <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
+      <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
+    </div>
     {data && (
       <>
         <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>

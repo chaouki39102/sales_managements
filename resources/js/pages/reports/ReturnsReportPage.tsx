@@ -1,14 +1,38 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ReportShell from './ReportShell';
+import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY } from './helpers';
 import { useReturnsReport } from '@/lib/api/endpoints/reports';
+import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+
+const def = { from: new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) };
 
 export default function ReturnsReportPage() {
-  const { data, isLoading, isError, refetch } = useReturnsReport();
-  return <ReportShell title="تقرير الإرجاعات" isLoading={isLoading} isError={isError} refetch={refetch} reportId="returns">
+  const [fromDate, setFromDate] = useState(def.from);
+  const [toDate, setToDate] = useState(def.to);
+  const { data, isLoading, isError, refetch } = useReturnsReport({ from_date: fromDate || undefined, to_date: toDate || undefined });
+
+  const handleExport = async () => {
+    if (!data) return;
+    const sheets = [];
+    if (data.documents.length > 0) {
+      sheets.push({ name: 'الوثائق', headers: ['#', 'رقم الوثيقة', 'النوع', 'التاريخ', 'العميل/المورد', 'HT', 'TTC', 'السبب'], rows: data.documents.map((d, i) => [i + 1, d.document_number, d.document_type, d.date, d.party_name ?? '—', d.total_ht, d.total_ttc, d.reason ?? '—']) });
+    }
+    if (data.product_recap.length > 0) {
+      sheets.push({ name: 'ملخص المنتجات', headers: ['#', 'المنتج', 'المرجع', 'الكمية', 'HT', 'TTC'], rows: data.product_recap.map((p, i) => [i + 1, p.product_name, p.product_ref, p.total_qty, p.total_ht, p.total_ttc]) });
+    }
+    await exportToExcel(sheets.length > 0 ? sheets : [{ name: 'الإرجاعات', headers: ['البيان'], rows: [['لا توجد إرجاعات']] }], `تقرير الإرجاعات ${fromDate}-${toDate}`);
+  };
+
+  return <ReportShell title="تقرير الإرجاعات" subtitle={`${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="returns">
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+      <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
+      <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
+    </div>
     {data && (
       <>
         <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
@@ -21,7 +45,7 @@ export default function ReturnsReportPage() {
           <Card noHeader style={{ padding: 0, marginTop: 16 }}>
             <div className="tw">
               <table>
-                <thead><tr><th>#</th><th>رقم الوثيقة</th><th>النوع</th><th>التاريخ</th><th>العميل/المورد</th><th>HT</th><th>TTC</th></tr></thead>
+                <thead><tr><th>#</th><th>رقم الوثيقة</th><th>النوع</th><th>التاريخ</th><th>العميل/المورد</th><th>HT</th><th>TTC</th><th>السبب</th></tr></thead>
                 <tbody>
                   {data.documents.map((doc, i) => (
                     <tr key={doc.id}>
@@ -32,6 +56,7 @@ export default function ReturnsReportPage() {
                       <td>{doc.party_name ?? '—'}</td>
                       <td>{FMT(doc.total_ht)}</td>
                       <td>{FMT(doc.total_ttc)}</td>
+                      <td style={{ color: 'var(--t4)' }}>{doc.reason ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -59,12 +84,6 @@ export default function ReturnsReportPage() {
               </table>
             </div>
           </Card>
-        )}
-        {data.documents.length === 0 && (
-          <div className="empty" style={{ padding: 40 }}>
-            <div className="empty-ic"><i className="ti ti-rotate-left"/></div>
-            <div className="empty-tx">لا توجد إرجاعات في هذه الفترة</div>
-          </div>
         )}
       </>
     )}

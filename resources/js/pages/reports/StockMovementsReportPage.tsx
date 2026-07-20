@@ -1,47 +1,45 @@
 import React, { useState } from 'react';
 import ReportShell from './ReportShell';
+import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY } from './helpers';
 import { useStockMovementsReport } from '@/lib/api/endpoints/reports';
+import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+
+const def = { from: new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) };
 
 export default function StockMovementsReportPage() {
-  const now = new Date();
-  const [fromDate, setFromDate] = useState(`${now.getFullYear()}-01-01`);
-  const [toDate, setToDate] = useState(now.toISOString().slice(0, 10));
-
-  const { data, isLoading, isError, refetch } = useStockMovementsReport({
-    from_date: fromDate,
-    to_date: toDate,
-  });
+  const [fromDate, setFromDate] = useState(def.from);
+  const [toDate, setToDate] = useState(def.to);
+  const { data, isLoading, isError, refetch } = useStockMovementsReport({ from_date: fromDate || undefined, to_date: toDate || undefined });
   const d = data;
 
-  return (
-    <ReportShell
-      title="حركات المخزون"
-      subtitle={`${fromDate} → ${toDate}`}
-      isLoading={isLoading}
-      isError={isError}
-      refetch={refetch}
-      reportId="stock-movements"
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-        <span style={{ fontWeight: 600 }}>من:</span>
-        <input type="date" className="form-control" style={{ width: 200 }} value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-        <span style={{ fontWeight: 600 }}>إلى:</span>
-        <input type="date" className="form-control" style={{ width: 200 }} value={toDate} onChange={(e) => setToDate(e.target.value)} />
-      </div>
+  const handleExport = async () => {
+    if (!d || d.movements.length === 0) return;
+    await exportToExcel([{
+      name: 'حركات المخزون',
+      headers: ['#', 'التاريخ', 'المنتج', 'المستودع', 'النوع', 'الاتجاه', 'الكمية', 'القيمة'],
+      rows: d.movements.map((m, i) => [i + 1, m.movement_date, m.product_name, m.warehouse_name ?? '—', m.type_label ?? '—', m.direction === 1 ? 'وارد' : m.direction === -1 ? 'صادر' : 'تسوية', m.quantity, m.total_price]),
+    }], `حركات المخزون ${fromDate}-${toDate}`);
+  };
 
+  return (
+    <ReportShell title="حركات المخزون" subtitle={`${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="stock-movements">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+        <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
+        <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
+      </div>
       {d && (
         <>
           <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
-            <KpiCard variant="green"  icon="ti-arrow-down"     label="وارد (كمية)"    value={FMT(d.summary.total_in)}/>
-            <KpiCard variant="red"    icon="ti-arrow-up"       label="صادر (كمية)"     value={FMT(d.summary.total_out)}/>
-            <KpiCard variant="gold"   icon="ti-adjustments"    label="تسويات"          value={FMT(d.summary.total_adjustment)}/>
-            <KpiCard variant="blue"   icon="ti-arrows-exchange" label="إجمالي الحركات"  value={d.summary.movement_count}/>
+            <KpiCard variant="green"  icon="ti-arrow-down"      label="وارد (كمية)"   value={FMT(d.summary.total_in)}/>
+            <KpiCard variant="red"    icon="ti-arrow-up"        label="صادر (كمية)"    value={FMT(d.summary.total_out)}/>
+            <KpiCard variant="gold"   icon="ti-adjustments"     label="تسويات"         value={FMT(d.summary.total_adjustment)}/>
+            <KpiCard variant="blue"   icon="ti-arrows-exchange" label="إجمالي الحركات" value={d.summary.movement_count}/>
           </div>
-
           {d.movements.length > 0 && (
             <Card noHeader style={{ padding: 0, marginTop: 16 }}>
               <div className="tw">
@@ -68,13 +66,6 @@ export default function StockMovementsReportPage() {
                 </table>
               </div>
             </Card>
-          )}
-
-          {d.movements.length === 0 && (
-            <div className="empty" style={{ padding: 40 }}>
-              <div className="empty-ic"><i className="ti ti-arrows-exchange"/></div>
-              <div className="empty-tx">لا توجد حركات مخزون في هذه الفترة</div>
-            </div>
           )}
         </>
       )}

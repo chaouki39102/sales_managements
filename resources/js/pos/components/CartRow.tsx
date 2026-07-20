@@ -10,6 +10,7 @@
 //   7. شريط اللون الأيمن يتغير مع الحالة (عادي / مختار / خصم)
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import type { CartItem } from '@/types';
 import { formatDZD, ttcToHt } from '../utils/calculations';
 
@@ -51,27 +52,50 @@ export default function CartRow({
   const priceInpRef = useRef<HTMLInputElement>(null);
   const qtyInpRef   = useRef<HTMLInputElement>(null);
   const rowRef      = useRef<HTMLDivElement>(null);
+  const popupNodeRef = useRef<HTMLDivElement>(null);
+  const popupAnchorRef = useRef<HTMLDivElement>(null);
+  const [popupPos, setPopupPos] = useState<{top: number; left: number; right: number}>({ top: 0, left: 0, right: 0 });
 
-  // focus input عند فتح الـ popup
+  const measurePopupAnchor = useCallback(() => {
+    if (popupAnchorRef.current) {
+      const r = popupAnchorRef.current.getBoundingClientRect();
+      setPopupPos({ top: r.bottom + 4, left: r.left, right: window.innerWidth - r.right });
+    }
+  }, []);
+
+  // focus + select input عند فتح الـ popup أو تبديل الوضع
   useEffect(() => {
-    if (popup === 'disc'  && discInpRef.current)  { discInpRef.current.focus();  discInpRef.current.select(); }
-    if (popup === 'price' && priceInpRef.current) { priceInpRef.current.focus(); priceInpRef.current.select(); }
-  }, [popup]);
+    if (popup === 'disc') {
+      measurePopupAnchor();
+      discInpRef.current?.focus();
+      discInpRef.current?.select();
+    }
+    if (popup === 'price') {
+      measurePopupAnchor();
+      priceInpRef.current?.focus();
+      priceInpRef.current?.select();
+    }
+  }, [popup, discMode, measurePopupAnchor]);
 
   useEffect(() => {
     if (editQty && qtyInpRef.current) { qtyInpRef.current.focus(); qtyInpRef.current.select(); }
   }, [editQty]);
 
-  // إغلاق الـ popup عند الضغط خارج الصف
+  // إغلاق الـ popup عند الضغط خارج الصف أو عند التمرير
   useEffect(() => {
     if (!popup) return;
     const h = (e: MouseEvent) => {
-      if (rowRef.current && !rowRef.current.contains(e.target as Node)) {
-        setPopup(null);
-      }
+      const target = e.target as Node;
+      if (rowRef.current?.contains(target) || popupNodeRef.current?.contains(target)) return;
+      setPopup(null);
     };
+    const scrollHandler = () => setPopup(null);
     document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
+    document.addEventListener('scroll', scrollHandler, true);
+    return () => {
+      document.removeEventListener('mousedown', h);
+      document.removeEventListener('scroll', scrollHandler, true);
+    };
   }, [popup]);
 
   // ── فتح popup الخصم ──────────────────────────────────────────────────────
@@ -195,8 +219,10 @@ export default function CartRow({
         </div>
 
         {/* ── Popup الخصم ── */}
-        {popup === 'disc' && (
-          <div className="cr-popup cr-popup--disc" onClick={e => e.stopPropagation()}>
+        <div ref={popupAnchorRef} style={{ position: 'absolute', width: 0, height: 0 }} />
+        {popup === 'disc' && createPortal(
+          <div ref={popupNodeRef} className="cr-popup cr-popup--disc cr-popup--portal" onClick={e => e.stopPropagation()}
+            style={{ position: 'fixed', top: popupPos.top, right: popupPos.right, zIndex: 9999 }}>
             <div className="cr-popup-arrow" />
 
             {/* تبديل الوضع */}
@@ -285,12 +311,14 @@ export default function CartRow({
                 <i className="ti ti-check" /> تطبيق
               </button>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         {/* ── Popup السعر ── */}
-        {popup === 'price' && (
-          <div className="cr-popup cr-popup--price" onClick={e => e.stopPropagation()}>
+        {popup === 'price' && createPortal(
+          <div ref={popupNodeRef} className="cr-popup cr-popup--price cr-popup--portal" onClick={e => e.stopPropagation()}
+            style={{ position: 'fixed', top: popupPos.top, right: popupPos.right, zIndex: 9999 }}>
             <div className="cr-popup-arrow" />
             <div className="cr-popup-label">سعر البيع TTC</div>
             <div className="cr-popup-inp-row">
@@ -321,7 +349,8 @@ export default function CartRow({
                 <i className="ti ti-check" /> تطبيق
               </button>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
 

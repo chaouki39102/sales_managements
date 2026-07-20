@@ -16,8 +16,8 @@ import type {
 
 export interface ReportBaseParams {
   year_id?:   number;
-  from?:      string;   // YYYY-MM-DD
-  to?:        string;
+  from_date?: string;   // YYYY-MM-DD
+  to_date?:   string;
   page?:      number;
   per_page?:  number;
 }
@@ -72,6 +72,7 @@ export interface SalesReportDocument {
   total_ht:          number;
   total_tva:         number;
   total_ttc:         number;
+  total_discount:    number;
   paid_amount:       number;
   remaining_amount:  number;
   doc_cost_ht:       number;
@@ -98,6 +99,7 @@ export interface SalesReportData {
     total_ht:          number;
     total_tva:         number;
     total_ttc:         number;
+    total_discount:    number;
     total_cost:        number;
     total_margin:      number;
     margin_pct:        number;
@@ -118,18 +120,20 @@ export interface PurchasesReportDocument {
   total_ht:         number;
   total_tva:        number;
   total_ttc:        number;
+  total_discount:   number;
   paid_amount:      number;
   remaining_amount: number;
   status:           string;
 }
 
 export interface PurchasesProductRecapItem {
-  product_id:   number;
-  product_name: string;
-  product_ref:  string;
-  total_qty:    number;
-  total_ht:     number;
-  total_ttc:    number;
+  product_id:     number;
+  product_name:   string;
+  product_ref:    string;
+  total_qty:      number;
+  total_ht:       number;
+  total_ttc:      number;
+  total_discount: number;
 }
 
 export interface PurchasesReportData {
@@ -137,6 +141,7 @@ export interface PurchasesReportData {
     total_ht:          number;
     total_tva:         number;
     total_ttc:         number;
+    total_discount:    number;
     total_paid:        number;
     total_remaining:   number;
     count:             number;
@@ -167,9 +172,19 @@ export interface CustomersReportData {
     total_customers:  number;
     total_ht:         number;
     total_ttc:        number;
+    total_discount:   number;
     total_remaining:  number;
   };
   customers: CustomersReportRow[];
+  product_recap: Array<{
+    product_id:     number;
+    product_name:   string;
+    product_ref:    string;
+    total_qty:      number;
+    total_ht:       number;
+    total_ttc:      number;
+    total_discount: number;
+  }>;
 }
 
 export interface SuppliersReportRow {

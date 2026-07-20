@@ -1,19 +1,56 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ReportShell from './ReportShell';
+import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY } from './helpers';
 import { useTvaReport } from '@/lib/api/endpoints/reports';
+import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+
+const def = { from: new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) };
 
 export default function TaxesReportPage() {
+  const [fromDate, setFromDate] = useState(def.from);
+  const [toDate, setToDate] = useState(def.to);
   const { data, isLoading, isError, refetch } = useTvaReport();
-  return <ReportShell title="تقرير الضرائب — TVA" isLoading={isLoading} isError={isError} refetch={refetch} reportId="taxes">
+
+  const handleExport = async () => {
+    if (!data) return;
+    await exportToExcel([{
+      name: 'ملخص TVA',
+      headers: ['البيان', 'المبلغ'],
+      rows: [
+        ['TVA محصلة (مبيعات)', data.summary.tva_collected],
+        ['TVA قابلة للخصم (مشتريات)', data.summary.tva_deductible],
+        ['صافي TVA المستحق', data.summary.tva_balance],
+        ['---', '---'],
+        ['بيعات HT', data.sales.total_ht],
+        ['بيعات TVA', data.sales.total_tva],
+        ['بيعات طابع جبائي', data.sales.total_stamp],
+        ['بيعات TTC', data.sales.total_ttc],
+        ['عدد مبيعات', data.sales.count],
+        ['---', '---'],
+        ['مشتريات HT', data.purchases.total_ht],
+        ['مشتريات TVA', data.purchases.total_tva],
+        ['مشتريات طابع جبائي', data.purchases.total_stamp],
+        ['مشتريات TTC', data.purchases.total_ttc],
+        ['عدد مشتريات', data.purchases.count],
+      ],
+    }], `تقرير الضرائب ${fromDate}-${toDate}`);
+  };
+
+  return <ReportShell title="تقرير الضرائب — TVA" subtitle={`${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="taxes">
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+      <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
+      <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
+    </div>
     {data && (
       <>
         <div className="kpis" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
-          <KpiCard variant="green" icon="ti-arrow-up-circle"   label="TVA محصلة (مبيعات)"  value={MONEY(data.summary.tva_collected)}/>
-          <KpiCard variant="blue"  icon="ti-arrow-down-circle" label="TVA قابلة للخصم"      value={MONEY(data.summary.tva_deductible)}/>
-          <KpiCard variant="red"   icon="ti-calculator"        label="صافي TVA المستحق"    value={MONEY(data.summary.tva_balance)}/>
+          <KpiCard variant="green" icon="ti-arrow-up-circle"   label="TVA محصلة (مبيعات)" value={MONEY(data.summary.tva_collected)}/>
+          <KpiCard variant="blue"  icon="ti-arrow-down-circle" label="TVA قابلة للخصم"     value={MONEY(data.summary.tva_deductible)}/>
+          <KpiCard variant="red"   icon="ti-calculator"        label="صافي TVA المستحق"   value={MONEY(data.summary.tva_balance)}/>
         </div>
         <div className="kpis" style={{ gridTemplateColumns: 'repeat(2,1fr)', marginTop: 8 }}>
           <Card title="المبيعات" titleIcon="ti-trending-up" padding="sm" style={{ borderRadius: 12 }}>
