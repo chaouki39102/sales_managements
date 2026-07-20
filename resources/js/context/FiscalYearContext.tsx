@@ -93,6 +93,13 @@ export function FiscalYearProvider({ children }: { children: React.ReactNode }) 
   const open    = data?.open    ?? [];
   const closed  = data?.closed  ?? [];
 
+  // ✅ Auto-select: إذا لم يُختر سنة بعد، نختار السنة الحالية
+  useEffect(() => {
+    if (!selectedYearId && current) {
+      setSelectedYearId(current.id);
+    }
+  }, [selectedYearId, current, setSelectedYearId]);
+
   // ─── selectedYear: من Zustand id → يبحث في القائمة ──────────────────────
   const selectedYear: FiscalYear | null = (() => {
     if (!data) return null;

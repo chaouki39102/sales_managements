@@ -11,7 +11,7 @@ interface ProductGridProps {
   view: ViewMode;
   gridSize: GridSize;
   loading: boolean;
-  onAdd: (v: ProductVariant) => void;
+  onAdd: (v: ProductVariant, qty?: number) => void;
   onAddManual: () => void;
   onPin: (v: ProductVariant) => void;
   isPinned: (variantId: number) => boolean;
@@ -28,28 +28,12 @@ interface ProductGridProps {
   scannedId?: number | null;
 }
 
-/** أقل عرض للبطاقة حسب حجم الشبكة */
-function minCardWidth(gridSize: GridSize): number {
-  switch (gridSize) {
-    case 'xs': return 100;
-    case 'sm': return 130;
-    case 'md': return 165;
-    case 'lg': return 200;
-  }
-}
+type RowItem = { variant: ProductVariant; idx: number };
 
-/** ارتفاع الصف التقريبي حسب حجم الشبكة — تقدير أوّلي فقط قبل القياس
- *  الفعلي؛ الارتفاع الحقيقي يُقاس ديناميكياً عبر measureElement أدناه
- *  فلا داعي لمطابقته بدقة (يمنع التداخل/الفراغات الزائدة عند تبديل
- *  الحجم s/m/l/xl). */
-function rowEstimate(gridSize: GridSize): number {
-  switch (gridSize) {
-    case 'xs': return 150;
-    case 'sm': return 195;
-    case 'md': return 255;
-    case 'lg': return 300;
-  }
-}
+const MIN_CARD_WIDTH: Record<GridSize, number> = { xs: 100, sm: 130, md: 165, lg: 200 };
+const ROW_ESTIMATE: Record<GridSize, number> = { xs: 150, sm: 195, md: 255, lg: 300 };
+const MAX_COLS: Record<GridSize, number> = { xs: 8, sm: 6, md: 5, lg: 4 };
+const GRID_GAP: Record<GridSize, number> = { xs: 6, sm: 8, md: 10, lg: 12 };
 
 export default function ProductGrid({
   variants, view, gridSize, loading, onAdd, onAddManual,
@@ -72,34 +56,25 @@ export default function ProductGrid({
   }, [variants]);
 
   // ── Grid view (virtualised) ──────────────────────────────────────────────
-  // Column calculation: keep cards between min‑width and max comfortable cols
   const gridWrapRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(4);
-  const MAX_COLS: Record<GridSize, number> = { xs: 8, sm: 6, md: 5, lg: 4 };
 
-  // نفس منطق useLayoutEffect أعلاه: نحسب عدد الأعمدة الأولي للحجم
-  // الجديد *قبل* الرسم لتفادي أي فلاش عند تبديل S/M/L/XL. تحديثات
-  // ResizeObserver اللاحقة (أثناء تغيير حجم النافذة الفعلي) تبقى غير
-  // متزامنة بطبيعتها من المتصفح، وهذا مقبول لأنها حالة مختلفة (تغيير
-  // حجم النافذة، وليس تبديل نمط العرض).
   useLayoutEffect(() => {
   if (view !== 'grid') return;
   const el = gridWrapRef.current;
   if (!el) return;
-  const minW = minCardWidth(gridSize);
+  const minW = MIN_CARD_WIDTH[gridSize];
   const calc = () => {
     const w = el.clientWidth;
-    if (w <= 0) return; // تجاهل أي قراءة عرض صفرية مؤقتة (تحدث عند إعادة تركيب العنصر بعد كل بحث)
+    if (w <= 0) return;
     setColumns(Math.min(MAX_COLS[gridSize], Math.max(1, Math.floor(w / minW))));
   };
   calc();
   const obs = new ResizeObserver(calc);
   obs.observe(el);
   return () => obs.disconnect();
-}, [view, gridSize, loading]); // ← أضفنا loading
+  }, [view, gridSize, loading]);
 
-  // Group into rows (keep original index for keyboard nav)
-  type RowItem = { variant: ProductVariant; idx: number };
   const rows = useMemo(() => {
     if (view !== 'grid' || columns < 1) return [] as RowItem[][];
     const r: RowItem[][] = [];
@@ -114,7 +89,7 @@ export default function ProductGrid({
   }, [variants, columns, view]);
 
   const rowCount = rows.length;
-  const rowH = rowEstimate(gridSize);
+  const rowH = ROW_ESTIMATE[gridSize];
 
   // Virtualizer — estimateSize is only the *initial* guess; measureElement
   // (passed as a ref on each row below) makes react-virtual re-measure the
@@ -128,20 +103,11 @@ export default function ProductGrid({
     overscan: 3,
   });
 
-  // Re-measure everything whenever the size preset changes (image height,
-  // paddings, font sizes all change with gridSize) so stale measurements
-  // from a previous size never leak into the new layout.
-  // useLayoutEffect (وليس useEffect) عمداً: لازم نعيد القياس *قبل* ما
-  // يرسم المتصفح الإطار (paint)، وإلا يشوف المستخدم لحظة (frame واحد
-  // أو أكثر) بارتفاعات صفوف قديمة/متراكبة قبل ما تتصحح — وهذا بالضبط
-  // كان سبب "الفلاش" اللي يبان كخطأ حتى لو يتصحح لحاله بعدين.
-  // useLayoutEffect يشتغل بشكل متزامن (synchronous) بعد تحديث DOM
-  // مباشرة وقبل الرسم، فالمستخدم ما يشوف إلا الحالة الصحيحة النهائية.
+  // Re-measure rows on size preset change (useLayoutEffect to avoid paint flash)
   useLayoutEffect(() => {
     rowVirtualizer.measure();
   }, [gridSize, columns, rowVirtualizer]);
 
-  // Keyboard navigation scroll sync
   const prevHl = useRef<number | undefined>(undefined);
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -267,29 +233,11 @@ export default function ProductGrid({
 
   // ── Grid view (virtualised) ──────────────────────────────────────────────
   const gridMod = gridSize === 'xs' ? 'pgrid--xs' : gridSize === 'sm' ? 'pgrid--sm' : gridSize === 'lg' ? 'pgrid--lg' : '';
-  const gap = gridSize === 'xs' ? 6 : gridSize === 'sm' ? 8 : gridSize === 'md' ? 10 : 12;
-
-  // عرض ثابت وموحّد لكل بطاقة = (100% - مسافات) / عدد الأعمدة.
-  // هذا يمنع تمدّد البطاقات لتملأ الصف عندما يحتوي الصف على عناصر
-  // أقل من عدد الأعمدة (مثال: منتج واحد فقط، أو صف أخير غير مكتمل) —
-  // فكل بطاقة تحافظ على نفس عرض بقية البطاقات في الشبكة دائماً.
+  const gap = GRID_GAP[gridSize];
   const colBasis = `calc((100% - ${(columns - 1) * gap}px) / ${columns})`;
 
   return (
-    // ملاحظة: 'pgrid' تُطبَّق دائماً (وليس فقط عند xs/sm/lg) لضمان أن
-    // --pcard-img-h معرّفة دوماً؛ سابقاً كانت تُطبَّق فقط كمعدِّل عند
-    // بعض الأحجام، فكان الحجم الافتراضي (md) بلا قيمة للمتغيّر وتنهار
-    // صورة البطاقة إلى ارتفاع صفري.
     <div
-      // key={gridSize}: يجبر React على تفكيك وإعادة تركيب هذه الحاوية
-      // بالكامل (بدل تحديثها فقط) عند تبديل حجم الشبكة (S/M/L/XL).
-      // بدونها، كان react-virtual أحياناً يحتفظ بقياسات ارتفاع صفوف
-      // من الحجم القديم قبل أن تتم إعادة قياسها بالكامل عبر
-      // rowVirtualizer.measure()، فتظهر البطاقات متراكبة/متداخلة
-      // لحظة الانتقال بين نمطين مختلفين لهما نفس عدد الأعمدة لكن
-      // ارتفاع صف مختلف (مثل L→M). التكلفة الوحيدة: يفقد موضع
-      // التمرير عند تبديل الحجم، وهو مقبول لأنه فعل مقصود من المستخدم
-      // أصلاً يغيّر ترتيب/أبعاد كل العناصر بأي حال.
       key={gridSize}
       className={`pos-grid-area pgrid ${gridMod}`}
       ref={scrollRef}

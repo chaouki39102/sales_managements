@@ -38,16 +38,16 @@ export default function ProductMovementPage() {
       {d && (
         <>
           <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
-            <KpiCard label="المنتجات" value={d.summary.total_products} icon="ti-package" color="var(--blue)" />
-            <KpiCard label="إجمالي المبيعات (Units)" value={FMT(d.summary.total_sales_qty)} icon="ti-trending-up" color="var(--em)" />
-            <KpiCard label="إجمالي المشتريات (Units)" value={FMT(d.summary.total_purchase_qty)} icon="ti-trending-down" color="var(--orange)" />
-            <KpiCard label="صافي الوحدات" value={FMT(d.summary.total_sales_qty - d.summary.total_purchase_qty)} icon="ti-arrows-exchange" color="var(--purple)" />
+            <KpiCard label="المنتجات" value={d.summary.total_products} icon="ti-package" variant="blue" />
+            <KpiCard label="إجمالي المبيعات (Units)" value={FMT(d.summary.total_sales_qty)} icon="ti-trending-up" variant="green" />
+            <KpiCard label="إجمالي المشتريات (Units)" value={FMT(d.summary.total_purchase_qty)} icon="ti-trending-down" variant="orange" />
+            <KpiCard label="صافي الوحدات" value={FMT(d.summary.total_sales_qty - d.summary.total_purchase_qty)} icon="ti-arrows-exchange" variant="purple" />
           </div>
 
           <div className="kpis" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
-            <KpiCard label="المبيعات (HT)" value={MONEY(d.summary.total_sales_ht)} icon="ti-cash" color="var(--em)" />
-            <KpiCard label="المشتريات (HT)" value={MONEY(d.summary.total_purchase_ht)} icon="ti-cash" color="var(--orange)" />
-            <KpiCard label="صافي القيمة HT" value={MONEY(d.summary.total_sales_ht - d.summary.total_purchase_ht)} icon="ti-chart-line" color="var(--teal)" />
+            <KpiCard label="المبيعات (HT)" value={MONEY(d.summary.total_sales_ht)} icon="ti-cash" variant="green" />
+            <KpiCard label="المشتريات (HT)" value={MONEY(d.summary.total_purchase_ht)} icon="ti-cash" variant="orange" />
+            <KpiCard label="صافي القيمة HT" value={MONEY(d.summary.total_sales_ht - d.summary.total_purchase_ht)} icon="ti-chart-line" variant="teal" />
           </div>
 
           {d.items.length > 0 && (

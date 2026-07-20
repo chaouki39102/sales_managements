@@ -8,7 +8,7 @@ import Badge from '@/components/ui/Badge';
 
 export default function ProfitLossPage() {
   const { data, isLoading, isError, refetch } = useProfitLossReport();
-  const d = data?.data;
+  const d = data;
 
   return (
     <ReportShell
@@ -24,10 +24,10 @@ export default function ProfitLossPage() {
           {/* Revenue Section */}
           <Card title="الإيرادات" titleIcon="ti-trending-up" padding="sm" style={{ borderRadius: 12 }}>
             <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
-              <KpiCard label="المبيعات HT (بدون ضريبة)" value={MONEY(d.revenue.sales_ht)} icon="ti-cash" color="var(--blue)" />
-              <KpiCard label="الضريبة TVA" value={MONEY(d.revenue.sales_tva)} icon="ti-calculator" color="var(--purple)" />
-              <KpiCard label="المبيعات TTC (مع الضريبة)" value={MONEY(d.revenue.sales_ttc)} icon="ti-cash" color="var(--teal)" />
-              <KpiCard label="تكلفة البضاعة المباعة" value={MONEY(d.revenue.sales_cost)} icon="ti-package" color="var(--orange)" />
+              <KpiCard label="المبيعات HT (بدون ضريبة)" value={MONEY(d.revenue.sales_ht)} icon="ti-cash" variant="blue" />
+              <KpiCard label="الضريبة TVA" value={MONEY(d.revenue.sales_tva)} icon="ti-calculator" variant="purple" />
+              <KpiCard label="المبيعات TTC (مع الضريبة)" value={MONEY(d.revenue.sales_ttc)} icon="ti-cash" variant="teal" />
+              <KpiCard label="تكلفة البضاعة المباعة" value={MONEY(d.revenue.sales_cost)} icon="ti-package" variant="orange" />
             </div>
           </Card>
 
@@ -38,13 +38,13 @@ export default function ProfitLossPage() {
                 label="الهامش الإجمالي (HT - Cost)"
                 value={MONEY(d.revenue.gross_margin)}
                 icon="ti-coin"
-                color={d.revenue.gross_margin >= 0 ? 'var(--em)' : 'var(--red)'}
+                variant={d.revenue.gross_margin >= 0 ? 'green' : 'red'}
               />
               <KpiCard
                 label="نسبة الهامش الإجمالي"
                 value={`${d.revenue.gross_margin_pct}%`}
                 icon="ti-chart-line"
-                color={d.revenue.gross_margin_pct >= 0 ? 'var(--em)' : 'var(--red)'}
+                variant={d.revenue.gross_margin_pct >= 0 ? 'green' : 'red'}
               />
             </div>
           </Card>
@@ -52,11 +52,11 @@ export default function ProfitLossPage() {
           {/* Purchases & Expenses */}
           <Card title="المشتريات والمصروفات" titleIcon="ti-trending-down" padding="sm" style={{ borderRadius: 12 }}>
             <div className="kpis" style={{ gridTemplateColumns: 'repeat(2,1fr)' }}>
-              <KpiCard label="المشتريات HT" value={MONEY(d.purchases.purchase_ht)} icon="ti-trending-down" color="var(--orange)" />
-              <KpiCard label="ضريبة المشتريات" value={MONEY(d.purchases.purchase_tva)} icon="ti-calculator" color="var(--purple)" />
+              <KpiCard label="المشتريات HT" value={MONEY(d.purchases.purchase_ht)} icon="ti-trending-down" variant="orange" />
+              <KpiCard label="ضريبة المشتريات" value={MONEY(d.purchases.purchase_tva)} icon="ti-calculator" variant="purple" />
             </div>
             <div className="kpis" style={{ gridTemplateColumns: '1fr', marginTop: 8 }}>
-              <KpiCard label="إجمالي المصروفات" value={MONEY(d.expenses.total_expenses)} icon="ti-wallet" color="var(--red)" />
+              <KpiCard label="إجمالي المصروفات" value={MONEY(d.expenses.total_expenses)} icon="ti-wallet" variant="red" />
             </div>
 
             {d.expenses.by_category.length > 0 && (
@@ -88,13 +88,13 @@ export default function ProfitLossPage() {
                 label="الهامش الإجمالي"
                 value={MONEY(d.result.gross_margin)}
                 icon="ti-coin"
-                color={d.result.gross_margin >= 0 ? 'var(--em)' : 'var(--red)'}
+                variant={d.result.gross_margin >= 0 ? 'green' : 'red'}
               />
               <KpiCard
                 label="صافي الربح/الخسارة"
                 value={MONEY(d.result.net_result)}
                 icon={d.result.net_result >= 0 ? 'ti-mood-happy' : 'ti-mood-sad'}
-                color={d.result.net_result >= 0 ? 'var(--em)' : 'var(--red)'}
+                variant={d.result.net_result >= 0 ? 'green' : 'red'}
               />
             </div>
 

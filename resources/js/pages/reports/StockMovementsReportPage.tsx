@@ -15,7 +15,7 @@ export default function StockMovementsReportPage() {
     from_date: fromDate,
     to_date: toDate,
   });
-  const d = data?.data;
+  const d = data;
 
   return (
     <ReportShell

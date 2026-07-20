@@ -18,9 +18,9 @@ export default function SalesReportPage() {
           <KpiCard variant="green"  icon="ti-trending-up"   label="إجمالي HT"     value={MONEY(data.summary.total_ht)}/>
           <KpiCard variant="blue"   icon="ti-receipt"       label="إجمالي TTC"    value={MONEY(data.summary.total_ttc)}/>
           <KpiCard variant="teal"   icon="ti-trending-down"  label="التكلفة"       value={MONEY(data.summary.total_cost)}/>
-          <KpiCard variant="gold"   icon="ti-coin"          label="الهامش"        value={MONEY(data.summary.total_margin)} subtitle={`${data.summary.margin_pct}%`}/>
+          <KpiCard variant="gold"   icon="ti-coin"          label="الهامش"        value={MONEY(data.summary.total_margin)} sub={`${data.summary.margin_pct}%`}/>
           <KpiCard variant="purple" icon="ti-file-text"     label="الوثائق"       value={data.summary.count}/>
-          <KpiCard variant="red"    icon="ti-clock"         label="غير مسددة"     value={data.summary.unpaid_count} subtitle={`${MONEY(data.summary.total_remaining)}`}/>
+          <KpiCard variant="red"    icon="ti-clock"         label="غير مسددة"     value={data.summary.unpaid_count} sub={`${MONEY(data.summary.total_remaining)}`}/>
         </div>
         <div style={{ display: 'flex', gap: 8, margin: '16px 0 8px' }}>
           <Button size="xs" variant={tab === 'docs' ? 'primary' : 'ghost'} onClick={() => setTab('docs')}>الوثائق ({data.summary.count})</Button>

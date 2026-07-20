@@ -3,6 +3,8 @@ import { familyIcon } from '../utils/posHelpers';
 
 interface CategoryTabsProps {
   families: { id: number; name: string }[];
+  counts?: Map<number, number>;
+  totalCount?: number;
   selected: number | null;
   onSelect: (id: number | null) => void;
 }
@@ -10,7 +12,7 @@ interface CategoryTabsProps {
 const SCROLL_AMOUNT = 200;
 
 export default function CategoryTabs({
-  families, selected, onSelect,
+  families, counts, totalCount = 0, selected, onSelect,
 }: CategoryTabsProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -26,13 +28,10 @@ export default function CategoryTabs({
       setCanScrollRight(false);
       return;
     }
-    // RTL: scrollLeft ∈ [-maxScroll, 0],  LTR: scrollLeft ∈ [0, maxScroll]
     if (scrollLeft < 0) {
-      // RTL: -maxScroll = at start (right edge), 0 = at end (left edge)
-      setCanScrollLeft(scrollLeft < -1);              // not at end → hidden on left
-      setCanScrollRight(scrollLeft > -maxScroll + 1); // not at start → hidden on right
+      setCanScrollLeft(scrollLeft < -1);
+      setCanScrollRight(scrollLeft > -maxScroll + 1);
     } else {
-      // LTR: 0 = at start (left edge), maxScroll = at end (right edge)
       setCanScrollLeft(scrollLeft > 1);
       setCanScrollRight(scrollLeft < maxScroll - 1);
     }
@@ -51,7 +50,6 @@ export default function CategoryTabs({
     };
   }, [checkScroll, families.length]);
 
-  // Auto-scroll to selected category
   useEffect(() => {
     if (selected === null || !scrollRef.current) return;
     const btn = scrollRef.current.querySelector<HTMLButtonElement>(`[data-cat-id="${selected}"]`);
@@ -81,6 +79,7 @@ export default function CategoryTabs({
         >
           <i className="ti ti-layout-2" />
           <span>الكل</span>
+          <span className="cat-count">{totalCount}</span>
         </button>
         {families.map((f, idx) => (
           <button
@@ -92,6 +91,7 @@ export default function CategoryTabs({
           >
             <i className={`ti ${familyIcon(f.name)}`} />
             <span>{f.name}</span>
+            {counts?.has(f.id) && <span className="cat-count">{counts.get(f.id)}</span>}
             {idx < 9 && <kbd className="cat-kb">Alt+{idx + 1}</kbd>}
           </button>
         ))}

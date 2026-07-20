@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { ProductVariant, PriceLevel } from '@/types';
 import { formatDZD } from '../utils/calculations';
 import { getVariantPrice, familyStyleFromName, isVariantOutOfStock } from '../utils/posHelpers';
@@ -14,7 +14,7 @@ interface ProductCardProps {
   allowNegativeStock?:   boolean;
   showStock?:            boolean;
   priceDisplayMode?:     'ttc' | 'ht';
-  onAdd:                 (v: ProductVariant) => void;
+  onAdd:                 (v: ProductVariant, qty?: number) => void;
   onPin:                 (v: ProductVariant) => void;
   onHighlight?:          (idx: number) => void;
   onQty?:                (variantId: number, newQty: number) => void;
@@ -22,6 +22,8 @@ interface ProductCardProps {
   scannedId?:            number | null;
   variantCount?:         number;
 }
+
+const TAP_THRESHOLD = 300;
 
 function highlightText(text: string, query: string): React.ReactNode[] {
   if (!query || query.length < 2) return [text];
@@ -41,7 +43,7 @@ function highlightText(text: string, query: string): React.ReactNode[] {
   return parts.length ? parts : [text];
 }
 
-export default function ProductCard({
+function ProductCardInner({
   variant: v,
   idx,
   qtyInCart,
@@ -71,6 +73,16 @@ export default function ProductCard({
   const negStock      = v.manages_stock && !unknownStock && (rawStock ?? 0) < 0;
   const lowStock      = v.manages_stock && !unknownStock && !negStock && (stock ?? 0) > 0 && (stock ?? 0) <= (v.min_stock_alert ?? 0);
   const lastPiece     = v.manages_stock && !unknownStock && !negStock && (stock ?? 0) > 0 && (stock ?? 0) <= 2 && !lowStock;
+
+  const bestDiscount = useMemo(() => {
+    const d = v.quantity_discounts?.filter(d => d.active !== false)
+      .sort((a, b) => b.discount_percentage - a.discount_percentage)[0];
+    return d && d.discount_percentage > 0 ? d : null;
+  }, [v.quantity_discounts]);
+
+  const isWholesalePrice = selectedPriceLevelId !== null &&
+    priceLevels.length > 0 &&
+    selectedPriceLevelId !== priceLevels[0]?.id;
 
   const style = familyStyleFromName(v.product?.family?.name ?? '');
   const imageUrl = (v as unknown as { image_url?: string }).image_url;
@@ -114,19 +126,32 @@ export default function ProductCard({
     }
   }, [showInfo]);
 
-  const handleAdd = useCallback(() => {
+  useEffect(() => {
+    return () => {
+      if (addTimerRef.current) clearTimeout(addTimerRef.current);
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+      if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+    };
+  }, []);
+
+  const lastTapRef = useRef(0);
+  const handleAdd = useCallback((qty?: number) => {
     if (outStock) return;
-    onAdd(v);
+    onAdd(v, qty);
     setJustAdded(true);
     if (addTimerRef.current) clearTimeout(addTimerRef.current);
     addTimerRef.current = setTimeout(() => setJustAdded(false), 450);
   }, [outStock, onAdd, v]);
 
   const handleClick = useCallback(() => {
-    if (!outStock) {
-      handleAdd();
+    if (outStock) { onHighlight?.(idx); return; }
+    const now = Date.now();
+    if (now - lastTapRef.current < TAP_THRESHOLD) {
+      handleAdd(2);
+      lastTapRef.current = 0;
     } else {
-      onHighlight?.(idx);
+      lastTapRef.current = now;
+      handleAdd(1);
     }
   }, [outStock, handleAdd, onHighlight, idx]);
 
@@ -140,6 +165,16 @@ export default function ProductCard({
     if (qtyInCart > 1) onQty?.(v.id, qtyInCart - 1);
     else onQty?.(v.id, 0);
   }, [onQty, v.id, qtyInCart]);
+
+  const handleAddBtn = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    handleAdd(1);
+  }, [handleAdd]);
+
+  const handlePin = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onPin(v);
+  }, [onPin, v]);
 
   const inCart = qtyInCart > 0;
 
@@ -168,6 +203,8 @@ export default function ProductCard({
 
         <div className="pcard-family-bar" style={{ background: style.color }} />
 
+        {bestDiscount && <span className="pcard-discount-badge">-{bestDiscount.discount_percentage}%</span>}
+        {isWholesalePrice && <span className="pcard-price-level-badge">جملة</span>}
         {inCart && <span className="pcard-in-cart" key={qtyInCart}>{qtyInCart}</span>}
         {outStock && <span className="pcard-out-badge">نفذ</span>}
         {negStock && !outStock && <span className="pcard-neg-badge">سالب</span>}
@@ -204,10 +241,10 @@ export default function ProductCard({
         </div>
       </div>
 
-      <div className="pcard-actions" onClick={e => e.stopPropagation()}>
+      <div className="pcard-actions">
         <button
           className={`pcard-pin ${isPinned ? 'on' : ''}`}
-          onClick={() => onPin(v)}
+          onClick={handlePin}
           title={isPinned ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}
         >
           <i className={`ti ti-star${isPinned ? '-filled' : ''}`} />
@@ -226,7 +263,7 @@ export default function ProductCard({
         ) : (
           <button
             className="pcard-add"
-            onClick={handleAdd}
+            onClick={handleAddBtn}
             disabled={outStock}
             title="إضافة للسلة"
           >
@@ -236,13 +273,36 @@ export default function ProductCard({
       </div>
 
       {showInfo && (
-        <div className="pcard-info-popover" onClick={e => e.stopPropagation()}>
+        <div className="pcard-info-popover">
           <div className="pcard-info-row"><span className="pcard-info-label">المراجع:</span> {v.ref}</div>
           {v.barcode && <div className="pcard-info-row"><span className="pcard-info-label">الباركود:</span> {v.barcode}</div>}
           {v.product?.family?.name && <div className="pcard-info-row"><span className="pcard-info-label">العائلة:</span> {v.product.family.name}</div>}
+          {bestDiscount && <div className="pcard-info-row"><span className="pcard-info-label">الخصم:</span> <span style={{color:'var(--red)'}}>{bestDiscount.discount_percentage}%</span></div>}
           {v.product?.description && <div className="pcard-info-row pcard-info-desc">{v.product.description}</div>}
         </div>
       )}
     </div>
   );
 }
+
+const ProductCard = React.memo(ProductCardInner, (prev, next) => {
+  return prev.variant.id === next.variant.id
+    && prev.idx === next.idx
+    && prev.qtyInCart === next.qtyInCart
+    && prev.highlighted === next.highlighted
+    && prev.isPinned === next.isPinned
+    && prev.selectedPriceLevelId === next.selectedPriceLevelId
+    && prev.allowNegativeStock === next.allowNegativeStock
+    && prev.showStock === next.showStock
+    && prev.priceDisplayMode === next.priceDisplayMode
+    && prev.searchQuery === next.searchQuery
+    && prev.scannedId === next.scannedId
+    && prev.variantCount === next.variantCount
+    && prev.priceLevels === next.priceLevels
+    && prev.onAdd === next.onAdd
+    && prev.onPin === next.onPin
+    && prev.onHighlight === next.onHighlight
+    && prev.onQty === next.onQty;
+});
+
+export default ProductCard;

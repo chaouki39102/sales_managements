@@ -11,7 +11,7 @@ export default function DailyReportPage() {
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(today);
   const { data, isLoading, isError, refetch } = useDailyReport({ date });
-  const d = data?.data;
+  const d = data;
 
   return (
     <ReportShell
@@ -36,17 +36,17 @@ export default function DailyReportPage() {
       {d && (
         <>
           <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
-            <KpiCard label="إجمالي الوثائق" value={d.summary.total_docs} icon="ti-file" color="var(--blue)" />
-            <KpiCard label="المبيعات (HT)" value={MONEY(d.summary.sales_ht)} icon="ti-trending-up" color="var(--em)" />
-            <KpiCard label="المشتريات (HT)" value={MONEY(d.summary.purchases_ht)} icon="ti-trending-down" color="var(--orange)" />
-            <KpiCard label="المدفوعات المحصلة" value={MONEY(d.summary.payments_received)} icon="ti-cash" color="var(--gold)" />
+            <KpiCard label="إجمالي الوثائق" value={d.summary.total_docs} icon="ti-file" variant="blue" />
+            <KpiCard label="المبيعات (HT)" value={MONEY(d.summary.sales_ht)} icon="ti-trending-up" variant="green" />
+            <KpiCard label="المشتريات (HT)" value={MONEY(d.summary.purchases_ht)} icon="ti-trending-down" variant="orange" />
+            <KpiCard label="المدفوعات المحصلة" value={MONEY(d.summary.payments_received)} icon="ti-cash" variant="gold" />
           </div>
 
           <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
-            <KpiCard label="فواتير البيع" value={d.summary.sales_count} icon="ti-receipt" color="var(--em)" />
-            <KpiCard label="فواتير الشراء" value={d.summary.purchases_count} icon="ti-receipt" color="var(--orange)" />
-            <KpiCard label="المبيعات (TTC)" value={MONEY(d.summary.sales_ttc)} icon="ti-trending-up" color="var(--em)" />
-            <KpiCard label="عدد الدفعات" value={d.summary.payment_count} icon="ti-credit-card" color="var(--purple)" />
+            <KpiCard label="فواتير البيع" value={d.summary.sales_count} icon="ti-receipt" variant="green" />
+            <KpiCard label="فواتير الشراء" value={d.summary.purchases_count} icon="ti-receipt" variant="orange" />
+            <KpiCard label="المبيعات (TTC)" value={MONEY(d.summary.sales_ttc)} icon="ti-trending-up" variant="green" />
+            <KpiCard label="عدد الدفعات" value={d.summary.payment_count} icon="ti-credit-card" variant="purple" />
           </div>
 
           {d.documents.length > 0 && (
@@ -79,7 +79,7 @@ export default function DailyReportPage() {
                         <td className="num">{FMT(doc.total_tva)}</td>
                         <td className="num">{FMT(doc.total_ttc)}</td>
                         <td>
-                          <Badge color={doc.payment_status === 'paid' ? 'em' : 'or'}>
+                          <Badge variant={doc.payment_status === 'paid' ? 'success' : 'warning'}>
                             {doc.payment_status === 'paid' ? 'مدفوع' : 'غير مدفوع'}
                           </Badge>
                         </td>

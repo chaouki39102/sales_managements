@@ -18,7 +18,7 @@ export default function AgingReportPage() {
         <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginTop: 8 }}>
           {data.buckets.map((b, i) => (
             <KpiCard key={i} variant={i === 3 ? 'red' : i === 2 ? 'gold' : i === 1 ? 'blue' : 'green'}
-              icon="ti-calendar" label={b.label} value={MONEY(b.total)} unit="دج" subtitle={`${b.count} فاتورة`}/>
+              icon="ti-calendar" label={b.label} value={MONEY(b.total)} unit="دج" sub={`${b.count} فاتورة`}/>
           ))}
         </div>
         <Card noHeader style={{ padding: 0, marginTop: 16 }}>
@@ -36,7 +36,7 @@ export default function AgingReportPage() {
                     <td>
                       {row.bucket === '90_plus' ? <Badge variant="danger" noDot>أكثر من 90 يوم</Badge>
                         : row.bucket === '61_90' ? <Badge variant="warning" noDot>61–90 يوم</Badge>
-                        : row.bucket === '31_60' ? <Badge variant="primary" noDot>31–60 يوم</Badge>
+                        : row.bucket === '31_60' ? <Badge variant="info" noDot>31–60 يوم</Badge>
                         : <Badge variant="success" noDot>0–30 يوم</Badge>}
                     </td>
                   </tr>

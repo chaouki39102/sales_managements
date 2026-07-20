@@ -18,18 +18,18 @@ export default function TaxesReportPage() {
         <div className="kpis" style={{ gridTemplateColumns: 'repeat(2,1fr)', marginTop: 8 }}>
           <Card title="المبيعات" titleIcon="ti-trending-up" padding="sm" style={{ borderRadius: 12 }}>
             <div className="kpis" style={{ gridTemplateColumns: 'repeat(2,1fr)' }}>
-              <KpiCard label="الوعاء HT" value={MONEY(data.sales.total_ht)} icon="ti-cash" color="var(--blue)"/>
-              <KpiCard label="الضريبة TVA" value={MONEY(data.sales.total_tva)} icon="ti-calculator" color="var(--green)"/>
-              <KpiCard label="الطابع الجبائي" value={MONEY(data.sales.total_stamp)} icon="ti-stamp" color="var(--purple)"/>
-              <KpiCard label="العدد" value={data.sales.count} icon="ti-file-text" color="var(--teal)"/>
+              <KpiCard label="الوعاء HT" value={MONEY(data.sales.total_ht)} icon="ti-cash" variant="blue"/>
+              <KpiCard label="الضريبة TVA" value={MONEY(data.sales.total_tva)} icon="ti-calculator" variant="green"/>
+              <KpiCard label="الطابع الجبائي" value={MONEY(data.sales.total_stamp)} icon="ti-stamp" variant="purple"/>
+              <KpiCard label="العدد" value={data.sales.count} icon="ti-file-text" variant="teal"/>
             </div>
           </Card>
           <Card title="المشتريات" titleIcon="ti-trending-down" padding="sm" style={{ borderRadius: 12 }}>
             <div className="kpis" style={{ gridTemplateColumns: 'repeat(2,1fr)' }}>
-              <KpiCard label="الوعاء HT" value={MONEY(data.purchases.total_ht)} icon="ti-cash" color="var(--blue)"/>
-              <KpiCard label="الضريبة TVA" value={MONEY(data.purchases.total_tva)} icon="ti-calculator" color="var(--orange)"/>
-              <KpiCard label="الطابع الجبائي" value={MONEY(data.purchases.total_stamp)} icon="ti-stamp" color="var(--purple)"/>
-              <KpiCard label="العدد" value={data.purchases.count} icon="ti-file-text" color="var(--teal)"/>
+              <KpiCard label="الوعاء HT" value={MONEY(data.purchases.total_ht)} icon="ti-cash" variant="blue"/>
+              <KpiCard label="الضريبة TVA" value={MONEY(data.purchases.total_tva)} icon="ti-calculator" variant="orange"/>
+              <KpiCard label="الطابع الجبائي" value={MONEY(data.purchases.total_stamp)} icon="ti-stamp" variant="purple"/>
+              <KpiCard label="العدد" value={data.purchases.count} icon="ti-file-text" variant="teal"/>
             </div>
           </Card>
         </div>

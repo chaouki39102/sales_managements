@@ -51,9 +51,9 @@ export default function PaymentsReportPage() {
                       <td style={{ color: 'var(--t4)', fontSize: 12 }}>{i + 1}</td>
                       <td>{p.payment_date}</td>
                       <td style={{ fontWeight: 700 }}>{FMT(p.amount)}</td>
-                      <td>{(p as any).payment_mode ?? '—'}</td>
-                      <td>{(p as any).party_name ?? '—'}</td>
-                      <td>{(p as any).document_number ?? '—'}</td>
+                      <td>{p.payment_mode ?? '—'}</td>
+                      <td>{p.party_name ?? '—'}</td>
+                      <td>{p.document_number ?? '—'}</td>
                       <td><span className={`badge badge-${p.status === 'confirmed' ? 'success' : p.status === 'pending' ? 'warning' : 'danger'}`}>{p.status}</span></td>
                     </tr>
                   ))}

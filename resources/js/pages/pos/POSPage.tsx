@@ -86,6 +86,7 @@ import type { PipelineSource } from '@/pages/settings/print-settings/runtime/Uni
 import type { CompanyPreviewData } from '@/pages/settings/print-settings/types';
 
 const QUICK_ITEMS_KEY = (slug: string) => `pos-quick-items-${slug}`;
+const RECENT_PRODUCTS_KEY = (slug: string) => `pos-recent-products-${slug}`;
 
 function compoundDiscountPct(linePct: number, invoicePct: number): number {
   if (invoicePct <= 0) return linePct;
@@ -289,6 +290,14 @@ function POSPage() {
   });
   const [showQuickbar, setShowQuickbar] = useState(settings.showQuickbarOnStart);
 
+  const [recentProducts, setRecentProducts] = useState<ProductVariant[]>(() => {
+    if (!slug) return [];
+    try {
+      const stored = localStorage.getItem(RECENT_PRODUCTS_KEY(slug));
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
+
   const handleToggleQuickbar = useCallback(() => {
     setShowQuickbar(prev => {
       const next = !prev;
@@ -302,6 +311,12 @@ function POSPage() {
     try { localStorage.setItem(QUICK_ITEMS_KEY(slug), JSON.stringify(quickItems)); }
     catch { /* storage full */ }
   }, [quickItems, slug]);
+
+  useEffect(() => {
+    if (!slug) return;
+    try { localStorage.setItem(RECENT_PRODUCTS_KEY(slug), JSON.stringify(recentProducts)); }
+    catch { /* storage full */ }
+  }, [recentProducts, slug]);
 
   // ── Search & Filters ──────────────────────────────────────────────────────
   const [sortBy, setSortBy] = useState<SortMode>('name');
@@ -543,6 +558,15 @@ function POSPage() {
     ).values(),
   ), [allVariants]);
 
+  const familyCounts = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const v of allVariants) {
+      const fid = v.product?.family?.id;
+      if (fid != null) map.set(fid, (map.get(fid) ?? 0) + 1);
+    }
+    return map;
+  }, [allVariants]);
+
   // مفصولة عن الفرز عمداً: تغيير sortBy لحاله (بدون تغيير أي فلتر) كان
   // يعيد تنفيذ كل سلسلة الفلترة (تصنيف + بحث + مخزون + سعر) من الصفر رغم
   // إنها ما تغيّرت أصلاً — الآن فقط الفرز يُعاد حسابه بهذي الحالة.
@@ -766,7 +790,7 @@ function POSPage() {
   const invoiceDiscountAmount = pos.totals.invoice_discount_amount ?? 0;
 
   const fiscalStampAmount = fiscalStampEnabled ? calcFiscalStamp(pos.totals.total_ttc) : 0;
-  const adjustedTotalTtcFinal = pos.totals.total_ht + pos.totals.total_tva + fiscalStampAmount;
+  const adjustedTotalTtcFinal = pos.totals.total_ttc + fiscalStampAmount;
 
   const existingPaymentsSum = useMemo(
     () => pos.payments.reduce((s, p) => s + Number(p.amount || 0), 0),
@@ -1194,8 +1218,12 @@ const handleCompleteSale = useCallback(async (params: {
   const isQuickItem = useCallback((variantId: number) =>
     quickItems.some(q => q.variantId === variantId), [quickItems]);
 
-  const handleAddItem = useCallback((v: ProductVariant) => {
-    posRef.current.addItem(v);
+  const handleAddItem = useCallback((v: ProductVariant, qty?: number) => {
+    posRef.current.addItem(v, qty);
+    setRecentProducts(prev => {
+      const filtered = prev.filter(p => p.id !== v.id);
+      return [v, ...filtered].slice(0, 5);
+    });
     // Auto-select + scroll to added item so user can immediately set qty via *<digits> Enter
     const items = useCartStore.getState().items;
     const added = items.find(i => i.variant_id === v.id);
@@ -1219,6 +1247,14 @@ const handleCompleteSale = useCallback(async (params: {
       });
     });
   }, [settings.clearSearchOnAdd, settings.playSoundOnAdd, settings.soundPreset, settings.soundVolume, allVariants, filteredVariants, safeToast]);
+
+  const handleQtyChange = useCallback((variantId: number, qty: number) => {
+    const item = pos.items.find(i => i.variant_id === variantId);
+    if (item) {
+      if (qty <= 0) pos.removeItem(item.id);
+      else pos.updateQty(item.id, qty);
+    }
+  }, [pos.items, pos.removeItem, pos.updateQty]);
 
   const handleArrowUp = useCallback(() => {
     setHighlightedIndex(prev => prev > 0 ? prev - 1 : filteredVariants.length - 1);
@@ -1362,6 +1398,22 @@ const handleCompleteSale = useCallback(async (params: {
         />
       )}
 
+      {recentProducts.length > 0 && (
+        <div className="pos-recent-bar">
+          <span className="pos-recent-label"><i className="ti ti-clock-hour-4" /> الأحدث:</span>
+          {recentProducts.map(v => (
+            <button
+              key={v.id}
+              className="pos-recent-item"
+              onClick={() => handleAddItem(v)}
+              title={v.product?.name}
+            >
+              {v.product?.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       <MobileTabs
         activeTab={mobTab} onTab={setMobTab}
         itemsCount={pos.totals.items_count}
@@ -1399,7 +1451,9 @@ const handleCompleteSale = useCallback(async (params: {
               onReset={() => { setFilterInStock(false); setFilterLowStock(false); setFilterMinPrice(''); setFilterMaxPrice(''); }}
             />
           )}
-          <CategoryTabs families={families} selected={pos.selectedCategory} onSelect={pos.setCategory} />
+          <CategoryTabs families={families} selected={pos.selectedCategory} onSelect={pos.setCategory}
+            counts={familyCounts} totalCount={allVariants.length}
+          />
           <ProductGrid
             variants={filteredVariants} view={view} gridSize={gridSize}
             loading={loadingAll}
@@ -1411,13 +1465,7 @@ const handleCompleteSale = useCallback(async (params: {
             cartItems={pos.items} allowNegativeStock={allowNegSetting}
             showStock={settings.showStockOnCard}
             priceDisplayMode={settings.priceDisplayMode}
-            onQty={(variantId, qty) => {
-              const item = pos.items.find(i => i.variant_id === variantId);
-              if (item) {
-                if (qty <= 0) pos.removeItem(item.id);
-                else pos.updateQty(item.id, qty);
-              }
-            }}
+            onQty={handleQtyChange}
             searchQuery={rawQuery}
             scannedId={scannedId}
           />

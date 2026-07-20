@@ -1002,6 +1002,106 @@
   -webkit-box-orient: vertical;
 }
 
+/* ── Discount badge (top-left on image) ── */
+.pcard-discount-badge {
+  position: absolute;
+  top: 6px; left: 6px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.4;
+  pointer-events: none;
+  z-index: 3;
+  box-shadow: 0 1px 4px rgba(220,53,69,.25);
+}
+.pgrid--xs .pcard-discount-badge {
+  font-size: 8px; padding: 1px 5px; top: 3px; left: 3px;
+}
+
+/* ── Price level indicator (wholesale tag) ── */
+.pcard-price-level-badge {
+  position: absolute;
+  top: 6px; left: 6px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.4;
+  pointer-events: none;
+  z-index: 3;
+  box-shadow: 0 1px 4px rgba(0,100,200,.2);
+}
+.pgrid--xs .pcard-price-level-badge {
+  font-size: 8px; padding: 1px 5px; top: 3px; left: 3px;
+}
+
+/* ── Category count badge ── */
+.cat-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--bg4);
+  color: var(--t3);
+  font-size: 10px;
+  font-weight: 700;
+  font-family: 'IBM Plex Mono', monospace;
+  line-height: 1;
+}
+.pos-cat.on .cat-count {
+  background: rgba(255,255,255,.25);
+  color: #fff;
+}
+
+/* ── Recent products bar ── */
+.pos-recent-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.pos-recent-bar::-webkit-scrollbar { display: none; }
+.pos-recent-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--t4);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.pos-recent-item {
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--bg3);
+  border: 1px solid var(--b2);
+  color: var(--t2);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all .12s;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pos-recent-item:hover {
+  background: var(--emb);
+  border-color: var(--embo);
+  color: var(--em);
+}
+
 /* ════════════════════════════════════════════════════
    LIST VIEW
 ════════════════════════════════════════════════════ */

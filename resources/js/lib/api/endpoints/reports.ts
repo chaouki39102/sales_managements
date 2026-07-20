@@ -9,7 +9,7 @@ import { tenantKeys }                        from '../core/queryKeys';
 import { useActiveSlug, useSelectedYearId }  from '../../store/appStore';
 import type {
   Party, Product, ProductVariant,
-  CommercialDocument, Payment,
+  CommercialDocument,
 } from '../core/types';
 
 // ─── Report Params ────────────────────────────────────────────────────────────
@@ -211,7 +211,19 @@ export interface PaymentsReportData {
     count:  number;
     total:  number;
   }>;
-  payments: Payment[];
+  payments: Array<{
+    id:               number;
+    payment_date:     string;
+    amount:           number;
+    document_number?: string;
+    document_type?:   string;
+    party_name?:      string;
+    payment_mode?:    string;
+    treasury_account?: string;
+    reference?:       string;
+    notes?:           string;
+    status:           string;
+  }>;
 }
 
 export interface TaxesReportSummary {

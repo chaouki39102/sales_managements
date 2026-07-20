@@ -13,8 +13,8 @@ export default function ReturnsReportPage() {
       <>
         <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
           <KpiCard variant="red"   icon="ti-rotate-left"   label="إجمالي الإرجاعات" value={data.summary.total_returns}/>
-          <KpiCard variant="orange" icon="ti-trending-up"  label="إرجاعات البيع"     value={data.summary.sale_returns} subtitle={MONEY(data.summary.sale_returns_ht)}/>
-          <KpiCard variant="blue"  icon="ti-trending-down" label="إرجاعات الشراء"   value={data.summary.purchase_returns} subtitle={MONEY(data.summary.purchase_returns_ht)}/>
+          <KpiCard variant="orange" icon="ti-trending-up"  label="إرجاعات البيع"     value={data.summary.sale_returns} sub={MONEY(data.summary.sale_returns_ht)}/>
+          <KpiCard variant="blue"  icon="ti-trending-down" label="إرجاعات الشراء"   value={data.summary.purchase_returns} sub={MONEY(data.summary.purchase_returns_ht)}/>
           <KpiCard variant="gold"  icon="ti-cash"          label="القيمة الإجمالية"  value={MONEY(data.summary.total_ht)}/>
         </div>
         {data.documents.length > 0 && (

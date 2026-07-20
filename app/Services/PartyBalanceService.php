@@ -324,7 +324,9 @@ class PartyBalanceService
             $cmp = strcmp($a['date'], $b['date']);
             if ($cmp !== 0) return $cmp;
             $cmp = strcmp($a['datetime'] ?? '', $b['datetime'] ?? '');
-            return $cmp !== 0 ? $cmp : $a['id'] - $b['id'];
+            if ($cmp !== 0) return $cmp;
+            if ($a['type'] !== $b['type']) return $a['type'] === 'document' ? -1 : 1;
+            return $a['id'] - $b['id'];
         });
         foreach ($all as $i => &$item) {
             $item['seq'] = $i + 1;
@@ -668,7 +670,9 @@ class PartyBalanceService
             $cmp = strcmp($a['date'], $b['date']);
             if ($cmp !== 0) return $cmp;
             $cmp = strcmp($a['datetime'] ?? '', $b['datetime'] ?? '');
-            return $cmp !== 0 ? $cmp : $a['id'] - $b['id'];
+            if ($cmp !== 0) return $cmp;
+            if ($a['type'] !== $b['type']) return $a['type'] === 'document' ? -1 : 1;
+            return $a['id'] - $b['id'];
         });
         foreach ($all as $i => &$item) {
             $item['seq'] = $i + 1;

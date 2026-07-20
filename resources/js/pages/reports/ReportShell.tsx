@@ -46,7 +46,7 @@ export default function ReportShell({ title, subtitle, isLoading, isError, refet
         </AlertBar>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {children ?? (
+          {React.Children.count(children) > 0 ? children : (
             <div className="empty" style={{ padding: 40 }}>
               <div className="empty-ic"><i className="ti ti-file-off"/></div>
               <div className="empty-tx">لا توجد بيانات متاحة لهذه الفترة</div>

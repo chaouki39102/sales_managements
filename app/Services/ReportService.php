@@ -8,6 +8,7 @@ use App\Models\Party;
 use App\Models\Product;
 use App\Models\Payment;
 use App\Models\StockMovement;
+use App\Services\CompanyContextService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -15,6 +16,11 @@ class ReportService
 {
     private const SALE_CODES = ['FV', 'AV', 'POS'];
     private const PURCHASE_CODES = ['FA', 'AA'];
+
+    private function companyId(): int
+    {
+        return (int) app(CompanyContextService::class)->get();
+    }
 
     public function salesReport(array $filters = []): array
     {
@@ -42,6 +48,7 @@ class ReportService
             $costRows = DB::table('commercial_document_lines as cdl')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->where('cd.company_id', $this->companyId())
                 ->whereIn('cdl.commercial_document_id', $docIds)
                 ->select(
                     'cdl.commercial_document_id',
@@ -62,6 +69,7 @@ class ReportService
                 ->join('products as p', 'p.id', '=', 'cdl.product_id')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->where('cd.company_id', $this->companyId())
                 ->whereIn('cdl.commercial_document_id', $docIds)
                 ->select(
                     'cdl.product_id',
@@ -115,6 +123,7 @@ class ReportService
                 'doc_cost_ht'       => round($docCost, 2),
                 'margin_value'      => round($doc->total_ht - $docCost, 2),
                 'payment_status'    => $doc->remaining_amount > 0.01 ? 'unpaid' : 'paid',
+                'status'            => $doc->remaining_amount > 0.01 ? 'unpaid' : 'paid',
             ];
         })->toArray();
 
@@ -176,6 +185,7 @@ class ReportService
                 ->join('products as p', 'p.id', '=', 'cdl.product_id')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->where('cd.company_id', $this->companyId())
                 ->whereIn('cdl.commercial_document_id', $docIds)
                 ->select(
                     'cdl.product_id',
@@ -218,6 +228,7 @@ class ReportService
             'paid_amount'       => round($doc->paid_amount, 2),
             'remaining_amount'  => round($doc->remaining_amount, 2),
             'payment_status'    => $doc->remaining_amount > 0.01 ? 'unpaid' : 'paid',
+            'status'            => $doc->remaining_amount > 0.01 ? 'unpaid' : 'paid',
         ])->toArray();
 
         return [
@@ -253,6 +264,7 @@ class ReportService
         if ($partyIds->isNotEmpty()) {
             $statsQuery = DB::table('commercial_documents as cd')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->where('cd.company_id', $this->companyId())
                 ->whereIn('cd.party_id', $partyIds)
                 ->whereIn('dt.code', self::SALE_CODES);
             if (!empty($filters['fiscal_year_id'])) {
@@ -327,6 +339,7 @@ class ReportService
         if ($partyIds->isNotEmpty()) {
             $statsQuery = DB::table('commercial_documents as cd')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->where('cd.company_id', $this->companyId())
                 ->whereIn('cd.party_id', $partyIds)
                 ->whereIn('dt.code', self::PURCHASE_CODES);
             if (!empty($filters['fiscal_year_id'])) {
@@ -405,6 +418,7 @@ class ReportService
             $statsQuery = DB::table('commercial_document_lines as cdl')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->where('cd.company_id', $this->companyId())
                 ->whereIn('cdl.product_id', $productIds)
                 ->whereIn('dt.code', self::SALE_CODES);
             if (!empty($filters['fiscal_year_id'])) {
@@ -429,10 +443,30 @@ class ReportService
             }
         }
 
+        $warehouseStockMap = [];
+        $useWarehouseStock = !empty($filters['warehouse_id']) && $productIds->isNotEmpty();
+        if ($useWarehouseStock) {
+            $stockRows = DB::table('stock_movements as sm')
+                ->join('stock_movement_types as smt', 'smt.id', '=', 'sm.stock_movement_type_id')
+                ->where('sm.warehouse_id', $filters['warehouse_id'])
+                ->whereIn('sm.product_id', $productIds)
+                ->select(
+                    'sm.product_id',
+                    DB::raw("SUM(CASE WHEN smt.direction = 1 THEN sm.quantity WHEN smt.direction = -1 THEN -sm.quantity ELSE sm.quantity END) as qty")
+                )
+                ->groupBy('sm.product_id')
+                ->get();
+
+            foreach ($stockRows as $row) {
+                $warehouseStockMap[$row->product_id] = (float) $row->qty;
+            }
+        }
+
         return [
-            'products' => $products->map(function ($product) use ($salesStats) {
+            'products' => $products->map(function ($product) use ($salesStats, $useWarehouseStock, $warehouseStockMap) {
                 $ss = $salesStats[$product->id] ?? ['total_sold' => 0, 'sales_ht' => 0, 'sales_cost' => 0];
-                $stockVal = round($product->current_stock * $product->current_cost_price, 2);
+                $stockQty = $useWarehouseStock ? ($warehouseStockMap[$product->id] ?? 0) : $product->current_stock;
+                $stockVal = round($stockQty * $product->current_cost_price, 2);
                 $margin = $ss['sales_ht'] - $ss['sales_cost'];
                 return [
                     'id'                  => $product->id,
@@ -444,7 +478,7 @@ class ReportService
                     'purchase_price_ht'   => round($product->purchase_price_ht, 2),
                     'current_cost_price'  => round($product->current_cost_price, 2),
                     'tva_rate'            => $product->tva?->rate,
-                    'stock_quantity'       => $product->current_stock,
+                    'stock_quantity'       => round($stockQty, 2),
                     'min_stock_alert'     => $product->min_stock_alert,
                     'stock_value'         => $stockVal,
                     'total_sold'          => $ss['total_sold'],
@@ -456,7 +490,10 @@ class ReportService
             })->toArray(),
             'summary' => [
                 'total_products'    => $products->count(),
-                'total_stock_value' => round($products->sum(fn($p) => $p->current_stock * $p->current_cost_price), 2),
+                'total_stock_value' => round((float) $products->sum(function ($p) use ($useWarehouseStock, $warehouseStockMap) {
+                    $qty = $useWarehouseStock ? ($warehouseStockMap[$p->id] ?? 0) : $p->current_stock;
+                    return $qty * $p->current_cost_price;
+                }), 2),
                 'total_sold'        => array_sum(array_column($salesStats, 'total_sold')),
                 'total_sales_ht'    => round(array_sum(array_column($salesStats, 'sales_ht')), 2),
             ],
@@ -473,27 +510,66 @@ class ReportService
 
         $products = $query->orderBy('name')->get();
 
+        $warehouseStockMap = [];
+        if (!empty($filters['warehouse_id']) && $products->isNotEmpty()) {
+            $productIds = $products->pluck('id');
+            $stockRows = DB::table('stock_movements as sm')
+                ->join('stock_movement_types as smt', 'smt.id', '=', 'sm.stock_movement_type_id')
+                ->where('sm.warehouse_id', $filters['warehouse_id'])
+                ->whereIn('sm.product_id', $productIds)
+                ->select(
+                    'sm.product_id',
+                    DB::raw("SUM(CASE WHEN smt.direction = 1 THEN sm.quantity WHEN smt.direction = -1 THEN -sm.quantity ELSE sm.quantity END) as qty")
+                )
+                ->groupBy('sm.product_id')
+                ->get();
+
+            foreach ($stockRows as $row) {
+                $warehouseStockMap[$row->product_id] = (float) $row->qty;
+            }
+        }
+        $useWarehouseStock = !empty($filters['warehouse_id']) && $products->isNotEmpty();
+
         $lowStock = $products->filter(fn($p) => $p->current_stock <= $p->min_stock_alert && $p->current_stock > 0);
         $outOfStock = $products->filter(fn($p) => $p->current_stock == 0);
 
+        $showLowStock = !empty($filters['low_stock']) && $filters['low_stock'] != '0';
+        $showOutOfStock = !empty($filters['out_of_stock']) && $filters['out_of_stock'] != '0';
+
+        if ($showLowStock && !$showOutOfStock) {
+            $products = $products->filter(fn($p) => $p->current_stock <= $p->min_stock_alert && $p->current_stock > 0);
+        } elseif (!$showLowStock && $showOutOfStock) {
+            $products = $products->filter(fn($p) => $p->current_stock == 0);
+        } elseif ($showLowStock && $showOutOfStock) {
+            $products = $products->filter(fn($p) => $p->current_stock <= $p->min_stock_alert);
+        }
+
         return [
-            'products' => $products->map(fn($product) => [
-                'id'                => $product->id,
-                'ref'               => $product->ref,
-                'name'              => $product->name,
-                'family'            => $product->family?->name,
-                'brand'             => $product->brand?->name,
-                'stock_quantity'     => $product->current_stock,
-                'min_stock_alert'    => $product->min_stock_alert,
-                'purchase_price_ht'  => round($product->purchase_price_ht, 2),
-                'current_cost_price' => round($product->current_cost_price, 2),
-                'stock_value'        => round($product->current_stock * $product->current_cost_price, 2),
-                'status'             => $product->current_stock == 0 ? 'out_of_stock' : ($product->current_stock <= $product->min_stock_alert ? 'low_stock' : 'in_stock'),
-            ])->toArray(),
+            'products' => $products->map(function ($product) use ($useWarehouseStock, $warehouseStockMap) {
+                $stockQty = $useWarehouseStock ? ($warehouseStockMap[$product->id] ?? 0) : $product->current_stock;
+                return [
+                    'id'                => $product->id,
+                    'ref'               => $product->ref,
+                    'name'              => $product->name,
+                    'family'            => $product->family?->name,
+                    'brand'             => $product->brand?->name,
+                    'stock_quantity'     => round($stockQty, 2),
+                    'min_stock_alert'    => $product->min_stock_alert,
+                    'purchase_price_ht'  => round($product->purchase_price_ht, 2),
+                    'current_cost_price' => round($product->current_cost_price, 2),
+                    'stock_value'        => round($stockQty * $product->current_cost_price, 2),
+                    'status'             => $stockQty == 0 ? 'out_of_stock' : ($stockQty <= $product->min_stock_alert ? 'low_stock' : 'in_stock'),
+                ];
+            })->toArray(),
             'summary' => [
                 'total_products'    => $products->count(),
-                'total_quantity'    => $products->sum('current_stock'),
-                'total_value'       => round($products->sum(fn($p) => $p->current_stock * $p->current_cost_price), 2),
+                'total_quantity'    => round((float) $products->sum(function ($p) use ($useWarehouseStock, $warehouseStockMap) {
+                    return $useWarehouseStock ? ($warehouseStockMap[$p->id] ?? 0) : $p->current_stock;
+                }), 2),
+                'total_value'       => round((float) $products->sum(function ($p) use ($useWarehouseStock, $warehouseStockMap) {
+                    $qty = $useWarehouseStock ? ($warehouseStockMap[$p->id] ?? 0) : $p->current_stock;
+                    return $qty * $p->current_cost_price;
+                }), 2),
                 'low_stock_count'   => $lowStock->count(),
                 'out_of_stock_count' => $outOfStock->count(),
             ],
@@ -554,6 +630,7 @@ class ReportService
         $rows = DB::table('commercial_document_lines as cdl')
             ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
             ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->where('cd.company_id', $this->companyId())
             ->whereDate('cd.document_date', '>=', $from)
             ->whereDate('cd.document_date', '<=', $to)
             ->whereIn('dt.code', array_merge(self::SALE_CODES, ['BL', 'BCC']))
@@ -605,6 +682,7 @@ class ReportService
         $rows = DB::table('commercial_document_lines as cdl')
             ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
             ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->where('cd.company_id', $this->companyId())
             ->whereDate('cd.document_date', '>=', $from)
             ->whereDate('cd.document_date', '<=', $to)
             ->whereIn('dt.code', array_merge(self::SALE_CODES, ['BL', 'BCC']))
@@ -780,14 +858,17 @@ class ReportService
         if ($salesIds->isNotEmpty()) {
             $lineData = DB::table('commercial_document_lines as cdl')
                 ->join('products as p', 'p.id', '=', 'cdl.product_id')
+                ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+                ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->where('cd.company_id', $this->companyId())
                 ->whereIn('cdl.commercial_document_id', $salesIds)
                 ->select(
                     'cdl.product_id',
                     'p.name as product_name',
                     'p.ref as product_ref',
-                    DB::raw('SUM(cdl.quantity) as total_qty'),
-                    DB::raw('SUM(cdl.total_ht) as total_ht'),
-                    DB::raw('SUM(cdl.quantity * cdl.cost_price_ht) as total_cost')
+                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity ELSE cdl.quantity END) as total_qty"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.total_ht ELSE cdl.total_ht END) as total_ht"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity * cdl.cost_price_ht ELSE cdl.quantity * cdl.cost_price_ht END) as total_cost")
                 )
                 ->groupBy('cdl.product_id', 'p.name', 'p.ref')
                 ->orderByDesc('total_ht')
@@ -820,20 +901,24 @@ class ReportService
             ->whereHas('documentType', fn($q) => $q->whereIn('code', self::SALE_CODES))
             ->where('remaining_amount', '>', 0);
         if ($fiscalYearId) $topCustomers->where('fiscal_year_id', $fiscalYearId);
-        $topCustomers = $topCustomers
+        $topCustomersRaw = $topCustomers
             ->select('party_id', DB::raw('SUM(total_ttc) as total_ttc'), DB::raw('COUNT(*) as doc_count'))
             ->groupBy('party_id')
             ->orderByDesc('total_ttc')
             ->limit(10)
-            ->get()
-            ->map(function ($row) {
-                $party = Party::find($row->party_id);
-                return [
-                    'party_name'   => $party?->name ?? '—',
-                    'total_ttc'    => round((float) $row->total_ttc, 2),
-                    'doc_count'    => (int) $row->doc_count,
-                ];
-            });
+            ->get();
+
+        $partyIds = $topCustomersRaw->pluck('party_id')->filter()->unique();
+        $partiesMap = Party::whereIn('id', $partyIds)->get()->keyBy('id');
+
+        $topCustomers = $topCustomersRaw->map(function ($row) use ($partiesMap) {
+            $party = $partiesMap->get($row->party_id);
+            return [
+                'party_name'   => $party?->name ?? '—',
+                'total_ttc'    => round((float) $row->total_ttc, 2),
+                'doc_count'    => (int) $row->doc_count,
+            ];
+        });
 
         $paymentsQuery = Payment::where('status', 'confirmed');
         if ($fiscalYearId) {
@@ -894,6 +979,7 @@ class ReportService
             'total_tva'        => round($doc->total_tva, 2),
             'total_ttc'        => round($doc->total_ttc, 2),
             'payment_status'   => $doc->remaining_amount > 0.01 ? 'unpaid' : 'paid',
+            'status'           => $doc->remaining_amount > 0.01 ? 'unpaid' : 'paid',
         ])->toArray();
 
         return [
@@ -923,6 +1009,7 @@ class ReportService
         $query = DB::table('commercial_document_lines as cdl')
             ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
             ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->where('cd.company_id', $this->companyId())
             ->whereDate('cd.document_date', '>=', $from)
             ->whereDate('cd.document_date', '<=', $to);
 
@@ -990,18 +1077,25 @@ class ReportService
     public function profitLossReport(array $filters = []): array
     {
         $fiscalYearId = $filters['fiscal_year_id'] ?? null;
+        $from = $filters['from_date'] ?? null;
+        $to   = $filters['to_date']   ?? null;
+
+        if ($fiscalYearId && (!$from || !$to)) {
+            $fy = \App\Models\FiscalYear::find($fiscalYearId);
+            if ($fy) {
+                $from = $from ?? $fy->start_date;
+                $to   = $to   ?? $fy->end_date;
+            }
+        }
 
         $salesQuery = CommercialDocument::whereHas('documentType', fn($q) => $q->whereIn('code', self::SALE_CODES));
         $purchaseQuery = CommercialDocument::whereHas('documentType', fn($q) => $q->whereIn('code', self::PURCHASE_CODES));
-        $expenseQuery = DB::table('expenses');
+        $expenseQuery = DB::table('expenses')->where('company_id', $this->companyId());
 
-        if ($fiscalYearId) {
-            $fy = \App\Models\FiscalYear::find($fiscalYearId);
-            if ($fy) {
-                $salesQuery->whereBetween('document_date', [$fy->start_date, $fy->end_date]);
-                $purchaseQuery->whereBetween('document_date', [$fy->start_date, $fy->end_date]);
-                $expenseQuery->whereBetween('date', [$fy->start_date, $fy->end_date]);
-            }
+        if ($from && $to) {
+            $salesQuery->whereBetween('document_date', [$from, $to]);
+            $purchaseQuery->whereBetween('document_date', [$from, $to]);
+            $expenseQuery->whereBetween('date', [$from, $to]);
         }
 
         $salesDocs = $salesQuery->get();
@@ -1020,6 +1114,7 @@ class ReportService
             $salesCost = DB::table('commercial_document_lines as cdl')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->where('cd.company_id', $this->companyId())
                 ->whereIn('cdl.commercial_document_id', $salesIds)
                 ->selectRaw("COALESCE(SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity * cdl.cost_price_ht ELSE cdl.quantity * cdl.cost_price_ht END), 0) as total")
                 ->value('total') ?? 0;
@@ -1031,17 +1126,15 @@ class ReportService
         $netResult = $grossMargin - $totalExpenses;
 
         $expenseByCategory = [];
-        if ($fiscalYearId) {
-            $fy = \App\Models\FiscalYear::find($fiscalYearId);
-            if ($fy) {
-                $expenseByCategory = DB::table('expenses as e')
-                    ->leftJoin('expense_categories as ec', 'ec.id', '=', 'e.expense_category_id')
-                    ->whereBetween('e.date', [$fy->start_date, $fy->end_date])
-                    ->select('ec.name as category_name', DB::raw('SUM(e.amount) as total'))
-                    ->groupBy('ec.name')
-                    ->get()
-                    ->toArray();
-            }
+        if ($from && $to) {
+            $expenseByCategory = DB::table('expenses as e')
+                ->leftJoin('expense_categories as ec', 'ec.id', '=', 'e.expense_category_id')
+                ->where('e.company_id', $this->companyId())
+                ->whereBetween('e.date', [$from, $to])
+                ->select('ec.name as category_name', DB::raw('SUM(e.amount) as total'))
+                ->groupBy('ec.name')
+                ->get()
+                ->toArray();
         }
 
         return [
@@ -1092,6 +1185,8 @@ class ReportService
         if ($documents->isNotEmpty()) {
             $lineData = DB::table('commercial_document_lines as cdl')
                 ->join('products as p', 'p.id', '=', 'cdl.product_id')
+                ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+                ->where('cd.company_id', $this->companyId())
                 ->whereIn('cdl.commercial_document_id', $documents->pluck('id'))
                 ->select(
                     'cdl.product_id',
@@ -1189,15 +1284,24 @@ class ReportService
 
     public function expensesReport(array $filters = []): array
     {
-        $query = DB::table('expenses as e')
-            ->leftJoin('expense_categories as ec', 'ec.id', '=', 'e.expense_category_id');
+        $companyId = $this->companyId();
+        $fiscalYearId = $filters['fiscal_year_id'] ?? null;
+        $from = $filters['from_date'] ?? null;
+        $to   = $filters['to_date']   ?? null;
 
-        if (!empty($filters['fiscal_year_id'])) {
-            $fy = \App\Models\FiscalYear::find($filters['fiscal_year_id']);
-            if ($fy) $query->whereBetween('e.date', [$fy->start_date, $fy->end_date]);
+        if ($fiscalYearId && (!$from || !$to)) {
+            $fy = \App\Models\FiscalYear::find($fiscalYearId);
+            if ($fy) {
+                $from = $from ?? $fy->start_date;
+                $to   = $to   ?? $fy->end_date;
+            }
         }
-        if (!empty($filters['from_date'])) $query->whereDate('e.date', '>=', $filters['from_date']);
-        if (!empty($filters['to_date']))   $query->whereDate('e.date', '<=', $filters['to_date']);
+
+        $query = DB::table('expenses as e')
+            ->leftJoin('expense_categories as ec', 'ec.id', '=', 'e.expense_category_id')
+            ->where('e.company_id', $companyId);
+
+        if ($from && $to) $query->whereBetween('e.date', [$from, $to]);
 
         $rows = $query->select(
             'e.id', 'e.expense_number', 'e.date', 'e.amount', 'e.description', 'e.status',
@@ -1206,24 +1310,20 @@ class ReportService
 
         $byCategoryQb = DB::table('expenses as e')
             ->leftJoin('expense_categories as ec', 'ec.id', '=', 'e.expense_category_id')
+            ->where('e.company_id', $companyId)
             ->select('ec.name as category_name', DB::raw('SUM(e.amount) as total'), DB::raw('COUNT(*) as count'))
             ->groupBy('ec.name')
             ->orderByDesc('total');
 
-        if (!empty($filters['fiscal_year_id'])) {
-            $fy = \App\Models\FiscalYear::find($filters['fiscal_year_id']);
-            if ($fy) $byCategoryQb->whereBetween('e.date', [$fy->start_date, $fy->end_date]);
-        }
+        if ($from && $to) $byCategoryQb->whereBetween('e.date', [$from, $to]);
         $byCategory = $byCategoryQb->get();
 
         $monthlyQb = DB::table('expenses')
-            ->select(DB::raw("strftime('%Y-%m', date) as month"), DB::raw('SUM(amount) as total'), DB::raw('COUNT(*) as count'))
+            ->where('company_id', $companyId)
+            ->select(DB::raw("DATE_FORMAT(date, '%Y-%m') as month"), DB::raw('SUM(amount) as total'), DB::raw('COUNT(*) as count'))
             ->groupBy('month')
             ->orderBy('month');
-        if (!empty($filters['fiscal_year_id'])) {
-            $fyMonthly = \App\Models\FiscalYear::find($filters['fiscal_year_id']);
-            if ($fyMonthly) $monthlyQb->whereBetween('date', [$fyMonthly->start_date, $fyMonthly->end_date]);
-        }
+        if ($from && $to) $monthlyQb->whereBetween('date', [$from, $to]);
         $monthly = $monthlyQb->get();
 
         return [

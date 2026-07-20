@@ -14,14 +14,14 @@ export default function CreativeReportPage() {
         <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
           <KpiCard variant="green"  icon="ti-trending-up"    label="المبيعات HT"      value={MONEY(data.overview.total_sales_ht)}/>
           <KpiCard variant="blue"   icon="ti-trending-down"  label="المشتريات HT"     value={MONEY(data.overview.total_purchases_ht)}/>
-          <KpiCard variant="teal"   icon="ti-coin"           label="هامش الربح"       value={MONEY(data.overview.total_sales_margin)} subtitle={`${data.overview.sales_margin_pct}%`}/>
+          <KpiCard variant="teal"   icon="ti-coin"           label="هامش الربح"       value={MONEY(data.overview.total_sales_margin)} sub={`${data.overview.sales_margin_pct}%`}/>
           <KpiCard variant="purple" icon="ti-percentage"     label="صافي الربح"       value={MONEY(data.overview.total_sales_ht - data.overview.total_purchases_ht)}/>
         </div>
 
         <div className="kpis" style={{ gridTemplateColumns: 'repeat(5,1fr)', marginTop: 8 }}>
           <KpiCard variant="green" icon="ti-wallet"           label="المتحصّل"           value={MONEY(data.cash_flow.collected)}/>
-          <KpiCard variant="red"   icon="ti-clock"            label="المستحق (مبيعات)"  value={MONEY(data.cash_flow.outstanding)} subtitle={`${data.cash_flow.collection_rate}% تحصيل`}/>
-          <KpiCard variant="gold"  icon="ti-receipt"          label="عدد المبيعات"       value={data.overview.sales_count} subtitle={`${data.overview.unpaid_sales_count} غير مسددة`}/>
+          <KpiCard variant="red"   icon="ti-clock"            label="المستحق (مبيعات)"  value={MONEY(data.cash_flow.outstanding)} sub={`${data.cash_flow.collection_rate}% تحصيل`}/>
+          <KpiCard variant="gold"  icon="ti-receipt"          label="عدد المبيعات"       value={data.overview.sales_count} sub={`${data.overview.unpaid_sales_count} غير مسددة`}/>
           <KpiCard variant="blue"  icon="ti-file-text"        label="عدد المشتريات"      value={data.overview.purchases_count}/>
           <KpiCard variant="teal"  icon="ti-credit-card"      label="المدفوعات"         value={MONEY(data.overview.total_payments)}/>
         </div>
