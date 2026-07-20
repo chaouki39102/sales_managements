@@ -28,7 +28,7 @@ export default function ProductsReportPage() {
                     <td style={{ color: 'var(--t4)', fontSize: 12 }}>{row.ref}</td>
                     <td>{row.family ?? '—'}</td>
                     <td>{row.stock_quantity}</td>
-                    <td>{FMT(row.current_cost_price)}</td>
+                    <td>{FMT(row.sales_cost)}</td>
                     <td>{row.total_sold}</td>
                     <td>{FMT(row.sales_ht)}</td>
                     <td style={{ color: row.margin_value >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(row.margin_value)}</td>

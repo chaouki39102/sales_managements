@@ -48,9 +48,9 @@ class PartyBalanceService
             ->whereDate('cd.document_date',  '<=', $date)
             ->whereNull('cd.deleted_at')
             ->selectRaw("
-                COALESCE(SUM(CASE WHEN dbo.name = 'sale'     THEN cd.net_to_pay ELSE 0 END), 0)
+                COALESCE(SUM(CASE WHEN dbo.name = 'sale'     THEN CASE WHEN dt.code = 'AV' THEN -cd.net_to_pay ELSE cd.net_to_pay END ELSE 0 END), 0)
                 -
-                COALESCE(SUM(CASE WHEN dbo.name = 'purchase' THEN cd.net_to_pay ELSE 0 END), 0)
+                COALESCE(SUM(CASE WHEN dbo.name = 'purchase' THEN CASE WHEN dt.code = 'AA' THEN -cd.net_to_pay ELSE cd.net_to_pay END ELSE 0 END), 0)
                 as balance
             ")
             ->value('balance') ?? 0);
@@ -145,9 +145,9 @@ class PartyBalanceService
             ->whereNull('cd.deleted_at')
             ->selectRaw("
                 cd.party_id,
-                COALESCE(SUM(CASE WHEN dbo.name = 'sale' THEN cd.net_to_pay ELSE 0 END), 0)
+                COALESCE(SUM(CASE WHEN dbo.name = 'sale'     THEN CASE WHEN dt.code = 'AV' THEN -cd.net_to_pay ELSE cd.net_to_pay END ELSE 0 END), 0)
                 -
-                COALESCE(SUM(CASE WHEN dbo.name = 'purchase' THEN cd.net_to_pay ELSE 0 END), 0)
+                COALESCE(SUM(CASE WHEN dbo.name = 'purchase' THEN CASE WHEN dt.code = 'AA' THEN -cd.net_to_pay ELSE cd.net_to_pay END ELSE 0 END), 0)
                 as total
             ")
             ->groupBy('cd.party_id')
@@ -245,9 +245,9 @@ class PartyBalanceService
                 'reference'       => $doc->document_number,
                 'label'           => $doc->type_name,
                 'type_code'       => $doc->type_code,
-                'document_amount' => $doc->operation === 'sale'
-                    ? round((float) $doc->net_to_pay, 2)
-                    : -round((float) $doc->net_to_pay, 2),
+                'document_amount' => ($doc->operation === 'sale')
+                    ? ($doc->type_code === 'AV' ? -round((float) $doc->net_to_pay, 2) : round((float) $doc->net_to_pay, 2))
+                    : ($doc->type_code === 'AA' ? round((float) $doc->net_to_pay, 2) : -round((float) $doc->net_to_pay, 2)),
                 'payment_amount'  => 0,
                 'remaining'       => round((float) $doc->remaining_amount, 2),
             ]);
@@ -264,7 +264,7 @@ class PartyBalanceService
                 ->whereNull('cd.deleted_at')
                 ->select(
                     'cdl.commercial_document_id',
-                    DB::raw('SUM(cdl.quantity * cdl.cost_price_ht) as doc_cost_ht')
+                    DB::raw('SUM(CASE WHEN dt.code = \'AV\' THEN -cdl.quantity * cdl.cost_price_ht ELSE cdl.quantity * cdl.cost_price_ht END) as doc_cost_ht')
                 )
                 ->groupBy('cdl.commercial_document_id')
                 ->get()
@@ -368,9 +368,9 @@ class PartyBalanceService
                 'br.name as brand_name',
                 'f.name as family_name',
                 'dbo.name as operation',
-                DB::raw('SUM(cdl.quantity) as total_quantity'),
-                DB::raw('SUM(cdl.total_ht) as total_ht'),
-                DB::raw('SUM(cdl.total_ttc) as total_ttc'),
+                DB::raw('SUM(CASE WHEN dbo.name = \'sale\' THEN CASE WHEN dt.code = \'AV\' THEN -cdl.quantity ELSE cdl.quantity END WHEN dbo.name = \'purchase\' THEN CASE WHEN dt.code = \'AA\' THEN -cdl.quantity ELSE cdl.quantity END ELSE 0 END) as total_quantity'),
+                DB::raw('SUM(CASE WHEN dbo.name = \'sale\' THEN CASE WHEN dt.code = \'AV\' THEN -cdl.total_ht ELSE cdl.total_ht END WHEN dbo.name = \'purchase\' THEN CASE WHEN dt.code = \'AA\' THEN -cdl.total_ht ELSE cdl.total_ht END ELSE 0 END) as total_ht'),
+                DB::raw('SUM(CASE WHEN dbo.name = \'sale\' THEN CASE WHEN dt.code = \'AV\' THEN -cdl.total_ttc ELSE cdl.total_ttc END WHEN dbo.name = \'purchase\' THEN CASE WHEN dt.code = \'AA\' THEN -cdl.total_ttc ELSE cdl.total_ttc END ELSE 0 END) as total_ttc'),
                 DB::raw('SUM(cdl.total_tva) as total_tva'),
                 DB::raw('SUM(cdl.discount_amount) as total_discount'),
                 DB::raw('COUNT(DISTINCT cd.id) as doc_count')
@@ -451,8 +451,8 @@ class PartyBalanceService
                 ->where('cdl.cost_price_ht', '>', 0)
                 ->select(
                     'cdl.product_id',
-                    DB::raw('SUM(cdl.quantity) as sale_qty'),
-                    DB::raw('SUM(cdl.quantity * cdl.cost_price_ht) as cost_ht')
+                    DB::raw('SUM(CASE WHEN dt.code = \'AV\' THEN -cdl.quantity ELSE cdl.quantity END) as sale_qty'),
+                    DB::raw('SUM(CASE WHEN dt.code = \'AV\' THEN -cdl.quantity * cdl.cost_price_ht ELSE cdl.quantity * cdl.cost_price_ht END) as cost_ht')
                 )
                 ->groupBy('cdl.product_id')
                 ->get()
@@ -547,6 +547,7 @@ class PartyBalanceService
 
         // 2. بنود المستندات
         $docIds = $documents->pluck('id');
+        $docTypeMap = $documents->pluck('type_code', 'id')->toArray();
         $linesMap = [];
         $docCostMap = [];
         if ($docIds->isNotEmpty()) {
@@ -579,7 +580,9 @@ class PartyBalanceService
                 }
                 $qty = (float) $line->quantity;
                 $cost = (float) $line->cost_price_ht;
-                $lineCost = $qty * $cost;
+                $isReturn = ($docTypeMap[$docId] ?? '') === 'AV';
+                $sign = $isReturn ? -1 : 1;
+                $lineCost = $sign * $qty * $cost;
                 $docCostMap[$docId] += $lineCost;
 
                 $linesMap[$docId][] = [
@@ -595,7 +598,7 @@ class PartyBalanceService
                     'tva_rate'        => round((float) $line->tva_rate, 2),
                     'cost_price_ht'   => round($cost, 4),
                     'line_cost_ht'    => round($lineCost, 2),
-                    'line_margin'     => round((float) $line->total_ht - $lineCost, 2),
+                    'line_margin'     => round($sign * (float) $line->total_ht - $lineCost, 2),
                 ];
             }
         }
@@ -608,14 +611,16 @@ class PartyBalanceService
             'reference'       => $doc->document_number,
             'label'           => $doc->type_name,
             'type_code'       => $doc->type_code,
-            'document_amount' => $doc->operation === 'sale'
-                ? round((float) $doc->net_to_pay, 2)
-                : -round((float) $doc->net_to_pay, 2),
+            'document_amount' => ($doc->operation === 'sale')
+                ? ($doc->type_code === 'AV' ? -round((float) $doc->net_to_pay, 2) : round((float) $doc->net_to_pay, 2))
+                : ($doc->type_code === 'AA' ? round((float) $doc->net_to_pay, 2) : -round((float) $doc->net_to_pay, 2)),
             'payment_amount'  => 0,
             'remaining'       => round((float) $doc->remaining_amount, 2),
             'doc_cost_ht'     => round($docCostMap[$doc->id] ?? 0, 2),
             'margin_value'    => round(
-                ($doc->operation === 'sale' ? (float) $doc->net_to_pay : -(float) $doc->net_to_pay)
+                (($doc->operation === 'sale')
+                    ? ($doc->type_code === 'AV' ? -(float) $doc->net_to_pay : (float) $doc->net_to_pay)
+                    : ($doc->type_code === 'AA' ? (float) $doc->net_to_pay : -(float) $doc->net_to_pay))
                 - ($docCostMap[$doc->id] ?? 0), 2
             ),
             'lines'           => $linesMap[$doc->id] ?? [],
