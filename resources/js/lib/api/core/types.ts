@@ -772,6 +772,8 @@ export interface ProductRecapItem {
   product_name:    string;
   product_ref:     string;
   unit_name:       string;
+  brand_name:      string;
+  family_name:     string;
   sale_qty:        number;
   sale_ht:         number;
   sale_ttc:        number;

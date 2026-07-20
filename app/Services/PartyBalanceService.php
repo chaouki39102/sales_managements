@@ -320,6 +320,8 @@ class PartyBalanceService
             ->join('document_base_operations as dbo', 'dt.document_base_operation_id', '=', 'dbo.id')
             ->join('products as p', 'p.id', '=', 'cdl.product_id')
             ->leftJoin('units as u', 'u.id', '=', 'p.unit_id')
+            ->leftJoin('brands as br', 'br.id', '=', 'p.brand_id')
+            ->leftJoin('families as f', 'f.id', '=', 'p.family_id')
             ->where('cd.company_id', $companyId)
             ->where('cd.party_id', $partyId)
             ->where('cd.fiscal_year_id', $fiscalYearId)
@@ -331,6 +333,8 @@ class PartyBalanceService
                 'p.name as product_name',
                 'p.ref as product_ref',
                 'u.name as unit_name',
+                'br.name as brand_name',
+                'f.name as family_name',
                 'dbo.name as operation',
                 DB::raw('SUM(cdl.quantity) as total_quantity'),
                 DB::raw('SUM(cdl.total_ht) as total_ht'),
@@ -339,7 +343,7 @@ class PartyBalanceService
                 DB::raw('SUM(cdl.discount_amount) as total_discount'),
                 DB::raw('COUNT(DISTINCT cd.id) as doc_count')
             )
-            ->groupBy('p.id', 'p.name', 'p.ref', 'u.name', 'dbo.name')
+            ->groupBy('p.id', 'p.name', 'p.ref', 'u.name', 'br.name', 'f.name', 'dbo.name')
             ->orderBy('p.name', 'asc')
             ->get();
 
@@ -353,6 +357,8 @@ class PartyBalanceService
                     'product_name' => $line->product_name,
                     'product_ref'  => $line->product_ref,
                     'unit_name'    => $line->unit_name,
+                    'brand_name'   => $line->brand_name,
+                    'family_name'  => $line->family_name,
                     'sale_qty'     => 0.0,
                     'sale_ht'      => 0.0,
                     'sale_ttc'     => 0.0,

@@ -86,7 +86,7 @@ export function usePartyProductRecap(partyId: number | null, date?: string) {
     const slug = useActiveSlug();
 
     return useQuery({
-        queryKey: tenantKeys.partyBalances.history(slug ?? '', partyId ?? 0, date, 'product-recap'),
+        queryKey: tenantKeys.partyBalances.productRecap(slug ?? '', partyId ?? 0, date),
         queryFn:  () => partyBalancesApi.getProductRecap(partyId!, date),
         enabled:  !!slug && !!partyId,
         staleTime: 30_000,
@@ -101,6 +101,8 @@ export function usePartyProductRecap(partyId: number | null, date?: string) {
                         product_name:    String(p.product_name ?? ''),
                         product_ref:     String(p.product_ref ?? ''),
                         unit_name:       String(p.unit_name ?? ''),
+                        brand_name:      String(p.brand_name ?? ''),
+                        family_name:     String(p.family_name ?? ''),
                         sale_qty:        Number(p.sale_qty ?? 0),
                         sale_ht:         Number(p.sale_ht ?? 0),
                         sale_ttc:        Number(p.sale_ttc ?? 0),

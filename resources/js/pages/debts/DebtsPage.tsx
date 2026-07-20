@@ -3,7 +3,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useModal } from '@/hooks/useModal';
 import { useFiscalYear } from '@/context/FiscalYearContext';
-import { usePartyBalances, usePartyBalanceHistory } from '@/lib/api/endpoints/partyBalances';
+import { usePartyBalances, usePartyBalanceHistory, usePartyProductRecap } from '@/lib/api/endpoints/partyBalances';
 import { DataTable, type Column } from '@/components/ui/DataTable/DataTable';
 import KpiCard from '@/components/ui/KpiCard';
 import Badge from '@/components/ui/Badge';
@@ -392,6 +392,7 @@ function BalanceDetailModal({
 
 // ─── TransactionHistoryModal ─────────────────────────────────────────────────
 type TxTypeFilter = 'all' | 'document' | 'payment';
+type ModalTab = 'transactions' | 'products';
 
 function TransactionHistoryModal({
     open,
@@ -409,15 +410,23 @@ function TransactionHistoryModal({
     navigate: (path: string) => void;
 }) {
     const { data, isLoading } = usePartyBalanceHistory(partyId, date);
+    const { data: recapData, isLoading: recapLoading } = usePartyProductRecap(partyId, date);
     const [txFilter, setTxFilter] = useState<TxTypeFilter>('all');
+    const [modalTab, setModalTab] = useState<ModalTab>('transactions');
+    const [fromDate, setFromDate] = useState('');
 
     const openingBalance = data?.opening_balance ?? 0;
     const allTransactions = data?.transactions ?? [];
 
+    const filteredTransactions = useMemo(() => {
+        if (!fromDate) return allTransactions;
+        return allTransactions.filter(t => t.date >= fromDate);
+    }, [allTransactions, fromDate]);
+
     const transactions = useMemo(() => {
-        if (txFilter === 'all') return allTransactions;
-        return allTransactions.filter(t => t.type === txFilter);
-    }, [allTransactions, txFilter]);
+        if (txFilter === 'all') return filteredTransactions;
+        return filteredTransactions.filter(t => t.type === txFilter);
+    }, [filteredTransactions, txFilter]);
 
     // Running balance = opening + Σdocs - Σpayments
     const txWithBalance = useMemo(() => {
@@ -428,8 +437,8 @@ function TransactionHistoryModal({
         });
     }, [transactions, openingBalance]);
 
-    const totalDocs   = useMemo(() => allTransactions.reduce((s, t) => s + t.document_amount, 0), [allTransactions]);
-    const totalPays   = useMemo(() => allTransactions.reduce((s, t) => s + t.payment_amount, 0), [allTransactions]);
+    const totalDocs   = useMemo(() => filteredTransactions.reduce((s, t) => s + t.document_amount, 0), [filteredTransactions]);
+    const totalPays   = useMemo(() => filteredTransactions.reduce((s, t) => s + t.payment_amount, 0), [filteredTransactions]);
     const finalBalance = openingBalance + totalDocs - totalPays;
 
     // Excel export columns
@@ -474,6 +483,65 @@ function TransactionHistoryModal({
         );
     }, [txWithBalance, openingBalance, totalDocs, totalPays, finalBalance, partyName, date, excelColumns]);
 
+    const recapProducts = recapData?.products ?? [];
+    const recapSummary = recapData?.summary;
+
+    const recapExcelColumns: Column<Record<string, unknown>>[] = useMemo(() => [
+        { key: '#',              header: '#',               width: 50 },
+        { key: 'product_ref',    header: 'المرجع',          width: 120 },
+        { key: 'product_name',   header: 'المنتج',          width: 180 },
+        { key: 'family_name',    header: 'المجموعة',        width: 120 },
+        { key: 'brand_name',     header: 'العلامة التجارية', width: 120 },
+        { key: 'unit_name',      header: 'الوحدة',          width: 80,  align: 'center' },
+        { key: 'sale_qty',       header: 'كمية البيع',      width: 110, align: 'center' },
+        { key: 'sale_ht',        header: 'مبيعات (HT)',     width: 130, align: 'center' },
+        { key: 'purchase_qty',   header: 'كمية الشراء',     width: 110, align: 'center' },
+        { key: 'purchase_ht',    header: 'مشتريات (HT)',    width: 130, align: 'center' },
+        { key: 'total_ht',       header: 'الإجمالي HT',     width: 130, align: 'center' },
+        { key: 'total_ttc',      header: 'الإجمالي TTC',    width: 130, align: 'center' },
+        { key: 'doc_count',      header: 'عدد المستندات',   width: 100, align: 'center' },
+    ], []);
+
+    const handleExportRecapExcel = useCallback(async () => {
+        const rows = recapProducts.map((p, i) => ({
+            '#':            i + 1,
+            product_ref:    p.product_ref || '—',
+            product_name:   p.product_name,
+            family_name:    p.family_name || '—',
+            brand_name:     p.brand_name || '—',
+            unit_name:      p.unit_name || '—',
+            sale_qty:       p.sale_qty || '',
+            sale_ht:        p.sale_ht || '',
+            purchase_qty:   p.purchase_qty || '',
+            purchase_ht:    p.purchase_ht || '',
+            total_ht:       p.total_ht,
+            total_ttc:      p.total_ttc,
+            doc_count:      p.doc_count,
+        }));
+
+        const summaryRow = recapSummary ? {
+            '#': '', product_ref: '', product_name: `الإجمالي (${recapSummary.product_count} منتج)`,
+            family_name: '', brand_name: '', unit_name: '', sale_qty: '', sale_ht: recapSummary.total_sale_ht,
+            purchase_qty: '', purchase_ht: recapSummary.total_purchase_ht,
+            total_ht: '', total_ttc: '', doc_count: '',
+        } : null;
+
+        const allRows = summaryRow ? [...rows, summaryRow] : rows;
+
+        const { exportToExcelAdvanced } = await import('@/components/ui/DataTable/excelExportAdvanced');
+        await exportToExcelAdvanced(
+            allRows as Record<string, unknown>[],
+            recapExcelColumns as never[],
+            {
+                fileName: `ملخص_المنتجات_${partyName}_${date}`,
+                title: `ملخص المنتجات – ${partyName}`,
+                sheetName: 'ملخص المنتجات',
+                documentInfo: { party: partyName, date },
+                showAggregates: false,
+            },
+        );
+    }, [recapProducts, recapSummary, partyName, date, recapExcelColumns]);
+
     return (
         <Modal
             open={open}
@@ -488,13 +556,13 @@ function TransactionHistoryModal({
                 </div>
             }
             footerLeft={
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8 }} className="no-print">
                     <Button
                         size="sm"
                         variant="gray"
                         icon={<i className="ti ti-file-spreadsheet" />}
-                        onClick={handleExportExcel}
-                        disabled={isLoading || allTransactions.length === 0}
+                        onClick={modalTab === 'products' ? handleExportRecapExcel : handleExportExcel}
+                        disabled={isLoading || (modalTab === 'transactions' ? allTransactions.length === 0 : recapProducts.length === 0)}
                     >
                         Excel
                     </Button>
@@ -503,201 +571,450 @@ function TransactionHistoryModal({
                         variant="gray"
                         icon={<i className="ti ti-printer" />}
                         onClick={() => window.print()}
-                        disabled={isLoading || allTransactions.length === 0}
+                        disabled={isLoading || (modalTab === 'transactions' ? allTransactions.length === 0 : recapProducts.length === 0)}
                     >
                         طباعة
                     </Button>
                 </div>
             }
-            footer={<Button onClick={onClose}>إغلاق</Button>}
+            footer={<div className="no-print"><Button onClick={onClose}>إغلاق</Button></div>}
         >
+            {/* Print-only header */}
+            <div className="print-only" style={{ display: 'none' }}>
+                <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>كشف حساب – {partyName}</h2>
+                <p style={{ fontSize: 12, color: '#666' }}>إلى {fmtDate(date)}</p>
+            </div>
             {isLoading ? (
                 <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-secondary)' }}>
                     <i className="ti ti-loader-2" style={{ fontSize: 28, animation: 'spin 1s linear infinite' }} />
                     <div style={{ marginTop: 8 }}>جاري التحميل...</div>
                 </div>
-            ) : allTransactions.length === 0 ? (
+            ) : allTransactions.length === 0 && recapProducts.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-tertiary)' }}>
                     <i className="ti ti-folder-open" style={{ fontSize: 36, display: 'block', marginBottom: 8 }} />
                     لا توجد معاملات قبل هذا التاريخ
                 </div>
             ) : (
                 <>
-                    {/* Summary cards */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
-                        <SummaryCard label="الرصيد الافتتاحي" value={openingBalance} color="var(--color-text-primary)" icon="ti-building-bank" />
-                        <SummaryCard label="المستندات" value={totalDocs} color="var(--em)" icon="ti-file-invoice" />
-                        <SummaryCard label="الدفعات" value={totalPays} color="var(--red)" icon="ti-wallet" />
-                        <SummaryCard label="الرصيد النهائي" value={finalBalance} color={finalBalance >= 0 ? 'var(--red)' : 'var(--green)'} icon="ti-calculator" bold />
-                    </div>
-
-                    {/* Filter chips */}
-                    <div style={{ display: 'flex', gap: 6, marginBottom: 12, alignItems: 'center' }}>
+                    {/* Main tabs */}
+                    <div className="no-print" style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid var(--color-border-secondary)' }}>
                         {([
-                            { key: 'all' as TxTypeFilter, label: 'الكل', count: allTransactions.length },
-                            { key: 'document' as TxTypeFilter, label: 'المستندات', count: allTransactions.filter(t => t.type === 'document').length },
-                            { key: 'payment' as TxTypeFilter, label: 'الدفعات', count: allTransactions.filter(t => t.type === 'payment').length },
-                        ]).map(f => (
+                            { key: 'transactions' as ModalTab, label: 'المعاملات', icon: 'ti-list', count: allTransactions.length },
+                            { key: 'products' as ModalTab, label: 'المنتجات', icon: 'ti-package', count: recapProducts.length },
+                        ]).map(tab => (
                             <button
-                                key={f.key}
-                                onClick={() => setTxFilter(f.key)}
+                                key={tab.key}
+                                onClick={() => setModalTab(tab.key)}
                                 style={{
-                                    padding: '4px 12px', borderRadius: 20, border: 'none',
-                                    background: txFilter === f.key ? 'var(--em)' : 'var(--color-background-secondary)',
-                                    color: txFilter === f.key ? '#fff' : 'var(--color-text-secondary)',
-                                    fontSize: 12, fontWeight: txFilter === f.key ? 600 : 400,
+                                    padding: '8px 16px', borderRadius: '8px 8px 0 0',
+                                    border: 'none', borderBottom: modalTab === tab.key ? '2px solid var(--em)' : '2px solid transparent',
+                                    marginBottom: -2,
+                                    background: modalTab === tab.key ? 'var(--color-background-secondary)' : 'transparent',
+                                    color: modalTab === tab.key ? 'var(--em)' : 'var(--color-text-secondary)',
+                                    fontSize: 13, fontWeight: modalTab === tab.key ? 700 : 500,
                                     cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
+                                    display: 'flex', alignItems: 'center', gap: 6,
+                                    transition: 'all .15s',
                                 }}
                             >
-                                {f.label} ({f.count})
+                                <i className={`ti ${tab.icon}`} style={{ fontSize: 15 }} />
+                                {tab.label}
+                                <span style={{
+                                    fontSize: 11, padding: '1px 7px', borderRadius: 10,
+                                    background: modalTab === tab.key ? 'var(--em)' : 'var(--color-border-tertiary)',
+                                    color: modalTab === tab.key ? '#fff' : 'var(--color-text-tertiary)',
+                                    fontWeight: 600,
+                                }}>
+                                    {tab.count}
+                                </span>
                             </button>
                         ))}
-                        <span style={{ marginRight: 'auto', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
-                            {transactions.length} معاملة
-                        </span>
                     </div>
 
-                    {/* Transactions table */}
-                    <div style={{ overflowX: 'auto', maxHeight: '55vh', overflowY: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                            <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-                                <tr style={{ borderBottom: '2px solid var(--color-border-secondary)', background: 'var(--color-background-primary)' }}>
-                                    <th style={thStyle}>#</th>
-                                    <th style={thStyle}>التاريخ والوقت</th>
-                                    <th style={thStyle}>البيان</th>
-                                    <th style={{ ...thStyle, textAlign: 'center' }}>المستندات</th>
-                                    <th style={{ ...thStyle, textAlign: 'center' }}>الدفعات</th>
-                                    <th style={{ ...thStyle, textAlign: 'center' }}>الرصيد</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {/* Opening balance row */}
-                                <tr style={{ background: 'var(--color-background-secondary)', fontWeight: 600 }}>
-                                    <td style={tdStyle}>—</td>
-                                    <td style={tdStyle}>—</td>
-                                    <td style={tdStyle}>
-                                        <i className="ti ti-building-bank" style={{ marginLeft: 4 }} />
-                                        رصيد افتتاحي
-                                    </td>
-                                    <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
-                                    <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
-                                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>
-                                        {fmtNumber(openingBalance)} دج
-                                    </td>
-                                </tr>
+                    {/* ── Transactions tab ─────────────────────────── */}
+                    {modalTab === 'transactions' && (
+                        <>
+                            {/* Date range filter */}
+                            <div style={{
+                                display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center',
+                                padding: '8px 12px', background: 'var(--color-background-secondary)',
+                                borderRadius: 8, border: '1px solid var(--color-border-tertiary)',
+                            }} className="no-print">
+                                <i className="ti ti-filter" style={{ fontSize: 14, color: 'var(--color-text-secondary)' }} />
+                                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>من:</span>
+                                <div style={{ width: 150 }}>
+                                    <DatePicker
+                                        value={fromDate}
+                                        onChange={setFromDate}
+                                        max={date}
+                                        clearable
+                                        placeholder="كل التواريخ"
+                                    />
+                                </div>
+                                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>إلى:</span>
+                                <div style={{ width: 150 }}>
+                                    <input
+                                        type="text"
+                                        value={fmtDate(date)}
+                                        readOnly
+                                        style={{
+                                            padding: '6px 10px', borderRadius: 6, border: '1px solid var(--color-border-tertiary)',
+                                            background: 'var(--color-background-primary)', fontSize: 12,
+                                            color: 'var(--color-text-secondary)', width: '100%',
+                                        }}
+                                    />
+                                </div>
+                                {fromDate && (
+                                    <button
+                                        onClick={() => setFromDate('')}
+                                        style={{
+                                            padding: '4px 10px', borderRadius: 6, border: 'none',
+                                            background: 'var(--red)', color: '#fff',
+                                            fontSize: 11, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
+                                            fontWeight: 600,
+                                        }}
+                                    >
+                                        مسح الفلتر
+                                    </button>
+                                )}
+                                <span style={{ marginRight: 'auto', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+                                    {filteredTransactions.length} من {allTransactions.length} معاملة
+                                </span>
+                            </div>
+
+                            {/* Summary cards */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
+                                <SummaryCard label="الرصيد الافتتاحي" value={openingBalance} color="var(--color-text-primary)" icon="ti-building-bank" />
+                                <SummaryCard label="المستندات" value={totalDocs} color="var(--em)" icon="ti-file-invoice" />
+                                <SummaryCard label="الدفعات" value={totalPays} color="var(--red)" icon="ti-wallet" />
+                                <SummaryCard label="الرصيد النهائي" value={finalBalance} color={finalBalance >= 0 ? 'var(--red)' : 'var(--green)'} icon="ti-calculator" bold />
+                            </div>
+
+                            {/* Filter chips */}
+                            <div className="no-print" style={{ display: 'flex', gap: 6, marginBottom: 12, alignItems: 'center' }}>
+                                {([
+                            { key: 'all' as TxTypeFilter, label: 'الكل', count: filteredTransactions.length },
+                            { key: 'document' as TxTypeFilter, label: 'المستندات', count: filteredTransactions.filter(t => t.type === 'document').length },
+                            { key: 'payment' as TxTypeFilter, label: 'الدفعات', count: filteredTransactions.filter(t => t.type === 'payment').length },
+                                ]).map(f => (
+                                    <button
+                                        key={f.key}
+                                        onClick={() => setTxFilter(f.key)}
+                                        style={{
+                                            padding: '4px 12px', borderRadius: 20, border: 'none',
+                                            background: txFilter === f.key ? 'var(--em)' : 'var(--color-background-secondary)',
+                                            color: txFilter === f.key ? '#fff' : 'var(--color-text-secondary)',
+                                            fontSize: 12, fontWeight: txFilter === f.key ? 600 : 400,
+                                            cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
+                                        }}
+                                    >
+                                        {f.label} ({f.count})
+                                    </button>
+                                ))}
+                                <span style={{ marginRight: 'auto', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+                                    {transactions.length} معاملة
+                                </span>
+                            </div>
+
+                            {/* Transactions table */}
+                            <div style={{ overflowX: 'auto', maxHeight: '55vh', overflowY: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                    <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
+                                        <tr style={{ borderBottom: '2px solid var(--color-border-secondary)', background: 'var(--color-background-primary)' }}>
+                                            <th style={thStyle}>#</th>
+                                            <th style={thStyle}>التاريخ والوقت</th>
+                                            <th style={thStyle}>البيان</th>
+                                            <th style={{ ...thStyle, textAlign: 'center' }}>المستندات</th>
+                                            <th style={{ ...thStyle, textAlign: 'center' }}>الدفعات</th>
+                                            <th style={{ ...thStyle, textAlign: 'center' }}>الرصيد</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {/* Opening balance row */}
+                                        <tr style={{ background: 'var(--color-background-secondary)', fontWeight: 600 }}>
+                                            <td style={tdStyle}>—</td>
+                                            <td style={tdStyle}>—</td>
+                                            <td style={tdStyle}>
+                                                <i className="ti ti-building-bank" style={{ marginLeft: 4 }} />
+                                                رصيد افتتاحي
+                                            </td>
+                                            <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
+                                            <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
+                                            <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>
+                                                {fmtNumber(openingBalance)} دج
+                                            </td>
+                                        </tr>
 
                                 {txWithBalance.map((tx, i) => {
                                     const isOverdue = tx.type === 'document' && tx.remaining > 0;
                                     const txDate = new Date(tx.date);
                                     const now = new Date();
                                     const daysOld = Math.floor((now.getTime() - txDate.getTime()) / 86400000);
-                                    const highlightOverdue = isOverdue && daysOld > 30;
 
-                                    return (
-                                        <tr
-                                            key={`${tx.type}-${tx.id}`}
-                                            style={{
-                                                borderBottom: '1px solid var(--color-border-tertiary)',
-                                                background: highlightOverdue
-                                                    ? 'rgba(220, 38, 38, 0.04)'
-                                                    : i % 2 === 0 ? 'transparent' : 'var(--color-background-secondary)',
-                                            }}
-                                        >
-                                            <td style={{ ...tdStyle, color: 'var(--color-text-tertiary)', fontSize: 11 }}>
-                                                {tx.seq}
-                                            </td>
-                                            <td style={tdStyle}>
-                                                <div style={{ lineHeight: 1.3 }}>
-                                                    <div>{fmtDate(tx.date)}</div>
-                                                    {tx.datetime && (
-                                                        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-                                                            {new Date(tx.datetime).toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' })}
+                                    // Aging color: <30 = default, 30-60 = amber, 60-90 = orange, >90 = red
+                                    let agingColor = 'var(--color-text-tertiary)';
+                                    let agingBg = 'transparent';
+                                    let agingLabel = '';
+                                    if (isOverdue && tx.remaining > 0) {
+                                        if (daysOld > 90) {
+                                            agingColor = '#dc2626'; agingBg = 'rgba(220,38,38,0.08)'; agingLabel = `${daysOld} يوم — متأخر جداً`;
+                                        } else if (daysOld > 60) {
+                                            agingColor = '#ea580c'; agingBg = 'rgba(234,88,12,0.08)'; agingLabel = `${daysOld} يوم — متأخر`;
+                                        } else if (daysOld > 30) {
+                                            agingColor = '#d97706'; agingBg = 'rgba(217,119,6,0.08)'; agingLabel = `${daysOld} يوم`;
+                                        } else if (daysOld > 0) {
+                                            agingColor = 'var(--color-text-secondary)'; agingBg = 'transparent'; agingLabel = `${daysOld} يوم`;
+                                        }
+                                    }
+
+                                            return (
+                                                <tr
+                                                    key={`${tx.type}-${tx.id}`}
+                                                    style={{
+                                                        borderBottom: '1px solid var(--color-border-tertiary)',
+                                                        background: isOverdue && daysOld > 90
+                                                            ? 'rgba(220, 38, 38, 0.04)'
+                                                            : i % 2 === 0 ? 'transparent' : 'var(--color-background-secondary)',
+                                                    }}
+                                                >
+                                                    <td style={{ ...tdStyle, color: 'var(--color-text-tertiary)', fontSize: 11 }}>
+                                                        {tx.seq}
+                                                    </td>
+                                                    <td style={tdStyle}>
+                                                        <div style={{ lineHeight: 1.3 }}>
+                                                            <div>{fmtDate(tx.date)}</div>
+                                                            {tx.datetime && (
+                                                                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                                                                    {new Date(tx.datetime).toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' })}
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td style={tdStyle}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                    {tx.type === 'document' && tx.type_code ? (
-                                                        <button
-                                                            onClick={() => { navigate(`/documents/${tx.type_code}/${tx.id}/edit`); onClose(); }}
-                                                            style={{
-                                                                background: 'none', border: 'none', cursor: 'pointer',
-                                                                fontFamily: 'monospace', fontSize: 12,
-                                                                color: 'var(--text-info, #3b82f6)', textDecoration: 'underline',
-                                                                padding: 0,
-                                                            }}
-                                                        >
-                                                            {tx.reference}
-                                                        </button>
-                                                    ) : (
-                                                        <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                                                            {tx.reference || '—'}
+                                                    </td>
+                                                    <td style={tdStyle}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                            {tx.type === 'document' && tx.type_code ? (
+                                                                <button
+                                                                    onClick={() => { navigate(`/documents/${tx.type_code}/${tx.id}/edit`); onClose(); }}
+                                                                    style={{
+                                                                        background: 'none', border: 'none', cursor: 'pointer',
+                                                                        fontFamily: 'monospace', fontSize: 12,
+                                                                        color: 'var(--text-info, #3b82f6)', textDecoration: 'underline',
+                                                                        padding: 0,
+                                                                    }}
+                                                                >
+                                                                    {tx.reference}
+                                                                </button>
+                                                            ) : (
+                                                                <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                                                                    {tx.reference || '—'}
+                                                                </span>
+                                                            )}
+                                                            <Badge variant={tx.type === 'document' ? 'danger' : 'success'} style={{ fontSize: 11 }}>
+                                                                {tx.label}
+                                                            </Badge>
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: tx.document_amount > 0 ? 600 : undefined }}>
+                                                        {tx.document_amount !== 0 ? (
+                                                            <span style={{ color: tx.document_amount > 0 ? 'var(--em)' : 'var(--red)' }}>
+                                                                {fmtNumber(tx.document_amount)} دج
+                                                            </span>
+                                                        ) : '—'}
+                                                    </td>
+                                                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: tx.payment_amount > 0 ? 600 : undefined }}>
+                                                        {tx.payment_amount > 0 ? (
+                                                            <span style={{ color: 'var(--red)' }}>
+                                                                {fmtNumber(tx.payment_amount)} دج
+                                                            </span>
+                                                        ) : '—'}
+                                                    </td>
+                                                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>
+                                                        <span style={{ color: tx.running_balance >= 0 ? 'var(--red)' : 'var(--green)' }}>
+                                                            {fmtNumber(tx.running_balance)} دج
                                                         </span>
-                                                    )}
-                                                    <Badge variant={tx.type === 'document' ? 'danger' : 'success'} style={{ fontSize: 11 }}>
-                                                        {tx.label}
-                                                    </Badge>
-                                                </div>
+                                                        {tx.remaining > 0 && (
+                                                            <div style={{ display: 'block', marginTop: 3 }}>
+                                                                <span style={{ fontSize: 10, color: 'var(--red)' }}>
+                                                                    متبقي {fmtNumber(tx.remaining)}
+                                                                </span>
+                                                                {isOverdue && daysOld > 0 && (
+                                                                    <span style={{
+                                                                        display: 'inline-block', fontSize: 10, marginLeft: 4,
+                                                                        padding: '1px 6px', borderRadius: 8,
+                                                                        background: agingBg, color: agingColor,
+                                                                        fontWeight: 600, lineHeight: '16px',
+                                                                    }}>
+                                                                        {agingLabel}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+
+                                        {/* Footer summary row */}
+                                        <tr style={{
+                                            fontWeight: 700,
+                                            background: 'var(--color-background-secondary)',
+                                            borderTop: '2px solid var(--color-border-secondary)',
+                                        }}>
+                                            <td style={tdStyle} colSpan={3}>
+                                                <i className="ti ti-calculator" style={{ marginLeft: 4 }} />
+                                                الإجمالي ({filteredTransactions.length} معاملة)
                                             </td>
-                                            <td style={{ ...tdStyle, textAlign: 'center', fontWeight: tx.document_amount > 0 ? 600 : undefined }}>
-                                                {tx.document_amount !== 0 ? (
-                                                    <span style={{ color: tx.document_amount > 0 ? 'var(--em)' : 'var(--red)' }}>
-                                                        {fmtNumber(tx.document_amount)} دج
-                                                    </span>
-                                                ) : '—'}
+                                            <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--em)', fontWeight: 700 }}>
+                                                {fmtNumber(totalDocs)} دج
                                             </td>
-                                            <td style={{ ...tdStyle, textAlign: 'center', fontWeight: tx.payment_amount > 0 ? 600 : undefined }}>
-                                                {tx.payment_amount > 0 ? (
-                                                    <span style={{ color: 'var(--red)' }}>
-                                                        {fmtNumber(tx.payment_amount)} دج
-                                                    </span>
-                                                ) : '—'}
+                                            <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--red)', fontWeight: 700 }}>
+                                                {fmtNumber(totalPays)} دج
                                             </td>
-                                            <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>
-                                                <span style={{ color: tx.running_balance >= 0 ? 'var(--red)' : 'var(--green)' }}>
-                                                    {fmtNumber(tx.running_balance)} دج
-                                                </span>
-                                                {tx.remaining > 0 && (
-                                                    <span style={{
-                                                        display: 'block', fontSize: 10, color: 'var(--red)',
-                                                        opacity: 0.7, marginTop: 1,
-                                                    }}>
-                                                        متبقي {fmtNumber(tx.remaining)}
-                                                        {highlightOverdue && ` (${daysOld} يوم)`}
-                                                    </span>
-                                                )}
+                                            <td style={{
+                                                ...tdStyle, textAlign: 'center', fontWeight: 800,
+                                                fontSize: 14, color: finalBalance >= 0 ? 'var(--red)' : 'var(--green)',
+                                            }}>
+                                                {fmtNumber(finalBalance)} دج
                                             </td>
                                         </tr>
-                                    );
-                                })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    )}
 
-                                {/* Footer summary row */}
-                                <tr style={{
-                                    fontWeight: 700,
-                                    background: 'var(--color-background-secondary)',
-                                    borderTop: '2px solid var(--color-border-secondary)',
-                                }}>
-                                    <td style={tdStyle} colSpan={3}>
-                                        <i className="ti ti-calculator" style={{ marginLeft: 4 }} />
-                                        الإجمالي ({allTransactions.length} معاملة)
-                                    </td>
-                                    <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--em)', fontWeight: 700 }}>
-                                        {fmtNumber(totalDocs)} دج
-                                    </td>
-                                    <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--red)', fontWeight: 700 }}>
-                                        {fmtNumber(totalPays)} دج
-                                    </td>
-                                    <td style={{
-                                        ...tdStyle, textAlign: 'center', fontWeight: 800,
-                                        fontSize: 14, color: finalBalance >= 0 ? 'var(--red)' : 'var(--green)',
-                                    }}>
-                                        {fmtNumber(finalBalance)} دج
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    {/* ── Products tab ─────────────────────────────── */}
+                    {modalTab === 'products' && (
+                        <>
+                            {recapLoading ? (
+                                <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-secondary)' }}>
+                                    <i className="ti ti-loader-2" style={{ fontSize: 28, animation: 'spin 1s linear infinite' }} />
+                                    <div style={{ marginTop: 8 }}>جاري تحميل ملخص المنتجات...</div>
+                                </div>
+                            ) : recapProducts.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-tertiary)' }}>
+                                    <i className="ti ti-package-off" style={{ fontSize: 36, display: 'block', marginBottom: 8 }} />
+                                    لا توجد منتجات في هذه الفترة
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Summary cards for products */}
+                                    {recapSummary && (
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
+                                            <SummaryCard label="عدد المنتجات" value={recapSummary.product_count} color="var(--text-info, #3b82f6)" icon="ti-package" />
+                                            <SummaryCard label="مبيعات HT" value={recapSummary.total_sale_ht} color="var(--em)" icon="ti-arrow-up-circle" />
+                                            <SummaryCard label="مشتريات HT" value={recapSummary.total_purchase_ht} color="var(--red)" icon="ti-arrow-down-circle" />
+                                            <SummaryCard label="إجمالي TTC" value={recapSummary.total_sale_ttc + recapSummary.total_purchase_ttc} color="var(--text-info, #3b82f6)" icon="ti-calculator" bold />
+                                        </div>
+                                    )}
+
+                                    {/* Products table */}
+                                    <div style={{ overflowX: 'auto', maxHeight: '55vh', overflowY: 'auto' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                            <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
+                                                <tr style={{ borderBottom: '2px solid var(--color-border-secondary)', background: 'var(--color-background-primary)' }}>
+                                                    <th style={thStyle}>#</th>
+                                                    <th style={thStyle}>المرجع</th>
+                                                    <th style={thStyle}>المنتج</th>
+                                                    <th style={thStyle}>المجموعة</th>
+                                                    <th style={thStyle}>العلامة التجارية</th>
+                                                    <th style={{ ...thStyle, textAlign: 'center' }}>الوحدة</th>
+                                                    <th style={{ ...thStyle, textAlign: 'center' }}>كمية البيع</th>
+                                                    <th style={{ ...thStyle, textAlign: 'center' }}>مبيعات HT</th>
+                                                    <th style={{ ...thStyle, textAlign: 'center' }}>كمية الشراء</th>
+                                                    <th style={{ ...thStyle, textAlign: 'center' }}>مشتريات HT</th>
+                                                    <th style={{ ...thStyle, textAlign: 'center' }}>الإجمالي TTC</th>
+                                                    <th style={{ ...thStyle, textAlign: 'center' }}>المستندات</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {recapProducts.map((p, i) => (
+                                                    <tr
+                                                        key={p.product_id}
+                                                        style={{
+                                                            borderBottom: '1px solid var(--color-border-tertiary)',
+                                                            background: i % 2 === 0 ? 'transparent' : 'var(--color-background-secondary)',
+                                                        }}
+                                                    >
+                                                        <td style={{ ...tdStyle, color: 'var(--color-text-tertiary)', fontSize: 11 }}>
+                                                            {i + 1}
+                                                        </td>
+                                                        <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: 12 }}>
+                                                            {p.product_ref || '—'}
+                                                        </td>
+                                                        <td style={tdStyle}>{p.product_name}</td>
+                                                        <td style={{ ...tdStyle, color: 'var(--color-text-secondary)' }}>
+                                                            {p.family_name || '—'}
+                                                        </td>
+                                                        <td style={{ ...tdStyle, color: 'var(--color-text-secondary)' }}>
+                                                            {p.brand_name || '—'}
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+                                                            {p.unit_name || '—'}
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                                            {p.sale_qty > 0 ? fmtNumber(p.sale_qty) : '—'}
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: p.sale_ht > 0 ? 600 : undefined }}>
+                                                            {p.sale_ht > 0 ? (
+                                                                <span style={{ color: 'var(--em)' }}>{fmtNumber(p.sale_ht)} دج</span>
+                                                            ) : '—'}
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                                            {p.purchase_qty > 0 ? fmtNumber(p.purchase_qty) : '—'}
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: p.purchase_ht > 0 ? 600 : undefined }}>
+                                                            {p.purchase_ht > 0 ? (
+                                                                <span style={{ color: 'var(--red)' }}>{fmtNumber(p.purchase_ht)} دج</span>
+                                                            ) : '—'}
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>
+                                                            {fmtNumber(p.total_ttc)} دج
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+                                                            {p.doc_count}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+
+                                                {/* Footer summary row */}
+                                                {recapSummary && (
+                                                    <tr style={{
+                                                        fontWeight: 700,
+                                                        background: 'var(--color-background-secondary)',
+                                                        borderTop: '2px solid var(--color-border-secondary)',
+                                                    }}>
+                                                         <td style={tdStyle} colSpan={2} />
+                                                        <td style={tdStyle} colSpan={3}>
+                                                            <i className="ti ti-calculator" style={{ marginLeft: 4 }} />
+                                                            الإجمالي ({recapSummary.product_count} منتج)
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--em)', fontWeight: 700 }}>
+                                                            {fmtNumber(recapProducts.reduce((s, p) => s + p.sale_qty, 0))}
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--em)', fontWeight: 700 }}>
+                                                            {fmtNumber(recapSummary.total_sale_ht)} دج
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--red)', fontWeight: 700 }}>
+                                                            {fmtNumber(recapProducts.reduce((s, p) => s + p.purchase_qty, 0))}
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--red)', fontWeight: 700 }}>
+                                                            {fmtNumber(recapSummary.total_purchase_ht)} دج
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 800, fontSize: 14, color: 'var(--text-info, #3b82f6)' }}>
+                                                            {fmtNumber(recapSummary.total_sale_ttc + recapSummary.total_purchase_ttc)} دج
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </>
+                            )}
+                        </>
+                    )}
                 </>
             )}
         </Modal>

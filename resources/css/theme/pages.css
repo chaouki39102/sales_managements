@@ -504,3 +504,71 @@
     max-width: 90px;
   }
 }
+
+/* ═══════════════ PRINT — كشف حساب ═══════════════ */
+@media print {
+  body * { visibility: hidden; }
+  .no-print, .no-print * { display: none !important; }
+  #sidebar, #topbar, .page-header, .page-header *,
+  .tabs, .kpis, .srch, .btn, button,
+  .modal-overlay, .modal-footer, .modal-header,
+  [class*="no-print"] { display: none !important; }
+
+  .modal {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 16px !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    z-index: 99999 !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  .modal > * { visibility: visible !important; }
+
+  .modal .modal-body,
+  .modal > div {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* جداول داخل المودال */
+  .modal table { page-break-inside: auto; }
+  .modal tr    { page-break-inside: avoid; }
+  .modal thead { display: table-header-group; }
+
+  /* إخفاء عناصر غير ضرورية للطباعة */
+  .modal [class*="badge"],
+  .modal button,
+  .modal .no-print { display: none !important; }
+
+  /* حجم خط موحّد */
+  .modal, .modal * {
+    font-size: 11pt !important;
+    color: #000 !important;
+    background: transparent !important;
+  }
+
+  /* إظهار النتائج والجداول فقط */
+  .modal table,
+  .modal table * {
+    visibility: visible !important;
+  }
+
+  /* إظهار العناصر المخصصة للطباعة */
+  .print-only {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  @page {
+    margin: 10mm;
+    size: A4 landscape;
+  }
+}
