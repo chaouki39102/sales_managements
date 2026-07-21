@@ -1,3 +1,12 @@
+const FORMULA_CHARS = /^[=+\-@\t\r]/;
+
+export function sanitizeCellValue(value: string | number): string | number {
+  if (typeof value === 'number') return value;
+  if (typeof value !== 'string') return String(value);
+  if (FORMULA_CHARS.test(value)) return `'${value}`;
+  return value;
+}
+
 export interface ExportSheet {
   name: string;
   headers: string[];
@@ -25,12 +34,17 @@ export async function exportToExcel(sheets: ExportSheet[], filename: string) {
     });
 
     for (const row of sheet.rows) {
-      const r = ws.addRow(row);
-      r.eachCell(cell => {
+      const sanitized = row.map(sanitizeCellValue);
+      const r = ws.addRow(sanitized);
+      r.eachCell((cell, colNumber) => {
+        const original = row[colNumber - 1];
         cell.alignment = { horizontal: 'right' };
         cell.border = {
           bottom: { style: 'hair', color: { argb: 'FFCCCCCC' } },
         };
+        if (typeof original === 'number') {
+          cell.numFmt = '#,##0.00';
+        }
       });
     }
 

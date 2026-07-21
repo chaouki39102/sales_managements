@@ -23,6 +23,14 @@ interface POSSettingsModalProps {
   onClose:       () => void;
   warehouses:    Warehouse[];
   documentTypes: DocumentType[];
+  /** System-level fiscal stamp setting (from DB) */
+  systemFiscalStampEnabled: boolean;
+  /** Toggle fiscal stamp in system settings DB */
+  onToggleFiscalStamp: (val: boolean) => Promise<void>;
+  /** System-level allow negative stock setting (from DB) */
+  systemAllowNegativeStock: boolean;
+  /** Toggle allow negative stock in system settings DB */
+  onToggleAllowNegative: (val: boolean) => Promise<void>;
 }
 
 type Tab = 'general' | 'pricing' | 'print' | 'receipt' | 'security';
@@ -72,7 +80,7 @@ const TOAST_POSITION_OPTIONS: { value: string; label: string }[] = [
   { value: 'bottom-right', label: 'أسفل يمين' },
 ];
 
-const toggleSettings: { key: keyof POSSettings; label: string }[] = [
+const toggleSettings: { key: keyof POSSettings; label: string; triState?: boolean }[] = [
   { key: 'showQuickbarOnStart', label: 'إظهار شريط المنتجات السريعة عند الفتح' },
   { key: 'confirmOnClear',      label: 'طلب تأكيد قبل مسح السلة' },
   { key: 'autoClosePayment',    label: 'إغلاق نافذة الدفع تلقائياً بعد النجاح' },
@@ -87,11 +95,15 @@ const toggleSettings: { key: keyof POSSettings; label: string }[] = [
 
 export default function POSSettingsModal({
   settings, onSave, onReset, onClose, warehouses, documentTypes,
+  systemFiscalStampEnabled, onToggleFiscalStamp,
+  systemAllowNegativeStock, onToggleAllowNegative,
 }: POSSettingsModalProps) {
   const [local,     setLocal]     = useState<POSSettings>({ ...settings });
   const [activeTab, setActiveTab] = useState<Tab>('general');
   const [dirty,     setDirty]     = useState(false);
   const [showPin,   setShowPin]   = useState(false);
+  const [stampSaving, setStampSaving]   = useState(false);
+  const [negSaving,   setNegSaving]     = useState(false);
   const deleteConfirm = useConfirm();
   const notify = useNotification();
 
@@ -180,6 +192,34 @@ export default function POSSettingsModal({
                 />
               </div>
             ))}
+
+            {/* ── السماح بالمخزون السالب — يكتب مباشرة في إعدادات النظام ── */}
+            <div className="fg s2">
+              <Switch
+                checked={systemAllowNegativeStock}
+                onChange={async (v) => {
+                  setNegSaving(true);
+                  try { await onToggleAllowNegative(v); }
+                  finally { setNegSaving(false); }
+                }}
+                label={negSaving ? 'جاري الحفظ...' : 'السماح بالمخزون السالب'}
+              />
+              <div className="fg-hint">نفس إعداد "السماح بالمخزون السالب" في إعدادات النظام</div>
+            </div>
+
+            {/* ── الطابع المالي — يكتب مباشرة في إعدادات النظام ── */}
+            <div className="fg s2">
+              <Switch
+                checked={systemFiscalStampEnabled}
+                onChange={async (v) => {
+                  setStampSaving(true);
+                  try { await onToggleFiscalStamp(v); }
+                  finally { setStampSaving(false); }
+                }}
+                label={stampSaving ? 'جاري الحفظ...' : 'الطابع المالي (Timbre Fiscal)'}
+              />
+              <div className="fg-hint">نفس إعداد "الطابع المالي" في إعدادات النظام — تغييره هنا يُحدّث النظام بالكامل</div>
+            </div>
 
             {(local.playSoundOnAdd || local.playSoundOnSale) && (
               <>

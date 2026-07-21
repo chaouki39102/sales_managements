@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
-import { FMT, MONEY } from './helpers';
+import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
 import { useVelocityReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 
-const def = { from: new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) };
+const def = REPORT_DEFAULTS;
 
 export default function VelocityReportPage() {
   const [fromDate, setFromDate] = useState(def.from);
@@ -20,7 +20,7 @@ export default function VelocityReportPage() {
     await exportToExcel([{
       name: 'سرعة البيع',
       headers: ['#', 'المنتج', 'المرجع', 'الكمية', 'عدد الفواتير', 'السرعة/يوم', 'متوسط السعر'],
-      rows: data.items.map((r, i) => [i + 1, r.product_name, r.product_ref, r.total_qty, r.doc_count, r.velocity.toFixed(2), r.avg_price]),
+      rows: data.items.map((r, i) => [i + 1, r.product_name, r.product_ref, r.total_qty, r.doc_count, FMT(r.velocity), FMT(r.avg_price)]),
     }], `سرعة البيع ${fromDate}-${toDate}`);
   };
 
@@ -48,7 +48,7 @@ export default function VelocityReportPage() {
                     <td style={{ color: 'var(--t4)', fontSize: 12 }}>{row.product_ref}</td>
                     <td>{FMT(row.total_qty)}</td>
                     <td>{row.doc_count}</td>
-                    <td style={{ fontWeight: 700 }}>{row.velocity.toFixed(2)}</td>
+                    <td style={{ fontWeight: 700 }}>{FMT(row.velocity)}</td>
                     <td>{FMT(row.avg_price)}</td>
                   </tr>
                 ))}

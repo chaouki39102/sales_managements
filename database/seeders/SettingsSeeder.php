@@ -538,6 +538,19 @@ class SettingsSeeder extends Seeder
                 'is_editable'   => true,
                 'display_order' => 47,
             ],
+
+            // ══════════════════════════════════════════
+            // group: print — إعدادات الطباعة
+            // ══════════════════════════════════════════
+            'print:doc_configs' => [
+                'value'         => self::getDefaultPrintDocConfigs(),
+                'group'         => 'print',
+                'type'          => 'json',
+                'description'   => 'تكوين الطباعة لكل نوع مستند (حجم الورق، النسخ، طباعة تلقائية، معاينة)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 90,
+            ],
         ];
     }
 
@@ -589,5 +602,40 @@ class SettingsSeeder extends Seeder
                 ]
             );
         }
+    }
+
+    /**
+     * Default print document configs for each doc type.
+     * POS: enabled with 80mm thermal + auto-print + preview.
+     * Others: enabled with A4 + preview (no auto-print).
+     */
+    private static function getDefaultPrintDocConfigs(): array
+    {
+        $docTypes = [
+            ['code' => 'POS', 'name' => 'مبيعات POS',       'paperSize' => '80mm',  'autoPrint' => true,  'showPreview' => true],
+            ['code' => 'FV',  'name' => 'Facture de vente',  'paperSize' => 'A4',    'autoPrint' => false, 'showPreview' => true],
+            ['code' => 'BL',  'name' => 'Bon de livraison',  'paperSize' => 'A4',    'autoPrint' => false, 'showPreview' => true],
+            ['code' => 'DEV', 'name' => 'Devis',             'paperSize' => 'A4',    'autoPrint' => false, 'showPreview' => true],
+            ['code' => 'BCC', 'name' => 'Bon de commande client', 'paperSize' => 'A4', 'autoPrint' => false, 'showPreview' => true],
+            ['code' => 'AV',  'name' => 'Avoir sur vente',   'paperSize' => 'A4',    'autoPrint' => false, 'showPreview' => true],
+            ['code' => 'AA',  'name' => 'Avoir sur achat',   'paperSize' => 'A4',    'autoPrint' => false, 'showPreview' => true],
+            ['code' => 'FA',  'name' => "Facture d'achat",   'paperSize' => 'A4',    'autoPrint' => false, 'showPreview' => true],
+            ['code' => 'BR',  'name' => 'Bon de réception',  'paperSize' => 'A4',    'autoPrint' => false, 'showPreview' => true],
+            ['code' => 'DDP', 'name' => 'Demande de prix',   'paperSize' => 'A4',    'autoPrint' => false, 'showPreview' => true],
+            ['code' => 'BT',  'name' => 'Bon de transfert',  'paperSize' => 'A4',    'autoPrint' => false, 'showPreview' => true],
+            ['code' => 'BCF', 'name' => 'Bon de commande fournisseur', 'paperSize' => 'A4', 'autoPrint' => false, 'showPreview' => true],
+        ];
+
+        return array_map(fn($d) => [
+            'docTypeCode'  => $d['code'],
+            'docTypeName'  => $d['name'],
+            'enabled'      => true,
+            'paperSize'    => $d['paperSize'],
+            'printerId'    => null,
+            'copies'       => 1,
+            'autoPrint'    => $d['autoPrint'],
+            'showPreview'  => $d['showPreview'],
+            'templates'    => [$d['paperSize']],
+        ], $docTypes);
     }
 }

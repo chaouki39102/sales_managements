@@ -8,7 +8,7 @@
 
 import type { PrintTemplate } from '@/pages/settings/print-settings/types';
 import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data';
-import { printFieldResolver } from '@/pages/settings/print-settings/services';
+import { printFieldResolver } from '@/pages/settings/print-settings/services/PrintFieldResolver';
 
 // ─── ESC/POS Constants ────────────────────────────────────────────────────────
 

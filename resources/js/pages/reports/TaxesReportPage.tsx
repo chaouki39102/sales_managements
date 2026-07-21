@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
-import { FMT, MONEY } from './helpers';
+import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
 import { useTvaReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 
-const def = { from: new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) };
+const def = REPORT_DEFAULTS;
 
 export default function TaxesReportPage() {
   const [fromDate, setFromDate] = useState(def.from);
   const [toDate, setToDate] = useState(def.to);
-  const { data, isLoading, isError, refetch } = useTvaReport();
+  const { data, isLoading, isError, refetch } = useTvaReport({ from_date: fromDate || undefined, to_date: toDate || undefined });
 
   const handleExport = async () => {
     if (!data) return;

@@ -26,7 +26,7 @@ class PosLookupsController extends Controller
             'documentTypes'    => DB::table('document_types as dt')
                 ->join('document_base_operations as dbo', 'dt.document_base_operation_id', '=', 'dbo.id')
                 ->where('dt.active', true)
-                ->select('dt.id', 'dt.name', 'dt.code', 'dbo.name as operation', 'dt.affects_accounting', 'dt.requires_tva_number')
+                ->select('dt.id', 'dt.name', 'dt.code', 'dbo.name as operation', 'dt.affects_accounting', 'dt.requires_party')
                 ->orderBy('dt.name')->get(),
             'priceLevels'      => PriceLevel::select('id', 'name', 'code', 'active')
                 ->where('active', true)->orderBy('name')->get(),

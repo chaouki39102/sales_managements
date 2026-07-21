@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
-import { FMT, MONEY } from './helpers';
+import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
 import { useProductsReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 
-const def = { from: new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) };
+const def = REPORT_DEFAULTS;
 
 export default function ProductsReportPage() {
   const [fromDate, setFromDate] = useState(def.from);
@@ -60,10 +60,11 @@ export default function ProductsReportPage() {
               <tfoot>
                 <tr style={{ fontWeight: 800, background: 'var(--bg2)' }}>
                   <td colSpan={5}>الإجمالي ({data.products.length} منتج)</td>
-                  <td></td>
+                  <td>{FMT(data.products.reduce((s, r) => s + r.sales_cost, 0))}</td>
                   <td>{data.products.reduce((s, r) => s + r.total_sold, 0)}</td>
                   <td>{FMT(data.summary.total_sales_ht)}</td>
-                  <td></td><td></td>
+                  <td>{FMT(data.products.reduce((s, r) => s + r.margin_value, 0))}</td>
+                  <td></td>
                 </tr>
               </tfoot>
             </table>

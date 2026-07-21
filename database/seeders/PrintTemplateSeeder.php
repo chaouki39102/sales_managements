@@ -180,34 +180,43 @@ class PrintTemplateSeeder extends Seeder
         }
 
         foreach ($companies as $company) {
-            foreach (self::DOC_TYPES as $docCode) {
-                $existing = PrintTemplate::where('company_id', $company->id)
-                    ->where('doc_type_code', $docCode)
-                    ->first();
-
-                if ($existing) {
-                    continue;
-                }
-
-                $config = self::DEFAULT_CONFIG;
-                $config['title_text'] = $docCode === 'POS' ? 'إيصال بيع' : 'فاتورة بيع';
-                $config['show_session'] = $docCode === 'POS';
-                $config['show_fiscal_stamp'] = in_array($docCode, ['FV', 'BL', 'FA', 'BR', 'AV']);
-
-                PrintTemplate::create([
-                    'company_id'    => $company->id,
-                    'name'          => 'قالب ' . ($docCode === 'POS' ? 'إيصال' : 'فاتورة') . ' افتراضي',
-                    'doc_type_code' => $docCode,
-                    'paper_size'    => '80mm',
-                    'is_default'    => true,
-                    'is_active'     => true,
-                    'config'        => $config,
-                ]);
-
-                $this->command->info("Created default template for {$company->name} / {$docCode}");
-            }
+            self::seedForCompany($company->id, $this->command);
         }
 
         $this->command->info('PrintTemplateSeeder completed successfully.');
+    }
+
+    /**
+     * Seed default print templates for a single company.
+     * Called by CompanySeeder via CompanyObserver when a new company is created.
+     */
+    public static function seedForCompany(int $companyId, ?\Illuminate\Console\Output\OutputInterface $output = null): void
+    {
+        foreach (self::DOC_TYPES as $docCode) {
+            $existing = PrintTemplate::where('company_id', $companyId)
+                ->where('doc_type_code', $docCode)
+                ->first();
+
+            if ($existing) {
+                continue;
+            }
+
+            $config = self::DEFAULT_CONFIG;
+            $config['title_text'] = $docCode === 'POS' ? 'إيصال بيع' : 'فاتورة بيع';
+            $config['show_session'] = $docCode === 'POS';
+            $config['show_fiscal_stamp'] = in_array($docCode, ['FV', 'BL', 'FA', 'BR', 'AV']);
+
+            PrintTemplate::create([
+                'company_id'    => $companyId,
+                'name'          => 'قالب ' . ($docCode === 'POS' ? 'إيصال' : 'فاتورة') . ' افتراضي',
+                'doc_type_code' => $docCode,
+                'paper_size'    => '80mm',
+                'is_default'    => true,
+                'is_active'     => true,
+                'config'        => $config,
+            ]);
+
+            $output?->info("Created default template for company #{$companyId} / {$docCode}");
+        }
     }
 }

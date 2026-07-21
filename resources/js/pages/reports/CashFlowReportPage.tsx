@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
-import { FMT, MONEY } from './helpers';
+import { FMT, MONEY, PCT, REPORT_DEFAULTS } from './helpers';
 import { useCashFlowReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 
-const def = { from: new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) };
+const def = REPORT_DEFAULTS;
 
 export default function CashFlowReportPage() {
   const [fromDate, setFromDate] = useState(def.from);
@@ -91,7 +91,7 @@ export default function CashFlowReportPage() {
                       <td style={{ fontWeight: 700 }}>{m.mode}</td>
                       <td className="num">{m.count}</td>
                       <td className="num">{MONEY(m.total)}</td>
-                      <td className="num">{data.summary.total_amount > 0 ? ((m.total / data.summary.total_amount) * 100).toFixed(1) : 0}%</td>
+                      <td className="num">{data.summary.total_amount > 0 ? PCT((m.total / data.summary.total_amount) * 100) : '0%'}</td>
                     </tr>
                   ))}
                 </tbody>

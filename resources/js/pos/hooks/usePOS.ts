@@ -32,8 +32,8 @@ export function usePOS(fiscalStampEnabled = true) {
   const setInvoiceDiscountPct = useCartStore(s => s.setInvoiceDiscountPct);
 
   const totals = useMemo(
-    () => calcTotals(items, invoiceDiscountPct, fiscalStampEnabled),
-    [items, invoiceDiscountPct, fiscalStampEnabled],
+    () => calcTotals(items, invoiceDiscountPct, fiscalStampEnabled, client?.is_tva_exempt ?? false),
+    [items, invoiceDiscountPct, fiscalStampEnabled, client?.is_tva_exempt],
   );
 
   const holdCart = useCallback((label?: string) => {

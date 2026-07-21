@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
-import { FMT, MONEY } from './helpers';
+import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
 import { useSalesReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
@@ -10,9 +10,8 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 
 export default function SalesReportPage() {
-  const fy = useFiscalYearRaw();
-  const [fromDate, setFromDate] = useState(fy.from);
-  const [toDate, setToDate] = useState(fy.to);
+  const [fromDate, setFromDate] = useState(REPORT_DEFAULTS.from);
+  const [toDate, setToDate] = useState(REPORT_DEFAULTS.to);
   const [tab, setTab] = useState<'docs' | 'products'>('docs');
   const { data, isLoading, isError, refetch } = useSalesReport({ from_date: fromDate || undefined, to_date: toDate || undefined });
 
@@ -148,9 +147,4 @@ export default function SalesReportPage() {
       </>
     )}
   </ReportShell>;
-}
-
-function useFiscalYearRaw() {
-  const now = new Date();
-  return { from: `${now.getFullYear()}-01-01`, to: now.toISOString().slice(0, 10) };
 }

@@ -119,6 +119,7 @@ export interface PurchasesReportDocument {
   party_name:       string;
   total_ht:         number;
   total_tva:        number;
+  total_stamp:      number;
   total_ttc:        number;
   total_discount:   number;
   paid_amount:      number;
@@ -132,6 +133,7 @@ export interface PurchasesProductRecapItem {
   product_ref:    string;
   total_qty:      number;
   total_ht:       number;
+  total_tva:      number;
   total_ttc:      number;
   total_discount: number;
 }
@@ -140,6 +142,7 @@ export interface PurchasesReportData {
   summary: {
     total_ht:          number;
     total_tva:         number;
+    total_stamp:       number;
     total_ttc:         number;
     total_discount:    number;
     total_paid:        number;
@@ -436,7 +439,7 @@ export interface CreativeReportData {
 
 // ─── Daily Report ─────────────────────────────────────────────────────────────
 
-export interface DailyReportParams {
+export interface DailyReportParams extends ReportBaseParams {
   date?: string;   // YYYY-MM-DD
 }
 
@@ -470,10 +473,8 @@ export interface DailyReportData {
 
 // ─── Product Movement Report ──────────────────────────────────────────────────
 
-export interface ProductMovementParams {
+export interface ProductMovementParams extends ReportBaseParams {
   product_id?: number;
-  from_date?:  string;
-  to_date?:    string;
 }
 
 export interface ProductMovementItem {
@@ -719,12 +720,12 @@ export function usePaymentsReport(params?: Omit<PaymentsReportParams, 'year_id'>
   });
 }
 
-export function useTvaReport() {
+export function useTvaReport(params?: Pick<TaxesReportParams, 'from_date' | 'to_date'>) {
   const slug   = useActiveSlug();
   const yearId = useSelectedYearId();
   return useQuery({
     queryKey:  tenantKeys.reports.tva(slug ?? '', yearId ?? 0),
-    queryFn:   () => reportsApi.taxes({ year_id: yearId ?? undefined }),
+    queryFn:   () => reportsApi.taxes({ year_id: yearId ?? undefined, ...params }),
     enabled:   !!slug && !!yearId,
     staleTime: 5 * 60_000,
   });
@@ -786,21 +787,23 @@ export function useCreativeReport(params?: ReportBaseParams) {
   });
 }
 
-export function useDailyReport(params?: DailyReportParams) {
-  const slug = useActiveSlug();
+export function useDailyReport(params?: Omit<DailyReportParams, 'year_id'>) {
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
   return useQuery({
-    queryKey:  [slug, 'reports', 'daily', params?.date],
-    queryFn:   () => reportsApi.daily(params),
+    queryKey:  [slug, 'reports', 'daily', yearId, params?.date],
+    queryFn:   () => reportsApi.daily({ year_id: yearId ?? undefined, ...params }),
     enabled:   !!slug,
     staleTime: 2 * 60_000,
   });
 }
 
-export function useProductMovementReport(params?: ProductMovementParams) {
-  const slug = useActiveSlug();
+export function useProductMovementReport(params?: Omit<ProductMovementParams, 'year_id'>) {
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
   return useQuery({
-    queryKey:  [slug, 'reports', 'product-movement', params],
-    queryFn:   () => reportsApi.productMovement(params),
+    queryKey:  [slug, 'reports', 'product-movement', yearId, params],
+    queryFn:   () => reportsApi.productMovement({ year_id: yearId ?? undefined, ...params }),
     enabled:   !!slug,
     staleTime: 5 * 60_000,
   });

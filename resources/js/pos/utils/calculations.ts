@@ -42,7 +42,7 @@ export function calcCompoundedDiscount(itemDiscPct: number, invDiscPct: number):
 }
 
 /** حساب مجاميع العربة */
-export function calcTotals(items: CartItem[], invoiceDiscountPct = 0, fiscalStampEnabled = true): CartTotals {
+export function calcTotals(items: CartItem[], invoiceDiscountPct = 0, fiscalStampEnabled = true, isTvaExempt = false): CartTotals {
   let totalHt       = 0;
   let totalTva      = 0;
   let totalDiscount = 0;
@@ -50,7 +50,6 @@ export function calcTotals(items: CartItem[], invoiceDiscountPct = 0, fiscalStam
 
   for (const item of items) {
     totalHt       += item.total_ht;
-    totalTva      += item.total_ht * (item.tva_rate / 100);
     totalDiscount += item.discount_amount;
     itemsCount    += item.quantity;
   }
@@ -61,12 +60,14 @@ export function calcTotals(items: CartItem[], invoiceDiscountPct = 0, fiscalStam
     ? totalHt * invoiceDiscountPct / 100
     : 0;
   const adjTotalHt  = totalHt - invoiceDiscountAmount;
-  const adjTotalTva = totalHt > 0
-    ? items.reduce((s, item) => {
-        const share = item.total_ht / totalHt;
-        return s + ((item.total_ht - invoiceDiscountAmount * share) * item.tva_rate / 100);
-      }, 0)
-    : totalTva;
+  // ✅ TVA-exempt parties: backend forces tva_rate=0, so frontend must match
+  const adjTotalTva = isTvaExempt ? 0
+    : totalHt > 0
+      ? items.reduce((s, item) => {
+          const share = item.total_ht / totalHt;
+          return s + ((item.total_ht - invoiceDiscountAmount * share) * item.tva_rate / 100);
+        }, 0)
+      : totalTva;
   const totalTtc     = adjTotalHt + adjTotalTva;
   const fiscalStamp  = fiscalStampEnabled ? calcFiscalStamp(totalTtc) : 0;
 

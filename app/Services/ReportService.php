@@ -240,6 +240,7 @@ class ReportService
                 'party_name'        => $doc->party?->name,
                 'total_ht'          => round($doc->total_ht, 2),
                 'total_tva'         => round($doc->total_tva, 2),
+                'total_stamp'       => round($doc->total_stamp, 2),
                 'total_ttc'         => round($doc->total_ttc, 2),
                 'total_discount'    => round($discountMap[$doc->id] ?? 0, 2),
                 'paid_amount'       => round($doc->paid_amount, 2),
@@ -255,6 +256,7 @@ class ReportService
             'summary'       => [
                 'total_ht'          => round($documents->sum('total_ht'), 2),
                 'total_tva'         => round($documents->sum('total_tva'), 2),
+                'total_stamp'       => round($documents->sum('total_stamp'), 2),
                 'total_ttc'         => round($documents->sum('total_ttc'), 2),
                 'total_discount'    => round($totalDiscount, 2),
                 'total_paid'        => round($documents->sum('paid_amount'), 2),
@@ -267,16 +269,27 @@ class ReportService
 
     public function customersReport(array $filters = []): array
     {
-        $query = Party::where('party_type_id', 1)->with(['commune', 'wilaya']);
-
+        $partyIdsWithDocs = collect();
+        $baseDocsQuery = DB::table('commercial_documents as cd')
+            ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->where('cd.company_id', $this->companyId())
+            ->whereIn('dt.code', self::SALE_CODES);
+        if (!empty($filters['fiscal_year_id'])) {
+            $baseDocsQuery->where('cd.fiscal_year_id', $filters['fiscal_year_id']);
+        }
         if (!empty($filters['from_date'])) {
-            $query->whereDate('created_at', '>=', $filters['from_date']);
+            $baseDocsQuery->whereDate('cd.document_date', '>=', $filters['from_date']);
         }
         if (!empty($filters['to_date'])) {
-            $query->whereDate('created_at', '<=', $filters['to_date']);
+            $baseDocsQuery->whereDate('cd.document_date', '<=', $filters['to_date']);
         }
+        $partyIdsWithDocs = $baseDocsQuery->pluck('cd.party_id')->filter()->unique();
 
-        $parties = $query->orderBy('created_at', 'desc')->get();
+        $query = Party::where('party_type_id', 1)->with(['commune', 'wilaya']);
+        if ($partyIdsWithDocs->isNotEmpty()) {
+            $query->whereIn('id', $partyIdsWithDocs);
+        }
+        $parties = $query->orderBy('name')->get();
 
         $partyIds = $parties->pluck('id');
         $partyStats = [];
@@ -404,16 +417,27 @@ class ReportService
 
     public function suppliersReport(array $filters = []): array
     {
-        $query = Party::where('party_type_id', 2)->with(['commune', 'wilaya']);
-
+        $partyIdsWithDocs = collect();
+        $baseDocsQuery = DB::table('commercial_documents as cd')
+            ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->where('cd.company_id', $this->companyId())
+            ->whereIn('dt.code', self::PURCHASE_CODES);
+        if (!empty($filters['fiscal_year_id'])) {
+            $baseDocsQuery->where('cd.fiscal_year_id', $filters['fiscal_year_id']);
+        }
         if (!empty($filters['from_date'])) {
-            $query->whereDate('created_at', '>=', $filters['from_date']);
+            $baseDocsQuery->whereDate('cd.document_date', '>=', $filters['from_date']);
         }
         if (!empty($filters['to_date'])) {
-            $query->whereDate('created_at', '<=', $filters['to_date']);
+            $baseDocsQuery->whereDate('cd.document_date', '<=', $filters['to_date']);
         }
+        $partyIdsWithDocs = $baseDocsQuery->pluck('cd.party_id')->filter()->unique();
 
-        $parties = $query->orderBy('created_at', 'desc')->get();
+        $query = Party::where('party_type_id', 2)->with(['commune', 'wilaya']);
+        if ($partyIdsWithDocs->isNotEmpty()) {
+            $query->whereIn('id', $partyIdsWithDocs);
+        }
+        $parties = $query->orderBy('name')->get();
 
         $partyIds = $parties->pluck('id');
         $partyStats = [];
@@ -505,6 +529,12 @@ class ReportService
             if (!empty($filters['fiscal_year_id'])) {
                 $statsQuery->where('cd.fiscal_year_id', $filters['fiscal_year_id']);
             }
+            if (!empty($filters['from_date'])) {
+                $statsQuery->whereDate('cd.document_date', '>=', $filters['from_date']);
+            }
+            if (!empty($filters['to_date'])) {
+                $statsQuery->whereDate('cd.document_date', '<=', $filters['to_date']);
+            }
             $stats = $statsQuery->select(
                     'cdl.product_id',
                     DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity ELSE cdl.quantity END) as total_sold"),
@@ -529,6 +559,7 @@ class ReportService
         if ($useWarehouseStock) {
             $stockRows = DB::table('stock_movements as sm')
                 ->join('stock_movement_types as smt', 'smt.id', '=', 'sm.stock_movement_type_id')
+                ->where('sm.company_id', $this->companyId())
                 ->where('sm.warehouse_id', $filters['warehouse_id'])
                 ->whereIn('sm.product_id', $productIds)
                 ->select(
@@ -596,6 +627,7 @@ class ReportService
             $productIds = $products->pluck('id');
             $stockRows = DB::table('stock_movements as sm')
                 ->join('stock_movement_types as smt', 'smt.id', '=', 'sm.stock_movement_type_id')
+                ->where('sm.company_id', $this->companyId())
                 ->where('sm.warehouse_id', $filters['warehouse_id'])
                 ->whereIn('sm.product_id', $productIds)
                 ->select(
@@ -771,6 +803,7 @@ class ReportService
                 'cdl.product_id',
                 DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity ELSE cdl.quantity END) as total_qty"),
                 DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.total_ht ELSE cdl.total_ht END) as total_ht"),
+                DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity * cdl.cost_price_ht ELSE cdl.quantity * cdl.cost_price_ht END) as total_cost")
             );
         if ($fyId) $rows->where('cd.fiscal_year_id', $fyId);
 
@@ -788,8 +821,8 @@ class ReportService
             'product_ref'   => $products->get($r->product_id)?->ref ?? '—',
             'total_qty'     => (float) $r->total_qty,
             'total_ht'      => round((float) $r->total_ht, 2),
-            'cost_price'    => $products->get($r->product_id)?->current_cost_price ?? 0,
-            'cost_total'    => round((float) $r->total_qty * ($products->get($r->product_id)?->current_cost_price ?? 0), 2),
+            'cost_price'    => (float) $r->total_qty > 0 ? round((float) $r->total_cost / (float) $r->total_qty, 2) : 0,
+            'cost_total'    => round((float) $r->total_cost, 2),
             'margin_amount' => 0,
             'margin_pct'    => 0,
         ])->map(fn($i) => [
@@ -819,11 +852,19 @@ class ReportService
         $refDate = $filters['as_of_date'] ?? now()->toDateString();
         $ref     = Carbon::parse($refDate);
 
-        $invoices = CommercialDocument::with('party')
+        $query = CommercialDocument::with('party')
             ->whereHas('documentType', fn($q) => $q->whereIn('code', array_merge(self::SALE_CODES, ['BL', 'BCC'])))
             ->where('remaining_amount', '>', 0)
-            ->whereDate('document_date', '<=', $refDate)
-            ->orderBy('due_date')
+            ->whereDate('document_date', '<=', $refDate);
+
+        if (!empty($filters['fiscal_year_id'])) {
+            $query->where('fiscal_year_id', $filters['fiscal_year_id']);
+        }
+        if (!empty($filters['from_date'])) {
+            $query->whereDate('document_date', '>=', $filters['from_date']);
+        }
+
+        $invoices = $query->orderBy('due_date')
             ->get();
 
         $parties = $invoices->groupBy('party_id');
@@ -921,15 +962,21 @@ class ReportService
     public function creativeReport(array $filters = []): array
     {
         $fiscalYearId = $filters['fiscal_year_id'] ?? null;
+        $from = $filters['from_date'] ?? null;
+        $to   = $filters['to_date']   ?? null;
 
         $salesQuery = CommercialDocument::with([])
             ->whereHas('documentType', fn($q) => $q->whereIn('code', self::SALE_CODES));
         if ($fiscalYearId) $salesQuery->where('fiscal_year_id', $fiscalYearId);
+        if ($from) $salesQuery->whereDate('document_date', '>=', $from);
+        if ($to)   $salesQuery->whereDate('document_date', '<=', $to);
         $salesDocs = $salesQuery->get();
 
         $purchasesQuery = CommercialDocument::with([])
             ->whereHas('documentType', fn($q) => $q->whereIn('code', self::PURCHASE_CODES));
         if ($fiscalYearId) $purchasesQuery->where('fiscal_year_id', $fiscalYearId);
+        if ($from) $purchasesQuery->whereDate('document_date', '>=', $from);
+        if ($to)   $purchasesQuery->whereDate('document_date', '<=', $to);
         $purchasesDocs = $purchasesQuery->get();
 
         $salesIds = $salesDocs->pluck('id');
@@ -982,6 +1029,8 @@ class ReportService
             ->whereHas('documentType', fn($q) => $q->whereIn('code', self::SALE_CODES))
             ->where('remaining_amount', '>', 0);
         if ($fiscalYearId) $topCustomers->where('fiscal_year_id', $fiscalYearId);
+        if ($from) $topCustomers->whereDate('document_date', '>=', $from);
+        if ($to)   $topCustomers->whereDate('document_date', '<=', $to);
         $topCustomersRaw = $topCustomers
             ->select('party_id', DB::raw('SUM(total_ttc) as total_ttc'), DB::raw('COUNT(*) as doc_count'))
             ->groupBy('party_id')
@@ -1005,6 +1054,8 @@ class ReportService
         if ($fiscalYearId) {
             $paymentsQuery->whereHas('commercialDocuments', fn($q) => $q->where('fiscal_year_id', $fiscalYearId));
         }
+        if ($from) $paymentsQuery->whereDate('payment_date', '>=', $from);
+        if ($to)   $paymentsQuery->whereDate('payment_date', '<=', $to);
         $totalPayments = $paymentsQuery->sum('amount');
 
         return [
@@ -1498,7 +1549,8 @@ class ReportService
         $query = DB::table('stock_movements as sm')
             ->join('products as p', 'p.id', '=', 'sm.product_id')
             ->leftJoin('warehouses as w', 'w.id', '=', 'sm.warehouse_id')
-            ->leftJoin('stock_movement_types as smt', 'smt.id', '=', 'sm.stock_movement_type_id');
+            ->leftJoin('stock_movement_types as smt', 'smt.id', '=', 'sm.stock_movement_type_id')
+            ->where('sm.company_id', $this->companyId());
 
         if (!empty($filters['product_id'])) $query->where('sm.product_id', $filters['product_id']);
         if (!empty($filters['warehouse_id'])) $query->where('sm.warehouse_id', $filters['warehouse_id']);
@@ -1514,7 +1566,8 @@ class ReportService
         )->orderBy('sm.movement_date', 'desc')->limit(500)->get();
 
         $summaryQuery = DB::table('stock_movements as sm')
-            ->leftJoin('stock_movement_types as smt', 'smt.id', '=', 'sm.stock_movement_type_id');
+            ->leftJoin('stock_movement_types as smt', 'smt.id', '=', 'sm.stock_movement_type_id')
+            ->where('sm.company_id', $this->companyId());
 
         if (!empty($filters['product_id'])) $summaryQuery->where('sm.product_id', $filters['product_id']);
         if (!empty($filters['warehouse_id'])) $summaryQuery->where('sm.warehouse_id', $filters['warehouse_id']);

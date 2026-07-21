@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
-import { FMT, MONEY } from './helpers';
+import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
 import { useCustomersReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
 import { TransactionHistoryModal } from '@/pages/debts/TransactionHistoryModal';
@@ -10,7 +10,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 
-const def = { from: new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) };
+const def = REPORT_DEFAULTS;
 
 export default function CustomersReportPage() {
   const navigate = useNavigate();

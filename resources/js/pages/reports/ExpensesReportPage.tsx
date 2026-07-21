@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
-import { FMT, MONEY } from './helpers';
+import { FMT, MONEY, PCT, REPORT_DEFAULTS } from './helpers';
 import { useExpensesReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 
-const def = { from: new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) };
+const def = REPORT_DEFAULTS;
 
 export default function ExpensesReportPage() {
   const [fromDate, setFromDate] = useState(def.from);
@@ -19,7 +19,7 @@ export default function ExpensesReportPage() {
     if (!data) return;
     const sheets = [];
     if (data.by_category.length > 0) {
-      sheets.push({ name: 'حسب الفئة', headers: ['الفئة', 'العدد', 'المبلغ', 'النسبة'], rows: data.by_category.map(c => [c.category_name ?? 'غير مصنف', c.count, c.total, data.summary.total_expenses > 0 ? `${((c.total / data.summary.total_expenses) * 100).toFixed(1)}%` : '0%']) });
+      sheets.push({ name: 'حسب الفئة', headers: ['الفئة', 'العدد', 'المبلغ', 'النسبة'], rows: data.by_category.map(c => [c.category_name ?? 'غير مصنف', c.count, c.total, data.summary.total_expenses > 0 ? PCT((c.total / data.summary.total_expenses) * 100) : '0%']) });
     }
     if (data.expenses.length > 0) {
       sheets.push({ name: 'التفاصيل', headers: ['#', 'رقم', 'التاريخ', 'المبلغ', 'الفئة', 'الوصف'], rows: data.expenses.map((e, i) => [i + 1, e.expense_number, e.date, e.amount, e.category_name ?? '—', e.description ?? '—']) });
@@ -49,7 +49,7 @@ export default function ExpensesReportPage() {
                       <td style={{ fontWeight: 700 }}>{c.category_name}</td>
                       <td className="num">{c.count}</td>
                       <td className="num">{MONEY(c.total)}</td>
-                      <td className="num">{data.summary.total_expenses > 0 ? ((c.total / data.summary.total_expenses) * 100).toFixed(1) : 0}%</td>
+                      <td className="num">{data.summary.total_expenses > 0 ? PCT((c.total / data.summary.total_expenses) * 100) : '0%'}</td>
                     </tr>
                   ))}
                 </tbody>

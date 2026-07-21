@@ -131,7 +131,7 @@ class ReportController extends Controller
 
     public function aging(Request $request): JsonResponse
     {
-        $filters = $request->only(['as_of_date']);
+        $filters = $this->prepareFilters($request, ['as_of_date', 'from_date', 'to_date']);
         $data = $this->reportService->agingReport($filters);
         return response()->json([
             'success' => true,
@@ -243,7 +243,7 @@ class ReportController extends Controller
 
     public function stockMovements(Request $request): JsonResponse
     {
-        $filters = $request->only(['product_id', 'warehouse_id', 'from_date', 'to_date']);
+        $filters = $this->prepareFilters($request, ['product_id', 'warehouse_id', 'from_date', 'to_date']);
         $data = $this->reportService->stockMovementsReport($filters);
         return response()->json([
             'success' => true,

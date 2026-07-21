@@ -12,6 +12,7 @@ import {
   usePOSAggregatedLookups,
 } from '@/lib/api/endpoints/lookups';
 import { productsApi }        from '@/lib/api/endpoints/products';
+import { settingsApi }        from '@/lib/api/endpoints/settings';
 import { apiGet }             from '@/lib/api/core/client';
 import { useSelectedFiscalYear } from '@/lib/api/endpoints/fiscalYears';
 import { documentsApi }       from '@/lib/api/endpoints/documents';
@@ -73,7 +74,8 @@ import { printReceiptDirect }   from '@/pos/utils/printUtils';
 import { openCashDrawerViaWebUSB } from '@/pos/utils/printService';
 import { playAddSound, playSaleSound } from '@/pos/utils/posSounds';
 import type { SoundPresetId } from '@/pos/utils/posSounds';
-import { renderPreviewToHtml, mapCompany }  from '@/pages/settings/print-settings/runtime';
+import { renderPreviewToHtml }  from '@/pages/settings/print-settings/runtime/renderPreviewToHtml';
+import { mapCompany }           from '@/pages/settings/print-settings/runtime/PrintRuntimeAdapter';
 import { printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
 import { useQueryClient }       from '@tanstack/react-query';
 import { partyBalancesApi } from '@/lib/api/endpoints/partyBalances';
@@ -95,13 +97,16 @@ function compoundDiscountPct(linePct: number, invoicePct: number): number {
 function POSPage() {
   const queryClient = useQueryClient();
   const slug        = useActiveSlug();
+  const { settings, setSettings, resetSettings } = usePOSSettings(slug);
+
+  // ── Aggregated lookups — single HTTP for all lookup tables + settings ──
   const { data: posLookups } = usePOSAggregatedLookups();
-  const fiscalStampVal = posLookups?.settings.fiscal_stamp_enabled;
-  const fiscalStampEnabled = fiscalStampVal === undefined
+  const fiscalStampVal = posLookups?.settings?.fiscal_stamp_enabled;
+  const systemFiscalStampEnabled = fiscalStampVal === undefined
     ? true
     : (fiscalStampVal === true || fiscalStampVal === 1 || fiscalStampVal === '1'
       || String(fiscalStampVal).toLowerCase() === 'true');
-  const pos         = usePOS(fiscalStampEnabled);
+  const pos         = usePOS(systemFiscalStampEnabled);
   const posRef      = useRef(pos);
   posRef.current    = pos;
   const fiscalYear  = useSelectedFiscalYear();
@@ -142,8 +147,6 @@ function POSPage() {
       safeToast.error(getErrorMessage(e, 'فشل إغلاق الجلسة'));
     }
   };
-
-  const { settings, setSettings, resetSettings } = usePOSSettings(slug);
 
   // ── Toast proxy: no-op when disabled ──────────────────────────────────
   const safeToast = useMemo(() => {
@@ -393,12 +396,13 @@ function POSPage() {
     }
   }, [isQtyCmd]);
 
-  // ── Products query (ALL active products — category filter is client-side) ──
+  // ── Products query (كل منتجات التصنيف الحالي — بدون نص البحث إطلاقاً) ───
   const { data: productsRaw, isLoading: loadingAll } = useQuery({
-    queryKey: [slug, 'products', 'pos'],
+    queryKey: [slug, 'products', 'pos', { cat: pos.selectedCategory }],
     queryFn: () => productsApi.list({
       per_page:  99999,
       include:   'tva,unit,family,prices.priceLevel,quantityDiscounts',
+      ...(queryFamilyId ? { family_id: queryFamilyId } : {}),
       filter:    { active: 1 },
     }),
     enabled:         !!slug,
@@ -411,16 +415,15 @@ function POSPage() {
       : (productsRaw as PaginatedResponse<Product>)?.data ?? []
   ), [productsRaw]);
 
-  // ── Lookups (from aggregated POS endpoint — 1 HTTP instead of 10+) ──────────
-  const fiscalYears = posLookups?.fiscalYears ?? [];
-  const customers   = posLookups?.customers ?? [];
-  const warehouses       = posLookups?.warehouses;
-  const documentTypes    = posLookups?.documentTypes;
-  const priceLevels      = posLookups?.priceLevels;
-  const currencies       = posLookups?.currencies;
-  const treasuryAccounts = posLookups?.treasuryAccounts;
-  const paymentModes     = posLookups?.paymentModes;
-  const priceLevelsList = useMemo<PriceLevel[]>(() => priceLevels ?? [], [priceLevels]);
+  // ── Lookups from aggregated hook (called at top) ────────────────────────
+  const warehouses       = posLookups?.warehouses ?? [];
+  const documentTypes    = posLookups?.documentTypes ?? [];
+  const priceLevelsList  = posLookups?.priceLevels ?? [];
+  const currencies       = posLookups?.currencies ?? [];
+  const treasuryAccounts = posLookups?.treasuryAccounts ?? [];
+  const fiscalYears      = posLookups?.fiscalYears ?? [];
+  const customers        = posLookups?.customers ?? [];
+  const paymentModes     = posLookups?.paymentModes ?? [];
 
   // ── Client balance ──────────────────────────────────────────────────────────
   const clientId = pos.client?.id;
@@ -457,42 +460,24 @@ function POSPage() {
     }
   }, [cachedWarehouseId, realWarehouseId]);
 
-  // ── Company-level allow_negative_stock ─────────────────────────────────────
-  const ALLOW_NEG_KEY = 'pos-neg-stock';
-  const [allowNegSetting, setAllowNegSetting] = useState<boolean | undefined>(undefined);
+  // ── Company-level allow_negative_stock (from aggregated lookup) ──────────────
+  const negSettingVal = posLookups?.settings?.allow_negative_stock;
+  const systemAllowNeg = negSettingVal === undefined
+    ? false
+    : (negSettingVal === true || negSettingVal === 1 || negSettingVal === '1'
+      || String(negSettingVal).toLowerCase() === 'true');
+  const allowNegSetting = systemAllowNeg;
 
-  // Restore cached value from localStorage when slug is available
-  useEffect(() => {
-    if (!slug) return;
-    try {
-      // Migration from old slug-based key → new fixed key, prefer old value
-      const old = localStorage.getItem(`pos-neg-stock-${slug}`);
-      if (old === 'true') {
-        localStorage.setItem(ALLOW_NEG_KEY, 'true');
-        setAllowNegSetting(true);
-        return;
-      }
-      if (old === 'false') {
-        localStorage.setItem(ALLOW_NEG_KEY, 'false');
-        setAllowNegSetting(false);
-        return;
-      }
-      // No old key — read the new key as cache
-      const v = localStorage.getItem(ALLOW_NEG_KEY);
-      if (v === 'true') { setAllowNegSetting(true); return; }
-      if (v === 'false') { setAllowNegSetting(false); return; }
-    } catch {}
-  }, [slug]);
+  // ── Toggle handlers for POS Settings modal (sync with system settings DB) ──
+  const toggleFiscalStamp = useCallback(async (val: boolean) => {
+    await settingsApi.update({ fiscal_stamp_enabled: val });
+    queryClient.invalidateQueries({ queryKey: tenantKeys.lookups.posAggregated(slug ?? '') });
+  }, [slug, queryClient]);
 
-  // Sync from aggregated lookups (replaces per-key settings queries)
-  useEffect(() => {
-    const raw = posLookups?.settings.allow_negative_stock;
-    if (raw === undefined) return;
-    const val = raw === true || raw === 1 || raw === '1'
-      || String(raw).toLowerCase() === 'true';
-    setAllowNegSetting(val);
-    try { localStorage.setItem(ALLOW_NEG_KEY, val ? 'true' : 'false'); } catch {}
-  }, [posLookups?.settings.allow_negative_stock]);
+  const toggleAllowNegative = useCallback(async (val: boolean) => {
+    await settingsApi.update({ allow_negative_stock: val });
+    queryClient.invalidateQueries({ queryKey: tenantKeys.lookups.posAggregated(slug ?? '') });
+  }, [slug, queryClient]);
 
   // ── Stock (حسب التصنيف فقط — بدون نص البحث، لنفس سبب استعلام المنتجات) ──
   const { data: stockData = {}, isLoading: stockLoading } = useQuery<Record<number, number>>({
@@ -508,7 +493,7 @@ function POSPage() {
             .map((r) => [r.id, r.current_stock ?? 0]),
         ),
       ),
-    enabled:   !!slug && !!effectiveWarehouseId && !!fiscalYear?.id,
+    enabled:   !!slug && !!effectiveWarehouseId,
     staleTime: 10_000,
   });
   // True while stock is still unresolved for the first time — used by ProductGrid
@@ -764,7 +749,7 @@ function POSPage() {
   // ✅ pos.totals (من calcTotals) تُطبِّق الخصم بالفعل ومرة واحدة فقط
   const invoiceDiscountAmount = pos.totals.invoice_discount_amount ?? 0;
 
-  const fiscalStampAmount = fiscalStampEnabled ? calcFiscalStamp(pos.totals.total_ttc) : 0;
+  const fiscalStampAmount = systemFiscalStampEnabled ? calcFiscalStamp(pos.totals.total_ttc) : 0;
   const adjustedTotalTtcFinal = pos.totals.total_ttc + fiscalStampAmount;
 
   const existingPaymentsSum = useMemo(
@@ -775,10 +760,8 @@ function POSPage() {
 
   const avgMargin = useMemo(() => {
     if (!pos.items.length) return 0;
-    return pos.items.reduce((s, i) => {
-      const variant = allVariants.find(v => v.id === i.variant_id);
-      return s + calcMargin(i.unit_price_ht, variant?.average_cost_price ?? 0);
-    }, 0) / pos.items.length;
+    const costMap = new Map(allVariants.map(v => [v.id, v.average_cost_price ?? 0]));
+    return pos.items.reduce((s, i) => s + calcMargin(i.unit_price_ht, costMap.get(i.variant_id) ?? 0), 0) / pos.items.length;
   }, [pos.items, allVariants]);
 
   const filterActive = filterInStock || filterLowStock || !!filterMinPrice || !!filterMaxPrice;
@@ -987,6 +970,9 @@ const handleCompleteSale = useCallback(async (params: {
           };
         });
 
+      // ✅ TVA-exempt parties: frontend must match backend override
+      const clientIsTvaExempt = currentClient?.is_tva_exempt ?? false;
+
       const linesPayload = currentItems.map(i => {
         const compoundedDisc = compoundDiscountPct(i.discount_percentage, currentInvDisc);
         return {
@@ -994,7 +980,7 @@ const handleCompleteSale = useCallback(async (params: {
           quantity:            i.quantity,
           unit_price_ht:       i.unit_price_ht,
           discount_percentage: Math.min(100, compoundedDisc),
-          tva_rate:            i.tva_rate,
+          tva_rate:            clientIsTvaExempt ? 0 : i.tva_rate,
         };
       });
 
@@ -1065,8 +1051,10 @@ const handleCompleteSale = useCallback(async (params: {
       };
 
       const totalPaid         = params.amountPaid;
-      const invoiceRemaining  = Math.max(0, effectiveTotalTtc - totalPaid);
-      const invoiceChange     = Math.max(0, totalPaid - effectiveTotalTtc);
+      const backendNetToPay   = res?.net_to_pay ?? effectiveTotalTtc;
+      const backendPaidAmount = res?.paid_amount ?? totalPaid;
+      const invoiceRemaining  = Math.max(0, backendNetToPay - backendPaidAmount);
+      const invoiceChange     = Math.max(0, backendPaidAmount - backendNetToPay);
       // SSOT: backend computes balance_data — no more partyBalancesApi.getOne()
       const newBalance = res?.balance_data?.new_balance ?? 0;
 
@@ -1103,12 +1091,13 @@ const handleCompleteSale = useCallback(async (params: {
         })),
         totals: {
           ...snapshot.totals,
-          total_ht:  effectiveTotalHt,
-          total_tva: effectiveTotalTva,
-          total_ttc: effectiveTotalTtc,
-          paid:      totalPaid,
+          total_ht:  res.total_ht  ?? effectiveTotalHt,
+          total_tva: res.total_tva ?? effectiveTotalTva,
+          total_ttc: res.total_ttc ?? effectiveTotalTtc,
+          paid:      backendPaidAmount,
           change:    invoiceChange,
           remaining: invoiceRemaining,
+          fiscal_stamp: res.total_stamp ?? snapshot.totals.fiscal_stamp,
         },
         docNumber: res.document_number,
         docDate: new Date().toISOString().slice(0, 10),
@@ -1133,18 +1122,14 @@ const handleCompleteSale = useCallback(async (params: {
       posRef.current.clearCart();
       setSelectedCartItemId(null);
 
-      if (autoPrint && isPrintEnabled && template) {
+      if (showPreview) {
+        setModal('receipt');
+      } else if (autoPrint && isPrintEnabled && template) {
         setTimeout(() => {
           const snap = receiptSnapshotRef.current;
           if (snap) handlePrintDirect(snap);
         }, 300);
-        if (!showPreview) {
-          setModal('none');
-        } else {
-          setModal('receipt');
-        }
-      } else if (showPreview) {
-        setModal('receipt');
+        setModal('none');
       } else {
         setModal('none');
       }
@@ -1161,8 +1146,8 @@ const handleCompleteSale = useCallback(async (params: {
         if (hasCash) openCashDrawerViaWebUSB();
       }
 
-      // Auto-close payment modal after a brief delay (receipt visible briefly)
-      if (settings.autoClosePayment && (autoPrint || showPreview)) {
+      // Auto-close only when no preview is shown (user sees nothing anyway)
+      if (settings.autoClosePayment && !showPreview && (autoPrint || isPrintEnabled)) {
         setTimeout(() => setModal('none'), 1200);
       }
 
@@ -1618,6 +1603,10 @@ const handleCompleteSale = useCallback(async (params: {
             onClose={() => setShowSettings(false)}
             warehouses={warehouses ?? []}
             documentTypes={documentTypes ?? []}
+            systemFiscalStampEnabled={systemFiscalStampEnabled}
+            onToggleFiscalStamp={toggleFiscalStamp}
+            systemAllowNegativeStock={allowNegSetting}
+            onToggleAllowNegative={toggleAllowNegative}
           />
         </Suspense>
       )}
