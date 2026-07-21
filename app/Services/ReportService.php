@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\Payment;
 use App\Models\StockMovement;
 use App\Services\CompanyContextService;
+use App\Services\PartyBalanceService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -363,9 +364,17 @@ class ReportService
             }
         }
 
+        // Fetch actual party balances using the authoritative PartyBalanceService
+        // (opening_balance + documents - payments), NOT SUM(remaining_amount)
+        $balanceDate = !empty($filters['to_date']) ? $filters['to_date'] : now()->toDateString();
+        $partyBalanceService = app(PartyBalanceService::class);
+        $actualBalances = $partyBalanceService->getAllBalancesAt($balanceDate, 1);
+        $balanceMap = collect($actualBalances)->keyBy('party_id');
+
         return [
-            'customers' => $parties->map(function ($party) use ($partyStats) {
+            'customers' => $parties->map(function ($party) use ($partyStats, $balanceMap) {
                 $stats = $partyStats[$party->id] ?? ['doc_count' => 0, 'total_ht' => 0, 'total_ttc' => 0, 'total_paid' => 0, 'total_remaining' => 0];
+                $balance = $balanceMap[$party->id] ?? null;
                 return [
                     'id'              => $party->id,
                     'code'            => $party->code,
@@ -379,7 +388,7 @@ class ReportService
                     'total_ht'        => $stats['total_ht'],
                     'total_ttc'       => $stats['total_ttc'],
                     'total_paid'      => $stats['total_paid'],
-                    'total_remaining' => $stats['total_remaining'],
+                    'total_remaining' => $balance ? round((float) $balance['current_balance'], 2) : 0,
                 ];
             })->toArray(),
             'product_recap' => $productRecap,
@@ -388,7 +397,7 @@ class ReportService
                 'total_ht'          => round(collect($partyStats)->sum('total_ht'), 2),
                 'total_ttc'         => round(collect($partyStats)->sum('total_ttc'), 2),
                 'total_discount'    => round($totalDiscount, 2),
-                'total_remaining'   => round(collect($partyStats)->sum('total_remaining'), 2),
+                'total_remaining'   => round((float) collect($actualBalances)->sum('current_balance'), 2),
             ],
         ];
     }

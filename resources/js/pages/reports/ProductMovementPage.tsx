@@ -26,7 +26,7 @@ export default function ProductMovementPage() {
   };
 
   return (
-    <ReportShell title="حركة المنتجات" subtitle={`${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="product-movement">
+    <ReportShell title="حركة المنتجات" subtitle={`تتبع تنقلات المنتجات بين المستودعات — ${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="product-movement">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
         <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
         <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>

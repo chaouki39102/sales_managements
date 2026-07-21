@@ -24,7 +24,7 @@ export default function CashFlowReportPage() {
     await exportToExcel(sheets.length > 0 ? sheets : [{ name: 'التدفقات', headers: ['البيان'], rows: [['لا توجد بيانات']] }], `التدفقات النقدية ${fromDate}-${toDate}`);
   };
 
-  return <ReportShell title="التدفقات النقدية" subtitle={`${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="cash-flow">
+  return <ReportShell title="التدفقات النقدية" subtitle={`حركة الإيرادات والمصروفات — ${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="cash-flow">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
       <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
       <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>

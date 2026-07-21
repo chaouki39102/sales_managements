@@ -234,6 +234,9 @@ Route::prefix('v1')->group(function () {
             // جداول مرجعية — endpoint مجمّع للمنتجات ( families + brands + units + tvas + ... )
             Route::get('lookups/products', [\App\Http\Controllers\Api\V1\ProductLookupsController::class, 'index']);
 
+            // جداول مرجعية — endpoint مجمّع لبيانات POS (1 요청 → 9 جداول مرجعية)
+            Route::get('lookups/pos', [\App\Http\Controllers\Api\V1\PosLookupsController::class, 'index']);
+
             // جداول مرجعية (قراءة)
             Route::apiResource('families',       FamilyController::class)->only(['index', 'show']);
             Route::apiResource('brands',         BrandController::class)->only(['index', 'show']);

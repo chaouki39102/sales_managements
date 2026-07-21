@@ -24,7 +24,7 @@ export default function AgingReportPage() {
     ], `لوحة الديون ${fromDate}-${toDate}`);
   };
 
-  return <ReportShell title="لوحة الديون" subtitle={`${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="aging">
+  return <ReportShell title="لوحة الديون والمتأخرات" subtitle={`${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="aging">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
       <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
       <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>

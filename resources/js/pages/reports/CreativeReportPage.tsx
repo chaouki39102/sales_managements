@@ -36,7 +36,7 @@ export default function CreativeReportPage() {
     await exportToExcel(sheets, `التقرير الشامل ${fromDate}-${toDate}`);
   };
 
-  return <ReportShell title="التقرير الشامل" subtitle={`${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="creative">
+  return <ReportShell title="التقرير الشامل" subtitle={`ملخص شامل للمبيعات والمشتريات والأرباح — ${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="creative">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
       <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
       <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>

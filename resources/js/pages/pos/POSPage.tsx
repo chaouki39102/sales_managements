@@ -7,15 +7,13 @@ import { useQuery } from '@tanstack/react-query';
 import { Toaster, toast }    from 'sonner';
 import { usePOS }             from '@/pos/hooks/usePOS';
 import { useCartStore }       from '@/pos/utils/useCartStore';
-import { useClients, useCashClient }  from '@/lib/api/endpoints/parties';
+import { useCashClient }  from '@/lib/api/endpoints/parties';
 import {
-  usePaymentModes, useWarehouses, usePriceLevels,
-  useCurrencies, useTreasuryAccounts, useDocumentTypes,
+  usePOSAggregatedLookups,
 } from '@/lib/api/endpoints/lookups';
 import { productsApi }        from '@/lib/api/endpoints/products';
-import { settingsApi }        from '@/lib/api/endpoints/settings';
 import { apiGet }             from '@/lib/api/core/client';
-import { useSelectedFiscalYear, useFiscalYears } from '@/lib/api/endpoints/fiscalYears';
+import { useSelectedFiscalYear } from '@/lib/api/endpoints/fiscalYears';
 import { documentsApi }       from '@/lib/api/endpoints/documents';
 import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
 import { useConfirm } from '@/hooks/useConfirm';
@@ -97,13 +95,8 @@ function compoundDiscountPct(linePct: number, invoicePct: number): number {
 function POSPage() {
   const queryClient = useQueryClient();
   const slug        = useActiveSlug();
-  const { data: fiscalStampRaw } = useQuery({
-    queryKey: [slug, 'settings', 'fiscal_stamp_enabled'],
-    queryFn:  () => settingsApi.getValue('fiscal_stamp_enabled'),
-    enabled:  !!slug,
-    staleTime: 60_000,
-  });
-  const fiscalStampVal = fiscalStampRaw?.value;
+  const { data: posLookups } = usePOSAggregatedLookups();
+  const fiscalStampVal = posLookups?.settings.fiscal_stamp_enabled;
   const fiscalStampEnabled = fiscalStampVal === undefined
     ? true
     : (fiscalStampVal === true || fiscalStampVal === 1 || fiscalStampVal === '1'
@@ -400,13 +393,12 @@ function POSPage() {
     }
   }, [isQtyCmd]);
 
-  // ── Products query (كل منتجات التصنيف الحالي — بدون نص البحث إطلاقاً) ───
+  // ── Products query (ALL active products — category filter is client-side) ──
   const { data: productsRaw, isLoading: loadingAll } = useQuery({
-    queryKey: [slug, 'products', 'pos', { cat: pos.selectedCategory }],
+    queryKey: [slug, 'products', 'pos'],
     queryFn: () => productsApi.list({
       per_page:  99999,
       include:   'tva,unit,family,prices.priceLevel,quantityDiscounts',
-      ...(queryFamilyId ? { family_id: queryFamilyId } : {}),
       filter:    { active: 1 },
     }),
     enabled:         !!slug,
@@ -419,19 +411,15 @@ function POSPage() {
       : (productsRaw as PaginatedResponse<Product>)?.data ?? []
   ), [productsRaw]);
 
-  // ── Lookups ─────────────────────────────────────────────────────────────────
-  const { data: fiscalYearsData } = useFiscalYears();
-  const fiscalYears = fiscalYearsData?.years ?? [];
-
-  const { data: customersData    } = useClients({ per_page: 200 });
-  const { data: warehouses       } = useWarehouses();
-  const { data: documentTypes }: { data?: DocumentType[] } = useDocumentTypes();
-  const { data: priceLevels }: { data?: PriceLevel[] } = usePriceLevels();
-  const { data: currencies       } = useCurrencies();
-  const { data: treasuryAccounts } = useTreasuryAccounts();   // ✅ مُضاف
-  const { data: paymentModes }: { data?: PaymentMode[] } = usePaymentModes();
-
-  const customers        = customersData?.data ?? [];
+  // ── Lookups (from aggregated POS endpoint — 1 HTTP instead of 10+) ──────────
+  const fiscalYears = posLookups?.fiscalYears ?? [];
+  const customers   = posLookups?.customers ?? [];
+  const warehouses       = posLookups?.warehouses;
+  const documentTypes    = posLookups?.documentTypes;
+  const priceLevels      = posLookups?.priceLevels;
+  const currencies       = posLookups?.currencies;
+  const treasuryAccounts = posLookups?.treasuryAccounts;
+  const paymentModes     = posLookups?.paymentModes;
   const priceLevelsList = useMemo<PriceLevel[]>(() => priceLevels ?? [], [priceLevels]);
 
   // ── Client balance ──────────────────────────────────────────────────────────
@@ -496,28 +484,15 @@ function POSPage() {
     } catch {}
   }, [slug]);
 
-  const { data: negSettingRaw } = useQuery({
-    queryKey: [slug, 'settings', 'allow_negative_stock'],
-    queryFn:  () => settingsApi.getValue('allow_negative_stock'),
-    enabled:  !!slug,
-    staleTime: 30_000,
-  });
-
+  // Sync from aggregated lookups (replaces per-key settings queries)
   useEffect(() => {
-    if (negSettingRaw !== undefined) {
-      // ✅ Defensive parsing: backend may return true/false, "true"/"false",
-      // 1/0, or "1"/"0" depending on how the boolean setting was cast.
-      // Also unwrap a possible { data: {...} } envelope just in case.
-      const raw = negSettingRaw?.value;
-      const val = raw === true || raw === 1 || raw === '1'
-        || String(raw).toLowerCase() === 'true';
-      setAllowNegSetting(val);
-      try { localStorage.setItem(ALLOW_NEG_KEY, val ? 'true' : 'false'); } catch {}
-      if (typeof window !== 'undefined' && (window as Window & { __POS_DEBUG__?: boolean }).__POS_DEBUG__) {
-        console.debug('[POS] allow_negative_stock raw=', negSettingRaw, '→ resolved=', val);
-      }
-    }
-  }, [negSettingRaw]);
+    const raw = posLookups?.settings.allow_negative_stock;
+    if (raw === undefined) return;
+    const val = raw === true || raw === 1 || raw === '1'
+      || String(raw).toLowerCase() === 'true';
+    setAllowNegSetting(val);
+    try { localStorage.setItem(ALLOW_NEG_KEY, val ? 'true' : 'false'); } catch {}
+  }, [posLookups?.settings.allow_negative_stock]);
 
   // ── Stock (حسب التصنيف فقط — بدون نص البحث، لنفس سبب استعلام المنتجات) ──
   const { data: stockData = {}, isLoading: stockLoading } = useQuery<Record<number, number>>({
@@ -533,7 +508,7 @@ function POSPage() {
             .map((r) => [r.id, r.current_stock ?? 0]),
         ),
       ),
-    enabled:   !!slug && !!effectiveWarehouseId,
+    enabled:   !!slug && !!effectiveWarehouseId && !!fiscalYear?.id,
     staleTime: 10_000,
   });
   // True while stock is still unresolved for the first time — used by ProductGrid

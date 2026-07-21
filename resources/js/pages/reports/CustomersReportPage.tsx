@@ -1,19 +1,19 @@
 import React, { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY } from './helpers';
 import { useCustomersReport } from '@/lib/api/endpoints/reports';
-import { usePartyBalanceHistory, usePartyProductRecap } from '@/lib/api/endpoints/partyBalances';
 import { exportToExcel } from './exportUtils';
+import { TransactionHistoryModal } from '@/pages/debts/TransactionHistoryModal';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
-import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
-import Modal from '@/components/ui/Modal';
 
 const def = { from: new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) };
 
 export default function CustomersReportPage() {
+  const navigate = useNavigate();
   const [fromDate, setFromDate] = useState(def.from);
   const [toDate, setToDate] = useState(def.to);
   const [tab, setTab] = useState<'table' | 'products'>('table');
@@ -31,7 +31,7 @@ export default function CustomersReportPage() {
     if (!data) return;
     const sheets = [{
       name: 'الزبائن',
-      headers: ['#', 'الاسم', 'الكود', 'الهاتف', 'الولاية', 'عدد الوثائق', 'المبيعات HT', 'الخصم', 'المدفوع', 'المتبقي'],
+      headers: ['#', 'الاسم', 'الكود', 'الهاتف', 'الولاية', 'عدد الوثائق', 'المبيعات HT', 'المدفوع', 'المتبقي'],
       rows: data.customers.map((r, i) => [i + 1, r.name, r.code ?? '—', r.phone ?? '—', r.wilaya ?? '—', r.doc_count, r.total_ht, r.total_paid, r.total_remaining]),
     }];
     if (data.product_recap && data.product_recap.length > 0) {
@@ -44,7 +44,7 @@ export default function CustomersReportPage() {
     await exportToExcel(sheets, `تقرير الزبائن ${fromDate}-${toDate}`);
   };
 
-  return <ReportShell title="تقرير الزبائن" subtitle={`${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="customers">
+  return <ReportShell title="تقرير الزبائن" subtitle={`أرصدة وحركة المبيعات — ${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="customers">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
       <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
       <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
@@ -139,148 +139,14 @@ export default function CustomersReportPage() {
       </>
     )}
     {historyParty && (
-      <CustomerHistoryModal
+      <TransactionHistoryModal
         open={historyOpen}
         partyId={historyParty.id}
         partyName={historyParty.name}
+        date={toDate}
         onClose={() => setHistoryOpen(false)}
+        navigate={navigate}
       />
     )}
   </ReportShell>;
 }
-
-function CustomerHistoryModal({ open, partyId, partyName, onClose }: { open: boolean; partyId: number; partyName: string; onClose: () => void }) {
-  const today = new Date().toISOString().slice(0, 10);
-  const [modalTab, setModalTab] = useState<'transactions' | 'products'>('transactions');
-  const { data: historyData, isLoading: histLoading } = usePartyBalanceHistory(partyId, today);
-  const { data: recapData, isLoading: recapLoading } = usePartyProductRecap(partyId, today);
-
-  const transactions = historyData?.transactions ?? [];
-  const openingBalance = historyData?.opening_balance ?? 0;
-  const products = recapData?.products ?? [];
-
-  let running = openingBalance;
-  const txWithBalance = transactions.map(tx => {
-    running += tx.document_amount - tx.payment_amount;
-    return { ...tx, running_balance: Math.round(running * 100) / 100 };
-  });
-
-  const loading = histLoading || recapLoading;
-
-  return (
-    <Modal open={open} onClose={onClose} size="xl" title={`كشف حساب – ${partyName}`}>
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid var(--color-border-secondary)' }}>
-        <button onClick={() => setModalTab('transactions')} style={{ padding: '8px 16px', borderRadius: '8px 8px 0 0', border: 'none', borderBottom: modalTab === 'transactions' ? '2px solid var(--em)' : '2px solid transparent', marginBottom: -2, background: modalTab === 'transactions' ? 'var(--color-background-secondary)' : 'transparent', color: modalTab === 'transactions' ? 'var(--em)' : 'var(--color-text-secondary)', fontSize: 13, fontWeight: modalTab === 'transactions' ? 700 : 500, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <i className="ti ti-list" style={{ fontSize: 15 }} /> المعاملات <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: modalTab === 'transactions' ? 'var(--em)' : 'var(--color-border-tertiary)', color: modalTab === 'transactions' ? '#fff' : 'var(--color-text-tertiary)', fontWeight: 600 }}>{transactions.length}</span>
-        </button>
-        <button onClick={() => setModalTab('products')} style={{ padding: '8px 16px', borderRadius: '8px 8px 0 0', border: 'none', borderBottom: modalTab === 'products' ? '2px solid var(--em)' : '2px solid transparent', marginBottom: -2, background: modalTab === 'products' ? 'var(--color-background-secondary)' : 'transparent', color: modalTab === 'products' ? 'var(--em)' : 'var(--color-text-secondary)', fontSize: 13, fontWeight: modalTab === 'products' ? 700 : 500, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <i className="ti ti-package" style={{ fontSize: 15 }} /> المنتجات <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: modalTab === 'products' ? 'var(--em)' : 'var(--color-border-tertiary)', color: modalTab === 'products' ? '#fff' : 'var(--color-text-tertiary)', fontWeight: 600 }}>{products.length}</span>
-        </button>
-      </div>
-
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: 48 }}>
-          <i className="ti ti-loader-2" style={{ fontSize: 28, animation: 'spin 1s linear infinite' }} />
-          <div style={{ marginTop: 8, color: 'var(--color-text-secondary)' }}>جاري التحميل...</div>
-        </div>
-      ) : modalTab === 'transactions' ? (
-        transactions.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-tertiary)' }}>
-            <i className="ti ti-folder-open" style={{ fontSize: 36, display: 'block', marginBottom: 8 }} />
-            لا توجد معاملات
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto', maxHeight: '55vh', overflowY: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-                <tr style={{ borderBottom: '2px solid var(--color-border-secondary)', background: 'var(--color-background-primary)' }}>
-                  <th style={thStyle}>#</th>
-                  <th style={thStyle}>التاريخ</th>
-                  <th style={thStyle}>البيان</th>
-                  <th style={{ ...thStyle, textAlign: 'center' }}>المستندات</th>
-                  <th style={{ ...thStyle, textAlign: 'center' }}>الدفعات</th>
-                  <th style={{ ...thStyle, textAlign: 'center' }}>الرصيد</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style={{ background: 'var(--color-background-secondary)', fontWeight: 600 }}>
-                  <td style={tdStyle}>—</td>
-                  <td style={tdStyle}>—</td>
-                  <td style={tdStyle}><i className="ti ti-building-bank" style={{ marginLeft: 4 }} /> رصيد افتتاحي</td>
-                  <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
-                  <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
-                  <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>{FMT(openingBalance)}</td>
-                </tr>
-                {txWithBalance.map((tx) => (
-                  <tr key={`${tx.type}-${tx.id}`} style={{ borderBottom: '1px solid var(--color-border-tertiary)' }}>
-                    <td style={{ ...tdStyle, color: 'var(--color-text-tertiary)', fontSize: 11 }}>{tx.seq}</td>
-                    <td style={tdStyle}>{tx.date}</td>
-                    <td style={tdStyle}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Badge variant={tx.type === 'document' ? 'danger' : 'success'} style={{ fontSize: 11 }}>{tx.label}</Badge>
-                        <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--color-text-secondary)' }}>{tx.reference || '—'}</span>
-                      </div>
-                    </td>
-                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: tx.document_amount > 0 ? 600 : undefined }}>
-                      {tx.document_amount !== 0 ? <span style={{ color: tx.document_amount > 0 ? 'var(--em)' : 'var(--red)' }}>{tx.document_amount > 0 ? '+' : ''}{FMT(tx.document_amount)}</span> : '—'}
-                    </td>
-                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: tx.payment_amount > 0 ? 600 : undefined }}>
-                      {tx.payment_amount !== 0 ? <span style={{ color: 'var(--red)' }}>-{FMT(tx.payment_amount)}</span> : '—'}
-                    </td>
-                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700, color: tx.running_balance >= 0 ? 'var(--red)' : 'var(--em)' }}>
-                      {FMT(tx.running_balance)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-      ) : (
-        products.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-tertiary)' }}>
-            <i className="ti ti-package" style={{ fontSize: 36, display: 'block', marginBottom: 8 }} />
-            لا توجد منتجات
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid var(--color-border-secondary)', background: 'var(--color-background-primary)' }}>
-                  <th style={thStyle}>#</th>
-                  <th style={thStyle}>المنتج</th>
-                  <th style={thStyle}>المرجع</th>
-                  <th style={thStyle}>المجموعة</th>
-                  <th style={{ ...thStyle, textAlign: 'center' }}>كمية البيع</th>
-                  <th style={{ ...thStyle, textAlign: 'center' }}>مبيعات HT</th>
-                  <th style={{ ...thStyle, textAlign: 'center' }}>TTC</th>
-                  <th style={{ ...thStyle, textAlign: 'center' }}>عدد المستندات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {products.map((p, i) => (
-                  <tr key={p.product_id} style={{ borderBottom: '1px solid var(--color-border-tertiary)' }}>
-                    <td style={{ ...tdStyle, color: 'var(--color-text-tertiary)', fontSize: 11 }}>{i + 1}</td>
-                    <td style={{ ...tdStyle, fontWeight: 700 }}>{p.product_name}</td>
-                    <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: 12 }}>{p.product_ref || '—'}</td>
-                    <td style={tdStyle}>{p.family_name || '—'}</td>
-                    <td style={{ ...tdStyle, textAlign: 'center' }}>{p.sale_qty || '—'}</td>
-                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>{FMT(p.total_ht)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'center' }}>{FMT(p.total_ttc)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'center' }}>{p.doc_count}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-      )}
-      <div style={{ textAlign: 'center', marginTop: 12 }}>
-        <Button onClick={onClose}>إغلاق</Button>
-      </div>
-    </Modal>
-  );
-}
-
-const thStyle: React.CSSProperties = { padding: '10px 12px', textAlign: 'right', fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', borderBottom: '2px solid var(--color-border-secondary)' };
-const tdStyle: React.CSSProperties = { padding: '10px 12px', textAlign: 'right', borderBottom: '1px solid var(--color-border-tertiary)' };

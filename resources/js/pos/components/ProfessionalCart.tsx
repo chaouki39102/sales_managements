@@ -87,6 +87,10 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
   const [invDiscMode,      setInvDiscMode]       = useState<'pct' | 'amount'>('pct');
   const [invDiscAmtVal,    setInvDiscAmtVal]     = useState('');
 
+  useEffect(() => {
+    if (!invoiceDiscountPct || invoiceDiscountPct <= 0) setInvDiscAmtVal('');
+  }, [invoiceDiscountPct]);
+
   // ── طيّ تفاصيل الحساب ─────────────────────────────────────────────────────
   // افتراضياً مطوي (يظهر فقط سطر الإجمالي TTC) لتحرير مساحة رأسية دائمة
   // لصالح قائمة الأصناف — التفاصيل (HT/TVA/الخصومات/رصيد الزبون) تظهر
@@ -209,10 +213,22 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
   const handleInvDiscAmount = useCallback((raw: string) => {
     setInvDiscAmtVal(raw);
     const n = parseFloat(raw) || 0;
-    if (!onInvoiceDiscountChange || totals.total_ht <= 0) return;
-    const pct = Math.min(100, (n / totals.total_ht) * 100);
+    if (!onInvoiceDiscountChange) return;
+
+    // Reverse-engineer the original TTC (before any invoice discount)
+    // to avoid stale closure where totals already include a partial discount
+    const curHt       = totals.total_ht ?? 0;
+    const curTva      = totals.total_tva ?? 0;
+    const curDiscHt   = totals.invoice_discount_amount ?? 0;
+    const origHt      = curHt + curDiscHt;
+    const avgTvaRate  = curHt > 0 ? curTva / curHt : 0;
+    const origTva     = curTva + curDiscHt * avgTvaRate;
+    const origTtc     = origHt + origTva;
+
+    if (origTtc <= 0) return;
+    const pct = Math.min(100, (n / origTtc) * 100);
     onInvoiceDiscountChange(pct);
-  }, [onInvoiceDiscountChange, totals.total_ht]);
+  }, [onInvoiceDiscountChange, totals.total_ht, totals.total_tva, totals.invoice_discount_amount]);
 
   return (
     <>

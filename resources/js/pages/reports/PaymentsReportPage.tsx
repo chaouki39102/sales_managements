@@ -26,7 +26,7 @@ export default function PaymentsReportPage() {
     await exportToExcel(sheets, `تقرير الدفعات ${fromDate}-${toDate}`);
   };
 
-  return <ReportShell title="تقرير الدفعات" subtitle={`${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="payments">
+  return <ReportShell title="تقرير الدفعات" subtitle={`التحصيلات والمدفوعات — ${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="payments">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
       <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
       <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>

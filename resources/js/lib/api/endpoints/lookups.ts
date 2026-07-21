@@ -96,6 +96,7 @@ export const tenantLookupsApi = {
   numberingSeries:     () => apiGet<NumberingSeries[]>('/numbering-series',       { per_page: 50  }),
   treasuryAccounts:    () => apiGet<TreasuryAccount[]>('/treasury-accounts',      { per_page: 50  }),
   productsAggregated:  () => apiGet<ProductAggregatedLookups>('/lookups/products'),
+  posAggregated:       () => apiGet<PosAggregatedLookups>('/lookups/pos'),
 } as const;
 
 // ─── Aggregated lookups type ──────────────────────────────────────────────────
@@ -138,6 +139,53 @@ export function useProductAggregatedLookups() {
     queryKey: tenantKeys.lookups.productsAggregated(slug ?? ''),
     queryFn:  () => tenantLookupsApi.productsAggregated(),
     select:   (raw) => normalizeLookups(raw),
+    enabled:  !!slug,
+    staleTime: TENANT_STALE,
+    gcTime:   60 * 60_000,
+  });
+}
+
+// ─── Aggregated POS lookups (1 HTTP → 9 lookup tables) ───────────────────────
+export interface PosAggregatedLookups {
+  warehouses:       Warehouse[];
+  documentTypes:    DocumentType[];
+  priceLevels:      PriceLevel[];
+  currencies:       Currency[];
+  paymentModes:     PaymentMode[];
+  treasuryAccounts: TreasuryAccount[];
+  fiscalYears:      { id: number; year: number; label: string; start_date: string; end_date: string; is_current: boolean; status: string }[];
+  customers:        { id: number; name: string; code: string; nif: string; commercial_name: string; party_type_id: number }[];
+  settings:         { fiscal_stamp_enabled: unknown; allow_negative_stock: unknown };
+}
+
+const EMPTY_POS_LOOKUPS: PosAggregatedLookups = {
+  warehouses: [], documentTypes: [], priceLevels: [], currencies: [],
+  paymentModes: [], treasuryAccounts: [], fiscalYears: [], customers: [], settings: { fiscal_stamp_enabled: undefined, allow_negative_stock: undefined },
+};
+
+function normalizePosLookups(raw: unknown): PosAggregatedLookups {
+  if (!raw || typeof raw !== 'object') return EMPTY_POS_LOOKUPS;
+  const obj = raw as Record<string, unknown>;
+  const pick = (k: string) => Array.isArray(obj[k]) ? obj[k] as never[] : [];
+  return {
+    warehouses:       pick('warehouses'),
+    documentTypes:    pick('documentTypes'),
+    priceLevels:      pick('priceLevels'),
+    currencies:       pick('currencies'),
+    paymentModes:     pick('paymentModes'),
+    treasuryAccounts: pick('treasuryAccounts'),
+    fiscalYears:      pick('fiscalYears'),
+    customers:        pick('customers'),
+    settings:         (obj.settings && typeof obj.settings === 'object') ? obj.settings as PosAggregatedLookups['settings'] : EMPTY_POS_LOOKUPS.settings,
+  };
+}
+
+export function usePOSAggregatedLookups() {
+  const slug = useActiveSlug();
+  return useQuery<PosAggregatedLookups>({
+    queryKey: tenantKeys.lookups.posAggregated(slug ?? ''),
+    queryFn:  () => tenantLookupsApi.posAggregated(),
+    select:   (raw) => normalizePosLookups(raw),
     enabled:  !!slug,
     staleTime: TENANT_STALE,
     gcTime:   60 * 60_000,

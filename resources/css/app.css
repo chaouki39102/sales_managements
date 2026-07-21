@@ -20,4 +20,34 @@
 @import 'theme/notifications.css';
 @import 'theme/print-settings.css';
 
+/* ═══════════════ PRINT — صفحات التقارير ═══════════════ */
+@media print {
+  .no-print, .no-print * { display: none !important; }
+  #sidebar, #topbar, .page-header, .page-header * { display: none !important; }
 
+  .kpis { display: none !important; }
+  .srch, .btn, button { display: none !important; }
+  [class*="ReportDateFilter"] { display: none !important; }
+
+  table { page-break-inside: auto; border-collapse: collapse !important; }
+  tr { page-break-inside: avoid; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+
+  table, table * {
+    color: #000 !important;
+    background: transparent !important;
+    border-color: #ccc !important;
+    font-size: 10pt !important;
+  }
+
+  thead th {
+    background: #f0f0f0 !important;
+    font-weight: 700 !important;
+  }
+
+  @page {
+    margin: 10mm;
+    size: A4 landscape;
+  }
+}

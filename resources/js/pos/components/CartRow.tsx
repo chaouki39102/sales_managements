@@ -222,7 +222,7 @@ export default function CartRow({
         <div ref={popupAnchorRef} style={{ position: 'absolute', width: 0, height: 0 }} />
         {popup === 'disc' && createPortal(
           <div ref={popupNodeRef} className="cr-popup cr-popup--disc cr-popup--portal" onClick={e => e.stopPropagation()}
-            style={{ position: 'fixed', top: popupPos.top, right: popupPos.right, zIndex: 9999 }}>
+            style={{ position: 'fixed', top: popupPos.top, right: popupPos.right, zIndex: 10000 }}>
             <div className="cr-popup-arrow" />
 
             {/* تبديل الوضع */}
@@ -318,7 +318,7 @@ export default function CartRow({
         {/* ── Popup السعر ── */}
         {popup === 'price' && createPortal(
           <div ref={popupNodeRef} className="cr-popup cr-popup--price cr-popup--portal" onClick={e => e.stopPropagation()}
-            style={{ position: 'fixed', top: popupPos.top, right: popupPos.right, zIndex: 9999 }}>
+            style={{ position: 'fixed', top: popupPos.top, right: popupPos.right, zIndex: 10000 }}>
             <div className="cr-popup-arrow" />
             <div className="cr-popup-label">سعر البيع TTC</div>
             <div className="cr-popup-inp-row">

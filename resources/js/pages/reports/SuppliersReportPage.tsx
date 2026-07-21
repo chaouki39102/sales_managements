@@ -24,7 +24,7 @@ export default function SuppliersReportPage() {
     }], `تقرير الموردين ${fromDate}-${toDate}`);
   };
 
-  return <ReportShell title="تقرير الموردين" subtitle={`${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="suppliers">
+  return <ReportShell title="تقرير الموردين" subtitle={`أرصدة وحركة المشتريات — ${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="suppliers">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
       <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
       <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>

@@ -8,6 +8,7 @@ import { useActiveSlug } from '@/lib/store/appStore';
 interface ReportShellProps {
   title: string;
   subtitle?: string;
+  description?: string;
   isLoading: boolean;
   isError: boolean;
   refetch: () => void;
@@ -15,7 +16,7 @@ interface ReportShellProps {
   children?: React.ReactNode;
 }
 
-export default function ReportShell({ title, subtitle, isLoading, isError, refetch, reportId, children }: ReportShellProps) {
+export default function ReportShell({ title, subtitle, description, isLoading, isError, refetch, reportId, children }: ReportShellProps) {
   const navigate = useNavigate();
   const slug = useActiveSlug();
   const exportUrl = (format: 'excel' | 'pdf') => `/api/v1/${slug}/reports/${reportId}?export=${format}`;
@@ -24,7 +25,7 @@ export default function ReportShell({ title, subtitle, isLoading, isError, refet
     <div>
       <PageHeader
         title={title}
-        subtitle={subtitle}
+        description={description ?? subtitle}
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
             <Button size="sm" icon={<i className="ti ti-arrow-right"/>} onClick={() => navigate('/reports')}>العودة</Button>

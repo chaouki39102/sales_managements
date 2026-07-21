@@ -24,7 +24,7 @@ export default function VelocityReportPage() {
     }], `سرعة البيع ${fromDate}-${toDate}`);
   };
 
-  return <ReportShell title="سرعة البيع" subtitle={`${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="velocity">
+  return <ReportShell title="سرعة البيع" subtitle={`تحليل سرعة دوران المنتجات — ${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="velocity">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
       <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
       <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>

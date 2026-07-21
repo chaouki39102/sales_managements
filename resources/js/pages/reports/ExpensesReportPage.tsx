@@ -27,7 +27,7 @@ export default function ExpensesReportPage() {
     await exportToExcel(sheets.length > 0 ? sheets : [{ name: 'المصروفات', headers: ['البيان'], rows: [['لا توجد بيانات']] }], `تقرير المصروفات ${fromDate}-${toDate}`);
   };
 
-  return <ReportShell title="تقرير المصروفات" subtitle={`${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="expenses">
+  return <ReportShell title="تقرير المصروفات" subtitle={`مصروفات وفئاتها — ${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="expenses">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
       <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
       <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>

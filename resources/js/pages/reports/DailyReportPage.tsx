@@ -24,7 +24,7 @@ export default function DailyReportPage() {
   };
 
   return (
-    <ReportShell title="التقرير اليومي" subtitle={d?.date ? `يوم ${d.date}` : undefined} isLoading={isLoading} isError={isError} refetch={refetch} reportId="daily">
+    <ReportShell title="التقرير اليومي" subtitle={d?.date ? `يوم ${d.date} — حركة المبيعات والمدفوعات` : undefined} isLoading={isLoading} isError={isError} refetch={refetch} reportId="daily">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
         <span style={{ fontWeight: 600 }}>التاريخ:</span>
         <input type="date" className="form-control" style={{ width: 200 }} value={date} onChange={(e) => setDate(e.target.value)} />

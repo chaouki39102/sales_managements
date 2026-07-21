@@ -24,7 +24,7 @@ export default function MarginReportPage() {
     }], `تقرير الهوامش ${fromDate}-${toDate}`);
   };
 
-  return <ReportShell title="تقرير الهوامش" subtitle={`${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="margin">
+  return <ReportShell title="تقرير الهوامش" subtitle={`هامش الربح والتكاليف — ${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="margin">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
       <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
       <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>

@@ -21,10 +21,10 @@ export default function SalesReportPage() {
     const sheets = [];
     sheets.push({
       name: 'الوثائق',
-      headers: ['#', 'رقم الوثيقة', 'التاريخ', 'الزبون', 'HT', 'TVA', 'الختم', 'TTC', 'المدفوع', 'المتبقي', 'التكلفة', 'الهامش', 'الحالة'],
+      headers: ['#', 'رقم الوثيقة', 'التاريخ', 'الزبون', 'HT', 'TVA', 'الخصم', 'TTC', 'المدفوع', 'المتبقي', 'التكلفة', 'الهامش', 'الحالة'],
       rows: data.documents.map((doc, i) => [
         i + 1, doc.document_number, doc.date, doc.party_name ?? '—',
-        doc.total_ht, doc.total_tva, doc.total_tva > 0 ? Math.round(doc.total_ht * 0.01) : 0,
+        doc.total_ht, doc.total_tva, doc.total_discount,
         doc.total_ttc, doc.paid_amount, doc.remaining_amount,
         doc.doc_cost_ht, doc.margin_value,
         doc.remaining_amount > 0.01 ? 'غير مسددة' : 'مسددة',
@@ -45,7 +45,7 @@ export default function SalesReportPage() {
     await exportToExcel(sheets, `report-exports/تقرير المبيعات ${fromDate ?? 'الكل'}-${toDate ?? 'الكل'}`);
   };
 
-  return <ReportShell title="تقرير المبيعات" subtitle={fromDate && toDate ? `${fromDate} → ${toDate}` : 'سنة مالية كاملة'} isLoading={isLoading} isError={isError} refetch={refetch} reportId="sales">
+  return <ReportShell title="تقرير المبيعات" subtitle={fromDate && toDate ? `المبيعات والمستندات — ${fromDate} → ${toDate}` : 'المبيعات — سنة مالية كاملة'} isLoading={isLoading} isError={isError} refetch={refetch} reportId="sales">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
       <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
       <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
@@ -69,7 +69,7 @@ export default function SalesReportPage() {
           <Card noHeader style={{ padding: 0 }}>
             <div className="tw">
               <table>
-                <thead><tr><th>#</th><th>الوثيقة</th><th>التاريخ</th><th>الزبون</th><th>HT</th><th>TVA</th><th>التكلفة</th><th>الهامش</th><th>TTC</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th></tr></thead>
+                <thead><tr><th>#</th><th>الوثيقة</th><th>التاريخ</th><th>الزبون</th><th>HT</th><th>TVA</th><th>الخصم</th><th>التكلفة</th><th>الهامش</th><th>TTC</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th></tr></thead>
                 <tbody>
                   {data.documents.map((doc, i) => (
                     <tr key={doc.id}>
@@ -79,6 +79,7 @@ export default function SalesReportPage() {
                       <td>{doc.party_name ?? '—'}</td>
                       <td>{FMT(doc.total_ht)}</td>
                       <td>{FMT(doc.total_tva)}</td>
+                      <td style={{ color: doc.total_discount > 0 ? 'var(--orange)' : undefined }}>{doc.total_discount > 0 ? FMT(doc.total_discount) : '—'}</td>
                       <td>{FMT(doc.doc_cost_ht)}</td>
                       <td style={{ color: doc.margin_value >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(doc.margin_value)}</td>
                       <td>{FMT(doc.total_ttc)}</td>
@@ -93,6 +94,7 @@ export default function SalesReportPage() {
                     <td colSpan={4}>الإجمالي ({data.summary.count})</td>
                     <td>{FMT(data.summary.total_ht)}</td>
                     <td>{FMT(data.summary.total_tva)}</td>
+                    <td style={{ color: data.summary.total_discount > 0 ? 'var(--orange)' : undefined }}>{data.summary.total_discount > 0 ? FMT(data.summary.total_discount) : '—'}</td>
                     <td>{FMT(data.summary.total_cost)}</td>
                     <td style={{ color: data.summary.total_margin >= 0 ? 'var(--em)' : 'var(--red)' }}>{FMT(data.summary.total_margin)}</td>
                     <td>{FMT(data.summary.total_ttc)}</td>
@@ -129,9 +131,10 @@ export default function SalesReportPage() {
                 </tbody>
                 <tfoot>
                   <tr style={{ fontWeight: 800, background: 'var(--bg2)' }}>
-                    <td colSpan={3}>الإجمالي ({data.product_recap.length} منتج)</td>
-                    <td>{data.product_recap.reduce((s, r) => s + r.total_qty, 0)}</td>
+                    <td colSpan={4}>الإجمالي ({data.product_recap.length} منتج)</td>
+                    <td></td>
                     <td>{FMT(data.summary.total_ht)}</td>
+                    <td style={{ color: data.summary.total_discount > 0 ? 'var(--orange)' : undefined }}>{data.summary.total_discount > 0 ? FMT(data.summary.total_discount) : '—'}</td>
                     <td>{FMT(data.summary.total_cost)}</td>
                     <td style={{ color: data.summary.total_margin >= 0 ? 'var(--em)' : 'var(--red)' }}>{FMT(data.summary.total_margin)}</td>
                     <td>{FMT(data.summary.total_ttc)}</td>
