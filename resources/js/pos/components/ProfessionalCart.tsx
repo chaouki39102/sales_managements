@@ -338,11 +338,12 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                 {/* يمين: الرصيد */}
                 {client !== null && clientBalance !== undefined && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                    <span style={{ color: 'rgba(255,255,255,.6)' }}>رصيد</span>
+                    <span style={{ color: 'rgba(255,255,255,.55)', fontSize: 10 }}>الرصيد السابق</span>
                     <span style={{ fontWeight: 600, color: clientBalance >= 0 ? '#fca5a5' : '#86efac' }}>
                       {formatDZD(clientBalance)}
                     </span>
-                    <i className="ti ti-arrow-right" style={{ color: 'rgba(255,255,255,.4)', fontSize: 10 }} />
+                    <i className="ti ti-arrow-left" style={{ color: 'rgba(255,255,255,.4)', fontSize: 10 }} />
+                    <span style={{ color: 'rgba(255,255,255,.55)', fontSize: 10 }}>الرصيد الجديد</span>
                     <span style={{ fontWeight: 700, color: '#fff' }}>
                       {formatDZD(clientBalance + totalTtcFinal)}
                     </span>
