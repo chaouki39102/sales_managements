@@ -326,11 +326,98 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
               <i className={`ti ${isEmpty ? 'ti-shopping-cart-off' : (remainingToPay <= 0 ? 'ti-circle-check' : 'ti-clock')}`} />
               {isEmpty ? 'السلة فارغة' : (remainingToPay <= 0 ? 'جاهز للدفع' : 'بانتظار الإتمام')}
             </div> */}
-            {!isEmpty && (
+            {!isEmpty && !showTotalsDetails && (
               <button type="button" className="ch-more-btn" onClick={toggleTotals}>
                 تفاصيل إضافية
-                <i className={`ti ti-eye${showTotalsDetails ? '' : '-off'}`} style={{ fontSize: 13 }} />
+                <i className="ti ti-chevron-up" style={{ fontSize: 13 }} />
               </button>
+            )}
+
+            {!isEmpty && showTotalsDetails && (
+              <div className="cart-totals" style={{ margin: 0, border: 'none', padding: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+                  <button
+                    type="button"
+                    onClick={toggleTotals}
+                    style={{ background: 'none', border: 'none', color: 'var(--t4)', cursor: 'pointer', padding: '2px 4px', fontSize: 14, display: 'flex' }}
+                    title="إخفاء التفاصيل"
+                  >
+                    <i className="ti ti-eye-off" />
+                  </button>
+                </div>
+
+                {onInvoiceDiscountChange && (
+                  <div className="ct-row ct-disc">
+                    <span>خصم الفاتورة</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <button
+                        className={`cr-disc-mode-btn ${invDiscMode === 'pct' ? 'on' : ''}`}
+                        onClick={() => setInvDiscMode('pct')}
+                        type="button"
+                        style={{ fontSize: 10, padding: '2px 5px' }}
+                      >%</button>
+                      <button
+                        className={`cr-disc-mode-btn ${invDiscMode === 'amount' ? 'on' : ''}`}
+                        onClick={() => setInvDiscMode('amount')}
+                        type="button"
+                        style={{ fontSize: 10, padding: '2px 5px' }}
+                      >دج</button>
+
+                      {invDiscMode === 'pct' ? (
+                        <>
+                          <input
+                            type="number"
+                            className="ct-disc-inp"
+                            value={invoiceDiscountPct || ''}
+                            onChange={e => onInvoiceDiscountChange(
+                              Math.min(100, Math.max(0, parseFloat(e.target.value) || 0))
+                            )}
+                            min={0} max={100} step={1}
+                            placeholder="0"
+                            style={{ width: 50 }}
+                          />
+                          <span style={{ fontSize: 11 }}>%</span>
+                          {invoiceDiscountAmount > 0 && (
+                            <span style={{ fontSize: 11, color: 'var(--red)', fontWeight: 700 }}>
+                              -{formatDZD(invoiceDiscountAmount)}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <input
+                            type="number"
+                            className="ct-disc-inp"
+                            value={invDiscAmtVal}
+                            onChange={e => handleInvDiscAmount(e.target.value)}
+                            min={0}
+                            placeholder="0"
+                            style={{ width: 70 }}
+                          />
+                          <span style={{ fontSize: 11 }}>دج</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {client !== null && clientBalance !== undefined && (
+                  <div className="ct-row" style={{ fontSize: 11.5, borderTop: '1px solid var(--b2)', paddingTop: 6, marginTop: 4 }}>
+                    <span>
+                      <span style={{ opacity: 0.65 }}>رصيد </span>
+                      <span style={{ fontWeight: 600, color: clientBalance >= 0 ? '#ef4444' : '#22c55e' }}>
+                        {formatDZD(clientBalance)}
+                      </span>
+                    </span>
+                    <span>
+                      <span style={{ opacity: 0.65 }}>الرصيد الجديد </span>
+                      <span style={{ fontWeight: 700, color: '#2563eb' }}>
+                        {formatDZD(clientBalance + totalTtcFinal)}
+                      </span>
+                    </span>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -440,96 +527,6 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
             </div>
           )}
         </div>
-
-        {!isEmpty && showTotalsDetails && (
-          <div className="cart-totals">
-                {totals.total_discount > 0 && (
-                  <div className="ct-row ct-disc">
-                    <span>إجمالي الخصومات</span>
-                    <span style={{ color: 'var(--red)' }}>- {formatDZD(totals.total_discount)}</span>
-                  </div>
-                )}
-
-                {onInvoiceDiscountChange && (
-                  <div className="ct-row ct-disc">
-                    <span>خصم الفاتورة</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <button
-                        className={`cr-disc-mode-btn ${invDiscMode === 'pct' ? 'on' : ''}`}
-                        onClick={() => setInvDiscMode('pct')}
-                        type="button"
-                        style={{ fontSize: 10, padding: '2px 5px' }}
-                      >%</button>
-                      <button
-                        className={`cr-disc-mode-btn ${invDiscMode === 'amount' ? 'on' : ''}`}
-                        onClick={() => setInvDiscMode('amount')}
-                        type="button"
-                        style={{ fontSize: 10, padding: '2px 5px' }}
-                      >دج</button>
-
-                      {invDiscMode === 'pct' ? (
-                        <>
-                          <input
-                            type="number"
-                            className="ct-disc-inp"
-                            value={invoiceDiscountPct || ''}
-                            onChange={e => onInvoiceDiscountChange(
-                              Math.min(100, Math.max(0, parseFloat(e.target.value) || 0))
-                            )}
-                            min={0} max={100} step={1}
-                            placeholder="0"
-                            style={{ width: 50 }}
-                          />
-                          <span style={{ fontSize: 11 }}>%</span>
-                          {invoiceDiscountAmount > 0 && (
-                            <span style={{ fontSize: 11, color: 'var(--red)', fontWeight: 700 }}>
-                              -{formatDZD(invoiceDiscountAmount)}
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <input
-                            type="number"
-                            className="ct-disc-inp"
-                            value={invDiscAmtVal}
-                            onChange={e => handleInvDiscAmount(e.target.value)}
-                            min={0}
-                            placeholder="0"
-                            style={{ width: 70 }}
-                          />
-                          <span style={{ fontSize: 11 }}>دج</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {totals.fiscal_stamp > 0 && (
-                  <div className="ct-row">
-                    <span>طابع مالي</span>
-                    <span>{formatDZD(totals.fiscal_stamp)}</span>
-                  </div>
-                )}
-
-                {client !== null && clientBalance !== undefined && (
-                  <div className="ct-row" style={{ fontSize: 11.5, borderTop: '1px solid var(--b2)', paddingTop: 6, marginTop: 4 }}>
-                    <span>
-                      <span style={{ opacity: 0.65 }}>رصيد </span>
-                      <span style={{ fontWeight: 600, color: clientBalance >= 0 ? '#ef4444' : '#22c55e' }}>
-                        {formatDZD(clientBalance)}
-                      </span>
-                    </span>
-                    <span>
-                      <span style={{ opacity: 0.65 }}>الرصيد الجديد </span>
-                      <span style={{ fontWeight: 700, color: '#2563eb' }}>
-                        {formatDZD(clientBalance + totalTtcFinal)}
-                      </span>
-                    </span>
-                  </div>
-                )}
-          </div>
-        )}
 
         <div className="cart-actions">
           <button
