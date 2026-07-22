@@ -334,87 +334,80 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
             )}
 
             {!isEmpty && showTotalsDetails && (
-              <div className="cart-totals" style={{ margin: 0, border: 'none', padding: 0, background: 'transparent' }}>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 2 }}>
-                  <button
-                    type="button"
-                    onClick={toggleTotals}
-                    style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.7)', cursor: 'pointer', padding: '2px 4px', fontSize: 14, display: 'flex' }}
-                    title="إخفاء التفاصيل"
-                  >
-                    <i className="ti ti-eye-off" />
-                  </button>
-                </div>
-
-                {onInvoiceDiscountChange && (
-                  <div className="ct-row ct-disc" style={{ color: 'rgba(255,255,255,.85)' }}>
-                    <span style={{ color: 'rgba(255,255,255,.75)' }}>خصم الفاتورة</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <button
-                        className={`cr-disc-mode-btn ${invDiscMode === 'pct' ? 'on' : ''}`}
-                        onClick={() => setInvDiscMode('pct')}
-                        type="button"
-                        style={{ fontSize: 10, padding: '2px 5px', background: invDiscMode === 'pct' ? 'rgba(255,255,255,.2)' : 'rgba(255,255,255,.08)', color: '#fff', border: '1px solid rgba(255,255,255,.15)', borderRadius: 4 }}
-                      >%</button>
-                      <button
-                        className={`cr-disc-mode-btn ${invDiscMode === 'amount' ? 'on' : ''}`}
-                        onClick={() => setInvDiscMode('amount')}
-                        type="button"
-                        style={{ fontSize: 10, padding: '2px 5px', background: invDiscMode === 'amount' ? 'rgba(255,255,255,.2)' : 'rgba(255,255,255,.08)', color: '#fff', border: '1px solid rgba(255,255,255,.15)', borderRadius: 4 }}
-                      >دج</button>
-
-                      {invDiscMode === 'pct' ? (
-                        <>
-                          <input
-                            type="number"
-                            className="ct-disc-inp"
-                            value={invoiceDiscountPct || ''}
-                            onChange={e => onInvoiceDiscountChange(
-                              Math.min(100, Math.max(0, parseFloat(e.target.value) || 0))
-                            )}
-                            min={0} max={100} step={1}
-                            placeholder="0"
-                            style={{ width: 50, background: 'rgba(255,255,255,.12)', color: '#fff', border: '1px solid rgba(255,255,255,.2)', borderRadius: 4, textAlign: 'center', fontSize: 11 }}
-                          />
-                          <span style={{ fontSize: 11, color: 'rgba(255,255,255,.7)' }}>%</span>
-                          {invoiceDiscountAmount > 0 && (
-                            <span style={{ fontSize: 11, color: '#fca5a5', fontWeight: 700 }}>
-                              -{formatDZD(invoiceDiscountAmount)}
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <input
-                            type="number"
-                            className="ct-disc-inp"
-                            value={invDiscAmtVal}
-                            onChange={e => handleInvDiscAmount(e.target.value)}
-                            min={0}
-                            placeholder="0"
-                            style={{ width: 70, background: 'rgba(255,255,255,.12)', color: '#fff', border: '1px solid rgba(255,255,255,.2)', borderRadius: 4, textAlign: 'center', fontSize: 11 }}
-                          />
-                          <span style={{ fontSize: 11, color: 'rgba(255,255,255,.7)' }}>دج</span>
-                        </>
-                      )}
-                    </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginTop: 4, fontSize: 11 }}>
+                {/* يمين: الرصيد */}
+                {client !== null && clientBalance !== undefined && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                    <span style={{ color: 'rgba(255,255,255,.6)' }}>رصيد</span>
+                    <span style={{ fontWeight: 600, color: clientBalance >= 0 ? '#fca5a5' : '#86efac' }}>
+                      {formatDZD(clientBalance)}
+                    </span>
+                    <i className="ti ti-arrow-right" style={{ color: 'rgba(255,255,255,.4)', fontSize: 10 }} />
+                    <span style={{ fontWeight: 700, color: '#fff' }}>
+                      {formatDZD(clientBalance + totalTtcFinal)}
+                    </span>
                   </div>
                 )}
 
-                {client !== null && clientBalance !== undefined && (
-                  <div className="ct-row" style={{ fontSize: 11.5, borderTop: '1px solid rgba(255,255,255,.15)', paddingTop: 6, marginTop: 4, color: 'rgba(255,255,255,.85)' }}>
-                    <span>
-                      <span style={{ opacity: 0.7 }}>رصيد </span>
-                      <span style={{ fontWeight: 600, color: clientBalance >= 0 ? '#fca5a5' : '#86efac' }}>
-                        {formatDZD(clientBalance)}
-                      </span>
+                {/* وسط: مرونة */}
+                <div style={{ flex: 1 }} />
+
+                {/* يسار: خصم الفاتورة */}
+                {onInvoiceDiscountChange && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+                    <span style={{ color: 'rgba(255,255,255,.6)' }}>خصم</span>
+                    <button
+                      onClick={() => setInvDiscMode('pct')}
+                      type="button"
+                      style={{
+                        fontSize: 9, padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(255,255,255,.2)',
+                        background: invDiscMode === 'pct' ? 'rgba(255,255,255,.2)' : 'transparent',
+                        color: '#fff', cursor: 'pointer',
+                      }}
+                    >%</button>
+                    <button
+                      onClick={() => setInvDiscMode('amount')}
+                      type="button"
+                      style={{
+                        fontSize: 9, padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(255,255,255,.2)',
+                        background: invDiscMode === 'amount' ? 'rgba(255,255,255,.2)' : 'transparent',
+                        color: '#fff', cursor: 'pointer',
+                      }}
+                    >دج</button>
+                    <input
+                      type="number"
+                      value={invDiscMode === 'pct' ? (invoiceDiscountPct || '') : invDiscAmtVal}
+                      onChange={e => {
+                        if (invDiscMode === 'pct') {
+                          onInvoiceDiscountChange(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)));
+                        } else {
+                          handleInvDiscAmount(e.target.value);
+                        }
+                      }}
+                      min={0}
+                      placeholder="0"
+                      style={{
+                        width: 44, textAlign: 'center', fontSize: 11, fontWeight: 700,
+                        background: 'rgba(255,255,255,.12)', color: '#fff',
+                        border: '1px solid rgba(255,255,255,.2)', borderRadius: 3,
+                      }}
+                    />
+                    <span style={{ color: 'rgba(255,255,255,.5)', fontSize: 10 }}>
+                      {invDiscMode === 'pct' ? '%' : 'دج'}
                     </span>
-                    <span>
-                      <span style={{ opacity: 0.7 }}>الرصيد الجديد </span>
-                      <span style={{ fontWeight: 700, color: '#fff' }}>
-                        {formatDZD(clientBalance + totalTtcFinal)}
+                    {((invDiscMode === 'pct' && invoiceDiscountAmount > 0) || (invDiscMode === 'amount' && parseFloat(invDiscAmtVal) > 0)) && (
+                      <span style={{ fontSize: 10, color: '#fca5a5', fontWeight: 700 }}>
+                        -{formatDZD(invoiceDiscountAmount)}
                       </span>
-                    </span>
+                    )}
+                    <button
+                      onClick={toggleTotals}
+                      type="button"
+                      style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', cursor: 'pointer', padding: '0 2px', fontSize: 13, display: 'flex' }}
+                      title="إخفاء التفاصيل"
+                    >
+                      <i className="ti ti-eye-off" />
+                    </button>
                   </div>
                 )}
               </div>
