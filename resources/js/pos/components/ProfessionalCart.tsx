@@ -338,13 +338,13 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                 {/* يمين: الرصيد */}
                 {client !== null && clientBalance !== undefined && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                    <span style={{ color: 'rgba(255,255,255,.55)', fontSize: 10 }}>الرصيد السابق</span>
-                    <span style={{ fontWeight: 600, color: clientBalance >= 0 ? '#fca5a5' : '#86efac' }}>
+                    <span style={{ color: 'rgba(255,255,255,.9)', fontSize: 12, fontWeight: 500 }}>الرصيد السابق</span>
+                    <span style={{ fontWeight: 700, fontSize: 12, color: clientBalance >= 0 ? '#fca5a5' : '#86efac' }}>
                       {formatDZD(clientBalance)}
                     </span>
-                    <i className="ti ti-arrow-left" style={{ color: 'rgba(255,255,255,.4)', fontSize: 10 }} />
-                    <span style={{ color: 'rgba(255,255,255,.55)', fontSize: 10 }}>الرصيد الجديد</span>
-                    <span style={{ fontWeight: 700, color: '#fff' }}>
+                    <i className="ti ti-arrow-left" style={{ color: 'rgba(255,255,255,.7)', fontSize: 11 }} />
+                    <span style={{ color: 'rgba(255,255,255,.9)', fontSize: 12, fontWeight: 500 }}>الرصيد الجديد</span>
+                    <span style={{ fontWeight: 700, fontSize: 12, color: '#fff' }}>
                       {formatDZD(clientBalance + totalTtcFinal)}
                     </span>
                   </div>
@@ -356,23 +356,23 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                 {/* يسار: خصم الفاتورة */}
                 {onInvoiceDiscountChange && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
-                    <span style={{ color: 'rgba(255,255,255,.6)' }}>خصم</span>
+                    <span style={{ color: 'rgba(255,255,255,.9)', fontSize: 12, fontWeight: 500 }}>خصم</span>
                     <button
                       onClick={() => setInvDiscMode('pct')}
                       type="button"
                       style={{
-                        fontSize: 9, padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(255,255,255,.2)',
+                        fontSize: 10, padding: '2px 5px', borderRadius: 3, border: '1px solid rgba(255,255,255,.2)',
                         background: invDiscMode === 'pct' ? 'rgba(255,255,255,.2)' : 'transparent',
-                        color: '#fff', cursor: 'pointer',
+                        color: '#fff', cursor: 'pointer', fontWeight: 600,
                       }}
                     >%</button>
                     <button
                       onClick={() => setInvDiscMode('amount')}
                       type="button"
                       style={{
-                        fontSize: 9, padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(255,255,255,.2)',
+                        fontSize: 10, padding: '2px 5px', borderRadius: 3, border: '1px solid rgba(255,255,255,.2)',
                         background: invDiscMode === 'amount' ? 'rgba(255,255,255,.2)' : 'transparent',
-                        color: '#fff', cursor: 'pointer',
+                        color: '#fff', cursor: 'pointer', fontWeight: 600,
                       }}
                     >دج</button>
                     <input
@@ -388,16 +388,16 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                       min={0}
                       placeholder="0"
                       style={{
-                        width: 44, textAlign: 'center', fontSize: 11, fontWeight: 700,
+                        width: 48, textAlign: 'center', fontSize: 12, fontWeight: 700,
                         background: 'rgba(255,255,255,.12)', color: '#fff',
                         border: '1px solid rgba(255,255,255,.2)', borderRadius: 3,
                       }}
                     />
-                    <span style={{ color: 'rgba(255,255,255,.5)', fontSize: 10 }}>
+                    <span style={{ color: 'rgba(255,255,255,.7)', fontSize: 11 }}>
                       {invDiscMode === 'pct' ? '%' : 'دج'}
                     </span>
                     {((invDiscMode === 'pct' && invoiceDiscountAmount > 0) || (invDiscMode === 'amount' && parseFloat(invDiscAmtVal) > 0)) && (
-                      <span style={{ fontSize: 10, color: '#fca5a5', fontWeight: 700 }}>
+                      <span style={{ fontSize: 12, color: '#fca5a5', fontWeight: 700 }}>
                         -{formatDZD(invoiceDiscountAmount)}
                       </span>
                     )}
