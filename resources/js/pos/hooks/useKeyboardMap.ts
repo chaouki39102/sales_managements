@@ -40,6 +40,7 @@ export const KB_DEFAULTS: Record<string, string> = {
   toggleHeld: 'Ctrl+ArrowRight',
   sessionInvoices: 'Ctrl+Shift+I',
   focusCart: 'Ctrl+Space',
+  quickCash: '',
 };
 
 export function normalizeEventKey(e: KeyboardEvent): string {

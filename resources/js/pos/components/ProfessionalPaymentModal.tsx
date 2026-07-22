@@ -68,6 +68,8 @@ interface Props {
   initialNote?:      string | null;
   onClose:           () => void;
   onConfirm:         (p: PaymentConfirmParams) => Promise<{ ok: boolean; message?: string }>;
+  pendingQuickCash?: boolean;
+  onQuickCashDone?:  () => void;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -194,6 +196,8 @@ export default function ProfessionalPaymentModal({
   initialTypeCode,
   initialCurrencyId,
   initialNote,
+  pendingQuickCash = false,
+  onQuickCashDone,
 }: Props) {
 
   const firstAmountRef = useRef<HTMLInputElement>(null);
@@ -431,24 +435,27 @@ export default function ProfessionalPaymentModal({
       const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
       if (e.key === 'Escape')              { e.preventDefault(); onClose(); }
       if (e.key === 'Enter' && !inInput)   { e.preventDefault(); handleSubmit(); }
-      // F2: Quick Cash — set cash mode, fill total, submit
-      if (e.key === 'F2') {
-        e.preventDefault();
-        if (defaultMode) {
-          setLines([{
-            id: uid(),
-            modeId: defaultMode.id,
-            amount: totalDue.toFixed(4),
-            refNote: '',
-            treasuryAccountId: null,
-          }]);
-          setTimeout(() => handleSubmit(), 50);
-        }
-      }
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [handleSubmit, onClose, defaultMode, totalDue]);
+  }, [handleSubmit, onClose]);
+
+  // ── Quick Cash: auto-fill cash + full amount + submit ────────────────────────
+  useEffect(() => {
+    if (!pendingQuickCash || !defaultMode) return;
+    setLines([{
+      id: uid(),
+      modeId: defaultMode.id,
+      amount: totalTtcFinal.toFixed(4),
+      refNote: '',
+      treasuryAccountId: null,
+    }]);
+    const t = setTimeout(() => {
+      handleSubmit();
+      onQuickCashDone?.();
+    }, 80);
+    return () => clearTimeout(t);
+  }, [pendingQuickCash]); // only fire once on mount
 
   // ── Split equally across all lines ──────────────────────────────────────────
   const splitEqually = useCallback(() => {

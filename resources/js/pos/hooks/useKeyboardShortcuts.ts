@@ -55,6 +55,7 @@ export interface KeyboardShortcutsSetters {
   setView:               React.Dispatch<React.SetStateAction<'grid' | 'list'>>;
   setGridSize:           React.Dispatch<React.SetStateAction<'xs' | 'sm' | 'md' | 'lg'>>;
   setReceiptSnapshot:    React.Dispatch<React.SetStateAction<POSSaleSnapshot | null>>;
+  setPendingQuickCash:   React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export interface KeyboardShortcutsActions {
@@ -97,6 +98,7 @@ export function useKeyboardShortcuts(
       if (matchOverrideFrom(overrides, 'searchFocus', e))  { e.preventDefault(); refs.searchRef.current?.focus(); }
       if (matchOverrideFrom(overrides, 'focusCart', e))    { e.preventDefault(); if (document.activeElement === refs.searchRef.current) { const lastItem = refs.posRef.current.items[refs.posRef.current.items.length - 1]; if (lastItem) { setters.setSelectedCartItemId(lastItem.id); refs.cartApiRef.current?.scrollToItemId(lastItem.id); } else { refs.cartRef.current?.focus(); } } else { refs.searchRef.current?.focus(); } }
       if (matchOverrideFrom(overrides, 'payment', e))      { e.preventDefault(); if (!state.isEmpty) { setters.setModal('payment'); } }
+      if (matchOverrideFrom(overrides, 'quickCash', e))   { e.preventDefault(); if (!state.isEmpty) { setters.setPendingQuickCash(true); setters.setModal('payment'); } }
       if (matchOverrideFrom(overrides, 'holdCart', e))     { e.preventDefault(); if (!state.isEmpty) refs.posRef.current.holdCart(); }
       if (matchOverrideFrom(overrides, 'manualProduct', e)){ e.preventDefault(); setters.setModal('manual'); }
       if (matchOverrideFrom(overrides, 'heldCarts', e))    { e.preventDefault(); setters.setModal('held'); }

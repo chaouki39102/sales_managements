@@ -86,6 +86,7 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
       title: 'السلة',
       items: [
         { action: 'focusCart', defaultKey: 'Ctrl+Space', desc: 'التركيز على السلة والتنقل بينها وبين البحث' },
+        { action: 'focusClient', defaultKey: 'Ctrl+K', desc: 'اختيار / إضافة زبون' },
         { action: 'qtyUp', defaultKey: 'NumpadAdd', desc: 'زيادة كمية آخر صنف' },
         { action: 'qtyDown', defaultKey: 'NumpadSubtract', desc: 'إنقاص كمية آخر صنف' },
         { action: 'deleteItem', defaultKey: 'Delete', desc: 'حذف الصنف المحدد من السلة' },
@@ -100,6 +101,7 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
       items: [
         { action: 'enterSearch', defaultKey: 'Enter', desc: 'إضافة أول نتيجة بحث' },
         { action: 'escape', defaultKey: 'Escape', desc: 'إغلاق المودال / مسح البحث' },
+        { action: 'quickCash', defaultKey: '—', desc: 'دفع سريع نقدي (Full Cash)' },
         { action: 'searchQtyCmd', defaultKey: '*15', desc: 'ضبط كمية الصنف المحدد في السلة (اكتب * متبوعاً بالرقم)' },
       ],
     },

@@ -242,7 +242,8 @@ function POSPage() {
     };
   }, [setSettings]);
   const [showFilter, setShowFilter] = useState(false);
-  const [modal,      setModal]      = useState<ActiveModal>('none');
+  const [modal, setModal] = useState<ActiveModal>('none');
+  const [pendingQuickCash, setPendingQuickCash] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [pinModal, setPinModal] = useState<{
     requestedDiscount: number;
@@ -834,7 +835,7 @@ function POSPage() {
   useKeyboardShortcuts(
     { posRef, overridesRef: kbOverridesRef, searchRef, cartRef, cartApiRef },
     { isEmpty, modal, showFilter, showSessionInvoices, showSettings, showCloseSession, pinModal, selectedCartItemId, families },
-    { setModal, setFilter: setShowFilter, setShowSessionInvoices, setShowSettings, setShowCloseSession, setPinModal, setSelectedCartItemId, setView, setGridSize, setReceiptSnapshot },
+    { setModal, setFilter: setShowFilter, setShowSessionInvoices, setShowSettings, setShowCloseSession, setPinModal, setSelectedCartItemId, setView, setGridSize, setReceiptSnapshot, setPendingQuickCash },
     { toggleFullscreen, handleClearCart, handleOpenDrawer, handleUndoClear, handleToggleQuickbar, handleSearchEscape, deleteConfirm },
   );
 
@@ -1523,8 +1524,10 @@ const handleCompleteSale = useCallback(async (params: {
             initialTypeCode={editingDocMetaRef.current?.typeCode}
             initialCurrencyId={editingDocMetaRef.current?.currencyId}
             initialNote={cartNote}
-            onClose={() => setModal('none')}
+            onClose={() => { setModal('none'); setPendingQuickCash(false); }}
             onConfirm={handleCompleteSale}
+            pendingQuickCash={pendingQuickCash}
+            onQuickCashDone={() => setPendingQuickCash(false)}
           />
         </Suspense>
       )}
