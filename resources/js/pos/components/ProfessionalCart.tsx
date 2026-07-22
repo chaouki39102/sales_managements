@@ -329,7 +329,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
             {!isEmpty && (
               <button type="button" className="ch-more-btn" onClick={toggleTotals}>
                 تفاصيل إضافية
-                <i className={`ti ti-chevron-down ct-toggle-ic ${showTotalsDetails ? 'open' : ''}`} />
+                <i className={`ti ti-eye${showTotalsDetails ? '' : '-off'}`} style={{ fontSize: 13 }} />
               </button>
             )}
           </div>
@@ -515,7 +515,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                 {client !== null && clientBalance !== undefined && (
                   <div className="ct-row" style={{ fontSize: 11.5, borderTop: '1px solid var(--b2)', paddingTop: 6, marginTop: 4 }}>
                     <span>
-                      <span style={{ opacity: 0.65 }}>رصيد {client.name} </span>
+                      <span style={{ opacity: 0.65 }}>رصيد </span>
                       <span style={{ fontWeight: 600, color: clientBalance >= 0 ? '#ef4444' : '#22c55e' }}>
                         {formatDZD(clientBalance)}
                       </span>

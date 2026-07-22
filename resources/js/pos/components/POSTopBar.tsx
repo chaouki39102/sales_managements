@@ -136,7 +136,7 @@ export default function POSTopBar({
           </div>
         )}
 
-        {!isEmpty && avgMargin > 0 && (
+        {!isEmpty && (
           <div className="pos-chip p" title="متوسط هامش الربح — السلة الحالية" style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <button
               onClick={e => { e.stopPropagation(); toggleMargin(); }}
