@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════════
    pages.css — أنماط مشتركة للصفحات
-   (sr, pb, av, tl, alert, tabs, forms, modals, settings)
+   (sr, pb, av, tl, alert, tabs, forms, settings, payment-items, dashboard, print)
+   المودالات (.ov, .modal, .m-*) تُدار من pos.css (SSOT)
 ══════════════════════════════════════════════════════= */
 
 /* ═══════════════ SUMMARY ROWS ═══════════════ */
@@ -74,136 +75,14 @@
 .d-item{display:flex;align-items:center;gap:7px;font-size:12px;}
 .d-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 
-/* ═══════════════ MODALS ═══════════════ */
-.ov{
-  position:fixed;inset:0;background:rgba(0,0,0,.60);
-  display:flex;align-items:center;justify-content:center;
-  z-index:10001;opacity:0;pointer-events:none;
-  transition:opacity .2s;backdrop-filter:blur(6px);padding:16px;
-}
-.ov.on{opacity:1;pointer-events:all;}
-
-.modal{
-  background:var(--bg2);border:1px solid var(--b3);
-  border-radius:var(--r4);width:100%;max-width:580px;
-  box-shadow:var(--shadow2);
-  transform:scale(.94) translateY(8px);
-  transition:transform .22s cubic-bezier(.34,1.4,.64,1);
-  max-height:90vh;display:flex;flex-direction:column;
-  position:relative;
-}
-.ov.on .modal{transform:scale(1) translateY(0);}
-.modal-lg{max-width:700px;}
-.modal-xl{max-width:1100px;}
-.modal-sm{max-width:420px;}
-.m-hd{
-  padding:16px 20px;border-bottom:1px solid var(--b2);
-  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
-}
-.m-title{font-size:15px;font-weight:800;color:var(--t1);}
-.m-sub{font-size:11.5px;color:var(--t4);margin-top:1px;}
-.m-x{
-  width:28px;height:28px;border-radius:7px;
-  background:var(--bg3);border:1px solid var(--b2);
-  cursor:pointer;display:flex;align-items:center;justify-content:center;
-  color:var(--t3);font-size:13px;transition:.15s;flex-shrink:0;
-}
-.m-x:hover{background:var(--redb);border-color:var(--redbo);color:var(--red);}
-.m-body{padding:20px;overflow-y:auto;}
-.m-foot{
-  padding:14px 20px;border-top:1px solid var(--b2);
-  display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-shrink:0;
-  background:var(--bg3);border-radius:0 0 var(--r4) var(--r4);
-}
-.m-foot-l{margin-right:auto;display:flex;gap:8px;}
-
-/* ═══════════════ MISC ═══════════════ */
-.sr{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--b1);}
-.sr:last-child{border-bottom:none;}
-.sr-l{font-size:12.5px;color:var(--t3);}
-.sr-v{font-size:13px;font-weight:700;color:var(--t1);}
-.pb{background:var(--bg4);border-radius:4px;height:5px;overflow:hidden;}
-.pb-f{height:100%;border-radius:4px;transition:width .5s ease;}
-.av{width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;}
-.av1{background:linear-gradient(135deg,var(--em),var(--em3));color:#fff;}
-.av2{background:linear-gradient(135deg,#d97706,#fbbf24);color:#fff;}
-.av3{background:linear-gradient(135deg,var(--blue),#60a5fa);color:#fff;}
-.av4{background:linear-gradient(135deg,var(--purple),#a78bfa);color:#fff;}
-.av5{background:linear-gradient(135deg,var(--red),#f87171);color:#fff;}
-.av6{background:var(--bg4);color:var(--t3);border:1px solid var(--b3);}
-.tl{padding-right:16px;position:relative;}
-.tl::before{content:'';position:absolute;right:5px;top:4px;bottom:4px;width:1px;background:var(--b2);}
-.tl-i{position:relative;padding-bottom:14px;padding-right:18px;}
-.tl-d{position:absolute;right:-7px;top:5px;width:12px;height:12px;border-radius:50%;border:2px solid var(--bg2);}
-.tl-d.e{background:var(--em2);}.tl-d.g{background:var(--gold);}.tl-d.b{background:var(--blue);}.tl-d.r{background:var(--red);}.tl-d.z{background:var(--t4);}
-.tl-t{font-size:10.5px;color:var(--t4);margin-bottom:2px;}
-.tl-x{font-size:12.5px;color:var(--t2);}
-.tl-x strong{color:var(--t1);}
-.empty{text-align:center;padding:50px 20px;}
-.empty-ic{font-size:42px;opacity:.2;margin-bottom:12px;}
-.empty-tx{font-size:14px;color:var(--t4);}
-.sw{width:38px;height:22px;border-radius:11px;background:var(--bg5);border:1px solid var(--b3);cursor:pointer;position:relative;transition:.18s;flex-shrink:0;}
-.sw.on{background:var(--em);border-color:var(--em);}
-.sw::after{content:'';position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;top:2px;right:2px;transition:transform .18s;box-shadow:0 1px 4px rgba(0,0,0,.2);}
-.sw.on::after{transform:translateX(-16px);}
-.qamt{
-  padding:5px 11px;border-radius:var(--r1);
-  background:var(--bg3);border:1px solid var(--b2);
-  font-size:12px;font-weight:700;color:var(--t2);cursor:pointer;
-  transition:.14s;font-family:'Tajawal',sans-serif;
-}
-.qamt:hover{background:var(--emb);border-color:var(--embo);color:var(--em);}
-
-/* ═══════════════ CHARTS ═══════════════ */
-.barchart{
-  height:200px;display:flex;align-items:flex-end;gap:7px;
-  padding:16px 0 0;position:relative;
-}
-.barchart::before{
-  content:'';position:absolute;top:16px;left:0;right:0;bottom:0;
-  background:repeating-linear-gradient(to bottom,transparent,transparent calc(25% - .5px),var(--b1) calc(25% - .5px),var(--b1) 25%);
-  pointer-events:none;
-}
-.bc-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;}
-.bc-bar{
-  width:100%;border-radius:4px 4px 0 0;min-height:4px;
-  background:linear-gradient(to top,var(--em),var(--em3));
-  position:relative;transition:opacity .2s;
-}
-.bc-bar:hover{opacity:.8;}
-.bc-bar.hi{background:linear-gradient(to top,var(--gold),#fbbf24);}
-.bc-lbl{font-size:10px;color:var(--t4);white-space:nowrap;}
-.bc-v{position:absolute;top:-17px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;color:var(--t3);white-space:nowrap;}
-.spark{display:flex;align-items:flex-end;gap:3px;height:36px;}
-.sp{flex:1;border-radius:2px 2px 0 0;background:var(--emb);min-height:4px;cursor:default;transition:background .18s;}
-.sp:hover,.sp.hi{background:var(--em);}
-.donut-w{display:flex;align-items:center;gap:16px;}
-.donut{
-  width:108px;height:108px;border-radius:50%;flex-shrink:0;
-  background:conic-gradient(var(--em2) 0% 38%,var(--gold) 38% 62%,var(--blue) 62% 79%,var(--purple) 79% 88%,var(--t4) 88% 100%);
-  position:relative;
-}
-.donut::after{content:'';position:absolute;inset:24px;border-radius:50%;background:var(--bg2);}
-.d-legend{display:flex;flex-direction:column;gap:6px;flex:1;}
-.d-item{display:flex;align-items:center;gap:7px;font-size:12px;}
-.d-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
-
-/* ═══════════════ POS — PROFESSIONAL UI ═══════════════ */
-
-/* Layout */
-/* ════════════════════════════════════════
-   POS — نقطة البيع المتكاملة
-════════════════════════════════════════ */
-
-/* Stats bar */
-
-/* ═══════════════════════════════════════
-   POS SYSTEM — شاشة البيع
-═══════════════════════════════════════ */
-
-/* ── Stats ── */
-
 /* ═══════════════ SETTINGS ═══════════════ */
+/* [Cleanup] العناصر التالية حُذفت من pages.css لأنها مكرّرة بالكامل في pos.css
+   (pos.css يُحمَّل بعد pages.css في app.css — pos.css هو SSOT):
+   • .ov / .ov.on         — طبقة خلفية المودال (opacity/pointer-events vs display)
+   • .modal / .modal-*    — تصميم المودال (border-radius: var(--r4) vs var(--r3))
+   • .m-hd / .m-title ... — عناصر المودال الداخلية
+   • .sr–.qamt / Charts   — مكرّر حرفياً مرتين في pages.css نفسه (MISC + SUMMARY ROWS)
+   • تعليقات POS الفارغة  — بقايا نقل الكود إلى pos.css */
 .stab{
   padding:9px 16px;cursor:pointer;font-size:13px;font-weight:700;
   color:var(--t4);border-bottom:2px solid transparent;margin-bottom:-1px;
@@ -251,20 +130,9 @@
 .pay-item-total { font-size:12px;font-weight:800;color:var(--em);white-space:nowrap;direction:ltr; }
 
 /* ── Payment Modal V2 ── */
-.pay-v2-body {
-  display:grid;grid-template-columns:1fr 1.3fr;
-  gap:0;overflow:hidden;flex:1;min-height:0;
-}
-.pay-v2-left {
-  border-left:1px solid var(--b2);
-  padding:16px 14px;overflow-y:auto;
-  display:flex;flex-direction:column;
-}
-.pay-v2-right {
-  padding:14px;overflow-y:auto;
-  display:flex;flex-direction:column;
-}
-
+/* [SSOT] .pay-v2-body / .pay-v2-left / .pay-v2-right معرّفة في pos.css
+   (pos.css يُحمَّل بعد pages.css في app.css، فقيمته ت prevails على أي تكرار).
+   تم حذف التعريف المكرر من هنا لمنع تعارض padding (16px/14px vs 12px/12px). */
 .pay-v2-summary  { margin-bottom:14px; }
 .pvs-row {
   display:flex;justify-content:space-between;align-items:center;
@@ -330,17 +198,35 @@
 .pay-qa-btn.on    { background:var(--em);border-color:var(--em);color:#fff;box-shadow:var(--emglow); }
 .pay-lines-v2 { display:flex;flex-direction:column;gap:7px; }
 .pay-line-v2 {
-  display:grid;
-  grid-template-columns:18px 1fr 130px 90px;
-  align-items:center;gap:5px;
-  padding:7px 8px;border-radius:var(--r2);
+  position:relative;display:grid;
+  grid-template-columns:20px 1fr 130px 90px;
+  align-items:center;gap:7px;
+  padding:8px 10px;border-radius:var(--r2);
   border:1.5px solid var(--b2);background:var(--bg3);
   cursor:pointer;transition:all .13s;
 }
+.pay-line-v2:has(.plv2-treasury)                    { grid-template-columns:20px 1fr 130px 90px 100px; }
+.pay-line-v2:has(.plv2-del)                         { grid-template-columns:20px 1fr 130px 90px 22px; }
+.pay-line-v2:has(.plv2-treasury):has(.plv2-del)     { grid-template-columns:20px 1fr 130px 90px 100px 22px; }
+
 .pay-line-v2:hover  { border-color:var(--embo); }
 .pay-line-v2.active { border-color:var(--em);background:var(--emb);box-shadow:0 0 0 3px var(--emb); }
-.pay-line-v2.has-treasury { grid-template-columns:18px 1fr 130px 90px 100px 22px; }
-.plv2-num    { font-size:10px;font-weight:800;color:var(--t4);text-align:center; }
+.pay-line-v2.active::before {
+  content:'';position:absolute;
+  top:0;bottom:0;right:-1.5px;
+  width:3px;border-radius:0 var(--r2) var(--r2) 0;
+  background:var(--em);
+}
+
+.plv2-num {
+  width:20px;height:20px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:800;
+  color:var(--t4);background:var(--bg2);border:1px solid var(--b2);
+}
+.pay-line-v2.active .plv2-num {
+  color:#fff;background:var(--em);border-color:var(--em);
+}
 .plv2-mode,.plv2-treasury {
   padding:5px 6px;border-radius:var(--r1);
   border:1px solid var(--b2);background:var(--bg2);
@@ -463,7 +349,7 @@
   .pay-hero-amount { font-size:26px; }
   .pay-numpad { gap:4px; }
   .pay-npk { padding:10px;font-size:16px; }
-  .pay-line-v2 { grid-template-columns:18px 1fr 100px; }
+  .pay-line-v2 { grid-template-columns:20px 1fr 100px; }
   .plv2-ref { display:none; }
   .pay-items-list { max-height:120px; }
   .pay-item-row { grid-template-columns:14px 24px 1fr auto; }

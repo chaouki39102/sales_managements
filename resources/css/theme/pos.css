@@ -1,7 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════════
    pos.css — نظام POS العالمي الاحترافي v4.0
-   (مدمج مع pos-additions.css و pos-missing.css – تم إزالة التكرارات)
-   ═══════════════════════════════════════════════════════════════════════ */
+   (مدمج مع pos-additions.css و pos-missing.css — تم إزالة التكرارات)
+   SSOT للمودالات (.ov, .modal, .m-*) — تم نقلها من pages.css
+═══════════════════════════════════════════════════════════════════════ */
 
 /* ════════════════════════════════════════════════════
    WRAPPER
@@ -591,7 +592,10 @@
   opacity: 0;
   transition: opacity .3s;
 }
-.pcard-img:has(img) ::after { opacity: 1; }
+/* [Fix] مسافة قبل ::after كانت تستهدف ::after لأي ابن داخل .pcard-img
+   بدل الـ ::after الخاص بـ .pcard-img نفسها → تدرّج الظل السفلي لم يعمل.
+   بدون مسافة: يُستهدف العنصر псевudo الخاص بالحاوية مباشرةً. */
+.pcard-img:has(img)::after { opacity: 1; }
 .pcard-img::before {
   content: '';
   position: absolute;
@@ -2034,23 +2038,52 @@ body.dark .pay-hero-amount { text-shadow: none; }
 
 .pay-lines-v2 { display: flex; flex-direction: column; gap: 7px; }
 .pay-line-v2 {
+  position: relative;
   display: grid;
-  grid-template-columns: 18px 1fr 130px 90px;
+  grid-template-columns: 20px 1fr 130px 90px;
   align-items: center;
-  gap: 5px;
-  padding: 7px 8px;
+  gap: 7px;
+  padding: 8px 10px;
   border-radius: var(--r2);
   border: 1.5px solid var(--b2);
   background: var(--bg3);
   cursor: pointer;
   transition: all .13s;
 }
+.pay-line-v2:has(.plv2-treasury)                    { grid-template-columns: 20px 1fr 130px 90px 100px; }
+.pay-line-v2:has(.plv2-del)                         { grid-template-columns: 20px 1fr 130px 90px 22px; }
+.pay-line-v2:has(.plv2-treasury):has(.plv2-del)     { grid-template-columns: 20px 1fr 130px 90px 100px 22px; }
+
 .pay-line-v2:hover { border-color: var(--embo); }
-.pay-line-v2.active { border-color: var(--em); background: var(--emb); box-shadow: 0 0 0 3px var(--emb); }
-.pay-line-v2.has-treasury {
-  grid-template-columns: 18px 1fr 130px 90px 100px 22px;
+
+.pay-line-v2.active {
+  border-color: var(--em);
+  background: var(--emb);
+  box-shadow: 0 0 0 3px var(--emb);
 }
-.plv2-num { font-size: 10px; font-weight: 800; color: var(--t4); text-align: center; }
+.pay-line-v2.active::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; right: -1.5px;
+  width: 3px;
+  border-radius: 0 var(--r2) var(--r2) 0;
+  background: var(--em);
+}
+
+.plv2-num {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 800;
+  color: var(--t4);
+  background: var(--bg2);
+  border: 1px solid var(--b2);
+}
+.pay-line-v2.active .plv2-num {
+  color: #fff;
+  background: var(--em);
+  border-color: var(--em);
+}
 .plv2-mode,
 .plv2-treasury {
   padding: 5px 6px;
@@ -2703,7 +2736,7 @@ body.dark .pay-hero-amount { text-shadow: none; }
   .pay-hero-amount { font-size: 22px; }
   .pay-numpad { gap: 4px; }
   .pay-npk { padding: 10px; font-size: 16px; }
-  .pay-line-v2 { grid-template-columns: 18px 1fr 100px; }
+  .pay-line-v2 { grid-template-columns: 20px 1fr 100px; }
   .plv2-ref { display: none; }
   .cart-client-v2 { padding: 5px 8px; gap: 4px; }
   .ctv2-av { width: 28px; height: 28px; font-size: 11px; }
