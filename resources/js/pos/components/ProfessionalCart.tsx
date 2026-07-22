@@ -334,12 +334,12 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
             )}
 
             {!isEmpty && showTotalsDetails && (
-              <div className="cart-totals" style={{ margin: 0, border: 'none', padding: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+              <div className="cart-totals" style={{ margin: 0, border: 'none', padding: 0, background: 'transparent' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 2 }}>
                   <button
                     type="button"
                     onClick={toggleTotals}
-                    style={{ background: 'none', border: 'none', color: 'var(--t4)', cursor: 'pointer', padding: '2px 4px', fontSize: 14, display: 'flex' }}
+                    style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.7)', cursor: 'pointer', padding: '2px 4px', fontSize: 14, display: 'flex' }}
                     title="إخفاء التفاصيل"
                   >
                     <i className="ti ti-eye-off" />
@@ -347,20 +347,20 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                 </div>
 
                 {onInvoiceDiscountChange && (
-                  <div className="ct-row ct-disc">
-                    <span>خصم الفاتورة</span>
+                  <div className="ct-row ct-disc" style={{ color: 'rgba(255,255,255,.85)' }}>
+                    <span style={{ color: 'rgba(255,255,255,.75)' }}>خصم الفاتورة</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <button
                         className={`cr-disc-mode-btn ${invDiscMode === 'pct' ? 'on' : ''}`}
                         onClick={() => setInvDiscMode('pct')}
                         type="button"
-                        style={{ fontSize: 10, padding: '2px 5px' }}
+                        style={{ fontSize: 10, padding: '2px 5px', background: invDiscMode === 'pct' ? 'rgba(255,255,255,.2)' : 'rgba(255,255,255,.08)', color: '#fff', border: '1px solid rgba(255,255,255,.15)', borderRadius: 4 }}
                       >%</button>
                       <button
                         className={`cr-disc-mode-btn ${invDiscMode === 'amount' ? 'on' : ''}`}
                         onClick={() => setInvDiscMode('amount')}
                         type="button"
-                        style={{ fontSize: 10, padding: '2px 5px' }}
+                        style={{ fontSize: 10, padding: '2px 5px', background: invDiscMode === 'amount' ? 'rgba(255,255,255,.2)' : 'rgba(255,255,255,.08)', color: '#fff', border: '1px solid rgba(255,255,255,.15)', borderRadius: 4 }}
                       >دج</button>
 
                       {invDiscMode === 'pct' ? (
@@ -374,11 +374,11 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                             )}
                             min={0} max={100} step={1}
                             placeholder="0"
-                            style={{ width: 50 }}
+                            style={{ width: 50, background: 'rgba(255,255,255,.12)', color: '#fff', border: '1px solid rgba(255,255,255,.2)', borderRadius: 4, textAlign: 'center', fontSize: 11 }}
                           />
-                          <span style={{ fontSize: 11 }}>%</span>
+                          <span style={{ fontSize: 11, color: 'rgba(255,255,255,.7)' }}>%</span>
                           {invoiceDiscountAmount > 0 && (
-                            <span style={{ fontSize: 11, color: 'var(--red)', fontWeight: 700 }}>
+                            <span style={{ fontSize: 11, color: '#fca5a5', fontWeight: 700 }}>
                               -{formatDZD(invoiceDiscountAmount)}
                             </span>
                           )}
@@ -392,9 +392,9 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                             onChange={e => handleInvDiscAmount(e.target.value)}
                             min={0}
                             placeholder="0"
-                            style={{ width: 70 }}
+                            style={{ width: 70, background: 'rgba(255,255,255,.12)', color: '#fff', border: '1px solid rgba(255,255,255,.2)', borderRadius: 4, textAlign: 'center', fontSize: 11 }}
                           />
-                          <span style={{ fontSize: 11 }}>دج</span>
+                          <span style={{ fontSize: 11, color: 'rgba(255,255,255,.7)' }}>دج</span>
                         </>
                       )}
                     </div>
@@ -402,16 +402,16 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                 )}
 
                 {client !== null && clientBalance !== undefined && (
-                  <div className="ct-row" style={{ fontSize: 11.5, borderTop: '1px solid var(--b2)', paddingTop: 6, marginTop: 4 }}>
+                  <div className="ct-row" style={{ fontSize: 11.5, borderTop: '1px solid rgba(255,255,255,.15)', paddingTop: 6, marginTop: 4, color: 'rgba(255,255,255,.85)' }}>
                     <span>
-                      <span style={{ opacity: 0.65 }}>رصيد </span>
-                      <span style={{ fontWeight: 600, color: clientBalance >= 0 ? '#ef4444' : '#22c55e' }}>
+                      <span style={{ opacity: 0.7 }}>رصيد </span>
+                      <span style={{ fontWeight: 600, color: clientBalance >= 0 ? '#fca5a5' : '#86efac' }}>
                         {formatDZD(clientBalance)}
                       </span>
                     </span>
                     <span>
-                      <span style={{ opacity: 0.65 }}>الرصيد الجديد </span>
-                      <span style={{ fontWeight: 700, color: '#2563eb' }}>
+                      <span style={{ opacity: 0.7 }}>الرصيد الجديد </span>
+                      <span style={{ fontWeight: 700, color: '#fff' }}>
                         {formatDZD(clientBalance + totalTtcFinal)}
                       </span>
                     </span>
