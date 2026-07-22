@@ -283,15 +283,6 @@ export default function ProfessionalPaymentModal({
     paymentModes.find(m => /آجل|deferred|ajil/i.test(m.name)),
   [paymentModes]);
 
-  useEffect(() => {
-    if (lines.length !== 1 || !deferredMode) return;
-    const line = lines[0];
-    const amt = parseFloat(line.amount) || 0;
-    if (amt < 0.0001 && line.modeId !== deferredMode.id) {
-      updateLine(line.id, 'modeId', deferredMode.id);
-    }
-  }, [lines, deferredMode, updateLine]);
-
   // ── Derived ────────────────────────────────────────────────────────────────
   const totalPaid = useMemo(
     () => lines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0),
@@ -388,6 +379,15 @@ export default function ProfessionalPaymentModal({
   ) => {
     setLines(prev => prev.map(l => l.id === id ? { ...l, [key]: val } : l));
   }, []);
+
+  useEffect(() => {
+    if (lines.length !== 1 || !deferredMode) return;
+    const line = lines[0];
+    const amt = parseFloat(line.amount) || 0;
+    if (amt < 0.0001 && line.modeId !== deferredMode.id) {
+      updateLine(line.id, 'modeId', deferredMode.id);
+    }
+  }, [lines, deferredMode, updateLine]);
 
   const fillRemaining = useCallback((id: string) => {
     const others = lines.filter(l => l.id !== id).reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
