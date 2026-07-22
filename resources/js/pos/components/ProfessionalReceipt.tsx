@@ -5,7 +5,7 @@
 // لتطابق تام بين المعاينة والطباعة الفعلية
 // ════════════════════════════════════════════════════════════════════════════
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import UniversalPrintPipeline from '@/pages/settings/print-settings/runtime/UniversalPrintPipeline';
 import type { PipelineSource } from '@/pages/settings/print-settings/runtime/UniversalPrintPipeline';
 import type { PrintTemplate, CompanyData } from '@/pages/settings/print-settings/types';
@@ -23,6 +23,24 @@ interface Props {
 export default function ProfessionalReceipt({
   template, company, source, docNumber, onClose, onPrint, onNewSale,
 }: Props) {
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.repeat) {
+        e.preventDefault();
+        onPrint();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onPrint, onClose]);
+
   return (
     <div className="ov on" onClick={onClose}>
       <div

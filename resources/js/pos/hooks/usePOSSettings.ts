@@ -19,6 +19,8 @@ import { useState, useEffect, useCallback } from 'react';
 
 export type PriceDisplayMode = 'ttc' | 'ht';
 export type GridDefaultSize  = 'xs' | 'sm' | 'md' | 'lg';
+export type QuickCashAction  = 'silent' | 'preview' | 'print' | 'none';
+export type AfterSaleAction  = 'preview' | 'print' | 'none';
 
 export interface POSSettings {
   // ── مستودع وفاتورة ──────────────────────────────────────────────────────
@@ -42,12 +44,14 @@ export interface POSSettings {
   // ── طباعة ───────────────────────────────────────────────────────────────
   /** فتح درج النقود تلقائياً عند الدفع نقداً */
   openCashDrawer:       boolean;
-  /** طباعة تلقائية بعد كل بيع */
-  autoPrint:            boolean;
+  /** ماذا يحدث بعد إتمام البيع العادي */
+  afterSaleAction:      AfterSaleAction;
   /** عدد نسخ الطباعة */
   printCopies:          1 | 2 | 3;
   /** طريقة الطباعة */
   printMode:            'thermal' | 'browser';
+  /** سلوك الدفع السريع (نقدي كامل) */
+  quickCashAction:      QuickCashAction;
 
   // ── رأس وتذييل الإيصال ─────────────────────────────────────────────────
   /** اسم المؤسسة في رأس الإيصال — null يعني يُقرأ من activeCompany */
@@ -117,9 +121,10 @@ export const DEFAULT_POS_SETTINGS: POSSettings = {
   discountPinThreshold: 20,
   managerPin:           '',
   openCashDrawer:       false,
-  autoPrint:            false,
+  afterSaleAction:      'preview',
   printCopies:          1,
   printMode:            'browser',
+  quickCashAction:      'silent',
   receiptCompanyName:   null,
   receiptHeader2:       '',
   receiptFooter:        'شكراً لتعاملكم معنا',

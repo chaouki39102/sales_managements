@@ -506,7 +506,7 @@
   cursor: pointer;
   transition: .12s;
   flex-shrink: 0;
-  opacity: 0;
+  opacity: 1;
   align-self: flex-start;
   padding-top: 3px;
   padding: 0;
@@ -1136,7 +1136,6 @@
   touch-action: pan-y;
   will-change: transform;
 }
-.cr-swipe-wrap .cr-del { display: none; }
 
 /* ── حجم xs: إخفاء بادج البيع ── */
 .pgrid--xs .pcard-sale-badge { font-size: 0; padding: 2px 5px; }

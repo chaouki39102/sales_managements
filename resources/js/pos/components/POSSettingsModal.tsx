@@ -5,7 +5,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useState } from 'react';
-import type { POSSettings, PriceDisplayMode, GridDefaultSize } from '@/pos/hooks/usePOSSettings';
+import type { POSSettings, PriceDisplayMode, GridDefaultSize, QuickCashAction, AfterSaleAction } from '@/pos/hooks/usePOSSettings';
 import { isWebUsbSupported } from '@/pos/utils/printService';
 import { SOUND_PRESETS, previewSound } from '@/pos/utils/posSounds';
 import type { Warehouse, DocumentType, PaymentMode } from '@/types';
@@ -422,11 +422,68 @@ export default function POSSettingsModal({
             </div>
 
             <div className="fg s2">
-              <Switch
-                checked={local.autoPrint}
-                onChange={v => patch({ autoPrint: v })}
-                label="طباعة تلقائية بعد كل بيع"
-              />
+              <label>بعد إتمام البيع</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 4 }}>
+                {[
+                  { value: 'preview', label: 'معاينة الإيصال', desc: 'فتح نافذة المعاينة' },
+                  { value: 'print', label: 'طباعة مباشرة', desc: 'إرسال للطابعة فوراً' },
+                  { value: 'none', label: 'إغلاق فقط', desc: 'بدون معاينة أو طباعة' },
+                ].map(opt => (
+                  <label
+                    key={opt.value}
+                    style={{
+                      padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
+                      background: local.afterSaleAction === opt.value ? 'var(--emb)' : 'var(--bg2)',
+                      border: `1px solid ${local.afterSaleAction === opt.value ? 'var(--embo)' : 'var(--b2)'}`,
+                      transition: 'all .15s',
+                    }}
+                  >
+                    <input
+                      type="radio" name="afterSaleAction" value={opt.value}
+                      style={{ display: 'none' }}
+                      checked={local.afterSaleAction === opt.value}
+                      onChange={() => patch({ afterSaleAction: opt.value as AfterSaleAction })}
+                    />
+                    <div style={{ fontWeight: local.afterSaleAction === opt.value ? 700 : 400, fontSize: 12, color: local.afterSaleAction === opt.value ? 'var(--em)' : 'var(--t2)' }}>
+                      {opt.label}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--t4)', marginTop: 2 }}>{opt.desc}</div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="fg s2">
+              <label>سلوك الدفع السريع (نقدي كامل)</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 4 }}>
+                {[
+                  { value: 'silent', label: 'طباعة مباشرة', desc: 'حرارية فقط — بدون أي نافذة' },
+                  { value: 'preview', label: 'معاينة الإيصال', desc: 'فتح نافذة المعاينة أولاً' },
+                  { value: 'print', label: 'طباعة المتصفح', desc: 'فتح نافذة الطباعة العادية' },
+                  { value: 'none', label: 'بدون طباعة', desc: 'إتمام البيع فقط' },
+                ].map(opt => (
+                  <label
+                    key={opt.value}
+                    style={{
+                      padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
+                      background: local.quickCashAction === opt.value ? 'var(--emb)' : 'var(--bg2)',
+                      border: `1px solid ${local.quickCashAction === opt.value ? 'var(--embo)' : 'var(--b2)'}`,
+                      transition: 'all .15s',
+                    }}
+                  >
+                    <input
+                      type="radio" name="quickCashAction" value={opt.value}
+                      style={{ display: 'none' }}
+                      checked={local.quickCashAction === opt.value}
+                      onChange={() => patch({ quickCashAction: opt.value as QuickCashAction })}
+                    />
+                    <div style={{ fontWeight: local.quickCashAction === opt.value ? 700 : 400, fontSize: 12, color: local.quickCashAction === opt.value ? 'var(--em)' : 'var(--t2)' }}>
+                      {opt.label}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--t4)', marginTop: 2 }}>{opt.desc}</div>
+                  </label>
+                ))}
+              </div>
             </div>
 
             <div className="fg s2">

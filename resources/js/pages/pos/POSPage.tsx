@@ -76,7 +76,7 @@ import { playAddSound, playSaleSound } from '@/pos/utils/posSounds';
 import type { SoundPresetId } from '@/pos/utils/posSounds';
 import { renderPreviewToHtml }  from '@/pages/settings/print-settings/runtime/renderPreviewToHtml';
 import { mapCompany }           from '@/pages/settings/print-settings/runtime/PrintRuntimeAdapter';
-import { printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
+import { isWebUsbSupported, printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
 import { useQueryClient }       from '@tanstack/react-query';
 import { partyBalancesApi } from '@/lib/api/endpoints/partyBalances';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
@@ -243,7 +243,6 @@ function POSPage() {
   }, [setSettings]);
   const [showFilter, setShowFilter] = useState(false);
   const [modal, setModal] = useState<ActiveModal>('none');
-  const [pendingQuickCash, setPendingQuickCash] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [pinModal, setPinModal] = useState<{
     requestedDiscount: number;
@@ -832,11 +831,12 @@ function POSPage() {
   }, []);
 
   // ── Keyboard Shortcuts ─────────────────────────────────────────────────────
+  const handleQuickCashRef = useRef<() => void>(() => {});
   useKeyboardShortcuts(
     { posRef, overridesRef: kbOverridesRef, searchRef, cartRef, cartApiRef },
     { isEmpty, modal, showFilter, showSessionInvoices, showSettings, showCloseSession, pinModal, selectedCartItemId, families },
-    { setModal, setFilter: setShowFilter, setShowSessionInvoices, setShowSettings, setShowCloseSession, setPinModal, setSelectedCartItemId, setView, setGridSize, setReceiptSnapshot, setPendingQuickCash },
-    { toggleFullscreen, handleClearCart, handleOpenDrawer, handleUndoClear, handleToggleQuickbar, handleSearchEscape, deleteConfirm },
+    { setModal, setFilter: setShowFilter, setShowSessionInvoices, setShowSettings, setShowCloseSession, setPinModal, setSelectedCartItemId, setView, setGridSize, setReceiptSnapshot },
+    { toggleFullscreen, handleClearCart, handleOpenDrawer, handleUndoClear, handleToggleQuickbar, handleSearchEscape, deleteConfirm, handleQuickCash: () => handleQuickCashRef.current() },
   );
 
   // ── Price Level ────────────────────────────────────────────────────────────
@@ -864,11 +864,9 @@ function POSPage() {
   }, [priceLevelsList, allVariants, pos]);
 
   // ── Print Settings ──────────────────────────────────────────────────────────
-  const { template, enabled: isPrintEnabled, copies: dbCopies, paperWidth, autoPrint: dbAutoPrint, showPreview }
+  const { template, enabled: isPrintEnabled, copies: dbCopies, paperWidth }
     = usePrintSettings('POS');
 
-  // POSSettings overrides DB config for POS context
-  const autoPrint = settings.autoPrint || dbAutoPrint;
   const copies = settings.printCopies || dbCopies;
 
   // Template with POS receipt overrides applied
@@ -902,10 +900,32 @@ function POSPage() {
 
   const handlePrintDirect = useCallback(async (
     snap: POSSaleSnapshot,
+    opts?: { silent?: boolean },
   ) => {
     if (!posTemplate) { safeToast.error('لا يوجد قالب طاعة'); return; }
     try {
       const resolvedDocNum = snap.docNumber;
+      const isThermalPaper = posTemplate.paper_size === '80mm' || posTemplate.paper_size === '58mm';
+
+      // Silent mode (quick cash): try WebUSB thermal only, no browser fallback
+      if (opts?.silent) {
+        if (!isWebUsbSupported()) {
+          safeToast.error('الطباعة المباشرة تتطلب متصفح يدعم WebUSB');
+          return;
+        }
+        if (!resolvedDocNum) {
+          safeToast.error('رقم الفاتورة غير متوفر للطباعة المباشرة');
+          return;
+        }
+        const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
+        const result = await printThermalViaWebUSBFromTemplate(posTemplate, data, resolvedDocNum);
+        if (result.ok) {
+          safeToast.success('✅ تمت الطباعة');
+        } else {
+          safeToast.error(`خطأ في الطباعة: ${result.message}`);
+        }
+        return;
+      }
 
       const html = renderPreviewToHtml({
         template: posTemplate,
@@ -913,7 +933,6 @@ function POSPage() {
         source: { type: 'pos-snapshot', snapshot: snap },
       });
 
-      const isThermalPaper = posTemplate.paper_size === '80mm' || posTemplate.paper_size === '58mm';
       if (settings.printMode === 'thermal' && resolvedDocNum && isThermalPaper) {
         const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
         const result = await printThermalViaWebUSBFromTemplate(posTemplate, data, resolvedDocNum);
@@ -947,6 +966,7 @@ const handleCompleteSale = useCallback(async (params: {
     docTypeCode?: string;
     payments?:    Array<{ id?: number; paymentModeId: number; amount: number; treasuryAccountId?: number | null; reference?: string | null }>;
     currencyId?:  number | null;
+    skipPreview?: boolean;
   }) => {
     const typeCode = params.docTypeCode ?? settings.defaultDocTypeCode;
     const invType  = documentTypes?.find(t => t.code === typeCode)
@@ -1147,16 +1167,41 @@ const handleCompleteSale = useCallback(async (params: {
       posRef.current.clearCart();
       setSelectedCartItemId(null);
 
-      if (showPreview) {
-        setModal('receipt');
-      } else if (autoPrint && isPrintEnabled && template) {
-        setTimeout(() => {
-          const snap = receiptSnapshotRef.current;
-          if (snap) handlePrintDirect(snap);
-        }, 300);
-        setModal('none');
+      // ── Print / Preview decision ─────────────────────────────────────────
+      if (params.skipPreview) {
+        // Quick cash — use quickCashAction setting
+        const action = settings.quickCashAction;
+        if (action === 'preview') {
+          setModal('receipt');
+        } else if (action === 'print') {
+          setTimeout(() => {
+            const snap = receiptSnapshotRef.current;
+            if (snap) handlePrintDirect(snap);
+          }, 300);
+          setModal('none');
+        } else if (action === 'silent') {
+          setTimeout(() => {
+            const snap = receiptSnapshotRef.current;
+            if (snap) handlePrintDirect(snap, { silent: true });
+          }, 300);
+          setModal('none');
+        } else {
+          setModal('none');
+        }
       } else {
-        setModal('none');
+        // Normal sale — use afterSaleAction setting
+        const action = settings.afterSaleAction;
+        if (action === 'preview') {
+          setModal('receipt');
+        } else if (action === 'print' && isPrintEnabled && template) {
+          setTimeout(() => {
+            const snap = receiptSnapshotRef.current;
+            if (snap) handlePrintDirect(snap);
+          }, 300);
+          setModal('none');
+        } else {
+          setModal('none');
+        }
       }
 
       safeToast.success(`✅ تم حفظ الفاتورة ${res.document_number ?? ''}`);
@@ -1178,7 +1223,13 @@ const handleCompleteSale = useCallback(async (params: {
       }
 
       // Auto-close only when no preview is shown (user sees nothing anyway)
-      if (settings.autoClosePayment && !showPreview && (autoPrint || isPrintEnabled)) {
+      const willShowPreview = params.skipPreview
+        ? settings.quickCashAction === 'preview'
+        : settings.afterSaleAction === 'preview';
+      const willPrint = params.skipPreview
+        ? settings.quickCashAction !== 'none'
+        : settings.afterSaleAction === 'print';
+      if (settings.autoClosePayment && !willShowPreview && willPrint) {
         setTimeout(() => setModal('none'), 1200);
       }
 
@@ -1190,7 +1241,24 @@ const handleCompleteSale = useCallback(async (params: {
       safeToast.error(String(msg));
       return { ok: false, message: String(msg) };
     }
-  }, [settings.defaultDocTypeCode, settings.playSoundOnSale, settings.soundPreset, settings.soundVolume, settings.openCashDrawer, settings.autoClosePayment, settings.autoPrint, settings.printCopies, paymentModes, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency?.id, cartNote, editingDocumentId, editingDocumentDate, currentSession?.id, autoPrint, isPrintEnabled, template, showPreview, safeToast, defaultTreasury?.id, incrementMut, invoiceDiscountAmount, queryClient, slug, handlePrintDirect, pos.payments]);
+  }, [settings.defaultDocTypeCode, settings.playSoundOnSale, settings.soundPreset, settings.soundVolume, settings.openCashDrawer, settings.autoClosePayment, settings.afterSaleAction, settings.quickCashAction, settings.printCopies, paymentModes, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency?.id, cartNote, editingDocumentId, editingDocumentDate, currentSession?.id, isPrintEnabled, template, safeToast, defaultTreasury?.id, incrementMut, invoiceDiscountAmount, queryClient, slug, handlePrintDirect, pos.payments]);
+
+  // ── Quick Cash (no modal) ────────────────────────────────────────────────
+  const handleQuickCash = useCallback(async () => {
+    if (pos.isEmpty) return;
+    const cashMode = paymentModes?.find(m =>
+      new RegExp(settings.defaultPaymentCode, 'i').test(m.name),
+    ) ?? paymentModes?.find(m => m.is_default) ?? paymentModes?.[0];
+    if (!cashMode) { safeToast.error('لم يتم العثور على وسيلة الدفع النقدية'); return; }
+    const totalTtc = pos.totals.total_ttc;
+    await handleCompleteSale({
+      amountPaid: totalTtc,
+      payments: [{ paymentModeId: cashMode.id, amount: totalTtc }],
+      docTypeCode: settings.defaultDocTypeCode,
+      skipPreview: true,
+    });
+  }, [pos.isEmpty, pos.totals.total_ttc, paymentModes, settings.defaultPaymentCode, settings.defaultDocTypeCode, handleCompleteSale, safeToast]);
+  useEffect(() => { handleQuickCashRef.current = handleQuickCash; }, [handleQuickCash]);
 
   // ── Quick Items ────────────────────────────────────────────────────────────
   const toggleQuickItem = useCallback((variant: ProductVariant) => {
@@ -1389,21 +1457,21 @@ const handleCompleteSale = useCallback(async (params: {
         />
       )}
 
-      {recentProducts.length > 0 && (
-        <div className="pos-recent-bar">
-          <span className="pos-recent-label"><i className="ti ti-clock-hour-4" /> الأحدث:</span>
-          {recentProducts.map(v => (
-            <button
-              key={v.id}
-              className="pos-recent-item"
-              onClick={() => handleAddItem(v)}
-              title={v.product?.name}
-            >
-              {v.product?.name}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* {recentProducts.length > 0 && (
+        // <div className="pos-recent-bar">
+        //   <span className="pos-recent-label"><i className="ti ti-clock-hour-4" /> الأحدث:</span>
+        //   {recentProducts.map(v => (
+        //     <button
+        //       key={v.id}
+        //       className="pos-recent-item"
+        //       onClick={() => handleAddItem(v)}
+        //       title={v.product?.name}
+        //     >
+        //       {v.product?.name}
+        //     </button>
+        //   ))}
+        // </div>
+      )} */}
 
       <MobileTabs
         activeTab={mobTab} onTab={setMobTab}
@@ -1524,10 +1592,8 @@ const handleCompleteSale = useCallback(async (params: {
             initialTypeCode={editingDocMetaRef.current?.typeCode}
             initialCurrencyId={editingDocMetaRef.current?.currencyId}
             initialNote={cartNote}
-            onClose={() => { setModal('none'); setPendingQuickCash(false); }}
+            onClose={() => setModal('none')}
             onConfirm={handleCompleteSale}
-            pendingQuickCash={pendingQuickCash}
-            onQuickCashDone={() => setPendingQuickCash(false)}
           />
         </Suspense>
       )}
