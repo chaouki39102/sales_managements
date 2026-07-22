@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { ProductVariant, PriceLevel, CartItem } from '@/types';
 import type { ViewMode, GridSize } from '../utils/posHelpers';
@@ -116,7 +116,7 @@ export default function ProductGrid({
     prevHl.current = highlightedIndex;
     if (view === 'grid') {
       const rowIdx = Math.floor(highlightedIndex / columns);
-      rowVirtualizer.scrollToIndex(rowIdx, { align: 'nearest' });
+      rowVirtualizer.scrollToIndex(rowIdx, { align: 'auto' });
     } else if (view === 'list') {
       listRef.current?.querySelector<HTMLElement>(`[data-hl-idx="${highlightedIndex}"]`)?.scrollIntoView({ block: 'nearest' });
     }
@@ -143,7 +143,7 @@ export default function ProductGrid({
         <div className="pos-empty-ttl">{searchQuery ? 'لا توجد نتائج' : 'لا توجد منتجات'}</div>
         <div className="pos-empty-sub">
           {searchQuery
-            ? <>لا توجد منتجات تطابق "<strong>{searchQuery}</strong>"</>
+            ? <>لا توجد منتجات تطابق &quot;<strong>{searchQuery}</strong>&quot;</>
             : 'جرّب البحث بكلمة أخرى أو أضف منتجاً يدوياً'
           }
         </div>
@@ -213,7 +213,7 @@ export default function ProductGrid({
                   <td>
                     <div className="prow-acts">
                       {inCart > 0 && <span className="incart-badge">{inCart}</span>}
-                      <button className="prow-pin" onClick={e => { e.stopPropagation(); onPin(v); }}
+                      <button className={`prow-pin${isPinned(v.id) ? ' on' : ''}`} onClick={e => { e.stopPropagation(); onPin(v); }}
                         title={isPinned(v.id) ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}>
                         <i className={`ti ti-star${isPinned(v.id) ? '-filled' : ''}`} />
                       </button>

@@ -137,7 +137,7 @@ export default function POSTopBar({
         )}
 
         {!isEmpty && (
-          <div className="pos-chip p" title="متوسط هامش الربح — السلة الحالية" style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <div className="pos-chip p" title="متوسط هامش الربح — السلة الحالية">
             <button
               onClick={e => { e.stopPropagation(); toggleMargin(); }}
               style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, display: 'flex', fontSize: 13, opacity: 0.6 }}
@@ -147,11 +147,11 @@ export default function POSTopBar({
               <i className={`ti ti-eye${showMargin ? '' : '-off'}`} />
             </button>
             {showMargin && (
-              <div className="pos-chip-inner" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <>
                 <i className="ti ti-trending-up pic-ic" />
                 <span className="pos-chip-label">هامش الربح</span>
                 <strong className="pos-chip-val">{avgMargin.toFixed(1)}%</strong>
-              </div>
+              </>
             )}
           </div>
         )}

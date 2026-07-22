@@ -1,5 +1,5 @@
 // resources/js/pos/components/OpenSessionModal.tsx — v2 احترافي
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { formatDZD } from '@/pos/utils/calculations';
 import type { Warehouse, FiscalYear } from '@/types';
 

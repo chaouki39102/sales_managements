@@ -530,7 +530,7 @@ export interface ProfitLossData {
 
 // ─── Returns Report ───────────────────────────────────────────────────────────
 
-export interface ReturnsReportParams extends ReportBaseParams {}
+export type ReturnsReportParams = ReportBaseParams
 
 export interface ReturnsReportData {
   documents: Array<{
@@ -551,7 +551,7 @@ export interface ReturnsReportData {
 
 // ─── Cash Flow Report ─────────────────────────────────────────────────────────
 
-export interface CashFlowParams extends ReportBaseParams {}
+export type CashFlowParams = ReportBaseParams
 
 export interface CashFlowData {
   daily: Array<{ date: string; count: number; amount: number }>;
@@ -565,7 +565,7 @@ export interface CashFlowData {
 
 // ─── Expenses Report ──────────────────────────────────────────────────────────
 
-export interface ExpensesReportParams extends ReportBaseParams {}
+export type ExpensesReportParams = ReportBaseParams
 
 export interface ExpensesReportData {
   expenses: Array<{
@@ -580,7 +580,7 @@ export interface ExpensesReportData {
 
 // ─── Sales Trend Report ───────────────────────────────────────────────────────
 
-export interface SalesTrendParams extends ReportBaseParams {}
+export type SalesTrendParams = ReportBaseParams
 
 export interface SalesTrendData {
   daily: Array<{ date: string; count: number; total_ht: number; total_ttc: number }>;

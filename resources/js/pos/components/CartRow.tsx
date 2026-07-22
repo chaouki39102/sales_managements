@@ -54,7 +54,7 @@ export default function CartRow({
   const discInpRef  = useRef<HTMLInputElement>(null);
   const priceInpRef = useRef<HTMLInputElement>(null);
   const qtyInpRef   = useRef<HTMLInputElement>(null);
-  const rowRef      = useRef<HTMLDivElement>(null);
+  const rowRef      = useRef<HTMLDivElement | null>(null);
   const popupNodeRef = useRef<HTMLDivElement>(null);
   const popupAnchorRef = useRef<HTMLDivElement>(null);
   const [popupPos, setPopupPos] = useState<{top: number; left: number; right: number}>({ top: 0, left: 0, right: 0 });
@@ -180,7 +180,7 @@ export default function CartRow({
   };
 
   // ── Derived values ────────────────────────────────────────────────────────
-  const maxQty    = item.max_stock !== null ? item.max_stock : Infinity;
+  const maxQty    = item.max_stock ?? Infinity;
   const stockFull = item.manages_stock && item.quantity >= maxQty;
   const hasDisc   = item.discount_percentage > 0 || item.discount_amount > 0;
   const discLabel = item.discount_percentage > 0

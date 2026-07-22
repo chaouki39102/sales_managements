@@ -5,7 +5,7 @@
 // لتطابق تام بين المعاينة والطباعة الفعلية
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import UniversalPrintPipeline from '@/pages/settings/print-settings/runtime/UniversalPrintPipeline';
 import type { PipelineSource } from '@/pages/settings/print-settings/runtime/UniversalPrintPipeline';
 import type { PrintTemplate, CompanyData } from '@/pages/settings/print-settings/types';

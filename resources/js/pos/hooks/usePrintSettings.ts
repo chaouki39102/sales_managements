@@ -114,7 +114,7 @@ interface PrintSettingsResult {
 /** hook للاستخدام في POSPage — يُرجع القالب والإعدادات لنوع مستند */
 export function usePrintSettings(docTypeCode: string): PrintSettingsResult {
   const { data: configs = [] } = useDocPrintConfigs();
-  const config = configs.find(c => c.docTypeCode === docTypeCode) ?? null;
+  const config = (configs.find(c => c.docTypeCode === docTypeCode) ?? null) as DocumentPrintConfig | null;
   const size   = (config?.paperSize ?? 'none') as PaperSize;
 
   const { data: templates = [] } = usePrintTemplatesList(docTypeCode as DocTypeCode);

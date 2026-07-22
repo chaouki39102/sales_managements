@@ -1,4 +1,3 @@
-import React from 'react';
 
 interface FilterPanelProps {
   inStock: boolean; onInStock: (v: boolean) => void;

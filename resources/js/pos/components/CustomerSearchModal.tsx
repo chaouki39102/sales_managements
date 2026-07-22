@@ -10,7 +10,7 @@
 //   3. عرض آخر X زبائن للاختيار السريع
 //   4. يُغلَق بـ Escape
 // ════════════════════════════════════════════════════════════════════════════
-import React, {
+import {
   useState, useEffect, useRef, useCallback, useMemo,
 } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';

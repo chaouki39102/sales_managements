@@ -19,6 +19,15 @@ export function calcMargin(sellingHt: number, costHt: number): number {
   return ((sellingHt - costHt) / sellingHt) * 100;
 }
 
+/** متوسط هامش الربح موزون حسب قيمة البيع */
+export function calcWeightedAverageMargin(items: Array<{ sellingHt: number; costHt: number }>): number {
+  if (!items.length) return 0;
+  const totalSellingHt = items.reduce((sum, item) => sum + (item.sellingHt ?? 0), 0);
+  if (totalSellingHt <= 0) return 0;
+  const totalCostHt = items.reduce((sum, item) => sum + (item.costHt ?? 0), 0);
+  return ((totalSellingHt - totalCostHt) / totalSellingHt) * 100;
+}
+
 /** الطابع الجبائي الجزائري — متوافق مع App\Services\Tax\FiscalStampCalculator */
 const FISCAL_STAMP_MIN = 5.0;
 const FISCAL_STAMP_MAX = 2500.0;
@@ -44,7 +53,7 @@ export function calcCompoundedDiscount(itemDiscPct: number, invDiscPct: number):
 /** حساب مجاميع العربة */
 export function calcTotals(items: CartItem[], invoiceDiscountPct = 0, fiscalStampEnabled = true, isTvaExempt = false): CartTotals {
   let totalHt       = 0;
-  let totalTva      = 0;
+  const totalTva      = 0;
   let totalDiscount = 0;
   let itemsCount    = 0;
 
@@ -100,7 +109,7 @@ export function calcChange(paid: number, totalTtc: number, fiscalStamp: number):
 
 /** تحقق أن الكمية في المخزون */
 export function checkStock(item: CartItem, newQty: number): { ok: boolean; message: string } {
-  if (item.max_stock === null) return { ok: true, message: '' };
+  if (item.max_stock == null) return { ok: true, message: '' };
   if (newQty > item.max_stock) {
     return { ok: false, message: `المخزون المتاح: ${item.max_stock} ${item.unit_symbol ?? ''}` };
   }

@@ -14,6 +14,7 @@ type ProductApiResponse = Product & {
   current_stock?:      number;
   prices?:             ProductVariantPrice[];
   quantityDiscounts?:  Array<{ min_quantity: number; discount_percentage: number }>;
+  default_selling_price_ht?: number;
 };
 
 export type ViewMode   = 'grid' | 'list';
@@ -66,9 +67,9 @@ export function productToVariant(p: Product): ProductVariant {
     tva_id:                     p.tva_id,
     valuation_method_id:        p.valuation_method_id,
     last_purchase_price:        p.purchase_price_ht ?? 0,
-    average_cost_price:         p.current_cost_price ?? 0,
+    average_cost_price:         Number(p.current_cost_price) || Number(p.purchase_price_ht) || 0,
     default_selling_price_ht:
-      p.default_selling_price_ht ??
+      pr.default_selling_price_ht ??
       (p.purchase_price_ht ? p.purchase_price_ht * 1.3 : 0),
     manages_stock:              p.manages_stock,
     allow_negative_stock:       p.allow_negative_stock,

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import type { ProductVariant } from '@/types';
 import type { QuickItem } from '../utils/posHelpers';
 import { formatDZD } from '../utils/calculations';

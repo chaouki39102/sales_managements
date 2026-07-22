@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { HeldCart, CartItem } from '@/types';
 import { formatDZD } from '../utils/calculations';
 
@@ -103,9 +103,9 @@ export default function HeldCartsModal({
                       <div className="hc-client">{c.client?.name ?? 'زبون عابر'}</div>
                       <div className="hc-meta">
                         {c.items?.length ?? 0} صنف
-                        · {formatDZD(c.total ?? 0)}
+                        · {formatDZD(c.totals.total_ttc ?? 0)}
                       </div>
-                      <div className="hc-time">{new Date(c.heldAt).toLocaleTimeString('ar-DZ')}</div>
+                      <div className="hc-time">{new Date(c.created_at).toLocaleTimeString('ar-DZ')}</div>
                     </div>
                     <div className="hc-acts">
                       <button className="btn btn-sm btn-p" onClick={e => { e.stopPropagation(); onRestore(c.id); }}>

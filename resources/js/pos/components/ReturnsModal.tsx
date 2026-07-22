@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import type { CommercialDocument, CommercialDocumentLine, DocumentType } from '@/types';
 import { documentsApi } from '@/lib/api/endpoints/documents';
 import { formatDZD } from '../utils/calculations';

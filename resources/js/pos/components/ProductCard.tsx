@@ -78,8 +78,8 @@ function ProductCardInner({
 
   const bestDiscount = useMemo(() => {
     const d = v.quantity_discounts?.filter(d => d.active !== false)
-      .sort((a, b) => b.discount_percentage - a.discount_percentage)[0];
-    return d && d.discount_percentage > 0 ? d : null;
+      .sort((a, b) => (b.discount_percentage ?? 0) - (a.discount_percentage ?? 0))[0];
+    return d && (d.discount_percentage ?? 0) > 0 ? d : null;
   }, [v.quantity_discounts]);
 
   const isWholesalePrice = selectedPriceLevelId !== null &&
@@ -199,7 +199,7 @@ function ProductCardInner({
     >
       <div className={`pcard-img ${showImage && !imgLoaded ? 'pcard-img-loading' : ''}`} style={!showImage ? { background: style.bg } : undefined}>
         {showImage
-          ? <img src={imageUrl} alt={v.product?.name} loading="lazy" onLoad={() => setImgLoaded(true)} onError={() => setImgFailed(true)} />
+          ? <img src={imageUrl ?? undefined} alt={v.product?.name} loading="lazy" onLoad={() => setImgLoaded(true)} onError={() => setImgFailed(true)} />
           : <i className={`ti ${style.icon}`} style={{ color: style.color, fontSize: 22 }} />
         }
 

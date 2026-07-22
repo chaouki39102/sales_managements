@@ -205,7 +205,7 @@ export default function POSSettingsModal({
                 }}
                 label={negSaving ? 'جاري الحفظ...' : 'السماح بالمخزون السالب'}
               />
-              <div className="fg-hint">نفس إعداد "السماح بالمخزون السالب" في إعدادات النظام</div>
+              <div className="fg-hint">نفس إعداد &quot;السماح بالمخزون السالب&quot; في إعدادات النظام</div>
             </div>
 
             {/* ── الطابع المالي — يكتب مباشرة في إعدادات النظام ── */}
@@ -219,7 +219,7 @@ export default function POSSettingsModal({
                 }}
                 label={stampSaving ? 'جاري الحفظ...' : 'الطابع المالي (Timbre Fiscal)'}
               />
-              <div className="fg-hint">نفس إعداد "الطابع المالي" في إعدادات النظام — تغييره هنا يُحدّث النظام بالكامل</div>
+              <div className="fg-hint">نفس إعداد &quot;الطابع المالي&quot; في إعدادات النظام — تغييره هنا يُحدّث النظام بالكامل</div>
             </div>
 
             {(local.playSoundOnAdd || local.playSoundOnSale) && (

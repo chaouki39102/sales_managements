@@ -10,6 +10,7 @@ import { useCartStore }       from '@/pos/utils/useCartStore';
 import { useCashClient }  from '@/lib/api/endpoints/parties';
 import {
   usePOSAggregatedLookups,
+  useFamilies,
 } from '@/lib/api/endpoints/lookups';
 import { productsApi }        from '@/lib/api/endpoints/products';
 import { settingsApi }        from '@/lib/api/endpoints/settings';
@@ -21,7 +22,7 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { ConfirmDialog } from '@/components/ui';
 
 import {
-  calcFiscalStamp, htToTtc, ttcToHt, calcMargin,
+  calcFiscalStamp, htToTtc, ttcToHt, calcMargin, calcWeightedAverageMargin,
 } from '@/pos/utils/calculations';
 import {
   productToVariant, makeFakeVariant,
@@ -187,7 +188,7 @@ function POSPage() {
     if (cashClient && !posRef.current.client) {
       pos.setClient(cashClient);
     }
-  }, [cashClient, pos.client]);
+  }, [cashClient, pos.client, pos.setClient]);
 
   const [view,       setView]       = useState<ViewMode>(settings.defaultView);
   const [gridSize,   setGridSize]   = useState<GridSize>(settings.defaultGridSize);
@@ -335,7 +336,7 @@ function POSPage() {
   const [filterLowStock, setFilterLowStock] = useState(false);
   const [filterMinPrice, setFilterMinPrice] = useState('');
   const [filterMaxPrice, setFilterMaxPrice] = useState('');
-  const [filterPerPage, setFilterPerPage] = useState(120);
+  const [filterPerPage, setFilterPerPage] = useState(2000);
 
   const [barcodeBuffer, setBarcodeBuffer] = useState('');
   const [scannedId, setScannedId] = useState<number | null>(null);
@@ -417,8 +418,7 @@ function POSPage() {
     queryFn: () => productsApi.list({
       per_page:  filterPerPage,
       include:   'tva,unit,family,prices.priceLevel,quantityDiscounts',
-      ...(queryFamilyId ? { family_id: queryFamilyId } : {}),
-      filter:    { active: 1 },
+      filter:    { active: 1, ...(queryFamilyId ? { family_id: queryFamilyId } : {}) },
     }),
     enabled:         !!slug,
     staleTime:       5 * 60_000,
@@ -776,15 +776,15 @@ function POSPage() {
   const avgMargin = useMemo(() => {
     if (!pos.items.length) return 0;
     const costMap = new Map(allVariants.map(v => [v.id, v.average_cost_price ?? 0]));
-    let total = 0;
-    let counted = 0;
-    for (const i of pos.items) {
+    const marginItems = pos.items.flatMap(i => {
       const cost = costMap.get(i.variant_id) ?? 0;
-      if (cost <= 0) continue;
-      total += calcMargin(i.unit_price_ht, cost);
-      counted++;
-    }
-    return counted > 0 ? total / counted : 0;
+      if (cost <= 0) return [];
+      return [{
+        sellingHt: i.unit_price_ht * i.quantity,
+        costHt: cost * i.quantity,
+      }];
+    });
+    return calcWeightedAverageMargin(marginItems);
   }, [pos.items, allVariants]);
 
   const filterActive = filterInStock || filterLowStock || !!filterMinPrice || !!filterMaxPrice;
@@ -792,39 +792,6 @@ function POSPage() {
   // ── Barcode Scanner ────────────────────────────────────────────────────────
   const barcodeRef = useRef('');
   useEffect(() => { barcodeRef.current = barcodeBuffer; }, [barcodeBuffer]);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const tag     = (e.target as HTMLElement)?.tagName;
-      const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-      const buf = barcodeRef.current;
-      if (e.key === 'Enter' && buf.length >= 4) {
-        const variant = allVariants.find(v => v.barcode === buf);
-        if (variant && !isVariantOutOfStock(variant, allowNegSetting)) {
-          posRef.current.addItem(variant);
-          setScannedId(variant.id);
-          const items = useCartStore.getState().items;
-          const added = items.find(i => i.variant_id === variant.id);
-          if (added) { setSelectedCartItemId(added.id); requestAnimationFrame(() => cartApiRef.current?.scrollToItemId(added.id)); }
-          safeToast.success(variant.product?.name ?? variant.variant_name ?? 'تمت الإضافة', {
-            id: 'pos-last-added',
-            duration: 1500,
-          });
-        }
-        setBarcodeBuffer('');
-        return;
-      }
-      // Don't accumulate barcode buffer when typing in an input field
-      // (e.g. search, modal fields) — avoids swallowing Enter from ProductSearchBar
-      if (!inInput && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        setBarcodeBuffer(b => b + e.key);
-        clearTimeout(barcodeTimer.current);
-        barcodeTimer.current = setTimeout(() => setBarcodeBuffer(''), 300);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [allVariants, allowNegSetting, safeToast]);
 
   // ── Fullscreen ─────────────────────────────────────────────────────────────
   const toggleFullscreen = useCallback(() => {
@@ -1295,9 +1262,19 @@ const handleCompleteSale = useCallback(async (params: {
     const items = useCartStore.getState().items;
     const added = items.find(i => i.variant_id === v.id);
     if (added) setSelectedCartItemId(added.id);
-    // Keep grid highlight on the added product (allVariants if search will clear, else filteredVariants)
-    const idx = (settings.clearSearchOnAdd ? allVariants : filteredVariants).findIndex(fv => fv.id === v.id);
-    if (idx >= 0) setHighlightedIndex(idx);
+    // Highlight position: always computed against filteredVariants — the array
+    // actually rendered on screen at click time (using allVariants here was wrong:
+    // its order/membership differs from filteredVariants during search/category
+    // filtering, so the highlighted index pointed at an unrelated card, several
+    // rows away). This is also the single place that decides stay-vs-advance,
+    // so settings.advanceOnAdd applies identically for every add path (click,
+    // double-click, Enter) instead of only being handled inside handleEnter.
+    const idx = filteredVariants.findIndex(fv => fv.id === v.id);
+    if (settings.advanceOnAdd) {
+      setHighlightedIndex(idx >= 0 ? (idx + 1 < filteredVariants.length ? idx + 1 : 0) : 0);
+    } else if (idx >= 0) {
+      setHighlightedIndex(idx);
+    }
     safeToast.success(v.product?.name ?? v.variant_name ?? 'تمت الإضافة', {
       id: 'pos-last-added',
       duration: 1500,
@@ -1313,7 +1290,34 @@ const handleCompleteSale = useCallback(async (params: {
         });
       });
     });
-  }, [settings.clearSearchOnAdd, settings.playSoundOnAdd, settings.soundPreset, settings.soundVolume, allVariants, filteredVariants, safeToast]);
+  }, [settings.clearSearchOnAdd, settings.advanceOnAdd, settings.playSoundOnAdd, settings.soundPreset, settings.soundVolume, filteredVariants, safeToast]);
+
+  // ── Barcode scanner — unified with handleAddItem ──────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag     = (e.target as HTMLElement)?.tagName;
+      const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+      const buf = barcodeRef.current;
+      if (e.key === 'Enter' && buf.length >= 4) {
+        const variant = allVariants.find(v => v.barcode === buf);
+        if (variant && !isVariantOutOfStock(variant, allowNegSetting)) {
+          setScannedId(variant.id);
+          handleAddItem(variant);
+        }
+        setBarcodeBuffer('');
+        return;
+      }
+      // Don't accumulate barcode buffer when typing in an input field
+      // (e.g. search, modal fields) — avoids swallowing Enter from ProductSearchBar
+      if (!inInput && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        setBarcodeBuffer(b => b + e.key);
+        clearTimeout(barcodeTimer.current);
+        barcodeTimer.current = setTimeout(() => setBarcodeBuffer(''), 300);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [allVariants, allowNegSetting, safeToast, handleAddItem]);
 
   const handleQtyChange = useCallback((variantId: number, qty: number) => {
     const item = pos.items.find(i => i.variant_id === variantId);
@@ -1355,22 +1359,17 @@ const handleCompleteSale = useCallback(async (params: {
     if (settings.keyboardNav) {
       const v = filteredVariants[highlightedIndex];
       if (v && !isVariantOutOfStock(v, allowNegSetting) && !(v.manages_stock && v.current_stock === undefined && stockPending)) {
+        // Stay-vs-advance is now decided entirely inside handleAddItem
+        // (based on settings.advanceOnAdd), so it isn't duplicated/raced here.
         handleAddItem(v);
-        if (settings.advanceOnAdd) {
-          const next = highlightedIndex + 1;
-          setHighlightedIndex(next < filteredVariants.length ? next : 0);
-        }
       }
     } else {
       const first = filteredVariants[0];
       if (first && !isVariantOutOfStock(first, allowNegSetting) && !(first.manages_stock && first.current_stock === undefined && stockPending)) {
         handleAddItem(first);
-        if (settings.advanceOnAdd) {
-          setHighlightedIndex(filteredVariants.length > 1 ? 1 : 0);
-        }
       }
     }
-  }, [selectedCartItemId, pos.searchQuery, settings.keyboardNav, settings.advanceOnAdd, safeToast, filteredVariants, highlightedIndex, allowNegSetting, stockPending, handleAddItem]);
+  }, [selectedCartItemId, pos.searchQuery, settings.keyboardNav, safeToast, filteredVariants, highlightedIndex, allowNegSetting, stockPending, handleAddItem]);
 
 
   // ── Render ─────────────────────────────────────────────────────────────────

@@ -17,6 +17,7 @@ import type { ActiveModal } from '../utils/posHelpers';
 export interface POSApi {
   items:          CartItem[];
   searchQuery:    string;
+  totals:         { total_ht: number; total_tva: number; total_ttc: number; fiscal_stamp: number; total_discount: number; paid: number; change: number; remaining: number } | null;
   holdCart:       () => void;
   clearCart:      () => void;
   setCategory:    (id: number | null) => void;
@@ -78,6 +79,7 @@ export function useKeyboardShortcuts(
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (!refs.posRef.current) return;
       const overrides = refs.overridesRef.current ?? {};
       const tag     = (e.target as HTMLElement)?.tagName;
       const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
@@ -96,10 +98,10 @@ export function useKeyboardShortcuts(
       }
 
       if (matchOverrideFrom(overrides, 'searchFocus', e))  { e.preventDefault(); refs.searchRef.current?.focus(); }
-      if (matchOverrideFrom(overrides, 'focusCart', e))    { e.preventDefault(); if (document.activeElement === refs.searchRef.current) { const lastItem = refs.posRef.current.items[refs.posRef.current.items.length - 1]; if (lastItem) { setters.setSelectedCartItemId(lastItem.id); refs.cartApiRef.current?.scrollToItemId(lastItem.id); } else { refs.cartRef.current?.focus(); } } else { refs.searchRef.current?.focus(); } }
+      if (matchOverrideFrom(overrides, 'focusCart', e))    { e.preventDefault(); if (document.activeElement === refs.searchRef.current) { const lastItem = refs.posRef.current!.items[refs.posRef.current!.items.length - 1]; if (lastItem) { setters.setSelectedCartItemId(lastItem.id); refs.cartApiRef.current?.scrollToItemId(lastItem.id); } else { refs.cartRef.current?.focus(); } } else { refs.searchRef.current?.focus(); } }
       if (matchOverrideFrom(overrides, 'payment', e))      { e.preventDefault(); if (!state.isEmpty) { setters.setModal('payment'); } }
       if (matchOverrideFrom(overrides, 'quickCash', e))   { e.preventDefault(); if (!state.isEmpty) { actions.handleQuickCash(); } }
-      if (matchOverrideFrom(overrides, 'holdCart', e))     { e.preventDefault(); if (!state.isEmpty) refs.posRef.current.holdCart(); }
+      if (matchOverrideFrom(overrides, 'holdCart', e))     { e.preventDefault(); if (!state.isEmpty) refs.posRef.current!.holdCart(); }
       if (matchOverrideFrom(overrides, 'manualProduct', e)){ e.preventDefault(); setters.setModal('manual'); }
       if (matchOverrideFrom(overrides, 'heldCarts', e))    { e.preventDefault(); setters.setModal('held'); }
       if (matchOverrideFrom(overrides, 'toggleHeld', e))   { e.preventDefault(); setters.setModal('held'); }
@@ -126,7 +128,7 @@ export function useKeyboardShortcuts(
       if (matchOverrideFrom(overrides, 'returns', e))      { e.preventDefault(); setters.setModal('returns'); }
       if (matchOverrideFrom(overrides, 'openDrawer', e))   { e.preventDefault(); actions.handleOpenDrawer(); }
       if (matchOverrideFrom(overrides, 'undoClear', e))    { e.preventDefault(); actions.handleUndoClear(); }
-      if (matchOverrideFrom(overrides, 'newSale', e))      { e.preventDefault(); if (state.isEmpty) { refs.posRef.current.clearCart(); } else { refs.posRef.current.holdCart(); } }
+      if (matchOverrideFrom(overrides, 'newSale', e))      { e.preventDefault(); if (state.isEmpty) { refs.posRef.current!.clearCart(); } else { refs.posRef.current!.holdCart(); } }
       if (matchOverrideFrom(overrides, 'settings', e))     { e.preventDefault(); setters.setShowSettings(true); }
       if (matchOverrideFrom(overrides, 'toggleQuickbar', e)) { e.preventDefault(); actions.handleToggleQuickbar(); }
       if (matchOverrideFrom(overrides, 'kioskMode', e))    { e.preventDefault(); navigate('/pos/kiosk'); }
@@ -147,31 +149,31 @@ export function useKeyboardShortcuts(
       }
       if (e.altKey && !isNaN(parseInt(e.key)) && !inInput) {
         const idx = parseInt(e.key) - 1;
-        if (idx === -1) refs.posRef.current.setCategory(null);
-        else if (idx < state.families.length) refs.posRef.current.setCategory(state.families[idx].id);
+        if (idx === -1) refs.posRef.current!.setCategory(null);
+        else if (idx < state.families.length) refs.posRef.current!.setCategory(state.families[idx].id);
         e.preventDefault();
       }
       if (!inInput) {
         const inCart = refs.cartRef.current?.contains(document.activeElement);
-        const lastItem = refs.posRef.current.items[refs.posRef.current.items.length - 1];
-        if (matchOverrideFrom(overrides, 'qtyUp', e)   && lastItem && !inCart)                          { e.preventDefault(); refs.posRef.current.updateQty(lastItem.id, lastItem.quantity + 1); }
-        if (matchOverrideFrom(overrides, 'qtyDown', e) && lastItem && lastItem.quantity > 1 && !inCart) { e.preventDefault(); refs.posRef.current.updateQty(lastItem.id, lastItem.quantity - 1); }
+        const lastItem = refs.posRef.current!.items[refs.posRef.current!.items.length - 1];
+        if (matchOverrideFrom(overrides, 'qtyUp', e)   && lastItem && !inCart)                          { e.preventDefault(); refs.posRef.current!.updateQty(lastItem.id, lastItem.quantity + 1); }
+        if (matchOverrideFrom(overrides, 'qtyDown', e) && lastItem && lastItem.quantity > 1 && !inCart) { e.preventDefault(); refs.posRef.current!.updateQty(lastItem.id, lastItem.quantity - 1); }
         if (matchOverrideFrom(overrides, 'deleteItem', e) && state.selectedCartItemId) {
           e.preventDefault();
           const id = state.selectedCartItemId;
-          const name = refs.posRef.current.items.find(i => i.id === id)?.product_name ?? '';
+          const name = refs.posRef.current!.items.find(i => i.id === id)?.product_name ?? '';
           actions.deleteConfirm.confirm(`هل تريد حذف "${name}" من السلة؟`, {
             title: 'حذف صنف',
             variant: 'danger',
             confirmText: 'حذف',
             cancelText: 'إلغاء',
-          }).then(ok => { if (ok) { refs.posRef.current.removeItem(id); setters.setSelectedCartItemId(null); } });
+          }).then(ok => { if (ok) { refs.posRef.current!.removeItem(id); setters.setSelectedCartItemId(null); } });
         }
       }
       if (matchOverrideFrom(overrides, 'escape', e)) {
         if (state.modal !== 'none')                 setters.setModal('none');
         else if (state.showFilter)                  setters.setFilter(false);
-        else if (!inInput && refs.posRef.current.searchQuery) actions.handleSearchEscape();
+        else if (!inInput && refs.posRef.current!.searchQuery) actions.handleSearchEscape();
       }
 
       // ── Cart row keyboard controls ─────────────────────────────────────
@@ -185,23 +187,23 @@ export function useKeyboardShortcuts(
         const isMinus = (e.ctrlKey && e.key === '-') || e.code === 'NumpadSubtract';
         if (isPlus) {
           e.preventDefault();
-          const item = refs.posRef.current.items.find(i => i.id === state.selectedCartItemId);
-          if (item) refs.posRef.current.updateQty(item.id, item.quantity + 1);
+          const item = refs.posRef.current!.items.find(i => i.id === state.selectedCartItemId);
+          if (item) refs.posRef.current!.updateQty(item.id, item.quantity + 1);
         } else if (isMinus) {
           e.preventDefault();
-          const item = refs.posRef.current.items.find(i => i.id === state.selectedCartItemId);
-          if (item && item.quantity > 1) refs.posRef.current.updateQty(item.id, item.quantity - 1);
+          const item = refs.posRef.current!.items.find(i => i.id === state.selectedCartItemId);
+          if (item && item.quantity > 1) refs.posRef.current!.updateQty(item.id, item.quantity - 1);
         }
       }
 
       // ── Arrow keys navigate cart rows (via cartApiRef) ─────────────────
       if (!inInput && refs.cartApiRef.current && state.selectedCartItemId && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
-        const curIdx = refs.posRef.current.items.findIndex(i => i.id === state.selectedCartItemId);
+        const curIdx = refs.posRef.current!.items.findIndex(i => i.id === state.selectedCartItemId);
         if (curIdx >= 0) {
           e.preventDefault();
           const nextIdx = e.key === 'ArrowDown' ? curIdx + 1 : curIdx - 1;
-          if (nextIdx >= 0 && nextIdx < refs.posRef.current.items.length) {
-            const nextItem = refs.posRef.current.items[nextIdx];
+          if (nextIdx >= 0 && nextIdx < refs.posRef.current!.items.length) {
+            const nextItem = refs.posRef.current!.items[nextIdx];
             setters.setSelectedCartItemId(nextItem.id);
             refs.cartApiRef.current.scrollToItemId(nextItem.id);
           }

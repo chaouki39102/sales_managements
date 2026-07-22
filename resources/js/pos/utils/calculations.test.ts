@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  htToTtc, ttcToHt, calcMargin, calcFiscalStamp,
+  htToTtc, ttcToHt, calcMargin, calcWeightedAverageMargin, calcFiscalStamp,
   calcTotals, formatDZD, calcChange, checkStock, round2,
 } from './calculations';
 import type { CartItem } from '@/types';
@@ -38,6 +38,20 @@ describe('calcMargin', () => {
   });
   it('returns negative margin when cost exceeds selling', () => {
     expect(calcMargin(100, 150)).toBeCloseTo(-50, 5);
+  });
+});
+
+describe('calcWeightedAverageMargin', () => {
+  it('weights margin by selling amount rather than averaging percentages', () => {
+    const items = [
+      { sellingHt: 1000, costHt: 900 },
+      { sellingHt: 100, costHt: 50 },
+    ];
+    expect(calcWeightedAverageMargin(items)).toBeCloseTo(13.63636, 5);
+  });
+
+  it('returns 0 for empty input', () => {
+    expect(calcWeightedAverageMargin([])).toBe(0);
   });
 });
 

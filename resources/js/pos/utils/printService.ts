@@ -455,7 +455,7 @@ function buildThermalBalance(
 
 function buildThermalFooter(
   b:        EscPosBuilder,
-  data:     UniversalDocumentData,
+  _data:    UniversalDocumentData,
   template: PrintTemplate,
 ): void {
   if (!template.show_footer_section) return;

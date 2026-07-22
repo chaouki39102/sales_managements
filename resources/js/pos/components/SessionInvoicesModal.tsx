@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { CommercialDocument } from '@/lib/api/core/types';
 import type { PosSession } from '@/lib/api/endpoints/posSession';
 import { documentsApi } from '@/lib/api/endpoints/documents';

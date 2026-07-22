@@ -10,7 +10,7 @@
 //   5. مؤشر بصري واضح: ناقص / كافٍ / زيادة
 //   6. إرسال treasury_account_id من وسيلة الدفع
 // ════════════════════════════════════════════════════════════════════════════
-import React, {
+import {
   useState, useEffect, useCallback, useRef, useMemo,
 } from 'react';
 import type {
@@ -134,11 +134,9 @@ function Numpad({
 function PaymentStatus({
   remaining,
   change,
-  _totalTtcFinal,
 }: {
-  remaining:     number;
-  change:        number;
-  _totalTtcFinal: number;
+  remaining: number;
+  change:    number;
 }) {
   if (remaining > 0.009) {
     return (
@@ -700,7 +698,6 @@ export default function ProfessionalPaymentModal({
               <PaymentStatus
                 remaining={remaining}
                 change={change}
-                totalTtcFinal={totalTtcFinal}
               />
             </div>
 

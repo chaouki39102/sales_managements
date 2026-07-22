@@ -1,5 +1,5 @@
 // resources/js/pos/components/CloseSessionModal.tsx — v2 احترافي
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { formatDZD } from '@/pos/utils/calculations';
 import type { PosSession } from '@/lib/api/endpoints/posSession';
 
