@@ -2086,26 +2086,39 @@ body.dark .pay-hero-amount { text-shadow: none; }
 }
 .plv2-mode,
 .plv2-treasury {
-  padding: 5px 6px;
+  padding: 6px 8px;
   border-radius: var(--r1);
-  border: 1px solid var(--b2);
+  border: 1.5px solid var(--b2);
   background: var(--bg2);
   font-family: 'Tajawal', sans-serif;
   font-size: 12px;
   outline: none;
   color: var(--t1);
+  transition: border-color .12s, box-shadow .12s, background .12s;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 6px center;
+  padding-left: 20px;
+}
+.plv2-mode:hover,
+.plv2-treasury:hover {
+  border-color: var(--embo);
+  background: var(--bg3);
 }
 .plv2-mode:focus,
 .plv2-treasury:focus {
   border-color: var(--em);
-  box-shadow: 0 0 0 2px var(--emb);
+  box-shadow: 0 0 0 3px var(--emb);
 }
-.plv2-amt-wrap { display: flex; align-items: center; gap: 2px; }
+.plv2-amt-wrap { display: flex; align-items: center; gap: 3px; }
 .plv2-amount {
   flex: 1;
-  padding: 5px 6px;
+  padding: 6px 8px;
   border-radius: var(--r1);
-  border: 1px solid var(--b2);
+  border: 1.5px solid var(--b2);
   background: var(--bg2);
   font-size: 13px;
   font-weight: 700;
@@ -2114,43 +2127,58 @@ body.dark .pay-hero-amount { text-shadow: none; }
   text-align: center;
   color: var(--t1);
   direction: ltr;
-  transition: border-color .12s, box-shadow .12s;
+  transition: border-color .12s, box-shadow .12s, background .12s;
+}
+.plv2-amount:hover {
+  border-color: var(--embo);
+  background: var(--bg3);
 }
 .plv2-amount:focus {
   border-color: var(--em);
-  box-shadow: 0 0 0 2px var(--emb);
+  box-shadow: 0 0 0 3px var(--emb);
 }
 .plv2-fill {
   width: 28px; height: 28px;
   border-radius: var(--r1);
-  border: 1px solid var(--b2);
-  background: var(--bg3);
+  border: 1.5px solid var(--b2);
+  background: var(--bg2);
   font-size: 14px; font-weight: 800;
   color: var(--t3); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: .12s;
+  transition: all .12s;
 }
-.plv2-fill:hover { background: var(--emb); color: var(--em); border-color: var(--embo); }
+.plv2-fill:hover { background: var(--emb); color: var(--em); border-color: var(--embo); transform: scale(1.05); }
 .plv2-fill:active { transform: scale(.92); }
 .plv2-ref {
-  padding: 5px 6px;
+  padding: 6px 8px;
   border-radius: var(--r1);
-  border: 1px solid var(--b2);
+  border: 1.5px solid var(--b2);
   background: var(--bg2);
   font-size: 11.5px;
   font-family: 'Tajawal', sans-serif;
   outline: none;
   color: var(--t3);
+  transition: border-color .12s, box-shadow .12s, background .12s;
+}
+.plv2-ref:hover {
+  border-color: var(--embo);
+  background: var(--bg3);
+}
+.plv2-ref:focus {
+  border-color: var(--em);
+  box-shadow: 0 0 0 3px var(--emb);
+  color: var(--t1);
 }
 .plv2-del {
-  width: 22px; height: 22px;
-  border-radius: var(--r1); border: none;
+  width: 24px; height: 24px;
+  border-radius: var(--r1); border: 1.5px solid transparent;
   background: none; color: var(--t4);
   cursor: pointer; font-size: 13px;
   display: flex; align-items: center; justify-content: center;
-  transition: .12s;
+  transition: all .12s;
 }
-.plv2-del:hover { color: var(--red); background: var(--redb); }
+.plv2-del:hover { color: var(--red); background: var(--redb); border-color: var(--redbo); }
+.plv2-del:active { transform: scale(.85); }
 
 .pay-numpad {
   display: grid;
