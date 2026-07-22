@@ -42,7 +42,7 @@ export function getVariantPrice(
     const priceEntry = v.prices?.find(
       (p: ProductVariantPrice) => p.price_level_id === priceLevelId,
     );
-    if (priceEntry) return (priceEntry as any).price_ht ?? priceEntry.price ?? defaultPrice;
+    if (priceEntry) return priceEntry.price ?? defaultPrice;
     const level = priceLevels.find((pl) => pl.id === priceLevelId);
     if (level?.discount_percent) {
       return Math.round(defaultPrice * (1 - level.discount_percent / 100) * 100) / 100;
@@ -151,10 +151,10 @@ export function makeFakeVariant(
 
 // ─── Stock helper ──────────────────────────────────────────────────────────────
 
-const _outStock = (v: ProductVariant, allowNegativeStock?: boolean): boolean => {
-  const stock    = (v as any).current_stock;
+const _outStock = (v: ProductVariant, allowNegativeStock: boolean = false): boolean => {
+  const stock    = v.current_stock;
   const unknown  = stock === undefined;
-  return v.manages_stock && !unknown && (stock ?? 0) <= 0 && !v.allow_negative_stock && allowNegativeStock === false;
+  return v.manages_stock && !unknown && (stock ?? 0) <= 0 && !v.allow_negative_stock && !allowNegativeStock;
 };
 export { _outStock as isVariantOutOfStock };
 

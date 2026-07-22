@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import type { CartItem } from '@/lib/api/core/types';
+import type { CartItem } from '@/types';
 
 interface QtySetModalProps {
   item: CartItem;

@@ -231,6 +231,7 @@ export interface PaymentMode extends BaseModel {
   is_default: boolean;
   active:     boolean;
   company_id: number;
+  treasury_account_id?: number | null;
 }
 export interface NumberingSeries extends BaseModel {
   name:               string;
@@ -416,6 +417,7 @@ export interface ProductVariant extends BaseModel {
   lots?:               ProductLot[];
   // Computed
   current_stock?:      number;
+  image_url?:          string | null;
   selling_price_ttc?:  number;
 }
 

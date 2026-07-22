@@ -21,7 +21,7 @@ import React, { useState, useCallback, useEffect, useRef, useLayoutEffect, forwa
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { CartItem, CartTotals, Party } from '@/types';
 import { formatDZD } from '../utils/calculations';
-import { getEffectiveShortcut, useKbOverrides } from '../hooks/useKeyboardMap';
+import { getEffectiveShortcut } from '../hooks/useKeyboardMap';
 import CartRow from './CartRow';
 import CustomerSearchModal from './CustomerSearchModal';
 
@@ -29,7 +29,6 @@ interface ProfessionalCartProps {
   items:                CartItem[];
   totals:               CartTotals;
   client:               Party | null;
-  customers:            Party[];
   note:                 string;
   selectedItemId:       string | null;
   onSelectItem:         (id: string | null) => void;
@@ -73,7 +72,7 @@ const CART_ZOOM_KEY = 'pos-cart-zoom';
 type CartZoom = 0.75 | 0.875 | 1 | 1.125 | 1.25;
 
 const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProps>(function ProfessionalCart({
-  items, totals, client, _customers,
+  items, totals, client,
   note, selectedItemId, onSelectItem,
   onQty, onDiscount, onDiscountAmount, onPrice, onRemove,
   onSetClient, onNoteChange,
@@ -168,7 +167,6 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
     if (i > 0) saveZoom(ZOOM_STEPS[i - 1]);
   }, [cartZoom, saveZoom]);
 
-  const _overrides = useKbOverrides(slug ?? null);
   const kb = (action: string) => getEffectiveShortcut(slug ?? null, action) ?? '';
 
   // ── افتراضية قائمة الأصناف (virtualization) ──────────────────────────────
@@ -215,20 +213,16 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
     const n = parseFloat(raw) || 0;
     if (!onInvoiceDiscountChange) return;
 
-    // Reverse-engineer the original TTC (before any invoice discount)
-    // to avoid stale closure where totals already include a partial discount
+    // Invoice discount is applied at HT level (calcTotals: invoiceDiscountAmount = totalHt * pct / 100).
+    // Reverse-engineer original HT before discount to compute the correct percentage.
     const curHt       = totals.total_ht ?? 0;
-    const curTva      = totals.total_tva ?? 0;
     const curDiscHt   = totals.invoice_discount_amount ?? 0;
     const origHt      = curHt + curDiscHt;
-    const avgTvaRate  = curHt > 0 ? curTva / curHt : 0;
-    const origTva     = curTva + curDiscHt * avgTvaRate;
-    const origTtc     = origHt + origTva;
 
-    if (origTtc <= 0) return;
-    const pct = Math.min(100, (n / origTtc) * 100);
+    if (origHt <= 0) return;
+    const pct = Math.min(100, (n / origHt) * 100);
     onInvoiceDiscountChange(pct);
-  }, [onInvoiceDiscountChange, totals.total_ht, totals.total_tva, totals.invoice_discount_amount]);
+  }, [onInvoiceDiscountChange, totals.total_ht, totals.invoice_discount_amount]);
 
   return (
     <>

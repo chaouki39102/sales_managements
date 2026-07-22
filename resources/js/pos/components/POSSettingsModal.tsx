@@ -8,7 +8,7 @@ import { useState } from 'react';
 import type { POSSettings, PriceDisplayMode, GridDefaultSize } from '@/pos/hooks/usePOSSettings';
 import { isWebUsbSupported } from '@/pos/utils/printService';
 import { SOUND_PRESETS, previewSound } from '@/pos/utils/posSounds';
-import type { Warehouse, DocumentType } from '@/types';
+import type { Warehouse, DocumentType, PaymentMode } from '@/types';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Switch from '@/components/ui/Switch';
@@ -23,6 +23,7 @@ interface POSSettingsModalProps {
   onClose:       () => void;
   warehouses:    Warehouse[];
   documentTypes: DocumentType[];
+  paymentModes:  PaymentMode[];
   /** System-level fiscal stamp setting (from DB) */
   systemFiscalStampEnabled: boolean;
   /** Toggle fiscal stamp in system settings DB */
@@ -43,7 +44,7 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: 'security', label: 'الأمان',    icon: 'ti-lock' },
 ];
 
-const PAYMENT_OPTIONS = [
+const DEFAULT_PAYMENT_OPTIONS = [
   { value: 'cash',   label: 'نقداً' },
   { value: 'cib',    label: 'CIB' },
   { value: 'ccp',    label: 'CCP' },
@@ -94,7 +95,7 @@ const toggleSettings: { key: keyof POSSettings; label: string; triState?: boolea
 ];
 
 export default function POSSettingsModal({
-  settings, onSave, onReset, onClose, warehouses, documentTypes,
+  settings, onSave, onReset, onClose, warehouses, documentTypes, paymentModes,
   systemFiscalStampEnabled, onToggleFiscalStamp,
   systemAllowNegativeStock, onToggleAllowNegative,
 }: POSSettingsModalProps) {
@@ -165,8 +166,8 @@ export default function POSSettingsModal({
                 value={local.defaultPaymentCode}
                 onChange={e => patch({ defaultPaymentCode: e.target.value })}
               >
-                {PAYMENT_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                {(paymentModes?.length ? paymentModes : DEFAULT_PAYMENT_OPTIONS.map(o => ({ id: 0, code: o.value, name: o.label } as any))).map((m: any) => (
+                  <option key={m.code} value={m.code?.toLowerCase()}>{m.name}</option>
                 ))}
               </select>
             </div>

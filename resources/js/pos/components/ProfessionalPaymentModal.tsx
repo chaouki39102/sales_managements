@@ -77,6 +77,23 @@ const DOC_CODES = ['POS', 'FV', 'BL', 'BCC', 'FA'] as const;
 /** مبالغ الأوراق النقدية الجزائرية */
 const DZD_BILLS = [0, 200, 500, 1000, 2000, 5000];
 
+/** أيقونة وسيلة الدفع حسب الكود */
+const MODE_ICON: Record<string, string> = {
+  cash: 'ti-cash', nad: 'ti-cash',
+  check: 'ti-file-invoice', chik: 'ti-file-invoice',
+  card: 'ti-credit-card', 'card-bank': 'ti-credit-card', 'بطاقة بنكية': 'ti-credit-card',
+  transfer: 'ti-building-bank', hawala: 'ti-building-bank', 'تحويل بنكي': 'ti-building-bank',
+  deferred: 'ti-calendar-time', ajil: 'ti-calendar-time', 'دفع آجل': 'ti-calendar-time',
+  order: 'ti-send', '_order': 'ti-send',
+};
+function getModeIcon(code: string): string {
+  const lc = code.toLowerCase().trim();
+  for (const [k, v] of Object.entries(MODE_ICON)) {
+    if (lc.includes(k)) return v;
+  }
+  return 'ti-credit-card';
+}
+
 function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -186,6 +203,8 @@ export default function ProfessionalPaymentModal({
 
   // ── State ──────────────────────────────────────────────────────────────────
   const defaultMode = paymentModes.find(m =>
+    m.code?.toLowerCase() === defaultPaymentCode.toLowerCase(),
+  ) ?? paymentModes.find(m =>
     new RegExp(defaultPaymentCode, 'i').test(m.name),
   ) ?? paymentModes.find(m => m.is_default) ?? paymentModes[0];
 
@@ -240,7 +259,7 @@ export default function ProfessionalPaymentModal({
     const balanceDate = isEditing ? documentDate : undefined;
     partyBalancesApi.getOne(client.id, balanceDate)
       .then(res => {
-        const data = (res as any)?.data ?? res;
+        const data = (res as { data?: { current_balance?: number } })?.data ?? (res as { current_balance?: number });
         const currentBalance = Number(data?.current_balance ?? 0);
         setInternalPrevBalance(currentBalance);
       })
@@ -257,6 +276,21 @@ export default function ProfessionalPaymentModal({
     }
     activeLineIdRef.current = activeLineId;
   }, [lines, activeLineId]);
+
+  // ── Auto-switch to deferred ("آجل") when amount is set to 0 on single line ──
+  const deferredMode = useMemo(() =>
+    paymentModes.find(m => /آجل|deferred|ajil/i.test(m.code)) ??
+    paymentModes.find(m => /آجل|deferred|ajil/i.test(m.name)),
+  [paymentModes]);
+
+  useEffect(() => {
+    if (lines.length !== 1 || !deferredMode) return;
+    const line = lines[0];
+    const amt = parseFloat(line.amount) || 0;
+    if (amt < 0.0001 && line.modeId !== deferredMode.id) {
+      updateLine(line.id, 'modeId', deferredMode.id);
+    }
+  }, [lines, deferredMode, updateLine]);
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const totalPaid = useMemo(
@@ -357,9 +391,9 @@ export default function ProfessionalPaymentModal({
 
   const fillRemaining = useCallback((id: string) => {
     const others = lines.filter(l => l.id !== id).reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
-    const rem    = Math.max(0, totalTtcFinal - others);
+    const rem    = Math.max(0, totalDue - others);
     updateLine(id, 'amount', rem.toFixed(4));
-  }, [lines, totalTtcFinal, updateLine]);
+  }, [lines, totalDue, updateLine]);
 
   // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = useCallback(async () => {
@@ -393,22 +427,60 @@ export default function ProfessionalPaymentModal({
   // ── Keyboard ───────────────────────────────────────────────────────────────
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
       if (e.key === 'Escape')              { e.preventDefault(); onClose(); }
-      if (e.key === 'Enter')               { e.preventDefault(); handleSubmit(); }
+      if (e.key === 'Enter' && !inInput)   { e.preventDefault(); handleSubmit(); }
+      // F2: Quick Cash — set cash mode, fill total, submit
+      if (e.key === 'F2') {
+        e.preventDefault();
+        if (defaultMode) {
+          setLines([{
+            id: uid(),
+            modeId: defaultMode.id,
+            amount: totalDue.toFixed(4),
+            refNote: '',
+            treasuryAccountId: null,
+          }]);
+          setTimeout(() => handleSubmit(), 50);
+        }
+      }
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [handleSubmit, onClose]);
+  }, [handleSubmit, onClose, defaultMode, totalDue]);
+
+  // ── Split equally across all lines ──────────────────────────────────────────
+  const splitEqually = useCallback(() => {
+    if (lines.length < 2) return;
+    const perLine = (totalDue / lines.length).toFixed(4);
+    setLines(prev => prev.map(l => ({ ...l, amount: perLine })));
+  }, [lines.length, totalDue]);
+
+  // ── Round amount to nearest step ────────────────────────────────────────────
+  const roundActiveLine = useCallback((step: number) => {
+    const id = activeLineIdRef.current;
+    if (!id) return;
+    setLines(prev => prev.map(l => {
+      if (l.id !== id) return l;
+      const amt = parseFloat(l.amount) || 0;
+      return { ...l, amount: (Math.ceil(amt / step) * step).toFixed(4) };
+    }));
+  }, []);
 
   // ─── Document types filter ─────────────────────────────────────────────────
   const availableDocTypes = documentTypes.filter(t => DOC_CODES.includes(t.code as typeof DOC_CODES[number]));
 
   // ── Treasury accounts per mode ─────────────────────────────────────────────
-  const getAccountsForMode = useCallback((_modeId: number) => {
+  const getAccountsForMode = useCallback((modeId: number) => {
     if (!treasuryAccounts) return [];
-    // نُظهر حسابات الخزينة المرتبطة بوسيلة الدفع (أو كلها)
+    const mode = paymentModes.find(m => m.id === modeId);
+    if (mode?.treasury_account_id) {
+      const matched = treasuryAccounts.find(a => a.id === mode.treasury_account_id);
+      if (matched) return [matched];
+    }
     return treasuryAccounts;
-  }, [treasuryAccounts]);
+  }, [treasuryAccounts, paymentModes]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -417,11 +489,9 @@ export default function ProfessionalPaymentModal({
         className="modal modal-pay-v2"
         onClick={e => e.stopPropagation()}
         style={{
-          maxWidth:  780,
           display:   'grid',
           gridTemplateRows: 'auto 1fr auto',
           maxHeight: 'calc(100vh - 40px)',
-          overflow:  'hidden',
         }}
       >
         {/* ── Header ── */}
@@ -474,7 +544,7 @@ export default function ProfessionalPaymentModal({
                     )}
                     {totals.invoice_discount_amount != null && totals.invoice_discount_amount > 0 && (
                       <div className="pvs-row pvs-disc">
-                        <span>Remise {totals.invoice_discount_pct ?? 0}%</span>
+                        <span>Remise {(totals.invoice_discount_pct ?? 0).toFixed(2)}%</span>
                         <span>- {formatDZD(totals.invoice_discount_amount)}</span>
                       </div>
                     )}
@@ -605,84 +675,104 @@ export default function ProfessionalPaymentModal({
               {lines.map((line, idx) => {
                 const accounts = getAccountsForMode(line.modeId);
                 const isActive = activeLineId === line.id;
+                const activeMode = paymentModes.find(m => m.id === line.modeId);
+                const showSecondary = accounts.length > 1 || line.refNote;
                 return (
                   <div
                     key={line.id}
-                    className={`pay-line-v2 ${isActive ? 'active' : ''}`}
+                    className={`pay-card ${isActive ? 'active' : ''}`}
                     onClick={() => setActiveLineId(line.id)}
                   >
-                    <div className="plv2-num">{idx + 1}</div>
-
-                    {/* وسيلة الدفع */}
-                    <select
-                      className="plv2-mode"
-                      value={line.modeId}
-                      onChange={e => updateLine(line.id, 'modeId', +e.target.value)}
-                      onClick={e => e.stopPropagation()}
-                    >
-                      {paymentModes.map(m => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
-                      ))}
-                    </select>
-
-                    {/* المبلغ */}
-                    <div className="plv2-amt-wrap">
-                      <input
-                        ref={idx === 0 ? firstAmountRef : undefined}
-                        type="number"
-                        className="plv2-amount"
-                        value={line.amount}
-                        onChange={e => updateLine(line.id, 'amount', e.target.value)}
-                        onFocus={() => setActiveLineId(line.id)}
-                        onClick={e => e.stopPropagation()}
-                        placeholder="0.00"
-                        dir="ltr"
-                      />
-                      <button
-                        className="plv2-fill"
-                        onClick={e => { e.stopPropagation(); fillRemaining(line.id); }}
-                        title="تعبئة المتبقي"
-                        type="button"
-                      >
-                        ≈
-                      </button>
+                    {/* ── Header: mode pills + delete ── */}
+                    <div className="pay-card-head">
+                      <div className="pay-card-pills">
+                        {paymentModes.map(m => (
+                          <button
+                            key={m.id}
+                            className={`pay-pill ${line.modeId === m.id ? 'on' : ''}`}
+                            onClick={e => { e.stopPropagation(); updateLine(line.id, 'modeId', m.id); }}
+                            type="button"
+                          >
+                            <i className={`ti ${getModeIcon(m.code)}`} />
+                            <span>{m.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="pay-card-actions">
+                        <span className="pay-card-num">{idx + 1}</span>
+                        {lines.length > 1 && (
+                          <button
+                            className="plv2-del"
+                            onClick={e => { e.stopPropagation(); removeLine(line.id); }}
+                            type="button"
+                          >
+                            <i className="ti ti-trash" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    {/* مرجع */}
-                    <input
-                      type="text"
-                      className="plv2-ref"
-                      value={line.refNote}
-                      onChange={e => updateLine(line.id, 'refNote', e.target.value)}
-                      placeholder="مرجع..."
-                      onClick={e => e.stopPropagation()}
-                    />
+                    {/* ── Amount row ── */}
+                    <div className="pay-card-amount">
+                      <span className="pay-card-amt-label">
+                        <i className={`ti ${getModeIcon(activeMode?.code ?? '')}`} style={{ opacity: 0.4 }} />
+                        المبلغ
+                      </span>
+                      <div className="plv2-amt-wrap">
+                        <input
+                          ref={idx === 0 ? firstAmountRef : undefined}
+                          type="number"
+                          className="plv2-amount"
+                          value={line.amount}
+                          onChange={e => updateLine(line.id, 'amount', e.target.value)}
+                          onFocus={() => setActiveLineId(line.id)}
+                          onClick={e => e.stopPropagation()}
+                          placeholder="0.00"
+                          dir="ltr"
+                        />
+                        <button
+                          className="plv2-fill"
+                          onClick={e => { e.stopPropagation(); fillRemaining(line.id); }}
+                          title="تعبئة المتبقي"
+                          type="button"
+                        >
+                          <i className="ti ti-arrow-down-circle" />
+                        </button>
+                      </div>
+                    </div>
 
-                    {/* حساب الخزينة */}
-                    {accounts.length > 0 && (
-                      <select
-                        className="plv2-treasury"
-                        value={line.treasuryAccountId ?? ''}
-                        onChange={e => updateLine(line.id, 'treasuryAccountId', e.target.value ? +e.target.value : null)}
-                        onClick={e => e.stopPropagation()}
-                        title="حساب الخزينة"
-                      >
-                        <option value="">— خزينة —</option>
-                        {accounts.map(a => (
-                          <option key={a.id} value={a.id}>{a.name}</option>
-                        ))}
-                      </select>
-                    )}
-
-                    {/* حذف */}
-                    {lines.length > 1 && (
-                      <button
-                        className="plv2-del"
-                        onClick={e => { e.stopPropagation(); removeLine(line.id); }}
-                        type="button"
-                      >
-                        <i className="ti ti-x" />
-                      </button>
+                    {/* ── Secondary row: ref + treasury (show when needed) ── */}
+                    {showSecondary && (
+                      <div className="pay-card-secondary">
+                        <div className="pay-card-field">
+                          <i className="ti ti-notes" />
+                          <input
+                            type="text"
+                            className="plv2-ref"
+                            value={line.refNote}
+                            onChange={e => updateLine(line.id, 'refNote', e.target.value)}
+                            placeholder="مرجع..."
+                            onClick={e => e.stopPropagation()}
+                          />
+                        </div>
+                        {accounts.length > 1 && (
+                          <div className="pay-card-field">
+                            <i className="ti ti-building" />
+                            <select
+                              className="plv2-treasury"
+                              value={line.treasuryAccountId ?? ''}
+                              onChange={e => updateLine(line.id, 'treasuryAccountId', e.target.value ? +e.target.value : null)}
+                              onClick={e => e.stopPropagation()}
+                              title="حساب الخزينة"
+                            >
+                              <option value="">— خزينة —</option>
+                              {accounts.map(a => (
+                                <option key={a.id} value={a.id}>{a.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 );
@@ -716,6 +806,21 @@ export default function ProfessionalPaymentModal({
                   {a.toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} دج
                 </button>
               ))}
+            </div>
+
+            {/* ── تقريب + تقسيم ── */}
+            <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
+              <button className="btn btn-xs" onClick={() => roundActiveLine(100)} type="button" style={{ flex: 1 }} title="تقريب لأقرب 100">
+                <i className="ti ti-arrows-round" /> تقريب 100
+              </button>
+              <button className="btn btn-xs" onClick={() => roundActiveLine(500)} type="button" style={{ flex: 1 }} title="تقريب لأقرب 500">
+                <i className="ti ti-arrows-round" /> تقريب 500
+              </button>
+              {lines.length >= 2 && (
+                <button className="btn btn-xs" onClick={splitEqually} type="button" style={{ flex: 1 }} title="تقسيم المبلغ بالتساوي">
+                  <i className="ti ti-divide" /> تقسيم متساوي
+                </button>
+              )}
             </div>
 
             {/* ── Numpad ── */}
@@ -760,6 +865,49 @@ export default function ProfessionalPaymentModal({
                 </>
             }
           </button>
+        </div>
+
+        {/* ── Resize handle ── */}
+        <div
+          className="modal-resize-handle"
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            right: 0,
+            width: 16,
+            height: 16,
+            cursor: 'nwse-resize',
+            opacity: 0.3,
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const modal = (e.currentTarget.parentElement as HTMLElement);
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startW = modal.offsetWidth;
+            const startH = modal.offsetHeight;
+            const onMove = (ev: MouseEvent) => {
+              const w = Math.max(400, startW + ev.clientX - startX);
+              const h = Math.max(250, startH + ev.clientY - startY);
+              modal.style.width = w + 'px';
+              modal.style.height = h + 'px';
+              modal.style.maxWidth = w + 'px';
+              modal.style.maxHeight = h + 'px';
+            };
+            const onUp = () => {
+              document.removeEventListener('mousemove', onMove);
+              document.removeEventListener('mouseup', onUp);
+              document.body.style.cursor = '';
+              document.body.style.userSelect = '';
+            };
+            document.body.style.cursor = 'nwse-resize';
+            document.body.style.userSelect = 'none';
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+          }}
+        >
+          <i className="ti ti-grip-vertical" style={{ position: 'absolute', bottom: 2, right: 2, fontSize: 10, transform: 'rotate(-45deg)' }} />
         </div>
       </div>
     </div>

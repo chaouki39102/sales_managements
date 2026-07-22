@@ -884,6 +884,31 @@
 }
 .pcard-stock-badge.neg { background: rgba(220,53,69,.85); color: #fff; }
 
+/* ── بادج "تم البيع" ── */
+.pcard-sale-badge {
+  position: absolute;
+  top: 6px; left: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(13,110,253,.9);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.4;
+  pointer-events: none;
+  z-index: 2;
+  box-shadow: 0 1px 4px rgba(0,0,0,.12);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  animation: pcard-sale-pulse 2s ease-in-out infinite;
+}
+.pcard-sale-badge i { font-size: 11px; }
+@keyframes pcard-sale-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .7; }
+}
+
 /* ── حجم xs و sm: أيقونة فقط ── */
 .pgrid--xs .pcard-img  { min-height: 55px; }
 .pgrid--xs .pcard-body { padding: 6px; }
@@ -1587,7 +1612,7 @@
 .modal-md { max-width: 600px; }
 .modal-lg { max-width: 780px; }
 .modal-pay { max-width: 780px; }
-.modal-pay-v2 { max-width: 780px; }
+.modal-pay-v2 { max-width: 780px; overflow: hidden; }
 .modal-receipt { max-width: 500px; }
 
 .m-hd {
@@ -1874,6 +1899,146 @@
   transition: .12s;
 }
 .plv2-del:hover { color: var(--red); background: var(--redb); }
+
+/* ═══ Payment Card (new card-based layout) ═══ */
+.pay-card {
+  border-radius: var(--r2);
+  border: 1.5px solid var(--b2);
+  background: var(--bg3);
+  cursor: pointer;
+  transition: all .15s;
+  overflow: hidden;
+}
+.pay-card:hover { border-color: var(--embo); }
+.pay-card.active {
+  border-color: var(--em);
+  background: var(--emb);
+  box-shadow: 0 0 0 2px var(--emb), 0 2px 8px rgba(0,0,0,.06);
+}
+
+.pay-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px 0;
+}
+.pay-card-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.pay-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+  border-radius: 20px;
+  border: 1px solid var(--b2);
+  background: var(--bg2);
+  font-size: 11px;
+  font-family: 'Tajawal', sans-serif;
+  color: var(--t3);
+  cursor: pointer;
+  transition: all .12s;
+  white-space: nowrap;
+  line-height: 1;
+}
+.pay-pill i { font-size: 12px; }
+.pay-pill:hover { border-color: var(--embo); color: var(--t1); }
+.pay-pill.on {
+  background: var(--em);
+  border-color: var(--em);
+  color: #fff;
+  font-weight: 600;
+}
+.pay-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.pay-card-num {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--t4);
+  width: 18px;
+  text-align: center;
+}
+
+.pay-card-amount {
+  padding: 6px 8px 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pay-card-amt-label {
+  font-size: 11px;
+  color: var(--t4);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.pay-card-amount .plv2-amt-wrap {
+  flex: 1;
+}
+.pay-card-amount .plv2-amount {
+  font-size: 15px;
+  font-weight: 800;
+  padding: 7px 10px;
+  border-radius: var(--r1);
+  background: var(--bg2);
+  border: 1.5px solid var(--b2);
+}
+.pay-card.active .plv2-amount {
+  border-color: var(--embo);
+  background: var(--bg);
+}
+.pay-card-amount .plv2-fill {
+  width: 32px;
+  height: 34px;
+  font-size: 16px;
+}
+
+.pay-card-secondary {
+  display: flex;
+  gap: 6px;
+  padding: 0 8px 7px;
+  align-items: center;
+}
+.pay-card-field {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--b2);
+  border-radius: var(--r1);
+  background: var(--bg2);
+  padding: 0 6px;
+}
+.pay-card-field i {
+  font-size: 11px;
+  color: var(--t4);
+  flex-shrink: 0;
+}
+.pay-card-field .plv2-ref {
+  border: none;
+  background: transparent;
+  padding: 5px 2px;
+  flex: 1;
+  min-width: 0;
+}
+.pay-card-field .plv2-treasury {
+  border: none;
+  background: transparent;
+  padding: 5px 2px;
+  flex: 1;
+  min-width: 0;
+}
+.pay-card-field select { appearance: auto; }
 
 .pay-numpad {
   display: grid;
@@ -2356,6 +2521,8 @@
   .pay-v2-body { grid-template-columns: 1fr; }
   .pay-v2-left { border-left: none; border-bottom: 1px solid var(--b2); }
   .kb-help-groups { grid-template-columns: 1fr; }
+  .pay-card-amount { flex-direction: column; align-items: stretch; }
+  .pay-card-amount .plv2-amt-wrap { width: 100%; }
 }
 @media (max-width: 900px) {
   .pay-v2-hero { padding: 10px 8px 6px; }
@@ -2449,8 +2616,15 @@
   .pay-hero-amount { font-size: 22px; }
   .pay-numpad { gap: 4px; }
   .pay-npk { padding: 10px; font-size: 16px; }
-  .pay-line-v2 { grid-template-columns: 18px 1fr 100px; }
-  .plv2-ref { display: none; }
+  .pay-card-head { flex-direction: column; align-items: stretch; gap: 4px; }
+  .pay-card-pills { gap: 3px; }
+  .pay-pill { padding: 3px 6px; font-size: 10px; gap: 2px; }
+  .pay-pill i { font-size: 10px; }
+  .pay-card-actions { justify-content: flex-end; }
+  .pay-card-amount { padding: 4px 6px 2px; gap: 4px; }
+  .pay-card-amount .plv2-amount { font-size: 13px; padding: 5px 8px; }
+  .pay-card-secondary { flex-direction: column; gap: 4px; padding: 0 6px 5px; }
+  .pay-v2-left, .pay-v2-right { padding: 8px; }
   .cart-client-v2 { padding: 5px 8px; gap: 4px; }
   .ctv2-av { width: 28px; height: 28px; font-size: 11px; }
   .ctv2-name { font-size: 12px; }

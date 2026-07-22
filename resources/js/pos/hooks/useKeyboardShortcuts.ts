@@ -107,7 +107,14 @@ export function useKeyboardShortcuts(
         e.preventDefault();
         if (!state.isEmpty) {
           const pos = refs.posRef.current;
-          setters.setReceiptSnapshot({ items: [...pos.items], totals: { ...pos.totals } } as POSSaleSnapshot);
+          setters.setReceiptSnapshot({
+            items: pos.items.map(i => ({
+              name: i.product_name, ref: i.ref, qty: i.quantity,
+              unit_price_ht: i.unit_price_ht, unit: i.unit_symbol,
+              tva_rate: i.tva_rate / 100, discount_percentage: i.discount_percentage, total_ht: i.total_ht,
+            })),
+            totals: { ...pos.totals },
+          } as POSSaleSnapshot);
           setters.setModal('receipt');
         }
       }

@@ -1,8 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { nanoid }  from 'nanoid';
-import type { CartItem, CartTotals, Party, ProductVariant, QuantityDiscount } from '@/types';
-import { calcTotals } from '../utils/calculations';
+import type { CartItem, Party, ProductVariant, QuantityDiscount } from '@/types';
 
 export interface DocumentPayment {
   id:                  number;
@@ -34,7 +33,6 @@ interface CartState {
   setPayments:          (payments: DocumentPayment[]) => void;
   clearCart:            () => void;
   setInvoiceDiscountPct:(pct: number) => void;
-  totals:               () => CartTotals;
   markClean:            () => void;
 }
 
@@ -84,7 +82,7 @@ function getUnitSymbol(v: ProductVariant): string {
 
 export const useCartStore = create<CartState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       items:              [],
       client:             null,
       notes:              '',
@@ -202,9 +200,6 @@ export const useCartStore = create<CartState>()(
         set({ invoiceDiscountPct: Math.min(100, Math.max(0, pct)), _isDirty: true }),
 
       markClean: () => set({ _isDirty: false }),
-
-      totals: (fiscalStampEnabled?: boolean) =>
-        calcTotals(get().items, get().invoiceDiscountPct, fiscalStampEnabled),
     }),
     {
       name:       'pos-cart',

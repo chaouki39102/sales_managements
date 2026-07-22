@@ -1107,3 +1107,37 @@
 .pos-cart .cr--compact .cr-total  { min-width: calc(58px * var(--cz)); }
 .pos-cart .cr--compact .cr-ttc    { font-size: calc(12px * var(--cz)); }
 .pos-cart .cr--compact .cr-del    { width: calc(20px * var(--cz)); height: calc(20px * var(--cz)); }
+
+/* ════════════════════════════════════════════════════════════════════════
+   SWIPE-TO-DELETE — لمس فقط
+   ════════════════════════════════════════════════════════════════════════ */
+.cr-swipe-wrap {
+  position: relative;
+  overflow: hidden;
+}
+.cr-swipe-del {
+  position: absolute;
+  top: 0; bottom: 0; right: 0;
+  width: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e74c3c;
+  color: #fff;
+  font-size: 20px;
+  opacity: 0;
+  transition: opacity .2s ease;
+  pointer-events: none;
+}
+.cr-swipe-wrap.cr-swipe-active .cr-swipe-del {
+  opacity: 1;
+}
+.cr-swipe-wrap .cr {
+  touch-action: pan-y;
+  will-change: transform;
+}
+.cr-swipe-wrap .cr-del { display: none; }
+
+/* ── حجم xs: إخفاء بادج البيع ── */
+.pgrid--xs .pcard-sale-badge { font-size: 0; padding: 2px 5px; }
+.pgrid--xs .pcard-sale-badge i { font-size: 10px; }

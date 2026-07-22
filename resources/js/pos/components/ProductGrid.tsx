@@ -26,6 +26,7 @@ interface ProductGridProps {
   onQty?: (variantId: number, newQty: number) => void;
   searchQuery?: string;
   scannedId?: number | null;
+  lastSaleIds?: Set<number>;
 }
 
 type RowItem = { variant: ProductVariant; idx: number };
@@ -40,7 +41,7 @@ export default function ProductGrid({
   onPin, isPinned, priceLevels, selectedPriceLevelId, cartItems, allowNegativeStock,
   showStock = true, priceDisplayMode = 'ttc',
   highlightedIndex, onHighlightIndexChange, onQty,
-  searchQuery = '', scannedId,
+  searchQuery = '', scannedId, lastSaleIds,
 }: ProductGridProps) {
   const inCartQty = useCallback((variantId: number) => {
     return cartItems.find(i => i.variant_id === variantId)?.quantity ?? 0;
@@ -287,6 +288,7 @@ export default function ProductGrid({
                     searchQuery={searchQuery}
                     scannedId={scannedId}
                     variantCount={variantCountByProduct.get(item.variant.product_id)}
+                    lastSale={lastSaleIds?.has(item.variant.id)}
                   />
                 </div>
               ))}

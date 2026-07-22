@@ -47,6 +47,9 @@ export default function CartRow({
   const [discVal,    setDiscVal]    = useState('');
   const [priceVal,   setPriceVal]   = useState('');
   const [qtyVal,     setQtyVal]     = useState('');
+  const [swipeX,     setSwipeX]     = useState(0);       // swipe-to-delete offset
+  const swipeStart   = useRef<{ x: number; y: number; time: number } | null>(null);
+  const isSwiping    = useRef(false);
 
   const discInpRef  = useRef<HTMLInputElement>(null);
   const priceInpRef = useRef<HTMLInputElement>(null);
@@ -55,6 +58,42 @@ export default function CartRow({
   const popupNodeRef = useRef<HTMLDivElement>(null);
   const popupAnchorRef = useRef<HTMLDivElement>(null);
   const [popupPos, setPopupPos] = useState<{top: number; left: number; right: number}>({ top: 0, left: 0, right: 0 });
+
+  // ── Swipe-to-delete gesture (touch only) ──────────────────────────────────
+  const SWIPE_THRESHOLD = 80;
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (popup) return; // don't interfere with open popup
+    const t = e.touches[0];
+    swipeStart.current = { x: t.clientX, y: t.clientY, time: Date.now() };
+    isSwiping.current = false;
+  }, [popup]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!swipeStart.current) return;
+    const t = e.touches[0];
+    const dx = swipeStart.current.x - t.clientX; // positive = swipe left (RTL)
+    const dy = Math.abs(t.clientY - swipeStart.current.y);
+    // Only horizontal swipe (ignore vertical scrolling)
+    if (dy > 20 && !isSwiping.current) { swipeStart.current = null; return; }
+    if (dx > 10) isSwiping.current = true;
+    if (isSwiping.current) {
+      e.preventDefault();
+      setSwipeX(Math.max(0, Math.min(dx, SWIPE_THRESHOLD + 40)));
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!swipeStart.current) { setSwipeX(0); return; }
+    const elapsed = Date.now() - swipeStart.current.time;
+    // Fast swipe or past threshold → snap open
+    if ((isSwiping.current && swipeX >= SWIPE_THRESHOLD) || (isSwiping.current && elapsed < 200 && swipeX > 30)) {
+      setSwipeX(SWIPE_THRESHOLD);
+    } else {
+      setSwipeX(0);
+    }
+    swipeStart.current = null;
+    isSwiping.current = false;
+  }, [swipeX]);
 
   const measurePopupAnchor = useCallback(() => {
     if (popupAnchorRef.current) {
@@ -151,12 +190,21 @@ export default function CartRow({
       : null;
 
   return (
-    <div
-      ref={el => { rowRef.current = el; registerNode?.(item.id, el); }}
-      tabIndex={-1}
-      className={`cr ${isSelected ? 'sel' : ''} ${hasDisc ? 'has-disc' : ''} ${popup ? 'cr--popup-open' : ''} ${compact ? 'cr--compact' : ''}`}
-      onClick={onSelect}
-    >
+    <div className={`cr-swipe-wrap ${swipeX > 0 ? 'cr-swipe-active' : ''}`}>
+      {/* Delete reveal behind the row */}
+      <div className="cr-swipe-del">
+        <i className="ti ti-trash" />
+      </div>
+      <div
+        ref={el => { rowRef.current = el; registerNode?.(item.id, el); }}
+        tabIndex={-1}
+        className={`cr ${isSelected ? 'sel' : ''} ${hasDisc ? 'has-disc' : ''} ${popup ? 'cr--popup-open' : ''} ${compact ? 'cr--compact' : ''}`}
+        onClick={onSelect}
+        style={{ transform: swipeX > 0 ? `translateX(-${swipeX}px)` : undefined, transition: swipeX === 0 ? 'transform .2s ease' : undefined }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
       {/* شريط اللون الجانبي */}
       <div className="cr-accent" />
 
@@ -436,6 +484,7 @@ export default function CartRow({
       >
         <i className="ti ti-x" />
       </button>
+    </div>
     </div>
   );
 }

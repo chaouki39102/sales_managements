@@ -314,6 +314,21 @@ function POSPage() {
     catch { /* storage full */ }
   }, [recentProducts, slug]);
 
+  // ── Last sale badge: track variant IDs from the most recent completed sale ──
+  const [lastSaleIds, setLastSaleIds] = useState<Set<number>>(() => {
+    if (!slug) return new Set();
+    try {
+      const stored = localStorage.getItem(`pos:lastSale:${slug}`);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+  const lastSaleTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    if (!slug || lastSaleIds.size === 0) return;
+    try { localStorage.setItem(`pos:lastSale:${slug}`, JSON.stringify([...lastSaleIds])); } catch {}
+  }, [lastSaleIds, slug]);
+
   // ── Search & Filters ──────────────────────────────────────────────────────
   const [sortBy, setSortBy] = useState<SortMode>('name');
   const [filterInStock, setFilterInStock] = useState(false);
@@ -398,9 +413,9 @@ function POSPage() {
 
   // ── Products query (كل منتجات التصنيف الحالي — بدون نص البحث إطلاقاً) ───
   const { data: productsRaw, isLoading: loadingAll } = useQuery({
-    queryKey: [slug, 'products', 'pos', { cat: pos.selectedCategory }],
+    queryKey: [slug, 'products', 'pos', { cat: pos.selectedCategory, perPage: filterPerPage }],
     queryFn: () => productsApi.list({
-      per_page:  99999,
+      per_page:  filterPerPage,
       include:   'tva,unit,family,prices.priceLevel,quantityDiscounts',
       ...(queryFamilyId ? { family_id: queryFamilyId } : {}),
       filter:    { active: 1 },
@@ -442,7 +457,7 @@ function POSPage() {
   const defaultTreasury  = treasuryAccounts?.find(a => a.is_default) ?? treasuryAccounts?.[0];
 
   // ── Cached warehouse ID (avoid cascading delay for stock query) ────────────
-  const WAREHOUSE_CACHE_KEY = 'pos-warehouse-id';
+  const WAREHOUSE_CACHE_KEY = `pos-warehouse-id-${slug}`;
   const [cachedWarehouseId, setCachedWarehouseId] = useState<number | null>(() => {
     try {
       const c = localStorage.getItem(WAREHOUSE_CACHE_KEY);
@@ -1117,6 +1132,15 @@ const handleCompleteSale = useCallback(async (params: {
       editingDocMetaRef.current = null;
       receiptSnapshotRef.current = fullSnapshot;
       setReceiptSnapshot(fullSnapshot);
+
+      // Track last sold variant IDs for badge display (clear after 5 minutes)
+      const soldIds = new Set(pos.items.map(i => i.variant_id));
+      if (soldIds.size > 0) {
+        setLastSaleIds(soldIds);
+        if (lastSaleTimerRef.current) clearTimeout(lastSaleTimerRef.current);
+        lastSaleTimerRef.current = setTimeout(() => setLastSaleIds(new Set()), 5 * 60 * 1000);
+      }
+
       setCartNote('');
       posRef.current.setInvoiceDiscountPct(0);
       posRef.current.clearCart();
@@ -1136,6 +1160,12 @@ const handleCompleteSale = useCallback(async (params: {
 
       safeToast.success(`✅ تم حفظ الفاتورة ${res.document_number ?? ''}`);
       if (settings.playSoundOnSale) playSaleSound(settings.soundPreset as SoundPresetId, settings.soundVolume);
+
+      // Haptic feedback on successful sale
+      try { navigator.vibrate?.(100); } catch {}
+
+      // Auto-focus search after sale
+      setTimeout(() => searchRef.current?.focus(), 200);
 
       // Auto-open cash drawer if payment includes cash and setting is enabled
       if (settings.openCashDrawer) {
@@ -1159,7 +1189,7 @@ const handleCompleteSale = useCallback(async (params: {
       safeToast.error(String(msg));
       return { ok: false, message: String(msg) };
     }
-  }, [settings.defaultDocTypeCode, settings.playSoundOnSale, settings.soundPreset, settings.soundVolume, settings.openCashDrawer, settings.autoClosePayment, settings.autoPrint, settings.printCopies, paymentModes, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency?.id, cartNote, editingDocumentId, editingDocumentDate, currentSession?.id, autoPrint, isPrintEnabled, template, showPreview, safeToast, defaultTreasury?.id, editingDocStatus, incrementMut, invoiceDiscountAmount, queryClient, slug, handlePrintDirect]);
+  }, [settings.defaultDocTypeCode, settings.playSoundOnSale, settings.soundPreset, settings.soundVolume, settings.openCashDrawer, settings.autoClosePayment, settings.autoPrint, settings.printCopies, paymentModes, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency?.id, cartNote, editingDocumentId, editingDocumentDate, currentSession?.id, autoPrint, isPrintEnabled, template, showPreview, safeToast, defaultTreasury?.id, incrementMut, invoiceDiscountAmount, queryClient, slug, handlePrintDirect, pos.payments]);
 
   // ── Quick Items ────────────────────────────────────────────────────────────
   const toggleQuickItem = useCallback((variant: ProductVariant) => {
@@ -1322,7 +1352,7 @@ const handleCompleteSale = useCallback(async (params: {
             const snapItems = pos.items.map(i => ({
               name: i.product_name, ref: i.ref, qty: i.quantity,
               unit_price_ht: i.unit_price_ht, unit: i.unit_symbol,
-              tva_rate: i.tva_rate, discount_percentage: i.discount_percentage, total_ht: i.total_ht,
+              tva_rate: i.tva_rate / 100, discount_percentage: i.discount_percentage, total_ht: i.total_ht,
             }));
             setReceiptSnapshot({
               items: snapItems,
@@ -1428,6 +1458,7 @@ const handleCompleteSale = useCallback(async (params: {
             onQty={handleQtyChange}
             searchQuery={rawQuery}
             scannedId={scannedId}
+            lastSaleIds={lastSaleIds}
           />
           <PanelResizer onMouseDown={handleResizerMouseDown} />
         </div>
@@ -1435,7 +1466,7 @@ const handleCompleteSale = useCallback(async (params: {
         {/* ✅ ProfessionalCart مع onDiscountAmount */}
         <ProfessionalCart
           ref={cartApiRef}
-          items={pos.items} totals={pos.totals} client={pos.client} customers={customers}
+          items={pos.items} totals={pos.totals} client={pos.client}
           note={cartNote} selectedItemId={selectedCartItemId}
           onSelectItem={setSelectedCartItemId}
           onQty={pos.updateQty}
@@ -1603,6 +1634,7 @@ const handleCompleteSale = useCallback(async (params: {
             onClose={() => setShowSettings(false)}
             warehouses={warehouses ?? []}
             documentTypes={documentTypes ?? []}
+            paymentModes={paymentModes ?? []}
             systemFiscalStampEnabled={systemFiscalStampEnabled}
             onToggleFiscalStamp={toggleFiscalStamp}
             systemAllowNegativeStock={allowNegSetting}
