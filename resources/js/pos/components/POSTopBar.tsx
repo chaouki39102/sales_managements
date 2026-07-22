@@ -5,6 +5,8 @@ import type { PosSession }           from '@/lib/api/endpoints/posSession';
 import { formatDZD }                 from '../utils/calculations';
 import { getEffectiveShortcut } from '../hooks/useKeyboardMap';
 
+const MARGIN_VIS_KEY = 'pos-margin-visible';
+
 interface POSTopBarProps {
   session:         PosSession | null | undefined;
   heldCount:       number;
@@ -58,6 +60,17 @@ export default function POSTopBar({
   const [dropPos, setDropPos] = useState({ top: 0, left: 0 });
   const tarifRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+
+  const [showMargin, setShowMargin] = useState(() => {
+    try { return localStorage.getItem(MARGIN_VIS_KEY) !== '0'; } catch { return true; }
+  });
+  const toggleMargin = useCallback(() => {
+    setShowMargin(prev => {
+      const next = !prev;
+      try { localStorage.setItem(MARGIN_VIS_KEY, next ? '1' : '0'); } catch {}
+      return next;
+    });
+  }, []);
   const selectedTarifLabel = selectedPriceLevelId === null
     ? 'عادي'
     : (priceLevels.find(pl => pl.id === selectedPriceLevelId)?.name ?? 'عادي');
@@ -124,12 +137,22 @@ export default function POSTopBar({
         )}
 
         {!isEmpty && avgMargin > 0 && (
-          <div className="pos-chip p" title="متوسط هامش الربح — السلة الحالية">
-            <i className="ti ti-trending-up pic-ic" />
-            <div className="pos-chip-inner">
-              <span className="pos-chip-label">هامش الربح</span>
-              <strong className="pos-chip-val">{avgMargin.toFixed(1)}%</strong>
-            </div>
+          <div className="pos-chip p" title="متوسط هامش الربح — السلة الحالية" style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <button
+              onClick={e => { e.stopPropagation(); toggleMargin(); }}
+              style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, display: 'flex', fontSize: 13, opacity: 0.6 }}
+              title={showMargin ? 'إخفاء هامش الربح' : 'إظهار هامش الربح'}
+              type="button"
+            >
+              <i className={`ti ti-eye${showMargin ? '' : '-off'}`} />
+            </button>
+            {showMargin && (
+              <div className="pos-chip-inner" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <i className="ti ti-trending-up pic-ic" />
+                <span className="pos-chip-label">هامش الربح</span>
+                <strong className="pos-chip-val">{avgMargin.toFixed(1)}%</strong>
+              </div>
+            )}
           </div>
         )}
 

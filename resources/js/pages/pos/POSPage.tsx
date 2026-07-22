@@ -776,7 +776,15 @@ function POSPage() {
   const avgMargin = useMemo(() => {
     if (!pos.items.length) return 0;
     const costMap = new Map(allVariants.map(v => [v.id, v.average_cost_price ?? 0]));
-    return pos.items.reduce((s, i) => s + calcMargin(i.unit_price_ht, costMap.get(i.variant_id) ?? 0), 0) / pos.items.length;
+    let total = 0;
+    let counted = 0;
+    for (const i of pos.items) {
+      const cost = costMap.get(i.variant_id) ?? 0;
+      if (cost <= 0) continue;
+      total += calcMargin(i.unit_price_ht, cost);
+      counted++;
+    }
+    return counted > 0 ? total / counted : 0;
   }, [pos.items, allVariants]);
 
   const filterActive = filterInStock || filterLowStock || !!filterMinPrice || !!filterMaxPrice;
@@ -1568,6 +1576,7 @@ const handleCompleteSale = useCallback(async (params: {
           clientBalance={clientBalance?.current_balance}
           slug={slug}
           cartRef={cartRef}
+          onClientModalClose={() => { setTimeout(() => searchRef.current?.focus(), 100); }}
         />
       </div>
 

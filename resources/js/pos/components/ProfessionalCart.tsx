@@ -17,7 +17,7 @@
 //      للاسترجاع. الآن onClear يحفظ نسخة تلقائياً (من POSPage) ويمكن
 //      استرجاعها بضغطة واحدة، أو Ctrl+Z.
 // ════════════════════════════════════════════════════════════════════════════
-import React, { useState, useCallback, useEffect, useRef, useLayoutEffect, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef, useLayoutEffect, forwardRef, useImperativeHandle } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { CartItem, CartTotals, Party } from '@/types';
 import { formatDZD } from '../utils/calculations';
@@ -54,6 +54,7 @@ interface ProfessionalCartProps {
   clientBalance?:       number;
   slug?:                string | null;
   cartRef?:             React.RefObject<HTMLDivElement>;
+  onClientModalClose?:  () => void;
 }
 
 /** واجهة برمجية للتحكم بالسلة من المكوّن الأب (POSPage) — بديل عن querySelectorAll */
@@ -78,7 +79,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
   onSetClient, onNoteChange,
   onHold, onSell, onClear, onHeld, totalTtcFinal, remainingToPay,
   invoiceDiscountPct = 0, onInvoiceDiscountChange, invoiceDiscountAmount = 0,
-  onUndoClear, canUndoClear, undoClearSecondsLeft = 0, clientBalance, slug, cartRef,
+  onUndoClear, canUndoClear, undoClearSecondsLeft = 0, clientBalance, slug, cartRef, onClientModalClose,
 }, ref) {
 
   const [showNote,         setShowNote]         = useState(false);
@@ -194,6 +195,11 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
 
   const isEmpty = !items.length;
 
+  const totalQty = useMemo(
+    () => items.reduce((sum, i) => sum + (i.quantity || 0), 0),
+    [items]
+  );
+
   useImperativeHandle(ref, () => ({
     scrollToItemId: (id: string) => {
       const idx = items.findIndex(i => i.id === id);
@@ -292,6 +298,40 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                 {kb('clearCart') && <span className="tb-txt"> {kb('clearCart')}</span>}
               </button>
             </div>
+          </div>
+
+          <div className={`cart-hero ${isEmpty ? '' : 'has-items'}`}>
+            <div className="ch-top">
+              <span className="ch-label"><i className="ti ti-wallet" /> الإجمالي المستحق</span>
+              <span className="ch-badge">{totalQty % 1 === 0 ? totalQty : totalQty.toFixed(2)} قطعة</span>
+            </div>
+            <div className="ch-amount">{formatDZD(totalTtcFinal)}</div>
+            {/* <div className="ch-stats">
+              <div className="ch-stat">
+                <span className="ch-stat-v">{items.length}</span>
+                <span className="ch-stat-l">صنف</span>
+              </div>
+              <div className="ch-stat">
+                <span className="ch-stat-v">{formatDZD(totals.total_ht)}</span>
+                <span className="ch-stat-l">HT</span>
+              </div>
+              <div className="ch-stat">
+                <span className="ch-stat-v">{formatDZD(totals.total_tva)}</span>
+                <span className="ch-stat-l">TVA</span>
+              </div>
+            </div> */}
+            {/* <div className={`pay-status ${
+              isEmpty ? 'pay-status--empty' : (remainingToPay <= 0 ? 'pay-status--ok' : 'pay-status--change')
+            }`}>
+              <i className={`ti ${isEmpty ? 'ti-shopping-cart-off' : (remainingToPay <= 0 ? 'ti-circle-check' : 'ti-clock')}`} />
+              {isEmpty ? 'السلة فارغة' : (remainingToPay <= 0 ? 'جاهز للدفع' : 'بانتظار الإتمام')}
+            </div> */}
+            {!isEmpty && (
+              <button type="button" className="ch-more-btn" onClick={toggleTotals}>
+                تفاصيل إضافية
+                <i className={`ti ti-chevron-down ct-toggle-ic ${showTotalsDetails ? 'open' : ''}`} />
+              </button>
+            )}
           </div>
 
           {showNote && (
@@ -401,35 +441,14 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
           )}
         </div>
 
-        {!isEmpty && (
+        {!isEmpty && showTotalsDetails && (
           <div className="cart-totals">
-            {/* ── سطر دائم: الإجمالي + زر إظهار/إخفاء التفاصيل ── */}
-            <div className="ct-row ct-grand ct-grand--toggle" onClick={toggleTotals}>
-              <span className="ct-grand-label">
-                الإجمالي TTC
-                <i className={`ti ti-chevron-down ct-toggle-ic ${showTotalsDetails ? 'open' : ''}`} />
-              </span>
-              <strong className="grand-amount">{formatDZD(totalTtcFinal)}</strong>
-            </div>
-
-            {showTotalsDetails && (
-              <>
-                <div className="ct-row">
-                  <span>المجموع HT</span>
-                  <span>{formatDZD(totals.total_ht)}</span>
-                </div>
-
                 {totals.total_discount > 0 && (
                   <div className="ct-row ct-disc">
                     <span>إجمالي الخصومات</span>
                     <span style={{ color: 'var(--red)' }}>- {formatDZD(totals.total_discount)}</span>
                   </div>
                 )}
-
-                <div className="ct-row">
-                  <span>TVA</span>
-                  <span>{formatDZD(totals.total_tva)}</span>
-                </div>
 
                 {onInvoiceDiscountChange && (
                   <div className="ct-row ct-disc">
@@ -509,8 +528,6 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                     </span>
                   </div>
                 )}
-              </>
-            )}
           </div>
         )}
 
@@ -549,8 +566,12 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
           onSelect={c => {
             onSetClient(c);
             setShowCustModal(false);
+            onClientModalClose?.();
           }}
-          onClose={() => setShowCustModal(false)}
+          onClose={() => {
+            setShowCustModal(false);
+            onClientModalClose?.();
+          }}
         />
       )}
     </>

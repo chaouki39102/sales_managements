@@ -85,23 +85,20 @@ export default function CustomerSearchModal({
   const [showCreate, setShowCreate] = useState(false);
   const [form,       setForm]       = useState<NewClientForm>(EMPTY_FORM);
   const [formError,  setFormError]  = useState('');
+  const [highlightedIdx, setHighlightedIdx] = useState(-1);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const debouncedQuery = useDebounce(query.trim(), 250);
   const isSearching    = debouncedQuery.length >= 2;
 
-  // Focus البحث عند الفتح
+  // Focus البحث عند الفتح أو عند الرجوع من وضع الإنشاء
   useEffect(() => {
     setTimeout(() => searchRef.current?.focus(), 80);
   }, []);
 
-  // Escape يُغلق
   useEffect(() => {
-    const h = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [onClose]);
+    if (!showCreate) setTimeout(() => searchRef.current?.focus(), 80);
+  }, [showCreate]);
 
   // ── بحث فوري ──────────────────────────────────────────────────────────────
   const { data: searchResults, isLoading: searching } = useQuery<Party[]>({
@@ -156,6 +153,32 @@ export default function CustomerSearchModal({
   const displayList: Party[] = isSearching
     ? (searchResults ?? [])
     : (recentClients ?? []);
+
+  // Escape يُغلق + Arrow navigation + Enter to select
+  useEffect(() => {
+    if (showCreate) return;
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { onClose(); return; }
+      const total = 1 + displayList.length;
+      if (total <= 0) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setHighlightedIdx(prev => (prev + 1) % total);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setHighlightedIdx(prev => prev <= 0 ? total - 1 : prev - 1);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (highlightedIdx === 0) onSelect(null);
+        else if (highlightedIdx > 0 && highlightedIdx <= displayList.length) onSelect(displayList[highlightedIdx - 1]);
+      }
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onClose, showCreate, displayList, highlightedIdx, onSelect]);
+
+  // Reset highlight on query change
+  useEffect(() => { setHighlightedIdx(-1); }, [debouncedQuery]);
 
   // ── إنشاء زبون جديد ───────────────────────────────────────────────────────
   const createMutation = useMutation({
@@ -220,7 +243,7 @@ export default function CustomerSearchModal({
           </div>
         </div>
 
-        <div className="m-body" style={{ padding: 16 }}>
+        <div className="m-body" style={{ padding: 16, minHeight: 420 }}>
 
           {/* ════ وضع البحث ════ */}
           {!showCreate && (
@@ -252,7 +275,7 @@ export default function CustomerSearchModal({
 
               {/* زبون عابر */}
               <button
-                className={`cust-row cust-anon ${!currentClient ? 'on' : ''}`}
+                className={`cust-row cust-anon ${!currentClient ? 'on' : ''} ${highlightedIdx === 0 ? 'hl' : ''}`}
                 onClick={() => onSelect(null)}
                 type="button"
               >
@@ -275,7 +298,7 @@ export default function CustomerSearchModal({
               </div>
 
               {/* القائمة */}
-              <div className="cust-list">
+              <div className="cust-list" ref={listRef}>
                 {displayList.length === 0 && !searching && isSearching && (
                   <div className="cust-empty">
                     <i className="ti ti-search-off" style={{ fontSize: 28, opacity: 0.3 }} />
@@ -291,10 +314,11 @@ export default function CustomerSearchModal({
                   </div>
                 )}
 
-                {displayList.map(c => (
+                {displayList.map((c, i) => (
                   <button
                     key={c.id}
-                    className={`cust-row ${currentClient?.id === c.id ? 'on' : ''}`}
+                    ref={highlightedIdx === i + 1 ? (el) => el?.scrollIntoView({ block: 'nearest' }) : undefined}
+                    className={`cust-row ${currentClient?.id === c.id ? 'on' : ''} ${highlightedIdx === i + 1 ? 'hl' : ''}`}
                     onClick={() => onSelect(c)}
                     type="button"
                   >
