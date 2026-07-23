@@ -242,16 +242,18 @@ const sideToOrder = (side: 'start' | 'end') => (side === 'start' ? 0 : 1);
 // ─── LayoutRowPair: label + value row from LayoutRow ──────────────────────────
 
 function LayoutRowPairFn({
-  row, label, value,
-}: { row: LayoutRow; label: string; value: unknown }) {
+  row, label, value, fieldOverride,
+}: { row: LayoutRow; label: string; value: unknown; fieldOverride?: FieldStyleOverride }) {
+  const o = fieldOverride;
   return (
     <div style={{
       display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
       padding: '3px 2px',
       marginRight: row.indent ?? 0,
-      fontWeight: row.bold ? 800 : 'inherit',
-      color: row.color ?? 'inherit',
-      fontSize: row.fontSize,
+      fontWeight: o?.bold !== undefined ? (o.bold ? 800 : 400) : (row.bold ? 800 : 'inherit'),
+      color: o?.color ?? row.color ?? 'inherit',
+      fontSize: o?.fontSize ?? row.fontSize,
+      fontFamily: o?.fontFamily ? fontFamily(o.fontFamily) : undefined,
       ...boxBorderCss(row.border),
     }}>
       <span style={{ order: sideToOrder(row.labelSide ?? 'start'), flexShrink: 0 }}>{label}</span>
@@ -265,13 +267,15 @@ export const LayoutRowPair = React.memo(LayoutRowPairFn);
 
 // ─── LayoutRowLine: free-text line (footer etc.) ──────────────────────────────
 
-function LayoutRowLineFn({ row, text }: { row: LayoutRow; text: string }) {
+function LayoutRowLineFn({ row, text, fieldOverride }: { row: LayoutRow; text: string; fieldOverride?: FieldStyleOverride }) {
+  const o = fieldOverride;
   return (
     <div style={{
       textAlign: row.labelSide === 'start' ? 'right' : row.labelSide === 'end' ? 'left' : 'center',
-      fontWeight: row.bold ? 800 : 'inherit',
-      color: row.color ?? 'inherit',
-      fontSize: row.fontSize,
+      fontWeight: o?.bold !== undefined ? (o.bold ? 800 : 400) : (row.bold ? 800 : 'inherit'),
+      color: o?.color ?? row.color ?? 'inherit',
+      fontSize: o?.fontSize ?? row.fontSize,
+      fontFamily: o?.fontFamily ? fontFamily(o.fontFamily) : undefined,
       padding: '2px 0',
       ...boxBorderCss(row.border),
     }}>
@@ -290,7 +294,7 @@ function LayoutColumnCellFn({
   const value = printFieldResolver.resolve(column.field, data, tpl);
 
   const labelSetting = COMPANY_FIELD_LABEL_SETTING[column.field] || CUSTOMER_FIELD_LABEL_SETTING[column.field];
-  const label = (labelSetting ? (tpl as any)[labelSetting] : '') || column.label ?? def?.label ?? column.field;
+  const label = column.label || (labelSetting ? (tpl as any)[labelSetting] : '') || def?.label || column.field;
 
   const flex = column.width || 1;
   const css: React.CSSProperties = {
@@ -349,11 +353,30 @@ const CUSTOMER_FIELD_LABEL_SETTING: Record<string, string> = {
   'customer.rib':            'label_customer_rib',
 };
 
+export interface FieldStyleOverride {
+  fontSize?: number;
+  bold?: boolean;
+  color?: string;
+  fontFamily?: FontFamily;
+}
+
+export interface RenderLayoutRowsOptions {
+  fieldStyleOverrides?: Record<string, FieldStyleOverride>;
+  sectionAlign?: AlignOption;
+}
+
 export function renderLayoutRows(
   rows: LayoutRow[] | undefined,
   data: UniversalDocumentData,
   tpl: PrintTemplate,
+  fieldStyleOverridesOrOptions?: Record<string, FieldStyleOverride> | RenderLayoutRowsOptions,
 ): JSX.Element[] {
+  const options: RenderLayoutRowsOptions =
+    fieldStyleOverridesOrOptions && 'sectionAlign' in fieldStyleOverridesOrOptions
+      ? fieldStyleOverridesOrOptions
+      : { fieldStyleOverrides: fieldStyleOverridesOrOptions };
+  const fieldStyleOverrides = options.fieldStyleOverrides;
+  const sectionAlign = options.sectionAlign;
   if (!rows || rows.length === 0) return [];
 
   const visible = [...rows].filter(r => r.visible).sort((a, b) => a.order - b.order);
@@ -385,26 +408,50 @@ export function renderLayoutRows(
       continue;
     }
 
-    // ── Legacy single-field mode (backward compatible) ──
+    // ── Legacy single-field mode → auto-convert to LayoutColumnCell ──
+    if (r.field && r.field !== 'totals.tvaBreakdownGroup' && r.field !== 'literal') {
+      const labelSetting = COMPANY_FIELD_LABEL_SETTING[r.field] || CUSTOMER_FIELD_LABEL_SETTING[r.field];
+      const def = printFieldRegistry.get(r.field);
+      const col: LayoutColumn = {
+        id: `${r.id}_auto_col`,
+        field: r.field,
+        label: r.label || (labelSetting ? (tpl as any)[labelSetting] : '') || def?.label || r.field,
+        width: 1,
+        alignment: sectionAlign ?? 'right',
+        labelSide: r.labelSide ?? 'start',
+        valueSide: r.valueSide ?? 'end',
+        bold: r.bold,
+        color: r.color,
+        fontSize: r.fontSize,
+      };
+      const cell = <LayoutColumnCell key={r.id} column={col} data={data} tpl={tpl} />;
+      out.push(
+        <div key={r.id} style={{
+          display: 'flex', flexDirection: 'row', gap: 8,
+          padding: '2px 2px', marginRight: r.indent ?? 0,
+          ...boxBorderCss(r.border),
+        }}>
+          {cell}
+        </div>,
+      );
+      continue;
+    }
+
+    // ── Legacy special fields ──
     if (r.field === 'totals.tvaBreakdownGroup') {
       for (const br of data.taxBreakdown ?? []) {
-        out.push(<LayoutRowPair key={`${r.id}-${br.rate}`} row={r} label={`TVA ${br.rate}%`} value={br.tva} />);
+        const fo = fieldStyleOverrides?.[r.field ?? ''];
+        out.push(<LayoutRowPair key={`${r.id}-${br.rate}`} row={r} label={`TVA ${br.rate}%`} value={br.tva} fieldOverride={fo} />);
       }
       continue;
     }
 
     if (r.field === 'literal') {
       if (!r.literalText) continue;
-      out.push(<LayoutRowLine key={r.id} row={r} text={r.literalText} />);
+      const fo = fieldStyleOverrides?.['literal'];
+      out.push(<LayoutRowLine key={r.id} row={r} text={r.literalText} fieldOverride={fo} />);
       continue;
     }
-
-    const def = printFieldRegistry.get(r.field ?? '');
-    const value = printFieldResolver.resolve(r.field ?? '', data, tpl);
-
-    const labelSetting = COMPANY_FIELD_LABEL_SETTING[r.field ?? ''] || CUSTOMER_FIELD_LABEL_SETTING[r.field ?? ''];
-    const label = (labelSetting ? (tpl as any)[labelSetting] : '') || r.label ?? def?.label ?? r.field;
-    out.push(<LayoutRowPair key={r.id} row={r} label={label} value={value} />);
   }
 
   return out;

@@ -23,10 +23,12 @@ function labelOf(key: string, tpl: PrintTemplate): string {
 
 function renderThermalDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
   const cs = customerInfoStyle(tpl);
+  const hasDocInfoRows = tpl.doc_info_rows && tpl.doc_info_rows.length > 0;
   const hasCustomerRows = tpl.customer_info_rows && tpl.customer_info_rows.length > 0;
+  const docInfoAlign = align(tpl.doc_info_align);
 
   return (
-    <div style={{ marginBottom: 5 }}>
+    <div style={{ marginBottom: 5, textAlign: docInfoAlign }}>
       <div style={{
         textAlign: align(tpl.title_align),
         fontSize: tpl.title_size,
@@ -39,17 +41,22 @@ function renderThermalDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
       </div>
 
       <div style={{ fontSize: tpl.base_font_size }}>
-        {tpl.show_doc_number && <DocRow label="رقم:" value={r('document.number', data, tpl) as string} mono />}
-        {tpl.show_date && <DocRow label="التاريخ:" value={`${formatDate(r('document.date', data, tpl) as string)}${tpl.show_time && r('document.time', data, tpl) ? ' ' + r('document.time', data, tpl) : ''}`} />}
-        {tpl.show_due_date && r('document.dueDate', data, tpl) && <DocRow label="تاريخ الاستحقاق:" value={r('document.dueDate', data, tpl) as string} />}
-        {tpl.show_cashier && r('customer.cashierName', data, tpl) && (
-          <DocRow label="الكاشير:" value={r('customer.cashierName', data, tpl) as string} />
-        )}
-        {tpl.show_session && r('session.code', data, tpl) && (
-          <DocRow label="الجلسة:" value={r('session.code', data, tpl) as string} />
-        )}
+        {hasDocInfoRows
+          ? renderLayoutRows(tpl.doc_info_rows, data, tpl, { sectionAlign: tpl.doc_info_align })
+          : <>
+              {tpl.show_doc_number && <DocRow label="رقم:" value={r('document.number', data, tpl) as string} mono />}
+              {tpl.show_date && <DocRow label="التاريخ:" value={`${formatDate(r('document.date', data, tpl) as string)}${tpl.show_time && r('document.time', data, tpl) ? ' ' + r('document.time', data, tpl) : ''}`} />}
+              {tpl.show_due_date && r('document.dueDate', data, tpl) && <DocRow label="تاريخ الاستحقاق:" value={r('document.dueDate', data, tpl) as string} />}
+              {tpl.show_cashier && r('customer.cashierName', data, tpl) && (
+                <DocRow label="الكاشير:" value={r('customer.cashierName', data, tpl) as string} />
+              )}
+              {tpl.show_session && r('session.code', data, tpl) && (
+                <DocRow label="الجلسة:" value={r('session.code', data, tpl) as string} />
+              )}
+            </>
+        }
         {hasCustomerRows
-          ? <div style={cs}>{renderLayoutRows(tpl.customer_info_rows, data, tpl)}</div>
+          ? <div style={cs}>{renderLayoutRows(tpl.customer_info_rows, data, tpl, { sectionAlign: tpl.customer_info_align })}</div>
           : tpl.show_client && (
               <div style={cs}>
                 {r('customer.name', data, tpl) && <DocRow label={(labelOf('label_client', tpl) || 'العميل') + ':'} value={r('customer.name', data, tpl) as string} />}
@@ -91,13 +98,13 @@ function renderPageDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
 
   if (isA4) {
     return (
-      <div>
+      <div style={{ textAlign: align(tpl.doc_info_align) }}>
         <div style={{ display: 'flex', gap: 30, marginBottom: 24 }}>
           <div style={{ flex: 1, padding: 12, background: '#f9fafb', borderRadius: 4, border: '1px solid #e2e8f0' }}>
             <div style={{ ...cs, fontWeight: 700, fontSize: tpl.customer_info_size + 1, marginBottom: 6, color: '#111' }}>بيانات العميل</div>
             <div style={{ ...cs, color: '#333' }}>
               {hasCustomerRows
-                ? renderLayoutRows(tpl.customer_info_rows, data, tpl)
+                ? renderLayoutRows(tpl.customer_info_rows, data, tpl, { sectionAlign: tpl.customer_info_align })
                 : <>
                     <div style={{ fontWeight: 600, marginBottom: 2 }}>{clientName}</div>
                     {tpl.show_client_nif     && <div>{labelOf('label_client_nif', tpl) || 'NIF'}: {r('customer.nif', data, tpl) as string}</div>}
@@ -135,9 +142,10 @@ function renderPageDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
     <div style={{
       ...cs, marginBottom: 10,
       padding: 8, background: '#f9fafb', borderRadius: 4,
+      textAlign: align(tpl.doc_info_align) as React.CSSProperties['textAlign'],
     }}>
       {hasCustomerRows
-        ? renderLayoutRows(tpl.customer_info_rows, data, tpl)
+        ? renderLayoutRows(tpl.customer_info_rows, data, tpl, { sectionAlign: tpl.customer_info_align })
         : <>
             <span style={{ fontWeight: 700 }}>{labelOf('label_client', tpl) || 'العميل'}: </span>{clientName}
             {tpl.show_client_nif     && <span style={{ marginRight: 12 }}>{labelOf('label_client_nif', tpl) || 'NIF'}: {r('customer.nif', data, tpl) as string}</span>}

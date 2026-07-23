@@ -461,6 +461,20 @@ export interface Product extends BaseModel {
   tva?:          Tva;
   unit?:         Unit;
   variants?:     ProductVariant[];
+  packagings?:   ProductPackaging[];
+}
+
+export interface ProductPackaging {
+  id:             number;
+  company_id:     number;
+  product_id:     number;
+  code:           string;
+  label:          string;
+  quantity:       number;
+  barcode?:       string | null;
+  is_default:     boolean;
+  active:         boolean;
+  display_order:  number;
 }
 
 // ─── Commercial Documents ─────────────────────────────────────────────────────
@@ -658,6 +672,9 @@ export interface CartItem {
   total_ttc:           number;
   max_stock?:          number | null;
   manages_stock:       boolean;
+  packaging_id?:       number | null;
+  pack_qty?:           number;
+  packaging_label?:    string | null;
 }
 export interface CartTotals {
   total_ht:       number;

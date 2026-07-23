@@ -8,13 +8,13 @@ OUTDIR="merged-files"
 rm -rf "$OUTDIR"
 mkdir -p "$OUTDIR"
 
-OUTFILE="$OUTDIR/DataTable.md"
+OUTFILE="$OUTDIR/pos.md"
 
-echo "# DataTable Components" > "$OUTFILE"
+echo "# pos Components" > "$OUTFILE"
 
-echo "🚀 Merging DataTable..."
+echo "🚀 Merging pos..."
 
-find "$ROOT/resources/js/components/ui/DataTable" \
+find "$ROOT/resources/js/pos" \
     -type f \
     \( \
         -name "*.ts" -o \

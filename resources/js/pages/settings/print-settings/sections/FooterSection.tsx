@@ -3,7 +3,7 @@ import type { BorderStyle } from '../types';
 import type { PrintTemplate } from '../types';
 import { Toggle, SliderField, Section } from './ToggleSwitch';
 import { ColorField, Field, Input, Textarea } from '../components/ui';
-import { BorderSelect } from './HeaderSection';
+import { AlignButtons, BorderSelect } from './HeaderSection';
 import { isSettingVisible } from '../services/SettingsRegistry';
 import { RowManager } from '../components/RowManager';
 
@@ -41,6 +41,9 @@ export default function FooterSectionControls({ tpl, update }: Props) {
 
         {sec('footer_separator') && <BorderSelect label="فاصل التذييل" value={tpl.footer_separator}
           onChange={v => update('footer_separator', v as BorderStyle)} />}
+        {sec('footer_align') && <AlignButtons label="محاذاة التذييل" value={tpl.footer_align}
+          onChange={v => update('footer_align', v)} />}
+        {sec('footer_text_color') && <ColorField label="لون النص" value={tpl.footer_text_color} onChange={v => update('footer_text_color', v)} />}
 
         <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
 

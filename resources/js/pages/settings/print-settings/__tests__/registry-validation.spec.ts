@@ -14,8 +14,8 @@ const VALID_COMPONENTS = [
 ] as const;
 
 describe('SettingsRegistry — Structural Validation', () => {
-  it('should have exactly 222 entries', () => {
-    expect(SETTING_COUNT).toBe(223);
+  it('should have exactly 228 entries', () => {
+    expect(SETTING_COUNT).toBe(228);
   });
 
   it('every entry should have a matching key in the registry object', () => {

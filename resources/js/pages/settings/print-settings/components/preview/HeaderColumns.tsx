@@ -3,6 +3,7 @@ import { layoutEngine, type LayoutElement } from '../../engines/LayoutEngine';
 import type { PrintTemplate, HeaderLayout, LayoutBlock } from '../../types/domain';
 import type { UniversalDocumentData } from '../../types/data';
 import { renderLayoutRows, boxBorderCss } from './shared';
+import type { AlignOption } from '../../types/domain';
 
 function spacingCss(p?: LayoutBlock['padding']): string {
   if (!p) return '4px 8px';
@@ -56,7 +57,7 @@ export function renderHeaderColumns(
               ...boxBorderCss(col.border),
             }}
           >
-            {renderLayoutRows(col.rows, data, tpl)}
+            {renderLayoutRows(col.rows, data, tpl, { sectionAlign: (col.align === 'start' ? 'right' : col.align === 'end' ? 'left' : 'center') as AlignOption })}
           </div>
         );
       })}

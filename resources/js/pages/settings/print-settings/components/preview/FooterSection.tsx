@@ -1,6 +1,6 @@
 import type { PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
-import { Separator, borderStyle } from './shared';
+import { Separator, borderStyle, align, fontFamily } from './shared';
 
 function barcodeText(tpl: PrintTemplate, data: UniversalDocumentData): string {
   if (tpl.barcode_content === 'custom') return tpl.barcode_custom_text;
@@ -30,7 +30,7 @@ function renderThermalFooter(tpl: PrintTemplate, data: UniversalDocumentData) {
   if (!hasContent) return null;
 
   return (
-    <div style={{ textAlign: 'center', fontSize: tpl.base_font_size - 0.5 }}>
+    <div style={{ textAlign: align(tpl.footer_align), fontSize: tpl.base_font_size - 0.5, color: tpl.footer_text_color }}>
       <Separator style={tpl.footer_separator} />
 
       {tpl.show_bank_details && tpl.bank_details_text && (
@@ -157,6 +157,8 @@ function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
       borderTop: tpl.footer_separator === 'none' ? 'none' : `2px ${borderStyle(tpl.footer_separator)} #111`,
       paddingTop: 16,
       marginTop: 12,
+      textAlign: align(tpl.footer_align),
+      color: tpl.footer_text_color,
     }}>
       {tpl.show_bank_details && tpl.bank_details_text && (
         <div style={{ marginBottom: 12 }}>
@@ -182,14 +184,13 @@ function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
           fontWeight: 700, margin: '8px 0',
           fontSize: tpl.thank_you_size,
           color: tpl.thank_you_color,
-          textAlign: 'center',
         }}>
           {tpl.thank_you_text}
         </div>
       )}
 
       {tpl.footer_legal_text && (
-        <div style={{ fontSize: tpl.base_font_size - 1.5, color: '#888', margin: '6px 0', textAlign: 'center' }}>
+        <div style={{ fontSize: tpl.base_font_size - 1.5, color: '#888', margin: '6px 0' }}>
           {tpl.footer_legal_text}
         </div>
       )}
@@ -276,8 +277,9 @@ function renderA5Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
 
   return (
     <div style={{
-      textAlign: 'center',
+      textAlign: align(tpl.footer_align),
       fontSize: tpl.base_font_size - 0.5,
+      color: tpl.footer_text_color,
       borderTop: tpl.footer_separator === 'none' ? 'none' : `1.5px ${borderStyle(tpl.footer_separator)} #111`,
       paddingTop: 10,
     }}>

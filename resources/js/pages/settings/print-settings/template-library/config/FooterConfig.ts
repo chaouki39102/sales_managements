@@ -48,3 +48,21 @@ export const DELIVERY_A5_FOOTER: FooterConfig = {
   footerLine2: '',
   thankYouSize: 10,
 };
+
+export const POS_RECEIPT_80MM_FOOTER: FooterConfig = {
+  ...INVOICE_FOOTER,
+  footerLine1: 'البضاعة المباعة لا ترد ولا تستبدل',
+  footerLine2: '',
+  footerLine3: '',
+  footerSeparator: 'none',
+  showThankYou: true,
+  thankYouText: 'شكراً لتعاملكم',
+  thankYouSize: 10,
+  showReturnsPolicy: true,
+  returnsPolicyText: 'البضاعة المباعة لا ترد ولا تستبدل',
+  showBarcode: true,
+  showQr: true,
+  showCashierSignature: false,
+  showClientSignature: false,
+  showStamp: false,
+};

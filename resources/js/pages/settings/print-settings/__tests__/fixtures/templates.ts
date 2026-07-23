@@ -148,6 +148,7 @@ export function createMockTemplate(
     customer_info_bold: false,
     customer_info_italic: false,
     customer_info_align: 'right' as any,
+    doc_info_align: 'right' as any,
     show_session: docType === 'POS',
     show_payment_term: false,
     show_bank_details: false,
@@ -196,11 +197,15 @@ export function createMockTemplate(
 
     show_payment_details: true,
     payment_font_size: 9,
+    payments_align: 'right',
+    payments_font_family: 'tajawal',
 
     footer_line1: '',
     footer_line2: '',
     footer_line3: '',
     footer_separator: 'solid',
+    footer_align: 'center',
+    footer_text_color: '#111111',
     show_thank_you: true,
     thank_you_text: 'Merci de votre visite!',
     thank_you_size: 11,

@@ -72,7 +72,7 @@ interface ApiDocumentLine {
     barcode?:    string | null;
     unit?: { name?: string } | null;
   } | null;
-  packaging?: { name?: string } | null;
+  packaging?: { label?: string; name?: string; quantity?: number } | null;
   stock_lot?: { lot_number?: string } | null;
   notes?:     string | null;
 }
@@ -456,6 +456,15 @@ function buildCurrencyFromApi(
   };
 }
 
+function buildUnitLabel(line: ApiDocumentLine): string | null {
+  const lbl = line.packaging?.label ?? line.packaging?.name;
+  if (!lbl) return line.product?.unit?.name ?? null;
+  const qty = line.packaging?.quantity != null ? Number(line.packaging.quantity) : null;
+  if (qty == null || qty === 0) return lbl;
+  const qtyStr = Number.isInteger(qty) ? String(qty) : qty.toFixed(4).replace(/\.?0+$/, '');
+  return `${lbl} (${qtyStr})`;
+}
+
 function buildLineFromApi(line: ApiDocumentLine, index: number): DocumentLine {
   const tvaRate   = num(line.tva_rate);
   const tvaPct    = Math.round(tvaRate * 100);
@@ -472,7 +481,7 @@ function buildLineFromApi(line: ApiDocumentLine, index: number): DocumentLine {
     ref:          line.product?.reference  ?? null,
     barcode:      line.product?.barcode    ?? null,
     name:         line.product?.name ?? line.description ?? '',
-    unit:         line.product?.unit?.name ?? line.packaging?.name ?? null,
+    unit:         buildUnitLabel(line),
     quantity:     num(line.quantity),
     unitPriceHt:  uPriceHt,
     unitPriceTtc: uPriceTtc,

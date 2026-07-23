@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { nanoid }  from 'nanoid';
-import type { CartItem, Party, ProductVariant, QuantityDiscount } from '@/types';
+import type { CartItem, Party, ProductPackaging, ProductVariant, QuantityDiscount } from '@/types';
 
 export interface DocumentPayment {
   id:                  number;
@@ -22,7 +22,7 @@ interface CartState {
   payments:           DocumentPayment[];
   _isDirty:           boolean;
 
-  addItem:              (variant: ProductVariant, qty?: number) => void;
+  addItem:              (variant: ProductVariant, qty?: number, packaging?: ProductPackaging | null) => void;
   removeItem:           (id: string) => void;
   updateQty:            (id: string, qty: number) => void;
   updateDiscount:       (id: string, pct: number) => void;
@@ -90,9 +90,15 @@ export const useCartStore = create<CartState>()(
       payments:           [],
       _isDirty:           false,
 
-      addItem: (variant, qty = 1) => {
+      addItem: (variant, qty = 1, packaging = null) => {
         set(state => {
-          const existing = state.items.find(i => i.variant_id === variant.id);
+          const packQty = packaging ? Math.max(1, Number(packaging.quantity) || 1) : 1;
+          const packId  = packaging?.id ?? null;
+
+          // Merge only if same product + same packaging
+          const existing = state.items.find(
+            i => i.variant_id === variant.id && (i.packaging_id ?? null) === packId,
+          );
           if (existing) {
             const newQty   = existing.quantity + qty;
             const autoDisc = findQuantityDiscount(variant.quantity_discounts, newQty);
@@ -103,13 +109,13 @@ export const useCartStore = create<CartState>()(
             });
             return {
               items: state.items.map(i =>
-                i.variant_id === variant.id ? updated : i,
+                i.variant_id === variant.id && (i.packaging_id ?? null) === packId ? updated : i,
               ),
               _isDirty: true,
             };
           }
 
-          const priceHt  = variant.default_selling_price_ht;
+          const priceHt  = variant.default_selling_price_ht * packQty;
           const tvaRate  = variant.tva?.rate ?? 0;
           const autoDisc = findQuantityDiscount(variant.quantity_discounts, qty);
 
@@ -121,7 +127,7 @@ export const useCartStore = create<CartState>()(
             product_name:        variant.product?.name ?? '',
             variant_name:        variant.variant_name ?? null,
             barcode:             variant.barcode ?? null,
-            unit_symbol:         getUnitSymbol(variant),
+            unit_symbol:         packaging?.label ?? getUnitSymbol(variant),
             image_url:           (variant as any).image_url ?? variant.product?.images?.[0] ?? null,
             quantity:            qty,
             unit_price_ht:       priceHt,
@@ -136,6 +142,9 @@ export const useCartStore = create<CartState>()(
             max_stock:           variant.manages_stock
               ? (variant.current_stock ?? null)
               : null,
+            packaging_id:        packId,
+            pack_qty:            packQty,
+            packaging_label:     packaging?.label ?? null,
           });
 
           return { items: [...state.items, newItem], _isDirty: true };

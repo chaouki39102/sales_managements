@@ -763,7 +763,7 @@
   flex-shrink: 0;
 }
 .pcard-pin:hover { color: var(--gold); border-color: var(--goldbo); background: var(--goldb); transform: scale(1.08); }
-.pcard-pin.on { color: var(--gold); border-color: var(--goldbo); background: var(--goldb); }
+.pcard-pin.on { color: var(--gold); border-color: var(--gold); background: rgba(184,125,10,.18); box-shadow: 0 0 0 1px rgba(184,125,10,.15); transform: scale(1.05); }
 .pcard-add {
   flex: 1;
   display: flex;
@@ -1180,6 +1180,7 @@
   transition: .12s;
 }
 .prow-pin:hover { color: var(--gold); border-color: var(--goldbo); background: var(--goldb); }
+.prow-pin.on { color: var(--gold); border-color: var(--gold); background: rgba(184,125,10,.18); box-shadow: 0 0 0 1px rgba(184,125,10,.15); }
 .incart-badge {
   background: var(--em);
   color: #fff;

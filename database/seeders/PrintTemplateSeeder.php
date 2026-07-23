@@ -180,7 +180,7 @@ class PrintTemplateSeeder extends Seeder
         }
 
         foreach ($companies as $company) {
-            self::seedForCompany($company->id, $this->command);
+            self::seedForCompany($company->id, $this->command instanceof \Illuminate\Console\Output\OutputInterface ? $this->command : null);
         }
 
         $this->command->info('PrintTemplateSeeder completed successfully.');

@@ -1,12 +1,24 @@
 import type { PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
-import { renderLayoutRows } from './shared';
+import { renderLayoutRows, align, borderStyle, type FieldStyleOverride } from './shared';
+import type { AlignOption } from '../../types';
 import { TotalsGrid } from './TotalsGrid';
+
+const TOTALS_FIELD_OVERRIDES: (tpl: PrintTemplate) => Record<string, FieldStyleOverride> = (tpl) => ({
+  'totals.ttc': {
+    fontSize: tpl.total_ttc_font_size,
+    bold: tpl.total_ttc_bold,
+    color: tpl.total_ttc_color,
+  },
+});
 
 function renderThermalTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
   const textAlign =
     tpl.totals_align === 'left'  ? 'left' :
     tpl.totals_align === 'center' ? 'center' : 'right';
+
+  const bs = tpl.total_border_style;
+  const hasBorder = bs && bs !== 'none';
 
   return (
     <div style={{
@@ -15,7 +27,14 @@ function renderThermalTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
       textAlign,
       marginBottom: 4,
     }}>
-      {renderLayoutRows(tpl.totals_rows, data, tpl)}
+      {hasBorder && (
+        <div style={{
+          borderTop: `${bs === 'double' ? '2px' : '1px'} ${borderStyle(bs)} #999`,
+          marginBottom: 4,
+          paddingTop: 4,
+        }} />
+      )}
+      {renderLayoutRows(tpl.totals_rows, data, tpl, { fieldStyleOverrides: TOTALS_FIELD_OVERRIDES(tpl), sectionAlign: tpl.totals_align })}
     </div>
   );
 }
@@ -27,6 +46,9 @@ function renderPageTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
     tpl.totals_align === 'left'  ? 'flex-start' :
     tpl.totals_align === 'center' ? 'center' : 'flex-end';
 
+  const bs = tpl.total_border_style;
+  const hasBorder = bs && bs !== 'none';
+
   return (
     <div style={{
       display: 'flex', justifyContent: justify,
@@ -37,7 +59,14 @@ function renderPageTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
         fontSize: tpl.totals_font_size,
         fontWeight: tpl.totals_bold ? 700 : 400,
       }}>
-        {renderLayoutRows(tpl.totals_rows, data, tpl)}
+        {hasBorder && (
+          <div style={{
+            borderTop: `${bs === 'double' ? '2px' : '1px'} ${borderStyle(bs)} #999`,
+            marginBottom: 4,
+            paddingTop: 4,
+          }} />
+        )}
+        {renderLayoutRows(tpl.totals_rows, data, tpl, { fieldStyleOverrides: TOTALS_FIELD_OVERRIDES(tpl), sectionAlign: tpl.totals_align })}
       </div>
     </div>
   );

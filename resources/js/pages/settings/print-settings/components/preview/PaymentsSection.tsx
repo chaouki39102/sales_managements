@@ -1,11 +1,11 @@
 import type { PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
-import { Separator } from './shared';
+import { Separator, align, fontFamily } from './shared';
 import { printFieldResolver } from '../../services';
 
 function renderThermalPayments(tpl: PrintTemplate, data: UniversalDocumentData) {
   return (
-    <div style={{ fontSize: tpl.payment_font_size, marginBottom: 4 }}>
+    <div style={{ fontSize: tpl.payment_font_size, fontFamily: fontFamily(tpl.payments_font_family), textAlign: align(tpl.payments_align), marginBottom: 4 }}>
       <Separator style="dashed" />
       <div style={{ fontWeight: 700, marginBottom: 2 }}>وسائل الدفع:</div>
       {data.payments.map((p, i) => (
@@ -23,7 +23,7 @@ function renderPagePayments(tpl: PrintTemplate, data: UniversalDocumentData) {
   const isA4 = tpl.paper_size === 'A4';
   if (isA4) {
     return (
-      <div style={{ fontSize: tpl.payment_font_size, marginBottom: 16 }}>
+      <div style={{ fontSize: tpl.payment_font_size, marginBottom: 16, textAlign: align(tpl.payments_align) }}>
         <div style={{ fontWeight: 700, marginBottom: 8 }}>تفاصيل الدفع</div>
         <table style={{ width: 320, borderCollapse: 'collapse', direction: 'ltr' }}>
           <tbody>
@@ -40,7 +40,7 @@ function renderPagePayments(tpl: PrintTemplate, data: UniversalDocumentData) {
   }
 
   return (
-    <div style={{ fontSize: tpl.payment_font_size, marginBottom: 10 }}>
+    <div style={{ fontSize: tpl.payment_font_size, marginBottom: 10, textAlign: align(tpl.payments_align) }}>
       <div style={{ fontWeight: 700, marginBottom: 4 }}>وسائل الدفع:</div>
       {data.payments.map((p, i) => (
         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', width: 200 }}>

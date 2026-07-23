@@ -66,7 +66,7 @@ function renderCompanyInfo(tpl: PrintTemplate, data: UniversalDocumentData, _isT
   if (rows.length > 0) {
     return (
       <div style={{ ...st, color: '#444' }}>
-        {renderLayoutRows(rows, data, tpl)}
+        {renderLayoutRows(rows, data, tpl, { sectionAlign: tpl.company_info_align })}
       </div>
     );
   }

@@ -411,7 +411,7 @@ function POSPage() {
     queryKey: [slug, 'products', 'pos', { cat: pos.selectedCategory, perPage: filterPerPage }],
     queryFn: () => productsApi.list({
       per_page:  filterPerPage,
-      include:   'tva,unit,family,prices.priceLevel,quantityDiscounts',
+      include:   'tva,unit,family,prices.priceLevel,quantityDiscounts,packagings',
       filter:    { active: 1, ...(queryFamilyId ? { family_id: queryFamilyId } : {}) },
     }),
     enabled:         !!slug,

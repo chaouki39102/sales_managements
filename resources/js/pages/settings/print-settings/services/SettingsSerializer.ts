@@ -49,10 +49,11 @@ export function toApiPayload(tpl: Partial<PrintTemplate>): Record<string, unknow
 /**
  * Reconstruct PrintTemplate from API response.
  *
- * DESIGN: The database is the ONLY source of truth.
+ * DESIGN: The database is the primary source of truth.
  * Config keys from the API response are merged directly.
- * No defaults are injected — if a key is missing from the DB,
- * it stays undefined. The first full save will populate it.
+ * Missing keys (from SETTINGS_REGISTRY) are filled with registry defaults,
+ * ensuring old templates survive new settings added after their creation.
+ * Layout fields (totals_rows, footer_rows, etc.) are populated by ensureLayoutFields().
  */
 export function fromApiResponse(r: ApiResponse): PrintTemplate {
   const result: Record<string, unknown> = {

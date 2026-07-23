@@ -57,3 +57,22 @@ export const DELIVERY_A5_TOTALS: TotalsConfig = {
   showFiscalStamp: false,
   showAmountInWords: false,
 };
+
+export const POS_RECEIPT_80MM_TOTALS: TotalsConfig = {
+  ...INVOICE_TOTALS,
+  totalsFontSize: 9,
+  totalTtcFontSize: 14,
+  showTotalHt: false,
+  showTotalTva: false,
+  showTvaBreakdown: false,
+  showDiscountTotal: false,
+  showFiscalStamp: false,
+  showTotalTtc: true,
+  totalTtcBold: true,
+  showAmountInWords: false,
+  showPaidAmount: true,
+  showChange: true,
+  showRemaining: false,
+  showPrevBalance: true,
+  showNewBalance: true,
+};

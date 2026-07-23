@@ -256,6 +256,7 @@ export interface PrintTemplate {
   customer_info_bold:   boolean;
   customer_info_italic: boolean;
   customer_info_align:  AlignOption;
+  doc_info_align:       AlignOption;
   show_session:     boolean;
   show_payment_term:boolean;
   show_bank_details:boolean;
@@ -317,11 +318,15 @@ export interface PrintTemplate {
 
   show_payment_details:boolean;
   payment_font_size:   number;
+  payments_align:      AlignOption;
+  payments_font_family: FontFamily;
 
   footer_line1:        string;
   footer_line2:        string;
   footer_line3:        string;
   footer_separator:    BorderStyle;
+  footer_align:        AlignOption;
+  footer_text_color:   string;
   show_thank_you:      boolean;
   thank_you_text:      string;
   thank_you_size:      number;

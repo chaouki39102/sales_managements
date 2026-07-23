@@ -113,7 +113,7 @@ function TotalsGridFn({
           fontWeight: tpl.totals_bold ? 700 : 400,
           maxWidth: 320,
         }}>
-          {renderLayoutRows(config.summaryRows, data, tpl)}
+          {renderLayoutRows(config.summaryRows, data, tpl, { sectionAlign: tpl.totals_align })}
         </div>
       )}
     </div>

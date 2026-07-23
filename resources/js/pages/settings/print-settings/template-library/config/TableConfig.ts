@@ -3,7 +3,7 @@ import {
   TABLE_ROW_ALT,
   COLUMN_REF_WIDTH, COLUMN_NAME_WIDTH, COLUMN_QTY_WIDTH,
   COLUMN_PRICE_WIDTH, COLUMN_TVA_WIDTH, COLUMN_TOTAL_WIDTH,
-  COLOR_PRIMARY,
+  COLOR_PRIMARY, COLOR_MUTED,
 } from '../constants';
 
 export interface TableConfig {
@@ -58,4 +58,22 @@ export const DELIVERY_A5_COLUMNS: TableConfig = {
   columnHeaders: { ref: 'م', name: 'البيان', quantity: 'الكمية', price: 'س.و.ح', total: 'المبلغ' },
   columnAligns: { ref: 'center', name: 'right', quantity: 'center', price: 'center', total: 'center' },
   itemsFontSize: 8,
+};
+
+export const POS_RECEIPT_80MM_COLUMNS: TableConfig = {
+  ...INVOICE_COLUMNS,
+  columnOrder: ['name', 'quantity', 'total'],
+  columnShow: { ref: false, name: true, quantity: true, price: false, tva: false, total: true },
+  columnWidths: { name: 44, quantity: 16, total: 24 },
+  columnHeaders: { name: 'البيان', quantity: 'الكمية', total: 'المبلغ' },
+  columnAligns: { name: 'right', quantity: 'center', total: 'right' },
+  itemsFontSize: 8,
+  showColHeader: true,
+  tableHeaderBold: false,
+  tableHeaderBg: 'transparent',
+  tableHeaderColor: COLOR_MUTED,
+  tableHeaderRadius: 0,
+  tableBorderStyle: 'none',
+  alternatingRows: false,
+  priceDisplay: 'ttc',
 };

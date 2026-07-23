@@ -107,6 +107,8 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
 
   const frameConfig = tpl.page_frame;
 
+  const watermark = tpl.watermark;
+
   return (
     <div style={{
       width: paperWidth,
@@ -120,6 +122,7 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
       margin: '0 auto',
       minHeight,
       boxSizing: 'border-box',
+      position: 'relative',
     }}>
       <PageFrame config={frameConfig ?? { enabled: false }} tpl={tpl}>
         {isDeliveryA5 ? (
@@ -140,6 +143,23 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
           </>
         )}
       </PageFrame>
+      {watermark?.enabled && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: `translate(-50%, -50%) rotate(${watermark.rotation ?? -30}deg)`,
+          fontSize: watermark.fontSize ?? 60,
+          color: watermark.color ?? 'rgba(0,0,0,0.06)',
+          fontWeight: 900,
+          whiteSpace: 'nowrap',
+          pointerEvents: 'none',
+          userSelect: 'none',
+          zIndex: 1,
+        }}>
+          {watermark.text || ''}
+        </div>
+      )}
     </div>
   );
 }

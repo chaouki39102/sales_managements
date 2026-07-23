@@ -132,6 +132,7 @@ export default function DocumentSectionControls({ tpl, update }: Props) {
         rows={tpl.doc_info_rows ?? []}
         onChange={rows => update('doc_info_rows', rows)}
       />
+      {sec('doc_info_align') && <AlignButtons label="محاذاة معلومات المستند" value={tpl.doc_info_align} onChange={v => update('doc_info_align', v)} />}
 
       <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
 

@@ -9,6 +9,7 @@ import {
   INVOICE_COLUMNS, INVOICE_TOTALS, INVOICE_FOOTER,
   DELIVERY_COLUMNS, DELIVERY_TOTALS, DELIVERY_FOOTER,
   DELIVERY_A5_COLUMNS, DELIVERY_A5_TOTALS, DELIVERY_A5_FOOTER,
+  POS_RECEIPT_80MM_COLUMNS, POS_RECEIPT_80MM_TOTALS, POS_RECEIPT_80MM_FOOTER,
 } from './config';
 import { headerConfig, paperConfig, typographyConfig } from './config';
 import { categoryFromDocType } from './categories';
@@ -158,24 +159,31 @@ export function buildTemplate(
 
   const isInvoice = docTypeCode === 'FV';
   const isA5 = paperSize === 'A5';
+  const isThermal = paperSize === '80mm' || paperSize === '58mm';
 
-  const table = isInvoice
-    ? INVOICE_COLUMNS
-    : isA5
-      ? DELIVERY_A5_COLUMNS
-      : DELIVERY_COLUMNS;
+  const table = isThermal
+    ? POS_RECEIPT_80MM_COLUMNS
+    : isInvoice
+      ? INVOICE_COLUMNS
+      : isA5
+        ? DELIVERY_A5_COLUMNS
+        : DELIVERY_COLUMNS;
 
-  const totals = isInvoice
-    ? INVOICE_TOTALS
-    : isA5
-      ? DELIVERY_A5_TOTALS
-      : DELIVERY_TOTALS;
+  const totals = isThermal
+    ? POS_RECEIPT_80MM_TOTALS
+    : isInvoice
+      ? INVOICE_TOTALS
+      : isA5
+        ? DELIVERY_A5_TOTALS
+        : DELIVERY_TOTALS;
 
-  const footer = isInvoice
-    ? INVOICE_FOOTER
-    : isA5
-      ? DELIVERY_A5_FOOTER
-      : DELIVERY_FOOTER;
+  const footer = isThermal
+    ? POS_RECEIPT_80MM_FOOTER
+    : isInvoice
+      ? INVOICE_FOOTER
+      : isA5
+        ? DELIVERY_A5_FOOTER
+        : DELIVERY_FOOTER;
 
   const base: PrintTemplate = {
     id: null,
@@ -320,6 +328,7 @@ export function buildTemplate(
     customer_info_bold: false,
     customer_info_italic: false,
     customer_info_align: 'right' as any,
+    doc_info_align: 'right' as any,
     show_session: false,
     show_payment_term: false,
     show_bank_details: isInvoice,
@@ -368,11 +377,15 @@ export function buildTemplate(
 
     show_payment_details: false,
     payment_font_size: 9,
+    payments_align: 'right',
+    payments_font_family: 'tajawal',
 
     footer_line1: footer.footerLine1,
     footer_line2: footer.footerLine2,
     footer_line3: footer.footerLine3,
     footer_separator: footer.footerSeparator,
+    footer_align: 'center',
+    footer_text_color: '#111111',
     show_thank_you: footer.showThankYou,
     thank_you_text: footer.thankYouText,
     thank_you_size: footer.thankYouSize,
@@ -602,6 +615,67 @@ export function registerBuiltinTemplates(): void {
       col_headers: { rowNumber: 'رقم', name: 'التعيين', quantity: 'الكمية', unit: 'الوحدة', total: 'المبلغ' },
       col_widths: { rowNumber: 6, name: 28, quantity: 12, unit: 16, total: 18 },
       col_aligns: { rowNumber: 'center', name: 'right', quantity: 'center', unit: 'center', total: 'right' },
+      totals_grid: { enabled: false, columns: [] } as any,
+    }),
+  });
+
+  templateRegistry.register({
+    meta: createMeta({
+      id: 'dz-pos-receipt-80mm',
+      name: 'Algerian POS Receipt 80mm',
+      nameAr: 'إيصال نقاط البيع الجزائري 80 ملم',
+      description: 'Algerian POS receipt in 80mm thermal format with compact 3-column items table, TTC totals, balance tracking, QR code and barcode.',
+      descriptionAr: 'إيصال نقاط بيع جزائري بصيغة حرارية 80 ملم مع جدول مواد مدمج ب3 أعمدة ومجاميع TTC وتتبع الأرصدة ورمز QR والباركود',
+      documentType: 'POS',
+      paperSize: '80mm',
+      tags: ['algeria', 'arabic', 'thermal', '80mm', 'pos', 'receipt', 'barcode', 'qrcode'],
+    }),
+    createConfig: () => buildTemplate('قالب إيصال نقاط البيع 80 ملم', 'POS', '80mm', {
+      show_logo: true,
+      logo_source: 'company',
+      logo_size: 50,
+      logo_align: 'center',
+      show_company_name: true,
+      company_name_bold: true,
+      company_name_align: 'center',
+      show_address: false,
+      show_phone: true,
+      show_tax_id: true,
+      show_rc: false,
+      show_nis: false,
+      show_article: false,
+      company_info_align: 'center',
+      company_info_size: 7,
+      show_doc_number: true,
+      show_date: true,
+      show_time: true,
+      show_cashier: true,
+      show_session: true,
+      show_client: true,
+      show_client_nif: false,
+      show_client_phone: false,
+      show_client_address: false,
+      title_text: 'إيصال بيع',
+      show_barcode: true,
+      barcode_content: 'doc-number',
+      show_qr: true,
+      qr_content: 'both',
+      show_thank_you: true,
+      show_returns_policy: true,
+      show_stamp: false,
+      show_cashier_signature: false,
+      show_client_signature: false,
+      doc_separator: 'dashed',
+      show_payment_details: true,
+      payment_font_size: 8,
+      show_bank_details: false,
+      header_separator: 'none',
+      show_header_section: true,
+      show_doc_info_section: true,
+      show_items_section: true,
+      show_totals_section: true,
+      show_payments_section: false,
+      show_footer_section: true,
       totals_grid: { enabled: false, columns: [] } as any,
     }),
   });

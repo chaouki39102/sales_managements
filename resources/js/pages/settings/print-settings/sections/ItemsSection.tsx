@@ -185,6 +185,8 @@ export default function ItemsSectionControls({ tpl, update }: Props) {
             {sec('table_header_bold') && <Toggle value={tpl.table_header_bold} onChange={v => update('table_header_bold', v)} label="خط عريض للرأس" />}
             {sec('table_header_bg') && <ColorField label="لون خلفية الرأس" value={tpl.table_header_bg || '#f5f5f5'} onChange={v => update('table_header_bg', v)} />}
             {sec('table_header_color') && <ColorField label="لون نص الرأس" value={tpl.table_header_color || '#111111'} onChange={v => update('table_header_color', v)} />}
+            {sec('table_header_radius') && <SliderField label="استدارة زوايا الرأس" value={tpl.table_header_radius ?? 6} min={0} max={20} step={1} unit="px"
+              onChange={v => update('table_header_radius', v)} />}
             {COLUMNS.filter(c => tpl.col_show[c.key] !== false).map(col => (
               <div className="ps-field" key={col.key} style={{ marginTop: 2 }}>
                 <label className="ps-field-label">رأس: {col.label}</label>
