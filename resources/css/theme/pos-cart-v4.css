@@ -482,11 +482,27 @@
   color: var(--em2);
   font-weight: 600;
 }
+/* ── cr-ht base (price text, without strike-through) ── */
+.cr-ht {
+  font-size: 13.5px;
+  font-weight: 900;
+  color: var(--em);
+  line-height: 1.2;
+}
 .cr-ht--strike {
   font-size: 10px;
   color: var(--t4);
   text-decoration: line-through;
   margin-top: 1px;
+}
+
+/* ── cr-popup--disc (discount popup variant) ── */
+.cr-popup--disc { min-width: 220px; }
+
+/* ── cr--popup-open (row with popup active) ── */
+.cr--popup-open {
+  background: var(--emb);
+  border-color: var(--embo);
 }
 
 /* ══════════════════════════════════════════

@@ -3037,3 +3037,276 @@ body.dark .thermal-status.err { background: #7f1d1d; color: #fecaca; }
   outline: none;
   cursor: pointer;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   11. RETURNS MODAL — مرتجع مبيعات
+══════════════════════════════════════════════════════════════════════════════ */
+.ret-search { margin-bottom: 12px; }
+.ret-doc {
+  border: 1.5px solid var(--b2);
+  border-radius: var(--r2);
+  background: var(--bg3);
+  overflow: hidden;
+}
+.ret-doc-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--b2);
+}
+.ret-doc-hd strong { font-size: 13px; }
+.ret-lines {
+  max-height: 320px;
+  overflow-y: auto;
+}
+.ret-line {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--b1);
+  transition: background .1s;
+}
+.ret-line:last-child { border-bottom: none; }
+.ret-line:hover { background: var(--bg4); }
+.ret-line-sel { background: var(--emb); }
+.ret-line-sel:hover { background: var(--emb); }
+.ret-line-lbl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 12.5px;
+}
+.ret-line-lbl input[type="checkbox"] {
+  accent-color: var(--em);
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+.ret-line-name { flex: 1; font-weight: 600; }
+.ret-line-qty { color: var(--t4); font-size: 11.5px; }
+.ret-line-amt {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--em);
+}
+.ret-line-qty-inp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--b1);
+  font-size: 12px;
+  color: var(--t3);
+}
+.ret-line-qty-inp .inp {
+  width: 70px;
+  padding: 4px 6px;
+  border-radius: var(--r1);
+  border: 1.5px solid var(--b2);
+  background: var(--bg2);
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'IBM Plex Mono', monospace;
+  text-align: center;
+  outline: none;
+}
+.ret-line-qty-inp .inp:focus {
+  border-color: var(--em);
+  box-shadow: 0 0 0 2px var(--emb);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   12. UTILITY: fg-hint — تلميح في مجموعات الإعدادات
+══════════════════════════════════════════════════════════════════════════════ */
+.fg-hint {
+  font-size: 11px;
+  color: var(--t4);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   13. KEYBOARD HELP MODAL
+══════════════════════════════════════════════════════════════════════════════ */
+.kb-capture {
+  border-color: var(--em) !important;
+  box-shadow: 0 0 0 3px var(--emb);
+  animation: kbPulse 1.2s ease-in-out infinite;
+}
+@keyframes kbPulse {
+  0%, 100% { box-shadow: 0 0 0 3px var(--emb); }
+  50% { box-shadow: 0 0 0 6px rgba(10,138,92,.1); }
+}
+.kb-key-clickable {
+  cursor: pointer;
+  transition: all .12s;
+}
+.kb-key-clickable:hover {
+  background: var(--emb);
+  border-color: var(--embo);
+  color: var(--em);
+}
+.kb-edit-on {
+  background: var(--emb);
+  border-radius: var(--r1);
+}
+
+/* ── al-i: alert info variant ── */
+.al-i {
+  background: var(--blueb);
+  border-color: var(--bluebo);
+  color: var(--blue);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   14. UNDO CLEAR — عداد التراجع عن المسح
+══════════════════════════════════════════════════════════════════════════════ */
+.undo-ct {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  margin-right: 3px;
+  border-radius: 8px;
+  background: var(--red);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+}
+.btn-pulse {
+  animation: btnPulse .8s ease-in-out infinite;
+}
+@keyframes btnPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .6; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   15. PRODUCT CARD INCREMENT VARIANT
+══════════════════════════════════════════════════════════════════════════════ */
+.pcard-qty-inc { color: var(--em2); }
+.pcard-qty-inc:hover { background: var(--emb); color: var(--em); }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   16. PRODUCT ROW NAME — عرض القائمة
+══════════════════════════════════════════════════════════════════════════════ */
+.prow-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t1);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   17. SEARCH POSITION BADGE
+══════════════════════════════════════════════════════════════════════════════ */
+.srch-pos {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--t4);
+  direction: ltr;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   18. GENERIC TABLE CLASSES
+══════════════════════════════════════════════════════════════════════════════ */
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.tbl th,
+.tbl td {
+  padding: 8px 10px;
+  text-align: right;
+  border-bottom: 1px solid var(--b2);
+}
+.tbl th {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--t3);
+  background: var(--bg2);
+}
+.tbl-sm { font-size: 12px; }
+.tbl-sm th,
+.tbl-sm td { padding: 6px 8px; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   19. SESSION INVOICE ROW
+══════════════════════════════════════════════════════════════════════════════ */
+.si-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--r1);
+  cursor: pointer;
+  transition: background .1s;
+}
+.si-row:hover { background: var(--bg3); }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   20. FORM CONTROL — إدخال عام
+══════════════════════════════════════════════════════════════════════════════ */
+.form-control {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--r2);
+  border: 1.5px solid var(--b2);
+  background: var(--bg2);
+  font-family: 'Tajawal', sans-serif;
+  font-size: 13px;
+  color: var(--t1);
+  outline: none;
+  transition: border-color .12s, box-shadow .12s;
+}
+.form-control:focus {
+  border-color: var(--em);
+  box-shadow: 0 0 0 3px var(--emb);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   21. CATEGORY TABS ARROW BUTTONS
+══════════════════════════════════════════════════════════════════════════════ */
+.pos-cats-btn-left {
+  border-radius: 50% 0 0 50%;
+}
+.pos-cats-btn-right {
+  border-radius: 0 50% 50% 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   22. QUICK BAR SCROLL LEFT
+══════════════════════════════════════════════════════════════════════════════ */
+.pqb-scroll-l {
+  border-right: 1px solid var(--b2);
+  border-left: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   23. POS SESSION TABLE ROW BASE
+══════════════════════════════════════════════════════════════════════════════ */
+.pss-tr {
+  transition: background .1s;
+}
+.pss-tr:hover { background: var(--bg3); }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   24. EDITING CHIP — وضع التعديل
+══════════════════════════════════════════════════════════════════════════════ */
+.pos-chip.editing {
+  animation: chipBlink 1s ease-in-out infinite;
+}
+@keyframes chipBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .6; }
+}

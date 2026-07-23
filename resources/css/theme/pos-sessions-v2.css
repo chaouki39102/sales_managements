@@ -54,7 +54,12 @@
 .osm-hero-time {
   font-size: 11px;
   opacity: .8;
-  margin-top: 2px;
+}
+.osm-hero-text {
+  flex: 1;
+  font-size: 13px;
+  color: #fff;
+  line-height: 1.5;
 }
 .osm-steps-mini {
   display: flex;
@@ -584,6 +589,7 @@
 .csm-tb-amount { font-size: 30px; font-weight: 900; letter-spacing: -1px; line-height: 1; }
 .csm-tb-dzd { font-size: 16px; opacity: .7; }
 .csm-tb-right { display: flex; gap: 20px; }
+.csm-tb-left { display: flex; flex-direction: column; justify-content: center; gap: 4px; }
 .csm-tb-stat { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .csm-tb-stat span { font-size: 18px; font-weight: 900; }
 .csm-tb-stat small { font-size: 10px; opacity: .8; }
@@ -1257,6 +1263,22 @@
   transition: .13s;
 }
 .ssm-btn-close:hover { background: var(--em2); }
+.ssm-btn-print {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 18px;
+  border-radius: var(--r2);
+  border: 1.5px solid var(--b2);
+  background: var(--bg3);
+  color: var(--t1);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: 'Tajawal', sans-serif;
+  transition: .13s;
+}
+.ssm-btn-print:hover { background: var(--emb); border-color: var(--embo); color: var(--em); }
 
 /* ── Spinner ── */
 .spin { animation: spin 1s linear infinite; }
