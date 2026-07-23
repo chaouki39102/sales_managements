@@ -55,9 +55,11 @@ export function createPrintTemplatesApi(api: ApiClient): PrintTemplatesApi {
       api.get<LibraryApiResponse[]>('/print-templates/library')
         .then(r => (Array.isArray(r) ? r : (r as Record<string, unknown>)?.data ?? [] as LibraryApiResponse[])),
 
-    installLibrary: (templateId: string) =>
-      api.post<PrintTemplateApiResponse>('/print-templates/library/install', { template_id: templateId })
-        .then(deserializeResponse),
+    installLibrary: (templateId: string, docTypeCode?: string) =>
+      api.post<PrintTemplateApiResponse>('/print-templates/library/install', {
+        template_id: templateId,
+        ...(docTypeCode ? { doc_type_code: docTypeCode } : {}),
+      }).then(deserializeResponse),
 
     uploadLogo: (file: File, onProgress?: (p: number) => void) => {
       const fd = new FormData();
@@ -126,7 +128,8 @@ export function usePrintTemplateMutations() {
   });
 
   const installLibrary = useMutation({
-    mutationFn: api.installLibrary,
+    mutationFn: ({ templateId, docTypeCode }: { templateId: string; docTypeCode?: string }) =>
+      api.installLibrary(templateId, docTypeCode),
     onSuccess: invalidateAll,
   });
 

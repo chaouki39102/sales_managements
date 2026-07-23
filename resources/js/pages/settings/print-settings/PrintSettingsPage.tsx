@@ -287,7 +287,7 @@ export default function PrintSettingsPage() {
 
   const handleInstallLibrary = useCallback(async (_templateId: string, _tpl: PrintTemplate) => {
     try {
-      const saved = await mutations.installLibrary.mutateAsync(_templateId);
+      const saved = await mutations.installLibrary.mutateAsync({ templateId: _templateId, docTypeCode: activeDoc });
       setSelectedTplId(saved.id);
       setLocalTpl({ ...saved });
       setIsDirty(false);

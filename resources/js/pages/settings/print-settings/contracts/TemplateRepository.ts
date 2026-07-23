@@ -9,7 +9,7 @@ export interface PrintTemplatesApi {
   setDefault(id: number): Promise<PrintTemplate>;
   duplicate(id: number, newName: string): Promise<PrintTemplate>;
   library(): Promise<{ id: string; name: string; paper_size: string }[]>;
-  installLibrary(templateId: string): Promise<PrintTemplate>;
+  installLibrary(templateId: string, docTypeCode?: string): Promise<PrintTemplate>;
   uploadLogo(file: File, onProgress?: (p: number) => void): Promise<{ path: string; url: string }>;
 }
 

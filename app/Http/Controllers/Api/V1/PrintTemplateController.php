@@ -212,6 +212,10 @@ class PrintTemplateController extends BaseApiController
                 return $this->errorResponse('فشل تحميل القالب', 500);
             }
 
+            if ($request->has('doc_type_code') && $request->input('doc_type_code')) {
+                $payload['doc_type_code'] = $request->input('doc_type_code');
+            }
+
             $template = PrintTemplate::create($payload);
 
             return $this->successResponse($template, 'تم تثبيت القالب من المكتبة', 201);
