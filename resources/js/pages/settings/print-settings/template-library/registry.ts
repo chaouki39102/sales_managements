@@ -195,9 +195,11 @@ export function buildTemplate(
     font_family: typo.fontFamily,
 
     show_logo: header.showLogo,
+    logo_source: 'company',
     logo_size: header.logoSize,
     logo_align: header.logoAlign,
     logo_border_radius: header.logoBorderRadius,
+    custom_logo_url: null,
 
     show_company_name: header.showCompanyName,
     company_name_text: '',
@@ -245,6 +247,7 @@ export function buildTemplate(
     override_nif: '',
     override_rc: '',
     override_nis: '',
+    override_ice: '',
     override_article: '',
     override_capital: '',
     override_mobile: '',
@@ -412,6 +415,8 @@ export function buildTemplate(
     show_report_summary_cards: false,
     show_report_payment_breakdown: false,
     show_report_top_products: false,
+    report_col_widths: {} as Record<string, number>,
+    report_col_headers: {} as Record<string, string>,
 
     totals_rows: [],
     footer_rows: [],
