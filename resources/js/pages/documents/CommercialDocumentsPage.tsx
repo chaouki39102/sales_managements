@@ -18,6 +18,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import React, {
+    Suspense,
     useState,
     useCallback,
     useMemo,
@@ -568,14 +569,13 @@ export default function CommercialDocumentsPage() {
 
     // ── Single-doc print preview ────────────────────────────────────────────
     const [printDocId, setPrintDocId] = useState<number | null>(null);
-    const { data: printDocData } = useQuery({
+    const { data: printDoc } = useQuery({
         queryKey: ['print-doc', printDocId],
-        queryFn: () => apiGet<{ data: CommercialDocument }>(`/documents/${printDocId}`, {
-            include: 'party,documentStatus,warehouse,lines,lines.product,lines.product_variant,payments,payments.payment_mode,totals',
+        queryFn: () => apiGet<CommercialDocument>(`/documents/${printDocId}`, {
+            include: 'party,documentType,documentStatus,warehouse,lines,lines.product,lines.product_variant,payments,payments.payment_mode,totals',
         }),
         enabled: printDocId !== null,
     });
-    const printDoc = printDocData?.data ?? null;
 
     // ── Server-side state ─────────────────────────────────────────────────────
     const [page, setPage]               = useState(1);
@@ -2012,17 +2012,17 @@ export default function CommercialDocumentsPage() {
             />
 
             {/* Single-doc print preview */}
-            {printDoc && companyInfo && (
+            {printDocId !== null && companyInfo && (
                 <Suspense fallback={null}>
                     <TemplatePrintModal
-                        open={printDocId !== null}
+                        open={!!printDoc}
                         onClose={() => { setPrintDocId(null); }}
-                        document={printDoc as Record<string, unknown>}
+                        document={printDoc as any}
                         company={companyInfo as any}
                         templates={printTemplates}
-                        docTypeCode={printDoc.document_type?.code ?? typeCode ?? 'FV'}
-                        prevBalance={(printDoc as any).balance_data?.previous_balance}
-                        newBalance={(printDoc as any).balance_data?.new_balance}
+                        docTypeCode={printDoc?.document_type?.code ?? typeCode ?? 'FV'}
+                        prevBalance={(printDoc as any)?.balance_data?.previous_balance}
+                        newBalance={(printDoc as any)?.balance_data?.new_balance}
                     />
                 </Suspense>
             )}

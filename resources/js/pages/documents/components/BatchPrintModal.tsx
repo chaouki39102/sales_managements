@@ -107,8 +107,7 @@ export default function BatchPrintModal({ open, onClose, documents: docs }: Prop
       setProgress({ current: i + 1, total: docs.length });
 
       try {
-        const res = await apiGet<{ data: CommercialDocument }>(`/documents/${doc.id}`, { include: 'party,documentStatus,warehouse,lines,payments,totals' });
-        const fullDoc = res.data;
+        const fullDoc = await apiGet<CommercialDocument>(`/documents/${doc.id}`, { include: 'party,documentType,documentStatus,warehouse,lines,payments,totals' });
 
         const code = ((fullDoc.document_type as Record<string, unknown> | undefined)?.code as string) ?? 'FV';
         const tpl = selectedTemplateId
