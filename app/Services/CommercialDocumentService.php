@@ -225,6 +225,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     // HOOK: afterUpdate
     // إعادة حساب الأسطر والإجماليات إذا تغيرت الأسطر
     // ─── ملاحظة: حركات المخزون لا تُعاد تلقائياً عند التعديل ───
+    // ─── ملاحظة: Snapshots لا تُعاد حسابها عند التعديل (مجمّدة عند الإنشاء) ───
     // TODO: إذا احتجت لذلك لاحقاً: احذف الحركات القديمة وأنشئ جديدة
     // ═══════════════════════════════════════════════════════════════════════
 
@@ -256,8 +257,8 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $this->payments()->syncPayments($item, $payments);
         }
 
-        // ✅ Freeze balance snapshots inside the transaction (SSOT for receipt reprinting)
-        $this->persistBalanceSnapshots($item);
+        // ✅ Snapshots intentionally NOT recomputed on update — they are frozen
+        // at creation time (afterCreate) and represent the historical balance state.
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -568,12 +569,10 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     // ═══════════════════════════════════════════════════════════════════════
     // PRIVATE: Freeze balance snapshots for historical receipt reprinting
     //
-    // Called INSIDE the DB transaction after recalculateTotals() + syncPayments().
-    // Uses PartyBalanceService::getBalanceAt() which queries the DB — since we're
-    // inside the same transaction, it sees the document + payments we just wrote.
-    //
-    // Snapshots are ALWAYS overwritten (not write-once) so that document updates
-    // correctly reflect the new balance state.
+    // Called INSIDE the DB transaction only during creation (afterCreate).
+    // Snapshots are WRITE-ONCE (frozen at creation) — they represent the
+    // historical balance state for receipt reprinting. Updates do NOT
+    // recompute snapshots to avoid picking up other documents created since.
     // ═══════════════════════════════════════════════════════════════════════
 
     public function persistBalanceSnapshots(CommercialDocument $item): void

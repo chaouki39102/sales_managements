@@ -4,7 +4,28 @@
 - **Always respond in English**, regardless of the language the user writes in.
 
 ## Date
-2026-07-18
+2026-07-23
+
+### Phase 24 — Balance Snapshot Write-Once Fix: Editing POS Invoice Destroys Historical Snapshots (July 23)
+
+**Bug**: Editing an existing POS invoice caused the receipt preview to show incorrect `prev=3351, new=3351` instead of the correct `prev=0, new=0` that the payment modal showed before confirmation.
+
+**Root cause**: `persistBalanceSnapshots()` was called in **both** `afterCreate()` and `afterUpdate()`, with the comment "ALWAYS overwritten (not write-once)". On update, `getBalanceAt()` recomputed `otherBalance` from the **current** DB state — picking up other documents created since the original invoice. This destroyed the historically accurate frozen snapshot.
+
+For the bug scenario (invoice 153 for "Client Cash", fully-paid):
+- At creation: `otherBalance = 0` (no other docs), snapshots frozen as `prev=0, new=0` ✓
+- On edit (after other docs created): `getBalanceAt()` returns `currentBalance = 3351` (from new docs), formula produces `prev=3351, new=3351` ✗
+
+**Fix**: Removed `persistBalanceSnapshots()` call from `afterUpdate()`. Snapshots are now **write-once** — frozen only at creation time in `afterCreate()`. This preserves the historical balance state for receipt reprinting.
+
+**Architectural rule updated**: `persistBalanceSnapshots()` is ONLY called during creation (`afterCreate`). Updates do NOT recompute snapshots. The frozen values represent the balance state at the moment of document creation and must not be overwritten by later database changes.
+
+**Files modified:**
+- `app/Services/CommercialDocumentService.php` — removed `$this->persistBalanceSnapshots($item)` from `afterUpdate()` (line 260); updated docblock to reflect write-once semantics; updated `afterUpdate` header comment
+
+**Verification**: `php -l` — 0 syntax errors.
+
+---
 
 ### Phase 23 — Balance Calculation Bug Fix: Redundant In-Transaction Balance Computation (July 18)
 
