@@ -33,7 +33,7 @@ import {
 } from "@tanstack/react-query";
 import { apiGet, apiPost } from "@/lib/api/core/client";
 import { tenantKeys } from "@/lib/api/core/queryKeys";
-import { useActiveSlug } from "@/lib/store/appStore";
+import { useActiveSlug, useActiveCompany } from "@/lib/store/appStore";
 import { useFiscalYear } from "@/context/FiscalYearContext";
 import { DataTable, DataTableErrorBoundary } from "@/components/ui/DataTable";
 import type {
@@ -49,6 +49,8 @@ import QuickSaleModal from "./QuickSaleModal";
 import { DeliveryProgressBar } from "./components/DeliveryProgressBar";
 import ConvertDocumentModal from "./components/ConvertDocumentModal";
 import BatchPrintModal from "./components/BatchPrintModal";
+const TemplatePrintModal = React.lazy(() => import('@/pages/settings/print-settings/components/shared/TemplatePrintModal'));
+import { usePrintTemplatesList, mapCompany } from '@/pages/settings/print-settings/runtime';
 import { ApprovalStatusBadge, ApprovalActions } from "./components/ApprovalWorkflow";
 import { useApprovalCheckBatch } from "@/lib/api/endpoints/approvals";
 import { SendDocumentMailModal } from "./components/SendDocumentMailModal";
@@ -533,6 +535,9 @@ export default function CommercialDocumentsPage() {
     const navigate                           = useNavigate();
     const qc                                 = useQueryClient();
     const slug                               = useActiveSlug();
+    const activeCompany                      = useActiveCompany();
+    const companyInfo                        = useMemo(() => mapCompany(activeCompany), [activeCompany]);
+    const { data: printTemplates = [] }      = usePrintTemplatesList();
     const { selectedYear, isReadOnly }       = useFiscalYear() as { selectedYear?: { id: number; name: string }; isReadOnly?: boolean };
     const { show: showToast, ToastContainer } = useToast();
 
@@ -560,6 +565,17 @@ export default function CommercialDocumentsPage() {
     // ── Batch print ───────────────────────────────────────────────────────────
     const [batchPrintOpen, setBatchPrintOpen] = useState(false);
     const [batchDocs, setBatchDocs] = useState<CommercialDocument[]>([]);
+
+    // ── Single-doc print preview ────────────────────────────────────────────
+    const [printDocId, setPrintDocId] = useState<number | null>(null);
+    const { data: printDocData } = useQuery({
+        queryKey: ['print-doc', printDocId],
+        queryFn: () => apiGet<{ data: CommercialDocument }>(`/documents/${printDocId}`, {
+            include: 'party,documentStatus,warehouse,lines,lines.product,lines.product_variant,payments,payments.payment_mode,totals',
+        }),
+        enabled: printDocId !== null,
+    });
+    const printDoc = printDocData?.data ?? null;
 
     // ── Server-side state ─────────────────────────────────────────────────────
     const [page, setPage]               = useState(1);
@@ -1586,6 +1602,9 @@ export default function CommercialDocumentsPage() {
                 {/* عرض — دائماً متاح */}
                 <ActionBtn icon="ti-eye" title="عرض" onClick={() => { setViewDocId(row.id); setModal("view"); }} />
 
+                {/* طباعة */}
+                <ActionBtn icon="ti-printer" title="طباعة" onClick={() => setPrintDocId(row.id)} />
+
                 {/* تعديل — !is_locked && !is_exported */}
                     {canEdit && (
                     <ActionBtn
@@ -1653,7 +1672,7 @@ export default function CommercialDocumentsPage() {
                 />
             </div>
         );
-    }, [isReadOnly, loadingEdit, lockMut, unlockMut, cancelMut, navigate, typeCode]);
+    }, [isReadOnly, loadingEdit, lockMut, unlockMut, cancelMut, navigate, typeCode, setPrintDocId]);
 
     // ════════════════════════════════════════════════════════════════════════
     // HEADER ACTIONS
@@ -1991,6 +2010,22 @@ export default function CommercialDocumentsPage() {
                 onClose={() => setBatchPrintOpen(false)}
                 documents={batchDocs}
             />
+
+            {/* Single-doc print preview */}
+            {printDoc && companyInfo && (
+                <Suspense fallback={null}>
+                    <TemplatePrintModal
+                        open={printDocId !== null}
+                        onClose={() => { setPrintDocId(null); }}
+                        document={printDoc as Record<string, unknown>}
+                        company={companyInfo as any}
+                        templates={printTemplates}
+                        docTypeCode={printDoc.document_type?.code ?? typeCode ?? 'FV'}
+                        prevBalance={(printDoc as any).balance_data?.previous_balance}
+                        newBalance={(printDoc as any).balance_data?.new_balance}
+                    />
+                </Suspense>
+            )}
 
             {/* Send email modal */}
             {mailModal && (

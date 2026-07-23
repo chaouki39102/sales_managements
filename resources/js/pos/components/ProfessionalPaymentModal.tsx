@@ -66,6 +66,7 @@ interface Props {
   initialTypeCode?:  string | null;
   initialCurrencyId?: number | null;
   initialNote?:      string | null;
+  documentNumber?:   string | null;
   onClose:           () => void;
   onConfirm:         (p: PaymentConfirmParams) => Promise<{ ok: boolean; message?: string }>;
 }
@@ -175,6 +176,7 @@ export default function ProfessionalPaymentModal({
   initialTypeCode,
   initialCurrencyId,
   initialNote,
+  documentNumber,
 }: Props) {
 
   const firstAmountRef = useRef<HTMLInputElement>(null);
@@ -431,6 +433,12 @@ export default function ProfessionalPaymentModal({
               <span className="pay-client-chip">
                 <i className="ti ti-user" style={{ fontSize: 11 }} />
                 {client.name}
+              </span>
+            )}
+            {documentNumber && (
+              <span className="pay-client-chip">
+                <i className="ti ti-hash" style={{ fontSize: 11 }} />
+                {documentNumber}
               </span>
             )}
           </div>

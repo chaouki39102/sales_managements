@@ -376,6 +376,8 @@ class CommercialDocumentController extends BaseApiController
                     $commercialDocument,
                     $validated['payments']
                 );
+                // Re-freeze balance snapshots after payment changes (inside transaction)
+                $this->commercialDocumentService->persistBalanceSnapshots($commercialDocument);
             });
 
             $freshDoc = $commercialDocument->fresh(['payments.paymentMode', 'payments.treasuryAccount', 'documentStatus']);
@@ -491,10 +493,30 @@ class CommercialDocumentController extends BaseApiController
     protected function getService(): CommercialDocumentService { return $this->commercialDocumentService; }
     protected function getModelClass(): string { return CommercialDocument::class; }
 
+    /**
+     * Attach balance_data to document from frozen snapshots (read-only).
+     *
+     * Snapshots are persisted by CommercialDocumentService::persistBalanceSnapshots()
+     * inside the DB transaction. This method only reads them and attaches to the
+     * model as a transient property for the API response.
+     *
+     * For old documents without snapshots (pre-migration), computes dynamically
+     * but does NOT save — use the artisan backfill command to freeze old docs.
+     */
     private function attachBalanceData(CommercialDocument $doc): void
     {
         if (!$doc->party_id || !$doc->document_date) return;
         try {
+            // Prefer frozen snapshots (persisted at creation/update time)
+            if ($doc->previous_balance_snapshot !== null && $doc->new_balance_snapshot !== null) {
+                $doc->balance_data = [
+                    'previous_balance' => (float) $doc->previous_balance_snapshot,
+                    'new_balance'      => (float) $doc->new_balance_snapshot,
+                ];
+                return;
+            }
+
+            // Fallback: compute dynamically for old documents without snapshots
             $balanceData = $this->partyBalanceService->getBalanceAt(
                 $doc->party_id,
                 $doc->document_date
@@ -505,10 +527,6 @@ class CommercialDocumentController extends BaseApiController
             $isSale = $doc->documentType?->documentBaseOperation?->name === 'sale';
             $isAccounting = $doc->documentType?->affects_accounting ?? true;
 
-            // getBalanceAt() includes BOTH this document's net_to_pay AND its payment(s).
-            // For sale:  currentBalance = oldBalance + net_to_pay - paid_amount
-            // So:        previousBalance = currentBalance - net_to_pay + paid_amount
-            // For purchase (reverse): previousBalance = currentBalance + net_to_pay - paid_amount
             $paidAmount = (float) ($doc->paid_amount ?? 0);
             $previousBalance = $isAccounting
                 ? ($isSale ? $currentBalance - $doc->net_to_pay + $paidAmount : $currentBalance + $doc->net_to_pay - $paidAmount)

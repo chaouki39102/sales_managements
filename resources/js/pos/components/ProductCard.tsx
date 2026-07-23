@@ -21,7 +21,6 @@ interface ProductCardProps {
   searchQuery?:          string;
   scannedId?:            number | null;
   variantCount?:         number;
-  lastSale?:             boolean;
 }
 
 const TAP_THRESHOLD = 300;
@@ -62,7 +61,6 @@ function ProductCardInner({
   searchQuery = '',
   scannedId,
   variantCount,
-  lastSale,
 }: ProductCardProps) {
   const priceHt  = getVariantPrice(v, selectedPriceLevelId, priceLevels);
   const tvaRate  = v.tva?.rate ?? 0;
@@ -212,7 +210,6 @@ function ProductCardInner({
         {negStock && !outStock && <span className="pcard-neg-badge">سالب</span>}
         {lowStock && !outStock && <span className="pcard-low-badge">قليل</span>}
         {lastPiece && <span className="pcard-last-badge">آخر قطعة</span>}
-        {lastSale && !outStock && <span className="pcard-sale-badge"><i className="ti ti-bolt" /> تم البيع</span>}
         {variantCount != null && variantCount > 1 && (
           <span className="pcard-variant-badge">{variantCount} خيارات</span>
         )}
@@ -301,7 +298,6 @@ const ProductCard = React.memo(ProductCardInner, (prev, next) => {
     && prev.searchQuery === next.searchQuery
     && prev.scannedId === next.scannedId
     && prev.variantCount === next.variantCount
-    && prev.lastSale === next.lastSale
     && prev.priceLevels === next.priceLevels
     && prev.onAdd === next.onAdd
     && prev.onPin === next.onPin

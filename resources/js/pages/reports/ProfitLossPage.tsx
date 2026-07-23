@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ReportShell from './ReportShell';
-import { FMT, MONEY } from './helpers';
+import ReportDateFilter from './ReportDateFilter';
+import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
 import { useProfitLossReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
@@ -8,7 +9,9 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 
 export default function ProfitLossPage() {
-  const { data, isLoading, isError, refetch } = useProfitLossReport();
+  const [fromDate, setFromDate] = useState(REPORT_DEFAULTS.from);
+  const [toDate, setToDate] = useState(REPORT_DEFAULTS.to);
+  const { data, isLoading, isError, refetch } = useProfitLossReport({ from_date: fromDate || undefined, to_date: toDate || undefined });
   const d = data;
 
   const handleExport = async () => {
@@ -33,8 +36,9 @@ export default function ProfitLossPage() {
   };
 
   return (
-    <ReportShell title="الأرباح والخسائر" subtitle="تقرير شامل للمبيعات والتكاليف والمصروفات والأرباح" isLoading={isLoading} isError={isError} refetch={refetch} reportId="profit-loss">
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+    <ReportShell title="الأرباح والخسائر" subtitle={`تقرير شامل للمبيعات والتكاليف والمصروفات والأرباح — ${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="profit-loss">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+        <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
         <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
       </div>
       {d && (

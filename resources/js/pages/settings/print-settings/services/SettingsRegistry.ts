@@ -119,6 +119,7 @@ export const SETTINGS_REGISTRY: Record<string, SettingMeta> = {
   override_nif:       { key: 'override_nif', label: 'Override NIF', labelAr: 'تجاوز رقم الضريبة', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   override_rc:        { key: 'override_rc', label: 'Override RC', labelAr: 'تجاوز السجل التجاري', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   override_nis:       { key: 'override_nis', label: 'Override NIS', labelAr: 'تجاوز NIS', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  override_ice:       { key: 'override_ice', label: 'Override ICE', labelAr: 'تجاوز ICE', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   override_article:   { key: 'override_article', label: 'Override Article', labelAr: 'تجاوز المادة الجبائية', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   override_capital:   { key: 'override_capital', label: 'Override Capital', labelAr: 'تجاوز الرأس المال', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   override_mobile:    { key: 'override_mobile', label: 'Override Mobile', labelAr: 'تجاوز المحمول', category: 'company', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },

@@ -52,6 +52,12 @@ import { useModal } from "@/hooks/useModal";
 import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
 import type { Company, ActiveCompany } from "@/lib/api/core/types";
 import ImagePreviewModal from './print-settings/components/ImagePreviewModal';
+import { isWebUsbSupported, getConnectedPrinters } from '@/pos/utils/printService';
+import {
+    deviceGetPrinters,
+    deviceSavePrinters,
+} from '@/pos/store/printStore';
+import type { DetectedPrinter } from './print-settings/types';
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 const TABS = [
@@ -63,6 +69,7 @@ const TABS = [
     { id: "documents", label: "المستندات", icon: "ti-file-text" },
     { id: "conversions", label: "خريطة التحويل", icon: "ti-transfer" },
     { id: "users", label: "المستخدمون", icon: "ti-users" },
+    { id: "printers", label: "الطابعات", icon: "ti-printer" },
     { id: "plan", label: "الخطة", icon: "ti-crown" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
@@ -351,6 +358,16 @@ const SEARCH_INDEX = [
         tab: "plan" as TabId,
         label: "الخطة والاشتراك",
         keywords: ["خطة", "اشتراك", "plan", "abonnement"],
+    },
+    {
+        tab: "printers" as TabId,
+        label: "الطابعات المتصلة",
+        keywords: ["طابعة", "printer", "usb", "حرارية", "thermal"],
+    },
+    {
+        tab: "printers" as TabId,
+        label: "طابعة الإيصال الافتراضية",
+        keywords: ["إيصال", "receipt", "افتراضي", "default", "طابعة"],
     },
 ];
 
@@ -1179,6 +1196,12 @@ export default function SettingsPage() {
                     />
                 )}
                 {tab === "plan" && <PlanTab />}
+                {tab === "printers" && (
+                    <PrintersTab
+                        onDirty={() => markTabDirty("printers")}
+                        onClean={() => markTabClean("printers")}
+                    />
+                )}
             </SettingsErrorBoundary>
         </div>
     );
@@ -5399,6 +5422,325 @@ function PlanTab() {
                     </strong>
                 </p>
             </div>
+        </div>
+    );
+}
+
+// ─── PrintersTab ─────────────────────────────────────────────────────────────
+
+function PrintersTab({ onDirty, onClean }: { onDirty?: () => void; onClean?: () => void }) {
+    const slug = useActiveSlug() ?? "";
+    const { isDirty, markDirty, markClean } = useDirtyState();
+    const [printers, setPrinters] = useState<DetectedPrinter[]>(() => deviceGetPrinters(slug));
+    const [detecting, setDetecting] = useState(false);
+    const [addModal, setAddModal] = useState(false);
+    const [manualName, setManualName] = useState("");
+    const [manualId, setManualId] = useState("");
+    const [webUsbSupported] = useState(() => isWebUsbSupported());
+
+    useEffect(() => {
+        setPrinters(deviceGetPrinters(slug));
+    }, [slug]);
+
+    const defaultPrinterId = printers.find(p => p.isDefault)?.id ?? null;
+
+    const save = useCallback((next: DetectedPrinter[]) => {
+        setPrinters(next);
+        deviceSavePrinters(slug, next);
+        markDirty();
+    }, [slug, markDirty]);
+
+    const handleDetect = useCallback(async () => {
+        setDetecting(true);
+        try {
+            const usbDevices = await getConnectedPrinters();
+            const existing = deviceGetPrinters(slug);
+            const existingIds = new Set(existing.map(p => p.id));
+
+            const detected: DetectedPrinter[] = usbDevices.map((d: any) => ({
+                id: `usb:${d.vendorId}:${d.productId}:${d.serialNumber ?? 'no-serial'}`,
+                name: d.productName || d.manufacturerName || `USB Device ${d.vendorId}`,
+                isDefault: false,
+                status: 'ready' as const,
+                source: 'usb' as const,
+            }));
+
+            const merged = [...existing];
+            for (const d of detected) {
+                if (!existingIds.has(d.id)) merged.push(d);
+            }
+            save(merged);
+        } catch {
+            /* ignore */
+        } finally {
+            setDetecting(false);
+        }
+    }, [slug, save]);
+
+    const handlePairNew = useCallback(async () => {
+        const usb = (navigator as any).usb;
+        if (!usb) return;
+        try {
+            const device = await usb.requestDevice({ filters: [] });
+            await device.open();
+            const name = device.productName || device.manufacturerName || `USB Device`;
+            const id = `usb:${device.vendorId}:${device.productId}:${device.serialNumber ?? 'no-serial'}`;
+            await device.close();
+
+            const existing = deviceGetPrinters(slug);
+            if (existing.some(p => p.id === id)) return;
+            save([...existing, { id, name, isDefault: false, status: 'ready', source: 'usb' }]);
+        } catch {
+            /* user cancelled */
+        }
+    }, [slug, save]);
+
+    const handleAddManual = useCallback(() => {
+        if (!manualName.trim()) return;
+        const id = manualId.trim() || `manual:${Date.now()}`;
+        const existing = deviceGetPrinters(slug);
+        if (existing.some(p => p.id === id)) return;
+        save([...existing, { id, name: manualName.trim(), isDefault: false, status: 'unknown', source: 'manual' }]);
+        setManualName("");
+        setManualId("");
+        setAddModal(false);
+    }, [slug, manualName, manualId, save]);
+
+    const handleSetDefault = useCallback((id: string) => {
+        save(printers.map(p => ({ ...p, isDefault: p.id === id })));
+    }, [printers, save]);
+
+    const handleRemove = useCallback((id: string) => {
+        save(printers.filter(p => p.id !== id));
+    }, [printers, save]);
+
+    const handleTestPrint = useCallback(async (printer: DetectedPrinter) => {
+        if (printer.source !== 'usb') return;
+        try {
+            const usb = (navigator as any).usb;
+            const devices = await usb.getDevices();
+            const device = devices.find((d: any) => {
+                const did = `usb:${d.vendorId}:${d.productId}:${d.serialNumber ?? 'no-serial'}`;
+                return did === printer.id;
+            });
+            if (!device) return;
+            await device.open();
+            if (device.configuration === null) await device.selectConfiguration(1);
+            const config = device.configuration;
+            let ifaceNum = 0;
+            let epNum = 2;
+            for (let i = 0; i < (config?.interfaces?.length ?? 0); i++) {
+                const iface = config.interfaces[i];
+                const alt = iface.alternates?.[0];
+                if (!alt || alt.interfaceClass === 0x02) continue;
+                const ep = alt.endpoints?.find((e: any) => e.direction === 'out' && (e.type === 'bulk' || e.type === 'interrupt'));
+                if (ep) { ifaceNum = iface.interfaceNumber; epNum = ep.endpointNumber; break; }
+            }
+            await device.claimInterface(ifaceNum);
+            const testBytes = new Uint8Array([0x1B, 0x40, 0x1B, 0x61, 0x01, ...new TextEncoder().encode('--- TEST ---\nPrinter OK\n'), 0x1D, 0x56, 0x00]);
+            await device.transferOut(epNum, testBytes);
+            await device.releaseInterface(ifaceNum);
+            try { await device.close(); } catch {}
+        } catch {}
+    }, []);
+
+    const webUsbLabel = webUsbSupported ? 'مدعوم' : 'غير مدعوم — يرجى استخدام Chrome أو Edge';
+    const webUsbColor = webUsbSupported ? 'var(--em)' : 'var(--red)';
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 760 }}>
+            {/* WebUSB Status */}
+            <Card title=".hardware" titleIcon="ti-chip">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                    <i className="ti ti-chip" style={{ fontSize: 18, color: webUsbColor }} />
+                    <div>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>WebUSB</div>
+                        <div style={{ fontSize: 12, color: 'var(--t4)' }}>{webUsbLabel}</div>
+                    </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                    <button
+                        className="btn btn-xs"
+                        onClick={handleDetect}
+                        disabled={detecting}
+                        type="button"
+                    >
+                        {detecting
+                            ? <><i className="ti ti-loader-2 spin" /> جارٍ الكشف...</>
+                            : <><i className="ti ti-refresh" /> كشف الطابعات المتصلة</>
+                        }
+                    </button>
+                    {webUsbSupported && (
+                        <button className="btn btn-xs" onClick={handlePairNew} type="button">
+                            <i className="ti ti-plus" /> زوج طابعة جديدة (USB)
+                        </button>
+                    )}
+                    <button className="btn btn-xs" onClick={() => setAddModal(true)} type="button">
+                        <i className="ti ti-pencil" /> إضافة يدوية
+                    </button>
+                </div>
+            </Card>
+
+            {/* Printer list */}
+            <Card title="الطابعات" titleIcon="ti-printer">
+                {printers.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--t4)', fontSize: 13 }}>
+                        <i className="ti ti-printer-off" style={{ fontSize: 36, display: 'block', marginBottom: 8, opacity: 0.3 }} />
+                        لا توجد طابعات مسجلة
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {printers.map(p => (
+                            <div
+                                key={p.id}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 12,
+                                    padding: '10px 14px',
+                                    borderRadius: 8,
+                                    border: `1.5px solid ${p.isDefault ? 'var(--em)' : 'var(--b2)'}`,
+                                    background: p.isDefault ? 'color-mix(in srgb, var(--em) 5%, transparent)' : 'var(--b1)',
+                                    transition: 'all .15s',
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: '50%',
+                                        background: p.status === 'ready' ? 'var(--em)' : p.status === 'offline' ? 'var(--red)' : 'var(--t4)',
+                                        flexShrink: 0,
+                                    }}
+                                />
+                                <i className={`ti ${p.source === 'usb' ? 'ti-plug-connected' : 'ti-device-desktop'}`}
+                                    style={{ fontSize: 16, color: 'var(--t3)' }} />
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {p.name}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: 'var(--t4)', display: 'flex', gap: 8, marginTop: 2 }}>
+                                        <span>{p.source === 'usb' ? 'USB' : 'يدوي'}</span>
+                                        <span>{p.status === 'ready' ? 'جاهزة' : p.status === 'offline' ? 'غير متصلة' : 'غير معروفة'}</span>
+                                        {p.isDefault && <span style={{ color: 'var(--em)', fontWeight: 600 }}>افتراضية</span>}
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                                    {p.source === 'usb' && (
+                                        <button
+                                            className="btn btn-xs"
+                                            onClick={() => handleTestPrint(p)}
+                                            title="طباعة تجريبية"
+                                            type="button"
+                                            style={{ padding: '4px 8px', fontSize: 11 }}
+                                        >
+                                            <i className="ti ti-test-pipe" />
+                                        </button>
+                                    )}
+                                    {!p.isDefault && (
+                                        <button
+                                            className="btn btn-xs"
+                                            onClick={() => handleSetDefault(p.id)}
+                                            title="تعيين كافتراضية"
+                                            type="button"
+                                            style={{ padding: '4px 8px', fontSize: 11 }}
+                                        >
+                                            <i className="ti ti-star" />
+                                        </button>
+                                    )}
+                                    <button
+                                        className="btn btn-xs"
+                                        onClick={() => handleRemove(p.id)}
+                                        title="حذف"
+                                        type="button"
+                                        style={{ padding: '4px 8px', fontSize: 11, color: 'var(--red)' }}
+                                    >
+                                        <i className="ti ti-trash" />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </Card>
+
+            {/* Default receipt printer */}
+            <Card title="طابعة الإيصال الافتراضية" titleIcon="ti-receipt">
+                <div style={{ fontSize: 12, color: 'var(--t4)', marginBottom: 10 }}>
+                    الطابعة المستخدمة تلقائياً لطباعة إيصالات POS
+                </div>
+                {printers.length === 0 ? (
+                    <div style={{ fontSize: 13, color: 'var(--t4)' }}>أضف طابعة أولاً</div>
+                ) : (
+                    <select
+                        className="pay-v2-select"
+                        value={defaultPrinterId ?? ''}
+                        onChange={e => {
+                            const val = e.target.value || null;
+                            save(printers.map(p => ({ ...p, isDefault: p.id === val })));
+                        }}
+                    >
+                        <option value="">— بدون افتراضي —</option>
+                        {printers.map(p => (
+                            <option key={p.id} value={p.id}>
+                                {p.name} ({p.source === 'usb' ? 'USB' : 'يدوي'})
+                            </option>
+                        ))}
+                    </select>
+                )}
+            </Card>
+
+            {/* Manual add modal */}
+            {addModal && (
+                <div className="ov on" onClick={() => setAddModal(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400, padding: 24 }}>
+                        <div className="m-hd">
+                            <div className="m-title">إضافة طابعة يدوياً</div>
+                            <div className="m-x" onClick={() => setAddModal(false)}><i className="ti ti-x" /></div>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 16 }}>
+                            <div>
+                                <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>اسم الطابعة</label>
+                                <input
+                                    type="text"
+                                    className="pay-v2-select"
+                                    value={manualName}
+                                    onChange={e => setManualName(e.target.value)}
+                                    placeholder="مثال: Epson TM-T20"
+                                    autoFocus
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                                    المعرف <span style={{ opacity: 0.5, fontWeight: 400 }}>(اختياري)</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    className="pay-v2-select"
+                                    value={manualId}
+                                    onChange={e => setManualId(e.target.value)}
+                                    placeholder="يُولَّد تلقائياً إن ترك فارغاً"
+                                />
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+                                <button className="btn" onClick={() => setAddModal(false)} type="button">إلغاء</button>
+                                <button className="btn btn-p" onClick={handleAddManual} disabled={!manualName.trim()} type="button">إضافة</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Save button */}
+            <SaveButton
+                onClick={async () => {
+                    deviceSavePrinters(slug, printers);
+                    markClean();
+                }}
+                loading={false}
+                isDirty={isDirty}
+                onClean={markClean}
+            />
         </div>
     );
 }

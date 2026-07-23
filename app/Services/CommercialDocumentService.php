@@ -184,8 +184,8 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $this->payments()->syncPayments($item, $payments);
         }
 
-        // ✅ balance_data يُحسب في Controlleur بعد انتهاء الـ transaction
-        // بواسطة attachBalanceData() — أي تعديل هنا لا يُaltaffect النتيجة النهائية
+        // ✅ Freeze balance snapshots inside the transaction (SSOT for receipt reprinting)
+        $this->persistBalanceSnapshots($item);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -256,8 +256,8 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $this->payments()->syncPayments($item, $payments);
         }
 
-        // ✅ balance_data يُحسب في Controlleur بعد انتهاء الـ transaction
-        // بواسطة attachBalanceData() — أي تعديل هنا لا يُaltaffect النتيجة النهائية
+        // ✅ Freeze balance snapshots inside the transaction (SSOT for receipt reprinting)
+        $this->persistBalanceSnapshots($item);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -563,6 +563,44 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             'net_to_pay'       => round($netToPay,       2),
             'remaining_amount' => round($netToPay,       2), // يُحدَّث لاحقاً بعد الدفعات
         ]);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PRIVATE: Freeze balance snapshots for historical receipt reprinting
+    //
+    // Called INSIDE the DB transaction after recalculateTotals() + syncPayments().
+    // Uses PartyBalanceService::getBalanceAt() which queries the DB — since we're
+    // inside the same transaction, it sees the document + payments we just wrote.
+    //
+    // Snapshots are ALWAYS overwritten (not write-once) so that document updates
+    // correctly reflect the new balance state.
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public function persistBalanceSnapshots(CommercialDocument $item): void
+    {
+        if (!$item->party_id || !$item->document_date) return;
+
+        try {
+            $balanceService = app(PartyBalanceService::class);
+            $balanceData = $balanceService->getBalanceAt($item->party_id, $item->document_date);
+            $currentBalance = $balanceData['current_balance'];
+
+            $item->loadMissing('documentType.documentBaseOperation');
+            $isSale = $item->documentType?->documentBaseOperation?->name === 'sale';
+            $isAccounting = $item->documentType?->affects_accounting ?? true;
+
+            $paidAmount = (float) ($item->paid_amount ?? 0);
+            $previousBalance = $isAccounting
+                ? ($isSale ? $currentBalance - $item->net_to_pay + $paidAmount : $currentBalance + $item->net_to_pay - $paidAmount)
+                : $currentBalance;
+
+            $item->updateQuietly([
+                'previous_balance_snapshot' => round($previousBalance, 2),
+                'new_balance_snapshot'      => round($currentBalance, 2),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning("Balance snapshot failed for doc#{$item->id}: " . $e->getMessage());
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════

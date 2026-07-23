@@ -1,5 +1,8 @@
 # AGENTS.md — Context Cache for AI Coding Agents
 
+## Global Rules
+- **Always respond in English**, regardless of the language the user writes in.
+
 ## Date
 2026-07-18
 

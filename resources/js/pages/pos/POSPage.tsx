@@ -267,6 +267,15 @@ function POSPage() {
     currencyId?: number | null;
   }>(null);
 
+  const clearEditingState = useCallback(() => {
+    setEditingDocumentId(null);
+    setEditingDocStatus(null);
+    setEditingDocumentDate(null);
+    setEditingDocumentNumber(null);
+    editingPrevBalanceRef.current = undefined;
+    editingDocMetaRef.current = null;
+  }, []);
+
 
   const receiptSource = useMemo((): PipelineSource | null => {
     if (!receiptSnapshot) return null;
@@ -314,21 +323,6 @@ function POSPage() {
     try { localStorage.setItem(RECENT_PRODUCTS_KEY(slug), JSON.stringify(recentProducts)); }
     catch { /* storage full */ }
   }, [recentProducts, slug]);
-
-  // ── Last sale badge: track variant IDs from the most recent completed sale ──
-  const [lastSaleIds, setLastSaleIds] = useState<Set<number>>(() => {
-    if (!slug) return new Set();
-    try {
-      const stored = localStorage.getItem(`pos:lastSale:${slug}`);
-      return stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch { return new Set(); }
-  });
-  const lastSaleTimerRef = useRef<ReturnType<typeof setTimeout>>();
-
-  useEffect(() => {
-    if (!slug || lastSaleIds.size === 0) return;
-    try { localStorage.setItem(`pos:lastSale:${slug}`, JSON.stringify([...lastSaleIds])); } catch {}
-  }, [lastSaleIds, slug]);
 
   // ── Search & Filters ──────────────────────────────────────────────────────
   const [sortBy, setSortBy] = useState<SortMode>('name');
@@ -607,7 +601,7 @@ function POSPage() {
   const undoClearIntervalRef = useRef<ReturnType<typeof setInterval>>();
 
   const handleClearCart = useCallback(async (opts?: { skipConfirm?: boolean }) => {
-    if (isEmpty) return;
+    if (isEmpty) { clearEditingState(); return; }
     if (settings.confirmOnClear && !opts?.skipConfirm) {
       if (!await clearCartConfirm.confirm('هل تريد مسح كل الأصناف من السلة؟')) return;
     }
@@ -636,13 +630,8 @@ function POSPage() {
     posRef.current.clearCart();
     posRef.current.setInvoiceDiscountPct(0);
     setCartNote('');
-    setEditingDocumentId(null);
-    setEditingDocStatus(null);
-    setEditingDocumentDate(null);
-    setEditingDocumentNumber(null);
-    editingPrevBalanceRef.current = undefined;
-    editingDocMetaRef.current = null;
-  }, [settings.confirmOnClear, isEmpty, cartNote, clearCartConfirm]);
+    clearEditingState();
+  }, [settings.confirmOnClear, isEmpty, cartNote, clearCartConfirm, clearEditingState]);
 
   const handleUndoClear = useCallback(() => {
     const snap = lastClearedSnapshotRef.current;
@@ -1120,22 +1109,9 @@ const handleCompleteSale = useCallback(async (params: {
         prevBalance,
         newBalance,
       };
-      setEditingDocumentId(null);
-      setEditingDocStatus(null);
-      setEditingDocumentDate(null);
-      setEditingDocumentNumber(null);
-      editingPrevBalanceRef.current = undefined;
-      editingDocMetaRef.current = null;
+      clearEditingState();
       receiptSnapshotRef.current = fullSnapshot;
       setReceiptSnapshot(fullSnapshot);
-
-      // Track last sold variant IDs for badge display (clear after 5 minutes)
-      const soldIds = new Set(pos.items.map(i => i.variant_id));
-      if (soldIds.size > 0) {
-        setLastSaleIds(soldIds);
-        if (lastSaleTimerRef.current) clearTimeout(lastSaleTimerRef.current);
-        lastSaleTimerRef.current = setTimeout(() => setLastSaleIds(new Set()), 5 * 60 * 1000);
-      }
 
       setCartNote('');
       posRef.current.setInvoiceDiscountPct(0);
@@ -1420,7 +1396,10 @@ const handleCompleteSale = useCallback(async (params: {
         priceLevels={priceLevelsList} selectedPriceLevelId={selectedPriceLevelId}
         onPriceLevelChange={applyPriceLevel}
         onHeld={() => setModal('held')}
-        onNewSale={() => isEmpty ? pos.clearCart() : pos.holdCart()}
+        onNewSale={() => {
+          clearEditingState();
+          if (isEmpty) pos.clearCart(); else pos.holdCart();
+        }}
         onManual={() => setModal('manual')}
         onReturn={() => setModal('returns')}
         onReceipt={() => {
@@ -1534,7 +1513,6 @@ const handleCompleteSale = useCallback(async (params: {
             onQty={handleQtyChange}
             searchQuery={rawQuery}
             scannedId={scannedId}
-            lastSaleIds={lastSaleIds}
           />
           <PanelResizer onMouseDown={handleResizerMouseDown} />
         </div>
@@ -1551,7 +1529,7 @@ const handleCompleteSale = useCallback(async (params: {
           onPrice={pos.updatePrice}
           onRemove={id => { pos.removeItem(id); if (selectedCartItemId === id) setSelectedCartItemId(null); }}
           onSetClient={pos.setClient}
-          onNoteChange={setCartNote} onHold={pos.holdCart}
+          onNoteChange={setCartNote} onHold={() => { clearEditingState(); pos.holdCart(); }}
           onSell={() => setModal('payment')} onClear={handleClearCart} onHeld={() => setModal('held')}
           totalTtcFinal={adjustedTotalTtcFinal}
           remainingToPay={remainingToPay}
@@ -1600,6 +1578,7 @@ const handleCompleteSale = useCallback(async (params: {
             initialTypeCode={editingDocMetaRef.current?.typeCode}
             initialCurrencyId={editingDocMetaRef.current?.currencyId}
             initialNote={cartNote}
+            documentNumber={editingDocumentNumber}
             onClose={() => setModal('none')}
             onConfirm={handleCompleteSale}
           />
@@ -1610,9 +1589,9 @@ const handleCompleteSale = useCallback(async (params: {
         <Suspense fallback={null}>
           <HeldCartsModal
             carts={pos.heldCarts} onClose={() => setModal('none')}
-            onRestore={id => { pos.restoreCart(id); setModal('none'); }}
+            onRestore={id => { clearEditingState(); pos.restoreCart(id); setModal('none'); }}
             onDelete={pos.deleteHeldCart}
-            onRestoreAndPay={id => { pos.restoreCart(id); setModal('payment'); }}
+            onRestoreAndPay={id => { clearEditingState(); pos.restoreCart(id); setModal('payment'); }}
           />
         </Suspense>
       )}
@@ -1627,23 +1606,13 @@ const handleCompleteSale = useCallback(async (params: {
             onClose={() => {
               setModal('none');
               setReceiptSnapshot(null);
-              setEditingDocumentId(null);
-              setEditingDocumentNumber(null);
-              setEditingDocStatus(null);
-              setEditingDocumentDate(null);
-              editingPrevBalanceRef.current = undefined;
-              editingDocMetaRef.current = null;
+              clearEditingState();
             }}
             onPrint={() => { handlePrintDirect(receiptSnapshot); }}
             onNewSale={() => {
               setModal('none');
               setReceiptSnapshot(null);
-              setEditingDocumentId(null);
-              setEditingDocumentNumber(null);
-              setEditingDocStatus(null);
-              setEditingDocumentDate(null);
-              editingPrevBalanceRef.current = undefined;
-              editingDocMetaRef.current = null;
+              clearEditingState();
               pos.clearCart();
             }}
           />

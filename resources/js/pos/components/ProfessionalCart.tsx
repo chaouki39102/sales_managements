@@ -84,7 +84,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
 
   const [showNote,         setShowNote]         = useState(false);
   const [showCustModal,    setShowCustModal]     = useState(false);
-  const [invDiscMode,      setInvDiscMode]       = useState<'pct' | 'amount'>('pct');
+  const [invDiscMode,      setInvDiscMode]       = useState<'pct' | 'amount'>('amount');
   const [invDiscAmtVal,    setInvDiscAmtVal]     = useState('');
 
   useEffect(() => {
@@ -327,9 +327,9 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
               {isEmpty ? 'السلة فارغة' : (remainingToPay <= 0 ? 'جاهز للدفع' : 'بانتظار الإتمام')}
             </div> */}
             {!isEmpty && !showTotalsDetails && (
-              <button type="button" className="ch-more-btn" onClick={toggleTotals}>
+              <button type="button" className="ch-more-btn" onClick={toggleTotals} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <i className="ti ti-eye" style={{ fontSize: 13 }} />
                 تفاصيل إضافية
-                <i className="ti ti-chevron-up" style={{ fontSize: 13 }} />
               </button>
             )}
 
@@ -339,7 +339,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                 {client !== null && clientBalance !== undefined && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                     <span style={{ color: 'rgba(255,255,255,.9)', fontSize: 12, fontWeight: 500 }}>الرصيد السابق</span>
-                    <span style={{ fontWeight: 700, fontSize: 12, color: clientBalance >= 0 ? '#fca5a5' : '#86efac' }}>
+                    <span style={{ fontWeight: 700, fontSize: 11, color: '#ef4444', background: 'rgba(255,255,255,0.85)', padding: '1px 6px', borderRadius: 4 }}>
                       {formatDZD(clientBalance)}
                     </span>
                     <i className="ti ti-arrow-left" style={{ color: 'rgba(255,255,255,.7)', fontSize: 11 }} />
@@ -404,10 +404,10 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                     <button
                       onClick={toggleTotals}
                       type="button"
-                      style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', cursor: 'pointer', padding: '0 2px', fontSize: 13, display: 'flex' }}
+                      style={{ background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.2)', color: '#fff', cursor: 'pointer', padding: '2px 6px', borderRadius: 4, fontSize: 13, display: 'flex', alignItems: 'center', gap: 3 }}
                       title="إخفاء التفاصيل"
                     >
-                      <i className="ti ti-eye-off" />
+                      <i className="ti ti-eye-off" style={{ fontSize: 13 }} />
                     </button>
                   </div>
                 )}

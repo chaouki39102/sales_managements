@@ -74,6 +74,7 @@ export function createMockTemplate(
     override_nif: '',
     override_rc: '',
     override_nis: '',
+    override_ice: '',
     override_article: '',
     override_capital: '',
     override_mobile: '',

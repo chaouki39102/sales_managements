@@ -154,7 +154,7 @@ class ReportController extends Controller
 
     public function creative(Request $request): JsonResponse
     {
-        $filters = $this->prepareFilters($request, []);
+        $filters = $this->prepareFilters($request, ['from_date', 'to_date']);
         $data = $this->reportService->creativeReport($filters);
 
         return response()->json([
@@ -188,7 +188,7 @@ class ReportController extends Controller
 
     public function profitLoss(Request $request): JsonResponse
     {
-        $filters = $this->prepareFilters($request, []);
+        $filters = $this->prepareFilters($request, ['from_date', 'to_date']);
         $data = $this->reportService->profitLossReport($filters);
         return response()->json([
             'success' => true,

@@ -70,6 +70,11 @@ export function fromApiResponse(r: ApiResponse): PrintTemplate {
   for (const key of Object.keys(config)) {
     result[key] = (config as any)[key];
   }
+  for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
+    if (!(key in result)) {
+      result[key] = meta.defaultValue;
+    }
+  }
   return ensureLayoutFields(result as unknown as PrintTemplate);
 }
 

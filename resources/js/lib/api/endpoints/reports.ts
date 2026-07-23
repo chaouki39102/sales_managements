@@ -502,7 +502,9 @@ export interface ProductMovementData {
 // ─── Profit & Loss Report ─────────────────────────────────────────────────────
 
 export interface ProfitLossParams {
-  year_id?: number;
+  year_id?:   number;
+  from_date?: string;
+  to_date?:   string;
 }
 
 export interface ProfitLossData {
@@ -809,11 +811,11 @@ export function useProductMovementReport(params?: Omit<ProductMovementParams, 'y
   });
 }
 
-export function useProfitLossReport(params?: ProfitLossParams) {
+export function useProfitLossReport(params?: Omit<ProfitLossParams, 'year_id'>) {
   const slug   = useActiveSlug();
   const yearId = useSelectedYearId();
   return useQuery({
-    queryKey:  [slug, 'reports', 'profit-loss', yearId],
+    queryKey:  [slug, 'reports', 'profit-loss', yearId, params],
     queryFn:   () => reportsApi.profitLoss({ year_id: yearId ?? undefined, ...params }),
     enabled:   !!slug && !!yearId,
     staleTime: 5 * 60_000,

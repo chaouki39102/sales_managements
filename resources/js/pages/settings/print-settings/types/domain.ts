@@ -182,6 +182,7 @@ export interface PrintTemplate {
   override_nif:        string;
   override_rc:         string;
   override_nis:        string;
+  override_ice:        string;
   override_article:    string;
   override_capital:    string;
   override_mobile:     string;

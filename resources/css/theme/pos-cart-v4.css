@@ -1154,5 +1154,4 @@
 }
 
 /* ── حجم xs: إخفاء بادج البيع ── */
-.pgrid--xs .pcard-sale-badge { font-size: 0; padding: 2px 5px; }
-.pgrid--xs .pcard-sale-badge i { font-size: 10px; }
+

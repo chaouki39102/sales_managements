@@ -87,9 +87,9 @@ describe('SettingsSerializer — fromApiResponse', () => {
       config: null,
     } as any);
 
-    // DB is the only source of truth — null config = no settings
-    expect(result.show_logo).toBeUndefined();
-    expect(result.title_text).toBeUndefined();
+    // null config → registry defaults injected
+    expect(result.show_logo).toBe(true);
+    expect(result.title_text).toBe('فاتورة بيع');
   });
 
   it('should return only explicitly stored config keys', () => {
@@ -103,10 +103,10 @@ describe('SettingsSerializer — fromApiResponse', () => {
       config: {},
     } as any);
 
-    // DB is the only source of truth — empty config = no settings
-    expect(result.show_logo).toBeUndefined();
-    expect(result.show_barcode).toBeUndefined();
-    expect(result.col_order).toBeUndefined();
+    // empty config → registry defaults injected
+    expect(result.show_logo).toBe(true);
+    expect(result.show_barcode).toBe(true);
+    expect(result.col_order).toEqual(['name', 'quantity', 'price', 'total']);
   });
 });
 
