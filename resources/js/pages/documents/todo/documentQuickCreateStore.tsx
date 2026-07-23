@@ -96,7 +96,7 @@ export function DocumentQuickCreateProvider({ children }: { children: React.Reac
         documentType={state.documentType}
         existingDocument={state.existingDocument}
         onClose={closeQuickCreate}
-        onSaved={handleSaved}
+        onSaved={() => { handleSaved(); closeQuickCreate(); }}
       />
     </DocumentQuickCreateContext.Provider>
   );

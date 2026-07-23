@@ -431,7 +431,6 @@ export function useCommercialDocumentController({
       successTimer.current = setTimeout(() => {
         setSuccessMsg('');
         onSaved();
-        onClose();
       }, 3000);
     },
     onError: (e: unknown) => {
@@ -453,7 +452,7 @@ export function useCommercialDocumentController({
       if (slug) qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
       setSuccessMsg('تم حذف المستند بنجاح');
       successTimer.current = setTimeout(() => {
-        setSuccessMsg(''); onSaved(); onClose();
+        setSuccessMsg(''); onSaved();
       }, 1500);
     },
     onError: (e: unknown) => {

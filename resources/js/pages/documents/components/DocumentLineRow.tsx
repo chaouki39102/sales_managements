@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useState, useRef, useCallback } from 'react';
 import { calcLineTotal, fmtDZD, toNum } from '../utils/document.utils';
 import { ProductSearch } from './ProductSearch';
 import { LotCell } from './LotCell';
@@ -50,6 +50,41 @@ function CellInput({
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
       style={{ ...cellStyle(highlight), width: width ?? '100%' }}
+    />
+  );
+}
+
+function TotalQtyInput({
+  baseQty, packQty, disabled, onUpdate,
+}: {
+  baseQty:  number;
+  packQty:  number;
+  disabled: boolean;
+  onUpdate: (totalQty: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const ref = useRef<HTMLInputElement>(null);
+  const display = draft ?? (Number.isInteger(baseQty) ? String(baseQty) : baseQty.toFixed(4).replace(/\.?0+$/, ''));
+
+  const handleBlur = useCallback(() => {
+    setDraft(null);
+    if (draft !== null) {
+      const num = toNum(draft);
+      if (num > 0) onUpdate(num);
+    }
+  }, [draft, onUpdate]);
+
+  return (
+    <input
+      ref={ref}
+      type="text"
+      inputMode="decimal"
+      value={display}
+      disabled={disabled}
+      onChange={(e) => setDraft(e.target.value)}
+      onFocus={() => setDraft(String(baseQty))}
+      onBlur={handleBlur}
+      style={{ ...cellStyle(), width: '100%' }}
     />
   );
 }
@@ -193,6 +228,15 @@ export const DocumentLineRow = memo(function DocumentLineRow({
               disabled={disabled}
               highlight={hasStockWarning && !stockValidation.blocking}
             />
+          </td>
+        )}
+
+        {col('total_qty') && (
+          <td style={{ padding: '3px 4px' }}>
+            <TotalQtyInput baseQty={baseQty} packQty={line._packQty} disabled={disabled} onUpdate={(v) => {
+              const newQty = line._packQty > 1 ? v / line._packQty : v;
+              onUpdate(idx, { quantity: newQty });
+            }} />
           </td>
         )}
 

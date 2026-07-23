@@ -263,6 +263,7 @@ export const ALL_COLUMNS = [
   { key: 'lot',        label: 'الحصة',             w: 120, fixed: false },
   { key: 'warehouse',  label: 'المستودع',        w: 100, fixed: false },
   { key: 'quantity',   label: 'الكمية',          w: 75,  fixed: true  },
+  { key: 'total_qty',  label: 'الكمية الإجمالية', w: 90,  fixed: false },
   { key: 'unit',       label: 'الوحدة',          w: 60,  fixed: false },
   { key: 'unit_price', label: 'سعر الوحدة HT',  w: 110, fixed: false },
   { key: 'pack_price', label: 'سعر التعبئة',    w: 100, fixed: false },

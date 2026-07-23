@@ -486,9 +486,9 @@ export function useDocumentForm({
   const isLocked    = !!(existingDocument?.is_locked);
   const isCancelled = LOCKED_STATUSES.has(docStatusName);
   const isReadOnly  = isLocked || isCancelled;
-  const isLinesReadOnly = isReadOnly;
 
   const pmMode = resolvePaymentMode(existingDocument, isLocked, isCancelled);
+  const isLinesReadOnly = isReadOnly || pmMode === 'additive';
 
   // ── Refs ──────────────────────────────────────────────────────────────────
 

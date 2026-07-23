@@ -743,6 +743,23 @@
 }
 .pcard-ht  { font-size: var(--fs-2xs); color: var(--t4); opacity: .85; }
 
+.pcard-pkg { margin-top: 4px; }
+.pcard-pkg-select {
+  width: 100%;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--t2);
+  background: var(--bg3);
+  border: 1px solid var(--b2);
+  border-radius: 6px;
+  padding: 2px 4px;
+  cursor: pointer;
+  text-align: center;
+  line-height: 1.4;
+}
+.pcard-pkg-select:focus { outline: none; border-color: var(--em); }
+.pgrid--xs .pcard-pkg-select { font-size: 9px; padding: 1px 3px; border-radius: 5px; }
+
 .pcard-actions {
   display: flex;
   align-items: center;

@@ -144,7 +144,7 @@ export default function POSKioskPage() {
     queryKey: ['pos-products-kiosk', slug, searchQuery, selectedCategory],
     queryFn:  () => productsApi.list({
       per_page:  PER_PAGE,
-      include:   'tva,unit,family,prices.priceLevel',
+      include:   'tva,unit,family,prices.priceLevel,packagings',
       search:    searchQuery || undefined,
       family_id: selectedCategory ?? undefined,
       filter:    { active: 1 },
@@ -210,6 +210,7 @@ export default function POSKioskPage() {
           unit_price_ht:       i.unit_price_ht,
           discount_percentage: i.discount_percentage,
           tva_rate:            i.tva_rate,
+          packaging_id:        i.packaging_id ?? null,
         })),
         payments: apiPayments,
       });

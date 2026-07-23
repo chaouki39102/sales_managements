@@ -69,6 +69,65 @@
   font-size: 11.5px;
 }
 
+.cr-pkg-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--blue);
+  background: var(--blueb);
+  border: 1px solid rgba(59,130,246,.2);
+  padding: 0 5px;
+  border-radius: 4px;
+  margin-bottom: 3px;
+  line-height: 1.5;
+}
+
+.cr-pkg-badge--selectable {
+  cursor: pointer;
+  border-style: dashed;
+  transition: all .15s ease;
+}
+.cr-pkg-badge--selectable:hover {
+  background: rgba(59,130,246,.15);
+  border-color: var(--blue);
+}
+.cr-pkg-badge--active {
+  background: var(--blue) !important;
+  color: #fff !important;
+  border-style: solid !important;
+}
+.cr-pkg-multi { font-weight: 700; }
+.cr-pkg-chevron { font-size: 8px; margin-inline-start: 2px; opacity: .6; }
+
+/* ── Packaging popup ── */
+.cr-popup--pkg { min-width: 180px; padding: 8px; }
+.cr-popup-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--t3);
+  margin-bottom: 6px;
+}
+.cr-pkg-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--b2);
+  border-radius: 6px;
+  background: var(--bg1);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--t1);
+  margin-bottom: 4px;
+  transition: all .12s ease;
+}
+.cr-pkg-option:last-child { margin-bottom: 0; }
+.cr-pkg-option:hover { border-color: var(--blue); background: var(--blueb); }
+.cr-pkg-option.on { border-color: var(--em); background: var(--emb); }
+.cr-pkg-opt-label { font-weight: 700; }
+.cr-pkg-opt-detail { font-size: 10px; color: var(--t4); }
+
 /* صف السعر + الخصم */
 .cr-price-row {
   display: flex;

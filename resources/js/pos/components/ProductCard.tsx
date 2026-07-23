@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import type { ProductVariant, PriceLevel } from '@/types';
+import type { ProductVariant, ProductPackaging, PriceLevel } from '@/types';
 import { formatDZD } from '../utils/calculations';
 import { getVariantPrice, familyStyleFromName, isVariantOutOfStock } from '../utils/posHelpers';
 
@@ -14,7 +14,7 @@ interface ProductCardProps {
   allowNegativeStock?:   boolean;
   showStock?:            boolean;
   priceDisplayMode?:     'ttc' | 'ht';
-  onAdd:                 (v: ProductVariant, qty?: number) => void;
+  onAdd:                 (v: ProductVariant, qty?: number, packaging?: ProductPackaging | null) => void;
   onPin:                 (v: ProductVariant) => void;
   onHighlight?:          (idx: number) => void;
   onQty?:                (variantId: number, newQty: number) => void;
@@ -62,10 +62,6 @@ function ProductCardInner({
   scannedId,
   variantCount,
 }: ProductCardProps) {
-  const priceHt  = getVariantPrice(v, selectedPriceLevelId, priceLevels);
-  const tvaRate  = v.tva?.rate ?? 0;
-  const priceTtc = priceHt * (1 + tvaRate / 100);
-
   const rawStock      = v.current_stock;
   const stock         = rawStock !== undefined ? Math.max(0, rawStock) : rawStock;
   const unknownStock  = rawStock === undefined;
@@ -86,6 +82,31 @@ function ProductCardInner({
 
   const style = familyStyleFromName(v.product?.family?.name ?? '');
   const imageUrl = v.image_url;
+
+  // ── Packaging ──────────────────────────────────────────────────────────────
+  const packagings = useMemo(() => {
+    const raw = v.packagings ?? (v.product as any)?.packagings;
+    if (!raw?.length) return [] as ProductPackaging[];
+    return raw.filter((p: ProductPackaging) => p.active !== false)
+      .sort((a: ProductPackaging, b: ProductPackaging) => a.display_order - b.display_order);
+  }, [v.packagings, v.product]);
+
+  const defaultPkg = useMemo(
+    () => packagings.find(p => p.is_default) ?? packagings[0] ?? null,
+    [packagings],
+  );
+  const [selectedPkgId, setSelectedPkgId] = useState<number | null>(null);
+
+  useEffect(() => { setSelectedPkgId(defaultPkg?.id ?? null); }, [defaultPkg?.id]);
+
+  const activePkg  = packagings.find(p => p.id === selectedPkgId) ?? defaultPkg;
+  const packQty    = activePkg ? Math.max(1, Number(activePkg.quantity) || 1) : 1;
+  const showPkgSel = packagings.length > 1;
+
+  const priceHtBase = getVariantPrice(v, selectedPriceLevelId, priceLevels);
+  const priceHt  = priceHtBase * packQty;
+  const tvaRate  = v.tva?.rate ?? 0;
+  const priceTtc = priceHt * (1 + tvaRate / 100);
 
   const [imgFailed, setImgFailed] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -137,11 +158,11 @@ function ProductCardInner({
   const lastTapRef = useRef(0);
   const handleAdd = useCallback((qty?: number) => {
     if (outStock) return;
-    onAdd(v, qty);
+    onAdd(v, qty, activePkg);
     setJustAdded(true);
     if (addTimerRef.current) clearTimeout(addTimerRef.current);
     addTimerRef.current = setTimeout(() => setJustAdded(false), 450);
-  }, [outStock, onAdd, v]);
+  }, [outStock, onAdd, v, activePkg]);
 
   const handleClick = useCallback(() => {
     if (outStock) { onHighlight?.(idx); return; }
@@ -235,10 +256,29 @@ function ProductCardInner({
           ) : (
             <>
               <span className="pcard-ttc">{formatDZD(priceTtc)}</span>
-              {tvaRate > 0 && <span className="pcard-ht">HT: {formatDZD(priceHt)}</span>}
+              {tvaRate > 0 && <span className="pcard-ht">HT: {formatDZD(priceHtBase)}</span>}
             </>
           )}
         </div>
+
+        {showPkgSel && (
+          <div className="pcard-pkg" onClick={e => e.stopPropagation()}>
+            <select
+              className="pcard-pkg-select"
+              value={activePkg?.id ?? ''}
+              onChange={e => {
+                const id = Number(e.target.value);
+                setSelectedPkgId(id);
+              }}
+            >
+              {packagings.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.label}{p.quantity > 1 ? ` (${p.quantity})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="pcard-actions">

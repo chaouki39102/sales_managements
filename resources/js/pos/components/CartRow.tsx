@@ -11,7 +11,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import type { CartItem } from '@/types';
+import type { CartItem, ProductPackaging } from '@/types';
 import { formatDZD, ttcToHt } from '../utils/calculations';
 
 interface CartRowProps {
@@ -24,6 +24,8 @@ interface CartRowProps {
   onDiscountAmount: (amount: number) => void;
   onPrice:          (price: number) => void;
   onRemove:         () => void;
+  onUpdatePackaging:(packaging: ProductPackaging | null, basePriceHt: number) => void;
+  availablePackagings: ProductPackaging[];
   /** 'compact' يعرض السلة بصف واحد مصغّر لكل صنف (المزيد من المنتجات
    *  مرئية دفعة واحدة)، 'comfortable' هو التصميم الافتراضي الحالي. */
   density?:         'comfortable' | 'compact';
@@ -33,11 +35,12 @@ interface CartRowProps {
 }
 
 type DiscMode  = 'pct' | 'amount';
-type PopupType = 'disc' | 'price' | null;
+type PopupType = 'disc' | 'price' | 'pkg' | null;
 
 export default function CartRow({
   item, idx, isSelected, onSelect,
   onQty, onDiscount, onDiscountAmount, onPrice, onRemove,
+  onUpdatePackaging, availablePackagings = [],
   density = 'comfortable', registerNode,
 }: CartRowProps) {
   const compact = density === 'compact';
@@ -57,6 +60,7 @@ export default function CartRow({
   const rowRef      = useRef<HTMLDivElement | null>(null);
   const popupNodeRef = useRef<HTMLDivElement>(null);
   const popupAnchorRef = useRef<HTMLDivElement>(null);
+  const pkgBtnRef = useRef<HTMLButtonElement>(null);
   const [popupPos, setPopupPos] = useState<{top: number; left: number; right: number}>({ top: 0, left: 0, right: 0 });
 
   // ── Swipe-to-delete gesture (touch only) ──────────────────────────────────
@@ -114,6 +118,10 @@ export default function CartRow({
       priceInpRef.current?.focus();
       priceInpRef.current?.select();
     }
+    if (popup === 'pkg' && pkgBtnRef.current) {
+      const r = pkgBtnRef.current.getBoundingClientRect();
+      setPopupPos({ top: r.bottom + 4, left: r.left, right: window.innerWidth - r.right });
+    }
   }, [popup, discMode, measurePopupAnchor]);
 
   useEffect(() => {
@@ -148,6 +156,14 @@ export default function CartRow({
   }, [discMode, item.discount_percentage, item.discount_amount]);
 
   const tvaRate = item.tva_rate;
+
+  /** Format the unit price for display in the packaging popup */
+  function basePriceLabel(pkg: ProductPackaging, ci: CartItem): string {
+    const baseHt = ci.base_price_ht ?? (ci.unit_price_ht / (ci.pack_qty || 1));
+    const pkgQty = Math.max(1, Number(pkg.quantity) || 1);
+    const priceTtc = baseHt * pkgQty * (1 + ci.tva_rate / 100);
+    return priceTtc.toLocaleString('fr-DZ', { maximumFractionDigits: 0 }) + ' دج';
+  }
 
   // ── فتح popup السعر ───────────────────────────────────────────────────────
   const openPrice = useCallback((e: React.MouseEvent) => {
@@ -212,15 +228,69 @@ export default function CartRow({
       <div className="cr-num">{idx + 1}</div>
 
       {/* ── معلومات المنتج ── */}
-      <div className="cr-info">
-        <div className="cr-name" title={item.product_name}>
-          {item.product_name}
-          {item.variant_name && (
-            <span className="cr-variant"> — {item.variant_name}</span>
-          )}
-        </div>
+        <div className="cr-info">
+          <div className="cr-name" title={item.product_name}>
+            {item.product_name}
+            {item.variant_name && (
+              <span className="cr-variant"> — {item.variant_name}</span>
+            )}
+          </div>
 
-        {/* صف السعر + الخصم */}
+          {/* ── Packaging badge (clickable when multiple options exist) ── */}
+          {availablePackagings.length > 1 && (
+            <button
+              ref={pkgBtnRef}
+              className={`cr-pkg-badge cr-pkg-badge--selectable ${popup === 'pkg' ? 'cr-pkg-badge--active' : ''}`}
+              onClick={e => { e.stopPropagation(); setPopup(p => p === 'pkg' ? null : 'pkg'); }}
+              title="تغيير الوحدة"
+              type="button"
+            >
+              {item.packaging_label ?? item.unit_symbol}
+              {item.pack_qty && item.pack_qty > 1 && <span className="cr-pkg-multi"> ×{item.pack_qty}</span>}
+              <i className="ti ti-chevron-down cr-pkg-chevron" />
+            </button>
+          )}
+          {availablePackagings.length <= 1 && item.packaging_label && (
+            <span className="cr-pkg-badge">
+              {item.packaging_label}
+            </span>
+          )}
+
+          {/* ── Packaging popup ── */}
+          {popup === 'pkg' && createPortal(
+            <div
+              ref={popupNodeRef}
+              className="cr-popup cr-popup--pkg cr-popup--portal"
+              onClick={e => e.stopPropagation()}
+              style={{ position: 'fixed', top: popupPos.top, right: popupPos.right, zIndex: 10000 }}
+            >
+              <div className="cr-popup-arrow" />
+              <div className="cr-popup-label">اختر الوحدة</div>
+              {availablePackagings.map(p => {
+                const isActive = item.packaging_id === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    className={`cr-pkg-option ${isActive ? 'on' : ''}`}
+                    onClick={() => {
+                      const baseHt = item.base_price_ht ?? (item.unit_price_ht / (item.pack_qty || 1));
+                      onUpdatePackaging(p, baseHt);
+                      setPopup(null);
+                    }}
+                    type="button"
+                  >
+                    <span className="cr-pkg-opt-label">{p.label}</span>
+                    <span className="cr-pkg-opt-detail">
+                      {p.quantity > 1 ? `${p.quantity} ×` : ''}{basePriceLabel(p, item)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>,
+            document.body
+          )}
+
+          {/* صف السعر + الخصم */}
         <div className="cr-price-row">
 
           {/* ── السعر قابل للتعديل ── */}

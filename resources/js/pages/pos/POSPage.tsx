@@ -32,7 +32,7 @@ import type { ActiveModal, QuickItem, ViewMode, GridSize, SortMode } from '@/pos
 import type { PaginatedResponse } from '@/lib/api/core/types';
 import { nanoid }   from 'nanoid';
 import type {
-  Product, ProductVariant, CartItem,
+  Product, ProductVariant, ProductPackaging, CartItem,
   PriceLevel, Party, PaymentMode, DocumentType,
   CommercialDocument,
 } from '@/types';
@@ -519,6 +519,15 @@ function POSPage() {
     [rawProducts, stockData],
   );
 
+  const packagingsMap = useMemo(() => {
+    const map = new Map<number, ProductPackaging[]>();
+    for (const v of allVariants) {
+      const pkgs = v.packagings ?? (v.product as any)?.packagings;
+      if (pkgs?.length) map.set(v.id, pkgs.filter((p: ProductPackaging) => p.active !== false));
+    }
+    return map;
+  }, [allVariants]);
+
   const families = useMemo(() => Array.from(
     new Map(
       allVariants
@@ -660,7 +669,7 @@ function POSPage() {
     if (!isEmpty && cartState._isDirty) posRef.current.holdCart();
     try {
       const doc = await apiGet<CommercialDocument>(`/documents/${docId}`, {
-        include: 'party,documentType,lines,lines.product,lines.product_variant,payments,payments.payment_mode',
+        include: 'party,documentType,lines,lines.product,lines.product_variant,lines.packaging,payments,payments.payment_mode',
       });
       if (!doc?.lines?.length) {
         safeToast.error('لا توجد أصناف في هذه الفاتورة');
@@ -671,6 +680,7 @@ function POSPage() {
       const items: CartItem[] = doc.lines.map(line => {
         const v    = line.product_variant;
         const prod = line.product;
+        const pkg  = (line as any).packaging ?? null;
         return {
           id:                  nanoid(8),
           product_id:          line.product_id ?? prod?.id ?? 0,
@@ -679,7 +689,7 @@ function POSPage() {
           variant_name:        v?.variant_name ?? null,
           ref:                 v?.ref ?? prod?.ref ?? '',
           barcode:             v?.barcode ?? null,
-          unit_symbol:         v?.unit?.abbreviation ?? 'قطعة',
+          unit_symbol:         pkg?.label ?? v?.unit?.abbreviation ?? 'قطعة',
           image_url:           null,
           quantity:            Number(line.quantity),
           unit_price_ht:       Number(line.unit_price_ht),
@@ -692,6 +702,9 @@ function POSPage() {
           total_ttc:           Number(line.total_ttc),
           max_stock:           null,
           manages_stock:       false,
+          packaging_id:        line.packaging_id ?? null,
+          pack_qty:            pkg ? Number(pkg.quantity) : 1,
+          packaging_label:     pkg?.label ?? null,
         };
       });
       const payments = (doc.payments ?? []).map(p => ({
@@ -981,6 +994,7 @@ const handleCompleteSale = useCallback(async (params: {
           unit_price_ht:       i.unit_price_ht,
           discount_percentage: Math.min(100, compoundedDisc),
           tva_rate:            clientIsTvaExempt ? 0 : i.tva_rate,
+          packaging_id:        i.packaging_id ?? null,
         };
       });
 
@@ -1228,8 +1242,8 @@ const handleCompleteSale = useCallback(async (params: {
   const isQuickItem = useCallback((variantId: number) =>
     quickItems.some(q => q.variantId === variantId), [quickItems]);
 
-  const handleAddItem = useCallback((v: ProductVariant, qty?: number) => {
-    posRef.current.addItem(v, qty);
+  const handleAddItem = useCallback((v: ProductVariant, qty?: number, packaging?: ProductPackaging | null) => {
+    posRef.current.addItem(v, qty, packaging);
     setRecentProducts(prev => {
       const filtered = prev.filter(p => p.id !== v.id);
       return [v, ...filtered].slice(0, 5);
@@ -1275,10 +1289,23 @@ const handleCompleteSale = useCallback(async (params: {
       const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
       const buf = barcodeRef.current;
       if (e.key === 'Enter' && buf.length >= 4) {
-        const variant = allVariants.find(v => v.barcode === buf);
+        // 1) Try product barcode
+        let variant = allVariants.find(v => v.barcode === buf);
+        let packaging: ProductPackaging | null = null;
         if (variant && !isVariantOutOfStock(variant, allowNegSetting)) {
           setScannedId(variant.id);
-          handleAddItem(variant);
+          handleAddItem(variant, 1, null);
+        } else {
+          // 2) Try packaging barcode
+          for (const v of allVariants) {
+            const pkgs = (v.packagings ?? (v.product as any)?.packagings) as ProductPackaging[] | undefined;
+            const match = pkgs?.find(p => p.barcode === buf);
+            if (match) { variant = v; packaging = match; break; }
+          }
+          if (variant && !isVariantOutOfStock(variant, allowNegSetting)) {
+            setScannedId(variant.id);
+            handleAddItem(variant, 1, packaging);
+          }
         }
         setBarcodeBuffer('');
         return;
@@ -1528,6 +1555,8 @@ const handleCompleteSale = useCallback(async (params: {
           onDiscountAmount={pos.updateDiscountAmount}          // ✅ جديد
           onPrice={pos.updatePrice}
           onRemove={id => { pos.removeItem(id); if (selectedCartItemId === id) setSelectedCartItemId(null); }}
+          onUpdatePackaging={pos.updatePackaging}
+          packagingsMap={packagingsMap}
           onSetClient={pos.setClient}
           onNoteChange={setCartNote} onHold={() => { clearEditingState(); pos.holdCart(); }}
           onSell={() => setModal('payment')} onClear={handleClearCart} onHeld={() => setModal('held')}

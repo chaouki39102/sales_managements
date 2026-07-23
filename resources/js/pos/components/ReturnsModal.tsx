@@ -91,6 +91,7 @@ export default function ReturnsModal({
           unit_price_ht: s.line.unit_price_ht,
           discount_percentage: s.line.discount_percentage,
           tva_rate: s.line.tva_rate,
+          packaging_id: (s.line as any).packaging_id ?? null,
         })),
       });
       toast.success('تم إنشاء المرتجع بنجاح');

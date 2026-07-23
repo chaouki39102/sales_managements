@@ -27,6 +27,7 @@ export function usePOS(fiscalStampEnabled = true) {
   const updateDiscount       = useCartStore(s => s.updateDiscount);
   const updateDiscountAmount = useCartStore(s => s.updateDiscountAmount);
   const updatePrice          = useCartStore(s => s.updatePrice);
+  const updatePackaging      = useCartStore(s => s.updatePackaging);
   const clearCart            = useCartStore(s => s.clearCart);
   const setClient            = useCartStore(s => s.setClient);
   const setInvoiceDiscountPct = useCartStore(s => s.setInvoiceDiscountPct);
@@ -50,7 +51,7 @@ export function usePOS(fiscalStampEnabled = true) {
 
     items, client, invoiceDiscountPct, payments,
     addItem, removeItem, updateQty,
-    updateDiscount, updateDiscountAmount, updatePrice,
+    updateDiscount, updateDiscountAmount, updatePrice, updatePackaging,
     clearCart, setClient, setInvoiceDiscountPct,
     totals,
   }), [
@@ -59,7 +60,7 @@ export function usePOS(fiscalStampEnabled = true) {
     setSearch, setCategory, openPayment, closePayment,
     items, client, invoiceDiscountPct, payments,
     addItem, removeItem, updateQty,
-    updateDiscount, updateDiscountAmount, updatePrice,
+    updateDiscount, updateDiscountAmount, updatePrice, updatePackaging,
     clearCart, setClient, setInvoiceDiscountPct,
     totals,
   ]);

@@ -19,7 +19,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useState, useCallback, useEffect, useMemo, useRef, useLayoutEffect, forwardRef, useImperativeHandle } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { CartItem, CartTotals, Party } from '@/types';
+import type { CartItem, CartTotals, Party, ProductPackaging } from '@/types';
 import { formatDZD } from '../utils/calculations';
 import { getEffectiveShortcut } from '../hooks/useKeyboardMap';
 import CartRow from './CartRow';
@@ -37,6 +37,8 @@ interface ProfessionalCartProps {
   onDiscountAmount:     (id: string, amount: number) => void;
   onPrice:              (id: string, price: number) => void;
   onRemove:             (id: string) => void;
+  onUpdatePackaging:    (id: string, packaging: ProductPackaging | null, basePriceHt: number) => void;
+  packagingsMap:        Map<number, ProductPackaging[]>;
   onSetClient:          (c: Party | null) => void;
   onNoteChange:         (n: string) => void;
   onHold:               () => void;
@@ -75,7 +77,7 @@ type CartZoom = 0.75 | 0.875 | 1 | 1.125 | 1.25;
 const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProps>(function ProfessionalCart({
   items, totals, client,
   note, selectedItemId, onSelectItem,
-  onQty, onDiscount, onDiscountAmount, onPrice, onRemove,
+  onQty, onDiscount, onDiscountAmount, onPrice, onRemove, onUpdatePackaging, packagingsMap,
   onSetClient, onNoteChange,
   onHold, onSell, onClear, onHeld, totalTtcFinal, remainingToPay,
   invoiceDiscountPct = 0, onInvoiceDiscountChange, invoiceDiscountAmount = 0,
@@ -512,6 +514,8 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                       onDiscountAmount={amount => onDiscountAmount(item.id, amount)}
                       onPrice={price => onPrice(item.id, price)}
                       onRemove={() => onRemove(item.id)}
+                      onUpdatePackaging={(pkg, baseHt) => onUpdatePackaging(item.id, pkg, baseHt)}
+                      availablePackagings={packagingsMap.get(item.variant_id) ?? []}
                       density={density}
                       registerNode={registerRowNode}
                     />

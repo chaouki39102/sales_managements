@@ -95,8 +95,8 @@ export function productToVariant(p: Product): ProductVariant {
     tva:               p.tva,
     current_stock:     pr.current_stock,
     prices:            pr.prices,
-    // ✅ الإضافة الجوهرية — بدونها getQuantityDiscount() ترجع 0 دائماً
     quantityDiscounts: pr.quantityDiscounts,
+    packagings:        (pr as any).packagings,
   } as unknown as ProductVariant;
 }
 

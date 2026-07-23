@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { fmtDZD, calcLineTotal, getProductStock, toNum } from '../utils/document.utils';
 import { ProductSearch } from './ProductSearch';
 import type { LineItem, Product } from '../types/document.types';
@@ -211,6 +211,17 @@ export function LineCard({
             </button>
           </div>
         </div>
+
+        {/* Total Quantity (baseQty) */}
+        {line._packQty > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ color: 'var(--t4)', fontSize: 10, width: 56 }}>الكمية الإجمالية:</span>
+            <TotalQtyCardInput baseQty={baseQty} packQty={line._packQty} disabled={disabled} onUpdate={(v) => {
+              const newQty = line._packQty > 1 ? v / line._packQty : v;
+              onUpdate(idx, { quantity: newQty });
+            }} />
+          </div>
+        )}
 
         {/* Unit Price */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

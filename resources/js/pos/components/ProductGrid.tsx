@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { ProductVariant, PriceLevel, CartItem } from '@/types';
+import type { ProductVariant, ProductPackaging, PriceLevel, CartItem } from '@/types';
 import type { ViewMode, GridSize } from '../utils/posHelpers';
 import { formatDZD } from '../utils/calculations';
 import { getVariantPrice, isVariantOutOfStock } from '../utils/posHelpers';
@@ -11,7 +11,7 @@ interface ProductGridProps {
   view: ViewMode;
   gridSize: GridSize;
   loading: boolean;
-  onAdd: (v: ProductVariant, qty?: number) => void;
+  onAdd: (v: ProductVariant, qty?: number, packaging?: ProductPackaging | null) => void;
   onAddManual: () => void;
   onPin: (v: ProductVariant) => void;
   isPinned: (variantId: number) => boolean;

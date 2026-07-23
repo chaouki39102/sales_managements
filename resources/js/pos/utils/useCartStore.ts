@@ -28,6 +28,7 @@ interface CartState {
   updateDiscount:       (id: string, pct: number) => void;
   updateDiscountAmount: (id: string, amount: number) => void;
   updatePrice:          (id: string, price: number) => void;
+  updatePackaging:      (id: string, packaging: ProductPackaging | null, basePriceHt: number) => void;
   setClient:            (client: Party | null) => void;
   setNotes:             (notes: string) => void;
   setPayments:          (payments: DocumentPayment[]) => void;
@@ -116,6 +117,7 @@ export const useCartStore = create<CartState>()(
           }
 
           const priceHt  = variant.default_selling_price_ht * packQty;
+          const baseHt   = variant.default_selling_price_ht;
           const tvaRate  = variant.tva?.rate ?? 0;
           const autoDisc = findQuantityDiscount(variant.quantity_discounts, qty);
 
@@ -145,6 +147,7 @@ export const useCartStore = create<CartState>()(
             packaging_id:        packId,
             pack_qty:            packQty,
             packaging_label:     packaging?.label ?? null,
+            base_price_ht:       baseHt,
           });
 
           return { items: [...state.items, newItem], _isDirty: true };
@@ -200,6 +203,29 @@ export const useCartStore = create<CartState>()(
           ),
           _isDirty: true,
         })),
+
+      updatePackaging: (id, packaging, basePriceHt) =>
+        set(state => {
+          const packQty = packaging ? Math.max(1, Number(packaging.quantity) || 1) : 1;
+          const newPrice = basePriceHt * packQty;
+          return {
+            items: state.items.map(i =>
+              i.id === id
+                ? recalcItem({
+                    ...i,
+                    packaging_id:     packaging?.id ?? null,
+                    pack_qty:         packQty,
+                    packaging_label:  packaging?.label ?? null,
+                    unit_symbol:      packaging?.label ?? i.unit_symbol,
+                    unit_price_ht:    newPrice,
+                    selling_price_ttc: newPrice * (1 + i.tva_rate / 100),
+                    base_price_ht:    basePriceHt,
+                  })
+                : i,
+            ),
+            _isDirty: true,
+          };
+        }),
 
       setClient: (client) => set({ client, _isDirty: true }),
       setNotes:  (notes)  => set({ notes, _isDirty: true }),

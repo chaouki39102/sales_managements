@@ -415,6 +415,7 @@ export interface ProductVariant extends BaseModel {
   prices?:             ProductVariantPrice[];
   quantity_discounts?: QuantityDiscount[];
   lots?:               ProductLot[];
+  packagings?:         ProductPackaging[];
   // Computed
   current_stock?:      number;
   image_url?:          string | null;
@@ -675,6 +676,7 @@ export interface CartItem {
   packaging_id?:       number | null;
   pack_qty?:           number;
   packaging_label?:    string | null;
+  base_price_ht?:      number;
 }
 export interface CartTotals {
   total_ht:       number;
