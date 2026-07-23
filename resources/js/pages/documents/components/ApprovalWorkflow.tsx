@@ -70,11 +70,11 @@ export function ApprovalStatusBadge({ documentId, statusSlug, approvalCheck }: A
 interface ApprovalActionsProps {
   documentId: number;
   statusSlug: string;
-  netToPay: number;
+  netToPay?: number;
   approvalCheck?: ApprovalCheck;
 }
 
-export function ApprovalActions({ documentId, statusSlug, netToPay: _netToPay, approvalCheck }: ApprovalActionsProps) {
+export function ApprovalActions({ documentId, statusSlug, netToPay: _netToPay, approvalCheck }: ApprovalActionsProps & { netToPay?: number }) {
   const { notify } = useNotification();
   const { data: hookCheck } = useApprovalCheck(approvalCheck === undefined ? documentId : null);
   const check = approvalCheck ?? hookCheck;

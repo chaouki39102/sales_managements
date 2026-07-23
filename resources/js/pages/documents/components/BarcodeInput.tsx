@@ -12,12 +12,20 @@ export function BarcodeInput({ products, onProductFound, disabled }: BarcodeInpu
   const [notFound, setNotFound] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const notFoundTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     if (!disabled && inputRef.current) {
       inputRef.current.focus();
     }
   }, [disabled]);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (notFoundTimerRef.current) clearTimeout(notFoundTimerRef.current);
+    };
+  }, []);
 
   const handleChange = (raw: string) => {
     const code = raw.trim();
@@ -37,7 +45,8 @@ export function BarcodeInput({ products, onProductFound, disabled }: BarcodeInpu
         setValue('');
       } else {
         setNotFound(true);
-        setTimeout(() => setNotFound(false), 2000);
+        if (notFoundTimerRef.current) clearTimeout(notFoundTimerRef.current);
+        notFoundTimerRef.current = setTimeout(() => setNotFound(false), 2000);
       }
     }, 300);
   };

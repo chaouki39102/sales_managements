@@ -219,21 +219,6 @@ class CommercialDocument extends Model
     // - تجاوز الـ scope عند الحاجة بـ withTrashed() أو onlyTrashed()
     // ════════════════════════════════════════════════════════════════════════════
 
-    protected static function booted(): void
-    {
-        // ✅ Global scope: استبعد البيانات المحذوفة بشكل افتراضي
-        // هذا يضمن أن جميع queries تستبعد soft-deleted records
-        // إلا إذا تم استخدام withTrashed() صراحة
-        static::addGlobalScope(function (Builder $query) {
-            // Laravel's SoftDeletes trait يُطبّق هذا تلقائياً
-            // لكن نوضحه هنا للوضوح
-            if (!$query->getQuery()->wheres) {
-                // فقط إذا لم تكن هناك wheres أخرى
-                // لا نفعل شيء — Laravel يتعامل مع هذا
-            }
-        });
-    }
-
     public function documentType(): BelongsTo
     {
         return $this->belongsTo(DocumentType::class);
@@ -298,28 +283,6 @@ class CommercialDocument extends Model
         );
     }
 
-    public function scopeLocked(Builder $query): Builder
-    {
-        return $query->where('is_locked', true);
-    }
-    public function scopeUnlocked(Builder $query): Builder
-    {
-        return $query->where('is_locked', false);
-    }
-    public function scopeValidated(Builder $query): Builder
-    {
-        return $query->whereNotNull('validated_at');
-    }
-    public function scopeUnpaid(Builder $query): Builder
-    {
-        return $query->where('remaining_amount', '>', 0);
-    }
-    public function scopeOverdue(Builder $query): Builder
-    {
-        return $query->where('due_date', '<', now())
-            ->where('remaining_amount', '>', 0);
-    }
-
     public function isFullyPaid(): bool
     {
         return $this->remaining_amount <= 0;
@@ -327,9 +290,5 @@ class CommercialDocument extends Model
     public function isOverdue(): bool
     {
         return $this->due_date && $this->due_date->isPast() && !$this->isFullyPaid();
-    }
-    public function canBeModified(): bool
-    {
-        return !$this->is_locked && !$this->validated_at;
     }
 }

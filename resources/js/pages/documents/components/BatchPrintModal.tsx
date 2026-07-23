@@ -16,13 +16,13 @@ const overlayStyle: React.CSSProperties = {
 
 const modalStyle: React.CSSProperties = {
   width: '90vw', maxWidth: 700, maxHeight: '90vh',
-  background: '#fff', borderRadius: 8, overflow: 'hidden',
+  background: 'var(--bg1)', borderRadius: 8, overflow: 'hidden',
   display: 'flex', flexDirection: 'column', boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
 };
 
 const headerStyle: React.CSSProperties = {
   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-  padding: '12px 16px', borderBottom: '1px solid #e2e8f0',
+  padding: '12px 16px', borderBottom: '1px solid var(--b1)',
 };
 
 const bodyStyle: React.CSSProperties = {
@@ -31,21 +31,21 @@ const bodyStyle: React.CSSProperties = {
 
 const listItemStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 10,
-  padding: '8px 12px', borderBottom: '1px solid #f0f1f3',
+  padding: '8px 12px', borderBottom: '1px solid var(--b1)',
   fontSize: 13,
 };
 
 const footerStyle: React.CSSProperties = {
   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-  gap: 8, padding: '12px 16px', borderTop: '1px solid #e2e8f0',
+  gap: 8, padding: '12px 16px', borderTop: '1px solid var(--b1)',
 };
 
 const progressBarOuter: React.CSSProperties = {
-  width: '100%', height: 6, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden', marginBottom: 12,
+  width: '100%', height: 6, background: 'var(--b1)', borderRadius: 3, overflow: 'hidden', marginBottom: 12,
 };
 
 const progressBarInner: React.CSSProperties = {
-  height: '100%', background: '#2563eb', borderRadius: 3, transition: 'width 0.3s ease',
+  height: '100%', background: 'var(--em)', borderRadius: 3, transition: 'width 0.3s ease',
 };
 
 function printDocument(_docNum: string, data: Record<string, unknown>, tpl: PrintTemplate, company: CompanyInfo): Promise<void> {

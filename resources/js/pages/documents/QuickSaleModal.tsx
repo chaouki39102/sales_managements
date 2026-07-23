@@ -525,13 +525,6 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
     return { ht, tva, ttc, stamp, netPay };
   }, [lines, fiscalStampEnabled]);
 
-  const _payAmount = useMemo(() => {
-    // اگر المبلغ 0 أو أكبر من المستحق، نستخدم المستحق
-    const amt = payment.amount;
-    if (amt <= 0 || amt >= totals.netPay) return totals.netPay;
-    return amt;
-  }, [payment.amount, totals.netPay]);
-
   // Validation
   const validate = useCallback((): boolean => {
     const errs: Record<string, string> = {};
@@ -633,11 +626,6 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
     return `${color} ${p.current_stock} ${p.unit?.symbol ?? ''}`;
   }, []);
   const getPartyLabel = useCallback((p: Record<string, unknown>) => String(p.name), []);
-
-  const _handleSave = useCallback(() => {
-    setApiErr('');
-    if (validate()) saveMut.mutate();
-  }, [validate, saveMut]);
 
   // معالجة Enter في حقل الكمية: إضافة سطر جديد
   const handleQuantityEnter = useCallback(

@@ -174,47 +174,6 @@ class PaymentSynchronizer
     // PUBLIC: حساب وتثبيت الرصيد
     // ═══════════════════════════════════════════════════════════════════════
 
-    /**
-     * حساب الرصيد السابق والجديد بعد مزامنة الدفعات.
-     *
-     * SSOT: الباكند يحسب كل شيء. الفرونت ينتهي لا يحسب أي رصيد.
-     * يُخزّن في `balance_data` كمفتاح ديناميكي (ليس عموداً في DB).
-     * يُقرأ من CommercialDocumentResource عند تحويل الـ JSON.
-     */
-    public function computeAndAttachBalances(CommercialDocument $doc): void
-    {
-        if (!$doc->party_id) return;
-
-        try {
-            /** @var PartyBalanceService $balanceService */
-            $balanceService = app(PartyBalanceService::class);
-            $balanceData    = $balanceService->getBalanceAt(
-                $doc->party_id,
-                $doc->document_date,
-            );
-
-            $signedBalance   = (float) ($balanceData['signed_balance'] ?? 0);
-            $currentBalance  = $signedBalance;
-            $netToPay        = (float) $doc->net_to_pay;
-            $paidAmount      = (float) $doc->paid_amount;
-            $remainingAmount = (float) $doc->remaining_amount;
-
-            $previousSigned = $signedBalance - $netToPay + $paidAmount;
-            $previousBalance = $previousSigned;
-
-            $doc->balance_data = [
-                'previous_balance' => round($previousBalance,  2),
-                'invoice_total'    => round($netToPay,         2),
-                'paid_amount'      => round($paidAmount,       2),
-                'remaining'        => round($remainingAmount,  2),
-                'change'           => round(max(0, $paidAmount - $netToPay), 2),
-                'new_balance'      => round($currentBalance,   2),
-            ];
-        } catch (\Throwable $e) {
-            Log::warning('computeAndAttachBalances failed for doc #' . $doc->id . ': ' . $e->getMessage());
-        }
-    }
-
     // ═══════════════════════════════════════════════════════════════════════
     // PRIVATE: حماية API/شبكة
     // ═══════════════════════════════════════════════════════════════════════

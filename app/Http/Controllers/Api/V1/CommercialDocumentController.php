@@ -3,8 +3,6 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Core\Http\Controllers\BaseApiController;
-use App\Http\Requests\StoreCommercialDocumentRequest;
-use App\Http\Requests\UpdateCommercialDocumentRequest;
 use App\Http\Resources\CommercialDocumentResource;
 use App\Services\QRCodeService;
 use App\Services\CommercialDocumentService;
@@ -371,13 +369,15 @@ class CommercialDocumentController extends BaseApiController
                 'payments.*.treasury_account_id'   => 'nullable|integer',
             ]);
 
+        if ($commercialDocument->is_exported_to_accounting) {
+                return $this->errorResponse('لا يمكن تعديل وثيقة تم تصديرها إلى المحاسبة.', 409);
+            }
+
             DB::transaction(function () use ($commercialDocument, $validated) {
                 $this->paymentSynchronizer->syncPayments(
                     $commercialDocument,
                     $validated['payments']
                 );
-                // Re-freeze balance snapshots after payment changes (inside transaction)
-                $this->commercialDocumentService->persistBalanceSnapshots($commercialDocument);
             });
 
             $freshDoc = $commercialDocument->fresh(['payments.paymentMode', 'payments.treasuryAccount', 'documentStatus']);

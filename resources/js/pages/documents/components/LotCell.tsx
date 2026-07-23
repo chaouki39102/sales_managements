@@ -1,17 +1,16 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { cellStyle } from './DocumentUIPrimitives';
-import type { LineItem, Product } from '../types/document.types';
+import type { LineItem } from '../types/document.types';
 
 interface LotCellProps {
   line:       LineItem;
   idx:        number;
-  prod?:      Product;
   disabled:   boolean;
   onUpdate:   (idx: number, patch: Partial<LineItem>) => void;
 }
 
-export function LotCell({ line, idx, prod: _prod, disabled, onUpdate }: LotCellProps) {
+export function LotCell({ line, idx, disabled, onUpdate }: LotCellProps) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);

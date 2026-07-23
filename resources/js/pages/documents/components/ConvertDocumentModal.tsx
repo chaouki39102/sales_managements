@@ -51,8 +51,6 @@ export default function ConvertDocumentModal({
     if (!docDate)    { setError('اختر التاريخ'); return; }
     setError('');
 
-    console.log('[ConvertModal] sending date:', docDate);
-
     convertMut.mutate(
       { documentId, targetTypeCode: targetCode, documentDate: docDate },
       {

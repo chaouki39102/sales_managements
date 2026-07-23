@@ -711,10 +711,6 @@ export default function CommercialDocumentsPage() {
     const { data: docsRaw, isLoading, isFetching } = useQuery({
         queryKey: tenantKeys.documents.byType(slug ?? "", typeCode ?? "", queryParams),
         queryFn: () => {
-            // TODO: احذف هذا الـ log بعد حل المشكلة
-            if (process.env.NODE_ENV === "development") {
-                console.debug("[CommercialDocumentsPage] sending params:", queryParams);
-            }
             return apiGet<{ data: CommercialDocument[]; meta: Record<string, number> }>("/documents", queryParams);
         },
         enabled: !!slug && !!typeCode && !!selectedYear?.id && !!docType?.id,
