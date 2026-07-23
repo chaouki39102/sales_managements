@@ -177,11 +177,11 @@ export default function POSTopBar({
         )}
 
         {editingDocumentNumber && (
-          <div className="pos-chip editing" title="جاري تعديل فاتورة" style={{ background: 'var(--y)', color: '#000', fontWeight: 700 }}>
-            <i className="ti ti-edit pic-ic" style={{ color: '#000' }} />
+          <div className="pos-chip editing" title="جاري تعديل فاتورة">
+            <i className="ti ti-edit pic-ic" />
             <div className="pos-chip-inner">
-              <span className="pos-chip-label" style={{ color: '#000', opacity: 0.8 }}>تعديل فاتورة</span>
-              <strong className="pos-chip-val" style={{ color: '#000' }}>{editingDocumentNumber}</strong>
+              <span className="pos-chip-label">تعديل فاتورة</span>
+              <strong className="pos-chip-val">{editingDocumentNumber}</strong>
             </div>
           </div>
         )}

@@ -3304,9 +3304,17 @@ body.dark .thermal-status.err { background: #7f1d1d; color: #fecaca; }
    24. EDITING CHIP — وضع التعديل
 ══════════════════════════════════════════════════════════════════════════════ */
 .pos-chip.editing {
-  animation: chipBlink 1s ease-in-out infinite;
+  background: rgba(239, 68, 68, .15);
+  border-color: rgba(239, 68, 68, .35);
+  color: var(--red);
+  animation: editPulse 1.6s ease-in-out infinite;
 }
-@keyframes chipBlink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: .6; }
+.pos-chip.editing .pic-ic,
+.pos-chip.editing .pos-chip-label,
+.pos-chip.editing .pos-chip-val {
+  color: var(--red) !important;
+}
+@keyframes editPulse {
+  0%, 100% { background: rgba(239, 68, 68, .15); border-color: rgba(239, 68, 68, .35); }
+  50% { background: rgba(239, 68, 68, .30); border-color: rgba(239, 68, 68, .55); }
 }

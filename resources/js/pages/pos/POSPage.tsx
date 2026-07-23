@@ -1572,7 +1572,7 @@ const handleCompleteSale = useCallback(async (params: {
           onUndoClear={handleUndoClear}
           canUndoClear={canUndoClear}
           undoClearSecondsLeft={undoClearSecondsLeft}
-          clientBalance={clientBalance?.current_balance}
+          clientBalance={editingDocumentId ? editingPrevBalanceRef.current : clientBalance?.current_balance}
           slug={slug}
           cartRef={cartRef}
           onClientModalClose={() => { setTimeout(() => searchRef.current?.focus(), 100); }}
@@ -1624,9 +1624,28 @@ const handleCompleteSale = useCallback(async (params: {
             company={companyData}
             source={receiptSource}
             docNumber={receiptSnapshot.docNumber}
-            onClose={() => { setModal('none'); setReceiptSnapshot(null); }}
+            onClose={() => {
+              setModal('none');
+              setReceiptSnapshot(null);
+              setEditingDocumentId(null);
+              setEditingDocumentNumber(null);
+              setEditingDocStatus(null);
+              setEditingDocumentDate(null);
+              editingPrevBalanceRef.current = undefined;
+              editingDocMetaRef.current = null;
+            }}
             onPrint={() => { handlePrintDirect(receiptSnapshot); }}
-            onNewSale={() => { setModal('none'); setReceiptSnapshot(null); pos.clearCart(); }}
+            onNewSale={() => {
+              setModal('none');
+              setReceiptSnapshot(null);
+              setEditingDocumentId(null);
+              setEditingDocumentNumber(null);
+              setEditingDocStatus(null);
+              setEditingDocumentDate(null);
+              editingPrevBalanceRef.current = undefined;
+              editingDocMetaRef.current = null;
+              pos.clearCart();
+            }}
           />
         </Suspense>
       )}
