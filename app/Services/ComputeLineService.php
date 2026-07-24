@@ -102,8 +102,8 @@ class ComputeLineService
         $isQuantityBlocked = false;
         $discountTier     = null;
 
-        if (!$isPurchase && $levelId && $product->manages_quantity_discounts) {
-            $discount = $product->applicableDiscount($levelId, $baseQty);
+        if (!$isPurchase && $product->manages_quantity_discounts) {
+            $discount = $product->applicableDiscount($levelId ?: null, $baseQty);
 
             if ($discount) {
                 if ($discount->is_blocked) {

@@ -823,45 +823,7 @@ export default function LookupPage({
   return (
     <div className="page on" style={{ padding: '18px 20px' }}>
 
-      {/* CSS مخصص */}
-      <style>{`
-        @keyframes toastIn {
-          from { opacity: 0; transform: translateX(-50%) translateY(16px) scale(.92); }
-          to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        .field-wrap { display: flex; flex-direction: column; gap: 5px; }
-        .field-label {
-          font-size: 12px; font-weight: 700; color: var(--t2);
-          display: flex; align-items: center; gap: 4;
-        }
-        .field-label .req { color: var(--red); }
-        .field-err { font-size: 11.5px; color: var(--red); display: flex; align-items: center; gap: 4; }
-        .field-hint { font-size: 11px; color: var(--t4); display: flex; align-items: center; gap: 4; }
-        .inp-focused input:focus,
-        .inp-focused select:focus,
-        .inp-focused textarea:focus {
-          border-color: var(--em) !important;
-          box-shadow: 0 0 0 3px var(--emb) !important;
-        }
-        .row-hover { transition: background .12s; }
-        .row-hover:hover { background: var(--bg3); }
-        .sort-btn { cursor: pointer; user-select: none; display: inline-flex; align-items: center; gap: 4; }
-        .sort-btn:hover { color: var(--t1); }
-        .bool-grid {
-          display: flex; flex-wrap: wrap; gap: 12px 20px;
-          background: var(--bg3); border: 1px solid var(--b2);
-          border-radius: var(--r2); padding: 12px 14px;
-        }
-        .bool-item { display: flex; align-items: center; gap: 10px; }
-        .bool-lbl { font-size: 12px; font-weight: 700; color: var(--t2); }
-        .btn-save-close:focus, .btn-save-new:focus {
-          outline: 2px solid var(--em);
-          outline-offset: 2px;
-        }
-      `}</style>
+
 
       {/* Toast */}
       {toast && (
@@ -893,7 +855,7 @@ export default function LookupPage({
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {/* البحث */}
-          <div className="srch inp-focused" style={{ width: 210 }}>
+          <div className="srch lkp-inp-focused" style={{ width: 210 }}>
             <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
             <input
               type="text" placeholder="بحث سريع..."
@@ -961,7 +923,7 @@ export default function LookupPage({
                   {tableFields.map(f => (
                     <th key={f.key}>
                       <span
-                        className="sort-btn"
+                        className="lkp-sort-btn"
                         onClick={() => handleSort(f.key)}
                         style={{ color: sortKey === f.key ? 'var(--em)' : undefined }}
                       >
@@ -979,7 +941,7 @@ export default function LookupPage({
                 {filtered.map((item, idx) => (
                   <tr
                     key={item.id}
-                    className="row-hover"
+                    className="lkp-row-hover"
                     onDoubleClick={() => openEdit(item)}
                     title="انقر مرتين للتعديل"
                   >
@@ -1042,10 +1004,10 @@ export default function LookupPage({
               return (
                 <div
                   key={f.key}
-                  className="field-wrap inp-focused"
+                  className="lkp-field-wrap lkp-inp-focused"
                   style={isTextarea ? { gridColumn: 'span 2' } : undefined}
                 >
-                  <label className="field-label">
+                  <label className="lkp-field-label">
                     {f.label}
                     {f.required && <span className="req">*</span>}
                   </label>
@@ -1071,7 +1033,7 @@ export default function LookupPage({
 
                   {/* خطأ الحقل */}
                   {fieldErrs[f.key] && (
-                    <span className="field-err">
+                    <span className="lkp-field-err">
                       <i className="ti ti-alert-circle" style={{ fontSize: 11 }} />
                       {fieldErrs[f.key]}
                     </span>
@@ -1079,7 +1041,7 @@ export default function LookupPage({
 
                   {/* تلميح */}
                   {f.hint && !fieldErrs[f.key] && (
-                    <span className="field-hint">
+                    <span className="lkp-field-hint">
                       <i className="ti ti-info-circle" style={{ fontSize: 11 }} />
                       {f.hint}
                     </span>
@@ -1091,10 +1053,10 @@ export default function LookupPage({
 
           {/* ── حقول Toggle/Boolean ── */}
           {boolFields.length > 0 && (
-            <div className="bool-grid" style={{ marginBottom: formErr ? 12 : 0 }}>
+            <div className="lkp-bool-grid" style={{ marginBottom: formErr ? 12 : 0 }}>
               {boolFields.map(f => (
-                <div key={f.key} className="bool-item">
-                  <span className="bool-lbl">{f.label}</span>
+                <div key={f.key} className="lkp-bool-item">
+                  <span className="lkp-bool-lbl">{f.label}</span>
                   <ToggleField
                     field={f}
                     value={formData[f.key]}
@@ -1139,7 +1101,7 @@ export default function LookupPage({
                 إلغاء
               </button>
               <button
-                className="btn btn-save-new"
+                className="btn lkp-btn-save-new"
                 onClick={() => performSubmit(false)}
                 disabled={saving}
                 style={{ background: 'var(--bg3)', border: '1px solid var(--b3)', color: 'var(--t2)' }}
@@ -1150,7 +1112,7 @@ export default function LookupPage({
                 حفظ وجديد
               </button>
               <button
-                className="btn btn-p btn-save-close"
+                className="btn btn-p lkp-btn-save-close"
                 onClick={() => performSubmit(true)}
                 disabled={saving}
               >

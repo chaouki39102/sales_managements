@@ -44,14 +44,13 @@ export default function ProfessionalReceipt({
   return (
     <div className="ov on" onClick={onClose}>
       <div
-        className="modal modal-md"
-        style={{ maxHeight: '95vh', display: 'flex', flexDirection: 'column' }}
+        className="modal modal-md pr-modal"
         onClick={e => e.stopPropagation()}
       >
         <div className="m-hd">
           <div>
             <div className="m-title">
-              <i className="ti ti-receipt" style={{ color: 'var(--em)', marginLeft: 7 }} />
+              <i className="ti ti-receipt text-em ml-2" />
               معاينة الإيصال
             </div>
             {docNumber && (
@@ -64,8 +63,7 @@ export default function ProfessionalReceipt({
         </div>
 
         <div
-          className="m-body"
-          style={{ flex: 1, overflowY: 'auto', padding: 16 }}
+          className="m-body pr-receipt-body"
           id="pos-receipt-print"
         >
           <UniversalPrintPipeline source={source} template={template} company={company} />
@@ -75,7 +73,7 @@ export default function ProfessionalReceipt({
           <button className="btn btn-p" onClick={onNewSale} type="button">
             <i className="ti ti-plus" /> بيع جديد
           </button>
-          <div style={{ flex: 1 }} />
+          <div className="flex-1" />
           <button className="btn" onClick={onClose} type="button">إغلاق</button>
           <button className="btn btn-p" onClick={onPrint} type="button">
             <i className="ti ti-printer" /> طباعة

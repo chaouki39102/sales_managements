@@ -175,23 +175,6 @@ export default function AdminBootModal({
       padding: 20, direction: 'rtl',
       animation: 'abFadeIn .25s ease',
     }}>
-      <style>{`
-        @keyframes abFadeIn   { from{opacity:0} to{opacity:1} }
-        @keyframes abSlideUp  { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:none} }
-        @keyframes abSpin     { to{transform:rotate(360deg)} }
-        @keyframes abPulse    { 0%,100%{opacity:1} 50%{opacity:.45} }
-        @keyframes abPop      {
-          0%  { transform:scale(.7); opacity:0 }
-          65% { transform:scale(1.1) }
-          100% { transform:scale(1); opacity:1 }
-        }
-        @keyframes abShimmer {
-          0%   { background-position:-400px 0 }
-          100% { background-position: 400px 0 }
-        }
-        .ab-step:hover { background:var(--bg3); }
-      `}</style>
-
       <div style={{
         background: 'var(--bg2)',
         borderRadius: 24,

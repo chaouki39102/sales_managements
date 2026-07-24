@@ -13,7 +13,7 @@ import type {
 type ProductApiResponse = Product & {
   current_stock?:      number;
   prices?:             ProductVariantPrice[];
-  quantityDiscounts?:  Array<{ min_quantity: number; discount_percentage: number }>;
+  quantity_discounts?:  Array<{ min_qty: number; discount_percentage: number }>;
   default_selling_price_ht?: number;
 };
 
@@ -95,7 +95,7 @@ export function productToVariant(p: Product): ProductVariant {
     tva:               p.tva,
     current_stock:     pr.current_stock,
     prices:            pr.prices,
-    quantityDiscounts: pr.quantityDiscounts,
+    quantity_discounts: pr.quantity_discounts,
     packagings:        (pr as any).packagings,
   } as unknown as ProductVariant;
 }

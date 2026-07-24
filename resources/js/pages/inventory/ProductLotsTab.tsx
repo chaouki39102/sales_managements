@@ -350,18 +350,18 @@ export default function ProductLotsTab() {
         ) : (
           <>
             <div style={{ overflowX: 'auto' }}>
-              <table className="tbl">
+              <table className="plt-tbl">
                 <thead>
                   <tr>
-                    <th className="th">{"\u0631\u0642\u0645 \u0627\u0644\u062f\u0641\u0639\u0629"}</th>
-                    <th className="th">{"\u0627\u0644\u0645\u0646\u062a\u062c"}</th>
-                    <th className="th">{"\u0627\u0644\u0645\u0633\u062a\u0648\u062f\u0639"}</th>
-                    <th className="th" style={{ textAlign: 'left' }}>{"\u0627\u0644\u0643\u0645\u064a\u0629"}</th>
-                    <th className="th" style={{ textAlign: 'left' }}>{"\u0627\u0644\u0645\u062a\u0628\u0642\u064a"}</th>
-                    <th className="th">{"\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0634\u0631\u0627\u0621"}</th>
-                    <th className="th">{"\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0627\u0646\u062a\u0647\u0627\u0621"}</th>
-                    <th className="th">{"\u0627\u0644\u062d\u0627\u0644\u0629"}</th>
-                    <th className="th" style={{ textAlign: 'center', width: 80 }}>{"\u0625\u062c\u0631\u0627\u0621\u0627\u062a"}</th>
+                    <th className="plt-th">{"\u0631\u0642\u0645 \u0627\u0644\u062f\u0641\u0639\u0629"}</th>
+                    <th className="plt-th">{"\u0627\u0644\u0645\u0646\u062a\u062c"}</th>
+                    <th className="plt-th">{"\u0627\u0644\u0645\u0633\u062a\u0648\u062f\u0639"}</th>
+                    <th className="plt-th" style={{ textAlign: 'left' }}>{"\u0627\u0644\u0643\u0645\u064a\u0629"}</th>
+                    <th className="plt-th" style={{ textAlign: 'left' }}>{"\u0627\u0644\u0645\u062a\u0628\u0642\u064a"}</th>
+                    <th className="plt-th">{"\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0634\u0631\u0627\u0621"}</th>
+                    <th className="plt-th">{"\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0627\u0646\u062a\u0647\u0627\u0621"}</th>
+                    <th className="plt-th">{"\u0627\u0644\u062d\u0627\u0644\u0629"}</th>
+                    <th className="plt-th" style={{ textAlign: 'center', width: 80 }}>{"\u0625\u062c\u0631\u0627\u0621\u0627\u062a"}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -371,15 +371,15 @@ export default function ProductLotsTab() {
                     const orig = Number(lot.original_quantity ?? 0);
                     const pct = orig > 0 ? (rem / orig) * 100 : 0;
                     return (
-                      <tr key={lot.id} className="tr-hover">
-                        <td className="td" style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: 11 }}>{lot.lot_number}</td>
-                        <td className="td">
+                      <tr key={lot.id} className="plt-tr-hover">
+                        <td className="plt-td" style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: 11 }}>{lot.lot_number}</td>
+                        <td className="plt-td">
                           <div style={{ fontWeight: 600 }}>{lot.product?.name ?? '\u2014'}</div>
                           {lot.product?.ref && <div style={{ fontSize: 10, color: 'var(--t4)' }}>{lot.product.ref}</div>}
                         </td>
-                        <td className="td" style={{ color: 'var(--t3)' }}>{lot.warehouse?.name ?? '\u2014'}</td>
-                        <td className="td" style={{ textAlign: 'left', fontFamily: 'monospace', fontSize: 12 }}>{fmtNum(orig)}</td>
-                        <td className="td" style={{ textAlign: 'left' }}>
+                        <td className="plt-td" style={{ color: 'var(--t3)' }}>{lot.warehouse?.name ?? '\u2014'}</td>
+                        <td className="plt-td" style={{ textAlign: 'left', fontFamily: 'monospace', fontSize: 12 }}>{fmtNum(orig)}</td>
+                        <td className="plt-td" style={{ textAlign: 'left' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: 12, color: rem <= 0 ? 'var(--t4)' : pct < 20 ? 'var(--red)' : 'var(--t1)' }}>{fmtNum(rem)}</span>
                             <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--bg4)', overflow: 'hidden' }}>
@@ -387,21 +387,21 @@ export default function ProductLotsTab() {
                             </div>
                           </div>
                         </td>
-                        <td className="td" style={{ color: 'var(--t3)', fontSize: 12 }}>{fmtDate(lot.purchase_date)}</td>
-                        <td className="td" style={{ fontSize: 12 }}>
+                        <td className="plt-td" style={{ color: 'var(--t3)', fontSize: 12 }}>{fmtDate(lot.purchase_date)}</td>
+                        <td className="plt-td" style={{ fontSize: 12 }}>
                           {lot.expiration_date ? (
                             <span style={{ color: st.variant === 'danger' ? 'var(--red)' : st.variant === 'warning' ? 'var(--gold)' : 'var(--t3)' }}>{fmtDate(lot.expiration_date)}</span>
                           ) : '\u2014'}
                         </td>
-                        <td className="td">
+                        <td className="plt-td">
                           <Badge variant={st.variant} noDot>
                             <i className={`ti ${st.icon}`} style={{ marginLeft: 4, fontSize: 10 }} />{st.label}
                           </Badge>
                         </td>
-                        <td className="td" style={{ textAlign: 'center' }}>
+                        <td className="plt-td" style={{ textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                            <button onClick={() => openEdit(lot)} title="\u062a\u0639\u062f\u064a\u0644" className="action-btn action-btn--edit"><i className="ti ti-pencil" /></button>
-                            <button onClick={() => handleDelete(lot.id, lot.lot_number)} title="\u062d\u0630\u0641" className="action-btn action-btn--delete"><i className="ti ti-trash" /></button>
+                            <button onClick={() => openEdit(lot)} title="\u062a\u0639\u062f\u064a\u0644" className="plt-action-btn plt-action-btn--edit"><i className="ti ti-pencil" /></button>
+                            <button onClick={() => handleDelete(lot.id, lot.lot_number)} title="\u062d\u0630\u0641" className="plt-action-btn plt-action-btn--delete"><i className="ti ti-trash" /></button>
                           </div>
                         </td>
                       </tr>
@@ -430,20 +430,7 @@ export default function ProductLotsTab() {
         <FormFields />
       </Modal>
 
-      <style>{`
-        .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .th { padding: 10px 16px; text-align: right; font-weight: 700; font-size: 11px; color: var(--t4); white-space: nowrap; background: var(--bg3); border-bottom: 2px solid var(--b2); }
-        .td { padding: 10px 16px; text-align: right; vertical-align: middle; }
-        .tr-hover { transition: background .1s; border-bottom: 1px solid var(--b1); }
-        .tr-hover:hover { background: var(--bg3); }
-        .action-btn {
-          width: 28px; height: 28px; border-radius: var(--r1); border: 1px solid var(--b1);
-          background: var(--bg2); color: var(--t3); font-size: 13px; cursor: pointer;
-          display: inline-flex; align-items: center; justify-content: center; transition: all .15s;
-        }
-        .action-btn--edit:hover { background: var(--blueb); color: var(--blue); border-color: var(--bluebo); }
-        .action-btn--delete:hover { background: var(--redb); color: var(--red); border-color: var(--redbo); }
-      `}</style>
+
     </div>
   );
 }

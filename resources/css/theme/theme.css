@@ -374,6 +374,15 @@ body.dark #topbar { background: rgba(10,14,22,.92); }
   font-family: 'Tajawal', sans-serif; padding: 0 !important;
 }
 .srch input::placeholder { color: var(--t4); }
+.srch--disabled { opacity: .55; pointer-events: none; }
+.srch-ic--loading { display: flex; flex-shrink: 0; color: var(--em); }
+.srch-clear {
+  display: flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  border: none; background: var(--bg5); color: var(--t4);
+  cursor: pointer; transition: .14s; flex-shrink: 0; padding: 0;
+}
+.srch-clear:hover { background: var(--redb); color: var(--red); }
 
 .ib {
   width: 34px; height: 34px; border-radius: var(--r2);

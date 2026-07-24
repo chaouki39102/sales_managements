@@ -3,13 +3,13 @@ import { usePrintJobQueue, statusColor, statusLabel } from '../../renderers/useP
 
 const panelStyle: React.CSSProperties = {
   position: 'fixed', bottom: 16, right: 16, width: 360, maxHeight: 400,
-  background: '#fff', borderRadius: 8, boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
+  background: 'var(--bg2)', borderRadius: 8, boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
   display: 'flex', flexDirection: 'column', zIndex: 999, overflow: 'hidden',
 };
 
 const headerStyle: React.CSSProperties = {
   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-  padding: '10px 14px', borderBottom: '1px solid #e2e8f0',
+  padding: '10px 14px', borderBottom: '1px solid var(--b2)',
   fontSize: 13, fontWeight: 700,
 };
 
@@ -19,18 +19,18 @@ const listStyle: React.CSSProperties = {
 
 const itemStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 8,
-  padding: '6px 14px', fontSize: 12, borderBottom: '1px solid #f8f9fa',
+  padding: '6px 14px', fontSize: 12, borderBottom: '1px solid var(--b1)',
 };
 
 const badgeStyle: (color: string) => React.CSSProperties = (color) => ({
   display: 'inline-flex', alignItems: 'center', gap: 4,
   padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 700,
-  color: '#fff', background: color, whiteSpace: 'nowrap',
+  color: 'var(--bg2)', background: color, whiteSpace: 'nowrap',
 });
 
 const btnStyle: React.CSSProperties = {
   background: 'none', border: 'none', cursor: 'pointer', fontSize: 12,
-  color: '#dc2626', padding: '2px 6px', borderRadius: 4,
+  color: 'var(--red)', padding: '2px 6px', borderRadius: 4,
 };
 
 export default function PrintQueuePanel() {
@@ -49,7 +49,7 @@ export default function PrintQueuePanel() {
           <i className="ti ti-printer" style={{ marginLeft: 6 }} />
           مهام الطباعة ({jobs.length})
           {isProcessing && (
-            <span style={{ fontSize: 11, fontWeight: 400, marginRight: 8, color: '#3b82f6' }}>
+            <span style={{ fontSize: 11, fontWeight: 400, marginRight: 8, color: 'var(--blue)' }}>
               <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite', marginLeft: 4 }} />
               جارٍ…
             </span>
@@ -62,7 +62,7 @@ export default function PrintQueuePanel() {
             </button>
           )}
           {completed + failed > 0 && completed + failed === jobs.length && (
-            <button onClick={clear} style={{ ...btnStyle, color: '#666' }} type="button">
+            <button onClick={clear} style={{ ...btnStyle, color: 'var(--t3)' }} type="button">
               مسح
             </button>
           )}
@@ -80,7 +80,7 @@ export default function PrintQueuePanel() {
                 {job.name}
               </span>
               {job.status === 'failed' && job.error && (
-                <span title={job.error} style={{ color: '#dc2626', fontSize: 10, cursor: 'help' }}>
+                <span title={job.error} style={{ color: 'var(--red)', fontSize: 10, cursor: 'help' }}>
                   <i className="ti ti-alert-triangle" />
                 </span>
               )}
@@ -88,7 +88,7 @@ export default function PrintQueuePanel() {
                 {job.status === 'printing' && <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />}
                 {statusLabel(job.status)}
               </span>
-              <span style={{ color: '#999', fontSize: 10, minWidth: 30, textAlign: 'left' }}>
+              <span style={{ color: 'var(--t4)', fontSize: 10, minWidth: 30, textAlign: 'left' }}>
                 {elapsed}s
               </span>
               {job.status === 'pending' && (
@@ -102,12 +102,12 @@ export default function PrintQueuePanel() {
       </div>
 
       <div style={{
-        display: 'flex', gap: 12, padding: '6px 14px', borderTop: '1px solid #e2e8f0',
-        fontSize: 11, color: '#94a3b8',
+        display: 'flex', gap: 12, padding: '6px 14px', borderTop: '1px solid var(--b2)',
+        fontSize: 11, color: 'var(--t4)',
       }}>
         <span>بانتظار: {pending}</span>
-        <span style={{ color: '#16a34a' }}>تم: {completed}</span>
-        {failed > 0 && <span style={{ color: '#dc2626' }}>فشل: {failed}</span>}
+        <span style={{ color: 'var(--green)' }}>تم: {completed}</span>
+        {failed > 0 && <span style={{ color: 'var(--red)' }}>فشل: {failed}</span>}
       </div>
     </div>
   );

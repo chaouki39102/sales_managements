@@ -452,6 +452,11 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         $party  = $document->party;
         $taxSvc = app(TaxRuleService::class);
 
+        // Resolve price level once per document for quantity-tier discount lookup.
+        // commercial_documents has no price_level_id column, so derive from party/global.
+        $priceLevelId = $party?->default_price_level_id
+            ?? \App\Models\Setting::getSetting('default_price_level_id', null, $document->company_id);
+
         foreach ($lines as $order => $lineData) {
             // Override TVA rate if party is exempt
             $product = isset($lineData['product_id'])
@@ -479,6 +484,46 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 $packagingUnitsSnapshot = (float) $packaging->quantity;
             }
 
+            // Quantity-tier discount resolution — mutually exclusive with manual discount_percentage.
+            $quantityDiscountId = null;
+            if ($product && $product->manages_quantity_discounts) {
+                $baseQtyForDiscount = $packagingUnitsSnapshot
+                    ? round((float) $lineData['quantity'] * $packagingUnitsSnapshot, 4)
+                    : (float) $lineData['quantity'];
+
+                // Check for blocked tiers first — applicableDiscount() excludes them.
+                $blockedQuery = $product->quantityDiscounts()
+                    ->where('active', true)
+                    ->where('is_blocked', true)
+                    ->where('min_qty', '<=', $baseQtyForDiscount)
+                    ->where(fn($q) => $q->whereNull('max_qty')->orWhere('max_qty', '>=', $baseQtyForDiscount));
+                if ($priceLevelId) {
+                    $blockedQuery->where('price_level_id', $priceLevelId);
+                }
+                $blockedTier = $blockedQuery->first();
+
+                if ($blockedTier) {
+                    throw new BusinessRuleException(
+                        "الكمية المطلوبة للمنتج {$product->name} في السطر " . ($order + 1) .
+                        " محجوبة بسياسة تسعير الكميات ولا يمكن بيعها بهذا العدد.",
+                        422
+                    );
+                }
+
+                $tier = $product->applicableDiscount($priceLevelId, $baseQtyForDiscount);
+
+                if ($tier) {
+                    $unitPriceForCalc = (float) $lineData['unit_price_ht'];
+                    $discountedPrice  = $tier->calculateDiscountedPrice($unitPriceForCalc);
+                    $qtyDiscountPct   = $unitPriceForCalc > 0
+                        ? round((($unitPriceForCalc - $discountedPrice) / $unitPriceForCalc) * 100, 4)
+                        : 0.0;
+
+                    $lineData['discount_percentage'] = $qtyDiscountPct;  // overrides manual value
+                    $quantityDiscountId = $tier->id;
+                }
+            }
+
             $totals = $this->computeLineTotals($lineData);
 
             $document->lines()->create([
@@ -490,6 +535,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 'quantity'               => (float) $lineData['quantity'],
                 'unit_price_ht'          => (float) $lineData['unit_price_ht'],
                 'discount_percentage'    => (float) ($lineData['discount_percentage'] ?? 0),
+                'quantity_discount_id'   => $quantityDiscountId,
                 'tva_rate'               => (float) ($lineData['tva_rate'] ?? 0),
                 'packaging_id'           => $lineData['packaging_id'] ?? null,
                 'packaging_units_snapshot' => $packagingUnitsSnapshot,

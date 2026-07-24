@@ -502,13 +502,7 @@ export default function LoginPage() {
                 </div>
             </div>
 
-            <style>{`
-                @keyframes spin { to { transform: rotate(360deg); } }
-                @media (max-width: 768px) {
-                    .login-panel { display: none !important; }
-                    .login-form-panel { width: 100% !important; }
-                }
-            `}</style>
+
         </div>
     );
 }

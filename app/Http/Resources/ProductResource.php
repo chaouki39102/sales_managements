@@ -60,6 +60,7 @@ class ProductResource extends JsonResource
             'valuation_method'          => new InventoryValuationMethodResource($this->whenLoaded('valuationMethod')),
             'prices'                    => ProductPriceResource::collection($this->whenLoaded('prices')),
             'packagings'                => ProductPackagingResource::collection($this->whenLoaded('packagings')),
+            'quantity_discounts'        => QuantityDiscountResource::collection($this->whenLoaded('quantityDiscounts')),
             'variants'                  => ProductVariantResource::collection($this->whenLoaded('variants')),
             'barcodes'                  => BarcodeResource::collection($this->whenLoaded('barcodes')),
         ];

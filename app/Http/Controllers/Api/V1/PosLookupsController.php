@@ -49,6 +49,7 @@ class PosLookupsController extends Controller
             'settings'         => [
                 'fiscal_stamp_enabled' => Setting::where('company_id', $companyId)->where('key', 'fiscal_stamp_enabled')->value('value'),
                 'allow_negative_stock' => Setting::where('company_id', $companyId)->where('key', 'allow_negative_stock')->value('value'),
+                'default_price_level_id' => Setting::where('company_id', $companyId)->where('key', 'default_price_level_id')->value('value'),
             ],
         ];
 

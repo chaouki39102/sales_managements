@@ -42,7 +42,7 @@ export default function BankReconciliationPage() {
   const reconciledCount = reconciled.data?.length ?? 0;
 
   return (
-    <div className="page-container">
+    <div className="recon-page-container">
       <PageHeader
         title="المطابقة البنكية"
         description="مطابقة المدفوعات مع حسابات البنك"
@@ -62,7 +62,7 @@ export default function BankReconciliationPage() {
         <div style={{ display: 'flex', gap: 4 }}>
           <button
             onClick={() => setTab('unreconciled')}
-            className={`tab-pill ${tab === 'unreconciled' ? 'active' : ''}`}
+            className={`recon-tab-pill ${tab === 'unreconciled' ? 'active' : ''}`}
           >
             <i className="ti ti-clock" style={{ marginLeft: 6, fontSize: 13 }} />
             غير مطابقة
@@ -77,7 +77,7 @@ export default function BankReconciliationPage() {
           </button>
           <button
             onClick={() => setTab('reconciled')}
-            className={`tab-pill ${tab === 'reconciled' ? 'active' : ''}`}
+            className={`recon-tab-pill ${tab === 'reconciled' ? 'active' : ''}`}
           >
             <i className="ti ti-circle-check" style={{ marginLeft: 6, fontSize: 13 }} />
             مطابقة
@@ -227,36 +227,7 @@ export default function BankReconciliationPage() {
         </div>
       )}
 
-      <style>{`
-        .page-container { padding: 20px 24px; max-width: 1200px; margin: 0 auto; direction: rtl; }
-        .tab-pill {
-          padding: 6px 14px; border-radius: 99px; border: none;
-          font-size: 12px; font-weight: 600; cursor: pointer;
-          background: var(--bg3); color: var(--t3);
-          transition: all .15s; font-family: inherit;
-          display: inline-flex; align-items: center;
-        }
-        .tab-pill:hover { background: var(--bg4); color: var(--t2); }
-        .tab-pill.active { background: var(--em); color: #fff; }
-        .recon-card { transition: transform .15s, box-shadow .15s; }
-        .recon-card:hover { transform: translateY(-1px); box-shadow: var(--shadow2); }
-        .recon-input {
-          padding: 6px 10px; border-radius: var(--r1);
-          border: 1px solid var(--b3); background: var(--bg1);
-          color: var(--t1); font-size: 12px; font-family: inherit;
-          width: 140px; outline: none; transition: border-color .15s;
-        }
-        .recon-input:focus { border-color: var(--em); }
-        .recon-action-btn {
-          width: 30px; height: 30px; border-radius: var(--r1);
-          border: 1px solid var(--b1); background: var(--bg2);
-          color: var(--t3); font-size: 14px; cursor: pointer;
-          display: inline-flex; align-items: center; justify-content: center;
-          transition: all .15s; flex-shrink: 0;
-        }
-        .recon-action-btn:hover { background: var(--redb); color: var(--red); border-color: var(--redbo); }
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
+
     </div>
   );
 }

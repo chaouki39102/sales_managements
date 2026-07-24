@@ -32,7 +32,7 @@ const IconX = () => (
 const IconLoader = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-    style={{ animation: 'srchSpin .7s linear infinite' }}>
+    className="animate-spin">
     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
   </svg>
 );
@@ -96,23 +96,12 @@ export default function SearchInput({
 
   return (
     <>
-      <style>{`
-        @keyframes srchSpin { to { transform: rotate(360deg); } }
-        .srch-clear {
-          display: flex; align-items: center; justify-content: center;
-          width: 18px; height: 18px; border-radius: 50%;
-          border: none; background: var(--bg5); color: var(--t4);
-          cursor: pointer; transition: .14s; flex-shrink: 0; padding: 0;
-        }
-        .srch-clear:hover { background: var(--redb); color: var(--red); }
-      `}</style>
-
       <div
-        className="srch"
-        style={{ width, opacity: disabled ? 0.55 : 1, pointerEvents: disabled ? 'none' : undefined }}
+        className={`srch${disabled ? ' srch--disabled' : ''}`}
+        style={{ width }}
       >
         {/* Leading icon: spinner when loading, search otherwise */}
-        <span className="srch-ic" style={{ display: 'flex', flexShrink: 0, color: loading ? 'var(--em)' : undefined }}>
+        <span className={`srch-ic${loading ? ' srch-ic--loading' : ''}`}>
           {loading ? <IconLoader /> : <IconSearch />}
         </span>
 
@@ -126,7 +115,7 @@ export default function SearchInput({
           disabled={disabled}
           autoComplete="off"
           spellCheck={false}
-          style={{ width: '100%' }}
+          className="w-full"
         />
 
         {/* Clear button */}

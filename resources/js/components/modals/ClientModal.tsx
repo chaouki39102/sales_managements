@@ -440,7 +440,7 @@ export default function ClientModal({ open, party, onClose, onSaved, isSubmittin
         )}
       </div>
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
     </Modal>
   );
 }

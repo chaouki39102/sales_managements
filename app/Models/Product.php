@@ -275,17 +275,20 @@ class Product extends Model
         return $packaging ? round($unitPrice * (float) $packaging->quantity, 4) : $unitPrice;
     }
 
-    public function applicableDiscount(int $priceLevelId, float $qty): ?QuantityDiscount
+    public function applicableDiscount(?int $priceLevelId, float $qty): ?QuantityDiscount
     {
         if (!$this->manages_quantity_discounts) return null;
-        return $this->quantityDiscounts()
-            ->where('price_level_id', $priceLevelId)
+        $query = $this->quantityDiscounts()
             ->where('active', true)
             ->where('is_blocked', false)
             ->where('min_qty', '<=', $qty)
-            ->where(fn($q) => $q->whereNull('max_qty')->orWhere('max_qty', '>=', $qty))
-            ->orderBy('tier_order')
-            ->first();
+            ->where(fn($q) => $q->whereNull('max_qty')->orWhere('max_qty', '>=', $qty));
+
+        if ($priceLevelId) {
+            $query->where('price_level_id', $priceLevelId);
+        }
+
+        return $query->orderBy('tier_order')->first();
     }
 
     public function finalPrice(int $priceLevelId, float $qty = 1, ?int $packagingId = null): float

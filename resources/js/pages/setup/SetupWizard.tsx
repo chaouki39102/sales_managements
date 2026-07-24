@@ -510,7 +510,7 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
         </p>
       </div>
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
     </div>
   );
 }

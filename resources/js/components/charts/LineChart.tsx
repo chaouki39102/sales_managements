@@ -20,7 +20,7 @@ interface LineChartProps {
 const LineChart: React.FC<LineChartProps> = ({
   data,
   height = 200,
-  color = 'var(--color-text-info, #3b82f6)',
+  color = 'var(--blue)',
   fill = true,
   showDots = true,
   showGrid = true,
@@ -86,7 +86,7 @@ const LineChart: React.FC<LineChartProps> = ({
             <g key={i}>
               <line
                 x1={48} y1={y} x2={W - 16} y2={y}
-                stroke="var(--color-border-tertiary)"
+                stroke="var(--b3)"
                 strokeWidth="0.8"
                 strokeDasharray="4 3"
               />
@@ -94,7 +94,7 @@ const LineChart: React.FC<LineChartProps> = ({
                 x={44} y={y + 4}
                 textAnchor="end"
                 fontSize="11"
-                fill="var(--color-text-tertiary)"
+                fill="var(--t3)"
                 fontFamily="inherit"
               >
                 {formatValue(val)}
@@ -121,7 +121,7 @@ const LineChart: React.FC<LineChartProps> = ({
           <g key={i}>
             <circle
               cx={p.x} cy={p.y}
-              fill="var(--color-background-primary)"
+               fill="var(--bg2)"
               stroke={color}
               strokeWidth="2"
               style={{ transition: 'r 0.1s' }}
@@ -146,7 +146,7 @@ const LineChart: React.FC<LineChartProps> = ({
               x={p.x} y={H - 4}
               textAnchor="middle"
               fontSize="11"
-              fill={hovered === i ? "var(--color-text-primary)" : "var(--color-text-tertiary)"}
+              fill={hovered === i ? "var(--t1)" : "var(--t3)"}
               fontFamily="inherit"
             >
               {p.label}
@@ -175,20 +175,17 @@ const LineChart: React.FC<LineChartProps> = ({
                 x={tooltipX} y={tooltipY}
                 width={tooltipW} height={34}
                 rx="6"
-                fill="var(--color-text-primary)"
+                fill="var(--t1)"
                 opacity="0.9"
               />
-              <text x={tooltipX + tooltipW / 2} y={tooltipY + 13} textAnchor="middle" fontSize="11" fill="var(--color-background-primary)" fontFamily="inherit">{p.label}</text>
-              <text x={tooltipX + tooltipW / 2} y={tooltipY + 27} textAnchor="middle" fontSize="12" fontWeight="500" fill="var(--color-background-primary)" fontFamily="inherit">{formatValue(p.value)}</text>
+              <text x={tooltipX + tooltipW / 2} y={tooltipY + 13} textAnchor="middle" fontSize="11" fill="var(--bg2)" fontFamily="inherit">{p.label}</text>
+              <text x={tooltipX + tooltipW / 2} y={tooltipY + 27} textAnchor="middle" fontSize="12" fontWeight="500" fill="var(--bg2)" fontFamily="inherit">{formatValue(p.value)}</text>
             </g>
           );
         })()}
       </svg>
 
-      <style>{`
-        .lc-wrapper { width: 100%; overflow: hidden; }
-        .lc-empty { padding: 40px; text-align: center; color: var(--color-text-tertiary); font-size: 14px; }
-      `}</style>
+
     </div>
   );
 };

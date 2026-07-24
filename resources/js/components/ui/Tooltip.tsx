@@ -88,38 +88,6 @@ const Tooltip: React.FC<TooltipProps> = ({
           <span className="tooltip__arrow" />
         </div>
       )}
-
-      <style>{`
-        .tooltip-trigger { display: inline-flex; }
-        .tooltip {
-          position: fixed;
-          z-index: 9999;
-          background: var(--color-text-primary, #1a1a1a);
-          color: var(--color-background-primary, #fff);
-          font-size: 12px;
-          line-height: 1.4;
-          padding: 6px 10px;
-          border-radius: 6px;
-          white-space: nowrap;
-          pointer-events: none;
-          max-width: 240px;
-          white-space: normal;
-          animation: tooltip-in 0.12s ease;
-        }
-        @keyframes tooltip-in {
-          from { opacity: 0; transform: scale(0.92); }
-          to   { opacity: 1; transform: scale(1); }
-        }
-        .tooltip__arrow {
-          position: absolute;
-          width: 0; height: 0;
-          border: 5px solid transparent;
-        }
-        .tooltip--top    .tooltip__arrow { bottom: -10px; left: 50%; transform: translateX(-50%); border-top-color: var(--color-text-primary, #1a1a1a); }
-        .tooltip--bottom .tooltip__arrow { top: -10px;    left: 50%; transform: translateX(-50%); border-bottom-color: var(--color-text-primary, #1a1a1a); }
-        .tooltip--left   .tooltip__arrow { right: -10px;  top:  50%; transform: translateY(-50%); border-left-color: var(--color-text-primary, #1a1a1a); }
-        .tooltip--right  .tooltip__arrow { left:  -10px;  top:  50%; transform: translateY(-50%); border-right-color: var(--color-text-primary, #1a1a1a); }
-      `}</style>
     </>
   );
 };

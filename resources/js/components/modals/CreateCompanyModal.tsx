@@ -1556,15 +1556,6 @@ export function CreateCompanyModal({
 
     return (
         <>
-            <style>{`
-        @keyframes fadein  { from{opacity:0} to{opacity:1} }
-        @keyframes slideup { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:none} }
-        @keyframes slidedown { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:none} }
-        @keyframes fadeup  { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
-        @keyframes spin    { to{transform:rotate(360deg)} }
-        @keyframes popIn   { from{opacity:0;transform:scale(.5)} to{opacity:1;transform:scale(1)} }
-      `}</style>
-
             {/* Overlay */}
             <div
                 style={{

@@ -482,7 +482,7 @@ function buildLineFromApi(line: ApiDocumentLine, index: number): DocumentLine {
     barcode:      line.product?.barcode    ?? null,
     name:         line.product?.name ?? line.description ?? '',
     unit:         buildUnitLabel(line),
-    quantity:     (() => { const pq = line.packaging?.quantity; return pq ? num(line.quantity) / Number(pq) : num(line.quantity); })(),
+    quantity:     num(line.quantity),
     unitPriceHt:  uPriceHt,
     unitPriceTtc: uPriceTtc,
     tvaRate,

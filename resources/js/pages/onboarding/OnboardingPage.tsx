@@ -1080,12 +1080,6 @@ const handleSeedingSkip = () => {
 
   return (
     <>
-      <style>{`
-        @keyframes fadein  { from{opacity:0} to{opacity:1} }
-        @keyframes slideup { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:none} }
-        @keyframes spin    { to{transform:rotate(360deg)} }
-      `}</style>
-
       <div style={{
         minHeight:'100vh', background:'var(--bg0)',
         display:'flex', flexDirection:'column',

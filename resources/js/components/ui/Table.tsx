@@ -28,7 +28,7 @@ interface TableProps<T> {
 
 function SortIcon({ active, dir }: { active: boolean; dir?: 'asc' | 'desc' }) {
   return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ opacity: active ? 1 : 0.4 }}>
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className={active ? '' : 'tbl-sort-inactive'}>
       <path d={dir === 'desc' || !active ? "M3 4.5l3-3 3 3" : "M3 7.5l3 3 3-3"} stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
       {!active && <path d="M3 7.5l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" opacity="0.5"/>}
     </svg>
@@ -181,45 +181,6 @@ function Table<T extends object>({
           )}
         </tbody>
       </table>
-
-      <style>{`
-        .tbl-outer { width: 100%; overflow-x: auto; border-radius: 10px; border: 1px solid var(--color-border-tertiary); }
-        .tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
-        .tbl-head { background: var(--color-background-secondary); }
-        .tbl-head.sticky { position: sticky; top: 0; z-index: 2; }
-        .tbl-th {
-          padding: 10px 14px; font-size: 12px; font-weight: 500;
-          color: var(--color-text-secondary); text-align: start;
-          border-bottom: 1px solid var(--color-border-secondary);
-          white-space: nowrap; user-select: none;
-        }
-        .tbl-th.sortable { cursor: pointer; }
-        .tbl-th.sortable:hover { color: var(--color-text-primary); background: var(--color-background-tertiary); }
-        .tbl-th.align-center { text-align: center; }
-        .tbl-th.align-end    { text-align: end; }
-        .tbl-th--select { width: 44px; padding: 10px 12px; }
-        .tbl-th__inner { display: inline-flex; align-items: center; gap: 5px; }
-        .tbl-row { border-bottom: 1px solid var(--color-border-tertiary); transition: background .1s; }
-        .tbl-row:last-child { border-bottom: none; }
-        .tbl-row:hover { background: var(--color-background-secondary); }
-        .tbl-row.selected { background: color-mix(in srgb, var(--color-text-info, #3b82f6) 6%, transparent); }
-        .tbl-row.clickable { cursor: pointer; }
-        .tbl-cell { padding: 12px 14px; color: var(--color-text-primary); vertical-align: middle; }
-        .tbl-cell.align-center { text-align: center; }
-        .tbl-cell.align-end    { text-align: end; }
-        .tbl-cell--select { padding: 12px 12px; width: 44px; }
-        .tbl-checkbox { width: 16px; height: 16px; cursor: pointer; accent-color: var(--color-text-info, #3b82f6); }
-        .tbl-empty { padding: 48px 20px; text-align: center; color: var(--color-text-secondary); }
-        .tbl-empty__inner { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-        .tbl-empty__icon { color: var(--color-text-tertiary); }
-        .tbl-skel {
-          height: 13px; border-radius: 4px;
-          background: linear-gradient(90deg, var(--color-background-secondary) 25%, var(--color-background-tertiary) 50%, var(--color-background-secondary) 75%);
-          background-size: 400px 100%;
-          animation: tbl-shimmer 1.4s infinite linear;
-        }
-        @keyframes tbl-shimmer { from { background-position: -400px 0; } to { background-position: 400px 0; } }
-      `}</style>
     </div>
   );
 }

@@ -102,7 +102,11 @@ export default function CartRow({
   const measurePopupAnchor = useCallback(() => {
     if (popupAnchorRef.current) {
       const r = popupAnchorRef.current.getBoundingClientRect();
-      setPopupPos({ top: r.bottom + 4, left: r.left, right: window.innerWidth - r.right });
+      const popupW = 220;
+      let left = r.left;
+      if (left + popupW > window.innerWidth - 8) left = window.innerWidth - popupW - 8;
+      if (left < 8) left = 8;
+      setPopupPos({ top: r.bottom + 4, left, right: window.innerWidth - left - popupW });
     }
   }, []);
 
@@ -120,7 +124,11 @@ export default function CartRow({
     }
     if (popup === 'pkg' && pkgBtnRef.current) {
       const r = pkgBtnRef.current.getBoundingClientRect();
-      setPopupPos({ top: r.bottom + 4, left: r.left, right: window.innerWidth - r.right });
+      const popupW = 220;
+      let left = r.left;
+      if (left + popupW > window.innerWidth - 8) left = window.innerWidth - popupW - 8;
+      if (left < 8) left = 8;
+      setPopupPos({ top: r.bottom + 4, left, right: window.innerWidth - left - popupW });
     }
   }, [popup, discMode, measurePopupAnchor]);
 
@@ -199,10 +207,10 @@ export default function CartRow({
   const maxQty    = item.max_stock ?? Infinity;
   const stockFull = item.manages_stock && item.quantity >= maxQty;
   const hasDisc   = item.discount_percentage > 0 || item.discount_amount > 0;
-  const discLabel = item.discount_percentage > 0
-    ? `-${item.discount_percentage % 1 === 0 ? item.discount_percentage : item.discount_percentage.toFixed(1)}%`
-    : item.discount_amount > 0
-      ? `-${formatDZD(item.discount_amount)}`
+  const discLabel = item.discount_amount > 0
+    ? `-${formatDZD(item.discount_amount)}`
+    : item.discount_percentage > 0
+      ? `-${item.discount_percentage % 1 === 0 ? item.discount_percentage : item.discount_percentage.toFixed(1)}%`
       : null;
 
   return (
@@ -262,7 +270,7 @@ export default function CartRow({
               ref={popupNodeRef}
               className="cr-popup cr-popup--pkg cr-popup--portal"
               onClick={e => e.stopPropagation()}
-              style={{ position: 'fixed', top: popupPos.top, right: popupPos.right, zIndex: 10000 }}
+              style={{ position: 'fixed', top: popupPos.top, left: popupPos.left, zIndex: 10000 }}
             >
               <div className="cr-popup-arrow" />
               <div className="cr-popup-label">اختر الوحدة</div>
@@ -329,6 +337,7 @@ export default function CartRow({
               خصم
             </button>
           )}
+          <div ref={popupAnchorRef} style={{ position: 'absolute', width: 0, height: 0 }} />
 
           {/* TVA badge */}
           {tvaRate > 0 && (
@@ -337,10 +346,9 @@ export default function CartRow({
         </div>
 
         {/* ── Popup الخصم ── */}
-        <div ref={popupAnchorRef} style={{ position: 'absolute', width: 0, height: 0 }} />
         {popup === 'disc' && createPortal(
           <div ref={popupNodeRef} className="cr-popup cr-popup--disc cr-popup--portal" onClick={e => e.stopPropagation()}
-            style={{ position: 'fixed', top: popupPos.top, right: popupPos.right, zIndex: 10000 }}>
+            style={{ position: 'fixed', top: popupPos.top, left: popupPos.left, zIndex: 10000 }}>
             <div className="cr-popup-arrow" />
 
             {/* تبديل الوضع */}
@@ -436,7 +444,7 @@ export default function CartRow({
         {/* ── Popup السعر ── */}
         {popup === 'price' && createPortal(
           <div ref={popupNodeRef} className="cr-popup cr-popup--price cr-popup--portal" onClick={e => e.stopPropagation()}
-            style={{ position: 'fixed', top: popupPos.top, right: popupPos.right, zIndex: 10000 }}>
+            style={{ position: 'fixed', top: popupPos.top, left: popupPos.left, zIndex: 10000 }}>
             <div className="cr-popup-arrow" />
             <div className="cr-popup-label">سعر البيع TTC</div>
             <div className="cr-popup-inp-row">

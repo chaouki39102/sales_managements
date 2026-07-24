@@ -218,22 +218,22 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
     <div style={{ textAlign: 'center', padding: '40px 20px' }}>
       <div
         style={{
-          border: '2px dashed #ccc', borderRadius: 12, padding: '60px 20px',
+          border: '2px dashed var(--b3)', borderRadius: 12, padding: '60px 20px',
           cursor: 'pointer', marginBottom: 16,
-          background: '#fafafa',
+          background: 'var(--bg3)',
         }}
         onClick={() => fileInputRef.current?.click()}
-        onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#0a7c52'; }}
-        onDragLeave={(e) => { e.currentTarget.style.borderColor = '#ccc'; }}
+        onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--em)'; }}
+        onDragLeave={(e) => { e.currentTarget.style.borderColor = 'var(--b3)'; }}
         onDrop={(e) => {
           e.preventDefault();
-          e.currentTarget.style.borderColor = '#ccc';
+          e.currentTarget.style.borderColor = 'var(--b3)';
           handleFile(e.dataTransfer.files[0]);
         }}
       >
-        <i className="ti ti-upload" style={{ fontSize: 48, color: '#999' }} />
-        <p style={{ marginTop: 12, color: '#666' }}>اسحب الملف إلى هنا أو انقر للاختيار</p>
-        <p style={{ fontSize: 12, color: '#999' }}>.xlsx, .xls فقط</p>
+        <i className="ti ti-upload" style={{ fontSize: 48, color: 'var(--t4)' }} />
+        <p style={{ marginTop: 12, color: 'var(--t3)' }}>اسحب الملف إلى هنا أو انقر للاختيار</p>
+        <p style={{ fontSize: 12, color: 'var(--t4)' }}>.xlsx, .xls فقط</p>
       </div>
       <input
         ref={fileInputRef}
@@ -251,7 +251,7 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
               <thead>
                 <tr>
                   {Object.keys(rawRows[0]).map((h) => (
-                    <th key={h} style={{ border: '1px solid #ddd', padding: '6px 8px', background: '#f0f0f0', whiteSpace: 'nowrap' }}>{h}</th>
+                    <th key={h} style={{ border: '1px solid var(--b3)', padding: '6px 8px', background: 'var(--bg3)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -259,7 +259,7 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
                 {rawRows.slice(0, 5).map((row, i) => (
                   <tr key={i}>
                     {Object.values(row).map((val, j) => (
-                      <td key={j} style={{ border: '1px solid #ddd', padding: '4px 8px' }}>{String(val ?? '')}</td>
+                      <td key={j} style={{ border: '1px solid var(--b3)', padding: '4px 8px' }}>{String(val ?? '')}</td>
                     ))}
                   </tr>
                 ))}
@@ -273,12 +273,12 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
 
   const renderMapping = () => (
     <div>
-      <p style={{ marginBottom: 12, color: '#666' }}>
+      <p style={{ marginBottom: 12, color: 'var(--t3)' }}>
         حدد الحقل المقابل لكل عمود من ملف Excel. الحقول المطلوبة <span style={{ color: 'red' }}>*</span>
       </p>
 
       {missingRequired.length > 0 && (
-        <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13 }}>
+        <div style={{ background: 'var(--goldb)', border: '1px solid var(--gold)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13 }}>
           <strong>تنبيه:</strong> الحقول التالية مطلوبة ولم يتم تعيينها: {missingRequired.map((f) => f.label).join('، ')}
         </div>
       )}
@@ -287,11 +287,11 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr>
-              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0f0f0', width: 40 }}>#</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0f0f0' }}>العمود في ملف Excel</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0f0f0', width: 60, textAlign: 'center' }}></th>
-              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0f0f0' }}>الحقل في النظام</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px', background: '#f0f0f0', width: 60 }}>مثال</th>
+              <th style={{ border: '1px solid var(--b3)', padding: '8px', background: 'var(--bg3)', width: 40 }}>#</th>
+              <th style={{ border: '1px solid var(--b3)', padding: '8px', background: 'var(--bg3)' }}>العمود في ملف Excel</th>
+              <th style={{ border: '1px solid var(--b3)', padding: '8px', background: 'var(--bg3)', width: 60, textAlign: 'center' }}></th>
+              <th style={{ border: '1px solid var(--b3)', padding: '8px', background: 'var(--bg3)' }}>الحقل في النظام</th>
+              <th style={{ border: '1px solid var(--b3)', padding: '8px', background: 'var(--bg3)', width: 60 }}>مثال</th>
             </tr>
           </thead>
           <tbody>
@@ -299,14 +299,14 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
               const sample = rawRows[0] ? Object.values(rawRows[0])[m.colIndex] : '';
               return (
                 <tr key={m.colIndex}>
-                  <td style={{ border: '1px solid #ddd', padding: '6px 8px', textAlign: 'center' }}>{m.colIndex + 1}</td>
-                  <td style={{ border: '1px solid #ddd', padding: '6px 8px', fontWeight: 600 }}>{m.colHeader}</td>
-                  <td style={{ border: '1px solid #ddd', padding: '6px 8px', textAlign: 'center' }}>←</td>
-                  <td style={{ border: '1px solid #ddd', padding: '6px 8px' }}>
+                  <td style={{ border: '1px solid var(--b3)', padding: '6px 8px', textAlign: 'center' }}>{m.colIndex + 1}</td>
+                  <td style={{ border: '1px solid var(--b3)', padding: '6px 8px', fontWeight: 600 }}>{m.colHeader}</td>
+                  <td style={{ border: '1px solid var(--b3)', padding: '6px 8px', textAlign: 'center' }}>←</td>
+                  <td style={{ border: '1px solid var(--b3)', padding: '6px 8px' }}>
                     <select
                       value={m.fieldKey}
                       onChange={(e) => updateMapping(m.colIndex, e.target.value)}
-                      style={{ width: '100%', padding: '4px 8px', borderRadius: 4, border: '1px solid #ccc' }}
+                      style={{ width: '100%', padding: '4px 8px', borderRadius: 4, border: '1px solid var(--b3)' }}
                     >
                       <option value="_skip">— تجاهل —</option>
                       {config.fields.map((f) => {
@@ -319,7 +319,7 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
                       })}
                     </select>
                   </td>
-                  <td style={{ border: '1px solid #ddd', padding: '6px 8px', fontSize: 12, color: '#666', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <td style={{ border: '1px solid var(--b3)', padding: '6px 8px', fontSize: 12, color: 'var(--t3)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {String(sample ?? '')}
                   </td>
                 </tr>
@@ -341,26 +341,26 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
     return (
       <div>
         <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-          <div style={{ flex: 1, background: '#d4edda', borderRadius: 8, padding: '12px 16px', textAlign: 'center' }}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: '#155724' }}>{validCount}</div>
-            <div style={{ fontSize: 13, color: '#155724' }}>سطر صحيح</div>
+          <div style={{ flex: 1, background: 'var(--greenb)', borderRadius: 8, padding: '12px 16px', textAlign: 'center' }}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--green)' }}>{validCount}</div>
+            <div style={{ fontSize: 13, color: 'var(--green)' }}>سطر صحيح</div>
           </div>
-          <div style={{ flex: 1, background: errorCount > 0 ? '#f8d7da' : '#e2e3e5', borderRadius: 8, padding: '12px 16px', textAlign: 'center' }}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: errorCount > 0 ? '#721c24' : '#6c757d' }}>{errorCount}</div>
-            <div style={{ fontSize: 13, color: errorCount > 0 ? '#721c24' : '#6c757d' }}>{errorCount > 0 ? 'خطأ' : 'خطأ'}</div>
+          <div style={{ flex: 1, background: errorCount > 0 ? 'var(--redb)' : 'var(--bg4)', borderRadius: 8, padding: '12px 16px', textAlign: 'center' }}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: errorCount > 0 ? 'var(--red)' : 'var(--t3)' }}>{errorCount}</div>
+            <div style={{ fontSize: 13, color: errorCount > 0 ? 'var(--red)' : 'var(--t3)' }}>{errorCount > 0 ? 'خطأ' : 'خطأ'}</div>
           </div>
         </div>
 
         {errors.length > 0 && (
           <div style={{ marginBottom: 16 }}>
-            <p style={{ fontWeight: 600, marginBottom: 8, color: '#721c24' }}>الأخطاء:</p>
-            <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid #f5c6cb', borderRadius: 8 }}>
+            <p style={{ fontWeight: 600, marginBottom: 8, color: 'var(--red)' }}>الأخطاء:</p>
+            <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid var(--b3)', borderRadius: 8 }}>
               {errors.map((err) => (
-                <div key={err.line} style={{ padding: '8px 12px', borderBottom: '1px solid #f5c6cb', fontSize: 13 }}>
+                <div key={err.line} style={{ padding: '8px 12px', borderBottom: '1px solid var(--b3)', fontSize: 13 }}>
                   <strong>سطر {err.line}:</strong>
                   <ul style={{ margin: '4px 0 0', paddingRight: 20 }}>
                     {err.errors.map((e, i) => (
-                      <li key={i} style={{ color: '#721c24' }}>{e}</li>
+                      <li key={i} style={{ color: 'var(--red)' }}>{e}</li>
                     ))}
                   </ul>
                 </div>
@@ -370,9 +370,9 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
         )}
 
         {pending_entities && (
-          <div style={{ marginBottom: 16, background: '#e8f4fd', border: '1px solid #b3d7ff', borderRadius: 8, padding: '12px 16px' }}>
-            <p style={{ fontWeight: 600, marginBottom: 8, color: '#004085' }}>سيتم إنشاء التالي تلقائياً:</p>
-            <ul style={{ margin: 0, paddingRight: 20, fontSize: 13, color: '#004085' }}>
+          <div style={{ marginBottom: 16, background: 'var(--blueb)', border: '1px solid var(--b3)', borderRadius: 8, padding: '12px 16px' }}>
+            <p style={{ fontWeight: 600, marginBottom: 8, color: 'var(--blue)' }}>سيتم إنشاء التالي تلقائياً:</p>
+            <ul style={{ margin: 0, paddingRight: 20, fontSize: 13, color: 'var(--blue)' }}>
               {pending_entities.families?.map((f) => <li key={f}>الفئة: {f}</li>)}
               {pending_entities.brands?.map((b) => <li key={b}>الماركة: {b}</li>)}
               {pending_entities.units?.map((u) => <li key={u}>الوحدة: {u}</li>)}
@@ -383,13 +383,13 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
 
         {validCount > 0 && (
           <div style={{ marginBottom: 16 }}>
-            <p style={{ fontWeight: 600, marginBottom: 8, color: '#155724' }}>معاينة البيانات الصحيحة (أول 5 أسطر):</p>
+            <p style={{ fontWeight: 600, marginBottom: 8, color: 'var(--green)' }}>معاينة البيانات الصحيحة (أول 5 أسطر):</p>
             <div style={{ overflowX: 'auto', fontSize: 12 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
                     {Object.keys(validated[0]).map((k) => (
-                      <th key={k} style={{ border: '1px solid #ddd', padding: '4px 6px', background: '#f0f0f0', whiteSpace: 'nowrap' }}>
+                      <th key={k} style={{ border: '1px solid var(--b3)', padding: '4px 6px', background: 'var(--bg3)', whiteSpace: 'nowrap' }}>
                         {config.fields.find((f) => f.key === k)?.label ?? k}
                       </th>
                     ))}
@@ -399,7 +399,7 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
                   {validated.slice(0, 5).map((row, i) => (
                     <tr key={i}>
                       {Object.values(row).map((val, j) => (
-                        <td key={j} style={{ border: '1px solid #ddd', padding: '3px 6px' }}>{String(val ?? '')}</td>
+                        <td key={j} style={{ border: '1px solid var(--b3)', padding: '3px 6px' }}>{String(val ?? '')}</td>
                       ))}
                     </tr>
                   ))}
@@ -421,7 +421,7 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
       <div style={{ textAlign: 'center', padding: '20px 0' }}>
         <i
           className={`ti ${failed.length === 0 ? 'ti-circle-check' : 'ti-alert-triangle'}`}
-          style={{ fontSize: 56, color: failed.length === 0 ? '#155724' : '#856404' }}
+          style={{ fontSize: 56, color: failed.length === 0 ? 'var(--green)' : 'var(--gold)' }}
         />
         <p style={{ fontSize: 18, fontWeight: 700, marginTop: 12 }}>
           {config.successMessage(imported)}
@@ -429,10 +429,10 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
 
         {failed.length > 0 && (
           <div style={{ marginTop: 16, textAlign: 'right' }}>
-            <p style={{ fontWeight: 600, color: '#856404' }}>بعض الأسطر لم تُستورد:</p>
-            <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid #ffc107', borderRadius: 8, marginTop: 8 }}>
+            <p style={{ fontWeight: 600, color: 'var(--gold)' }}>بعض الأسطر لم تُستورد:</p>
+            <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid var(--gold)', borderRadius: 8, marginTop: 8 }}>
               {failed.map((f) => (
-                <div key={f.line} style={{ padding: '6px 12px', borderBottom: '1px solid #ffc107', fontSize: 13 }}>
+                <div key={f.line} style={{ padding: '6px 12px', borderBottom: '1px solid var(--gold)', fontSize: 13 }}>
                   <strong>سطر {f.line}:</strong> {f.error}
                 </div>
               ))}
@@ -501,15 +501,15 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
               <div
                 style={{
                   width: 28, height: 28, borderRadius: '50%', margin: '0 auto 4px',
-                  background: active ? '#0a7c52' : '#e0e0e0',
-                  color: active ? '#fff' : '#999',
+                  background: active ? 'var(--em)' : 'var(--b3)',
+                  color: active ? '#fff' : 'var(--t4)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 13, fontWeight: 700,
                 }}
               >
                 {idx}
               </div>
-              <div style={{ fontSize: 11, color: active ? '#0a7c52' : '#999' }}>{stepTitles[s]}</div>
+              <div style={{ fontSize: 11, color: active ? 'var(--em)' : 'var(--t4)' }}>{stepTitles[s]}</div>
             </div>
           );
         })}

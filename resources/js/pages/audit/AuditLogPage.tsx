@@ -70,7 +70,7 @@ export default function AuditLogPage() {
   const meta  = data?.meta as BackendMeta | undefined;
 
   return (
-    <div className="page-container">
+    <div className="audit-page-container">
       <PageHeader
         title="سجل التدقيق"
         description="سجل جميع العمليات على البيانات"
@@ -93,7 +93,7 @@ export default function AuditLogPage() {
             <button
               key={opt.key}
               onClick={() => setFilters(f => ({ ...f, event: opt.key || undefined, page: 1 }))}
-              className={`tab-pill ${filters.event === opt.key || (!filters.event && opt.key === '') ? 'active' : ''}`}
+              className={`audit-tab-pill ${filters.event === opt.key || (!filters.event && opt.key === '') ? 'active' : ''}`}
             >
               {opt.label}
             </button>
@@ -112,15 +112,15 @@ export default function AuditLogPage() {
         ) : (
           <>
             <div style={{ overflowX: 'auto' }}>
-              <table className="tbl">
+              <table className="audit-tbl">
                 <thead>
                   <tr>
-                    <th className="th">التاريخ</th>
-                    <th className="th">المستخدم</th>
-                    <th className="th">الحدث</th>
-                    <th className="th">النوع</th>
-                    <th className="th">الرقم</th>
-                    <th className="th" style={{ width: 40 }} />
+                    <th className="audit-th">التاريخ</th>
+                    <th className="audit-th">المستخدم</th>
+                    <th className="audit-th">الحدث</th>
+                    <th className="audit-th">النوع</th>
+                    <th className="audit-th">الرقم</th>
+                    <th className="audit-th" style={{ width: 40 }} />
                   </tr>
                 </thead>
                 <tbody>
@@ -131,31 +131,31 @@ export default function AuditLogPage() {
                     return (
                       <React.Fragment key={log.id}>
                         <tr
-                          className={`tr-hover ${isExpanded ? 'tr-active' : ''}`}
+                          className={`audit-tr-hover ${isExpanded ? 'audit-tr-active' : ''}`}
                           onClick={() => setExpandedId(isExpanded ? null : log.id)}
                           style={{ cursor: 'pointer' }}
                         >
-                          <td className="td" style={{ color: 'var(--t3)', fontSize: 12, whiteSpace: 'nowrap' }}>
+                          <td className="audit-td" style={{ color: 'var(--t3)', fontSize: 12, whiteSpace: 'nowrap' }}>
                             {formatDate(log.created_at)}
                           </td>
-                          <td className="td">
+                          <td className="audit-td">
                             <span style={{ fontWeight: 600 }}>
                               {log.user?.name ?? `#${log.user_id}`}
                             </span>
                           </td>
-                          <td className="td">
+                          <td className="audit-td">
                             <Badge variant={evt.variant} noDot>
                               <i className={`ti ${evt.icon}`} style={{ marginLeft: 4, fontSize: 11 }} />
                               {evt.label}
                             </Badge>
                           </td>
-                          <td className="td" style={{ color: 'var(--t2)' }}>
+                          <td className="audit-td" style={{ color: 'var(--t2)' }}>
                             {typeLabel}
                           </td>
-                          <td className="td" style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--t4)' }}>
+                          <td className="audit-td" style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--t4)' }}>
                             #{log.auditable_id}
                           </td>
-                          <td className="td" style={{ textAlign: 'center' }}>
+                          <td className="audit-td" style={{ textAlign: 'center' }}>
                             <i
                               className={`ti ti-chevron-${isExpanded ? 'up' : 'down'}`}
                               style={{ fontSize: 14, color: 'var(--t4)', transition: 'transform .2s' }}
@@ -201,28 +201,7 @@ export default function AuditLogPage() {
         )}
       </div>
 
-      <style>{`
-        .page-container { padding: 20px 24px; max-width: 1200px; margin: 0 auto; direction: rtl; }
-        .tab-pill {
-          padding: 6px 14px; border-radius: 99px; border: none;
-          font-size: 12px; font-weight: 600; cursor: pointer;
-          background: var(--bg3); color: var(--t3);
-          transition: all .15s; font-family: inherit;
-        }
-        .tab-pill:hover { background: var(--bg4); color: var(--t2); }
-        .tab-pill.active { background: var(--em); color: #fff; }
-        .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .th {
-          padding: 10px 16px; text-align: right; font-weight: 700;
-          font-size: 11px; color: var(--t4); white-space: nowrap;
-          background: var(--bg3); border-bottom: 2px solid var(--b2);
-        }
-        .td { padding: 10px 16px; text-align: right; vertical-align: middle; }
-        .tr-hover { transition: background .1s; border-bottom: 1px solid var(--b1); }
-        .tr-hover:hover { background: var(--bg3); }
-        .tr-active { background: var(--bg3); }
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
+
     </div>
   );
 }

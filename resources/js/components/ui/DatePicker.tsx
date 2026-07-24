@@ -159,61 +159,6 @@ const DatePicker: React.FC<DatePickerProps> = ({
         </div>
       )}
 
-      <style>{`
-        .dp-wrapper { position: relative; display: flex; flex-direction: column; gap: 4px; z-index: 2000; }
-        .dp-label { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); }
-        .dp-trigger {
-          display: flex; align-items: center; gap: 8px;
-          padding: 8px 12px; width: 100%;
-          background: var(--color-background-primary);
-          border: 1px solid var(--color-border-secondary);
-          border-radius: 8px; cursor: pointer;
-          font-size: 14px; color: var(--color-text-primary);
-          transition: border-color .15s, box-shadow .15s;
-          text-align: start;
-        }
-        .dp-trigger:hover:not(.disabled) { border-color: var(--color-border-primary); }
-        .dp-trigger.open { border-color: var(--color-text-info, #3b82f6); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-text-info, #3b82f6) 15%, transparent); }
-        .dp-trigger.has-error { border-color: var(--color-text-danger, #ef4444); }
-        .dp-trigger.disabled { opacity: .5; cursor: not-allowed; }
-        .dp-icon { color: var(--color-text-secondary); flex-shrink: 0; }
-        .dp-placeholder { color: var(--color-text-tertiary); flex: 1; }
-        .dp-trigger span:not(.dp-placeholder):not(.dp-clear) { flex: 1; }
-        .dp-clear { font-size: 11px; color: var(--color-text-secondary); padding: 2px 4px; border-radius: 4px; line-height: 1; margin-inline-start: auto; }
-        .dp-clear:hover { color: var(--color-text-primary); background: var(--color-background-secondary); }
-        .dp-error { font-size: 12px; color: var(--color-text-danger, #ef4444); }
-        .dp-calendar {
-          position: absolute; top: calc(100% + 4px); left: 0; z-index: 1000;
-          background: var(--color-background-primary);
-          border: 1px solid var(--color-border-secondary);
-          border-radius: 10px; padding: 12px;
-          box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-          min-width: 260px;
-          animation: dp-open .12s ease;
-        }
-        @keyframes dp-open { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform: translateY(0); } }
-        .dp-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-        .dp-nav-btn { background: none; border: none; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 18px; color: var(--color-text-secondary); line-height: 1; }
-        .dp-nav-btn:hover { background: var(--color-background-secondary); color: var(--color-text-primary); }
-        .dp-nav-title { font-size: 14px; font-weight: 500; color: var(--color-text-primary); }
-        .dp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-        .dp-day-header { text-align: center; font-size: 11px; font-weight: 500; color: var(--color-text-tertiary); padding: 4px 0; }
-        .dp-day {
-          display: flex; align-items: center; justify-content: center;
-          height: 32px; border-radius: 6px; border: none; background: none;
-          font-size: 13px; cursor: pointer; color: var(--color-text-primary);
-          transition: background .1s, color .1s;
-        }
-        .dp-day:hover:not(.disabled) { background: var(--color-background-secondary); }
-        .dp-day.today { font-weight: 600; color: var(--color-text-info, #3b82f6); }
-        .dp-day.today::after { content:''; display:block; width:4px; height:4px; background: currentColor; border-radius:50%; position:absolute; bottom:3px; }
-        .dp-day.today { position: relative; }
-        .dp-day.selected { background: var(--color-text-info, #3b82f6); color: #fff; font-weight: 500; }
-        .dp-day.disabled { opacity: .3; cursor: not-allowed; }
-        .dp-footer { margin-top: 8px; border-top: 1px solid var(--color-border-tertiary); padding-top: 8px; display: flex; justify-content: center; }
-        .dp-today-btn { background: none; border: none; font-size: 13px; cursor: pointer; color: var(--color-text-info, #3b82f6); font-weight: 500; padding: 4px 8px; border-radius: 6px; }
-        .dp-today-btn:hover { background: var(--color-background-secondary); }
-      `}</style>
     </div>
   );
 };

@@ -1972,14 +1972,7 @@ export default function UsersPage() {
 
     return (
         <>
-            <style>{`
-        @keyframes ovIn    { from{opacity:0} to{opacity:1} }
-        @keyframes modalIn { from{opacity:0;transform:scale(.94) translateY(8px)} to{opacity:1;transform:scale(1) translateY(0)} }
-        @keyframes spin    { to{transform:rotate(360deg)} }
-        @keyframes slideIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
-        .u-row:hover { background: var(--bg3) !important; }
-        .r-card:hover { border-color: var(--embo) !important; transform: translateY(-1px); }
-      `}</style>
+
 
             <div
                 className="page on"

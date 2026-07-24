@@ -905,6 +905,15 @@
 }
 .cart-sell-btn:active:not(:disabled) { transform: translateY(0) scale(.98); }
 .cart-sell-btn:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+
+.cart-quick-sell {
+  flex: 0 0 auto;
+  padding: 16px 14px;
+  background: var(--em2);
+  gap: 5px;
+}
+.cart-quick-sell:hover:not(:disabled) { background: #065d3d; }
+.cart-quick-sell i { font-size: 16px; }
 /* ══════════════════════════════════════════
    12. PRODUCT CARD — تحسينات إضافية
 ══════════════════════════════════════════ */

@@ -155,12 +155,12 @@ export interface PosAggregatedLookups {
   treasuryAccounts: TreasuryAccount[];
   fiscalYears:      { id: number; year: number; label: string; start_date: string; end_date: string; is_current: boolean; status: string }[];
   customers:        { id: number; name: string; code: string; nif: string; commercial_name: string; party_type_id: number }[];
-  settings:         { fiscal_stamp_enabled: unknown; allow_negative_stock: unknown };
+  settings:         { fiscal_stamp_enabled: unknown; allow_negative_stock: unknown; default_price_level_id: unknown };
 }
 
 const EMPTY_POS_LOOKUPS: PosAggregatedLookups = {
   warehouses: [], documentTypes: [], priceLevels: [], currencies: [],
-  paymentModes: [], treasuryAccounts: [], fiscalYears: [], customers: [], settings: { fiscal_stamp_enabled: undefined, allow_negative_stock: undefined },
+  paymentModes: [], treasuryAccounts: [], fiscalYears: [], customers: [], settings: { fiscal_stamp_enabled: undefined, allow_negative_stock: undefined, default_price_level_id: undefined },
 };
 
 function normalizePosLookups(raw: unknown): PosAggregatedLookups {

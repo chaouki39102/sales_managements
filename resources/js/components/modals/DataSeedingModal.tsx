@@ -295,12 +295,6 @@ const handleApply = async () => {
         })}
       </div>
 
-      <style>{`
-        @keyframes slideInRow {
-          from { opacity: 0; transform: translateX(10px); }
-          to   { opacity: 1; transform: translateX(0); }
-        }
-      `}</style>
     </div>
   );
 
@@ -459,13 +453,6 @@ const handleApply = async () => {
           })}
         </div>
 
-        <style>{`
-          @keyframes spin          { to { transform: rotate(360deg); } }
-          @keyframes pingPulse     { 0%,100% { box-shadow: 0 0 0 3px var(--emb); } 50% { box-shadow: 0 0 0 6px transparent; } }
-          @keyframes glowPulse     { 0%,100% { box-shadow: 0 0 0 6px var(--emb); } 50% { box-shadow: 0 0 0 10px transparent; } }
-          @keyframes slideInActive { from { opacity: 0; transform: translateY(-8px) scale(.97); } to { opacity: 1; transform: none; } }
-          @keyframes itemComplete  { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
-        `}</style>
       </div>
     );
   };
@@ -544,7 +531,6 @@ const handleApply = async () => {
         الدخول إلى الشركة
       </button>
 
-      <style>{`@keyframes popIn { from { transform: scale(.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }`}</style>
     </div>
   );
 

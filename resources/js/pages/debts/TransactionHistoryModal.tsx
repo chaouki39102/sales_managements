@@ -387,7 +387,7 @@ export function TransactionHistoryModal({
         >
             <div className="print-only" style={{ display: 'none' }}>
                 <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>كشف حساب – {partyName}</h2>
-                <p style={{ fontSize: 12, color: '#666' }}>إلى {fmtDate(date)}</p>
+                <p style={{ fontSize: 12, color: 'var(--t3)' }}>إلى {fmtDate(date)}</p>
             </div>
             {isLoading ? (
                 <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-secondary)' }}>
@@ -529,9 +529,9 @@ export function TransactionHistoryModal({
                                             let agingBg = 'transparent';
                                             let agingLabel = '';
                                             if (isOverdue && tx.remaining > 0) {
-                                                if (daysOld > 90) { agingColor = '#dc2626'; agingBg = 'rgba(220,38,38,0.08)'; agingLabel = `${daysOld} يوم — متأخر جداً`; }
+                                                if (daysOld > 90) { agingColor = 'var(--red)'; agingBg = 'var(--redb)'; agingLabel = `${daysOld} يوم — متأخر جداً`; }
                                                 else if (daysOld > 60) { agingColor = '#ea580c'; agingBg = 'rgba(234,88,12,0.08)'; agingLabel = `${daysOld} يوم — متأخر`; }
-                                                else if (daysOld > 30) { agingColor = '#d97706'; agingBg = 'rgba(217,119,6,0.08)'; agingLabel = `${daysOld} يوم`; }
+                                                else if (daysOld > 30) { agingColor = 'var(--gold)'; agingBg = 'var(--goldb)'; agingLabel = `${daysOld} يوم`; }
                                                 else if (daysOld > 0) { agingColor = 'var(--color-text-secondary)'; agingBg = 'transparent'; agingLabel = `${daysOld} يوم`; }
                                             }
 
@@ -540,7 +540,7 @@ export function TransactionHistoryModal({
                                                     key={`${tx.type}-${tx.id}`}
                                                     style={{
                                                         borderBottom: '1px solid var(--color-border-tertiary)',
-                                                        background: isOverdue && daysOld > 90 ? 'rgba(220, 38, 38, 0.04)' : i % 2 === 0 ? 'transparent' : 'var(--color-background-secondary)',
+                                                        background: isOverdue && daysOld > 90 ? 'var(--redb)' : i % 2 === 0 ? 'transparent' : 'var(--color-background-secondary)',
                                                     }}
                                                 >
                                                     <td style={{ ...tdStyle, color: 'var(--color-text-tertiary)', fontSize: 11 }}>{tx.seq}</td>
@@ -559,7 +559,7 @@ export function TransactionHistoryModal({
                                                             {tx.type === 'document' && tx.type_code ? (
                                                                 <button
                                                                     onClick={() => { navigate(`/documents/${tx.type_code}/${tx.id}/edit`); onClose(); }}
-                                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'monospace', fontSize: 12, color: 'var(--text-info, #3b82f6)', textDecoration: 'underline', padding: 0 }}
+                                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'monospace', fontSize: 12, color: 'var(--text-info, var(--blue))', textDecoration: 'underline', padding: 0 }}
                                                                 >
                                                                     {tx.reference}
                                                                 </button>
@@ -580,7 +580,7 @@ export function TransactionHistoryModal({
                                                     </td>
                                                     <td style={{ ...tdStyle, textAlign: 'center' }}>
                                                         {tx.margin_value !== 0 ? (
-                                                            <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: tx.margin_value >= 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: tx.margin_value >= 0 ? 'var(--em)' : 'var(--red)' }}>
+                                                            <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: tx.margin_value >= 0 ? 'var(--greenb)' : 'var(--redb)', color: tx.margin_value >= 0 ? 'var(--em)' : 'var(--red)' }}>
                                                                 {fmtNumber(tx.margin_value)} دج
                                                             </span>
                                                         ) : '—'}
@@ -608,7 +608,7 @@ export function TransactionHistoryModal({
                                             <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--em)', fontWeight: 700 }}>{fmtNumber(totalDocs)} دج</td>
                                             <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>{fmtNumber(totalCost)} دج</td>
                                             <td style={{ ...tdStyle, textAlign: 'center' }}>
-                                                <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: totalMargin >= 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: totalMargin >= 0 ? 'var(--em)' : 'var(--red)' }}>
+                                                <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: totalMargin >= 0 ? 'var(--greenb)' : 'var(--redb)', color: totalMargin >= 0 ? 'var(--em)' : 'var(--red)' }}>
                                                     {fmtNumber(totalMargin)} دج
                                                 </span>
                                             </td>
@@ -715,15 +715,15 @@ export function TransactionHistoryModal({
                                                         let agingBg = 'transparent';
                                                         let agingLabel = '';
                                                         if (isOverdue && tx.remaining > 0) {
-                                                            if (daysOld > 90) { agingColor = '#dc2626'; agingBg = 'rgba(220,38,38,0.08)'; agingLabel = `${daysOld} يوم — متأخر جداً`; }
+                                                            if (daysOld > 90) { agingColor = 'var(--red)'; agingBg = 'var(--redb)'; agingLabel = `${daysOld} يوم — متأخر جداً`; }
                                                             else if (daysOld > 60) { agingColor = '#ea580c'; agingBg = 'rgba(234,88,12,0.08)'; agingLabel = `${daysOld} يوم — متأخر`; }
-                                                            else if (daysOld > 30) { agingColor = '#d97706'; agingBg = 'rgba(217,119,6,0.08)'; agingLabel = `${daysOld} يوم`; }
+                                                            else if (daysOld > 30) { agingColor = 'var(--gold)'; agingBg = 'var(--goldb)'; agingLabel = `${daysOld} يوم`; }
                                                             else if (daysOld > 0) { agingColor = 'var(--color-text-secondary)'; agingBg = 'transparent'; agingLabel = `${daysOld} يوم`; }
                                                         }
 
                                                         return (
                                                             <React.Fragment key={`${tx.type}-${tx.id}`}>
-                                                                <tr style={{ borderBottom: '1px solid var(--color-border-tertiary)', background: isOverdue && daysOld > 90 ? 'rgba(220, 38, 38, 0.04)' : i % 2 === 0 ? 'transparent' : 'var(--color-background-secondary)' }}>
+                                                                <tr style={{ borderBottom: '1px solid var(--color-border-tertiary)', background: isOverdue && daysOld > 90 ? 'var(--redb)' : i % 2 === 0 ? 'transparent' : 'var(--color-background-secondary)' }}>
                                                                     <td style={tdStyle}>
                                                                         {hasLines && (
                                                                             <button onClick={() => toggleDoc(tx.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--color-text-secondary)' }}>
@@ -741,7 +741,7 @@ export function TransactionHistoryModal({
                                                                     <td style={tdStyle}>
                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                                                             {isDoc && tx.type_code ? (
-                                                                                <button onClick={(e) => { e.stopPropagation(); navigate(`/documents/${tx.type_code}/${tx.id}/edit`); onClose(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'monospace', fontSize: 12, color: 'var(--text-info, #3b82f6)', textDecoration: 'underline', padding: 0 }}>{tx.reference}</button>
+                                                                                <button onClick={(e) => { e.stopPropagation(); navigate(`/documents/${tx.type_code}/${tx.id}/edit`); onClose(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'monospace', fontSize: 12, color: 'var(--text-info, var(--blue))', textDecoration: 'underline', padding: 0 }}>{tx.reference}</button>
                                                                             ) : (
                                                                                 <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--color-text-secondary)' }}>{tx.reference || '—'}</span>
                                                                             )}
@@ -759,7 +759,7 @@ export function TransactionHistoryModal({
                                                                     </td>
                                                                     <td style={{ ...tdStyle, textAlign: 'center' }}>
                                                                         {tx.margin_value !== 0 ? (
-                                                                            <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: tx.margin_value >= 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: tx.margin_value >= 0 ? 'var(--em)' : 'var(--red)' }}>
+                                                                            <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: tx.margin_value >= 0 ? 'var(--greenb)' : 'var(--redb)', color: tx.margin_value >= 0 ? 'var(--em)' : 'var(--red)' }}>
                                                                                 {fmtNumber(tx.margin_value)} دج
                                                                             </span>
                                                                         ) : '—'}
@@ -773,13 +773,13 @@ export function TransactionHistoryModal({
                                                                     </td>
                                                                 </tr>
                                                                 {isExpanded && hasLines && (tx as any).lines.map((line: any, li: number) => (
-                                                                    <tr key={`line-${tx.id}-${li}`} style={{ borderBottom: '1px solid var(--color-border-tertiary)', background: 'rgba(59, 130, 246, 0.03)' }}>
+                                                                    <tr key={`line-${tx.id}-${li}`} style={{ borderBottom: '1px solid var(--color-border-tertiary)', background: 'var(--blueb)' }}>
                                                                         <td style={tdStyle}></td>
                                                                         <td style={{ ...tdStyle, fontSize: 10, color: 'var(--color-text-tertiary)' }}>{tx.seq}.{li + 1}</td>
                                                                         <td colSpan={7} style={{ ...tdStyle, padding: '4px 12px 4px 36px' }}>
                                                                             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 180 }}>
-                                                                                    <i className="ti ti-package" style={{ fontSize: 11, color: 'var(--text-info, #3b82f6)', opacity: 0.6 }} />
+                                                                                    <i className="ti ti-package" style={{ fontSize: 11, color: 'var(--text-info, var(--blue))', opacity: 0.6 }} />
                                                                                     <span style={{ fontWeight: 600, fontSize: 12 }}>{line.product_name}</span>
                                                                                     <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'monospace' }}>({line.product_ref})</span>
                                                                                     {line.unit_name && <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', padding: '1px 5px', borderRadius: 4, background: 'var(--color-background-secondary)' }}>{line.unit_name}</span>}
@@ -789,7 +789,7 @@ export function TransactionHistoryModal({
                                                                                 <span style={{ fontSize: 11, fontWeight: 600 }}>{fmtNumber(line.total_ttc)} دج<span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginInlineStart: 4 }}>(HT: {fmtNumber(line.total_ht)} + TVA {line.tva_rate}%)</span></span>
                                                                                 {line.cost_price_ht > 0 && <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>تكلفة: {fmtNumber(line.line_cost_ht)} دج</span>}
                                                                                 {line.line_margin !== 0 && (
-                                                                                    <span style={{ display: 'inline-block', padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 600, background: line.line_margin >= 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: line.line_margin >= 0 ? 'var(--em)' : 'var(--red)' }}>
+                                                                                    <span style={{ display: 'inline-block', padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 600, background: line.line_margin >= 0 ? 'var(--greenb)' : 'var(--redb)', color: line.line_margin >= 0 ? 'var(--em)' : 'var(--red)' }}>
                                                                                         هامش: {fmtNumber(line.line_margin)} دج
                                                                                     </span>
                                                                                 )}
@@ -808,7 +808,7 @@ export function TransactionHistoryModal({
                                                         <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--em)', fontWeight: 700 }}>{fmtNumber(detTotalDocs)} دج</td>
                                                         <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>{fmtNumber(detTotalCost)} دج</td>
                                                         <td style={{ ...tdStyle, textAlign: 'center' }}>
-                                                            <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: detTotalMargin >= 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: detTotalMargin >= 0 ? 'var(--em)' : 'var(--red)' }}>{fmtNumber(detTotalMargin)} دج</span>
+                                                            <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: detTotalMargin >= 0 ? 'var(--greenb)' : 'var(--redb)', color: detTotalMargin >= 0 ? 'var(--em)' : 'var(--red)' }}>{fmtNumber(detTotalMargin)} دج</span>
                                                         </td>
                                                         <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--red)', fontWeight: 700 }}>{fmtNumber(detTotalPays)} دج</td>
                                                         <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 800, fontSize: 14, color: (computedDetBalance + detTotalDocs - detTotalPays) >= 0 ? 'var(--red)' : 'var(--green)' }}>{fmtNumber(computedDetBalance + detTotalDocs - detTotalPays)} دج</td>
@@ -883,7 +883,7 @@ export function TransactionHistoryModal({
                                                         <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-secondary)' }}>{p.cost_ht > 0 ? <span>{fmtNumber(p.cost_ht)} دج</span> : '—'}</td>
                                                         <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>{fmtNumber(p.total_ttc)} دج</td>
                                                         <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 600 }}><span style={{ color: p.margin_value >= 0 ? 'var(--em)' : 'var(--red)' }}>{fmtNumber(p.margin_value)} دج</span></td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center' }}><span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: p.margin_value >= 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: p.margin_value >= 0 ? 'var(--em)' : 'var(--red)' }}>{p.margin_pct}%</span></td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center' }}><span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: p.margin_value >= 0 ? 'var(--greenb)' : 'var(--redb)', color: p.margin_value >= 0 ? 'var(--em)' : 'var(--red)' }}>{p.margin_pct}%</span></td>
                                                         <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-secondary)' }}>{p.doc_count}</td>
                                                     </tr>
                                                 ))}
@@ -897,9 +897,9 @@ export function TransactionHistoryModal({
                                                         <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--red)', fontWeight: 700 }}>{fmtNumber(recapProducts.reduce((s, p) => s + p.purchase_qty, 0))}</td>
                                                         <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--red)', fontWeight: 700 }}>{fmtNumber(recapSummary.total_purchase_ht)} دج</td>
                                                         <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>{fmtNumber(recapSummary.total_cost_ht)} دج</td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 800, fontSize: 14, color: 'var(--text-info, #3b82f6)' }}>{fmtNumber(recapSummary.total_sale_ttc + recapSummary.total_purchase_ttc)} دج</td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 800, fontSize: 14, color: 'var(--text-info, var(--blue))' }}>{fmtNumber(recapSummary.total_sale_ttc + recapSummary.total_purchase_ttc)} دج</td>
                                                         <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}><span style={{ color: recapSummary.total_margin_value >= 0 ? 'var(--em)' : 'var(--red)' }}>{fmtNumber(recapSummary.total_margin_value)} دج</span></td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center' }}><span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: recapSummary.total_margin_value >= 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: recapSummary.total_margin_value >= 0 ? 'var(--em)' : 'var(--red)' }}>{recapSummary.total_margin_pct}%</span></td>
+                                                        <td style={{ ...tdStyle, textAlign: 'center' }}><span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: recapSummary.total_margin_value >= 0 ? 'var(--greenb)' : 'var(--redb)', color: recapSummary.total_margin_value >= 0 ? 'var(--em)' : 'var(--red)' }}>{recapSummary.total_margin_pct}%</span></td>
                                                         <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
                                                     </tr>
                                                 )}

@@ -8,8 +8,8 @@ export const MONEY = (n: number) => `${FMT(n)} دج`;
 export const PCT = (n: number) => `${n.toFixed(1)}%`;
 
 export const REPORT_DEFAULTS = {
-  from: `${new Date().getFullYear()}-01-01`,
-  to: new Date().toISOString().slice(0, 10),
+  from: new Date().toISOString().slice(0, 10),
+  to:   new Date().toISOString().slice(0, 10),
 } as const;
 
 export interface ReportCardMeta {

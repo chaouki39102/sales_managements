@@ -169,8 +169,7 @@ export function FiscalYearSelector() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setIsOpen(v => !v)}
-        className="flex items-center gap-6 px-12 py-5 rounded-full bg-3 border border-b2 cursor-pointer transition"
-        style={{ fontFamily: 'Tajawal, sans-serif' }}
+        className="flex items-center gap-6 px-12 py-5 rounded-full bg-3 border border-b2 cursor-pointer transition font-sans"
         onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--em)')}
         onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--b2)')}
       >
@@ -182,13 +181,13 @@ export function FiscalYearSelector() {
           {selectedYear?.name ?? 'اختر سنة'}
         </span>
         {selectedYear?.is_current && (
-          <i className="ti ti-star-filled" style={{ color: 'var(--gold)', fontSize: 9 }} />
+          <i className="ti ti-star-filled text-gold text-9" />
         )}
         <i className={`ti ti-chevron-${isOpen ? 'up' : 'down'} text-sm text-t4`} />
       </button>
 
       {isOpen && (
-        <div className="absolute top-0 left-0 mt-6 min-w-52 bg-2 border border-b2 rounded-lg shadow-md z-1000 overflow-hidden" style={{ direction: 'rtl' }}>
+        <div className="absolute top-0 left-0 mt-6 min-w-52 bg-2 border border-b2 rounded-lg shadow-md z-1000 overflow-hidden rtl">
           {open.length > 0 && (
             <>
               <div className="px-12 py-6 text-xs font-extrabold text-em uppercase tracking-widest bg-3">

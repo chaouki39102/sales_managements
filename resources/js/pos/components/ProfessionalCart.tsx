@@ -43,6 +43,7 @@ interface ProfessionalCartProps {
   onNoteChange:         (n: string) => void;
   onHold:               () => void;
   onSell:               () => void;
+  onQuickSell:          () => void;
   onClear:              () => void;
   onHeld:               () => void;
   totalTtcFinal:        number;
@@ -79,7 +80,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
   note, selectedItemId, onSelectItem,
   onQty, onDiscount, onDiscountAmount, onPrice, onRemove, onUpdatePackaging, packagingsMap,
   onSetClient, onNoteChange,
-  onHold, onSell, onClear, onHeld, totalTtcFinal, remainingToPay,
+  onHold, onSell, onQuickSell, onClear, onHeld, totalTtcFinal, remainingToPay,
   invoiceDiscountPct = 0, onInvoiceDiscountChange, invoiceDiscountAmount = 0,
   onUndoClear, canUndoClear, undoClearSecondsLeft = 0, clientBalance, slug, cartRef, onClientModalClose,
 }, ref) {
@@ -515,7 +516,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                       onPrice={price => onPrice(item.id, price)}
                       onRemove={() => onRemove(item.id)}
                       onUpdatePackaging={(pkg, baseHt) => onUpdatePackaging(item.id, pkg, baseHt)}
-                      availablePackagings={packagingsMap.get(item.variant_id) ?? []}
+                      availablePackagings={packagingsMap.get(item.variant_id) ?? packagingsMap.get(item.product_id) ?? []}
                       density={density}
                       registerNode={registerRowNode}
                     />
@@ -552,6 +553,17 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
             </span>
             {kb('payment') && <span className="tb-txt" style={{ fontSize: 13 }}> {kb('payment')}</span>}
           </button>
+          {!isEmpty && (
+            <button
+              className="cart-sell-btn cart-quick-sell"
+              onClick={onQuickSell}
+              title="دفع نقدي سريع — المبلغ كامل نقدياً بدون مودال"
+              type="button"
+            >
+              <i className="ti ti-bolt" />
+              <span>سريع</span>
+            </button>
+          )}
         </div>
       </div>
 

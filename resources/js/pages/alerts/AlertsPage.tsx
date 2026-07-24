@@ -78,7 +78,7 @@ export default function AlertsPage() {
   const unreadCount = alerts.filter(a => !a.is_read).length;
 
   return (
-    <div className="page-container">
+    <div className="alert-page-container">
       <PageHeader
         title="التنبيهات الذكية"
         description="مراقبة الأحداث والتنبيهات المهمة"
@@ -111,7 +111,7 @@ export default function AlertsPage() {
           <button
             key={tab.key}
             onClick={() => setFilter(tab.key)}
-            className={`tab-pill ${filter === tab.key ? 'active' : ''}`}
+            className={`alert-tab-pill ${filter === tab.key ? 'active' : ''}`}
           >
             {tab.label}
             <span style={{
@@ -200,21 +200,7 @@ export default function AlertsPage() {
         )}
       </div>
 
-      <style>{`
-        .page-container { padding: 20px 24px; max-width: 1200px; margin: 0 auto; direction: rtl; }
-        .tab-pill {
-          padding: 6px 14px; border-radius: 99px; border: none;
-          font-size: 12px; font-weight: 600; cursor: pointer;
-          background: var(--bg3); color: var(--t3);
-          transition: all .15s; font-family: inherit;
-          display: inline-flex; align-items: center;
-        }
-        .tab-pill:hover { background: var(--bg4); color: var(--t2); }
-        .tab-pill.active { background: var(--em); color: #fff; }
-        .alert-card { transition: transform .15s, box-shadow .15s; }
-        .alert-card:hover { transform: translateY(-1px); box-shadow: var(--shadow2); }
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
+
     </div>
   );
 }

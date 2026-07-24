@@ -133,42 +133,42 @@ export default function SessionInvoicesModal({ session, onClose, onOpen }: Props
       <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
         <div className="m-hd">
           <div className="m-title">
-            <i className="ti ti-receipt" style={{ marginLeft: 6 }} />
+            <i className="ti ti-receipt ml-2" />
             فواتير الجلسة
           </div>
           <div className="m-x" onClick={onClose}><i className="ti ti-x" /></div>
         </div>
-        <div className="m-body" style={{ maxHeight: '70vh', overflow: 'auto' }}>
+        <div className="m-body si-modal-body">
           {loading ? (
-            <div style={{ textAlign: 'center', padding: 40, color: 'var(--t4)' }}>
-              <i className="ti ti-loader" style={{ fontSize: 24 }} />
-              <div style={{ marginTop: 8 }}>جاري تحميل الفواتير...</div>
+            <div className="si-empty si-empty-lg">
+              <i className="ti ti-loader" />
+              <div>جاري تحميل الفواتير...</div>
             </div>
           ) : docs.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 40, color: 'var(--t4)' }}>
-              <i className="ti ti-receipt-off" style={{ fontSize: 32 }} />
-              <div style={{ marginTop: 8 }}>لا توجد فواتير في هذه الجلسة</div>
+            <div className="si-empty si-empty-sm">
+              <i className="ti ti-receipt-off" />
+              <div>لا توجد فواتير في هذه الجلسة</div>
             </div>
           ) : (
-            <table className="tbl tbl-sm si-modal-tbl" style={{ width: '100%' }}>
+            <table className="tbl tbl-sm si-modal-tbl w-full">
               <thead>
                 <tr>
                   <th>#</th>
                   <th className="si-th-sort" onClick={() => toggleSort('document_number')}>
-                    <i className={sortIcon('document_number')} style={{ fontSize: 11, marginLeft: 3 }} /> رقم الفاتورة
+                    <i className={`${sortIcon('document_number')} si-sort-ic`} /> رقم الفاتورة
                   </th>
                   <th className="si-col-client">العميل</th>
                   <th className="si-th-sort" onClick={() => toggleSort('document_date')}>
-                    <i className={sortIcon('document_date')} style={{ fontSize: 11, marginLeft: 3 }} /> التاريخ
+                    <i className={`${sortIcon('document_date')} si-sort-ic`} /> التاريخ
                   </th>
                   <th className="si-th-sort" onClick={() => toggleSort('total_ttc')}>
-                    <i className={sortIcon('total_ttc')} style={{ fontSize: 11, marginLeft: 3 }} /> الإجمالي
+                    <i className={`${sortIcon('total_ttc')} si-sort-ic`} /> الإجمالي
                   </th>
                   <th className="si-th-sort" onClick={() => toggleSort('paid_amount')}>
-                    <i className={sortIcon('paid_amount')} style={{ fontSize: 11, marginLeft: 3 }} /> المدفوع
+                    <i className={`${sortIcon('paid_amount')} si-sort-ic`} /> المدفوع
                   </th>
                   <th className="si-th-sort" onClick={() => toggleSort('remaining_amount')}>
-                    <i className={sortIcon('remaining_amount')} style={{ fontSize: 11, marginLeft: 3 }} /> المتبقي
+                    <i className={`${sortIcon('remaining_amount')} si-sort-ic`} /> المتبقي
                   </th>
                 </tr>
               </thead>
@@ -177,34 +177,33 @@ export default function SessionInvoicesModal({ session, onClose, onOpen }: Props
                   <tr
                     key={doc.id}
                     onClick={() => handleRowClick(doc)}
-                    style={{ cursor: 'pointer' }}
-                    className={`si-row${i === selectedIndex ? ' si-row-sel' : ''}`}
+                    className={`si-row cursor-pointer${i === selectedIndex ? ' si-row-sel' : ''}`}
                   >
                     <td>{i + 1}</td>
                     <td><strong>{doc.document_number}</strong></td>
-                    <td className="si-col-client">{doc.party?.name ?? <span style={{ color: 'var(--t4)' }}>—</span>}</td>
-                    <td style={{ whiteSpace: 'nowrap', fontSize: 13 }}>{doc.created_at?.slice(0, 16).replace('T', ' ') ?? doc.document_date?.slice(0, 16).replace('T', ' ')}</td>
-                    <td style={{ fontWeight: 600, color: 'var(--p)' }}>{formatDZD(doc.total_ttc)}</td>
-                    <td style={{ color: 'var(--g)' }}>{formatDZD(doc.paid_amount ?? 0)}</td>
-                    <td style={{ fontWeight: 600, color: Number(doc.remaining_amount ?? 0) > 0 ? 'var(--r)' : 'var(--t4)' }}>
+                    <td className="si-col-client">{doc.party?.name ?? <span className="si-null">—</span>}</td>
+                    <td className="si-date-cell">{doc.created_at?.slice(0, 16).replace('T', ' ') ?? doc.document_date?.slice(0, 16).replace('T', ' ')}</td>
+                    <td className="si-ttc-cell">{formatDZD(doc.total_ttc)}</td>
+                    <td className="si-paid-cell">{formatDZD(doc.paid_amount ?? 0)}</td>
+                    <td className={`si-remain-cell ${Number(doc.remaining_amount ?? 0) > 0 ? 'si-remain-pos' : 'si-remain-neg'}`}>
                       {formatDZD(doc.remaining_amount ?? 0)}
                     </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr style={{ fontWeight: 700, borderTop: '2px solid var(--b3)' }}>
-                  <td colSpan={4} style={{ textAlign: 'left' }}>المجموع</td>
-                  <td style={{ color: 'var(--p)' }}>{formatDZD(totals.ttc)}</td>
-                  <td style={{ color: 'var(--g)' }}>{formatDZD(totals.paid)}</td>
-                  <td style={{ color: totals.remaining > 0 ? 'var(--r)' : 'var(--t4)' }}>{formatDZD(totals.remaining)}</td>
+                <tr className="si-foot-row">
+                  <td colSpan={4} className="text-left">المجموع</td>
+                  <td className="si-ttc-cell">{formatDZD(totals.ttc)}</td>
+                  <td className="si-paid-cell">{formatDZD(totals.paid)}</td>
+                  <td className={totals.remaining > 0 ? 'si-remain-pos' : 'si-remain-neg'}>{formatDZD(totals.remaining)}</td>
                 </tr>
               </tfoot>
             </table>
           )}
         </div>
         <div className="m-foot">
-          <span style={{ fontSize: 12, color: 'var(--t4)' }}>
+          <span className="si-foot-hint">
             ↑↓ للتنقل · Enter لفتح الفاتورة · Esc للإغلاق
           </span>
           <button className="btn" onClick={onClose}>إغلاق</button>

@@ -67,27 +67,6 @@ export const TextArea: React.FC<TextAreaProps> = ({
         )}
       </div>
 
-      <style>{`
-        .ta-wrapper { display: flex; flex-direction: column; gap: 4px; }
-        .ta-label { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); }
-        .ta-required { color: var(--color-text-danger, #ef4444); margin-inline-start: 2px; }
-        .ta-field {
-          width: 100%; padding: 8px 12px; resize: vertical;
-          background: var(--color-background-primary);
-          border: 1px solid var(--color-border-secondary);
-          border-radius: 8px; font-size: 14px; font-family: inherit;
-          color: var(--color-text-primary); line-height: 1.5; outline: none;
-          transition: border-color .15s, box-shadow .15s;
-          box-sizing: border-box;
-        }
-        .ta-field:focus { border-color: var(--color-text-info, #3b82f6); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-text-info,#3b82f6) 15%, transparent); }
-        .ta-field.has-error { border-color: var(--color-text-danger, #ef4444); }
-        .ta-field:disabled { opacity: .5; cursor: not-allowed; resize: none; }
-        .ta-footer { display: flex; justify-content: space-between; align-items: center; }
-        .ta-hint { font-size: 12px; color: var(--color-text-tertiary); }
-        .ta-error { font-size: 12px; color: var(--color-text-danger, #ef4444); }
-        .ta-counter { font-size: 12px; color: var(--color-text-tertiary); margin-inline-start: auto; }
-      `}</style>
     </div>
   );
 };
@@ -136,14 +115,6 @@ export const FormField: React.FC<FormFieldProps> = ({
       {hint && !error && <p className="ff-hint">{hint}</p>}
       {error && <p className="ff-error" role="alert">{error}</p>}
 
-      <style>{`
-        .ff-wrapper { display: flex; flex-direction: column; gap: 4px; }
-        .ff-label { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); display: inline-flex; align-items: center; gap: 2px; }
-        .ff-required { color: var(--color-text-danger, #ef4444); }
-        .ff-control { display: flex; flex-direction: column; }
-        .ff-hint  { margin: 0; font-size: 12px; color: var(--color-text-tertiary); }
-        .ff-error { margin: 0; font-size: 12px; color: var(--color-text-danger, #ef4444); }
-      `}</style>
     </div>
   );
 };
@@ -236,45 +207,6 @@ export const NumberInput: React.FC<NumberInputProps> = ({
       {hint && !error && <p className="ni-hint">{hint}</p>}
       {error && <p className="ni-error">{error}</p>}
 
-      <style>{`
-        .ni-wrapper { display: flex; flex-direction: column; gap: 4px; }
-        .ni-label { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); }
-        .ni-required { color: var(--color-text-danger, #ef4444); margin-inline-start: 2px; }
-        .ni-control {
-          display: flex; align-items: center;
-          background: var(--color-background-primary);
-          border: 1px solid var(--color-border-secondary);
-          border-radius: 8px; overflow: hidden;
-          transition: border-color .15s, box-shadow .15s;
-        }
-        .ni-control:focus-within:not(.disabled) { border-color: var(--color-text-info, #3b82f6); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-text-info,#3b82f6) 15%, transparent); }
-        .ni-control.has-error { border-color: var(--color-text-danger, #ef4444); }
-        .ni-control.disabled { opacity: .5; }
-        .ni-step {
-          flex-shrink: 0; width: 34px; height: 36px; border: none;
-          background: var(--color-background-secondary); color: var(--color-text-secondary);
-          font-size: 16px; cursor: pointer; line-height: 1;
-          transition: background .1s, color .1s;
-          display: flex; align-items: center; justify-content: center;
-        }
-        .ni-step:hover:not(:disabled) { background: var(--color-border-tertiary); color: var(--color-text-primary); }
-        .ni-step:disabled { opacity: .4; cursor: not-allowed; }
-        .ni-step:first-of-type { border-inline-end: 1px solid var(--color-border-tertiary); }
-        .ni-step:last-of-type  { border-inline-start: 1px solid var(--color-border-tertiary); }
-        .ni-field {
-          flex: 1; padding: 8px 6px; border: none; outline: none;
-          background: transparent; font-size: 14px; text-align: center;
-          color: var(--color-text-primary); font-family: inherit;
-          -moz-appearance: textfield;
-        }
-        .ni-field::-webkit-outer-spin-button,
-        .ni-field::-webkit-inner-spin-button { -webkit-appearance: none; }
-        .ni-affix { padding: 0 10px; font-size: 13px; color: var(--color-text-secondary); background: var(--color-background-secondary); align-self: stretch; display: flex; align-items: center; }
-        .ni-prefix { border-inline-end: 1px solid var(--color-border-tertiary); }
-        .ni-suffix { border-inline-start: 1px solid var(--color-border-tertiary); }
-        .ni-hint  { margin: 0; font-size: 12px; color: var(--color-text-tertiary); }
-        .ni-error { margin: 0; font-size: 12px; color: var(--color-text-danger, #ef4444); }
-      `}</style>
     </div>
   );
 };

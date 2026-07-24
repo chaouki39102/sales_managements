@@ -414,7 +414,7 @@ export default function OpeningBalanceTab() {
         <div style={{
           marginBottom: 12, padding: '10px 14px',
           background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)',
-          borderRadius: 8, color: '#ef4444', fontSize: 13,
+          borderRadius: 8, color: 'var(--red)', fontSize: 13,
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
           <i className="ti ti-alert-circle" />
@@ -666,7 +666,7 @@ export default function OpeningBalanceTab() {
                         ) : isDeleting ? (
                           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                             <span style={{
-                              fontSize: 10, color: '#ef4444', whiteSpace: 'nowrap',
+                              fontSize: 10, color: 'var(--red)', whiteSpace: 'nowrap',
                             }}>
                               تأكيد؟
                             </span>
@@ -938,7 +938,7 @@ export default function OpeningBalanceTab() {
           background: 'rgba(16,185,129,.08)',
           border: '1px solid rgba(16,185,129,.25)',
           borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8,
-          fontSize: 12, color: '#10b981',
+          fontSize: 12, color: 'var(--green)',
         }}>
           <i className="ti ti-info-circle" style={{ fontSize: 15 }} />
           الرصيد الافتتاحي يُحتسب تلقائياً ضمن المخزون الفعلي للمنتجات
@@ -963,7 +963,7 @@ export default function OpeningBalanceTab() {
             {/* ── Header ── */}
             <div style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '16px 20px', borderBottom: '1px solid #e2e8f0', flexShrink: 0,
+              padding: '16px 20px', borderBottom: '1px solid var(--b2)', flexShrink: 0,
             }}>
               <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <i className="ti ti-packages" style={{ color: '#0891b2' }} />
@@ -971,7 +971,7 @@ export default function OpeningBalanceTab() {
               </h3>
               {!addAllLoading && (
                 <button onClick={() => { setShowAddAllModal(false); setAddAllResult(null); }}
-                  style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#666', padding: 0, lineHeight: 1 }}>
+                  style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--t3)', padding: 0, lineHeight: 1 }}>
                   ✕
                 </button>
               )}
@@ -988,17 +988,17 @@ export default function OpeningBalanceTab() {
                 }}>
                   <div style={{ textAlign: 'center', minWidth: 60 }}>
                     <i className="ti ti-package" style={{ fontSize: 28, color: '#0891b2' }} />
-                    <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{products.length} منتج</div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>{products.length} منتج</div>
                   </div>
                   <i className="ti ti-arrow-left" style={{ fontSize: 20, color: '#0891b2', alignSelf: 'center' }} />
                   <div style={{ textAlign: 'center', minWidth: 60 }}>
                     <i className="ti ti-building-warehouse" style={{ fontSize: 28, color: '#0891b2' }} />
-                    <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>المستودع</div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>المستودع</div>
                   </div>
                   <i className="ti ti-arrow-left" style={{ fontSize: 20, color: '#0891b2', alignSelf: 'center' }} />
                   <div style={{ textAlign: 'center', minWidth: 60 }}>
                     <i className="ti ti-clipboard-list" style={{ fontSize: 28, color: '#0891b2' }} />
-                    <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>الرصيد الافتتاحي</div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>الرصيد الافتتاحي</div>
                   </div>
                 </div>
 
@@ -1008,14 +1008,14 @@ export default function OpeningBalanceTab() {
                 </div>
 
                 <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4, color: '#333' }}>
-                  المستودع الافتراضي <span style={{ color: '#ef4444' }}>*</span>
+                  المستودع الافتراضي <span style={{ color: 'var(--red)' }}>*</span>
                 </label>
                 <select
                   value={addAllWarehouseId}
                   onChange={e => setAddAllWarehouseId(e.target.value ? +e.target.value : '')}
                   style={{
                     width: '100%', padding: '8px 12px', borderRadius: 6,
-                    border: '1px solid #e2e8f0', fontSize: 13, marginBottom: 14,
+                    border: '1px solid var(--b2)', fontSize: 13, marginBottom: 14,
                     background: '#fff', fontFamily: 'Tajawal, sans-serif',
                   }}
                 >
@@ -1026,7 +1026,7 @@ export default function OpeningBalanceTab() {
                 </select>
 
                 <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4, color: '#333' }}>
-                  الكمية الافتراضية <span style={{ color: '#ef4444' }}>*</span>
+                  الكمية الافتراضية <span style={{ color: 'var(--red)' }}>*</span>
                 </label>
                 <input
                   type="number" step="0.001" min="0"
@@ -1035,7 +1035,7 @@ export default function OpeningBalanceTab() {
                   placeholder="مثال: 1"
                   style={{
                     width: '100%', padding: '8px 12px', borderRadius: 6,
-                    border: '1px solid #e2e8f0', fontSize: 13, marginBottom: 14,
+                    border: '1px solid var(--b2)', fontSize: 13, marginBottom: 14,
                     fontFamily: 'Tajawal, sans-serif',
                   }}
                 />
@@ -1048,14 +1048,14 @@ export default function OpeningBalanceTab() {
                     <input type="radio" name="priceSource" value="purchase_price" checked={addAllPriceSource === 'purchase_price'} onChange={() => setAddAllPriceSource('purchase_price')} style={{ accentColor: '#0891b2' }} />
                     <div>
                       <div style={{ fontWeight: 600 }}>سعر الشراء للمنتج</div>
-                      <div style={{ fontSize: 11, color: '#666' }}>كل منتج بسعر شرائه</div>
+                      <div style={{ fontSize: 11, color: 'var(--t3)' }}>كل منتج بسعر شرائه</div>
                     </div>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', flex: 1, padding: '8px 12px', borderRadius: 6, border: `1px solid ${addAllPriceSource === 'manual' ? '#0891b2' : '#e2e8f0'}`, background: addAllPriceSource === 'manual' ? '#f0f9ff' : '#fff' }}>
                     <input type="radio" name="priceSource" value="manual" checked={addAllPriceSource === 'manual'} onChange={() => setAddAllPriceSource('manual')} style={{ accentColor: '#0891b2' }} />
                     <div>
                       <div style={{ fontWeight: 600 }}>سعر يدوي</div>
-                      <div style={{ fontSize: 11, color: '#666' }}>سعر واحد للكل</div>
+                      <div style={{ fontSize: 11, color: 'var(--t3)' }}>سعر واحد للكل</div>
                     </div>
                   </label>
                 </div>
@@ -1076,19 +1076,19 @@ export default function OpeningBalanceTab() {
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: '#fff', borderRadius: 4 }}>
-                          <span style={{ color: '#555' }}>منتجات بها سعر</span>
+                          <span style={{ color: 'var(--t4)' }}>منتجات بها سعر</span>
                           <strong>{withPrice}</strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: '#fff', borderRadius: 4 }}>
-                          <span style={{ color: '#555' }}>بلا سعر (0 دج)</span>
+                          <span style={{ color: 'var(--t4)' }}>بلا سعر (0 دج)</span>
                           <strong style={{ color: withoutPrice > 0 ? '#ef4444' : undefined }}>{withoutPrice}</strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: '#fff', borderRadius: 4 }}>
-                          <span style={{ color: '#555' }}>متوسط السعر</span>
+                          <span style={{ color: 'var(--t4)' }}>متوسط السعر</span>
                           <strong>{fmt(avg)} دج</strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: '#fff', borderRadius: 4 }}>
-                          <span style={{ color: '#555' }}>إجمالي أسعار الشراء</span>
+                          <span style={{ color: 'var(--t4)' }}>إجمالي أسعار الشراء</span>
                           <strong>{fmt(total)} دج</strong>
                         </div>
                       </div>
@@ -1112,11 +1112,11 @@ export default function OpeningBalanceTab() {
                       placeholder="مثال: 100"
                       style={{
                         width: '100%', padding: '8px 12px', borderRadius: 6,
-                        border: '1px solid #e2e8f0', fontSize: 13, marginBottom: 6,
+                        border: '1px solid var(--b2)', fontSize: 13, marginBottom: 6,
                         fontFamily: 'Tajawal, sans-serif',
                       }}
                     />
-                    <div style={{ fontSize: 11, color: '#999', marginBottom: 14 }}>
+                    <div style={{ fontSize: 11, color: 'var(--t4)', marginBottom: 14 }}>
                       {addAllQty && addAllUnitPrice
                         ? `القيمة الإجمالية التقديرية: ${(+addAllQty * +addAllUnitPrice).toLocaleString('fr-DZ')} دج`
                         : 'اتركه فارغاً إذا أردت أن تكون القيمة الإجمالية 0'}
@@ -1149,12 +1149,12 @@ export default function OpeningBalanceTab() {
               </div>
               <div style={{
                   display: 'flex', gap: 8, justifyContent: 'flex-end',
-                  padding: '12px 20px', borderTop: '1px solid #e2e8f0', flexShrink: 0,
+                  padding: '12px 20px', borderTop: '1px solid var(--b2)', flexShrink: 0,
                   background: '#fff',
                 }}>
                   <button onClick={() => { setShowAddAllModal(false); setAddAllResult(null); }}
                     style={{
-                      padding: '8px 20px', border: '1px solid #e2e8f0', borderRadius: 6,
+                      padding: '8px 20px', border: '1px solid var(--b2)', borderRadius: 6,
                       background: '#fff', color: '#333', fontSize: 13, cursor: 'pointer',
                       fontFamily: 'Tajawal, sans-serif',
                     }}>
@@ -1180,16 +1180,7 @@ export default function OpeningBalanceTab() {
             {addAllLoading && (
               <div style={{ padding: 32, textAlign: 'center', flex: 1, overflowY: 'auto', minHeight: 0 }}>
 
-                <style>{`
-                  @keyframes floatY {
-                    0%, 100% { transform: translateY(0px); }
-                    50%      { transform: translateY(-6px); }
-                  }
-                  @keyframes shimmer {
-                    0%   { background-position: 200% center; }
-                    100% { background-position: -200% center; }
-                  }
-                `}</style>
+
 
                 <div style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1301,7 +1292,7 @@ export default function OpeningBalanceTab() {
                 <div style={{
                   width: '80%', maxWidth: 320, margin: '0 auto 10px',
                   height: 6, background: '#f1f5f9', borderRadius: 3,
-                  overflow: 'hidden', border: '1px solid #e2e8f0',
+                  overflow: 'hidden', border: '1px solid var(--b2)',
                 }}>
                   <div style={{
                     height: '100%',
@@ -1317,9 +1308,9 @@ export default function OpeningBalanceTab() {
                   fontSize: 12, color: '#94a3b8',
                   display: 'flex', justifyContent: 'center', gap: 16,
                 }}>
-                  <span style={{ color: '#16a34a' }}>✓ {liveAdded} تمت</span>
-                  <span style={{ color: '#d97706' }}>⏭ {liveSkipped} تخطي</span>
-                  <span style={{ color: '#ef4444' }}>✕ {liveErrors} فشل</span>
+                  <span style={{ color: 'var(--green)' }}>✓ {liveAdded} تمت</span>
+                  <span style={{ color: 'var(--gold)' }}>⏭ {liveSkipped} تخطي</span>
+                  <span style={{ color: 'var(--red)' }}>✕ {liveErrors} فشل</span>
                 </div>
               </div>
             )}
@@ -1335,16 +1326,16 @@ export default function OpeningBalanceTab() {
                     flex: 1, minWidth: 100, textAlign: 'center', padding: 14,
                     background: '#f0fdf4', borderRadius: 10, border: '1px solid #bbf7d0',
                   }}>
-                    <div style={{ fontSize: 24, fontWeight: 800, color: '#16a34a' }}>{addAllResult.added}</div>
-                    <div style={{ fontSize: 11, color: '#666' }}>تمت الإضافة</div>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--green)' }}>{addAllResult.added}</div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>تمت الإضافة</div>
                   </div>
                   {addAllResult.skipped > 0 && (
                     <div style={{
                       flex: 1, minWidth: 100, textAlign: 'center', padding: 14,
                       background: '#fef3c7', borderRadius: 10, border: '1px solid #fde68a',
                     }}>
-                      <div style={{ fontSize: 24, fontWeight: 800, color: '#d97706' }}>{addAllResult.skipped}</div>
-                      <div style={{ fontSize: 11, color: '#666' }}>تم التخطي</div>
+                      <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--gold)' }}>{addAllResult.skipped}</div>
+                      <div style={{ fontSize: 11, color: 'var(--t3)' }}>تم التخطي</div>
                     </div>
                   )}
                   {addAllResult.errors > 0 && (
@@ -1352,8 +1343,8 @@ export default function OpeningBalanceTab() {
                       flex: 1, minWidth: 100, textAlign: 'center', padding: 14,
                       background: '#fef2f2', borderRadius: 10, border: '1px solid #fecaca',
                     }}>
-                      <div style={{ fontSize: 24, fontWeight: 800, color: '#dc2626' }}>{addAllResult.errors}</div>
-                      <div style={{ fontSize: 11, color: '#666' }}>فشل</div>
+                      <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--red)' }}>{addAllResult.errors}</div>
+                      <div style={{ fontSize: 11, color: 'var(--t3)' }}>فشل</div>
                     </div>
                   )}
                 </div>
@@ -1372,7 +1363,7 @@ export default function OpeningBalanceTab() {
 
                 <div style={{
                   maxHeight: 200, overflow: 'auto', marginBottom: 12,
-                  border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12,
+                  border: '1px solid var(--b2)', borderRadius: 8, fontSize: 12,
                 }}>
                   {addAllResult.details.map((d, i) => (
                     <div key={i} style={{
@@ -1386,7 +1377,7 @@ export default function OpeningBalanceTab() {
               </div>
               <div style={{
                   display: 'flex', gap: 8, justifyContent: 'flex-end',
-                  padding: '12px 20px', borderTop: '1px solid #e2e8f0', flexShrink: 0,
+                  padding: '12px 20px', borderTop: '1px solid var(--b2)', flexShrink: 0,
                   background: '#fff',
                 }}>
                   <button onClick={() => { setShowAddAllModal(false); setAddAllResult(null); }}
@@ -1425,7 +1416,7 @@ export default function OpeningBalanceTab() {
               background: '#fef2f2', margin: '0 auto 16px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <i className="ti ti-alert-triangle" style={{ fontSize: 28, color: '#ef4444' }} />
+              <i className="ti ti-alert-triangle" style={{ fontSize: 28, color: 'var(--red)' }} />
             </div>
 
             <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
@@ -1435,7 +1426,7 @@ export default function OpeningBalanceTab() {
             <p style={{ margin: '0 0 20px', fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>
               هل أنت متأكد من حذف جميع المنتجات ({rows.length} منتج) من الرصيد الافتتاحي؟
               <br />
-              <strong style={{ color: '#ef4444' }}>هذا الإجراء لا يمكن التراجع عنه.</strong>
+              <strong style={{ color: 'var(--red)' }}>هذا الإجراء لا يمكن التراجع عنه.</strong>
             </p>
 
             <div style={{
@@ -1445,7 +1436,7 @@ export default function OpeningBalanceTab() {
                 onClick={() => setShowDeleteAllModal(false)}
                 disabled={deleteAllLoading}
                 style={{
-                  padding: '9px 24px', border: '1px solid #e2e8f0', borderRadius: 8,
+                  padding: '9px 24px', border: '1px solid var(--b2)', borderRadius: 8,
                   background: '#fff', color: '#333', fontSize: 13, cursor: deleteAllLoading ? 'not-allowed' : 'pointer',
                   fontFamily: 'Tajawal, sans-serif', opacity: deleteAllLoading ? .6 : 1,
                 }}>

@@ -66,8 +66,6 @@ export function DrawerShell({ open, onClose, title, subtitle, badge, children, w
       style={{ position: 'fixed', inset: 0, zIndex: 1200, display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,.45)', direction: 'rtl' }}
     >
       <div style={{ width, maxWidth: '100vw', background: 'var(--bg2)', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 32px rgba(0,0,0,.2)', maxHeight: '100vh', animation: 'slideInRight .22s ease' }}>
-        <style>{`@keyframes slideInRight{from{transform:translateX(100%);opacity:0}to{transform:none;opacity:1}}`}</style>
-
         {/* Header */}
         <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--b2)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>

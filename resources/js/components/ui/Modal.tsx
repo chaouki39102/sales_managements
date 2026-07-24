@@ -106,9 +106,8 @@ export default function Modal({
 
   return (
     <div
-      className={`ov ${open ? 'on' : ''}`}
+      className={`ov ${open ? 'on' : ''}${open ? '' : ' hidden'}`}
       onClick={onClose}
-      style={{ display: open ? undefined : 'none' }}
     >
       <div
         ref={modalRef}
@@ -142,17 +141,10 @@ export default function Modal({
         {resizable && (
           <div
             onMouseDown={onMouseDown}
-            style={{
-              position: 'absolute', bottom: 0, right: 0,
-              width: 28, height: 28, cursor: 'nwse-resize',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--color-text-tertiary)', fontSize: 14,
-              zIndex: 10, userSelect: 'none',
-            }}
             className="modal-resize-handle"
             title="سحب لتغيير الحجم"
           >
-            <i className="ti ti-grip-vertical" style={{ transform: 'rotate(-45deg)' }} />
+            <i className="ti ti-grip-vertical" />
           </div>
         )}
       </div>

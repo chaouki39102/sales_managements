@@ -49,35 +49,15 @@ export default function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <Modal open={open} onClose={onCancel} size="sm" title={title}>
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 12,
-        padding: '8px 0 4px',
-        textAlign: 'center',
-      }}>
-        <div style={{
-          width: 52, height: 52, borderRadius: '50%',
-          background: variantBg[variant],
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <i className={`ti ${icon || variantIcon[variant]}`} style={{
-            fontSize: 24, color: variantColor[variant],
-          }} />
+      <div className="cfm-body">
+        <div className="cfm-icon-circle" style={{ background: variantBg[variant] }}>
+          <i className={`ti ${icon || variantIcon[variant]}`} style={{ color: variantColor[variant] }} />
         </div>
 
-        <p style={{
-          margin: 0, fontSize: 15, fontWeight: 600,
-          color: 'var(--t1)', lineHeight: 1.5,
-        }}>
-          {message}
-        </p>
+        <p className="cfm-msg">{message}</p>
       </div>
 
-      <div style={{
-        display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16,
-      }}>
+      <div className="cfm-btns">
         <Button onClick={onCancel} disabled={loading}>{cancelText}</Button>
         <Button variant={variant} onClick={onConfirm} disabled={loading}>
           {loading ? 'جارٍ التحميل...' : confirmText}

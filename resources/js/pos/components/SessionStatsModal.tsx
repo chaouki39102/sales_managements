@@ -137,7 +137,7 @@ export default function SessionStatsModal({ session, onClose, onEndSession }: Pr
                 {t.label}
               </button>
             ))}
-            <div style={{ flex: 1 }} />
+            <div className="flex-1" />
             <button className="m-x" onClick={onClose} type="button">
               <i className="ti ti-x" />
             </button>
@@ -164,7 +164,7 @@ export default function SessionStatsModal({ session, onClose, onEndSession }: Pr
                       </div>
                       <div className="ssm-kpi-title">{k.title}</div>
                     </div>
-                    <div className="ssm-kpi-value" style={{ direction: 'ltr' }}>{k.value}</div>
+                    <div className="ssm-kpi-value ltr">{k.value}</div>
                     <div className="ssm-kpi-sub">{k.sub}</div>
                   </div>
                 ))}
@@ -193,7 +193,7 @@ export default function SessionStatsModal({ session, onClose, onEndSession }: Pr
                         <div className="ssm-qp-name">
                           {p.payment_mode?.name ?? `#${p.payment_mode_id}`}
                         </div>
-                        <div className="ssm-qp-amount" style={{ direction: 'ltr' }}>
+                        <div className="ssm-qp-amount ltr">
                           {formatDZD(p.amount)}
                         </div>
                         <div className="ssm-qp-count">{p.count} عملية</div>
@@ -219,7 +219,7 @@ export default function SessionStatsModal({ session, onClose, onEndSession }: Pr
               {/* إجمالي بارز */}
               <div className="ssm-pay-total-banner">
                 <div className="ssm-ptb-label">إجمالي المحصَّل (نقد + بطاقات + تحويل)</div>
-                <div className="ssm-ptb-amount" style={{ direction: 'ltr' }}>
+                <div className="ssm-ptb-amount ltr">
                   {formatDZD(totalCollected)}
                 </div>
                 {(session.credit_total ?? 0) > 0 && (
@@ -267,8 +267,8 @@ export default function SessionStatsModal({ session, onClose, onEndSession }: Pr
                             </div>
                           </div>
                           <div
-                            className="ssm-pay-card-amount"
-                            style={{ color: colors[0], direction: 'ltr' }}
+                            className="ssm-pay-card-amount ltr"
+                            style={{ color: colors[0] }}
                           >
                             {formatDZD(p.amount)}
                           </div>
@@ -300,9 +300,9 @@ export default function SessionStatsModal({ session, onClose, onEndSession }: Pr
                   <div className="ssm-prod-header-row">
                     <span>#</span>
                     <span>المنتج</span>
-                    <span style={{ textAlign: 'center' }}>الكمية</span>
-                    <span style={{ textAlign: 'left' }}>الإجمالي</span>
-                    <span style={{ textAlign: 'left', minWidth: 80 }}>النسبة</span>
+                    <span className="text-center">الكمية</span>
+                    <span className="text-left">الإجمالي</span>
+                    <span className="text-left" style={{ minWidth: 80 }}>النسبة</span>
                   </div>
                   {topProducts.map((p, i) => {
                     const barW = (p.total_ttc / maxProdTtc) * 100;
@@ -321,7 +321,7 @@ export default function SessionStatsModal({ session, onClose, onEndSession }: Pr
                         <div className="ssm-prod-qty">
                           <span>×{p.quantity_sold % 1 === 0 ? p.quantity_sold : p.quantity_sold.toFixed(2)}</span>
                         </div>
-                        <div className="ssm-prod-ttc" style={{ direction: 'ltr' }}>
+                        <div className="ssm-prod-ttc ltr">
                           {formatDZD(p.total_ttc)}
                         </div>
                         <div className="ssm-prod-pct">
@@ -349,7 +349,7 @@ export default function SessionStatsModal({ session, onClose, onEndSession }: Pr
               <i className="ti ti-door-exit" /> إغلاق الجلسة
             </button>
           )}
-          <div style={{ flex: 1 }} />
+          <div className="flex-1" />
           <button
             type="button"
             className="ssm-btn-print"

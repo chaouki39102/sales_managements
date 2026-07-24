@@ -254,6 +254,14 @@ function POSPage() {
   const [selectedPriceLevelId, setSelectedPriceLevelId] = useState<number | null>(null);
   const [selectedCartItemId, setSelectedCartItemId] = useState<string | null>(null);
 
+  // ── Initialize price level from DB setting (default_price_level_id) ──
+  useEffect(() => {
+    const dbVal = posLookups?.settings?.default_price_level_id;
+    if (dbVal != null && dbVal !== '' && dbVal !== 0) {
+      setSelectedPriceLevelId(Number(dbVal));
+    }
+  }, [posLookups?.settings?.default_price_level_id]);
+
   const [receiptSnapshot, setReceiptSnapshot] = useState<POSSaleSnapshot | null>(null);
   const receiptSnapshotRef = useRef<POSSaleSnapshot | null>(null);
   const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
@@ -488,6 +496,16 @@ function POSPage() {
     queryClient.invalidateQueries({ queryKey: tenantKeys.lookups.posAggregated(slug ?? '') });
   }, [slug, queryClient]);
 
+  const saveDefaultPriceLevel = useCallback(async (id: number | null) => {
+    await settingsApi.update({ default_price_level_id: id });
+    queryClient.invalidateQueries({ queryKey: tenantKeys.lookups.posAggregated(slug ?? '') });
+  }, [slug, queryClient]);
+
+  const dbDefaultPriceLevelId = (() => {
+    const v = posLookups?.settings?.default_price_level_id;
+    return v != null && v !== '' && v !== 0 ? Number(v) : null;
+  })();
+
   // ── Stock (حسب التصنيف فقط — بدون نص البحث، لنفس سبب استعلام المنتجات) ──
   const { data: stockData = {}, isLoading: stockLoading } = useQuery<Record<number, number>>({
     queryKey: [slug, 'pos-stock', effectiveWarehouseId, fiscalYear?.id, { family_id: queryFamilyId }],
@@ -681,10 +699,11 @@ function POSPage() {
         const v    = line.product_variant;
         const prod = line.product;
         const pkg  = (line as any).packaging ?? null;
+        const pkgSnap = (line as any).packaging_units_snapshot;
         return {
           id:                  nanoid(8),
           product_id:          line.product_id ?? prod?.id ?? 0,
-          variant_id:          line.product_variant_id ?? 0,
+          variant_id:          line.product_id ?? prod?.id ?? 0,
           product_name:        line.description ?? v?.product?.name ?? prod?.name ?? '',
           variant_name:        v?.variant_name ?? null,
           ref:                 v?.ref ?? prod?.ref ?? '',
@@ -703,8 +722,9 @@ function POSPage() {
           max_stock:           null,
           manages_stock:       false,
           packaging_id:        line.packaging_id ?? null,
-          pack_qty:            pkg ? Number(pkg.quantity) : 1,
+          pack_qty:            pkg ? Number(pkg.quantity) : (pkgSnap ? Number(pkgSnap) : 1),
           packaging_label:     pkg?.label ?? null,
+          base_price_ht:       Number(line.unit_price_ht) / ((pkg ? Number(pkg.quantity) : (pkgSnap ? Number(pkgSnap) : 1)) || 1),
         };
       });
       const payments = (doc.payments ?? []).map(p => ({
@@ -1534,6 +1554,7 @@ const handleCompleteSale = useCallback(async (params: {
             onHighlightIndexChange={setHighlightedIndex}
             onPin={toggleQuickItem} isPinned={isQuickItem}
             priceLevels={priceLevelsList} selectedPriceLevelId={selectedPriceLevelId}
+            defaultPriceLevelId={dbDefaultPriceLevelId}
             cartItems={pos.items} allowNegativeStock={allowNegSetting}
             showStock={settings.showStockOnCard}
             priceDisplayMode={settings.priceDisplayMode}
@@ -1559,7 +1580,7 @@ const handleCompleteSale = useCallback(async (params: {
           packagingsMap={packagingsMap}
           onSetClient={pos.setClient}
           onNoteChange={setCartNote} onHold={() => { clearEditingState(); pos.holdCart(); }}
-          onSell={() => setModal('payment')} onClear={handleClearCart} onHeld={() => setModal('held')}
+          onSell={() => setModal('payment')} onQuickSell={handleQuickCash} onClear={handleClearCart} onHeld={() => setModal('held')}
           totalTtcFinal={adjustedTotalTtcFinal}
           remainingToPay={remainingToPay}
           invoiceDiscountPct={pos.invoiceDiscountPct}
@@ -1729,10 +1750,13 @@ const handleCompleteSale = useCallback(async (params: {
             warehouses={warehouses ?? []}
             documentTypes={documentTypes ?? []}
             paymentModes={paymentModes ?? []}
+            priceLevels={priceLevelsList}
             systemFiscalStampEnabled={systemFiscalStampEnabled}
             onToggleFiscalStamp={toggleFiscalStamp}
             systemAllowNegativeStock={allowNegSetting}
             onToggleAllowNegative={toggleAllowNegative}
+            defaultPriceLevelId={dbDefaultPriceLevelId}
+            onSaveDefaultPriceLevel={saveDefaultPriceLevel}
           />
         </Suspense>
       )}

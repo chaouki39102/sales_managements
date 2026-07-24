@@ -101,52 +101,6 @@ const Drawer: React.FC<DrawerProps> = ({
         {footer && <div className="drawer__footer">{footer}</div>}
       </div>
 
-      <style>{`
-        .drawer-overlay {
-          position: fixed; inset: 0; z-index: 1040;
-          background: rgba(0,0,0,0.4);
-          opacity: 0; pointer-events: none;
-          transition: opacity 0.25s;
-        }
-        .drawer-overlay.open { opacity: 1; pointer-events: auto; }
-
-        .drawer {
-          position: fixed; top: 0; bottom: 0; z-index: 1050;
-          width: min(var(--drawer-width), 100vw);
-          background: var(--color-background-primary);
-          border-inline-start: 1px solid var(--color-border-tertiary);
-          display: flex; flex-direction: column;
-          transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
-          box-shadow: -4px 0 24px rgba(0,0,0,0.08);
-        }
-        .drawer--right { right: 0; transform: translateX(100%); }
-        .drawer--left  { left:  0; transform: translateX(-100%); }
-        .drawer--right.open,
-        .drawer--left.open  { transform: translateX(0); }
-
-        .drawer__header {
-          display: flex; align-items: flex-start; justify-content: space-between;
-          gap: 12px; padding: 20px 20px 16px;
-          border-bottom: 1px solid var(--color-border-tertiary);
-          flex-shrink: 0;
-        }
-        .drawer__header-text { display: flex; flex-direction: column; gap: 2px; }
-        .drawer__title { margin: 0; font-size: 16px; font-weight: 500; color: var(--color-text-primary); }
-        .drawer__description { margin: 0; font-size: 13px; color: var(--color-text-secondary); }
-        .drawer__close {
-          flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-          width: 32px; height: 32px; border: none; background: transparent;
-          border-radius: 6px; cursor: pointer; color: var(--color-text-secondary);
-          transition: background 0.15s, color 0.15s;
-        }
-        .drawer__close:hover { background: var(--color-background-secondary); color: var(--color-text-primary); }
-        .drawer__body { flex: 1; overflow-y: auto; padding: 20px; }
-        .drawer__footer {
-          padding: 16px 20px;
-          border-top: 1px solid var(--color-border-tertiary);
-          flex-shrink: 0;
-        }
-      `}</style>
     </>,
     document.body
   );

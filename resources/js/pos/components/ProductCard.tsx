@@ -14,6 +14,7 @@ interface ProductCardProps {
   allowNegativeStock?:   boolean;
   showStock?:            boolean;
   priceDisplayMode?:     'ttc' | 'ht';
+  defaultPriceLevelId?:  number | null;
   onAdd:                 (v: ProductVariant, qty?: number, packaging?: ProductPackaging | null) => void;
   onPin:                 (v: ProductVariant) => void;
   onHighlight?:          (idx: number) => void;
@@ -54,6 +55,7 @@ function ProductCardInner({
   allowNegativeStock,
   showStock = true,
   priceDisplayMode = 'ttc',
+  defaultPriceLevelId = null,
   onAdd,
   onPin,
   onHighlight,
@@ -72,13 +74,19 @@ function ProductCardInner({
 
   const bestDiscount = useMemo(() => {
     const d = v.quantity_discounts?.filter(d => d.active !== false)
-      .sort((a, b) => (b.discount_percentage ?? 0) - (a.discount_percentage ?? 0))[0];
-    return d && (d.discount_percentage ?? 0) > 0 ? d : null;
+      .sort((a, b) => {
+        const aPct = a.discount_percentage ?? (a.discount_amount && a.discount_amount > 0 ? 1 : 0);
+        const bPct = b.discount_percentage ?? (b.discount_amount && b.discount_amount > 0 ? 1 : 0);
+        return bPct - aPct;
+      })[0];
+    if (!d) return null;
+    const hasPct = (d.discount_percentage ?? 0) > 0;
+    const hasAmt = (d.discount_amount ?? 0) > 0;
+    return (hasPct || hasAmt) ? d : null;
   }, [v.quantity_discounts]);
 
-  const isWholesalePrice = selectedPriceLevelId !== null &&
-    priceLevels.length > 0 &&
-    selectedPriceLevelId !== priceLevels[0]?.id;
+  const isWholesalePrice = selectedPriceLevelId != null &&
+    selectedPriceLevelId !== (defaultPriceLevelId ?? priceLevels[0]?.id ?? null);
 
   const style = familyStyleFromName(v.product?.family?.name ?? '');
   const imageUrl = v.image_url;
@@ -224,7 +232,13 @@ function ProductCardInner({
 
         <div className="pcard-family-bar" style={{ background: style.color }} />
 
-        {bestDiscount && <span className="pcard-discount-badge">-{bestDiscount.discount_percentage}%</span>}
+        {bestDiscount && <span className="pcard-discount-badge">
+          {bestDiscount.discount_percentage != null && bestDiscount.discount_percentage > 0
+            ? `-${bestDiscount.discount_percentage}%`
+            : bestDiscount.discount_amount != null && bestDiscount.discount_amount > 0
+              ? `-${formatDZD(bestDiscount.discount_amount)}`
+              : null}
+        </span>}
         {isWholesalePrice && <span className="pcard-price-level-badge">جملة</span>}
         {inCart && <span className="pcard-in-cart" key={qtyInCart}>{qtyInCart}</span>}
         {outStock && <span className="pcard-out-badge">نفذ</span>}
@@ -317,7 +331,13 @@ function ProductCardInner({
           <div className="pcard-info-row"><span className="pcard-info-label">المراجع:</span> {v.ref}</div>
           {v.barcode && <div className="pcard-info-row"><span className="pcard-info-label">الباركود:</span> {v.barcode}</div>}
           {v.product?.family?.name && <div className="pcard-info-row"><span className="pcard-info-label">العائلة:</span> {v.product.family.name}</div>}
-          {bestDiscount && <div className="pcard-info-row"><span className="pcard-info-label">الخصم:</span> <span style={{color:'var(--red)'}}>{bestDiscount.discount_percentage}%</span></div>}
+          {bestDiscount && <div className="pcard-info-row"><span className="pcard-info-label">الخصم:</span> <span style={{color:'var(--red)'}}>
+            {bestDiscount.discount_percentage != null && bestDiscount.discount_percentage > 0
+              ? `${bestDiscount.discount_percentage}%`
+              : bestDiscount.discount_amount != null && bestDiscount.discount_amount > 0
+                ? `${formatDZD(bestDiscount.discount_amount)}/وحدة`
+                : ''}
+          </span></div>}
           {v.product?.description && <div className="pcard-info-row pcard-info-desc">{v.product.description}</div>}
         </div>
       )}

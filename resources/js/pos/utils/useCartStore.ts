@@ -37,16 +37,24 @@ interface CartState {
   markClean:            () => void;
 }
 
-function findQuantityDiscount(discounts: QuantityDiscount[] | undefined, qty: number): number {
+function findQuantityDiscount(discounts: QuantityDiscount[] | undefined, qty: number, unitPriceHt: number): number {
   if (!discounts?.length) return 0;
   const sorted = [...discounts]
     .filter(d => d.active)
     .sort((a, b) => b.tier_order - a.tier_order);
   const match = sorted.find(d =>
-    qty >= d.min_quantity &&
-    (d.max_quantity === null || d.max_quantity === undefined || qty <= d.max_quantity)
+    qty >= d.min_qty &&
+    (d.max_qty === null || d.max_qty === undefined || qty <= d.max_qty)
   );
-  return match ? Math.min(100, Math.max(0, match.discount_percentage ?? 0)) : 0;
+  if (!match) return 0;
+  // discount_percentage takes precedence; otherwise compute from discount_amount
+  if (match.discount_percentage != null && match.discount_percentage > 0) {
+    return Math.min(100, match.discount_percentage);
+  }
+  if (match.discount_amount != null && match.discount_amount > 0 && unitPriceHt > 0) {
+    return Math.min(100, (match.discount_amount / unitPriceHt) * 100);
+  }
+  return 0;
 }
 
 function recalcItem(item: CartItem): CartItem {
@@ -102,7 +110,7 @@ export const useCartStore = create<CartState>()(
           );
           if (existing) {
             const newQty   = existing.quantity + qty;
-            const autoDisc = findQuantityDiscount(variant.quantity_discounts, newQty);
+            const autoDisc = findQuantityDiscount(variant.quantity_discounts, newQty, existing.base_price_ht ?? existing.unit_price_ht);
             const updated  = recalcItem({
               ...existing,
               quantity:            newQty,
@@ -119,7 +127,7 @@ export const useCartStore = create<CartState>()(
           const priceHt  = variant.default_selling_price_ht * packQty;
           const baseHt   = variant.default_selling_price_ht;
           const tvaRate  = variant.tva?.rate ?? 0;
-          const autoDisc = findQuantityDiscount(variant.quantity_discounts, qty);
+          const autoDisc = findQuantityDiscount(variant.quantity_discounts, qty, variant.default_selling_price_ht ?? 0);
 
           const newItem: CartItem = recalcItem({
             id:                  nanoid(8),

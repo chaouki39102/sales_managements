@@ -19,9 +19,9 @@ import type { BackendMeta } from '@/hooks/usePagination';
 // ─── ثوابت ───────────────────────────────────────────────────────────────────
 
 const STATUS = {
-  out: { label: 'نافد',   color: '#ef4444', bg: 'rgba(239,68,68,.12)'  },
-  low: { label: 'منخفض', color: '#f59e0b', bg: 'rgba(245,158,11,.12)' },
-  ok:  { label: 'جيد',   color: '#10b981', bg: 'rgba(16,185,129,.12)' },
+  out: { label: 'نافد',   color: 'var(--red)',  bg: 'var(--redb)'  },
+  low: { label: 'منخفض', color: 'var(--gold)',  bg: 'var(--goldb)' },
+  ok:  { label: 'جيد',   color: 'var(--green)', bg: 'var(--greenb)' },
 } as const;
 
 type StatusKey = keyof typeof STATUS;
@@ -29,9 +29,9 @@ type Filter    = 'all' | StatusKey;
 
 const KPI_DEFS: { key: Filter; label: string; icon: string; color: string }[] = [
   { key: 'all', label: 'إجمالي المنتجات', icon: 'ti-cube',           color: 'var(--em)' },
-  { key: 'out', label: 'نافد المخزون',    icon: 'ti-alert-circle',   color: '#ef4444'   },
-  { key: 'low', label: 'مخزون منخفض',    icon: 'ti-alert-triangle', color: '#f59e0b'   },
-  { key: 'ok',  label: 'مخزون جيد',      icon: 'ti-circle-check',   color: '#10b981'   },
+  { key: 'out', label: 'نافد المخزون',    icon: 'ti-alert-circle',   color: 'var(--red)'  },
+  { key: 'low', label: 'مخزون منخفض',    icon: 'ti-alert-triangle', color: 'var(--gold)' },
+  { key: 'ok',  label: 'مخزون جيد',      icon: 'ti-circle-check',   color: 'var(--green)' },
 ];
 
 function stockStatus(row: StockAtRow): StatusKey {
@@ -98,23 +98,23 @@ function LotsSubRow({
                       <td style={{ padding: '5px 8px', textAlign: 'left' }}>{original}</td>
                       <td style={{ padding: '5px 8px', textAlign: 'left' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
-                          <span style={{ fontWeight: 700, color: depleted ? 'var(--t4)' : pct < 20 ? '#ef4444' : 'var(--t1)' }}>{remaining}</span>
+                          <span style={{ fontWeight: 700, color: depleted ? 'var(--t4)' : pct < 20 ? 'var(--red)' : 'var(--t1)' }}>{remaining}</span>
                           <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--bg4)', overflow: 'hidden' }}>
                             <div style={{
                               width: `${pct}%`, height: '100%',
-                              background: pct < 20 ? '#ef4444' : pct < 50 ? '#f59e0b' : '#10b981',
+                              background: pct < 20 ? 'var(--red)' : pct < 50 ? 'var(--gold)' : 'var(--green)',
                             }} />
                           </div>
                         </div>
                       </td>
-                      <td style={{ padding: '5px 8px', color: expired ? '#ef4444' : expiring ? '#f59e0b' : 'var(--t3)' }}>
+                      <td style={{ padding: '5px 8px', color: expired ? 'var(--red)' : expiring ? 'var(--gold)' : 'var(--t3)' }}>
                         {lt.expiration_date ? new Date(lt.expiration_date).toLocaleDateString('ar-DZ') : '\u2014'}
                       </td>
                       <td style={{ padding: '5px 8px' }}>
                         <span style={{
                           padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700,
-                          color:      depleted ? 'var(--t4)' : expired ? '#ef4444' : expiring ? '#f59e0b' : '#10b981',
-                          background: depleted ? 'var(--bg3)' : expired ? 'rgba(239,68,68,.12)' : expiring ? 'rgba(245,158,11,.12)' : 'rgba(16,185,129,.12)',
+                          color:      depleted ? 'var(--t4)' : expired ? 'var(--red)' : expiring ? 'var(--gold)' : 'var(--green)',
+                          background: depleted ? 'var(--bg3)' : expired ? 'var(--redb)' : expiring ? 'var(--goldb)' : 'var(--greenb)',
                         }}>
                           {depleted ? '\u0641\u0627\u0631\u063a\u0629' : expired ? '\u0645\u0646\u062a\u0647\u064a\u0629' : expiring ? '\u062a\u0646\u062a\u0647\u064a' : '\u0646\u0634\u0637\u0629'}
                         </span>
@@ -445,14 +445,14 @@ export default function StockTab() {
 
                     {/* المدخلات */}
                     <td style={{ padding: '10px 12px' }}>
-                      <span style={{ color: '#10b981', fontWeight: 600 }}>
+                      <span style={{ color: 'var(--green)', fontWeight: 600 }}>
                         +{fmt(row.total_in, 3)}
                       </span>
                     </td>
 
                     {/* المخرجات */}
                     <td style={{ padding: '10px 12px' }}>
-                      <span style={{ color: '#ef4444', fontWeight: 600 }}>
+                      <span style={{ color: 'var(--red)', fontWeight: 600 }}>
                         -{fmt(row.total_out, 3)}
                       </span>
                     </td>
@@ -461,8 +461,8 @@ export default function StockTab() {
                     <td style={{ padding: '10px 12px' }}>
                       <span style={{
                         fontWeight: 700, fontSize: 14,
-                        color: st === 'out' ? '#ef4444'
-                             : st === 'low' ? '#f59e0b'
+                        color: st === 'out' ? 'var(--red)'
+                             : st === 'low' ? 'var(--gold)'
                              : 'var(--t1)',
                       }}>
                         {fmt(row.current_stock, 3)}
@@ -538,10 +538,10 @@ export default function StockTab() {
                 <td style={{ padding: '10px 12px', color: 'var(--t2)' }}>
                   {fmt(totals.opening, 3)}
                 </td>
-                <td style={{ padding: '10px 12px', color: '#10b981' }}>
+                <td style={{ padding: '10px 12px', color: 'var(--green)' }}>
                   +{fmt(totals.in, 3)}
                 </td>
-                <td style={{ padding: '10px 12px', color: '#ef4444' }}>
+                <td style={{ padding: '10px 12px', color: 'var(--red)' }}>
                   -{fmt(totals.out, 3)}
                 </td>
                 <td style={{ padding: '10px 12px', color: 'var(--t1)', fontSize: 14 }}>

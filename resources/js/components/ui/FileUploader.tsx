@@ -156,45 +156,6 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         </ul>
       )}
 
-      <style>{`
-        .fu-wrapper { display: flex; flex-direction: column; gap: 6px; }
-        .fu-label { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); }
-        .fu-input { display: none; }
-        .fu-zone {
-          border: 2px dashed var(--color-border-secondary);
-          border-radius: 10px; padding: 28px 20px;
-          cursor: pointer; transition: border-color .15s, background .15s;
-          text-align: center; outline: none;
-        }
-        .fu-zone:hover:not(.disabled), .fu-zone:focus:not(.disabled) { border-color: var(--color-text-info, #3b82f6); background: color-mix(in srgb, var(--color-text-info, #3b82f6) 4%, transparent); }
-        .fu-zone.dragging { border-color: var(--color-text-info, #3b82f6); background: color-mix(in srgb, var(--color-text-info, #3b82f6) 8%, transparent); }
-        .fu-zone.has-error { border-color: var(--color-text-danger, #ef4444); }
-        .fu-zone.disabled { opacity: .5; cursor: not-allowed; }
-        .fu-zone__content { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-        .fu-zone__icon { color: var(--color-text-tertiary); margin-bottom: 4px; }
-        .fu-zone__text { margin: 0; font-size: 14px; color: var(--color-text-secondary); }
-        .fu-zone__link { color: var(--color-text-info, #3b82f6); font-weight: 500; }
-        .fu-zone__hint { margin: 0; font-size: 12px; color: var(--color-text-tertiary); }
-        .fu-errors { display: flex; flex-direction: column; gap: 2px; }
-        .fu-error { margin: 0; font-size: 12px; color: var(--color-text-danger, #ef4444); }
-        .fu-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-        .fu-file {
-          display: flex; align-items: center; gap: 10px;
-          padding: 8px 12px; border-radius: 8px;
-          background: var(--color-background-secondary);
-          border: 1px solid var(--color-border-tertiary);
-        }
-        .fu-file__icon { color: var(--color-text-secondary); flex-shrink: 0; }
-        .fu-file__info { flex: 1; overflow: hidden; }
-        .fu-file__name { display: block; font-size: 13px; color: var(--color-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .fu-file__size { font-size: 12px; color: var(--color-text-tertiary); }
-        .fu-file__remove {
-          flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-          width: 24px; height: 24px; border: none; background: none;
-          border-radius: 4px; cursor: pointer; color: var(--color-text-secondary);
-        }
-        .fu-file__remove:hover { background: var(--color-background-primary); color: var(--color-text-danger, #ef4444); }
-      `}</style>
     </div>
   );
 };

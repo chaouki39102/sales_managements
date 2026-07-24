@@ -363,12 +363,6 @@ export default function SetupHub({ companySlug, onFinish }: Props) {
   // ════════════════════════════════════════════════
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg0)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '28px 16px', direction: 'rtl' }}>
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-        @keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:none} }
-      `}</style>
-
       <div style={{ width: '100%', maxWidth: 860, animation: 'slideUp .3s ease' }}>
 
         {/* ── Header ── */}

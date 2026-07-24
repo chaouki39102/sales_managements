@@ -122,12 +122,9 @@ const AdminReportsPage   = lazy(() => import('@/pages/admin/AdminReportsPage'));
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function PageLoader() {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '100vh', background: 'var(--bg0)',
-    }}>
-      <span className="ic ic-xl" style={{ color: 'var(--em)' }}>
-        <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
+    <div className="page-loader">
+      <span className="ic ic-xl text-em">
+        <i className="ti ti-loader animate-spin" />
       </span>
     </div>
   );

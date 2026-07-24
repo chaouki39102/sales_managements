@@ -120,13 +120,13 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: bo
           </div>
           <span style={{
             fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-            background: user.active ? '#10b98120' : '#ef444420',
-            color: user.active ? '#10b981' : '#ef4444',
+            background: user.active ? 'var(--greenb)' : 'var(--redb)',
+            color: user.active ? 'var(--green)' : 'var(--red)',
           }}>{user.active ? 'نشط' : 'معطل'}</span>
           <span style={{
             fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-            background: user.is_approved ? '#10b98120' : '#f59e0b20',
-            color: user.is_approved ? '#10b981' : '#f59e0b',
+            background: user.is_approved ? 'var(--greenb)' : 'var(--goldb)',
+            color: user.is_approved ? 'var(--green)' : 'var(--gold)',
           }}>{user.is_approved ? 'مفعّل' : 'بانتظار التفعيل'}</span>
           <button onClick={() => onClose()} style={{
             background: 'none', border: 'none', cursor: 'pointer',
@@ -140,8 +140,8 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: bo
         {flash && (
           <div style={{
             padding: '9px 20px', fontSize: 12, fontWeight: 700, flexShrink: 0,
-            background: flash.ok ? '#10b98115' : '#ef444415',
-            color: flash.ok ? '#10b981' : '#ef4444',
+            background: flash.ok ? 'var(--greenb)' : 'var(--redb)',
+            color: flash.ok ? 'var(--green)' : 'var(--red)',
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
             <i className={`ti ${flash.ok ? 'ti-check' : 'ti-alert-circle'}`} />{flash.msg}
@@ -156,8 +156,8 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: bo
           {TABS.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)} style={{
               padding: '9px 12px', border: 'none', background: 'none',
-              borderBottom: tab === t.key ? '2px solid #dc2626' : '2px solid transparent',
-              color: tab === t.key ? '#dc2626' : 'var(--t3)',
+              borderBottom: tab === t.key ? '2px solid var(--red)' : '2px solid transparent',
+              color: tab === t.key ? 'var(--red)' : 'var(--t3)',
               fontWeight: tab === t.key ? 700 : 500, fontSize: 11.5,
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
               whiteSpace: 'nowrap', fontFamily: "'Tajawal',sans-serif",
@@ -227,8 +227,8 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: bo
                       </div>
                       <span style={{
                         fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
-                        background: co.active ? '#10b98120' : '#ef444420',
-                        color: co.active ? '#10b981' : '#ef4444',
+                        background: co.active ? 'var(--greenb)' : 'var(--redb)',
+                        color: co.active ? 'var(--green)' : 'var(--red)',
                       }}>{co.active ? 'نشطة' : 'معطلة'}</span>
                     </div>
                   ))}
@@ -242,8 +242,8 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: bo
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{
                 padding: '10px 14px', borderRadius: 9,
-                background: '#f59e0b15', border: '1px solid #f59e0b30',
-                fontSize: 12, color: '#f59e0b', fontWeight: 600,
+                  background: 'var(--goldb)', border: '1px solid #f59e0b30',
+                  fontSize: 12, color: 'var(--gold)', fontWeight: 600,
               }}>
                 <i className="ti ti-alert-triangle" style={{ marginLeft: 6 }} />
                 ستنتهي جميع جلسات المستخدم الحالية فور تغيير كلمة المرور
@@ -267,7 +267,7 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: bo
                 onClick={handleResetPwd}
                 style={{
                   padding: '11px 18px', borderRadius: 9, border: 'none',
-                  background: pwd ? '#f59e0b' : '#6b7280', color: '#fff',
+                  background: pwd ? 'var(--gold)' : '#6b7280', color: '#fff',
                   fontSize: 13, fontWeight: 700, cursor: pwd ? 'pointer' : 'not-allowed',
                   fontFamily: 'Tajawal,sans-serif', display: 'flex',
                   alignItems: 'center', gap: 6, justifyContent: 'center',
@@ -318,23 +318,23 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: bo
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: '12px 14px', borderRadius: 10,
-                  border: `1px solid ${user.active ? '#ef444425' : '#10b98125'}`,
-                  background: user.active ? '#ef444408' : '#10b98108',
+                  border: `1px solid ${user.active ? 'var(--redb)' : 'var(--greenb)'}`,
+                  background: user.active ? 'var(--redb)' : 'var(--greenb)',
                   cursor: 'pointer', textAlign: 'right', width: '100%',
                   fontFamily: 'Tajawal,sans-serif',
                 }}>
                 <div style={{
                   width: 36, height: 36, borderRadius: 9, flexShrink: 0,
-                  background: user.active ? '#ef444420' : '#10b98120',
+                  background: user.active ? 'var(--redb)' : 'var(--greenb)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: user.active ? '#ef4444' : '#10b981', fontSize: 17,
+                  color: user.active ? 'var(--red)' : 'var(--green)', fontSize: 17,
                 }}>
                   {busy === 'toggle'
                     ? <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} />
                     : <i className={`ti ${user.active ? 'ti-user-off' : 'ti-user-check'}`} />}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: user.active ? '#ef4444' : '#10b981' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: user.active ? 'var(--red)' : 'var(--green)' }}>
                     {user.active ? 'تعطيل المستخدم' : 'تفعيل المستخدم'}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--t4)' }}>
@@ -352,23 +352,23 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: bo
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: '12px 14px', borderRadius: 10,
-                  border: `1px solid ${user.is_approved ? '#f59e0b25' : '#10b98125'}`,
-                  background: user.is_approved ? '#f59e0b08' : '#10b98108',
+                  border: `1px solid ${user.is_approved ? 'var(--goldb)' : 'var(--greenb)'}`,
+                  background: user.is_approved ? 'var(--goldb)' : 'var(--greenb)',
                   cursor: 'pointer', textAlign: 'right', width: '100%',
                   fontFamily: 'Tajawal,sans-serif',
                 }}>
                 <div style={{
                   width: 36, height: 36, borderRadius: 9, flexShrink: 0,
-                  background: user.is_approved ? '#f59e0b20' : '#10b98120',
+                  background: user.is_approved ? 'var(--goldb)' : 'var(--greenb)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: user.is_approved ? '#f59e0b' : '#10b981', fontSize: 17,
+                  color: user.is_approved ? 'var(--gold)' : 'var(--green)', fontSize: 17,
                 }}>
                   {busy === 'approval'
                     ? <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} />
                     : <i className={`ti ${user.is_approved ? 'ti-user-off' : 'ti-user-check'}`} />}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: user.is_approved ? '#f59e0b' : '#10b981' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: user.is_approved ? 'var(--gold)' : 'var(--green)' }}>
                     {user.is_approved ? 'إلغاء تفعيل الحساب' : 'تفعيل الحساب'}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--t4)' }}>
@@ -383,9 +383,9 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: bo
                   onClick={() => setShowConfirm(true)}
                   style={{
                     padding: '12px 14px', borderRadius: 10,
-                    border: '1px solid #ef444425', background: '#ef444408',
+                    border: '1px solid var(--redb)', background: 'var(--redb)',
                     cursor: 'pointer', fontSize: 13, fontWeight: 700,
-                    color: '#ef4444', fontFamily: 'Tajawal,sans-serif',
+                    color: 'var(--red)', fontFamily: 'Tajawal,sans-serif',
                     display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center',
                   }}>
                   <i className="ti ti-trash" /> حذف المستخدم نهائياً
@@ -393,9 +393,9 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: bo
               ) : (
                 <div style={{
                   padding: '14px 16px', borderRadius: 10,
-                  border: '1px solid #ef444430', background: '#ef444410',
+                  border: '1px solid var(--redb)', background: 'var(--redb)',
                 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#ef4444', marginBottom: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--red)', marginBottom: 8 }}>
                     هل أنت متأكد من حذف &ldquo;{user.name}&rdquo;؟
                   </div>
                   <div style={{ fontSize: 11.5, color: 'var(--t3)', marginBottom: 12 }}>
@@ -412,7 +412,7 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: bo
                       onClick={() => run('delete', () => adminApi.deleteUser(user.id), 'تم حذف المستخدم')}
                       style={{
                         flex: 1, padding: '8px', borderRadius: 8, border: 'none',
-                        background: '#ef4444', color: '#fff', fontSize: 12, fontWeight: 700,
+                        background: 'var(--red)', color: '#fff', fontSize: 12, fontWeight: 700,
                         cursor: 'pointer', fontFamily: 'Tajawal,sans-serif',
                       }}>
                       {busy === 'delete' ? 'جاري الحذف...' : 'حذف نهائياً'}
@@ -424,10 +424,7 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: bo
           )}
         </div>
       </div>
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg) } }
-        @keyframes slideInRight { from { transform: translateX(100%) } to { transform: translateX(0) } }
-      `}</style>
+
     </div>
   );
 }
@@ -567,8 +564,8 @@ export default function AdminUsersPage() {
                     <td style={{ padding: '11px 14px' }}>
                       <span style={{
                         fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20,
-                        background: u.role === 'super_admin' ? '#dc262620' : '#6366f115',
-                        color: u.role === 'super_admin' ? '#dc2626' : '#6366f1',
+                        background: u.role === 'super_admin' ? 'var(--redb)' : 'var(--purb)',
+                        color: u.role === 'super_admin' ? 'var(--red)' : 'var(--purple)',
                       }}>{u.role ?? 'user'}</span>
                     </td>
                     <td style={{ padding: '11px 14px', fontSize: 13, color: 'var(--t2)' }}>
@@ -577,15 +574,15 @@ export default function AdminUsersPage() {
                     <td style={{ padding: '11px 14px' }}>
                       <span style={{
                         fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20,
-                        background: u.active ? '#10b98120' : '#6b728020',
-                        color: u.active ? '#10b981' : '#6b7280',
+                        background: u.active ? 'var(--greenb)' : 'var(--b2)',
+                        color: u.active ? 'var(--green)' : 'var(--t3)',
                       }}>{u.active ? 'نشط' : 'معطل'}</span>
                     </td>
                     <td style={{ padding: '11px 14px' }}>
                       <span style={{
                         fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20,
-                        background: u.is_approved ? '#10b98120' : '#f59e0b20',
-                        color: u.is_approved ? '#10b981' : '#f59e0b',
+                        background: u.is_approved ? 'var(--greenb)' : 'var(--goldb)',
+                        color: u.is_approved ? 'var(--green)' : 'var(--gold)',
                       }}>{u.is_approved ? 'مفعّل' : 'بانتظار'}</span>
                     </td>
                     <td style={{ padding: '11px 14px', fontSize: 12, color: 'var(--t4)', whiteSpace: 'nowrap' }}>
@@ -639,7 +636,7 @@ export default function AdminUsersPage() {
         />
       )}
 
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+
     </div>
   );
 }

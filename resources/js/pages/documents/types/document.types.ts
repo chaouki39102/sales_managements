@@ -87,7 +87,7 @@ export interface Product {
   unit?:                      { id: number; symbol: string; name: string } | null;
   packagings?:                Packaging[];
   prices?:                    ProductPrice[];
-  quantityDiscounts?:         QuantityDiscount[];
+  quantity_discounts?:       QuantityDiscount[];
   lots?:                      ProductLot[];
   manages_stock?:             boolean;
   manages_quantity_discounts?: boolean;

@@ -30,6 +30,7 @@ class CommercialDocumentLineResource extends JsonResource
             'total_additional_cost'    => $this->total_additional_cost,
             'total_discount_amount'    => $this->total_discount_amount,
             'packaging_id'             => $this->packaging_id,
+            'packaging_units_snapshot' => $this->packaging_units_snapshot,
             'stock_lot_id'             => $this->stock_lot_id,
             'is_auto_split'            => $this->is_auto_split,
             'parent_line_id'           => $this->parent_line_id,

@@ -107,22 +107,21 @@ export default function ReturnsModal({
       <div className="modal modal-md" onClick={e => e.stopPropagation()}>
         <div className="m-hd">
           <div className="m-title">
-            <i className="ti ti-receipt-refund" style={{ marginLeft: 6 }} />
+            <i className="ti ti-receipt-refund ml-2" />
             مرتجع مبيعات
           </div>
           <div className="m-x" onClick={onClose}><i className="ti ti-x" /></div>
         </div>
-        <div className="m-body" style={{ maxHeight: '70vh', overflow: 'auto' }}>
+        <div className="m-body si-modal-body">
           <div className="ret-search">
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            <div className="flex gap-8 mb-4">
               <input
                 type="text"
-                className="inp"
+                className="inp flex-1"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
                 placeholder="رقم الفاتورة..."
-                style={{ flex: 1 }}
               />
               <button className="btn btn-p" onClick={handleSearch} disabled={searching}>
                 {searching ? '...' : 'بحث'}
@@ -134,7 +133,7 @@ export default function ReturnsModal({
             <div className="ret-doc">
               <div className="ret-doc-hd">
                 <strong>الفاتورة: {doc.document_number}</strong>
-                <span style={{ color: 'var(--t4)', fontSize: 12 }}>
+                <span className="ret-doc-meta">
                   {doc.party?.name} — {formatDZD(doc.total_ttc)}
                 </span>
               </div>
@@ -158,14 +157,13 @@ export default function ReturnsModal({
                           <span>كمية الإرجاع:</span>
                           <input
                             type="number"
-                            className="inp"
+                            className="inp ret-inp-w"
                             value={sel.qty}
                             min={1}
                             max={line.quantity}
                             onChange={e => updateReturnQty(line.id, parseInt(e.target.value) || 0)}
-                            style={{ width: 80 }}
                           />
-                          <span style={{ fontSize: 11, color: 'var(--t4)' }}>/ {line.quantity}</span>
+                          <span className="text-sm text-t4">/ {line.quantity}</span>
                         </div>
                       )}
                     </div>

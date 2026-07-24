@@ -350,11 +350,13 @@ export interface ProductVariantPrice extends BaseModel {
 }
 
 export interface QuantityDiscount extends BaseModel {
-  product_variant_id:  number;
-  min_quantity:        number;
-  max_quantity?:       number | null;
+  product_id:          number;
+  price_level_id:      number;
+  min_qty:             number;
+  max_qty?:            number | null;
+  discount_amount?:    number | null;
   discount_percentage?:number | null;
-  discount_per_unit?:  number | null;
+  is_blocked?:         boolean;
   tier_order:          number;
   active:              boolean;
 }
@@ -495,10 +497,12 @@ export interface CommercialDocumentLine extends BaseModel {
   total_ht:               number;
   total_tva:              number;
   total_ttc:              number;
+  packaging_units_snapshot?: number | null;
   line_order:             number;
   // Relations
   product?:         Product;
   product_variant?: ProductVariant;
+  packaging?:       ProductPackaging;
 }
 
 export interface CommercialDocument extends BaseModel {

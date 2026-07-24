@@ -240,12 +240,6 @@ export default function CompanyFormDrawer({ open, company, onClose, onSaved }: P
 
   return (
     <>
-      <style>{`
-        @keyframes drawerIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
-        @keyframes ovFade   { from{opacity:0} to{opacity:1} }
-        @keyframes spin     { to{transform:rotate(360deg)} }
-      `}</style>
-
       {/* Overlay */}
       <div
         style={{

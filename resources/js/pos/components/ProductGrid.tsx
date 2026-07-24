@@ -21,6 +21,7 @@ interface ProductGridProps {
   allowNegativeStock?: boolean | undefined;
   showStock?: boolean;
   priceDisplayMode?: 'ttc' | 'ht';
+  defaultPriceLevelId?: number | null;
   highlightedIndex?: number;
   onHighlightIndexChange?: (idx: number) => void;
   onQty?: (variantId: number, newQty: number) => void;
@@ -38,7 +39,7 @@ const GRID_GAP: Record<GridSize, number> = { xs: 6, sm: 8, md: 10, lg: 12 };
 export default function ProductGrid({
   variants, view, gridSize, loading, onAdd, onAddManual,
   onPin, isPinned, priceLevels, selectedPriceLevelId, cartItems, allowNegativeStock,
-  showStock = true, priceDisplayMode = 'ttc',
+  showStock = true, priceDisplayMode = 'ttc', defaultPriceLevelId = null,
   highlightedIndex, onHighlightIndexChange, onQty,
   searchQuery = '', scannedId,
 }: ProductGridProps) {
@@ -277,6 +278,7 @@ export default function ProductGrid({
                     isPinned={isPinned(item.variant.id)}
                     priceLevels={priceLevels}
                     selectedPriceLevelId={selectedPriceLevelId}
+                    defaultPriceLevelId={defaultPriceLevelId}
                     allowNegativeStock={allowNegativeStock}
                     showStock={showStock}
                     priceDisplayMode={priceDisplayMode}

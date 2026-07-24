@@ -210,14 +210,7 @@ export default function ManagerPinModal({
         </div>
       </div>
 
-      <style>{`
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          20%, 60%  { transform: translateX(-8px); }
-          40%, 80%  { transform: translateX(8px); }
-        }
-        .shake { animation: shake .4s ease; }
-      `}</style>
+
     </div>
   );
 }

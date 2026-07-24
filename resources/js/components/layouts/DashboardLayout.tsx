@@ -280,8 +280,9 @@ function NoFiscalYearModal({ onCreated }: { onCreated: () => void }) {
             )}
           </button>
         </div>
-      </div>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+            </div>
+
+
     </div>
   );
 }
@@ -414,8 +415,6 @@ function CompanySwitcher() {
           overflow: 'hidden', direction: 'rtl',
           animation: 'fadeInPop .15s ease',
         }}>
-          <style>{`@keyframes fadeInPop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}`}</style>
-
           {/* Header */}
           <div style={{ padding: '10px 13px', borderBottom: '1px solid var(--b1)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <i className="ti ti-building-community" style={{ color: 'var(--em)', fontSize: 13 }} />
@@ -567,8 +566,6 @@ const meta = useTopbarTitle();
 
   return (
     <>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-
       {/* ════════ SIDEBAR ════════ */}
       <nav id="sidebar" className={sidebarCollapsed ? 'collapsed' : ''}>
         <div className="sb-logo">

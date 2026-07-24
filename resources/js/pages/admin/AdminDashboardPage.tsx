@@ -34,7 +34,7 @@ export default function AdminDashboardPage() {
   );
 
   if (isError) return (
-    <div style={{ padding: 20, textAlign: 'center', color: '#ef4444' }}>
+    <div style={{ padding: 20, textAlign: 'center', color: 'var(--red)' }}>
       <i className="ti ti-alert-circle" style={{ fontSize: 32, display: 'block', marginBottom: 10 }} />
       فشل تحميل البيانات.{' '}
       <Button onClick={() => refetch()}>إعادة المحاولة</Button>
@@ -53,12 +53,12 @@ export default function AdminDashboardPage() {
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '10px 16px', borderRadius: 10,
-          background: '#f59e0b1a', border: '1px solid #f59e0b33', fontSize: 13, color: '#f59e0b',
+          background: 'var(--goldb)', border: '1px solid #f59e0b33', fontSize: 13, color: 'var(--gold)',
         }}>
           <span><i className="ti ti-alert-triangle" style={{ marginLeft: 8 }} />البيانات العالمية غير مكتملة</span>
           <button onClick={() => setBootDismissed(false)} style={{
             padding: '4px 12px', borderRadius: 7, border: '1px solid #f59e0b55',
-            background: '#f59e0b22', color: '#f59e0b', fontSize: 12, fontWeight: 700,
+            background: 'var(--goldb)', color: 'var(--gold)', fontSize: 12, fontWeight: 700,
             cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
           }}>إعداد النظام</button>
         </div>
@@ -96,8 +96,8 @@ export default function AdminDashboardPage() {
               return (
                 <div key={d.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                   <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end', height: 60 }}>
-                    <div style={{ width: 8, height: h1, background: '#10b981', borderRadius: 3 }} title={`${d.companies} شركة`} />
-                    <div style={{ width: 8, height: h2, background: '#6366f1', borderRadius: 3 }} title={`${d.users} مستخدم`} />
+                    <div style={{ width: 8, height: h1, background: 'var(--green)', borderRadius: 3 }} title={`${d.companies} شركة`} />
+                    <div style={{ width: 8, height: h2, background: 'var(--purple)', borderRadius: 3 }} title={`${d.users} مستخدم`} />
                   </div>
                   <span style={{ fontSize: 8, color: 'var(--t4)' }}>{new Date(d.date).toLocaleDateString('ar-DZ', { weekday: 'narrow' })}</span>
                 </div>
@@ -105,8 +105,8 @@ export default function AdminDashboardPage() {
             })}
           </div>
           <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--t4)' }}>
-            <span><span style={{ display: 'inline-block', width: 8, height: 8, background: '#10b981', borderRadius: 2, marginLeft: 4 }} />شركات</span>
-            <span><span style={{ display: 'inline-block', width: 8, height: 8, background: '#6366f1', borderRadius: 2, marginLeft: 4 }} />مستخدمون</span>
+            <span><span style={{ display: 'inline-block', width: 8, height: 8, background: 'var(--green)', borderRadius: 2, marginLeft: 4 }} />شركات</span>
+            <span><span style={{ display: 'inline-block', width: 8, height: 8, background: 'var(--purple)', borderRadius: 2, marginLeft: 4 }} />مستخدمون</span>
           </div>
         </Card>
 
@@ -152,8 +152,8 @@ export default function AdminDashboardPage() {
                 </div>
                 <div style={{
                   fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
-                  background: co.pct >= 90 ? '#ef444422' : '#f59e0b22',
-                  color: co.pct >= 90 ? '#ef4444' : '#f59e0b',
+                  background: co.pct >= 90 ? 'var(--redb)' : 'var(--goldb)',
+                  color: co.pct >= 90 ? 'var(--red)' : 'var(--gold)',
                 }}>{co.pct}%</div>
               </div>
             ))
@@ -245,7 +245,7 @@ export default function AdminDashboardPage() {
             {system_health.maintenance_mode && (
               <div style={{
                 gridColumn: '1 / -1', padding: '10px 14px', borderRadius: 10,
-                background: '#f59e0b1a', border: '1px solid #f59e0b33', fontSize: 12, color: '#f59e0b',
+                background: 'var(--goldb)', border: '1px solid #f59e0b33', fontSize: 12, color: 'var(--gold)',
                 display: 'flex', alignItems: 'center', gap: 8,
               }}>
                 <i className="ti ti-tool" /> الموقع في وضع الصيانة حالياً
@@ -270,7 +270,7 @@ export default function AdminDashboardPage() {
         </div>
       </Card>
 
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+
     </div>
   );
 }
@@ -278,11 +278,11 @@ export default function AdminDashboardPage() {
 function HealthItem({ icon, label, value, warn, danger }: {
   icon: string; label: string; value: string | number; warn?: boolean; danger?: boolean;
 }) {
-  const color = danger ? '#ef4444' : warn ? '#f59e0b' : 'var(--t4)';
+  const color = danger ? 'var(--red)' : warn ? 'var(--gold)' : 'var(--t4)';
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-      borderRadius: 8, background: danger ? '#ef44440d' : warn ? '#f59e0b0d' : 'var(--bg3)',
+      borderRadius: 8, background: danger ? 'var(--redb)' : warn ? 'var(--goldb)' : 'var(--bg3)',
     }}>
       <i className={`ti ${icon}`} style={{ fontSize: 16, color }} />
       <div>
@@ -302,9 +302,9 @@ function QuickAction({ icon, label, to, highlight }: {
       onClick={() => navigate(to)}
       style={{
         display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px',
-        borderRadius: 10, border: highlight ? '1px solid #f59e0b44' : '1px solid var(--b2)',
-        background: highlight ? '#f59e0b10' : 'var(--bg3)',
-        color: highlight ? '#f59e0b' : 'var(--t2)',
+        borderRadius: 10,         border: highlight ? '1px solid var(--goldb)' : '1px solid var(--b2)',
+        background: highlight ? 'var(--goldb)' : 'var(--bg3)',
+        color: highlight ? 'var(--gold)' : 'var(--t2)',
         fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
         flex: '1 1 auto', minWidth: 140, justifyContent: 'center',
       }}

@@ -9,7 +9,7 @@ interface SwitchProps {
 
 export default function Switch({ checked, onChange, label }: SwitchProps) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div className="flex items-center gap-8">
       <div
         className={`sw ${checked ? 'on' : ''}`}
         onClick={() => onChange(!checked)}
@@ -18,7 +18,7 @@ export default function Switch({ checked, onChange, label }: SwitchProps) {
         tabIndex={0}
         onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') onChange(!checked); }}
       />
-      {label && <span style={{ fontSize: 13, color: 'var(--t2)' }}>{label}</span>}
+      {label && <span className="text-base text-t2">{label}</span>}
     </div>
   );
 }

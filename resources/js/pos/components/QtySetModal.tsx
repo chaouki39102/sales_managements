@@ -23,22 +23,15 @@ export default function QtySetModal({ item, onClose, onConfirm }: QtySetModalPro
     if (qty > 0) onConfirm(qty);
   };
 
-  const kbdStyle: React.CSSProperties = {
-    display: 'inline-block', padding: '1px 5px', borderRadius: 3,
-    background: 'var(--b2)', color: 'var(--t1)', fontSize: 10,
-    fontWeight: 600, fontFamily: 'monospace', lineHeight: '1.4',
-    border: '1px solid var(--b3)', margin: '0 1px',
-  };
-
   return (
     <div className="ov on" onClick={onClose}>
       <div className="modal modal-sm" onClick={e => e.stopPropagation()} onKeyDown={handleKey}>
         <div className="m-hd">
-          <div className="m-title"><i className="ti ti-edit" style={{ marginLeft: 6 }} /> تعديل الكمية</div>
+          <div className="m-title"><i className="ti ti-edit ml-2" /> تعديل الكمية</div>
           <div className="m-x" onClick={onClose}><i className="ti ti-x" /></div>
         </div>
         <div className="m-body">
-          <div style={{ marginBottom: 16, fontWeight: 600, fontSize: 15, color: 'var(--t1)' }}>
+          <div className="qsm-product">
             {item.product_name}
           </div>
           <div className="fg">
@@ -46,17 +39,16 @@ export default function QtySetModal({ item, onClose, onConfirm }: QtySetModalPro
             <input
               ref={inpRef}
               type="number"
-              className="form-control"
+              className="form-control qsm-inp"
               value={val}
               onChange={e => setVal(e.target.value)}
               min="0.001"
               step="1"
-              style={{ fontSize: 18, padding: '10px 12px', textAlign: 'center' }}
             />
           </div>
-          <div style={{ marginTop: 12, fontSize: 11, color: 'var(--t3)', lineHeight: 1.7 }}>
-            <div><kbd style={kbdStyle}>Enter</kbd> تأكيد · <kbd style={kbdStyle}>Esc</kbd> إلغاء</div>
-            <div style={{ marginTop: 4 }}><kbd style={kbdStyle}>Ctrl++</kbd> زيادة · <kbd style={kbdStyle}>Ctrl+-</kbd> نقصان · <kbd style={kbdStyle}>↑↓</kbd> تنقل · <kbd style={kbdStyle}>Del</kbd> حذف</div>
+          <div className="qsm-hint">
+            <div><kbd className="qsm-kbd">Enter</kbd> تأكيد · <kbd className="qsm-kbd">Esc</kbd> إلغاء</div>
+            <div className="qsm-hint-row"><kbd className="qsm-kbd">Ctrl++</kbd> زيادة · <kbd className="qsm-kbd">Ctrl+-</kbd> نقصان · <kbd className="qsm-kbd">↑↓</kbd> تنقل · <kbd className="qsm-kbd">Del</kbd> حذف</div>
           </div>
         </div>
         <div className="m-foot">

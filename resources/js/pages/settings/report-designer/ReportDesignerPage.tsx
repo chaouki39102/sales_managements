@@ -6,20 +6,20 @@ export default function ReportDesignerPage() {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      height: '100%', background: '#f0f2f5', gap: 16, padding: 32,
+      height: '100%', background: 'var(--bg3)', gap: 16, padding: 32,
     }}>
-      <i className="ti ti-tools-off" style={{ fontSize: 48, color: '#bbb' }} />
-      <span style={{ fontSize: 18, fontWeight: 700, color: '#555' }}>
+      <i className="ti ti-tools-off" style={{ fontSize: 48, color: 'var(--t4)' }} />
+      <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--t3)' }}>
         مصمم القوالب المتقدم
       </span>
-      <span style={{ fontSize: 14, color: '#888', textAlign: 'center', maxWidth: 360 }}>
+      <span style={{ fontSize: 14, color: 'var(--t4)', textAlign: 'center', maxWidth: 360 }}>
         تمت إزالة هذه الأداة التجريبية. يمكنك تعديل القوالب من صفحة إعدادات الطباعة.
       </span>
       <button
         onClick={() => navigate('/settings/print')}
         style={{
           padding: '8px 24px', borderRadius: 6, border: 'none',
-          background: '#1890ff', color: '#fff', cursor: 'pointer',
+          background: 'var(--blue)', color: '#fff', cursor: 'pointer',
           fontSize: 13, fontFamily: 'Tajawal, sans-serif', fontWeight: 600,
         }}
       >

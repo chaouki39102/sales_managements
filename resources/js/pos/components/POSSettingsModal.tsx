@@ -8,7 +8,7 @@ import { useState } from 'react';
 import type { POSSettings, PriceDisplayMode, GridDefaultSize, QuickCashAction, AfterSaleAction } from '@/pos/hooks/usePOSSettings';
 import { isWebUsbSupported } from '@/pos/utils/printService';
 import { SOUND_PRESETS, previewSound } from '@/pos/utils/posSounds';
-import type { Warehouse, DocumentType, PaymentMode } from '@/types';
+import type { Warehouse, DocumentType, PaymentMode, PriceLevel } from '@/types';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Switch from '@/components/ui/Switch';
@@ -24,6 +24,7 @@ interface POSSettingsModalProps {
   warehouses:    Warehouse[];
   documentTypes: DocumentType[];
   paymentModes:  PaymentMode[];
+  priceLevels:   PriceLevel[];
   /** System-level fiscal stamp setting (from DB) */
   systemFiscalStampEnabled: boolean;
   /** Toggle fiscal stamp in system settings DB */
@@ -32,6 +33,10 @@ interface POSSettingsModalProps {
   systemAllowNegativeStock: boolean;
   /** Toggle allow negative stock in system settings DB */
   onToggleAllowNegative: (val: boolean) => Promise<void>;
+  /** Default price level ID from system settings DB */
+  defaultPriceLevelId: number | null;
+  /** Save default price level to system settings DB */
+  onSaveDefaultPriceLevel: (id: number | null) => Promise<void>;
 }
 
 type Tab = 'general' | 'pricing' | 'print' | 'receipt' | 'security';
@@ -95,9 +100,10 @@ const toggleSettings: { key: keyof POSSettings; label: string; triState?: boolea
 ];
 
 export default function POSSettingsModal({
-  settings, onSave, onReset, onClose, warehouses, documentTypes, paymentModes,
+  settings, onSave, onReset, onClose, warehouses, documentTypes, paymentModes, priceLevels,
   systemFiscalStampEnabled, onToggleFiscalStamp,
   systemAllowNegativeStock, onToggleAllowNegative,
+  defaultPriceLevelId, onSaveDefaultPriceLevel,
 }: POSSettingsModalProps) {
   const [local,     setLocal]     = useState<POSSettings>({ ...settings });
   const [activeTab, setActiveTab] = useState<Tab>('general');
@@ -105,6 +111,7 @@ export default function POSSettingsModal({
   const [showPin,   setShowPin]   = useState(false);
   const [stampSaving, setStampSaving]   = useState(false);
   const [negSaving,   setNegSaving]     = useState(false);
+  const [plSaving,    setPlSaving]      = useState(false);
   const deleteConfirm = useConfirm();
   const notify = useNotification();
 
@@ -345,6 +352,25 @@ export default function POSSettingsModal({
                   </label>
                 ))}
               </div>
+            </div>
+
+            <div className="fg s2">
+              <label>فئة السعر الافتراضية</label>
+              <select
+                value={defaultPriceLevelId ?? ''}
+                onChange={async (e) => {
+                  const val = e.target.value ? parseInt(e.target.value) : null;
+                  setPlSaving(true);
+                  try { await onSaveDefaultPriceLevel(val); }
+                  finally { setPlSaving(false); }
+                }}
+              >
+                <option value="">— بدون —</option>
+                {priceLevels.map(pl => (
+                  <option key={pl.id} value={pl.id}>{pl.name}</option>
+                ))}
+              </select>
+              <div className="fg-hint">{plSaving ? 'جاري الحفظ...' : 'يُستخدم كفئة سعر افتراضية للمنتجات في نقطة البيع'}</div>
             </div>
 
             <div className="fg">

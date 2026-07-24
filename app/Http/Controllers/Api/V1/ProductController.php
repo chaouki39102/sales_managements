@@ -91,7 +91,7 @@ class ProductController extends BaseApiController
             'filters'         => Product::$filterable,
             'sorts'           => Product::$sortable,
             'relations'       => Product::$allowedIncludes,
-            'default_includes'=> ['family', 'brand', 'productType', 'packagings'],
+            'default_includes'=> ['family', 'brand', 'productType', 'packagings', 'quantityDiscounts'],
             'default_sort'    => Product::$defaultSort,
             'default_per_page'=> Product::$defaultPerPage ?? 15,
             'per_page_limit'  => Product::$perPageLimit ?? 100,

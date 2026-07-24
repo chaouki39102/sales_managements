@@ -107,37 +107,6 @@ const Pagination: React.FC<PaginationProps> = ({
         </div>
       )}
 
-      <style>{`
-        .pg-bar {
-          display: flex; align-items: center; justify-content: space-between;
-          flex-wrap: wrap; gap: 12px; padding: 12px 0;
-        }
-        .pg-info { font-size: 13px; color: var(--color-text-secondary); }
-        .pg-pages { display: flex; align-items: center; gap: 2px; }
-        .pg-btn {
-          display: flex; align-items: center; justify-content: center;
-          min-width: 32px; height: 32px; padding: 0 6px;
-          border: 1px solid transparent; border-radius: 6px; cursor: pointer;
-          font-size: 13px; color: var(--color-text-secondary); background: none;
-          transition: background .1s, border-color .1s, color .1s;
-        }
-        .pg-btn:hover:not(:disabled) { background: var(--color-background-secondary); color: var(--color-text-primary); }
-        .pg-btn:disabled { opacity: .35; cursor: not-allowed; }
-        .pg-btn.pg-page.active {
-          background: var(--color-text-info, #3b82f6);
-          border-color: var(--color-text-info, #3b82f6);
-          color: #fff; font-weight: 500; cursor: default;
-        }
-        .pg-nav { color: var(--color-text-secondary); }
-        .pg-dots { padding: 0 4px; color: var(--color-text-tertiary); font-size: 14px; }
-        .pg-size { display: flex; align-items: center; gap: 6px; }
-        .pg-size-label { font-size: 13px; color: var(--color-text-secondary); }
-        .pg-size-select {
-          padding: 4px 8px; border: 1px solid var(--color-border-secondary);
-          border-radius: 6px; font-size: 13px; background: var(--color-background-primary);
-          color: var(--color-text-primary); outline: none; cursor: pointer;
-        }
-      `}</style>
     </div>
   );
 };

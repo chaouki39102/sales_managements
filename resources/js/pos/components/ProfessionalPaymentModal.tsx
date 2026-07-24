@@ -123,7 +123,6 @@ function Numpad({
         className="pay-npk clear"
         onClick={onClear}
         type="button"
-        style={{ gridColumn: 'span 3' }}
       >
         مسح
       </button>
@@ -200,7 +199,7 @@ export default function ProfessionalPaymentModal({
         treasuryAccountId:  ep.treasury_account_id ?? null,
       }));
     }
-    const initAmount = totalTtcFinal.toFixed(4);
+    const initAmount = isEditing ? '0' : totalTtcFinal.toFixed(4);
     return defaultMode
       ? [{ id: uid(), modeId: defaultMode.id, amount: initAmount, refNote: '', treasuryAccountId: null }]
       : [];
@@ -416,28 +415,21 @@ export default function ProfessionalPaymentModal({
       <div
         className="modal modal-pay-v2"
         onClick={e => e.stopPropagation()}
-        style={{
-          maxWidth:  780,
-          display:   'grid',
-          gridTemplateRows: 'auto 1fr auto',
-          maxHeight: 'calc(100vh - 40px)',
-          overflow:  'hidden',
-        }}
       >
         {/* ── Header ── */}
         <div className="m-hd">
           <div className="m-title">
-            <i className="ti ti-credit-card" style={{ marginLeft: 6 }} />
+            <i className="ti ti-credit-card ml-2" />
             إتمام الدفع
             {client && (
               <span className="pay-client-chip">
-                <i className="ti ti-user" style={{ fontSize: 11 }} />
+                <i className="ti ti-user text-sm" />
                 {client.name}
               </span>
             )}
             {documentNumber && (
               <span className="pay-client-chip">
-                <i className="ti ti-hash" style={{ fontSize: 11 }} />
+                <i className="ti ti-hash text-sm" />
                 {documentNumber}
               </span>
             )}
@@ -510,30 +502,30 @@ export default function ProfessionalPaymentModal({
                   <span>الرصيد السابق</span>
                   <span>{balanceLoading ? '...' : formatDZD(internalPrevBalance)}</span>
                 </div>
-                <div className="pvs-row" style={{ borderTop: '1px dashed #ccc', paddingTop: 6, marginTop: 2 }}>
-                  <span>المجموع <span style={{ fontSize: 11, opacity: 0.6 }}>(سابق + مستحق)</span></span>
+                <div className="pvs-row pay-bal-dash">
+                  <span>المجموع <span className="pay-hint-sub">(سابق + مستحق)</span></span>
                   <strong>{formatDZD(internalPrevBalance + totalTtcFinal)}</strong>
                 </div>
                 {isEditing && existingTotal > 0 && (
                   <div className="pvs-row">
-                    <span style={{ color: '#888' }}>مدفوع سابقاً</span>
-                    <span style={{ color: '#888' }}>{formatDZD(existingTotal)}</span>
+                    <span className="text-t4">مدفوع سابقاً</span>
+                    <span className="text-t4">{formatDZD(existingTotal)}</span>
                   </div>
                 )}
                 {isEditing && newPaid > 0 && (
                   <div className="pvs-row">
-                    <span style={{ color: '#2563eb' }}>المدفوع الآن</span>
-                    <span style={{ color: '#2563eb' }}>{formatDZD(newPaid)}</span>
+                    <span className="text-blue">المدفوع الآن</span>
+                    <span className="text-blue">{formatDZD(newPaid)}</span>
                   </div>
                 )}
-                <div className="pvs-row" style={{ borderTop: '1px solid #ddd', paddingTop: 6, marginTop: 2 }}>
+                <div className="pvs-row pay-bal-solid">
                   <span>{isEditing ? 'إجمالي المدفوع' : 'المدفوع'}</span>
                   <span>{formatDZD(totalPaid)}</span>
                 </div>
-                <div className="pvs-row pvs-total" style={{ marginTop: 4 }}>
+                <div className="pvs-row pvs-total pay-bal-edit-mt">
                   <span>
                     الرصيد الجديد
-                    <span style={{ fontSize: 11, opacity: 0.6 }}> (سابق + إجمالي - المدفوع)</span>
+                    <span className="pay-hint-sub"> (سابق + إجمالي - المدفوع)</span>
                   </span>
                   <strong>{formatDZD(internalPrevBalance + totalTtcFinal - totalPaid)}</strong>
                 </div>
@@ -580,7 +572,7 @@ export default function ProfessionalPaymentModal({
 
             {/* تاريخ الاستحقاق */}
             <div className="pay-v2-section">
-              <div className="pay-v2-sec-title">تاريخ الاستحقاق <span style={{ opacity: 0.5, fontWeight: 400 }}>(اختياري)</span></div>
+              <div className="pay-v2-sec-title">تاريخ الاستحقاق <span className="pay-hint-opt">(اختياري)</span></div>
               <input
                 type="date"
                 className="pay-v2-date"
@@ -606,7 +598,7 @@ export default function ProfessionalPaymentModal({
           <div className="pay-v2-right">
 
             {/* وسائل الدفع */}
-            <div className="pay-v2-sec-title" style={{ marginBottom: 8 }}>وسائل الدفع</div>
+            <div className="pay-v2-sec-title pay-sec-title">وسائل الدفع</div>
 
             <div className="pay-lines-v2">
               {lines.map((line, idx) => {
@@ -697,12 +689,12 @@ export default function ProfessionalPaymentModal({
             </div>
 
             {/* إضافة وسيلة دفع */}
-            <button className="btn btn-xs" onClick={addLine} type="button" style={{ marginTop: 6 }}>
+            <button className="btn btn-xs pay-add-mode" onClick={addLine} type="button">
               <i className="ti ti-plus" /> إضافة وسيلة دفع
             </button>
 
             {/* ── مؤشر الحالة ── */}
-            <div style={{ margin: '12px 0 8px' }}>
+            <div className="pay-status-wrap">
               <PaymentStatus
                 remaining={remaining}
                 change={change}
@@ -710,7 +702,7 @@ export default function ProfessionalPaymentModal({
             </div>
 
             {/* ── أزرار المبالغ السريعة ── */}
-            <div className="pay-v2-sec-title" style={{ marginBottom: 6 }}>مبالغ سريعة</div>
+            <div className="pay-v2-sec-title pay-sec-title-sm">مبالغ سريعة</div>
             <div className="pay-quick-amts">
               {quickAmounts.map(a => (
                 <button
@@ -725,7 +717,7 @@ export default function ProfessionalPaymentModal({
             </div>
 
             {/* ── Numpad ── */}
-            <div className="pay-v2-sec-title" style={{ margin: '10px 0 6px' }}>لوحة الأرقام</div>
+            <div className="pay-v2-sec-title pay-sec-title-m">لوحة الأرقام</div>
             <Numpad
               onDigit={onDigit}
               onDot={onDot}
@@ -735,7 +727,7 @@ export default function ProfessionalPaymentModal({
 
             {/* ── خطأ ── */}
             {error && (
-              <div className="al al-r" style={{ marginTop: 10 }}>
+              <div className="al al-r pay-error-mt">
                 <i className="ti ti-alert-circle" /> {error}
               </div>
             )}
@@ -746,12 +738,11 @@ export default function ProfessionalPaymentModal({
         <div className="m-foot">
           <button className="btn" onClick={onClose} type="button">إلغاء</button>
           <button
-            className="btn btn-p"
+            className="btn btn-p pay-btn-confirm"
             onClick={handleSubmit}
             disabled={!canSubmit}
             title="تأكيد الدفع — Ctrl+Enter"
             type="button"
-            style={{ minWidth: 200, fontSize: 14 }}
           >
             {submitting
               ? <><i className="ti ti-loader-2 spin" /> جارٍ الحفظ...</>
@@ -759,7 +750,7 @@ export default function ProfessionalPaymentModal({
                   <i className="ti ti-circle-check" />
                   تأكيد الدفع — {formatDZD(totalPaid)}
                   {change > 0.009 && (
-                    <span style={{ marginRight: 8, fontSize: 12, opacity: 0.85 }}>
+                    <span className="pay-change-txt">
                       (باقٍ {formatDZD(change)})
                     </span>
                   )}

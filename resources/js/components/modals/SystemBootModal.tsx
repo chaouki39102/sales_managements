@@ -193,30 +193,6 @@ export default function SystemBootModal({
       padding: 20, direction: 'rtl',
       animation: 'bootFadeIn .25s ease',
     }}>
-      <style>{`
-        @keyframes bootFadeIn { from{opacity:0} to{opacity:1} }
-        @keyframes bootSlideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:none} }
-        @keyframes bootPulse { 0%,100%{opacity:1} 50%{opacity:.5} }
-        @keyframes bootSpin { to{transform:rotate(360deg)} }
-        @keyframes bootShimmer {
-          0%   { background-position: -400px 0 }
-          100% { background-position:  400px 0 }
-        }
-        @keyframes bootPop {
-          0%   { transform:scale(.8); opacity:0 }
-          60%  { transform:scale(1.12) }
-          100% { transform:scale(1); opacity:1 }
-        }
-        @keyframes bootProgress {
-          from { width: 0% }
-        }
-        .boot-item-row {
-          display:flex; align-items:center; gap:10; padding:7px 12px;
-          border-radius:10px; transition:background .15s;
-        }
-        .boot-item-row:hover { background: var(--bg3); }
-      `}</style>
-
       <div style={{
         background: 'var(--bg2)',
         borderRadius: 24,

@@ -8,7 +8,7 @@ export interface PriceLevel { id: number; name: string; }
 export interface InventoryValuationMethod { id: number; name: string; method: 'FIFO' | 'LIFO' | 'AVERAGE'; }
 export interface Warehouse { id: number; name: string; }
 export interface ProductVariantPrice { price_level_id: number; price: number | null; valid_from?: string | null; valid_to?: string | null; active: boolean; }
-export interface QuantityDiscount { min_quantity: number; max_quantity?: number | null; discount_percentage?: number | null; discount_per_unit?: number | null; tier_order: number; active: boolean; }
+export interface QuantityDiscount { id: number; price_level_id: number; min_qty: number; max_qty?: number | null; discount_amount?: number | null; discount_percentage?: number | null; is_blocked?: boolean; tier_order: number; active: boolean; }
 export interface ProductLot { lot_number: string; supplier_lot_number?: string | null; warehouse_id: number | null; manufacturing_date?: string | null; expiration_date?: string | null; purchase_date?: string | null; purchase_price: number | null; legal_selling_price?: number | null; margin_percentage?: number | null; original_quantity: number; remaining_quantity?: number; active?: boolean; }
 export interface ProductVariant {
   id?: number; ref: string; barcode?: string | null; variant_name?: string | null;

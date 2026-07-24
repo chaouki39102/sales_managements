@@ -176,7 +176,7 @@ export default function AdminSettingsPage() {
         <div style={{
           position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)',
           zIndex: 9999, padding: '10px 20px', borderRadius: 12,
-          background: flash.ok ? '#10b981' : '#ef4444',
+          background: flash.ok ? 'var(--green)' : 'var(--red)',
           color: '#fff', fontSize: 13, fontWeight: 700,
           boxShadow: '0 4px 20px rgba(0,0,0,.25)',
           display: 'flex', alignItems: 'center', gap: 8,
@@ -196,7 +196,7 @@ export default function AdminSettingsPage() {
           onClick={() => saveMut.mutate(form)}
           style={{
             padding: '10px 22px', borderRadius: 10, border: 'none',
-            background: '#10b981', color: '#fff', fontSize: 13, fontWeight: 700,
+            background: 'var(--green)', color: '#fff', fontSize: 13, fontWeight: 700,
             cursor: 'pointer', fontFamily: 'Tajawal,sans-serif',
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
@@ -210,16 +210,16 @@ export default function AdminSettingsPage() {
       {sysStatus && (
         <div style={{
           padding: '12px 16px', borderRadius: 12,
-          background: (sysStatus as any).is_ready ? '#10b98110' : '#f59e0b10',
+          background: (sysStatus as any).is_ready ? 'var(--greenb)' : 'var(--goldb)',
           border: `1px solid ${(sysStatus as any).is_ready ? '#10b98130' : '#f59e0b30'}`,
           display: 'flex', alignItems: 'center', gap: 10,
         }}>
           <div style={{
             width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
-            background: (sysStatus as any).is_ready ? '#10b981' : '#f59e0b',
+            background: (sysStatus as any).is_ready ? 'var(--green)' : '#f59e0b',
             boxShadow: `0 0 8px ${(sysStatus as any).is_ready ? '#10b98188' : '#f59e0b88'}`,
           }} />
-          <span style={{ fontSize: 13, fontWeight: 700, color: (sysStatus as any).is_ready ? '#10b981' : '#f59e0b' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: (sysStatus as any).is_ready ? 'var(--green)' : '#f59e0b' }}>
             {(sysStatus as any).is_ready ? 'النظام جاهز ويعمل بشكل طبيعي' : 'النظام يحتاج إعداداً — اذهب لـ /admin/boot'}
           </span>
         </div>
@@ -281,7 +281,7 @@ export default function AdminSettingsPage() {
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)' }}>
               وضع الصيانة
-              {isMaint && <span style={{ marginRight: 8, fontSize: 11, color: '#f59e0b', fontWeight: 700 }}>● مفعّل الآن</span>}
+              {isMaint && <span style={{ marginRight: 8, fontSize: 11, color: 'var(--gold)', fontWeight: 700 }}>● مفعّل الآن</span>}
             </div>
             <div style={{ fontSize: 11.5, color: 'var(--t4)', marginTop: 2 }}>
               {isMaint ? 'الموقع محجوب حالياً للمستخدمين العاديين' : 'عند التفعيل يُعرض للمستخدمين صفحة صيانة'}
@@ -292,7 +292,7 @@ export default function AdminSettingsPage() {
             onClick={() => maintMut.mutate()}
             style={{
               padding: '7px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: isMaint ? '#10b981' : '#f59e0b', color: '#fff',
+              background: isMaint ? 'var(--green)' : '#f59e0b', color: '#fff',
               fontSize: 12, fontWeight: 700, fontFamily: 'Tajawal,sans-serif',
               display: 'flex', alignItems: 'center', gap: 5,
             }}>
@@ -315,7 +315,7 @@ export default function AdminSettingsPage() {
             onClick={() => cacheMut.mutate()}
             style={{
               padding: '7px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: '#ef4444', color: '#fff', fontSize: 12, fontWeight: 700,
+              background: 'var(--red)', color: '#fff', fontSize: 12, fontWeight: 700,
               fontFamily: 'Tajawal,sans-serif', display: 'flex', alignItems: 'center', gap: 5,
             }}>
             {cacheMut.isPending
@@ -408,7 +408,7 @@ export default function AdminSettingsPage() {
         </div>
       </Section>
 
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+
     </div>
   );
 }

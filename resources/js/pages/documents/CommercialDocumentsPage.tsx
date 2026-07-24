@@ -1752,15 +1752,7 @@ export default function CommercialDocumentsPage() {
 
     return (
         <>
-            <style>{`
-                @keyframes cdp-spin    { to { transform: rotate(360deg); } }
-                @keyframes cdp-toast-in {
-                    from { transform: translateY(10px); opacity: 0; }
-                    to   { transform: translateY(0);    opacity: 1; }
-                }
-                .cdp-row-cancelled td { opacity: .55; }
-                .cdp-row-overdue td:first-child { border-right: 3px solid var(--red) !important; }
-            `}</style>
+
 
             <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 14, minHeight: 0, flex: 1, direction: "rtl", fontFamily: "Tajawal, sans-serif" }}>
 

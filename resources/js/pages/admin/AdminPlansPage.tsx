@@ -83,8 +83,8 @@ export default function AdminPlansPage() {
         <PageHeader title="الخطط" />
         <div style={{
           padding: '16px 20px', borderRadius: 10,
-          background: '#ef44441a', border: '1px solid #ef444433',
-          color: '#ef4444', fontSize: 13,
+          background: 'var(--redb)', border: '1px solid #ef444433',
+          color: 'var(--red)', fontSize: 13,
         }}>
           تعذّر تحميل الخطط: {(error as any)?.message ?? 'خطأ'}
         </div>
@@ -145,7 +145,7 @@ export default function AdminPlansPage() {
                     </button>
                     <button
                       onClick={() => { setDeletingId(plan.id); deleteModal.openModal(); }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4 }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', padding: 4 }}
                       title="حذف"
                     >
                       <i className="ti ti-trash" />

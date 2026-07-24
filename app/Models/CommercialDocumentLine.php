@@ -29,6 +29,7 @@ class CommercialDocumentLine extends Model
         'unit_price_ht',
         'cost_price_ht',
         'discount_percentage',
+        'quantity_discount_id',
         'discount_amount',
         'additional_costs',
         'total_additional_cost',
@@ -89,6 +90,7 @@ class CommercialDocumentLine extends Model
     public function childLines(): HasMany { return $this->hasMany(CommercialDocumentLine::class, 'parent_line_id'); }
     public function stockMovements(): HasMany { return $this->hasMany(StockMovement::class, 'commercial_document_line_id'); }
     public function packaging(): BelongsTo { return $this->belongsTo(ProductPackaging::class, 'packaging_id'); }
+    public function quantityDiscount(): BelongsTo { return $this->belongsTo(QuantityDiscount::class); }
 
     public function scopeParentLines(Builder $query): Builder { return $query->whereNull('parent_line_id'); }
     public function scopeChildLines(Builder $query): Builder { return $query->whereNotNull('parent_line_id'); }

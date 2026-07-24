@@ -68,30 +68,6 @@ const SelectInput: React.FC<SelectInputProps> = ({
       {hint && !error && <p className="select-hint">{hint}</p>}
       {error && <p id={`${id}-error`} className="select-error" role="alert">{error}</p>}
 
-      <style>{`
-        .select-wrapper { display: flex; flex-direction: column; gap: 4px; }
-        .select-label { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); display: flex; align-items: center; gap: 2px; }
-        .select-required { color: var(--color-text-danger, #ef4444); }
-        .select-control { position: relative; }
-        .select-field {
-          width: 100%; padding: 8px 36px 8px 12px; appearance: none;
-          background: var(--color-background-primary);
-          border: 1px solid var(--color-border-secondary);
-          border-radius: 8px; cursor: pointer;
-          font-size: 14px; color: var(--color-text-primary);
-          transition: border-color .15s, box-shadow .15s;
-          outline: none;
-        }
-        .select-field:focus { border-color: var(--color-text-info, #3b82f6); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-text-info, #3b82f6) 15%, transparent); }
-        .select-field.has-error { border-color: var(--color-text-danger, #ef4444); }
-        .select-field:disabled { opacity: .5; cursor: not-allowed; }
-        .select-chevron {
-          position: absolute; inset-inline-end: 10px; top: 50%; transform: translateY(-50%);
-          display: flex; pointer-events: none; color: var(--color-text-secondary);
-        }
-        .select-hint { margin: 0; font-size: 12px; color: var(--color-text-tertiary); }
-        .select-error { margin: 0; font-size: 12px; color: var(--color-text-danger, #ef4444); }
-      `}</style>
     </div>
   );
 };
