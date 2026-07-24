@@ -62,7 +62,17 @@ class StoreCommercialDocumentRequest extends FormRequest
             // ── الأسطر ───────────────────────────────────────────────
             'lines'                            => 'required|array|min:1',
             'lines.*.product_id'               => 'required|integer|exists:products,id',
-            'lines.*.quantity'                 => 'required|numeric|min:0.001|max:9999999',
+            'lines.*.quantity'                 => ['required', 'numeric', 'min:0.0001', function ($attr, $value, $fail) use ($request) {
+                $index       = (int) explode('.', $attr)[1];
+                $packagingId = $request->input("lines.$index.packaging_id");
+                $product     = \App\Models\Product::find($request->input("lines.$index.product_id"));
+
+                if ($product && !($product->is_sold_by_weight ?? false) && !$packagingId) {
+                    if (abs(round($value) - $value) > 0.0001) {
+                        $fail("لا يمكن بيع كمية كسرية من وحدة أساسية: {$product->name}");
+                    }
+                }
+            }],
             'lines.*.unit_price_ht'            => 'required|numeric|min:0|max:9999999999',
             'lines.*.discount_percentage'      => 'nullable|numeric|min:0|max:100',
             'lines.*.discount_amount'          => 'nullable|numeric|min:0',

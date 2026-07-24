@@ -464,6 +464,21 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 }
             }
 
+            // Freeze the packaging-to-base-unit conversion factor at time of sale.
+            // Must NEVER be re-derived from the live ProductPackaging row after this point —
+            // if ProductPackaging.quantity changes later, this line keeps its original value.
+            $packagingUnitsSnapshot = null;
+            if (!empty($lineData['packaging_id'])) {
+                $packaging = \App\Models\ProductPackaging::find((int) $lineData['packaging_id']);
+                if (!$packaging) {
+                    throw new BusinessRuleException(
+                        'وحدة التعبئة المحدَّدة في السطر ' . ($order + 1) . ' غير موجودة.',
+                        422
+                    );
+                }
+                $packagingUnitsSnapshot = (float) $packaging->quantity;
+            }
+
             $totals = $this->computeLineTotals($lineData);
 
             $document->lines()->create([
@@ -477,6 +492,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 'discount_percentage'    => (float) ($lineData['discount_percentage'] ?? 0),
                 'tva_rate'               => (float) ($lineData['tva_rate'] ?? 0),
                 'packaging_id'           => $lineData['packaging_id'] ?? null,
+                'packaging_units_snapshot' => $packagingUnitsSnapshot,
                 'stock_lot_id'           => $lineData['stock_lot_id'] ?? null,
                 'line_attributes'        => $this->buildLineAttributes($lineData),
                 'total_ht'               => $totals['total_ht'],
@@ -655,7 +671,9 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             if (!$line->product_id || !$line->product) continue;
 
             $product = $line->product;
-            $baseQty = (float) $line->quantity;
+            $baseQty = ($line->packaging_id && $line->packaging_units_snapshot)
+                ? round((float) $line->quantity * (float) $line->packaging_units_snapshot, 4)
+                : (float) $line->quantity;
 
             // ── التحقق من المخزون قبل إنشاء الحركة ─────────────────────────
             $shouldCheckStock = false;
@@ -702,10 +720,10 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 'stock_movement_type_id'      => $stockMovementTypeId,
                 'commercial_document_id'      => $document->id,
                 'commercial_document_line_id' => $line->id,
-                'quantity'                    => (float) $line->quantity,
+                'quantity'                    => $baseQty,
                 'unit_price'                  => (float) $line->unit_price_ht,
                 'cost_price'                  => $costPrice,
-                'total_price'                 => round((float) $line->quantity * $costPrice, 4),
+                'total_price'                 => round($baseQty * $costPrice, 4),
                 'movement_date'               => $document->document_date,
                 'price_source'                => $direction < 0 ? 'sale' : 'purchase',
                 'lot_number'                  => $line->line_attributes['lot_number'] ?? $line->lot_number ?? null,

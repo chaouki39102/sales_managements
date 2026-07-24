@@ -42,6 +42,7 @@ class CommercialDocumentLine extends Model
         'parent_line_id',
         'line_attributes',
         'packaging_id',
+        'packaging_units_snapshot',
     ];
 
     protected $casts = [
@@ -51,6 +52,7 @@ class CommercialDocumentLine extends Model
         'total_discount_amount' => 'decimal:4',
         'line_order' => 'integer',
         'quantity' => 'decimal:3',
+        'packaging_units_snapshot' => 'decimal:4',
         'delivered_quantity' => 'decimal:3',
         'returned_quantity' => 'decimal:3',
         'unit_price_ht' => 'decimal:4',
@@ -92,6 +94,7 @@ class CommercialDocumentLine extends Model
     public function scopeChildLines(Builder $query): Builder { return $query->whereNotNull('parent_line_id'); }
 
     public function getRemainingQuantity(): float { return $this->quantity - $this->delivered_quantity - $this->returned_quantity; }
+    public function getBaseQuantityAttribute(): float { return round((float) $this->quantity * (float) ($this->packaging_units_snapshot ?? 1), 4); }
     public function isFullyDelivered(): bool { return $this->getRemainingQuantity() <= 0; }
     public function hasDiscount(): bool { return $this->discount_percentage > 0 || $this->discount_amount > 0; }
 }
