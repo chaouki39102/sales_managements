@@ -437,43 +437,41 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
   const [apiErr, setApiErr] = useState('');
   const [success, setSuccess] = useState<SuccessState | null>(null);
 
-  // الدفع ثابت: فوري ونقدي
-  const payment = {
-    enabled: true,
-    payment_mode_id: defaultPaymentModeId,
-    treasury_account_id: defaultTreasuryId,
-    amount: 0, // 0 يعني كامل المبلغ
-    reference: '',
-    payment_date: defaultDocDate(selectedYear),
-  };
-
   // Effects for reset
   useEffect(() => {
     if (open) {
       setPartyId('');
       setDocDate(defaultDocDate(selectedYear));
       setNotes('');
-      setLines([]);
+      setLines([{ product_id: '', quantity: 1, price: 0, tva_rate: 19 }]);
       setErrors({});
       setApiErr('');
       setSuccess(null);
       setWarehouseId(defaultWarehouseId);
+      setPaymentLocal(p => ({
+        ...p,
+        payment_mode_id: defaultPaymentModeId,
+        treasury_account_id: defaultTreasuryId,
+        amount: 0,
+        payment_date: defaultDocDate(selectedYear),
+      }));
     }
     return () => {
       if (successTimer.current) clearTimeout(successTimer.current);
     };
   }, [open, defaultWarehouseId, selectedYear]);
 
-  // Line helpers
+  // Line helpers — use ref to avoid addLine depending on lines.length
+  const linesLenRef = useRef(0);
+  linesLenRef.current = lines.length;
+
   const addLine = useCallback(() => {
     setLines(prev => [...prev, { product_id: '', quantity: 1, price: 0, tva_rate: 19 }]);
-    // بعد إضافة السطر، نركز على حقل البحث في السطر الجديد
     setTimeout(() => {
-      const lastIndex = lines.length;
-      const input = productInputRefs.current[lastIndex];
+      const input = productInputRefs.current[linesLenRef.current];
       input?.focus();
     }, 50);
-  }, [lines.length]);
+  }, []);
 
   const removeLine = useCallback((idx: number) => {
     setLines(prev => prev.filter((_, i) => i !== idx));
@@ -557,64 +555,6 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
     return Object.keys(errs).length === 0;
   }, [warehouseId, lines, products, paymentLocal.treasury_account_id]);
 
-  // Save mutation
-  const saveMut = useMutation({
-    mutationFn: async () => {
-      const payAmount = totals.netPay;
-
-      const docPayload = {
-        document_type_code: 'FV',
-        party_id: partyId ? parseInt(partyId) : null,
-        warehouse_id: parseInt(warehouseId),
-        fiscal_year_id: selectedYear?.id ?? null,
-        document_date: docDate,
-        notes: notes || null,
-        lines: lines.map(l => ({
-          product_id: parseInt(l.product_id),
-          quantity: l.quantity,
-          unit_price_ht: l.price,
-          tva_rate: l.tva_rate,
-          discount_percentage: 0,
-        })),
-        payments: payAmount > 0 ? [{
-          payment_mode_id: parseInt(payment.payment_mode_id),
-          treasury_account_id: parseInt(payment.treasury_account_id),
-          amount: payAmount,
-          payment_date: payment.payment_date || docDate,
-          reference: payment.reference || null,
-          client_ref: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        }] : [],
-      };
-      const docRes = await apiPost<Record<string, unknown>>('/documents', docPayload);
-      const docNum = String(
-        (docRes as any).document_number ?? (docRes as any).data?.document_number ?? '—'
-      );
-
-      return {
-        document_number: docNum,
-        net_to_pay: totals.netPay,
-        paid: payAmount,
-        remaining: Math.max(0, totals.netPay - payAmount),
-      };
-    },
-    onSuccess: state => {
-      if (slug) {
-        qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
-        qc.invalidateQueries({ queryKey: tenantKeys.inventory.all(slug) });
-        qc.invalidateQueries({ queryKey: [slug, 'payments'] });
-      }
-      setSuccess(state);
-      successTimer.current = setTimeout(() => onSaved(state), 2_500);
-    },
-    onError: (e: unknown) => {
-      const err = e as Record<string, unknown>;
-      const errs = err?.errors as Record<string, string[]> | undefined;
-      setApiErr(
-        errs ? Object.values(errs).flat().join(' | ') : String(err?.message ?? 'فشل الحفظ')
-      );
-    },
-  });
-
   // Getters for SearchSelect
   const getProductLabel = useCallback(
     (p: Product) => `${p.name}${p.ref ? ` (${p.ref})` : ''}`,
@@ -630,27 +570,22 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
   // معالجة Enter في حقل الكمية: إضافة سطر جديد
   const handleQuantityEnter = useCallback(
     (idx: number) => {
-      if (idx === lines.length - 1) {
+      if (idx === linesLenRef.current - 1) {
         addLine();
       } else {
-        // إذا لم يكن آخر سطر، ننتقل إلى السطر التالي
         const nextInput = productInputRefs.current[idx + 1];
         nextInput?.focus();
       }
     },
-    [lines.length, addLine]
+    [addLine]
   );
 
-  // تعبئة المبلغ المستحق تلقائياً
+  // Fill payment amount with full due amount
   const fillFullAmount = useCallback(() => {
-    // لا نحتاج state لأن payment.amount ثابت، لكننا نستطيع إعادة حساب payAmount
-    // لاحظ أننا لا نستخدم state للدفع، المبلغ يظل 0 وهذا يعني كامل المبلغ.
-    // لكن إذا أردنا تغيير قيمة الدفع نضيف useState للدفع. لكن حسب الطلب "اجعل الدفع دائما فوري ونقدا" ربما يعني إخفاء الخيارات. سنكتفي بأن المبلغ المدفوع = كامل المستحق.
-    // ولكن لتطبيق زر "تعبئة المبلغ"، سنضيف useState محلي للدفع.
     setPaymentLocal(prev => ({ ...prev, amount: totals.netPay }));
   }, [totals.netPay]);
 
-  // لإضافة حالة محلية للدفع (لأن payment الآن ثابت، لكننا نحتاج لتعديل amount)
+  // Payment state — synced with defaults when queries resolve
   const [paymentLocal, setPaymentLocal] = useState({
     enabled: true,
     payment_mode_id: defaultPaymentModeId,
@@ -660,7 +595,7 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
     payment_date: defaultDocDate(selectedYear),
   });
 
-  // تحديث paymentLocal عند تحميل البيانات
+  // Sync paymentLocal with defaults after queries resolve
   useEffect(() => {
     if (defaultPaymentModeId && defaultTreasuryId) {
       setPaymentLocal(prev => ({
@@ -671,15 +606,14 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
     }
   }, [defaultPaymentModeId, defaultTreasuryId]);
 
-  // إعادة حساب payAmount باستخدام paymentLocal
+  // Compute actual payment amount (0 means full amount)
   const finalPayAmount = useMemo(() => {
     const amt = paymentLocal.amount;
     if (amt <= 0 || amt >= totals.netPay) return totals.netPay;
     return amt;
   }, [paymentLocal.amount, totals.netPay]);
 
-  // تعديل دوال الحفظ لاستخدام paymentLocal
-  const finalSaveMut = useMutation({
+  const saveMut = useMutation({
     mutationFn: async () => {
       const docPayload = {
         document_type_code: 'FV',
@@ -734,24 +668,24 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
     },
   });
 
-  const handleFinalSave = useCallback(() => {
+  const handleSave = useCallback(() => {
     setApiErr('');
-    if (validate()) finalSaveMut.mutate();
-  }, [validate, finalSaveMut]);
+    if (validate()) saveMut.mutate();
+  }, [validate, saveMut]);
 
   // اختصار F8
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'F8' && open && !finalSaveMut.isPending && !success) {
+      if (e.key === 'F8' && open && !saveMut.isPending && !success) {
         e.preventDefault();
-        handleFinalSave();
+        handleSave();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, finalSaveMut.isPending, success, handleFinalSave]);
+  }, [open, saveMut.isPending, success, handleSave]);
 
-  const isPending = finalSaveMut.isPending;
+  const isPending = saveMut.isPending;
 
   // ========== JSX ==========
   return (
@@ -1445,7 +1379,7 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
               إلغاء
             </button>
             <button
-              onClick={handleFinalSave}
+              onClick={handleSave}
               disabled={isPending || !!success}
               style={{
                 padding: '8px 22px',
@@ -1546,57 +1480,6 @@ function cellStyle(): React.CSSProperties {
     fontSize: 12,
     fontFamily: 'Tajawal, sans-serif',
     outline: 'none',
-    textAlign: 'center',
-  };
-}
-
-function _selectStyle(disabled: boolean, hasValue: boolean): React.CSSProperties {
-  return {
-    width: '100%',
-    padding: '8px 12px 8px 34px',
-    borderRadius: 'var(--r2)',
-    border: `1px solid ${disabled ? 'var(--b2)' : 'var(--b3)'}`,
-    background: disabled ? 'var(--bg3)' : 'var(--bg1)',
-    color: hasValue && !disabled ? 'var(--t1)' : 'var(--t4)',
-    fontSize: 13,
-    fontFamily: 'Tajawal, sans-serif',
-    outline: 'none',
-    appearance: 'none' as any,
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    transition: 'border-color .15s, box-shadow .15s',
-  };
-}
-
-function _inpNumStyle(err?: boolean): React.CSSProperties {
-  return {
-    width: '100%',
-    boxSizing: 'border-box',
-    padding: '7px 10px',
-    borderRadius: 'var(--r2)',
-    border: `1px solid ${err ? 'var(--red)' : 'var(--b3)'}`,
-    background: 'var(--bg1)',
-    color: 'var(--t1)',
-    fontSize: 13,
-    fontFamily: 'Tajawal, sans-serif',
-    outline: 'none',
-    textAlign: 'center',
-  };
-}
-
-function _selectNumStyle(disabled: boolean, hasValue: boolean): React.CSSProperties {
-  return {
-    width: '100%',
-    padding: '8px 12px 8px 34px',
-    borderRadius: 'var(--r2)',
-    border: `1px solid ${disabled ? 'var(--b2)' : 'var(--b3)'}`,
-    background: disabled ? 'var(--bg3)' : 'var(--bg1)',
-    color: hasValue && !disabled ? 'var(--t1)' : 'var(--t4)',
-    fontSize: 13,
-    fontFamily: 'Tajawal, sans-serif',
-    outline: 'none',
-    appearance: 'none' as any,
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    transition: 'border-color .15s, box-shadow .15s',
     textAlign: 'center',
   };
 }
