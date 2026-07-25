@@ -723,7 +723,7 @@ function POSPage() {
           selling_price_ttc:   htToTtc(priceHt, Number(line.tva_rate)),
           tva_rate:            Number(line.tva_rate),
           tva_id:              v?.tva_id ?? null,
-          discount_percentage: discPct,
+          discount_percentage: 0,
           discount_amount:     Math.round(totalDisc * 100) / 100,
           total_ht:            Number(line.total_ht),
           total_ttc:           Number(line.total_ttc),
@@ -1016,11 +1016,13 @@ const handleCompleteSale = useCallback(async (params: {
 
       const linesPayload = currentItems.map(i => {
         const compoundedDisc = compoundDiscountPct(i.discount_percentage, currentInvDisc);
+        const lineDiscAmount = i.quantity > 0 ? Math.round((i.discount_amount / i.quantity) * 100) / 100 : 0;
         return {
           product_id:          i.product_id,
           quantity:            i.quantity,
           unit_price_ht:       i.unit_price_ht,
           discount_percentage: Math.min(100, compoundedDisc),
+          discount_amount:     lineDiscAmount,
           tva_rate:            clientIsTvaExempt ? 0 : i.tva_rate,
           packaging_id:        i.packaging_id ?? null,
         };

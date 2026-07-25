@@ -60,14 +60,11 @@ function findQuantityDiscount(discounts: QuantityDiscount[] | undefined, qty: nu
 function recalcItem(item: CartItem): CartItem {
   const gross = item.unit_price_ht * item.quantity;
   let discAmount: number;
-  if (item.discount_percentage > 0) {
-    discAmount = gross * (item.discount_percentage / 100);
-  } else if (item.discount_amount > 0) {
+  if (item.discount_amount > 0) {
     discAmount = Math.min(gross, item.discount_amount);
-    item = {
-      ...item,
-      discount_percentage: gross > 0 ? (discAmount / gross) * 100 : 0,
-    };
+    item = { ...item, discount_percentage: gross > 0 ? round2((discAmount / gross) * 100) : 0 };
+  } else if (item.discount_percentage > 0) {
+    discAmount = gross * (item.discount_percentage / 100);
   } else {
     discAmount = 0;
   }

@@ -63,9 +63,10 @@ class CommercialDocumentLineObserver
         $discPct    = (float) ($line->discount_percentage ?? 0);
         $discAmount = (float) ($line->discount_amount     ?? 0);
 
-        // إذا كان discPct = 0 لكن discount_amount > 0
-        // → وضع fixed: نحسب discPct من discount_amount
-        if ($discPct <= 0 && $discAmount > 0 && $price > 0) {
+        // discount_amount (per-unit) is the source of truth for fixed discounts.
+        // When provided, derive discount_percentage from it — this preserves the
+        // exact fixed DZD value the user entered, even if compounding changed the percentage.
+        if ($discAmount > 0 && $price > 0) {
             $discPct = ($discAmount / $price) * 100;
         }
 
