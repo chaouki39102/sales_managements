@@ -37,24 +37,57 @@ interface CartState {
   markClean:            () => void;
 }
 
-function findQuantityDiscount(discounts: QuantityDiscount[] | undefined, qty: number, unitPriceHt: number): number {
-  if (!discounts?.length) return 0;
+interface ResolvedTier {
+  mode:               'percentage' | 'fixed_amount';
+  discount_percentage: number;
+  discount_amount:     number;  // total line discount (per_unit × qty)
+  quantity_discount_id?: number | null;
+}
+
+function resolveQuantityTier(
+  discounts: QuantityDiscount[] | undefined,
+  qty: number,
+  unitPriceHt: number,
+): ResolvedTier | null {
+  if (!discounts?.length) return null;
   const sorted = [...discounts]
-    .filter(d => d.active)
+    .filter(d => d.active && !d.is_blocked)
     .sort((a, b) => b.min_qty - a.min_qty);
   const match = sorted.find(d =>
     qty >= d.min_qty &&
     (d.max_qty === null || d.max_qty === undefined || qty <= d.max_qty)
   );
-  if (!match) return 0;
-  // discount_percentage takes precedence; otherwise compute from discount_amount
+  if (!match) return null;
+
+  // Fixed-amount tier — native per-unit DZD, NO percentage conversion
+  if (match.discount_amount != null && match.discount_amount > 0) {
+    return {
+      mode:               'fixed_amount',
+      discount_percentage: 0,
+      discount_amount:     match.discount_amount * qty,
+      quantity_discount_id: match.id,
+    };
+  }
+  // Percentage tier
   if (match.discount_percentage != null && match.discount_percentage > 0) {
-    return Math.min(100, match.discount_percentage);
+    const pct = Math.min(100, match.discount_percentage);
+    return {
+      mode:               'percentage',
+      discount_percentage: pct,
+      discount_amount:     0,
+      quantity_discount_id: match.id,
+    };
   }
-  if (match.discount_amount != null && match.discount_amount > 0 && unitPriceHt > 0) {
-    return Math.min(100, (match.discount_amount / unitPriceHt) * 100);
-  }
-  return 0;
+  return null;
+}
+
+/** @deprecated Use resolveQuantityTier instead */
+function findQuantityDiscount(discounts: QuantityDiscount[] | undefined, qty: number, unitPriceHt: number): number {
+  const resolved = resolveQuantityTier(discounts, qty, unitPriceHt);
+  if (!resolved) return 0;
+  if (resolved.mode === 'percentage') return resolved.discount_percentage;
+  // For fixed-amount: convert to percentage for backward-compat callers (addItem merge)
+  return unitPriceHt > 0 ? Math.min(100, (resolved.discount_amount / qty / unitPriceHt) * 100) : 0;
 }
 
 function recalcItem(item: CartItem): CartItem {
@@ -105,12 +138,13 @@ export const useCartStore = create<CartState>()(
           );
           if (existing) {
             const newQty   = existing.quantity + qty;
-            const autoDisc = findQuantityDiscount(variant.quantity_discounts, newQty, existing.base_price_ht ?? existing.unit_price_ht);
+            const resolved = resolveQuantityTier(variant.quantity_discounts, newQty, existing.base_price_ht ?? existing.unit_price_ht);
             const updated  = recalcItem({
               ...existing,
               quantity:            newQty,
-              discount_percentage: Math.max(existing.discount_percentage, autoDisc),
-              discount_mode:       'percentage',
+              discount_percentage: resolved?.discount_percentage ?? existing.discount_percentage,
+              discount_amount:     resolved?.mode === 'fixed_amount' ? resolved.discount_amount : existing.discount_amount,
+              discount_mode:       resolved?.mode ?? existing.discount_mode,
             });
             return {
               items: state.items.map(i =>
@@ -123,7 +157,7 @@ export const useCartStore = create<CartState>()(
           const priceHt  = variant.default_selling_price_ht * packQty;
           const baseHt   = variant.default_selling_price_ht;
           const tvaRate  = variant.tva?.rate ?? 0;
-          const autoDisc = findQuantityDiscount(variant.quantity_discounts, qty, variant.default_selling_price_ht ?? 0);
+          const resolved = resolveQuantityTier(variant.quantity_discounts, qty, variant.default_selling_price_ht ?? 0);
 
           const newItem: CartItem = recalcItem({
             id:                  nanoid(8),
@@ -140,9 +174,9 @@ export const useCartStore = create<CartState>()(
             selling_price_ttc:   priceHt * (1 + tvaRate / 100),
             tva_rate:            tvaRate,
             tva_id:              variant.tva_id ?? null,
-            discount_percentage: autoDisc,
-            discount_amount:     0,
-            discount_mode:       'percentage',
+            discount_percentage: resolved?.discount_percentage ?? 0,
+            discount_amount:     resolved?.discount_amount ?? 0,
+            discount_mode:       resolved?.mode ?? 'percentage',
             total_ht:            0,
             total_ttc:           0,
             manages_stock:       variant.manages_stock,
@@ -153,6 +187,7 @@ export const useCartStore = create<CartState>()(
             pack_qty:            packQty,
             packaging_label:     packaging?.label ?? null,
             base_price_ht:       baseHt,
+            quantity_discounts:  variant.quantity_discounts ?? [],
           });
 
           return { items: [...state.items, newItem], _isDirty: true };
@@ -167,7 +202,21 @@ export const useCartStore = create<CartState>()(
           const item = state.items.find(i => i.id === id);
           if (!item) return state;
           const safeQty = Math.max(0.001, qty);
-          const updated = recalcItem({ ...item, quantity: safeQty });
+
+          // Strict tier re-evaluation on every qty change.
+          // The backend ALWAYS re-evaluates tiers in createDocumentLines(),
+          // so the frontend must mirror this to keep cart display consistent.
+          const resolved = item.quantity_discounts?.length
+            ? resolveQuantityTier(item.quantity_discounts, safeQty, item.base_price_ht ?? item.unit_price_ht)
+            : null;
+
+          const updated = recalcItem({
+            ...item,
+            quantity:            safeQty,
+            discount_percentage: resolved?.discount_percentage ?? item.discount_percentage,
+            discount_amount:     resolved?.mode === 'fixed_amount' ? resolved.discount_amount : item.discount_amount,
+            discount_mode:       resolved?.mode ?? item.discount_mode,
+          });
           return { items: state.items.map(i => i.id === id ? updated : i), _isDirty: true };
         }),
 
@@ -215,6 +264,11 @@ export const useCartStore = create<CartState>()(
         set(state => {
           const packQty = packaging ? Math.max(1, Number(packaging.quantity) || 1) : 1;
           const newPrice = basePriceHt * packQty;
+          const item = state.items.find(i => i.id === id);
+          // Re-evaluate tier when packaging/price changes
+          const resolved = item?.quantity_discounts?.length
+            ? resolveQuantityTier(item.quantity_discounts, item.quantity, basePriceHt)
+            : null;
           return {
             items: state.items.map(i =>
               i.id === id
@@ -227,6 +281,9 @@ export const useCartStore = create<CartState>()(
                     unit_price_ht:    newPrice,
                     selling_price_ttc: newPrice * (1 + i.tva_rate / 100),
                     base_price_ht:    basePriceHt,
+                    discount_percentage: resolved?.discount_percentage ?? i.discount_percentage,
+                    discount_amount:     resolved?.mode === 'fixed_amount' ? resolved.discount_amount : i.discount_amount,
+                    discount_mode:       resolved?.mode ?? i.discount_mode,
                   })
                 : i,
             ),

@@ -745,6 +745,7 @@ function POSPage() {
           pack_qty:            pkg ? Number(pkg.quantity) : (pkgSnap ? Number(pkgSnap) : 1),
           packaging_label:     pkg?.label ?? null,
           base_price_ht:       priceHt / ((pkg ? Number(pkg.quantity) : (pkgSnap ? Number(pkgSnap) : 1)) || 1),
+          quantity_discounts:  (prod as any)?.quantity_discounts ?? [],
         };
       });
       const payments = (doc.payments ?? []).map(p => ({

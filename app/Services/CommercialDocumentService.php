@@ -513,8 +513,6 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 $tier = $product->applicableDiscount($priceLevelId, $baseQtyForDiscount);
 
                 if ($tier) {
-                    $unitPriceForCalc = (float) $lineData['unit_price_ht'];
-
                     if ($tier->discount_amount !== null && (float) $tier->discount_amount > 0) {
                         // Native fixed-amount tier — store as-is, no percentage conversion, ever.
                         $lineData['discount_amount_per_unit'] = (float) $tier->discount_amount;
@@ -524,6 +522,12 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                         $lineData['discount_amount_per_unit'] = null;
                     }
                     $quantityDiscountId = $tier->id;
+                } else {
+                    // No tier matches at current qty — clear any frontend-sent discount.
+                    // Prevents stale tier-2 discount persisting when qty drops below tier-2 min_qty.
+                    $lineData['discount_amount_per_unit'] = null;
+                    $lineData['discount_percentage']      = 0;
+                    $quantityDiscountId                   = null;
                 }
             }
 

@@ -684,6 +684,7 @@ export interface CartItem {
   pack_qty?:           number;
   packaging_label?:    string | null;
   base_price_ht?:      number;
+  quantity_discounts?: QuantityDiscount[];
 }
 export interface CartTotals {
   total_ht:       number;
