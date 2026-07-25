@@ -565,7 +565,9 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         $gross = $qty * $price;
 
         if ($discAmtPerUnit > 0) {
-            $discount = $discAmtPerUnit * $qty;
+            $packQty = (float) ($line['packaging_units_snapshot'] ?? 1);
+            $baseQty = $qty * $packQty;
+            $discount = $discAmtPerUnit * $baseQty;
         } else {
             $discount = $gross * ($discPct / 100);
         }

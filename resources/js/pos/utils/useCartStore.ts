@@ -47,24 +47,26 @@ interface ResolvedTier {
 function resolveQuantityTier(
   discounts: QuantityDiscount[] | undefined,
   qty: number,
-  unitPriceHt: number,
+  packQty: number,
 ): ResolvedTier | null {
   if (!discounts?.length) return null;
+  // Tier lookup uses BASE QTY (entered qty × packQty), matching backend
+  const baseQty = qty * (packQty || 1);
   const sorted = [...discounts]
     .filter(d => d.active && !d.is_blocked)
     .sort((a, b) => b.min_qty - a.min_qty);
   const match = sorted.find(d =>
-    qty >= d.min_qty &&
-    (d.max_qty === null || d.max_qty === undefined || qty <= d.max_qty)
+    baseQty >= d.min_qty &&
+    (d.max_qty === null || d.max_qty === undefined || baseQty <= d.max_qty)
   );
   if (!match) return null;
 
-  // Fixed-amount tier — native per-unit DZD, NO percentage conversion
+  // Fixed-amount tier — per-BASE-UNIT DZD, NO percentage conversion
   if (match.discount_amount != null && match.discount_amount > 0) {
     return {
       mode:               'fixed_amount',
       discount_percentage: 0,
-      discount_amount:     match.discount_amount * qty,
+      discount_amount:     match.discount_amount * baseQty,
       quantity_discount_id: match.id,
     };
   }
@@ -82,12 +84,12 @@ function resolveQuantityTier(
 }
 
 /** @deprecated Use resolveQuantityTier instead */
-function findQuantityDiscount(discounts: QuantityDiscount[] | undefined, qty: number, unitPriceHt: number): number {
-  const resolved = resolveQuantityTier(discounts, qty, unitPriceHt);
+function findQuantityDiscount(discounts: QuantityDiscount[] | undefined, qty: number, unitPriceHt: number, packQty: number = 1): number {
+  const resolved = resolveQuantityTier(discounts, qty, packQty);
   if (!resolved) return 0;
   if (resolved.mode === 'percentage') return resolved.discount_percentage;
-  // For fixed-amount: convert to percentage for backward-compat callers (addItem merge)
-  return unitPriceHt > 0 ? Math.min(100, (resolved.discount_amount / qty / unitPriceHt) * 100) : 0;
+  const baseQty = qty * (packQty || 1);
+  return unitPriceHt > 0 ? Math.min(100, (resolved.discount_amount / baseQty / unitPriceHt) * 100) : 0;
 }
 
 function recalcItem(item: CartItem): CartItem {
@@ -138,7 +140,8 @@ export const useCartStore = create<CartState>()(
           );
           if (existing) {
             const newQty   = existing.quantity + qty;
-            const resolved = resolveQuantityTier(variant.quantity_discounts, newQty, existing.base_price_ht ?? existing.unit_price_ht);
+            const existPackQty = existing.pack_qty ?? 1;
+            const resolved = resolveQuantityTier(variant.quantity_discounts, newQty, existPackQty);
             const updated  = recalcItem({
               ...existing,
               quantity:            newQty,
@@ -157,7 +160,7 @@ export const useCartStore = create<CartState>()(
           const priceHt  = variant.default_selling_price_ht * packQty;
           const baseHt   = variant.default_selling_price_ht;
           const tvaRate  = variant.tva?.rate ?? 0;
-          const resolved = resolveQuantityTier(variant.quantity_discounts, qty, variant.default_selling_price_ht ?? 0);
+          const resolved = resolveQuantityTier(variant.quantity_discounts, qty, packQty);
 
           const newItem: CartItem = recalcItem({
             id:                  nanoid(8),
@@ -206,8 +209,9 @@ export const useCartStore = create<CartState>()(
           // Strict tier re-evaluation on every qty change.
           // The backend ALWAYS re-evaluates tiers in createDocumentLines(),
           // so the frontend must mirror this to keep cart display consistent.
+          const packQty = item.pack_qty ?? 1;
           const resolved = item.quantity_discounts?.length
-            ? resolveQuantityTier(item.quantity_discounts, safeQty, item.base_price_ht ?? item.unit_price_ht)
+            ? resolveQuantityTier(item.quantity_discounts, safeQty, packQty)
             : null;
 
           const updated = recalcItem({
@@ -267,7 +271,7 @@ export const useCartStore = create<CartState>()(
           const item = state.items.find(i => i.id === id);
           // Re-evaluate tier when packaging/price changes
           const resolved = item?.quantity_discounts?.length
-            ? resolveQuantityTier(item.quantity_discounts, item.quantity, basePriceHt)
+            ? resolveQuantityTier(item.quantity_discounts, item.quantity, packQty)
             : null;
           return {
             items: state.items.map(i =>

@@ -1029,11 +1029,13 @@ const handleCompleteSale = useCallback(async (params: {
 
       const linesPayload = currentItems.map(i => {
         const compoundedDisc = compoundDiscountPct(i.discount_percentage, currentInvDisc);
-        const lineDiscAmount = i.quantity > 0 ? Math.round((i.discount_amount / i.quantity) * 100) / 100 : 0;
+        const baseQty = i.quantity * (i.pack_qty ?? 1);
+        const lineDiscAmount = baseQty > 0 ? Math.round((i.discount_amount / baseQty) * 100) / 100 : 0;
         const isFixedAmount  = i.discount_mode === 'fixed_amount' && lineDiscAmount > 0;
         return {
           product_id:               i.product_id,
           quantity:                 i.quantity,
+          pack_qty:                 i.pack_qty ?? 1,
           unit_price_ht:            i.unit_price_ht,
           discount_percentage:      isFixedAmount ? 0 : Math.min(100, compoundedDisc),
           discount_amount:          lineDiscAmount,
@@ -1045,15 +1047,17 @@ const handleCompleteSale = useCallback(async (params: {
 
       const effectiveTotalHt = linesPayload.reduce((s, l) => {
         const gross = l.quantity * l.unit_price_ht;
+        const bq = l.quantity * l.pack_qty;
         const disc = l.discount_amount_per_unit
-          ? l.discount_amount_per_unit * l.quantity
+          ? l.discount_amount_per_unit * bq
           : gross * (l.discount_percentage / 100);
         return s + gross - disc;
       }, 0);
       const effectiveTotalTva = linesPayload.reduce((s, l) => {
         const gross = l.quantity * l.unit_price_ht;
+        const bq = l.quantity * l.pack_qty;
         const disc = l.discount_amount_per_unit
-          ? l.discount_amount_per_unit * l.quantity
+          ? l.discount_amount_per_unit * bq
           : gross * (l.discount_percentage / 100);
         const lineHt = gross - disc;
         return s + lineHt * l.tva_rate / 100;

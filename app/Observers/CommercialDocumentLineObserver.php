@@ -56,10 +56,12 @@ class CommercialDocumentLineObserver
 
         $gross = $qty * $price;
 
-        // Native fixed-amount path: discount_amount_per_unit is the frozen per-unit
-        // discount from a quantity tier. NEVER convert to/from percentage here.
+        // Native fixed-amount path: discount_amount_per_unit is per-BASE-UNIT from a
+        // quantity tier. Multiply by baseQty (qty × packQty), NOT just qty.
         if ($discAmtPerUnit > 0) {
-            $discountTotal = $discAmtPerUnit * $qty;
+            $packQty = (float) ($line->packaging_units_snapshot ?? 1);
+            $baseQty = $qty * $packQty;
+            $discountTotal = $discAmtPerUnit * $baseQty;
             $unitDiscount  = $discAmtPerUnit;
         } else {
             $discountTotal = $gross * ($discPct / 100);
