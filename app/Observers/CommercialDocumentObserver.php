@@ -68,7 +68,7 @@ class CommercialDocumentObserver
     {
         $totalHt       = (float) $document->lines->sum('total_ht');
         $totalTva      = (float) $document->lines->sum('total_tva');
-        $totalDiscount = (float) $document->lines->sum('discount_amount');
+        $totalDiscount = (float) $document->lines->sum('total_discount_amount');
         $totalTtc      = $totalHt + $totalTva;
 
         // الطابع الجبائي — يُحسب فقط إذا كان الإعداد مفعّلاً

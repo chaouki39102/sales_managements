@@ -374,7 +374,7 @@ class PartyBalanceService
                 DB::raw('SUM(CASE WHEN dbo.name = \'sale\' THEN CASE WHEN dt.code = \'AV\' THEN -cdl.total_ht ELSE cdl.total_ht END WHEN dbo.name = \'purchase\' THEN CASE WHEN dt.code = \'AA\' THEN -cdl.total_ht ELSE cdl.total_ht END ELSE 0 END) as total_ht'),
                 DB::raw('SUM(CASE WHEN dbo.name = \'sale\' THEN CASE WHEN dt.code = \'AV\' THEN -cdl.total_ttc ELSE cdl.total_ttc END WHEN dbo.name = \'purchase\' THEN CASE WHEN dt.code = \'AA\' THEN -cdl.total_ttc ELSE cdl.total_ttc END ELSE 0 END) as total_ttc'),
                 DB::raw('SUM(cdl.total_tva) as total_tva'),
-                DB::raw('SUM(cdl.discount_amount) as total_discount'),
+                DB::raw('SUM(cdl.total_discount_amount) as total_discount'),
                 DB::raw('COUNT(DISTINCT cd.id) as doc_count')
             )
             ->groupBy('p.id', 'p.name', 'p.ref', 'u.name', 'br.name', 'f.name', 'dbo.name')
