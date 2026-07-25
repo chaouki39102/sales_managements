@@ -60,13 +60,11 @@ function findQuantityDiscount(discounts: QuantityDiscount[] | undefined, qty: nu
 function recalcItem(item: CartItem): CartItem {
   const gross = item.unit_price_ht * item.quantity;
   let discAmount: number;
-  if (item.discount_amount > 0) {
+  if (item.discount_mode === 'fixed_amount') {
     discAmount = Math.min(gross, item.discount_amount);
     item = { ...item, discount_percentage: gross > 0 ? round2((discAmount / gross) * 100) : 0 };
-  } else if (item.discount_percentage > 0) {
-    discAmount = gross * (item.discount_percentage / 100);
   } else {
-    discAmount = 0;
+    discAmount = gross * (item.discount_percentage / 100);
   }
   const totalHt  = gross - discAmount;
   const totalTva = totalHt * (item.tva_rate / 100);
@@ -112,6 +110,7 @@ export const useCartStore = create<CartState>()(
               ...existing,
               quantity:            newQty,
               discount_percentage: Math.max(existing.discount_percentage, autoDisc),
+              discount_mode:       'percentage',
             });
             return {
               items: state.items.map(i =>
@@ -143,6 +142,7 @@ export const useCartStore = create<CartState>()(
             tva_id:              variant.tva_id ?? null,
             discount_percentage: autoDisc,
             discount_amount:     0,
+            discount_mode:       'percentage',
             total_ht:            0,
             total_ttc:           0,
             manages_stock:       variant.manages_stock,
@@ -179,6 +179,7 @@ export const useCartStore = create<CartState>()(
                   ...i,
                   discount_percentage: Math.min(100, Math.max(0, pct)),
                   discount_amount:     0,
+                  discount_mode:       'percentage',
                 })
               : i,
           ),
@@ -193,6 +194,7 @@ export const useCartStore = create<CartState>()(
                   ...i,
                   discount_amount:     Math.max(0, amount),
                   discount_percentage: 0,
+                  discount_mode:       'fixed_amount',
                 })
               : i,
           ),

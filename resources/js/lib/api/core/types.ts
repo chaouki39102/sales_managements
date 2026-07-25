@@ -673,6 +673,7 @@ export interface CartItem {
   tva_id?:             number | null;
   discount_percentage: number;
   discount_amount:     number;
+  discount_mode?:      'percentage' | 'fixed_amount';
   total_ht:            number;
   total_ttc:           number;
   max_stock?:          number | null;

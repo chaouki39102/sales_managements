@@ -725,6 +725,7 @@ function POSPage() {
           tva_id:              v?.tva_id ?? null,
           discount_percentage: 0,
           discount_amount:     Math.round(totalDisc * 100) / 100,
+          discount_mode:       'fixed_amount',
           total_ht:            Number(line.total_ht),
           total_ttc:           Number(line.total_ttc),
           max_stock:           null,
