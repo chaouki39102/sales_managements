@@ -6,6 +6,7 @@ import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
+import SimpleTable from '@/components/ui/SimpleTable';
 import KpiCard from '@/components/ui/KpiCard';
 import EmptyState from '@/components/ui/EmptyState';
 import AlertBar from '@/components/ui/AlertBar';
@@ -114,75 +115,50 @@ export default function DocumentTypesPage() {
                 <EmptyState icon="ti-file-off" text="لم يتم العثور على أنواع مستندات" sub="أضف نوعاً جديداً للبدء" action={<Button variant="primary" onClick={openAdd}>إضافة نوع جديد</Button>} />
             ) : (
                 <Card noHeader style={{ padding: 0 }}>
-                    <div className="tw">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>الاسم (عربي)</th>
-                                    <th>الاسم (لاتيني)</th>
-                                    <th>الكود</th>
-                                    <th>العملية الأساسية</th>
-                                    <th>اتجاه المخزون</th>
-                                    <th>يحتاج متعامل</th>
-                                    <th>محاسبي</th>
-                                    <th>نشط</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {items.map((item: any) => {
-                                    // الحصول على اسم العملية من الخريطة
-                                    const operationName = operationMap[item.document_base_operation_id] || '-';
-                                    const operationCode = operationsArray.find((o: any) => o.id === item.document_base_operation_id)?.name || '';
-                                    // اختيار لون البادج
-                                    let badgeVariant: any = 'info';
-                                    if (operationCode === 'sale') badgeVariant = 'success';
-                                    else if (operationCode === 'purchase') badgeVariant = 'warning';
-                                    else if (operationCode === 'transfer') badgeVariant = 'info';
-                                    else if (operationCode === 'adjustment') badgeVariant = 'info';
-
-                                    return (
-                                        <tr key={item.id}>
-                                            <td className="s">{item.name}</td>
-                                            <td style={{ color: 'var(--t3)' }}>{item.name_latin}</td>
-                                            <td className="m">{item.code}</td>
-                                            <td>
-                                                <Badge variant={badgeVariant}>
-                                                    {operationName}
-                                                </Badge>
-                                            </td>
-                                            <td style={{ textAlign: 'center' }}>
-                                                {item.affects_stock_direction === 1 ? (
-                                                    <Badge variant="success">+ دخول</Badge>
-                                                ) : item.affects_stock_direction === -1 ? (
-                                                    <Badge variant="danger">- خروج</Badge>
-                                                ) : (
-                                                    <Badge variant="gray">لا تأثير</Badge>
-                                                )}
-                                            </td>
-                                            <td style={{ textAlign: 'center' }}>
-                                                <span className="ic ic-xs" style={{ color: item.requires_party ? 'var(--em)' : 'var(--t4)' }}>
-                                                    <i className={`ti ${item.requires_party ? 'ti-check' : 'ti-x'}`} />
-                                                </span>
-                                            </td>
-                                            <td style={{ textAlign: 'center' }}>
-                                                <span className="ic ic-xs" style={{ color: item.affects_accounting ? 'var(--em)' : 'var(--t4)' }}>
-                                                    <i className={`ti ${item.affects_accounting ? 'ti-check' : 'ti-x'}`} />
-                                                </span>
-                                            </td>
-                                            <td><Badge variant={item.active ? 'success' : 'danger'}>{item.active ? 'نشط' : 'موقوف'}</Badge></td>
-                                            <td>
-                                                <div style={{ display: 'flex', gap: 3 }}>
-                                                    <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={() => openEdit(item)} />
-                                                    <Button size="xs" variant="danger" icon={<i className="ti ti-trash" />} onClick={() => handleDelete(item.id)} />
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
+                    <SimpleTable
+                        columns={[
+                            { key: 'name', label: 'الاسم (عربي)', className: 's' },
+                            { key: 'name_latin', label: 'الاسم (لاتيني)', render: (v) => <span style={{ color: 'var(--t3)' }}>{v as string}</span> },
+                            { key: 'code', label: 'الكود', className: 'm' },
+                            { key: 'document_base_operation_id', label: 'العملية الأساسية', render: (v, row) => {
+                                const item = row as any;
+                                const opName = operationMap[item.document_base_operation_id] || '-';
+                                const opCode = operationsArray.find((o: any) => o.id === item.document_base_operation_id)?.name || '';
+                                let variant: any = 'info';
+                                if (opCode === 'sale') variant = 'success';
+                                else if (opCode === 'purchase') variant = 'warning';
+                                return <Badge variant={variant}>{opName}</Badge>;
+                            }},
+                            { key: 'affects_stock_direction', label: 'اتجاه المخزون', align: 'center', render: (v) => (
+                                v === 1 ? <Badge variant="success">+ دخول</Badge> :
+                                v === -1 ? <Badge variant="danger">- خروج</Badge> :
+                                <Badge variant="gray">لا تأثير</Badge>
+                            )},
+                            { key: 'requires_party', label: 'يحتاج متعامل', align: 'center', render: (v) => (
+                                <span className="ic ic-xs" style={{ color: v ? 'var(--em)' : 'var(--t4)' }}>
+                                    <i className={`ti ${v ? 'ti-check' : 'ti-x'}`} />
+                                </span>
+                            )},
+                            { key: 'affects_accounting', label: 'محاسبي', align: 'center', render: (v) => (
+                                <span className="ic ic-xs" style={{ color: v ? 'var(--em)' : 'var(--t4)' }}>
+                                    <i className={`ti ${v ? 'ti-check' : 'ti-x'}`} />
+                                </span>
+                            )},
+                            { key: 'active', label: 'نشط', render: (v) => <Badge variant={v ? 'success' : 'danger'}>{v ? 'نشط' : 'موقوف'}</Badge> },
+                            { key: '_actions', label: '', render: (_, row) => {
+                                const item = row as any;
+                                return (
+                                    <div style={{ display: 'flex', gap: 3 }}>
+                                        <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={() => openEdit(item)} />
+                                        <Button size="xs" variant="danger" icon={<i className="ti ti-trash" />} onClick={() => handleDelete(item.id)} />
+                                    </div>
+                                );
+                            }},
+                        ]}
+                        data={items as any}
+                        rowKey="id"
+                        emptyText="لم يتم العثور على أنواع مستندات"
+                    />
                 </Card>
             )}
 

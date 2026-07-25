@@ -11,6 +11,7 @@ import Button from '@/components/ui/Button';
 import KpiCard from '@/components/ui/KpiCard';
 import Avatar from '@/components/ui/Avatar';
 import EmptyState from '@/components/ui/EmptyState';
+import SimpleTable from '@/components/ui/SimpleTable';
 import SearchInput from '@/components/ui/SearchInput';
 import Skeleton from '@/components/ui/Skeleton';
 import ClientModal from '@/components/modals/ClientModal';
@@ -564,32 +565,20 @@ export default function ClientsPage() {
         />
       ) : (
         <Card noHeader className="p-0">
-          <div className="tw">
-            <table className="table">
-              <thead>
-                <tr>
-                  {buildTableCols(hiddenCols).map(col => (
-                    <th key={col.key} style={col.thStyle}
-                      onClick={col.sortable ? () => handleSort(col.sortField ?? col.key) : undefined}>
-                      {col.label}{col.sortable && sortField === (col.sortField ?? col.key) ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {clients.map((c, idx) => {
-                  const rowNum = (currentPage - 1) * perPage + idx + 1;
-                  return (
-                    <tr key={c.id}>
-                      {buildTableCols(hiddenCols).map(col => (
-                        <td key={col.key} style={col.tdStyle}>{col.render(c, idx, rowNum)}</td>
-                      ))}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <SimpleTable
+            columns={buildTableCols(hiddenCols).map(col => ({
+              key: col.key,
+              label: col.label + (col.sortable && sortField === (col.sortField ?? col.key) ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''),
+              render: (_v: unknown, row: Record<string, unknown>) => {
+                const c = row as unknown as Party;
+                const idx = clients.indexOf(c);
+                const rowNum = (currentPage - 1) * perPage + idx + 1;
+                return col.render(c, idx, rowNum);
+              },
+            }))}
+            data={clients as unknown as Record<string, unknown>[]}
+            rowKey="id"
+          />
 
           {meta && (
             <ClientsPagination

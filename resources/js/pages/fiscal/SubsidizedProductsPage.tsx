@@ -3,6 +3,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
+import SimpleTable from '@/components/ui/SimpleTable';
 import KpiCard from '@/components/ui/KpiCard';
 import Modal from '@/components/ui/Modal';
 import { Input, Select, FormField } from '@/components/ui/FormInputs';
@@ -62,71 +63,58 @@ export default function SubsidizedProductsPage() {
       {/* Violations */}
       {violations && violations.length > 0 && (
         <Card title="مخالفات الأسعار" subtitle="مواد بيعت بأكثر من السعر الأقصى القانوني" style={{ marginBottom: 20 }}>
-          <div className="tw">
-            <table>
-              <thead><tr><th>المنتج</th><th>الكمية</th><th>سعر البيع</th><th>السعر الأقصى</th></tr></thead>
-              <tbody>
-                {violations.map((v) => (
-                  <tr key={v.id}>
-                    <td>{v.product_label}</td>
-                    <td>{v.qty_sold}</td>
-                    <td className="e">{v.weighted_avg_sell_price?.toLocaleString('fr-DZ')} دج</td>
-                    <td className="e">{v.pmp?.toLocaleString('fr-DZ')} دج</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <SimpleTable
+            columns={[
+              { key: 'product_label', label: 'المنتج' },
+              { key: 'qty_sold', label: 'الكمية', className: 'm' },
+              { key: 'weighted_avg_sell_price', label: 'سعر البيع', render: (v) => <span className="e">{(v as number)?.toLocaleString('fr-DZ')} دج</span> },
+              { key: 'pmp', label: 'السعر الأقصى', render: (v) => <span className="e">{(v as number)?.toLocaleString('fr-DZ')} دج</span> },
+            ]}
+            data={violations}
+            rowKey="id"
+            emptyText="لا توجد مخالفات"
+          />
         </Card>
       )}
 
       {/* Details */}
       <Card title="تفاصيل المواد المدعمة" subtitle="الهامش و IFU لكل مادة">
-        <div className="tw">
-          <table>
-            <thead>
-              <tr>
-                <th>المنتج</th>
-                <th>الكمية</th>
-                <th>متوسط سعر البيع</th>
-                <th>PMP</th>
-                <th>الإيرادات</th>
-                <th>تكلفة الشراء</th>
-                <th>الهامش</th>
-                <th>IFU</th>
-                <th>حالة السعر</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {summary?.summaries?.map((s) => (
-                <tr key={s.id} style={s.price_violation ? { background: 'rgba(255,0,0,0.05)' } : undefined}>
-                  <td>{s.product_label}</td>
-                  <td className="m">{s.qty_sold}</td>
-                  <td className="m">{s.weighted_avg_sell_price?.toLocaleString('fr-DZ')} دج</td>
-                  <td className="m">{s.pmp?.toLocaleString('fr-DZ')} دج</td>
-                  <td className="m">{s.total_revenue?.toLocaleString('fr-DZ')} دج</td>
-                  <td className="m">{s.total_purchase_cost?.toLocaleString('fr-DZ')} دج</td>
-                  <td className={s.margin >= 0 ? 'e' : 'r'}>{s.margin?.toLocaleString('fr-DZ')} دج</td>
-                  <td className="e">{s.ifu_due?.toLocaleString('fr-DZ')} دج</td>
-                  <td>{s.price_violation ? <Badge variant="danger">مخالف</Badge> : <Badge variant="success">مطابق</Badge>}</td>
-                  <td>
-                    <div className="ac">
-                      <button className="btn btn-icon btn-ghost" title="تعديل"
-                        onClick={() => { setEditing(s); editModal.openModal(); }}>
-                        <i className="ti ti-pencil" />
-                      </button>
-                      <button className="btn btn-icon btn-ghost c-r" title="حذف"
-                        onClick={async () => { if (await deleteConfirm.confirm('تأكيد حذف هذه المادة؟')) mutations.deleteSubsidizedRow.mutate(s.id, { onSuccess: () => notify.success('تم الحذف') }); }}>
-                        <i className="ti ti-trash" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <style>{`.tw-row-violation{background:rgba(255,0,0,.05)}`}</style>
+        <SimpleTable
+          columns={[
+            { key: 'product_label', label: 'المنتج' },
+            { key: 'qty_sold', label: 'الكمية', className: 'm' },
+            { key: 'weighted_avg_sell_price', label: 'متوسط سعر البيع', className: 'm', render: (v) => `${(v as number)?.toLocaleString('fr-DZ')} دج` },
+            { key: 'pmp', label: 'PMP', className: 'm', render: (v) => `${(v as number)?.toLocaleString('fr-DZ')} دج` },
+            { key: 'total_revenue', label: 'الإيرادات', className: 'm', render: (v) => `${(v as number)?.toLocaleString('fr-DZ')} دج` },
+            { key: 'total_purchase_cost', label: 'تكلفة الشراء', className: 'm', render: (v) => `${(v as number)?.toLocaleString('fr-DZ')} دج` },
+            { key: 'margin', label: 'الهامش', render: (v) => {
+              const cls = (v as number) >= 0 ? 'e' : 'r';
+              return <span className={cls}>{(v as number)?.toLocaleString('fr-DZ')} دج</span>;
+            }},
+            { key: 'ifu_due', label: 'IFU', render: (v) => <span className="e">{(v as number)?.toLocaleString('fr-DZ')} دج</span> },
+            { key: 'price_violation', label: 'حالة السعر', render: (v) => v ? <Badge variant="danger">مخالف</Badge> : <Badge variant="success">مطابق</Badge> },
+            { key: '_actions', label: '', render: (_, row) => {
+              const s = row as SubsidizedSalesSummary;
+              return (
+                <div className="ac">
+                  <button className="btn btn-icon btn-ghost" title="تعديل"
+                    onClick={() => { setEditing(s); editModal.openModal(); }}>
+                    <i className="ti ti-pencil" />
+                  </button>
+                  <button className="btn btn-icon btn-ghost c-r" title="حذف"
+                    onClick={async () => { if (await deleteConfirm.confirm('تأكيد حذف هذه المادة؟')) mutations.deleteSubsidizedRow.mutate(s.id, { onSuccess: () => notify.success('تم الحذف') }); }}>
+                    <i className="ti ti-trash" />
+                  </button>
+                </div>
+              );
+            }},
+          ]}
+          data={summary?.summaries ?? []}
+          rowKey="id"
+          rowClassName={(row) => (row as SubsidizedSalesSummary).price_violation ? 'tw-row-violation' : ''}
+          emptyText="لا توجد بيانات"
+        />
       </Card>
 
       {/* Edit Modal */}

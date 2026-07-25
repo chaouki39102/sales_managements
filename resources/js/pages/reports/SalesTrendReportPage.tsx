@@ -7,6 +7,7 @@ import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import SimpleTable from '@/components/ui/SimpleTable';
 
 const def = REPORT_DEFAULTS;
 
@@ -41,59 +42,44 @@ export default function SalesTrendReportPage() {
         </div>
         {data.by_type.length > 0 && (
           <Card title="حسب نوع الوثيقة" titleIcon="ti-file-text" padding="sm" style={{ borderRadius: 12 }}>
-            <div className="tw">
-              <table>
-                <thead><tr><th>النوع</th><th className="num">العدد</th><th className="num">HT</th><th className="num">TTC</th></tr></thead>
-                <tbody>
-                  {data.by_type.map((t) => (
-                    <tr key={t.code}>
-                      <td style={{ fontWeight: 700 }}>{t.code}</td>
-                      <td className="num">{t.count}</td>
-                      <td className="num">{MONEY(t.total_ht)}</td>
-                      <td className="num">{MONEY(t.total_ttc)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <SimpleTable
+              rowKey={(row) => String(row.code ?? '')}
+              columns={[
+                { key: 'code', label: 'النوع', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
+                { key: 'count', label: 'العدد', className: 'num' },
+                { key: 'total_ht', label: 'HT', className: 'num', render: (v) => MONEY(v as number) },
+                { key: 'total_ttc', label: 'TTC', className: 'num', render: (v) => MONEY(v as number) },
+              ]}
+              data={data.by_type}
+            />
           </Card>
         )}
         {data.monthly.length > 0 && (
           <Card title="التطور الشهري" titleIcon="ti-chart-line" padding="sm" style={{ borderRadius: 12 }}>
-            <div className="tw">
-              <table>
-                <thead><tr><th>الشهر</th><th className="num">العدد</th><th className="num">HT</th><th className="num">TTC</th></tr></thead>
-                <tbody>
-                  {data.monthly.map((m) => (
-                    <tr key={m.month}>
-                      <td style={{ fontWeight: 700 }}>{m.month}</td>
-                      <td className="num">{m.count}</td>
-                      <td className="num">{MONEY(m.total_ht)}</td>
-                      <td className="num">{MONEY(m.total_ttc)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <SimpleTable
+              rowKey={(row) => String(row.month ?? '')}
+              columns={[
+                { key: 'month', label: 'الشهر', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
+                { key: 'count', label: 'العدد', className: 'num' },
+                { key: 'total_ht', label: 'HT', className: 'num', render: (v) => MONEY(v as number) },
+                { key: 'total_ttc', label: 'TTC', className: 'num', render: (v) => MONEY(v as number) },
+              ]}
+              data={data.monthly}
+            />
           </Card>
         )}
         {data.weekly.length > 0 && (
           <Card title="التطور الأسبوعي" titleIcon="ti-calendar" padding="sm" style={{ borderRadius: 12 }}>
-            <div className="tw">
-              <table>
-                <thead><tr><th>الأسبوع</th><th className="num">العدد</th><th className="num">HT</th><th className="num">TTC</th></tr></thead>
-                <tbody>
-                  {data.weekly.map((w) => (
-                    <tr key={w.week}>
-                      <td style={{ fontWeight: 700 }}>{w.week}</td>
-                      <td className="num">{w.count}</td>
-                      <td className="num">{MONEY(w.total_ht)}</td>
-                      <td className="num">{MONEY(w.total_ttc)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <SimpleTable
+              rowKey={(row) => String(row.week ?? '')}
+              columns={[
+                { key: 'week', label: 'الأسبوع', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
+                { key: 'count', label: 'العدد', className: 'num' },
+                { key: 'total_ht', label: 'HT', className: 'num', render: (v) => MONEY(v as number) },
+                { key: 'total_ttc', label: 'TTC', className: 'num', render: (v) => MONEY(v as number) },
+              ]}
+              data={data.weekly}
+            />
           </Card>
         )}
       </>

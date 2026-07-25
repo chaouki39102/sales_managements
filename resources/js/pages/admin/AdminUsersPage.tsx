@@ -8,6 +8,8 @@ import { adminApi } from '@/lib/admin';
 import { adminKeys } from '@/lib/api/core/queryKeys';
 import { tokenStorage } from '@/lib/api/core/client';
 import { useDebounce } from '@/hooks/useDebounce';
+import PageHeader from '@/components/ui/PageHeader';
+import SimpleTable from '@/components/ui/SimpleTable';
 import type { AdminUser, AdminCompany } from '@/types/admin';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -456,20 +458,17 @@ export default function AdminUsersPage() {
   const meta = (data as any)?.meta;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="page on" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--t1)' }}>إدارة المستخدمين</div>
-          <div style={{ fontSize: 12, color: 'var(--t4)', marginTop: 2 }}>
-            {meta ? `${meta.total} مستخدم` : '—'}
-          </div>
-        </div>
-        <button className="btn" onClick={() => refetch()} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <i className="ti ti-refresh" /> تحديث
-        </button>
-      </div>
+      <PageHeader
+        title="إدارة المستخدمين"
+        description={meta ? `${meta.total} مستخدم` : '—'}
+        actions={
+          <button className="btn" onClick={() => refetch()} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-refresh" /> تحديث
+          </button>
+        }
+      />
 
       {/* Filters */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 10 }}>
@@ -520,90 +519,72 @@ export default function AdminUsersPage() {
             <button className="btn btn-p" onClick={() => refetch()}>إعادة المحاولة</button>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: 'var(--bg3)', borderBottom: '1px solid var(--b1)' }}>
-                  {['المستخدم', 'الدور', 'الشركات', 'الحالة', 'التفعيل', 'تاريخ الإنشاء', ''].map(h => (
-                    <th key={h} style={{
-                      padding: '10px 14px', fontSize: 11.5, fontWeight: 700,
-                      color: 'var(--t4)', textAlign: 'right', whiteSpace: 'nowrap',
-                    }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {users.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'var(--t4)', fontSize: 13 }}>
-                      <i className="ti ti-users" style={{ fontSize: 30, display: 'block', marginBottom: 8, opacity: .5 }} />
-                      لا يوجد مستخدمون
-                    </td>
-                  </tr>
-                ) : users.map(u => (
-                  <tr key={u.id}
-                    style={{ borderBottom: '1px solid var(--b1)', transition: 'background .1s', cursor: 'pointer' }}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-                    onClick={() => setSelected(u)}
-                  >
-                    <td style={{ padding: '11px 14px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{
-                          width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
-                          background: avGrad(u.id), display: 'flex',
-                          alignItems: 'center', justifyContent: 'center',
-                          color: '#fff', fontSize: 13, fontWeight: 800,
-                        }}>{u.name?.[0]?.toUpperCase()}</div>
-                        <div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>{u.name}</div>
-                          <div style={{ fontSize: 11, color: 'var(--t4)' }}>{u.email}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td style={{ padding: '11px 14px' }}>
-                      <span style={{
-                        fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20,
-                        background: u.role === 'super_admin' ? 'var(--redb)' : 'var(--purb)',
-                        color: u.role === 'super_admin' ? 'var(--red)' : 'var(--purple)',
-                      }}>{u.role ?? 'user'}</span>
-                    </td>
-                    <td style={{ padding: '11px 14px', fontSize: 13, color: 'var(--t2)' }}>
-                      {u.companies_count ?? 0}
-                    </td>
-                    <td style={{ padding: '11px 14px' }}>
-                      <span style={{
-                        fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20,
-                        background: u.active ? 'var(--greenb)' : 'var(--b2)',
-                        color: u.active ? 'var(--green)' : 'var(--t3)',
-                      }}>{u.active ? 'نشط' : 'معطل'}</span>
-                    </td>
-                    <td style={{ padding: '11px 14px' }}>
-                      <span style={{
-                        fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20,
-                        background: u.is_approved ? 'var(--greenb)' : 'var(--goldb)',
-                        color: u.is_approved ? 'var(--green)' : 'var(--gold)',
-                      }}>{u.is_approved ? 'مفعّل' : 'بانتظار'}</span>
-                    </td>
-                    <td style={{ padding: '11px 14px', fontSize: 12, color: 'var(--t4)', whiteSpace: 'nowrap' }}>
-                      {fmtDate(u.created_at)}
-                    </td>
-                    <td style={{ padding: '11px 14px' }}>
-                      <button
-                        onClick={e => { e.stopPropagation(); setSelected(u); }}
-                        style={{
-                          padding: '5px 12px', borderRadius: 7, border: '1px solid var(--b2)',
-                          background: 'var(--bg3)', color: 'var(--t3)', fontSize: 11.5,
-                          cursor: 'pointer', fontFamily: 'Tajawal,sans-serif', fontWeight: 600,
-                        }}>
-                        إدارة
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <SimpleTable
+            isLoading={isLoading}
+            columns={[
+              { key: 'name', label: 'المستخدم', render: (_v, row) => {
+                const u = row as unknown as AdminUser;
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{
+                      width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+                      background: avGrad(u.id), display: 'flex',
+                      alignItems: 'center', justifyContent: 'center',
+                      color: '#fff', fontSize: 13, fontWeight: 800,
+                    }}>{u.name?.[0]?.toUpperCase()}</div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>{u.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--t4)' }}>{u.email}</div>
+                    </div>
+                  </div>
+                );
+              }},
+              { key: 'role', label: 'الدور', render: (v) => (
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20,
+                  background: v === 'super_admin' ? 'var(--redb)' : 'var(--purb)',
+                  color: v === 'super_admin' ? 'var(--red)' : 'var(--purple)',
+                }}>{(v as string) ?? 'user'}</span>
+              )},
+              { key: 'companies_count', label: 'الشركات', render: (v) => (
+                <span style={{ fontSize: 13, color: 'var(--t2)' }}>{(v as number) ?? 0}</span>
+              )},
+              { key: 'active', label: 'الحالة', render: (v) => (
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20,
+                  background: v ? 'var(--greenb)' : 'var(--b2)',
+                  color: v ? 'var(--green)' : 'var(--t3)',
+                }}>{v ? 'نشط' : 'معطل'}</span>
+              )},
+              { key: 'is_approved', label: 'التفعيل', render: (v) => (
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20,
+                  background: v ? 'var(--greenb)' : 'var(--goldb)',
+                  color: v ? 'var(--green)' : 'var(--gold)',
+                }}>{v ? 'مفعّل' : 'بانتظار'}</span>
+              )},
+              { key: 'created_at', label: 'تاريخ الإنشاء', render: (v) => (
+                <span style={{ fontSize: 12, color: 'var(--t4)', whiteSpace: 'nowrap' }}>
+                  {fmtDate(v as string)}
+                </span>
+              )},
+              { key: 'action', label: '', render: (_v, row) => (
+                <button
+                  onClick={e => { e.stopPropagation(); setSelected(row as unknown as AdminUser); }}
+                  style={{
+                    padding: '5px 12px', borderRadius: 7, border: '1px solid var(--b2)',
+                    background: 'var(--bg3)', color: 'var(--t3)', fontSize: 11.5,
+                    cursor: 'pointer', fontFamily: 'Tajawal,sans-serif', fontWeight: 600,
+                  }}>
+                  إدارة
+                </button>
+              )},
+            ]}
+            data={users}
+            rowKey="id"
+            emptyText="لا يوجد مستخدمون"
+            onRowClick={(row) => setSelected(row as unknown as AdminUser)}
+          />
         )}
 
         {/* Pagination */}

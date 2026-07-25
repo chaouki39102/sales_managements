@@ -7,6 +7,7 @@ import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import SimpleTable from '@/components/ui/SimpleTable';
 
 const def = REPORT_DEFAULTS;
 
@@ -58,44 +59,34 @@ export default function CreativeReportPage() {
         </div>
         {data.top_products.length > 0 && (
           <Card title={<><span className="ic ic-sm" style={{ color: 'var(--em)' }}><i className="ti ti-trophy"/></span> أفضل 10 منتجات حسب الهامش</>}>
-            <div className="tw">
-              <table>
-                <thead><tr><th>#</th><th>المنتج</th><th>المرجع</th><th>الكمية</th><th>HT</th><th>التكلفة</th><th>الهامش</th><th>%</th></tr></thead>
-                <tbody>
-                  {data.top_products.map((p, i) => (
-                    <tr key={i}>
-                      <td style={{ color: 'var(--t4)', fontSize: 12 }}>{i + 1}</td>
-                      <td style={{ fontWeight: 700 }}>{p.product_name}</td>
-                      <td style={{ color: 'var(--t4)', fontSize: 12 }}>{p.product_ref}</td>
-                      <td>{p.total_qty}</td>
-                      <td>{FMT(p.total_ht)}</td>
-                      <td>{FMT(p.total_cost)}</td>
-                      <td style={{ color: p.margin_value >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(p.margin_value)}</td>
-                      <td style={{ color: p.margin_pct >= 0 ? 'var(--em)' : 'var(--red)' }}>{p.margin_pct}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <SimpleTable
+              rowKey={(row, i) => String(i)}
+              columns={[
+                { key: '_idx', label: '#' },
+                { key: 'product_name', label: 'المنتج', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
+                { key: 'product_ref', label: 'المرجع', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v as string}</span> },
+                { key: 'total_qty', label: 'الكمية' },
+                { key: 'total_ht', label: 'HT', render: (v) => FMT(v as number) },
+                { key: 'total_cost', label: 'التكلفة', render: (v) => FMT(v as number) },
+                { key: 'margin_value', label: 'الهامش', render: (v) => <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(v as number)}</span> },
+                { key: 'margin_pct', label: '%', render: (v) => <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)' }}>{v}%</span> },
+              ]}
+              data={data.top_products.map((p, i) => ({ ...p, _idx: i + 1 }))}
+            />
           </Card>
         )}
         {data.top_customers.length > 0 && (
           <Card title={<><span className="ic ic-sm" style={{ color: 'var(--purple)' }}><i className="ti ti-crown"/></span> أفضل 10 زبائن حسب المشتريات</>}>
-            <div className="tw">
-              <table>
-                <thead><tr><th>#</th><th>الزبون</th><th>إجمالي المشتريات TTC</th><th>عدد الوثائق</th></tr></thead>
-                <tbody>
-                  {data.top_customers.map((c, i) => (
-                    <tr key={i}>
-                      <td style={{ color: 'var(--t4)', fontSize: 12 }}>{i + 1}</td>
-                      <td style={{ fontWeight: 700 }}>{c.party_name}</td>
-                      <td>{FMT(c.total_ttc)}</td>
-                      <td>{c.doc_count}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <SimpleTable
+              rowKey={(row, i) => String(i)}
+              columns={[
+                { key: '_idx', label: '#' },
+                { key: 'party_name', label: 'الزبون', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
+                { key: 'total_ttc', label: 'إجمالي المشتريات TTC', render: (v) => FMT(v as number) },
+                { key: 'doc_count', label: 'عدد الوثائق' },
+              ]}
+              data={data.top_customers.map((c, i) => ({ ...c, _idx: i + 1 }))}
+            />
           </Card>
         )}
       </>

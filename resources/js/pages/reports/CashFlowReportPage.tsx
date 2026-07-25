@@ -7,6 +7,7 @@ import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import SimpleTable from '@/components/ui/SimpleTable';
 
 const def = REPORT_DEFAULTS;
 
@@ -24,6 +25,11 @@ export default function CashFlowReportPage() {
     await exportToExcel(sheets.length > 0 ? sheets : [{ name: 'التدفقات', headers: ['البيان'], rows: [['لا توجد بيانات']] }], `التدفقات النقدية ${fromDate}-${toDate}`);
   };
 
+  const dailyData = data ? [
+    ...data.daily,
+    { __isSummary: true, date: `الإجمالي (${data.daily.length} يوم)`, count: data.daily.reduce((s, d) => s + d.count, 0), amount: data.summary.total_amount },
+  ] : [];
+
   return <ReportShell title="التدفقات النقدية" subtitle={`حركة الإيرادات والمصروفات — ${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="cash-flow">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
       <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
@@ -39,64 +45,46 @@ export default function CashFlowReportPage() {
         </div>
         {data.daily.length > 0 && (
           <Card title="التحصيل اليومي" titleIcon="ti-calendar-day" padding="sm" style={{ borderRadius: 12 }}>
-            <div className="tw">
-              <table>
-                <thead><tr><th>التاريخ</th><th className="num">العدد</th><th className="num">المبلغ</th></tr></thead>
-                <tbody>
-                  {data.daily.map((d) => (
-                    <tr key={d.date}>
-                      <td style={{ fontWeight: 700 }}>{d.date}</td>
-                      <td className="num">{d.count}</td>
-                      <td className="num">{MONEY(d.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr style={{ fontWeight: 800, background: 'var(--bg2)' }}>
-                    <td>الإجمالي ({data.daily.length} يوم)</td>
-                    <td className="num">{data.daily.reduce((s, d) => s + d.count, 0)}</td>
-                    <td className="num">{MONEY(data.summary.total_amount)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+            <SimpleTable
+              rowKey={(row) => (row as any).__isSummary ? '__summary__' : String(row.date ?? '')}
+              rowClassName={(row) => (row as any).__isSummary ? 'tw-sr' : undefined}
+              columns={[
+                { key: 'date', label: 'التاريخ', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
+                { key: 'count', label: 'العدد', className: 'num' },
+                { key: 'amount', label: 'المبلغ', className: 'num', render: (v) => MONEY(v as number) },
+              ]}
+              data={dailyData}
+            />
           </Card>
         )}
         {data.monthly.length > 0 && (
           <Card title="الإيرادات الشهرية" titleIcon="ti-calendar" padding="sm" style={{ borderRadius: 12 }}>
-            <div className="tw">
-              <table>
-                <thead><tr><th>الشهر</th><th className="num">العدد</th><th className="num">المبلغ</th></tr></thead>
-                <tbody>
-                  {data.monthly.map((m) => (
-                    <tr key={m.month}>
-                      <td style={{ fontWeight: 700 }}>{m.month}</td>
-                      <td className="num">{m.count}</td>
-                      <td className="num">{MONEY(m.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <SimpleTable
+              rowKey={(row) => String(row.month ?? '')}
+              columns={[
+                { key: 'month', label: 'الشهر', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
+                { key: 'count', label: 'العدد', className: 'num' },
+                { key: 'amount', label: 'المبلغ', className: 'num', render: (v) => MONEY(v as number) },
+              ]}
+              data={data.monthly}
+            />
           </Card>
         )}
         {data.by_mode.length > 0 && (
           <Card title="حسب طريقة الدفع" titleIcon="ti-wallet" padding="sm" style={{ borderRadius: 12 }}>
-            <div className="tw">
-              <table>
-                <thead><tr><th>الطريقة</th><th className="num">العدد</th><th className="num">المبلغ</th><th className="num">النسبة</th></tr></thead>
-                <tbody>
-                  {data.by_mode.map((m, i) => (
-                    <tr key={i}>
-                      <td style={{ fontWeight: 700 }}>{m.mode}</td>
-                      <td className="num">{m.count}</td>
-                      <td className="num">{MONEY(m.total)}</td>
-                      <td className="num">{data.summary.total_amount > 0 ? PCT((m.total / data.summary.total_amount) * 100) : '0%'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <SimpleTable
+              rowKey={(row, i) => String(i)}
+              columns={[
+                { key: 'mode', label: 'الطريقة', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
+                { key: 'count', label: 'العدد', className: 'num' },
+                { key: 'total', label: 'المبلغ', className: 'num', render: (v) => MONEY(v as number) },
+                { key: 'pct', label: 'النسبة', className: 'num', render: (_v, row) => {
+                  const m = row as any;
+                  return data.summary.total_amount > 0 ? PCT((m.total / data.summary.total_amount) * 100) : '0%';
+                }},
+              ]}
+              data={data.by_mode}
+            />
           </Card>
         )}
       </>

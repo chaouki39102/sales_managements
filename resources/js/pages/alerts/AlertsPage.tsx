@@ -13,6 +13,7 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
 import Skeleton from '@/components/ui/Skeleton';
+import Card from '@/components/ui/Card';
 
 interface Alert {
   id:           number;
@@ -129,17 +130,17 @@ export default function AlertsPage() {
       {/* ── Content ─────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {isLoading ? (
-          <div className="card">
+          <Card>
             <Skeleton variant="table" rows={5} />
-          </div>
+          </Card>
         ) : filtered.length === 0 ? (
-          <div className="card">
+          <Card>
             <EmptyState
               icon={filter === 'unread' ? 'ti-bell' : 'ti-bell-off'}
               text={filter === 'unread' ? 'لا توجد تنبيهات جديدة' : 'لا توجد تنبيهات'}
               sub={filter === 'unread' ? 'جميع التنبيهات مقروءة' : 'لم يتم تسجيل أي تنبيه بعد'}
             />
-          </div>
+          </Card>
         ) : (
           filtered.map(alert => {
             const sev = SEVERITY_CONFIG[alert.severity] ?? SEVERITY_CONFIG.low;

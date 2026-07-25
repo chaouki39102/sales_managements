@@ -46,7 +46,7 @@ export default function CartRow({
   const compact = density === 'compact';
   const [popup,      setPopup]      = useState<PopupType>(null);
   const [editQty,    setEditQty]    = useState(false);
-  const [discMode,   setDiscMode]   = useState<DiscMode>('pct');
+  const [discMode,   setDiscMode]   = useState<DiscMode>('amount');
   const [discVal,    setDiscVal]    = useState('');
   const [priceVal,   setPriceVal]   = useState('');
   const [qtyVal,     setQtyVal]     = useState('');
@@ -106,7 +106,7 @@ export default function CartRow({
       let left = r.left;
       if (left + popupW > window.innerWidth - 8) left = window.innerWidth - popupW - 8;
       if (left < 8) left = 8;
-      setPopupPos({ top: r.bottom + 4, left, right: window.innerWidth - left - popupW });
+      setPopupPos({ top: r.bottom + 12, left, right: window.innerWidth - left - popupW });
     }
   }, []);
 
@@ -128,7 +128,7 @@ export default function CartRow({
       let left = r.left;
       if (left + popupW > window.innerWidth - 8) left = window.innerWidth - popupW - 8;
       if (left < 8) left = 8;
-      setPopupPos({ top: r.bottom + 4, left, right: window.innerWidth - left - popupW });
+      setPopupPos({ top: r.bottom + 12, left, right: window.innerWidth - left - popupW });
     }
   }, [popup, discMode, measurePopupAnchor]);
 
@@ -157,8 +157,8 @@ export default function CartRow({
   const openDisc = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     const currentVal = discMode === 'pct'
-      ? String(item.discount_percentage || 0)
-      : String(item.discount_amount || 0);
+      ? String(Number(item.discount_percentage || 0).toFixed(2))
+      : String(Number(item.discount_amount || 0).toFixed(2));
     setDiscVal(currentVal);
     setPopup(p => p === 'disc' ? null : 'disc');
   }, [discMode, item.discount_percentage, item.discount_amount]);
@@ -210,7 +210,7 @@ export default function CartRow({
   const discLabel = item.discount_amount > 0
     ? `-${formatDZD(item.discount_amount)}`
     : item.discount_percentage > 0
-      ? `-${item.discount_percentage % 1 === 0 ? item.discount_percentage : item.discount_percentage.toFixed(1)}%`
+      ? `-${item.discount_percentage % 1 === 0 ? item.discount_percentage : item.discount_percentage.toFixed(2)}%`
       : null;
 
   return (
@@ -337,7 +337,7 @@ export default function CartRow({
               خصم
             </button>
           )}
-          <div ref={popupAnchorRef} style={{ position: 'absolute', width: 0, height: 0 }} />
+          <div ref={popupAnchorRef} style={{ position: 'relative', width: 0, height: 0, flex: '0 0 0' }} />
 
           {/* TVA badge */}
           {tvaRate > 0 && (
@@ -355,14 +355,14 @@ export default function CartRow({
             <div className="cr-popup-modes">
               <button
                 className={`cr-popup-mode ${discMode === 'pct' ? 'on' : ''}`}
-                onClick={() => { setDiscMode('pct'); setDiscVal(String(item.discount_percentage || 0)); }}
+                onClick={() => { setDiscMode('pct'); setDiscVal(String(Number(item.discount_percentage || 0).toFixed(2))); }}
                 type="button"
               >
                 <i className="ti ti-percentage" /> نسبة %
               </button>
               <button
                 className={`cr-popup-mode ${discMode === 'amount' ? 'on' : ''}`}
-                onClick={() => { setDiscMode('amount'); setDiscVal(String(item.discount_amount || 0)); }}
+                onClick={() => { setDiscMode('amount'); setDiscVal(String(Number(item.discount_amount || 0).toFixed(2))); }}
                 type="button"
               >
                 <i className="ti ti-currency-dinar" /> مبلغ دج
@@ -383,8 +383,8 @@ export default function CartRow({
                 }}
                 min={0}
                 max={discMode === 'pct' ? 100 : undefined}
-                step={discMode === 'pct' ? 0.5 : 1}
-                placeholder={discMode === 'pct' ? '0' : '0.00'}
+                step={discMode === 'pct' ? 0.01 : 1}
+                placeholder="0.00"
               />
               <span className="cr-popup-unit">{discMode === 'pct' ? '%' : 'دج'}</span>
             </div>
@@ -399,22 +399,6 @@ export default function CartRow({
                     : formatDZD(parseFloat(discVal))
                   }
                 </strong>
-              </div>
-            )}
-
-            {/* أزرار سريعة (نسب شائعة) */}
-            {discMode === 'pct' && (
-              <div className="cr-popup-quick">
-                {[5, 10, 15, 20, 25, 30].map(p => (
-                  <button
-                    key={p}
-                    className={`cr-popup-qbtn ${parseFloat(discVal) === p ? 'on' : ''}`}
-                    onClick={() => { setDiscVal(String(p)); }}
-                    type="button"
-                  >
-                    {p}%
-                  </button>
-                ))}
               </div>
             )}
 

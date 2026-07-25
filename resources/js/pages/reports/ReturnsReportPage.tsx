@@ -8,6 +8,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
+import SimpleTable from '@/components/ui/SimpleTable';
 
 const def = REPORT_DEFAULTS;
 
@@ -43,46 +44,36 @@ export default function ReturnsReportPage() {
         </div>
         {data.documents.length > 0 && (
           <Card noHeader style={{ padding: 0, marginTop: 16 }}>
-            <div className="tw">
-              <table>
-                <thead><tr><th>#</th><th>رقم الوثيقة</th><th>النوع</th><th>التاريخ</th><th>العميل/المورد</th><th>HT</th><th>TTC</th><th>السبب</th></tr></thead>
-                <tbody>
-                  {data.documents.map((doc, i) => (
-                    <tr key={doc.id}>
-                      <td style={{ color: 'var(--t4)', fontSize: 12 }}>{i + 1}</td>
-                      <td style={{ fontWeight: 700 }}>{doc.document_number}</td>
-                      <td><Badge>{doc.document_type}</Badge></td>
-                      <td>{doc.date}</td>
-                      <td>{doc.party_name ?? '—'}</td>
-                      <td>{FMT(doc.total_ht)}</td>
-                      <td>{FMT(doc.total_ttc)}</td>
-                      <td style={{ color: 'var(--t4)' }}>{doc.reason ?? '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <SimpleTable
+              rowKey={(row) => String(row.id ?? '')}
+              columns={[
+                { key: '_idx', label: '#' },
+                { key: 'document_number', label: 'رقم الوثيقة', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
+                { key: 'document_type', label: 'النوع', render: (v) => <Badge>{v as string}</Badge> },
+                { key: 'date', label: 'التاريخ' },
+                { key: 'party_name', label: 'العميل/المورد', render: (v) => v ?? '—' },
+                { key: 'total_ht', label: 'HT', render: (v) => FMT(v as number) },
+                { key: 'total_ttc', label: 'TTC', render: (v) => FMT(v as number) },
+                { key: 'reason', label: 'السبب', render: (v) => <span style={{ color: 'var(--t4)' }}>{v ?? '—'}</span> },
+              ]}
+              data={data.documents.map((doc, i) => ({ ...doc, _idx: i + 1 }))}
+            />
           </Card>
         )}
         {data.product_recap.length > 0 && (
           <Card noHeader style={{ padding: 0, marginTop: 16 }}>
-            <div className="tw">
-              <table>
-                <thead><tr><th>#</th><th>المنتج</th><th>المرجع</th><th>الكمية</th><th>HT</th><th>TTC</th></tr></thead>
-                <tbody>
-                  {data.product_recap.map((p, i) => (
-                    <tr key={p.product_id}>
-                      <td style={{ color: 'var(--t4)', fontSize: 12 }}>{i + 1}</td>
-                      <td style={{ fontWeight: 700 }}>{p.product_name}</td>
-                      <td>{p.product_ref}</td>
-                      <td>{p.total_qty}</td>
-                      <td>{FMT(p.total_ht)}</td>
-                      <td>{FMT(p.total_ttc)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <SimpleTable
+              rowKey={(row) => String(row.product_id ?? '')}
+              columns={[
+                { key: '_idx', label: '#' },
+                { key: 'product_name', label: 'المنتج', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
+                { key: 'product_ref', label: 'المرجع' },
+                { key: 'total_qty', label: 'الكمية' },
+                { key: 'total_ht', label: 'HT', render: (v) => FMT(v as number) },
+                { key: 'total_ttc', label: 'TTC', render: (v) => FMT(v as number) },
+              ]}
+              data={data.product_recap.map((p, i) => ({ ...p, _idx: i + 1 }))}
+            />
           </Card>
         )}
       </>

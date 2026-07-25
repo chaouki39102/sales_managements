@@ -700,6 +700,14 @@ function POSPage() {
         const prod = line.product;
         const pkg  = (line as any).packaging ?? null;
         const pkgSnap = (line as any).packaging_units_snapshot;
+        const qty      = Number(line.quantity);
+        const priceHt  = Number(line.unit_price_ht);
+        const discPct  = Number(line.discount_percentage);
+        const gross    = qty * priceHt;
+        // total_discount_amount = the EXACT total discount computed by the Observer
+        // (discount_amount in DB is per-unit, discount_percentage is rounded to 2 decimals)
+        const apiTotalDisc = Number((line as any).total_discount_amount) || 0;
+        const totalDisc = apiTotalDisc > 0 ? apiTotalDisc : gross * (discPct / 100);
         return {
           id:                  nanoid(8),
           product_id:          line.product_id ?? prod?.id ?? 0,
@@ -710,13 +718,13 @@ function POSPage() {
           barcode:             v?.barcode ?? null,
           unit_symbol:         pkg?.label ?? v?.unit?.abbreviation ?? 'قطعة',
           image_url:           null,
-          quantity:            Number(line.quantity),
-          unit_price_ht:       Number(line.unit_price_ht),
-          selling_price_ttc:   htToTtc(Number(line.unit_price_ht), Number(line.tva_rate)),
+          quantity:            qty,
+          unit_price_ht:       priceHt,
+          selling_price_ttc:   htToTtc(priceHt, Number(line.tva_rate)),
           tva_rate:            Number(line.tva_rate),
           tva_id:              v?.tva_id ?? null,
-          discount_percentage: Number(line.discount_percentage),
-          discount_amount:     Number(line.discount_amount),
+          discount_percentage: discPct,
+          discount_amount:     Math.round(totalDisc * 100) / 100,
           total_ht:            Number(line.total_ht),
           total_ttc:           Number(line.total_ttc),
           max_stock:           null,
@@ -724,7 +732,7 @@ function POSPage() {
           packaging_id:        line.packaging_id ?? null,
           pack_qty:            pkg ? Number(pkg.quantity) : (pkgSnap ? Number(pkgSnap) : 1),
           packaging_label:     pkg?.label ?? null,
-          base_price_ht:       Number(line.unit_price_ht) / ((pkg ? Number(pkg.quantity) : (pkgSnap ? Number(pkgSnap) : 1)) || 1),
+          base_price_ht:       priceHt / ((pkg ? Number(pkg.quantity) : (pkgSnap ? Number(pkgSnap) : 1)) || 1),
         };
       });
       const payments = (doc.payments ?? []).map(p => ({

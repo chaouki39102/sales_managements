@@ -7,6 +7,7 @@ import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import SimpleTable from '@/components/ui/SimpleTable';
 
 export default function ProfitLossPage() {
   const [fromDate, setFromDate] = useState(REPORT_DEFAULTS.from);
@@ -66,19 +67,14 @@ export default function ProfitLossPage() {
               <KpiCard label="إجمالي المصروفات" value={MONEY(d.expenses.total_expenses)} icon="ti-wallet" variant="red" />
             </div>
             {d.expenses.by_category.length > 0 && (
-              <div className="tw" style={{ marginTop: 12 }}>
-                <table>
-                  <thead><tr><th>الفئة</th><th className="num">المبلغ</th></tr></thead>
-                  <tbody>
-                    {d.expenses.by_category.map((cat, i) => (
-                      <tr key={i}>
-                        <td>{cat.category_name ?? 'غير مصنف'}</td>
-                        <td className="num">{FMT(cat.total)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <SimpleTable
+                columns={[
+                  { key: 'category_name', label: 'الفئة', render: (v) => v ?? 'غير مصنف' },
+                  { key: 'total', label: 'المبلغ', className: 'num', render: (v) => FMT(v as number) },
+                ]}
+                data={d.expenses.by_category}
+                rowKey="category_name"
+              />
             )}
           </Card>
           <Card title="النتيجة النهائية" titleIcon="ti-chart-line" padding="sm" style={{ borderRadius: 12 }}>

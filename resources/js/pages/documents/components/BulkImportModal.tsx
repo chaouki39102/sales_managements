@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
+import SimpleTable from '@/components/ui/SimpleTable';
 import type { LineItem, Product } from '../types/document.types';
 
 interface ParsedRow {
@@ -163,36 +164,31 @@ export function BulkImportModal({ open, onClose, onImport, products }: BulkImpor
                 <span style={{ color: 'var(--green)' }}>✓ الكل مطابق</span>
               )}
             </div>
-            <div className="tw" style={{ maxHeight: 300, overflow: 'auto' }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>المنتج</th>
-                    <th>الكمية</th>
-                    <th>السعر</th>
-                    <th>الحالة</th>
-                    <th>ملاحظة</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r, i) => (
-                    <tr key={i} style={r._errors ? { background: 'var(--redb)' } : !r._match ? { background: 'var(--orangeb, #fff3e0)' } : undefined}>
-                      <td>{i + 1}</td>
-                      <td>{r.product_name ?? r.product_ref ?? '—'}</td>
-                      <td>{r.quantity}</td>
-                      <td>{r.unit_price_ht?.toLocaleString('fr-DZ') ?? '—'}</td>
-                      <td>
-                        {r._match
-                          ? <span style={{ color: 'var(--green)', fontSize: 11 }}>✓ {r._match.name}</span>
-                          : <span style={{ color: 'var(--orange)', fontSize: 11 }}>⚠ بدون مطابقة</span>
-                        }
-                      </td>
-                      <td style={{ color: 'var(--t4)', fontSize: 12 }}>{r.line_note ?? ''}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div style={{ maxHeight: 300, overflow: 'auto' }}>
+              <SimpleTable
+                columns={[
+                  { key: 'idx', label: '#', render: (_v, _r, _k, i) => (i ?? 0) + 1 },
+                  { key: 'product_name', label: 'المنتج', render: (v, r) => (r as ParsedRow).product_name ?? (r as ParsedRow).product_ref ?? '—' },
+                  { key: 'quantity', label: 'الكمية' },
+                  { key: 'unit_price_ht', label: 'السعر', render: (v) => (v as number)?.toLocaleString('fr-DZ') ?? '—' },
+                  {
+                    key: '_match', label: 'الحالة',
+                    render: (_v, r) => {
+                      const row = r as ParsedRow;
+                      return row._match
+                        ? <span style={{ color: 'var(--green)', fontSize: 11 }}>✓ {row._match.name}</span>
+                        : <span style={{ color: 'var(--orange)', fontSize: 11 }}>⚠ بدون مطابقة</span>;
+                    },
+                  },
+                  { key: 'line_note', label: 'ملاحظة', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{(v as string) ?? ''}</span> },
+                ]}
+                data={rows as unknown as Record<string, unknown>[]}
+                rowKey={(_r, i) => i}
+                rowClassName={(r) => {
+                  const row = r as unknown as ParsedRow;
+                  return row._errors ? 'tw-row--error' : !row._match ? 'tw-row--warn' : '';
+                }}
+              />
             </div>
             {unmatchedCount > 0 && (
               <div style={{ fontSize: 12, color: 'var(--red)', padding: '6px 10px', background: 'var(--redb)', borderRadius: 'var(--r1)' }}>

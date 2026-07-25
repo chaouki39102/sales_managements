@@ -9,6 +9,7 @@ import { TransactionHistoryModal } from '@/pages/debts/TransactionHistoryModal';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import SimpleTable from '@/components/ui/SimpleTable';
 
 const def = REPORT_DEFAULTS;
 
@@ -44,6 +45,16 @@ export default function CustomersReportPage() {
     await exportToExcel(sheets, `تقرير الزبائن ${fromDate}-${toDate}`);
   };
 
+  const customersData = data ? [
+    ...data.customers.map((row, i) => ({ ...row, _idx: i + 1 })),
+    { __isSummary: true, _idx: `الإجمالي (${data.customers.length})`, doc_count: data.customers.reduce((s, r) => s + r.doc_count, 0), total_ht: data.customers.reduce((s, r) => s + r.total_ht, 0), total_paid: data.customers.reduce((s, r) => s + r.total_paid, 0), total_remaining: data.summary.total_remaining },
+  ] : [];
+
+  const productsData = data?.product_recap ? [
+    ...data.product_recap.map((p, i) => ({ ...p, _idx: i + 1 })),
+    { __isSummary: true, _idx: `الإجمالي (${data.product_recap.length} منتج)`, total_qty: data.product_recap.reduce((s, r) => s + r.total_qty, 0), total_ht: data.product_recap.reduce((s, r) => s + r.total_ht, 0), total_discount: data.summary.total_discount, total_ttc: data.product_recap.reduce((s, r) => s + r.total_ttc, 0) },
+  ] : [];
+
   return <ReportShell title="تقرير الزبائن" subtitle={`أرصدة وحركة المبيعات — ${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="customers">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
       <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
@@ -66,74 +77,44 @@ export default function CustomersReportPage() {
         )}
         {tab === 'table' && (
           <Card noHeader style={{ padding: 0 }}>
-            <div className="tw">
-              <table>
-                <thead>
-                  <tr><th>#</th><th>الاسم</th><th>الكود</th><th>الهاتف</th><th>الولاية</th><th>عدد الوثائق</th><th>المبيعات HT</th><th>المدفوع</th><th>المتبقي</th><th></th></tr>
-                </thead>
-                <tbody>
-                  {data.customers.map((row, i) => (
-                    <tr key={row.id}>
-                      <td style={{ color: 'var(--t4)', fontSize: 12 }}>{i + 1}</td>
-                      <td style={{ fontWeight: 700 }}>{row.name}</td>
-                      <td style={{ color: 'var(--t4)' }}>{row.code ?? '—'}</td>
-                      <td>{row.phone ?? '—'}</td>
-                      <td>{row.wilaya ?? '—'}</td>
-                      <td>{row.doc_count}</td>
-                      <td>{FMT(row.total_ht)}</td>
-                      <td style={{ color: 'var(--em)' }}>{FMT(row.total_paid)}</td>
-                      <td style={{ color: row.total_remaining > 0 ? 'var(--red)' : 'var(--em)', fontWeight: 700 }}>{FMT(row.total_remaining)}</td>
-                      <td>
-                        {row.doc_count > 0 && (
-                          <Button size="xs" variant="gray" icon={<i className="ti ti-history"/>} onClick={() => openHistory(row.id, row.name)}>كشف حساب</Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr style={{ fontWeight: 800, background: 'var(--bg2)' }}>
-                    <td colSpan={5}>الإجمالي ({data.customers.length})</td>
-                    <td>{data.customers.reduce((s, r) => s + r.doc_count, 0)}</td>
-                    <td>{FMT(data.customers.reduce((s, r) => s + r.total_ht, 0))}</td>
-                    <td style={{ color: 'var(--em)' }}>{FMT(data.customers.reduce((s, r) => s + r.total_paid, 0))}</td>
-                    <td style={{ color: 'var(--red)' }}>{FMT(data.summary.total_remaining)}</td>
-                    <td></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+            <SimpleTable
+              rowKey={(row) => (row as any).__isSummary ? '__summary__' : String(row.id ?? '')}
+              rowClassName={(row) => (row as any).__isSummary ? 'tw-sr' : undefined}
+              columns={[
+                { key: '_idx', label: '#' },
+                { key: 'name', label: 'الاسم', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
+                { key: 'code', label: 'الكود', render: (v) => <span style={{ color: 'var(--t4)' }}>{v ?? '—'}</span> },
+                { key: 'phone', label: 'الهاتف', render: (v) => v ?? '—' },
+                { key: 'wilaya', label: 'الولاية', render: (v) => v ?? '—' },
+                { key: 'doc_count', label: 'عدد الوثائق' },
+                { key: 'total_ht', label: 'المبيعات HT', render: (v) => FMT(v as number) },
+                { key: 'total_paid', label: 'المدفوع', render: (v) => <span style={{ color: 'var(--em)' }}>{FMT(v as number)}</span> },
+                { key: 'total_remaining', label: 'المتبقي', render: (v) => <span style={{ color: (v as number) > 0 ? 'var(--red)' : 'var(--em)', fontWeight: 700 }}>{FMT(v as number)}</span> },
+                { key: 'action', label: '', render: (_v, row) => {
+                  const r = row as any;
+                  return r.__isSummary ? null : r.doc_count > 0 ? <Button size="xs" variant="gray" icon={<i className="ti ti-history"/>} onClick={() => openHistory(r.id, r.name)}>كشف حساب</Button> : null;
+                }},
+              ]}
+              data={customersData}
+            />
           </Card>
         )}
         {tab === 'products' && data.product_recap && (
           <Card noHeader style={{ padding: 0 }}>
-            <div className="tw">
-              <table>
-                <thead><tr><th>#</th><th>المنتج</th><th>المرجع</th><th>الكمية</th><th>HT</th><th>الخصم</th><th>TTC</th></tr></thead>
-                <tbody>
-                  {data.product_recap.map((p, i) => (
-                    <tr key={p.product_id}>
-                      <td style={{ color: 'var(--t4)', fontSize: 12 }}>{i + 1}</td>
-                      <td style={{ fontWeight: 700 }}>{p.product_name}</td>
-                      <td style={{ color: 'var(--t4)' }}>{p.product_ref}</td>
-                      <td>{p.total_qty}</td>
-                      <td>{FMT(p.total_ht)}</td>
-                      <td style={{ color: p.total_discount > 0 ? 'var(--orange)' : undefined }}>{p.total_discount > 0 ? FMT(p.total_discount) : '—'}</td>
-                      <td>{FMT(p.total_ttc)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr style={{ fontWeight: 800, background: 'var(--bg2)' }}>
-                    <td colSpan={3}>الإجمالي ({data.product_recap.length} منتج)</td>
-                    <td>{data.product_recap.reduce((s, r) => s + r.total_qty, 0)}</td>
-                    <td>{FMT(data.product_recap.reduce((s, r) => s + r.total_ht, 0))}</td>
-                    <td style={{ color: data.summary.total_discount > 0 ? 'var(--orange)' : undefined }}>{data.summary.total_discount > 0 ? FMT(data.summary.total_discount) : '—'}</td>
-                    <td>{FMT(data.product_recap.reduce((s, r) => s + r.total_ttc, 0))}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+            <SimpleTable
+              rowKey={(row) => (row as any).__isSummary ? '__summary__' : String(row.product_id ?? '')}
+              rowClassName={(row) => (row as any).__isSummary ? 'tw-sr' : undefined}
+              columns={[
+                { key: '_idx', label: '#' },
+                { key: 'product_name', label: 'المنتج', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
+                { key: 'product_ref', label: 'المرجع', render: (v) => <span style={{ color: 'var(--t4)' }}>{v as string}</span> },
+                { key: 'total_qty', label: 'الكمية' },
+                { key: 'total_ht', label: 'HT', render: (v) => FMT(v as number) },
+                { key: 'total_discount', label: 'الخصم', render: (v) => (v as number) > 0 ? <span style={{ color: 'var(--orange)' }}>{FMT(v as number)}</span> : '—' },
+                { key: 'total_ttc', label: 'TTC', render: (v) => FMT(v as number) },
+              ]}
+              data={productsData}
+            />
           </Card>
         )}
       </>

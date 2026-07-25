@@ -8,6 +8,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
+import SimpleTable from '@/components/ui/SimpleTable';
 
 export default function SalesReportPage() {
   const [fromDate, setFromDate] = useState(REPORT_DEFAULTS.from);
@@ -44,6 +45,22 @@ export default function SalesReportPage() {
     await exportToExcel(sheets, `report-exports/تقرير المبيعات ${fromDate ?? 'الكل'}-${toDate ?? 'الكل'}`);
   };
 
+  const docsData = data ? [
+    ...data.documents.map((doc, i) => ({ ...doc, _idx: i + 1 })),
+    { __isSummary: true, _idx: `الإجمالي (${data.summary.count})`, total_ht: data.summary.total_ht, total_tva: data.summary.total_tva, total_discount: data.summary.total_discount, doc_cost_ht: data.summary.total_cost, margin_value: data.summary.total_margin, total_ttc: data.summary.total_ttc, paid_amount: data.summary.total_paid, remaining_amount: data.summary.total_remaining },
+  ] : [];
+
+  const productsData = data ? [
+    ...data.product_recap.map((item, i) => ({
+      ...item,
+      _idx: i + 1,
+      unit_price: item.total_qty > 0 ? Math.round((item.total_ht + item.total_discount) / item.total_qty) : null,
+    })),
+    { __isSummary: true, _idx: `الإجمالي (${data.product_recap.length} منتج)`, unit_price: null, total_ht: data.summary.total_ht, total_discount: data.summary.total_discount, total_cost: data.summary.total_cost, margin_value: data.summary.total_margin, total_ttc: data.summary.total_ttc, margin_pct: data.summary.margin_pct },
+  ] : [];
+
+  const summaryRow = () => 'tw-sr';
+
   return <ReportShell title="تقرير المبيعات" subtitle={fromDate && toDate ? `المبيعات والمستندات — ${fromDate} → ${toDate}` : 'المبيعات — سنة مالية كاملة'} isLoading={isLoading} isError={isError} refetch={refetch} reportId="sales">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
       <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
@@ -66,82 +83,51 @@ export default function SalesReportPage() {
         </div>
         {tab === 'docs' && (
           <Card noHeader style={{ padding: 0 }}>
-            <div className="tw">
-              <table>
-                <thead><tr><th>#</th><th>الوثيقة</th><th>التاريخ</th><th>الزبون</th><th>HT</th><th>TVA</th><th>الخصم</th><th>التكلفة</th><th>الهامش</th><th>TTC</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th></tr></thead>
-                <tbody>
-                  {data.documents.map((doc, i) => (
-                    <tr key={doc.id}>
-                      <td style={{ color: 'var(--t4)', fontSize: 12 }}>{i + 1}</td>
-                      <td style={{ fontWeight: 700 }}>{doc.document_number}</td>
-                      <td>{doc.date}</td>
-                      <td>{doc.party_name ?? '—'}</td>
-                      <td>{FMT(doc.total_ht)}</td>
-                      <td>{FMT(doc.total_tva)}</td>
-                      <td style={{ color: doc.total_discount > 0 ? 'var(--orange)' : undefined }}>{doc.total_discount > 0 ? FMT(doc.total_discount) : '—'}</td>
-                      <td>{FMT(doc.doc_cost_ht)}</td>
-                      <td style={{ color: doc.margin_value >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(doc.margin_value)}</td>
-                      <td>{FMT(doc.total_ttc)}</td>
-                      <td style={{ color: 'var(--em)' }}>{FMT(doc.paid_amount)}</td>
-                      <td style={{ color: doc.remaining_amount > 0 ? 'var(--red)' : 'var(--t4)', fontWeight: doc.remaining_amount > 0 ? 700 : 400 }}>{FMT(doc.remaining_amount)}</td>
-                      <td>{doc.status === 'Annulé' ? <Badge variant="danger" noDot>ملغاة</Badge> : doc.remaining_amount > 0.01 ? <Badge variant="warning" noDot>غير مسددة</Badge> : <Badge variant="success" noDot>مسددة</Badge>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr style={{ fontWeight: 800, background: 'var(--bg2)' }}>
-                    <td colSpan={4}>الإجمالي ({data.summary.count})</td>
-                    <td>{FMT(data.summary.total_ht)}</td>
-                    <td>{FMT(data.summary.total_tva)}</td>
-                    <td style={{ color: data.summary.total_discount > 0 ? 'var(--orange)' : undefined }}>{data.summary.total_discount > 0 ? FMT(data.summary.total_discount) : '—'}</td>
-                    <td>{FMT(data.summary.total_cost)}</td>
-                    <td style={{ color: data.summary.total_margin >= 0 ? 'var(--em)' : 'var(--red)' }}>{FMT(data.summary.total_margin)}</td>
-                    <td>{FMT(data.summary.total_ttc)}</td>
-                    <td style={{ color: 'var(--em)' }}>{FMT(data.summary.total_paid)}</td>
-                    <td style={{ color: data.summary.total_remaining > 0 ? 'var(--red)' : undefined }}>{FMT(data.summary.total_remaining)}</td>
-                    <td></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+            <SimpleTable
+              rowKey={(row) => (row as any).__isSummary ? '__summary__' : String(row.id ?? '')}
+              rowClassName={summaryRow}
+              columns={[
+                { key: '_idx', label: '#' },
+                { key: 'document_number', label: 'الوثيقة', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
+                { key: 'date', label: 'التاريخ' },
+                { key: 'party_name', label: 'الزبون', render: (v) => v ?? '—' },
+                { key: 'total_ht', label: 'HT', render: (v) => FMT(v as number) },
+                { key: 'total_tva', label: 'TVA', render: (v) => FMT(v as number) },
+                { key: 'total_discount', label: 'الخصم', render: (v, row) => (v as number) > 0 ? <span style={{ color: 'var(--orange)' }}>{FMT(v as number)}</span> : '—' },
+                { key: 'doc_cost_ht', label: 'التكلفة', render: (v) => FMT(v as number) },
+                { key: 'margin_value', label: 'الهامش', render: (v) => <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(v as number)}</span> },
+                { key: 'total_ttc', label: 'TTC', render: (v) => FMT(v as number) },
+                { key: 'paid_amount', label: 'المدفوع', render: (v) => <span style={{ color: 'var(--em)' }}>{FMT(v as number)}</span> },
+                { key: 'remaining_amount', label: 'المتبقي', render: (v) => <span style={{ color: (v as number) > 0 ? 'var(--red)' : 'var(--t4)', fontWeight: (v as number) > 0 ? 700 : 400 }}>{FMT(v as number)}</span> },
+                { key: 'status', label: 'الحالة', render: (_v, row) => {
+                  const doc = row as any;
+                  return doc.status === 'Annulé' ? <Badge variant="danger" noDot>ملغاة</Badge> : doc.remaining_amount > 0.01 ? <Badge variant="warning" noDot>غير مسددة</Badge> : <Badge variant="success" noDot>مسددة</Badge>;
+                }},
+              ]}
+              data={docsData}
+            />
           </Card>
         )}
         {tab === 'products' && (
           <Card noHeader style={{ padding: 0 }}>
-            <div className="tw">
-              <table>
-                <thead><tr><th>#</th><th>المنتج</th><th>المرجع</th><th>الكمية</th><th>م.الوحدة</th><th>HT</th><th>الخصم</th><th>التكلفة</th><th>الهامش</th><th>TTC</th><th>%</th></tr></thead>
-                <tbody>
-                  {data.product_recap.map((item, i) => (
-                    <tr key={item.product_id}>
-                      <td style={{ color: 'var(--t4)', fontSize: 12 }}>{i + 1}</td>
-                      <td style={{ fontWeight: 700 }}>{item.product_name}</td>
-                      <td style={{ color: 'var(--t4)', fontSize: 12 }}>{item.product_ref}</td>
-                      <td>{item.total_qty}</td>
-                      <td>{item.total_qty > 0 ? FMT(Math.round((item.total_ht + item.total_discount) / item.total_qty)) : '—'}</td>
-                      <td>{FMT(item.total_ht)}</td>
-                      <td style={{ color: item.total_discount > 0 ? 'var(--orange)' : undefined }}>{item.total_discount > 0 ? FMT(item.total_discount) : '—'}</td>
-                      <td>{FMT(item.total_cost)}</td>
-                      <td style={{ color: item.margin_value >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(item.margin_value)}</td>
-                      <td>{FMT(item.total_ttc)}</td>
-                      <td style={{ color: item.margin_pct >= 0 ? 'var(--em)' : 'var(--red)' }}>{item.margin_pct}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr style={{ fontWeight: 800, background: 'var(--bg2)' }}>
-                    <td colSpan={4}>الإجمالي ({data.product_recap.length} منتج)</td>
-                    <td></td>
-                    <td>{FMT(data.summary.total_ht)}</td>
-                    <td style={{ color: data.summary.total_discount > 0 ? 'var(--orange)' : undefined }}>{data.summary.total_discount > 0 ? FMT(data.summary.total_discount) : '—'}</td>
-                    <td>{FMT(data.summary.total_cost)}</td>
-                    <td style={{ color: data.summary.total_margin >= 0 ? 'var(--em)' : 'var(--red)' }}>{FMT(data.summary.total_margin)}</td>
-                    <td>{FMT(data.summary.total_ttc)}</td>
-                    <td style={{ color: data.summary.margin_pct >= 0 ? 'var(--em)' : 'var(--red)' }}>{data.summary.margin_pct}%</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+            <SimpleTable
+              rowKey={(row) => (row as any).__isSummary ? '__summary__' : String(row.product_id ?? '')}
+              rowClassName={summaryRow}
+              columns={[
+                { key: '_idx', label: '#' },
+                { key: 'product_name', label: 'المنتج', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
+                { key: 'product_ref', label: 'المرجع', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v as string}</span> },
+                { key: 'total_qty', label: 'الكمية' },
+                { key: 'unit_price', label: 'م.الوحدة', render: (v) => v != null ? FMT(v as number) : '—' },
+                { key: 'total_ht', label: 'HT', render: (v) => FMT(v as number) },
+                { key: 'total_discount', label: 'الخصم', render: (v) => (v as number) > 0 ? <span style={{ color: 'var(--orange)' }}>{FMT(v as number)}</span> : '—' },
+                { key: 'total_cost', label: 'التكلفة', render: (v) => FMT(v as number) },
+                { key: 'margin_value', label: 'الهامش', render: (v) => <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(v as number)}</span> },
+                { key: 'total_ttc', label: 'TTC', render: (v) => FMT(v as number) },
+                { key: 'margin_pct', label: '%', render: (v) => <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)' }}>{v}%</span> },
+              ]}
+              data={productsData}
+            />
           </Card>
         )}
       </>

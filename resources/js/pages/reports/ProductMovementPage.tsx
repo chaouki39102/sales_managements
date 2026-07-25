@@ -7,6 +7,7 @@ import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import SimpleTable from '@/components/ui/SimpleTable';
 
 const def = REPORT_DEFAULTS;
 
@@ -46,28 +47,22 @@ export default function ProductMovementPage() {
           </div>
           {d.items.length > 0 && (
             <Card title={`حركة المنتجات (${d.items.length})`} titleIcon="ti-arrows-exchange" padding="sm" style={{ borderRadius: 12 }}>
-              <div className="tw">
-                <table>
-                  <thead><tr><th>المرجع</th><th>المنتج</th><th className="num">كمية المبيعات</th><th className="num">قيمة المبيعات HT</th><th className="num">كمية المشتريات</th><th className="num">قيمة المشتريات HT</th><th className="num">الصافي (Units)</th></tr></thead>
-                  <tbody>
-                    {d.items.map((item) => (
-                      <tr key={item.product_id}>
-                        <td><span style={{ fontWeight: 600 }}>{item.product_ref}</span></td>
-                        <td>{item.product_name}</td>
-                        <td className="num">{FMT(item.sales_qty)}</td>
-                        <td className="num">{FMT(item.sales_ht)}</td>
-                        <td className="num">{FMT(item.purchase_qty)}</td>
-                        <td className="num">{FMT(item.purchase_ht)}</td>
-                        <td className="num">
-                          <span style={{ fontWeight: 700, color: item.net_qty > 0 ? 'var(--em)' : item.net_qty < 0 ? 'var(--red)' : undefined }}>
-                            {item.net_qty > 0 ? '+' : ''}{FMT(item.net_qty)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <SimpleTable
+                columns={[
+                  { key: 'product_ref', label: 'المرجع', render: (v) => <span style={{ fontWeight: 600 }}>{v}</span> },
+                  { key: 'product_name', label: 'المنتج' },
+                  { key: 'sales_qty', label: 'كمية المبيعات', className: 'num', render: (v) => FMT(v as number) },
+                  { key: 'sales_ht', label: 'قيمة المبيعات HT', className: 'num', render: (v) => FMT(v as number) },
+                  { key: 'purchase_qty', label: 'كمية المشتريات', className: 'num', render: (v) => FMT(v as number) },
+                  { key: 'purchase_ht', label: 'قيمة المشتريات HT', className: 'num', render: (v) => FMT(v as number) },
+                  { key: 'net_qty', label: 'الصافي (Units)', className: 'num', render: (v) => {
+                    const n = v as number;
+                    return <span style={{ fontWeight: 700, color: n > 0 ? 'var(--em)' : n < 0 ? 'var(--red)' : undefined }}>{n > 0 ? '+' : ''}{FMT(n)}</span>;
+                  }},
+                ]}
+                data={d.items}
+                rowKey="product_id"
+              />
             </Card>
           )}
         </>

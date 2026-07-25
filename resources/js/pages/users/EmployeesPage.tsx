@@ -9,6 +9,7 @@ import Modal from '@/components/ui/Modal';
 import KpiCard from '@/components/ui/KpiCard';
 import Avatar from '@/components/ui/Avatar';
 import EmptyState from '@/components/ui/EmptyState';
+import SimpleTable from '@/components/ui/SimpleTable';
 import AlertBar from '@/components/ui/AlertBar';
 import { useTenantQuery, useTenantMutation } from '@/hooks/useTenantQuery';
 import { employeesApi } from '@/lib/api/endpoints/employees';
@@ -91,65 +92,67 @@ export default function EmployeesPage() {
                 <EmptyState icon="ti-users" text="لا يوجد موظفون" sub="أضف أول موظف" action={<Button variant="primary" onClick={openAdd}>موظف جديد</Button>} />
             ) : (
                 <Card noHeader style={{ padding: 0 }}>
-                    <div className="tw">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>الموظف</th>
-                                    <th>رقم التسجيل</th>
-                                    <th>NSS</th>
-                                    <th>تاريخ الميلاد</th>
-                                    <th>تاريخ التوظيف</th>
-                                    <th>الحالة الوظيفية</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {employees.map((emp: any, i: number) => (
-                                    <tr key={emp.id}>
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                <Avatar
-                                                    initials={`${emp.first_name?.[0] || ''}${emp.last_name?.[0] || ''}`}
-                                                    color={((i % 7) + 1) as 1|2|3|4|5|6|7}
-                                                    size={32}
-                                                />
-                                                <div>
-                                                    <div className="s">{emp.first_name} {emp.last_name}</div>
-                                                    <div style={{ fontSize: 11, color: 'var(--t4)' }}>
-                                                        {emp.relations?.user?.email || '—'}
-                                                    </div>
+                    <SimpleTable
+                        columns={[
+                            {
+                                key: 'name', label: 'الموظف',
+                                render: (_v, row) => {
+                                    const emp = row as any;
+                                    return (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <Avatar
+                                                initials={`${emp.first_name?.[0] || ''}${emp.last_name?.[0] || ''}`}
+                                                color={((emp.id % 7) + 1) as 1|2|3|4|5|6|7}
+                                                size={32}
+                                            />
+                                            <div>
+                                                <div className="s">{emp.first_name} {emp.last_name}</div>
+                                                <div style={{ fontSize: 11, color: 'var(--t4)' }}>
+                                                    {emp.relations?.user?.email || '—'}
                                                 </div>
                                             </div>
-                                        </td>
-                                        <td className="m">{emp.matricule || '—'}</td>
-                                        <td className="m" style={{ fontSize: 11 }}>{emp.nss || '—'}</td>
-                                        <td style={{ fontSize: 12, color: 'var(--t4)' }}>
-                                            {emp.birth_date ? new Date(emp.birth_date).toLocaleDateString('fr-DZ') : '—'}
-                                        </td>
-                                        <td style={{ fontSize: 12, color: 'var(--t4)' }}>
-                                            {emp.hire_date ? new Date(emp.hire_date).toLocaleDateString('fr-DZ') : '—'}
-                                        </td>
-                                        <td>
-                                            <Badge variant={
-                                                emp.employment_status === 'active' ? 'success' :
-                                                emp.employment_status === 'suspended' ? 'warning' : 'danger'
-                                            }>
-                                                {emp.employment_status === 'active' ? 'نشط' :
-                                                 emp.employment_status === 'suspended' ? 'معلق' : 'منتهي الخدمة'}
-                                            </Badge>
-                                        </td>
-                                        <td>
-                                            <div style={{ display: 'flex', gap: 3 }}>
-                                                <Button size="xs" icon={<i className="ti ti-pencil"/>} onClick={() => openEdit(emp)}/>
-                                                <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>} onClick={() => deleteMutation.mutate(emp.id)}/>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                        </div>
+                                    );
+                                },
+                            },
+                            { key: 'matricule', label: 'رقم التسجيل', className: 'm' },
+                            { key: 'nss', label: 'NSS', className: 'm' },
+                            {
+                                key: 'birth_date', label: 'تاريخ الميلاد',
+                                render: (v) => <span style={{ fontSize: 12, color: 'var(--t4)' }}>{v ? new Date(v as string).toLocaleDateString('fr-DZ') : '—'}</span>,
+                            },
+                            {
+                                key: 'hire_date', label: 'تاريخ التوظيف',
+                                render: (v) => <span style={{ fontSize: 12, color: 'var(--t4)' }}>{v ? new Date(v as string).toLocaleDateString('fr-DZ') : '—'}</span>,
+                            },
+                            {
+                                key: 'employment_status', label: 'الحالة الوظيفية',
+                                render: (v) => (
+                                    <Badge variant={
+                                        v === 'active' ? 'success' :
+                                        v === 'suspended' ? 'warning' : 'danger'
+                                    }>
+                                        {v === 'active' ? 'نشط' :
+                                         v === 'suspended' ? 'معلق' : 'منتهي الخدمة'}
+                                    </Badge>
+                                ),
+                            },
+                            {
+                                key: 'actions', label: '',
+                                render: (_v, row) => {
+                                    const emp = row as any;
+                                    return (
+                                        <div style={{ display: 'flex', gap: 3 }}>
+                                            <Button size="xs" icon={<i className="ti ti-pencil"/>} onClick={() => openEdit(emp)}/>
+                                            <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>} onClick={() => deleteMutation.mutate(emp.id)}/>
+                                        </div>
+                                    );
+                                },
+                            },
+                        ]}
+                        data={employees as any}
+                        rowKey="id"
+                    />
                 </Card>
             )}
 

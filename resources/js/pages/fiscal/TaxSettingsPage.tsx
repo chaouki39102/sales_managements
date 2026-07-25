@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button';
 import Skeleton from '@/components/ui/Skeleton';
 import Modal from '@/components/ui/Modal';
 import { Input, Select, FormField } from '@/components/ui/FormInputs';
+import SimpleTable from '@/components/ui/SimpleTable';
 import { useModal } from '@/hooks/useModal';
 import { useTaxConfig, useTaxConfigHistory, useTaxManagementMutations, useDocumentTypes } from '@/lib/api/endpoints/taxManagement';
 import type { TaxConfig, DocumentType, IfuDocumentSource, TvaRate, TimbreBaremeItem } from '@/lib/api/endpoints/taxManagement';
@@ -214,29 +215,35 @@ function TaxConfigModal({ open, config, regime, onClose }: { open: boolean; conf
 
             <FormField span={2}>
               <label className="req">شريحة الطابع المالي (Barème)</label>
-              <div className="tw" style={{ marginTop: 8 }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>من (دج)</th>
-                      <th>إلى (دج)</th>
-                      <th>النوع</th>
-                      <th>النسبة / المبلغ</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {form.timbre_bareme.map((b, i) => (
-                      <tr key={i}>
-                        <td><Input type="number" style={{ width: 90 }} value={b.from_amount ?? 0} onChange={e => { const arr = [...form.timbre_bareme]; arr[i] = { ...arr[i], from_amount: Number(e.target.value) }; setField('timbre_bareme', arr); }} /></td>
-                        <td><Input type="number" style={{ width: 90 }} value={b.to_amount ?? ''} placeholder="∞" onChange={e => { const arr = [...form.timbre_bareme]; arr[i] = { ...arr[i], to_amount: e.target.value ? Number(e.target.value) : null }; setField('timbre_bareme', arr); }} /></td>
-                        <td><Select style={{ width: 120 }} value={b.type ?? 'percent_per_100'} onChange={e => { const arr = [...form.timbre_bareme]; arr[i] = { ...arr[i], type: e.target.value }; setField('timbre_bareme', arr); }}><option value="fixed">مبلغ ثابت</option><option value="percent_per_100">نسبة/100 دج</option></Select></td>
-                        <td><Input type="number" step="0.001" style={{ width: 80 }} value={b.type === 'fixed' ? (b.amount ?? 0) : (b.rate ?? 0)} onChange={e => { const arr = [...form.timbre_bareme]; if (arr[i].type === 'fixed') { arr[i] = { ...arr[i], amount: Number(e.target.value) } } else { arr[i] = { ...arr[i], rate: Number(e.target.value) } }; setField('timbre_bareme', arr); }} /></td>
-                        <td><Button size="xs" variant="danger" icon={<i className="ti ti-trash" />} onClick={() => { setField('timbre_bareme', form.timbre_bareme.filter((_, idx) => idx !== i)); }} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div style={{ marginTop: 8 }}>
+                <SimpleTable
+                  columns={[
+                    { key: 'from_amount', label: 'من (دج)', render: (_v, row, _k) => {
+                      const i = form.timbre_bareme.indexOf(row as any);
+                      return <Input type="number" style={{ width: 90 }} value={(row as any).from_amount ?? 0} onChange={e => { const arr = [...form.timbre_bareme]; arr[i] = { ...arr[i], from_amount: Number(e.target.value) }; setField('timbre_bareme', arr); }} />;
+                    }},
+                    { key: 'to_amount', label: 'إلى (دج)', render: (_v, row, _k) => {
+                      const i = form.timbre_bareme.indexOf(row as any);
+                      return <Input type="number" style={{ width: 90 }} value={(row as any).to_amount ?? ''} placeholder="∞" onChange={e => { const arr = [...form.timbre_bareme]; arr[i] = { ...arr[i], to_amount: e.target.value ? Number(e.target.value) : null }; setField('timbre_bareme', arr); }} />;
+                    }},
+                    { key: 'type', label: 'النوع', render: (_v, row, _k) => {
+                      const i = form.timbre_bareme.indexOf(row as any);
+                      return <Select style={{ width: 120 }} value={(row as any).type ?? 'percent_per_100'} onChange={e => { const arr = [...form.timbre_bareme]; arr[i] = { ...arr[i], type: e.target.value }; setField('timbre_bareme', arr); }}><option value="fixed">مبلغ ثابت</option><option value="percent_per_100">نسبة/100 دج</option></Select>;
+                    }},
+                    { key: 'value', label: 'النسبة / المبلغ', render: (_v, row, _k) => {
+                      const i = form.timbre_bareme.indexOf(row as any);
+                      const b = row as any;
+                      return <Input type="number" step="0.001" style={{ width: 80 }} value={b.type === 'fixed' ? (b.amount ?? 0) : (b.rate ?? 0)} onChange={e => { const arr = [...form.timbre_bareme]; if (arr[i].type === 'fixed') { arr[i] = { ...arr[i], amount: Number(e.target.value) } } else { arr[i] = { ...arr[i], rate: Number(e.target.value) } }; setField('timbre_bareme', arr); }} />;
+                    }},
+                    { key: 'delete', label: '', render: (_v, row, _k) => {
+                      const i = form.timbre_bareme.indexOf(row as any);
+                      return <Button size="xs" variant="danger" icon={<i className="ti ti-trash" />} onClick={() => { setField('timbre_bareme', form.timbre_bareme.filter((_, idx) => idx !== i)); }} />;
+                    }},
+                  ]}
+                  data={form.timbre_bareme}
+                  rowKey={(_row) => String((_row as any)._key ?? JSON.stringify(_row))}
+                  emptyText="لا توجد شرائح"
+                />
                 <Button size="xs" icon={<i className="ti ti-plus" />} style={{ marginTop: 8 }} onClick={() => { setField('timbre_bareme', [...form.timbre_bareme, { from_amount: 0, to_amount: null, rate: 0, type: 'percent_per_100', amount: null }]); }}>إضافة شريحة</Button>
               </div>
               <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -388,24 +395,30 @@ export default function TaxSettingsPage() {
       <div className="g2" style={{ marginBottom: 20 }}>
         <Card title="معدلات TVA" subtitle={regime === 'reel' ? 'نسب الضريبة على القيمة المضافة' : 'غير مطبقة في النظام الجزافي'}>
           {regime === 'reel' && config?.tva_rates && config.tva_rates.length > 0 ? (
-            <table className="tw"><thead><tr><th>النسبة</th><th>الوصف</th></tr></thead>
-              <tbody>{(config.tva_rates as any[]).map((r, i) => <tr key={i}><td>{r.rate}%</td><td>{r.label}</td></tr>)}</tbody>
-            </table>
+            <SimpleTable
+              columns={[
+                { key: 'rate', label: 'النسبة', render: (v) => `${v}%` },
+                { key: 'label', label: 'الوصف' },
+              ]}
+              data={config.tva_rates as any[]}
+              emptyText="—"
+            />
           ) : <p style={{ color: 'var(--t4)' }}>—</p>}
         </Card>
 
         <Card title="الطابع الجبائي" subtitle="التصميم التدريجي">
           {config?.timbre_bareme && (config.timbre_bareme as any[]).length > 0 ? (
-            <table className="tw"><thead><tr><th>من</th><th>إلى</th><th>النوع</th><th>القيمة</th></tr></thead>
-              <tbody>{(config.timbre_bareme as any[]).map((t, i) => (
-                <tr key={i}>
-                  <td>{Number(t.from_amount).toLocaleString('fr-DZ')} دج</td>
-                  <td>{t.to_amount ? `${Number(t.to_amount).toLocaleString('fr-DZ')} دج` : '∞'}</td>
-                  <td>{t.type}</td>
-                  <td>{t.amount ?? `${t.rate}%`}</td>
-                </tr>
-              ))}</tbody>
-            </table>
+            <SimpleTable
+              columns={[
+                { key: 'from_amount', label: 'من', render: (v) => `${Number(v).toLocaleString('fr-DZ')} دج` },
+                { key: 'to_amount', label: 'إلى', render: (v) => v ? `${Number(v).toLocaleString('fr-DZ')} دج` : '∞' },
+                { key: 'type', label: 'النوع' },
+                { key: 'value', label: 'القيمة', render: (_v, row) => (row as any).amount ?? `${(row as any).rate}%` },
+              ]}
+              data={(config.timbre_bareme as any[]).map((t, i) => ({ ...t, _key: i }))}
+              rowKey="_key"
+              emptyText="—"
+            />
           ) : <p style={{ color: 'var(--t4)' }}>—</p>}
         </Card>
       </div>
@@ -429,29 +442,22 @@ export default function TaxSettingsPage() {
           </div>
 
           <Card title="إعدادات حساب IFU" subtitle="مصادر البيانات وأساس الحساب لكل فئة" style={{ marginBottom: 20 }}>
-            <table className="tw">
-              <thead>
-                <tr><th>الفئة</th><th>المستندات المصدر</th><th>أساس الحساب</th><th>اشتراط الإغلاق</th><th>التعريفة</th></tr>
-              </thead>
-              <tbody>
-                {([
-                  { cat: 'subsidized',  label: 'مواد مدعمة', rate: config?.ifu_rate_subsidized ?? config?.ifu_rate_goods ?? 5 },
-                  { cat: 'other_goods', label: 'بضائع أخرى', rate: config?.ifu_rate_goods ?? 5 },
-                  { cat: 'services',    label: 'خدمات',      rate: config?.ifu_rate_services ?? 12 },
-                ] as const).map(({ cat, label, rate }) => {
-                  const src = getSource(cat);
-                  return (
-                    <tr key={cat}>
-                      <td>{label}</td>
-                      <td>{(src?.document_codes ?? []).join('، ') || '—'}</td>
-                      <td>{BASE_OPTIONS.find(o => o.value === (src?.base ?? 'purchases'))?.label ?? 'المشتريات'}</td>
-                      <td>{src?.require_locked ? 'نعم' : 'لا'}</td>
-                      <td>{rate}%</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <SimpleTable
+              columns={[
+                { key: 'label', label: 'الفئة' },
+                { key: 'document_codes', label: 'المستندات المصدر', render: (v) => (v as string[]).join('، ') || '—' },
+                { key: 'base', label: 'أساس الحساب', render: (v) => BASE_OPTIONS.find(o => o.value === (v as string))?.label ?? 'المشتريات' },
+                { key: 'require_locked', label: 'اشتراط الإغلاق', render: (v) => v ? 'نعم' : 'لا' },
+                { key: 'rate', label: 'التعريفة', render: (v) => `${v}%` },
+              ]}
+              data={[
+                { cat: 'subsidized', label: 'مواد مدعمة', document_codes: (getSource('subsidized')?.document_codes ?? []), base: getSource('subsidized')?.base ?? 'purchases', require_locked: getSource('subsidized')?.require_locked ?? false, rate: config?.ifu_rate_subsidized ?? config?.ifu_rate_goods ?? 5 },
+                { cat: 'other_goods', label: 'بضائع أخرى', document_codes: (getSource('other_goods')?.document_codes ?? []), base: getSource('other_goods')?.base ?? 'purchases', require_locked: getSource('other_goods')?.require_locked ?? false, rate: config?.ifu_rate_goods ?? 5 },
+                { cat: 'services', label: 'خدمات', document_codes: (getSource('services')?.document_codes ?? []), base: getSource('services')?.base ?? 'purchases', require_locked: getSource('services')?.require_locked ?? false, rate: config?.ifu_rate_services ?? 12 },
+              ]}
+              rowKey="cat"
+              emptyText="—"
+            />
           </Card>
         </>
       )}
@@ -464,15 +470,16 @@ export default function TaxSettingsPage() {
 
       {history && history.length > 0 && (
         <Card title="سجل التعديلات" subtitle={`آخر ${history.length} تغيير`}>
-          <table className="tw"><thead><tr><th>الإصدار</th><th>التاريخ</th><th>الملاحظات</th></tr></thead>
-            <tbody>{(history as any[]).map((h) => (
-              <tr key={h.id}>
-                <td className="m">{h.version}</td>
-                <td>{h.updated_at ? new Date(h.updated_at).toLocaleDateString('ar-DZ') : '—'}</td>
-                <td style={{ color: 'var(--t4)' }}>{h.change_notes ?? '—'}</td>
-              </tr>
-            ))}</tbody>
-          </table>
+          <SimpleTable
+            columns={[
+              { key: 'version', label: 'الإصدار', className: 'm' },
+              { key: 'updated_at', label: 'التاريخ', render: (v) => v ? new Date(v as string).toLocaleDateString('ar-DZ') : '—' },
+              { key: 'change_notes', label: 'الملاحظات', render: (v) => <span style={{ color: 'var(--t4)' }}>{(v as string) ?? '—'}</span> },
+            ]}
+            data={(history as any[]).map(h => ({ ...h, _key: h.id }))}
+            rowKey="_key"
+            emptyText="—"
+          />
         </Card>
       )}
 

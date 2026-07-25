@@ -10,7 +10,6 @@ export { default as FileUploader } from './ui/FileUploader';
 
 // ── UI Components (Upgraded) ─────────────────────────────────────────────────
 export { default as Pagination }   from './ui/Pagination';
-export { default as Table }        from './ui/Table';
 export { default as PageHeader }   from './ui/PageHeader';
 
 // ── Form Components (New) ────────────────────────────────────────────────────
@@ -24,4 +23,4 @@ export { default as LineChart }    from './charts/LineChart';
 export type { DropdownOption }     from './ui/Dropdown';
 export type { BreadcrumbItem }     from './ui/Breadcrumb';
 export type { StepperStep }        from './ui/Stepper';
-export type { TableColumn }        from './ui/Table';
+

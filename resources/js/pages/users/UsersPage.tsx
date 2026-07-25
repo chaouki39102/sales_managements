@@ -11,6 +11,7 @@ import { useTenantQuery, useTenantMutation } from "@/hooks/useTenantQuery";
 import { useNotification } from '@/hooks/useNotification';
 import { useConfirm } from '@/hooks/useConfirm';
 import { ConfirmDialog } from '@/components/ui';
+import Modal from '@/components/ui/Modal';
 
 // ─── Types ─────────────────────────────────────
 interface Permission {
@@ -167,194 +168,6 @@ function StatusBadge({ active }: { active: boolean }) {
             />
             موقوف
         </Badge>
-    );
-}
-
-// ─── Overlay / Modal ────────────────────────────
-function Overlay({
-    open,
-    onClose,
-    children,
-    width = 600,
-}: {
-    open: boolean;
-    onClose: () => void;
-    children: React.ReactNode;
-    width?: number;
-}) {
-    useEffect(() => {
-        const h = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-        document.addEventListener("keydown", h);
-        return () => document.removeEventListener("keydown", h);
-    }, [onClose]);
-    if (!open) return null;
-    return (
-        <div
-            style={{
-                position: "fixed",
-                inset: 0,
-                zIndex: 10001,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "rgba(0,0,0,.6)",
-                backdropFilter: "blur(6px)",
-                padding: 16,
-                animation: "ovIn .18s ease",
-            }}
-            onClick={(e) => {
-                if (e.target === e.currentTarget) onClose();
-            }}
-        >
-            <div
-                style={{
-                    background: "var(--bg2)",
-                    borderRadius: 20,
-                    width: "100%",
-                    maxWidth: width,
-                    border: "1px solid var(--b3)",
-                    boxShadow: "0 24px 64px rgba(0,0,0,.3)",
-                    maxHeight: "92vh",
-                    display: "flex",
-                    flexDirection: "column",
-                    animation: "modalIn .22s cubic-bezier(.34,1.4,.64,1)",
-                }}
-            >
-                {children}
-            </div>
-        </div>
-    );
-}
-
-function MHead({
-    title,
-    sub,
-    icon,
-    onClose,
-}: {
-    title: string;
-    sub?: string;
-    icon?: string;
-    onClose: () => void;
-}) {
-    return (
-        <div
-            style={{
-                padding: "16px 20px",
-                borderBottom: "1px solid var(--b2)",
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                flexShrink: 0,
-            }}
-        >
-            {icon && (
-                <div
-                    style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: 10,
-                        background: "var(--emb)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 18,
-                        color: "var(--em)",
-                        flexShrink: 0,
-                    }}
-                >
-                    <i className={`ti ${icon}`} />
-                </div>
-            )}
-            <div style={{ flex: 1 }}>
-                <div
-                    style={{
-                        fontSize: 15,
-                        fontWeight: 800,
-                        color: "var(--t1)",
-                    }}
-                >
-                    {title}
-                </div>
-                {sub && (
-                    <div
-                        style={{
-                            fontSize: 11,
-                            color: "var(--t4)",
-                            marginTop: 1,
-                        }}
-                    >
-                        {sub}
-                    </div>
-                )}
-            </div>
-            <button
-                onClick={onClose}
-                style={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: 8,
-                    border: "1px solid var(--b2)",
-                    background: "var(--bg3)",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "var(--t3)",
-                    fontSize: 14,
-                    flexShrink: 0,
-                    transition: ".14s",
-                }}
-                onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background =
-                        "var(--redb)";
-                    (e.currentTarget as HTMLButtonElement).style.color =
-                        "var(--red)";
-                }}
-                onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background =
-                        "var(--bg3)";
-                    (e.currentTarget as HTMLButtonElement).style.color =
-                        "var(--t3)";
-                }}
-            >
-                <i className="ti ti-x" />
-            </button>
-        </div>
-    );
-}
-
-function MBody({
-    children,
-    pad = 20,
-}: {
-    children: React.ReactNode;
-    pad?: number;
-}) {
-    return (
-        <div style={{ padding: pad, overflowY: "auto", flex: 1 }}>
-            {children}
-        </div>
-    );
-}
-
-function MFoot({ children }: { children: React.ReactNode }) {
-    return (
-        <div
-            style={{
-                padding: "14px 20px",
-                borderTop: "1px solid var(--b2)",
-                flexShrink: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "flex-end",
-                gap: 8,
-                background: "var(--bg3)",
-                borderRadius: "0 0 20px 20px",
-            }}
-        >
-            {children}
-        </div>
     );
 }
 
@@ -676,14 +489,29 @@ function UserDetailModal({
     );
 
     return (
-        <Overlay open onClose={onClose} width={580}>
-            <MHead
-                title={user.name}
-                sub={user.job_title ?? user.email}
-                icon="ti-user"
-                onClose={onClose}
-            />
-            <MBody>
+        <Modal open onClose={onClose} title={user.name} subtitle={user.job_title ?? user.email} size="md"
+                footer={<>
+                    <Btn
+                        variant="danger"
+                        icon={
+                            <i
+                                className={`ti ti-${user.active ? "user-x" : "user-check"}`}
+                            />
+                        }
+                        loading={toggleActive.isPending}
+                        onClick={() => toggleActive.mutate()}
+                    >
+                        {user.active ? "إيقاف" : "تفعيل"}
+                    </Btn>
+                    <Btn onClick={onClose}>إغلاق</Btn>
+                    <Btn
+                        variant="primary"
+                        icon={<i className="ti ti-pencil" />}
+                        onClick={() => onEdit(user)}
+                    >
+                        تعديل
+                    </Btn>
+                </>}>
                 <div
                     style={{
                         display: "flex",
@@ -954,30 +782,7 @@ function UserDetailModal({
                         </div>
                     )}
                 </div>
-            </MBody>
-            <MFoot>
-                <Btn
-                    variant="danger"
-                    icon={
-                        <i
-                            className={`ti ti-${user.active ? "user-x" : "user-check"}`}
-                        />
-                    }
-                    loading={toggleActive.isPending}
-                    onClick={() => toggleActive.mutate()}
-                >
-                    {user.active ? "إيقاف" : "تفعيل"}
-                </Btn>
-                <Btn onClick={onClose}>إغلاق</Btn>
-                <Btn
-                    variant="primary"
-                    icon={<i className="ti ti-pencil" />}
-                    onClick={() => onEdit(user)}
-                >
-                    تعديل
-                </Btn>
-            </MFoot>
-        </Overlay>
+        </Modal>
     );
 }
 
@@ -1069,15 +874,25 @@ function UserFormModal({
     const sel_perm_count = form.permission_ids.length;
 
     return (
-        <Overlay open onClose={onClose} width={620}>
-            <MHead
-                title={isEdit ? `تعديل: ${user?.name}` : "مستخدم جديد"}
-                sub={
+        <Modal open onClose={onClose} title={isEdit ? `تعديل: ${user?.name}` : "مستخدم جديد"}
+                subtitle={
                     isEdit ? "تحديث بيانات المستخدم" : "إضافة مستخدم إلى الشركة"
-                }
-                icon={isEdit ? "ti-user-edit" : "ti-user-plus"}
-                onClose={onClose}
-            />
+                } size="md"
+                footer={<>
+                    <Btn onClick={onClose}>إلغاء</Btn>
+                    <Btn
+                        variant="primary"
+                        icon={
+                            <i
+                                className={`ti ti-${isEdit ? "device-floppy" : "user-plus"}`}
+                            />
+                        }
+                        loading={mutation.isPending}
+                        onClick={() => mutation.mutate(form)}
+                    >
+                        {isEdit ? "حفظ التغييرات" : "إنشاء المستخدم"}
+                    </Btn>
+                </>}>
 
             {/* Tabs */}
             <div
@@ -1132,7 +947,6 @@ function UserFormModal({
                 ))}
             </div>
 
-            <MBody>
                 {error && (
                     <div
                         style={{
@@ -1388,24 +1202,7 @@ function UserFormModal({
                         />
                     </div>
                 )}
-            </MBody>
-
-            <MFoot>
-                <Btn onClick={onClose}>إلغاء</Btn>
-                <Btn
-                    variant="primary"
-                    icon={
-                        <i
-                            className={`ti ti-${isEdit ? "device-floppy" : "user-plus"}`}
-                        />
-                    }
-                    loading={mutation.isPending}
-                    onClick={() => mutation.mutate(form)}
-                >
-                    {isEdit ? "حفظ التغييرات" : "إنشاء المستخدم"}
-                </Btn>
-            </MFoot>
-        </Overlay>
+        </Modal>
     );
 }
 
@@ -1470,18 +1267,26 @@ function RoleFormModal({
     );
 
     return (
-        <Overlay open onClose={onClose} width={640}>
-            <MHead
-                title={
+        <Modal open onClose={onClose} title={
                     isEdit
                         ? `تعديل الدور: ${role?.display_name ?? role?.name}`
                         : "دور جديد"
-                }
-                sub="تحديد الصلاحيات المرتبطة بالدور"
-                icon="ti-shield"
-                onClose={onClose}
-            />
-            <MBody>
+                } subtitle="تحديد الصلاحيات المرتبطة بالدور" size="md"
+                footer={<>
+                    <Btn onClick={onClose}>إلغاء</Btn>
+                    <Btn
+                        variant="primary"
+                        icon={
+                            <i
+                                className={`ti ti-${isEdit ? "device-floppy" : "shield-plus"}`}
+                            />
+                        }
+                        loading={mutation.isPending}
+                        onClick={() => mutation.mutate()}
+                    >
+                        {isEdit ? "حفظ التغييرات" : "إنشاء الدور"}
+                    </Btn>
+                </>}>
                 {error && (
                     <div
                         style={{
@@ -1633,23 +1438,7 @@ function RoleFormModal({
                         />
                     </div>
                 </div>
-            </MBody>
-            <MFoot>
-                <Btn onClick={onClose}>إلغاء</Btn>
-                <Btn
-                    variant="primary"
-                    icon={
-                        <i
-                            className={`ti ti-${isEdit ? "device-floppy" : "shield-plus"}`}
-                        />
-                    }
-                    loading={mutation.isPending}
-                    onClick={() => mutation.mutate()}
-                >
-                    {isEdit ? "حفظ التغييرات" : "إنشاء الدور"}
-                </Btn>
-            </MFoot>
-        </Overlay>
+        </Modal>
     );
 }
 
@@ -1688,14 +1477,32 @@ function RoleDetailModal({
     }, {});
 
     return (
-        <Overlay open onClose={onClose} width={540}>
-            <MHead
-                title={role.display_name ?? role.name}
-                sub={role.description ?? "تفاصيل الدور"}
-                icon="ti-shield"
-                onClose={onClose}
-            />
-            <MBody>
+        <Modal open onClose={onClose} title={role.display_name ?? role.name} subtitle={role.description ?? "تفاصيل الدور"} size="sm"
+            footer={<>
+                <Btn
+                    variant="danger"
+                    icon={<i className="ti ti-trash" />}
+                    loading={deleteRole.isPending}
+                    onClick={async () => {
+                        if (
+                            await deleteConfirm.confirm(
+                                `حذف دور "${role.display_name ?? role.name}"؟`,
+                            )
+                        )
+                            deleteRole.mutate();
+                    }}
+                >
+                    حذف
+                </Btn>
+                <Btn onClick={onClose}>إغلاق</Btn>
+                <Btn
+                    variant="primary"
+                    icon={<i className="ti ti-pencil" />}
+                    onClick={() => onEdit(role)}
+                >
+                    تعديل
+                </Btn>
+            </>}>
                 <div
                     style={{
                         display: "flex",
@@ -1860,34 +1667,8 @@ function RoleDetailModal({
                         </div>
                     )}
                 </div>
-            </MBody>
-            <MFoot>
-                <Btn
-                    variant="danger"
-                    icon={<i className="ti ti-trash" />}
-                    loading={deleteRole.isPending}
-                    onClick={async () => {
-                        if (
-                            await deleteConfirm.confirm(
-                                `حذف دور "${role.display_name ?? role.name}"؟`,
-                            )
-                        )
-                            deleteRole.mutate();
-                    }}
-                >
-                    حذف
-                </Btn>
-                <Btn onClick={onClose}>إغلاق</Btn>
-                <Btn
-                    variant="primary"
-                    icon={<i className="ti ti-pencil" />}
-                    onClick={() => onEdit(role)}
-                >
-                    تعديل
-                </Btn>
-            </MFoot>
             <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
-        </Overlay>
+        </Modal>
     );
 }
 

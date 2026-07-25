@@ -10,6 +10,7 @@ import Badge from '@/components/ui/Badge';
 import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import Pagination from '@/components/ui/Pagination';
+import Card from '@/components/ui/Card';
 import type { BackendMeta } from '@/hooks/usePagination';
 
 const EVENT_CONFIG: Record<string, { label: string; variant: 'success' | 'info' | 'danger'; icon: string }> = {
@@ -82,7 +83,7 @@ export default function AuditLogPage() {
       />
 
       {/* ── Filters ─────────────────────────────────────────────────── */}
-      <div className="card" style={{ marginBottom: 16 }}>
+      <Card style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {([
             { key: '',      label: 'جميع الأحداث' },
@@ -99,10 +100,10 @@ export default function AuditLogPage() {
             </button>
           ))}
         </div>
-      </div>
+      </Card>
 
       {/* ── Table ───────────────────────────────────────────────────── */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <Card noHeader style={{ padding: 0, overflow: 'hidden' }}>
         {isLoading ? (
           <div style={{ padding: 24 }}>
             <Skeleton variant="table" rows={6} />
@@ -199,7 +200,7 @@ export default function AuditLogPage() {
             <i className="ti ti-loader-2" style={{ fontSize: 14, animation: 'spin 1s linear infinite', color: 'var(--em)' }} />
           </div>
         )}
-      </div>
+      </Card>
 
 
     </div>

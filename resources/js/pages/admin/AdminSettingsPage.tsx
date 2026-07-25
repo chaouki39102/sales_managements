@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/admin';
+import PageHeader from '@/components/ui/PageHeader';
 import type { SystemSettings } from '@/types/admin';
 
 // ─── Toggle ───────────────────────────────────────────────────────────────────
@@ -185,26 +186,25 @@ export default function AdminSettingsPage() {
         </div>
       )}
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--t1)' }}>إعدادات النظام</div>
-          <div style={{ fontSize: 12, color: 'var(--t4)', marginTop: 2 }}>التحكم في سلوك المنصة</div>
-        </div>
-        <button
-          disabled={saveMut.isPending}
-          onClick={() => saveMut.mutate(form)}
-          style={{
-            padding: '10px 22px', borderRadius: 10, border: 'none',
-            background: 'var(--green)', color: '#fff', fontSize: 13, fontWeight: 700,
-            cursor: 'pointer', fontFamily: 'Tajawal,sans-serif',
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-          {saveMut.isPending
-            ? <><i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} /> جارٍ الحفظ...</>
-            : <><i className="ti ti-device-floppy" /> حفظ الإعدادات</>}
-        </button>
-      </div>
+      <PageHeader
+        title="إعدادات النظام"
+        description="التحكم في سلوك المنصة"
+        actions={
+          <button
+            disabled={saveMut.isPending}
+            onClick={() => saveMut.mutate(form)}
+            style={{
+              padding: '10px 22px', borderRadius: 10, border: 'none',
+              background: 'var(--green)', color: '#fff', fontSize: 13, fontWeight: 700,
+              cursor: 'pointer', fontFamily: 'Tajawal,sans-serif',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+            {saveMut.isPending
+              ? <><i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} /> جارٍ الحفظ...</>
+              : <><i className="ti ti-device-floppy" /> حفظ الإعدادات</>}
+          </button>
+        }
+      />
 
       {/* حالة النظام */}
       {sysStatus && (

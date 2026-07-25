@@ -6,6 +6,7 @@ import { useConfirm } from '@/hooks/useConfirm';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
+import PageHeader from '@/components/ui/PageHeader';
 import type { Paginated } from '@/types/admin';
 
 interface PendingUser {
@@ -100,25 +101,22 @@ export default function AdminApprovalsPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--t1)' }}>طلبات التفعيل</div>
-          <div style={{ fontSize: 12, color: 'var(--t4)', marginTop: 2 }}>
-            {meta?.total ?? 0} حساب بانتظار المراجعة
-          </div>
-        </div>
-        {selected.size > 0 && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button variant="primary" icon={<i className="ti ti-check" />} onClick={handleApproveAll} loading={bulkApproveMut.isPending}>
-              تفعيل ({selected.size})
-            </Button>
-            <Button variant="danger" icon={<i className="ti ti-x" />} onClick={handleBulkReject} loading={bulkRejectMut.isPending}>
-              رفض ({selected.size})
-            </Button>
-          </div>
-        )}
-      </div>
+      <PageHeader
+        title="طلبات التفعيل"
+        description={meta?.total != null ? `${meta.total} حساب بانتظار المراجعة` : '—'}
+        actions={
+          selected.size > 0 ? (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button variant="primary" icon={<i className="ti ti-check" />} onClick={handleApproveAll} loading={bulkApproveMut.isPending}>
+                تفعيل ({selected.size})
+              </Button>
+              <Button variant="danger" icon={<i className="ti ti-x" />} onClick={handleBulkReject} loading={bulkRejectMut.isPending}>
+                رفض ({selected.size})
+              </Button>
+            </div>
+          ) : undefined
+        }
+      />
 
       {/* Search */}
       <div style={{ display: 'flex', gap: 10 }}>
@@ -253,6 +251,7 @@ export default function AdminApprovalsPage() {
       )}
 
 
+      <ConfirmDialog {...confirm.confirmDialogProps} />
     </div>
   );
 }

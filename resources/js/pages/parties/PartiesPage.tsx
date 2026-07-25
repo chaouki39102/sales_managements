@@ -15,6 +15,7 @@ import Button          from '@/components/ui/Button';
 import KpiCard         from '@/components/ui/KpiCard';
 import Avatar          from '@/components/ui/Avatar';
 import EmptyState      from '@/components/ui/EmptyState';
+import SimpleTable     from '@/components/ui/SimpleTable';
 import Card            from '@/components/ui/Card';
 import PartyFormModal  from '@/components/modals/PartyFormModal';
 import PartyStatsModal from '@/components/modals/PartyStatsModal';
@@ -258,82 +259,132 @@ export default function PartiesPage() {
         />
       ) : (
         <Card noHeader style={{ padding: 0 }}>
-          <div className="tw">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th style={{ width: 36 }}>#</th>
-                  <th>الطرف</th>
-                  <th>النوع</th>
-                  <th>الهاتف</th>
-                  <th>الولاية</th>
-                  <th>NIF</th>
-                  <th style={{ textAlign: 'end' }}>الرصيد</th>
-                  <th style={{ textAlign: 'end' }}>الحد</th>
-                  <th>الحالة</th>
-                  <th style={{ width: 80 }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {parties.map((p, idx) => {
-                  const hasDebt   = (p.balance ?? 0) > 0;
-                  const clr       = ((p.id % 7) + 1) as 1|2|3|4|5|6|7;
-                  const rowNum    = ((page - 1) * (meta?.per_page ?? 25)) + idx + 1;
-                  const location  = [p.wilaya?.name, p.commune?.name].filter(Boolean).join(' / ') || '—';
-
+          <SimpleTable
+            columns={[
+              {
+                key: '_num',
+                label: '#',
+                render: (_v, row) => {
+                  const p = row as unknown as Party;
+                  const idx = parties.indexOf(p);
+                  return ((page - 1) * (meta?.per_page ?? 25)) + idx + 1;
+                },
+              },
+              {
+                key: 'name',
+                label: 'الطرف',
+                render: (_v, row) => {
+                  const p = row as unknown as Party;
+                  const clr = ((p.id % 7) + 1) as 1|2|3|4|5|6|7;
                   return (
-                    <tr key={p.id} style={{ opacity: p.active ? 1 : 0.55, cursor: 'pointer' }}
-                      onClick={() => openStats(p)}>
-                      <td style={{ color: 'var(--t4)', fontSize: 11 }}>{rowNum}</td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <Avatar initials={p.name?.[0] ?? '?'} color={clr} size={32} />
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
-                            {p.commercial_name && (
-                              <div style={{ fontSize: 11, color: 'var(--t4)' }}>{p.commercial_name}</div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td><PartyTypeBadge typeId={p.party_type_id} /></td>
-                      <td style={{ fontSize: 12, color: 'var(--t3)' }}>{p.phone || p.mobile || '—'}</td>
-                      <td style={{ fontSize: 11, color: 'var(--t4)' }}>{location}</td>
-                      <td style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--t4)' }}>{p.nif || '—'}</td>
-                      <td style={{ textAlign: 'end' }}>
-                        {p.balance !== undefined ? (
-                          <span style={{ color: hasDebt ? 'var(--red)' : 'inherit', fontWeight: hasDebt ? 600 : 400, fontSize: 13 }}>
-                            {p.balance.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })}
-                            <span style={{ fontSize: 10, color: 'var(--t4)', marginRight: 3 }}>دج</span>
-                          </span>
-                        ) : '—'}
-                      </td>
-                      <td style={{ textAlign: 'end', fontSize: 12, color: 'var(--t4)' }}>
-                        {p.credit_limit > 0
-                          ? `${p.credit_limit.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج`
-                          : '—'}
-                      </td>
-                      <td>
-                        <Badge variant={p.active ? 'success' : 'danger'}>
-                          {p.active ? 'نشط' : 'موقوف'}
-                        </Badge>
-                      </td>
-                      <td onClick={e => e.stopPropagation()}>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <Button size="xs" variant="ghost" title="إحصاءات"
-                            icon={<i className="ti ti-chart-bar" />}
-                            onClick={() => openStats(p)} />
-                          <Button size="xs" variant="ghost" title="تعديل"
-                            icon={<i className="ti ti-pencil" />}
-                            onClick={() => openEdit(p)} />
-                        </div>
-                      </td>
-                    </tr>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Avatar initials={p.name?.[0] ?? '?'} color={clr} size={32} />
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
+                        {p.commercial_name && (
+                          <div style={{ fontSize: 11, color: 'var(--t4)' }}>{p.commercial_name}</div>
+                        )}
+                      </div>
+                    </div>
                   );
-                })}
-              </tbody>
-            </table>
-          </div>
+                },
+              },
+              {
+                key: 'party_type_id',
+                label: 'النوع',
+                render: (_v, row) => <PartyTypeBadge typeId={(row as unknown as Party).party_type_id} />,
+              },
+              {
+                key: 'phone',
+                label: 'الهاتف',
+                render: (_v, row) => {
+                  const p = row as unknown as Party;
+                  return <span style={{ fontSize: 12, color: 'var(--t3)' }}>{p.phone || p.mobile || '—'}</span>;
+                },
+              },
+              {
+                key: 'wilaya',
+                label: 'الولاية',
+                render: (_v, row) => {
+                  const p = row as unknown as Party;
+                  const location = [p.wilaya?.name, p.commune?.name].filter(Boolean).join(' / ') || '—';
+                  return <span style={{ fontSize: 11, color: 'var(--t4)' }}>{location}</span>;
+                },
+              },
+              {
+                key: 'nif',
+                label: 'NIF',
+                render: (_v, row) => (
+                  <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--t4)' }}>
+                    {(row as unknown as Party).nif || '—'}
+                  </span>
+                ),
+              },
+              {
+                key: 'balance',
+                label: 'الرصيد',
+                align: 'end',
+                render: (_v, row) => {
+                  const p = row as unknown as Party;
+                  const hasDebt = (p.balance ?? 0) > 0;
+                  return p.balance !== undefined ? (
+                    <span style={{ color: hasDebt ? 'var(--red)' : 'inherit', fontWeight: hasDebt ? 600 : 400, fontSize: 13 }}>
+                      {p.balance.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })}
+                      <span style={{ fontSize: 10, color: 'var(--t4)', marginRight: 3 }}>دج</span>
+                    </span>
+                  ) : '—';
+                },
+              },
+              {
+                key: 'credit_limit',
+                label: 'الحد',
+                align: 'end',
+                render: (_v, row) => {
+                  const p = row as unknown as Party;
+                  return (
+                    <span style={{ fontSize: 12, color: 'var(--t4)' }}>
+                      {p.credit_limit > 0
+                        ? `${p.credit_limit.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج`
+                        : '—'}
+                    </span>
+                  );
+                },
+              },
+              {
+                key: 'active',
+                label: 'الحالة',
+                render: (_v, row) => {
+                  const p = row as unknown as Party;
+                  return (
+                    <Badge variant={p.active ? 'success' : 'danger'}>
+                      {p.active ? 'نشط' : 'موقوف'}
+                    </Badge>
+                  );
+                },
+              },
+              {
+                key: '_actions',
+                label: '',
+                render: (_v, row) => {
+                  const p = row as unknown as Party;
+                  return (
+                    <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+                      <Button size="xs" variant="ghost" title="إحصاءات"
+                        icon={<i className="ti ti-chart-bar" />}
+                        onClick={() => openStats(p)} />
+                      <Button size="xs" variant="ghost" title="تعديل"
+                        icon={<i className="ti ti-pencil" />}
+                        onClick={() => openEdit(p)} />
+                    </div>
+                  );
+                },
+              },
+            ]}
+            data={parties}
+            rowKey="id"
+            onRowClick={(row) => openStats(row as unknown as Party)}
+            rowClassName={(row) => (row as unknown as Party).active ? '' : 'opacity-55'}
+          />
         </Card>
       )}
 

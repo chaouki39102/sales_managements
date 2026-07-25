@@ -26,6 +26,8 @@ import {
 } from '@/lib/api/endpoints/lookups';
 import { tenantKeys }  from '@/lib/api/core/queryKeys';
 import { useActiveSlug } from '@/lib/store/appStore';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { useConfirm } from '@/hooks/useConfirm';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -401,6 +403,7 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
   const nameRef   = useRef<HTMLInputElement>(null);
   const initDone  = useRef(false);
   const slugEdited = useRef(false); // لمنع auto-slug بعد التعديل اليدوي
+  const { confirm, confirmDialogProps } = useConfirm();
 
   const [activeTab, setActiveTab] = useState<TabId>('basic');
   const [form,      setForm]      = useState<ProductForm>(() => emptyForm());
@@ -692,9 +695,9 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
     mutation.mutate(buildPayload(form));
   }
 
-  function handleClose() {
+  async function handleClose() {
     if (isDirty && !mutation.isPending) {
-      if (!window.confirm('لديك تعديلات غير محفوظة. هل تريد الخروج؟')) return;
+      if (!await confirm('لديك تعديلات غير محفوظة. هل تريد الخروج؟')) return;
     }
     onClose();
   }
@@ -2071,6 +2074,7 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
         </div>
 
       </div>
+      <ConfirmDialog {...confirmDialogProps} />
     </div>
   );
 }

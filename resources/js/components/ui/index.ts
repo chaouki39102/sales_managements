@@ -13,7 +13,7 @@ export { default as Button }                             from './Button'
 export { default as Badge }                              from './Badge'
 export { default as KpiCard }                            from './KpiCard'
 export { default as Modal }                              from './Modal'
-export { default as Table }                              from './Table'
+export { default as SimpleTable }                        from './SimpleTable'
 export { Alert }                                         from './Alert'
 export { default as Avatar }                             from './Avatar'
 export { default as ConfirmDialog }                      from './ConfirmDialog'
@@ -23,7 +23,7 @@ export {
   FormField, FormGrid, InputRow,
 }                                                        from './FormInputs'
 export {
-  Switch, ProgressBar, EmptyState, PageHeader,
+  Switch, ProgressBar, EmptyState,
   Sep, DotSep, IconButton, Tabs, SummaryRow,
   Grid2, Grid3, Grid4, Grid65, KpiGrid,
 }                                                        from './Misc'

@@ -4,6 +4,7 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Switch from '@/components/ui/Switch';
+import SimpleTable from '@/components/ui/SimpleTable';
 import Skeleton from '@/components/ui/Skeleton';
 import Modal from '@/components/ui/Modal';
 import { Input, Select, FormField, Textarea } from '@/components/ui/FormInputs';
@@ -157,45 +158,36 @@ export default function RegulatedProductsPage() {
       />
 
       <Card title="قائمة المواد المقنَّنة" subtitle={`${products?.length ?? 0} منتج`}>
-        <div className="tw">
-          <table>
-            <thead>
-              <tr>
-                <th>المنتج</th>
-                <th>التصنيف</th>
-                <th>السعر الأقصى</th>
-                <th>الهامش</th>
-                <th>نوع التنظيم</th>
-                <th>الحالة</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {products?.map((p) => (
-                <tr key={p.id}>
-                  <td><strong>{p.label}</strong><br /><span style={{ fontSize: 11, color: 'var(--t4)' }}>{p.product_key}</span></td>
-                  <td>{p.category}</td>
-                  <td className="m">{p.regulated_max_price?.toLocaleString('fr-DZ')} دج/{p.unit_label}</td>
-                  <td className="m">{p.regulated_margin ? `${p.regulated_margin}%` : '—'}</td>
-                  <td><Badge variant={p.regulation_type === 'price' ? 'info' : 'warning'}>{p.regulation_type === 'price' ? 'سعر' : 'هامش'}</Badge></td>
-                  <td>
-                    <Switch
-                      checked={p.active}
-                      onChange={() => mutations.toggleRegulatedProduct.mutate(p.id)}
-                    />
-                  </td>
-                  <td>
-                    <Button size="xs" variant="info" icon={<i className="ti ti-edit" />}
-                      style={{ marginLeft: 4 }} onClick={() => openEdit(p)} />
-                    <Button size="xs" variant="danger" icon={<i className="ti ti-trash" />}
-                      onClick={async () => { if (await deleteConfirm.confirm('حذف هذه المادة؟')) mutations.deleteRegulatedProduct.mutate(p.id, { onSuccess: () => notify.success('تم الحذف') }); }}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <SimpleTable
+          columns={[
+            { key: 'label', label: 'المنتج', render: (_, row) => {
+              const p = row as RegulatedProduct;
+              return <><strong>{p.label}</strong><br /><span style={{ fontSize: 11, color: 'var(--t4)' }}>{p.product_key}</span></>;
+            }},
+            { key: 'category', label: 'التصنيف' },
+            { key: 'regulated_max_price', label: 'السعر الأقصى', className: 'm', render: (v, row) => `${(v as number)?.toLocaleString('fr-DZ')} دج/${(row as RegulatedProduct).unit_label}` },
+            { key: 'regulated_margin', label: 'الهامش', render: (v) => v ? `${v}%` : '—' },
+            { key: 'regulation_type', label: 'نوع التنظيم', render: (v) => <Badge variant={v === 'price' ? 'info' : 'warning'}>{v === 'price' ? 'سعر' : 'هامش'}</Badge> },
+            { key: 'active', label: 'الحالة', render: (v, row) => (
+              <Switch checked={v as boolean} onChange={() => mutations.toggleRegulatedProduct.mutate((row as RegulatedProduct).id)} />
+            )},
+            { key: '_actions', label: '', render: (_, row) => {
+              const p = row as RegulatedProduct;
+              return (
+                <>
+                  <Button size="xs" variant="info" icon={<i className="ti ti-edit" />}
+                    style={{ marginLeft: 4 }} onClick={() => openEdit(p)} />
+                  <Button size="xs" variant="danger" icon={<i className="ti ti-trash" />}
+                    onClick={async () => { if (await deleteConfirm.confirm('حذف هذه المادة؟')) mutations.deleteRegulatedProduct.mutate(p.id, { onSuccess: () => notify.success('تم الحذف') }); }}
+                  />
+                </>
+              );
+            }},
+          ]}
+          data={products ?? []}
+          rowKey="id"
+          emptyText="لا توجد مواد مقنَّنة"
+        />
       </Card>
 
       <RegulatedProductModal open={createModal.open} product={null} onClose={createModal.closeModal} />

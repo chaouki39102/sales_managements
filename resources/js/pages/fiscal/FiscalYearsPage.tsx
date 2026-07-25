@@ -16,6 +16,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import AlertBar from '@/components/ui/AlertBar';
 import ProgressBar from '@/components/ui/ProgressBar';
 import EmptyState from '@/components/ui/EmptyState';
+import SimpleTable from '@/components/ui/SimpleTable';
 import type { FiscalYear } from '@/types';
 
 // ─────────────────────────────────────────────────────────────
@@ -298,98 +299,108 @@ export default function FiscalYearsPage() {
                     action={<Button variant="primary" onClick={openAdd}><i className="ti ti-plus"/> سنة مالية جديدة</Button>} />
             ) : (
                 <Card noHeader style={{ padding: 0 }}>
-                    <div className="tw">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>السنة المالية</th>
-                                    <th>بداية الفترة</th>
-                                    <th>نهاية الفترة</th>
-                                    <th>المدة</th>
-                                    <th>التقدم</th>
-                                    <th>الحالة</th>
-                                    <th>الإقفال</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {years.map(y => {
-                                    const s = toInput(y.start_date), e = toInput(y.end_date);
-                                    const total = daysBetween(s, e);
-                                    const months = Math.round(total / 30.44);
-                                    const progress = y.is_closed ? 100 : calcProgress(s, e);
-                                    const closedByName = resolveClosedByName(y);
-
+                    <SimpleTable
+                        onRowClick={(row) => openDetail(row as unknown as FiscalYear)}
+                        columns={[
+                            {
+                                key: 'name', label: 'السنة المالية',
+                                render: (_v, row) => {
+                                    const y = row as unknown as FiscalYear;
                                     return (
-                                        <tr key={y.id} style={{ ...(y.is_current ? { background: 'var(--emb)' } : {}), cursor: 'pointer' }}
-                                            onClick={() => openDetail(y)}>
-                                            <td>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                    <div style={{
-                                                        width: 36, height: 36, borderRadius: 10,
-                                                        background: y.is_closed ? 'var(--bg4)' : y.is_current ? 'var(--emb)' : 'var(--blueb)',
-                                                        border: `1px solid ${y.is_closed ? 'var(--b2)' : y.is_current ? 'var(--embo)' : 'var(--bluebo)'}`,
-                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    }}>
-                                                        <i className={`ti ${y.is_closed ? 'ti-lock' : y.is_current ? 'ti-star-filled' : 'ti-calendar'}`}
-                                                            style={{ fontSize: 16, color: y.is_closed ? 'var(--t4)' : y.is_current ? 'var(--gold)' : 'var(--blue)' }}/>
-                                                    </div>
-                                                    <div>
-                                                        <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--t1)' }}>{y.name}</div>
-                                                        <div style={{ fontSize: 10, color: 'var(--t4)', fontFamily: 'monospace' }}>
-                                                            {y.is_current ? '★ الحالية' : y.is_closed ? '🔒 مقفلة' : 'مفتوحة'}
-                                                        </div>
-                                                    </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <div style={{
+                                                width: 36, height: 36, borderRadius: 10,
+                                                background: y.is_closed ? 'var(--bg4)' : y.is_current ? 'var(--emb)' : 'var(--blueb)',
+                                                border: `1px solid ${y.is_closed ? 'var(--b2)' : y.is_current ? 'var(--embo)' : 'var(--bluebo)'}`,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            }}>
+                                                <i className={`ti ${y.is_closed ? 'ti-lock' : y.is_current ? 'ti-star-filled' : 'ti-calendar'}`}
+                                                    style={{ fontSize: 16, color: y.is_closed ? 'var(--t4)' : y.is_current ? 'var(--gold)' : 'var(--blue)' }}/>
+                                            </div>
+                                            <div>
+                                                <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--t1)' }}>{y.name}</div>
+                                                <div style={{ fontSize: 10, color: 'var(--t4)', fontFamily: 'monospace' }}>
+                                                    {y.is_current ? '★ الحالية' : y.is_closed ? '🔒 مقفلة' : 'مفتوحة'}
                                                 </div>
-                                            </td>
-                                            <td className="m">{fmtDate(y.start_date)}</td>
-                                            <td className="m">{fmtDate(y.end_date)}</td>
-                                            <td style={{ fontSize: 12, color: 'var(--t3)' }}>{months} شهراً</td>
-                                            <td style={{ minWidth: 120 }}>
-                                                {y.is_closed ? (
-                                                    <span style={{ fontSize: 11, color: 'var(--t4)', fontStyle: 'italic' }}>مكتملة</span>
-                                                ) : (
-                                                    <div>
-                                                        <ProgressBar value={progress} color={y.is_current ? 'var(--em)' : 'var(--blue)'} height={6}/>
-                                                        <div style={{ fontSize: 10, color: 'var(--t4)', marginTop: 3, textAlign: 'left' }}>{progress}٪</div>
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td><StatusBadge year={y}/></td>
-                                            <td style={{ fontSize: 11, color: 'var(--t4)' }}>
-                                                {y.is_closed ? (
-                                                    <div>
-                                                        <div>{fmtDate(y.closed_at)}</div>
-                                                        {closedByName !== '—' && <div style={{ color: 'var(--t3)' }}>{closedByName}</div>}
-                                                    </div>
-                                                ) : '—'}
-                                            </td>
-                                            <td onClick={e => e.stopPropagation()}>
-                                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                                    <Button size="xs" icon={<i className="ti ti-eye"/>} onClick={() => openDetail(y)}/>
-                                                    {!y.is_closed && (
-                                                        <>
-                                                            {!y.is_current && (
-                                                                <Button size="xs" variant="info" icon={<i className="ti ti-star"/>}
-                                                                    onClick={() => setCurrent.mutate(y.id)} disabled={setCurrent.isPending}/>
-                                                            )}
-                                                            <Button size="xs" icon={<i className="ti ti-pencil"/>} onClick={() => openEdit(y)}/>
-                                                            <Button size="xs" variant="info" icon={<i className="ti ti-import"/>} onClick={() => openImport(y)}>استيراد</Button>
-                                                            {y.is_current && (
-                                                                <Button size="xs" variant="warning" icon={<i className="ti ti-lock"/>} onClick={() => openClose(y)}>إقفال</Button>
-                                                            )}
-                                                            <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>}
-                                                                onClick={() => handleDeleteClick(y)} disabled={deleteYear.isPending}/>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
+                                            </div>
+                                        </div>
                                     );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
+                                },
+                            },
+                            { key: 'start_date', label: 'بداية الفترة', render: (v) => <span className="m">{fmtDate(v)}</span> },
+                            { key: 'end_date', label: 'نهاية الفترة', render: (v) => <span className="m">{fmtDate(v)}</span> },
+                            {
+                                key: 'duration', label: 'المدة',
+                                render: (_v, row) => {
+                                    const y = row as unknown as FiscalYear;
+                                    const total = daysBetween(toInput(y.start_date), toInput(y.end_date));
+                                    return <span style={{ fontSize: 12, color: 'var(--t3)' }}>{Math.round(total / 30.44)} شهراً</span>;
+                                },
+                            },
+                            {
+                                key: 'progress', label: 'التقدم',
+                                render: (_v, row) => {
+                                    const y = row as unknown as FiscalYear;
+                                    const s = toInput(y.start_date), e = toInput(y.end_date);
+                                    const progress = y.is_closed ? 100 : calcProgress(s, e);
+                                    return y.is_closed ? (
+                                        <span style={{ fontSize: 11, color: 'var(--t4)', fontStyle: 'italic' }}>مكتملة</span>
+                                    ) : (
+                                        <div>
+                                            <ProgressBar value={progress} color={y.is_current ? 'var(--em)' : 'var(--blue)'} height={6}/>
+                                            <div style={{ fontSize: 10, color: 'var(--t4)', marginTop: 3, textAlign: 'left' }}>{progress}٪</div>
+                                        </div>
+                                    );
+                                },
+                            },
+                            {
+                                key: 'status', label: 'الحالة',
+                                render: (_v, row) => <StatusBadge year={row as unknown as FiscalYear}/>,
+                            },
+                            {
+                                key: 'closure', label: 'الإقفال',
+                                render: (_v, row) => {
+                                    const y = row as unknown as FiscalYear;
+                                    const closedByName = resolveClosedByName(y);
+                                    return y.is_closed ? (
+                                        <div>
+                                            <div>{fmtDate(y.closed_at)}</div>
+                                            {closedByName !== '—' && <div style={{ color: 'var(--t3)' }}>{closedByName}</div>}
+                                        </div>
+                                    ) : '—';
+                                },
+                            },
+                            {
+                                key: 'actions', label: '',
+                                render: (_v, row) => {
+                                    const y = row as unknown as FiscalYear;
+                                    return (
+                                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+                                            <Button size="xs" icon={<i className="ti ti-eye"/>} onClick={() => openDetail(y)}/>
+                                            {!y.is_closed && (
+                                                <>
+                                                    {!y.is_current && (
+                                                        <Button size="xs" variant="info" icon={<i className="ti ti-star"/>}
+                                                            onClick={() => setCurrent.mutate(y.id)} disabled={setCurrent.isPending}/>
+                                                    )}
+                                                    <Button size="xs" icon={<i className="ti ti-pencil"/>} onClick={() => openEdit(y)}/>
+                                                    <Button size="xs" variant="info" icon={<i className="ti ti-import"/>} onClick={() => openImport(y)}>استيراد</Button>
+                                                    {y.is_current && (
+                                                        <Button size="xs" variant="warning" icon={<i className="ti ti-lock"/>} onClick={() => openClose(y)}>إقفال</Button>
+                                                    )}
+                                                    <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>}
+                                                        onClick={() => handleDeleteClick(y)} disabled={deleteYear.isPending}/>
+                                                </>
+                                            )}
+                                        </div>
+                                    );
+                                },
+                            },
+                        ]}
+                        data={years}
+                        rowKey="id"
+                        emptyText="لا توجد سنوات مالية"
+                    />
                 </Card>
             )}
 

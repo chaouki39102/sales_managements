@@ -7,6 +7,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
+import SimpleTable from '@/components/ui/SimpleTable';
 
 export default function DailyReportPage() {
   const today = new Date().toISOString().slice(0, 10);
@@ -46,24 +47,19 @@ export default function DailyReportPage() {
           </div>
           {d.documents.length > 0 && (
             <Card title={`الوثائق (${d.documents.length})`} titleIcon="ti-file-text" padding="sm" style={{ borderRadius: 12 }}>
-              <div className="tw">
-                <table>
-                  <thead><tr><th>رقم الوثيقة</th><th>النوع</th><th>العميل/المورد</th><th className="num">HT</th><th className="num">TVA</th><th className="num">TTC</th><th>الحالة</th></tr></thead>
-                  <tbody>
-                    {d.documents.map((doc) => (
-                      <tr key={doc.id}>
-                        <td><span style={{ fontWeight: 600 }}>{doc.document_number}</span></td>
-                        <td><Badge>{doc.document_type}</Badge></td>
-                        <td>{doc.party_name ?? '—'}</td>
-                        <td className="num">{FMT(doc.total_ht)}</td>
-                        <td className="num">{FMT(doc.total_tva)}</td>
-                        <td className="num">{FMT(doc.total_ttc)}</td>
-                        <td><Badge variant={doc.payment_status === 'paid' ? 'success' : 'warning'} noDot>{doc.payment_status === 'paid' ? 'مدفوع' : 'غير مدفوع'}</Badge></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <SimpleTable
+                columns={[
+                  { key: 'document_number', label: 'رقم الوثيقة', render: (v) => <span style={{ fontWeight: 600 }}>{v as string}</span> },
+                  { key: 'document_type', label: 'النوع', render: (v) => <Badge>{v as string}</Badge> },
+                  { key: 'party_name', label: 'العميل/المورد' },
+                  { key: 'total_ht', label: 'HT', className: 'num', render: (v) => FMT(v as number) },
+                  { key: 'total_tva', label: 'TVA', className: 'num', render: (v) => FMT(v as number) },
+                  { key: 'total_ttc', label: 'TTC', className: 'num', render: (v) => FMT(v as number) },
+                  { key: 'payment_status', label: 'الحالة', render: (v) => <Badge variant={v === 'paid' ? 'success' : 'warning'} noDot>{v === 'paid' ? 'مدفوع' : 'غير مدفوع'}</Badge> },
+                ]}
+                data={d.documents}
+                rowKey="id"
+              />
             </Card>
           )}
         </>

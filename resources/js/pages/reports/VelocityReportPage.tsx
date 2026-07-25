@@ -7,6 +7,7 @@ import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import SimpleTable from '@/components/ui/SimpleTable';
 
 const def = REPORT_DEFAULTS;
 
@@ -37,24 +38,19 @@ export default function VelocityReportPage() {
           <KpiCard variant="gold" icon="ti-calendar"  label="فترة التحليل (أيام)"   value={data.summary.period_days}/>
         </div>
         <Card noHeader style={{ padding: 0, marginTop: 16 }}>
-          <div className="tw">
-            <table>
-              <thead><tr><th>#</th><th>المنتج</th><th>المرجع</th><th>الكمية</th><th>عدد الفواتير</th><th>السرعة (يوم)</th><th>متوسط السعر</th></tr></thead>
-              <tbody>
-                {data.items.map((row, i) => (
-                  <tr key={i}>
-                    <td style={{ color: 'var(--t4)', fontSize: 12 }}>{i + 1}</td>
-                    <td style={{ fontWeight: 700 }}>{row.product_name}</td>
-                    <td style={{ color: 'var(--t4)', fontSize: 12 }}>{row.product_ref}</td>
-                    <td>{FMT(row.total_qty)}</td>
-                    <td>{row.doc_count}</td>
-                    <td style={{ fontWeight: 700 }}>{FMT(row.velocity)}</td>
-                    <td>{FMT(row.avg_price)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <SimpleTable
+            columns={[
+              { key: '_idx', label: '#', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v as number}</span> },
+              { key: 'product_name', label: 'المنتج', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
+              { key: 'product_ref', label: 'المرجع', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v as string}</span> },
+              { key: 'total_qty', label: 'الكمية', render: (v) => FMT(v as number) },
+              { key: 'doc_count', label: 'عدد الفواتير' },
+              { key: 'velocity', label: 'السرعة (يوم)', render: (v) => <span style={{ fontWeight: 700 }}>{FMT(v as number)}</span> },
+              { key: 'avg_price', label: 'متوسط السعر', render: (v) => FMT(v as number) },
+            ]}
+            data={data.items.map((row, i) => ({ ...row, _idx: i + 1 }))}
+            rowKey={(row) => `row-${row._idx}`}
+          />
         </Card>
       </>
     )}

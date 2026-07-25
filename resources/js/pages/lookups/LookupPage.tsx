@@ -9,6 +9,8 @@ import React, {
 import { useLookup }       from '@/hooks/useLookup';
 import { useRemoteLabels } from '@/hooks/useRemoteLabels';
 import apiClient           from '@/lib/api/core/client';
+import Card                from '@/components/ui/Card';
+import SimpleTable          from '@/components/ui/SimpleTable';
 
 // ── Types ──────────────────────────────────────
 export interface FieldDef {
@@ -896,7 +898,7 @@ export default function LookupPage({
       )}
 
       {/* ── Table ── */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <Card noHeader style={{ padding: 0, overflow: 'hidden' }}>
         {loading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, gap: 10, color: 'var(--t3)' }}>
             <i className="ti ti-loader-2" style={{ fontSize: 22, animation: 'spin .8s linear infinite' }} />
@@ -916,53 +918,30 @@ export default function LookupPage({
           </div>
         ) : (
           <div className="tw">
-            <table>
-              <thead>
-                <tr>
-                  <th style={{ width: 40, textAlign: 'center' }}>#</th>
-                  {tableFields.map(f => (
-                    <th key={f.key}>
-                      <span
-                        className="lkp-sort-btn"
-                        onClick={() => handleSort(f.key)}
-                        style={{ color: sortKey === f.key ? 'var(--em)' : undefined }}
-                      >
-                        {f.label}
-                        {sortKey === f.key
-                          ? <i className={`ti ${sortAsc ? 'ti-sort-ascending' : 'ti-sort-descending'}`} style={{ fontSize: 11 }} />
-                          : <i className="ti ti-selector" style={{ fontSize: 10, opacity: .4 }} />}
-                      </span>
-                    </th>
-                  ))}
-                  <th style={{ width: 90, textAlign: 'center' }}>إجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((item, idx) => (
-                  <tr
-                    key={item.id}
-                    className="lkp-row-hover"
-                    onDoubleClick={() => openEdit(item)}
-                    title="انقر مرتين للتعديل"
-                  >
-                    <td style={{ color: 'var(--t4)', fontSize: 11, textAlign: 'center' }}>{idx + 1}</td>
-                    {tableFields.map(f => (
-                      <td key={f.key}>{renderCellValue(f, item)}</td>
-                    ))}
-                    <td>
-                      <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                        <button className="btn btn-xs" onClick={() => openEdit(item)} title="تعديل (Enter للتأكيد)">
-                          <i className="ti ti-pencil" />
-                        </button>
-                        <button className="btn btn-xs btn-r" onClick={() => setDelItem(item)} title="حذف">
-                          <i className="ti ti-trash" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <SimpleTable
+              columns={[
+                { key: '_idx', label: '#', className: 'center', render: (_v, _row, _k) => filtered.indexOf(_row as any) + 1 },
+                ...tableFields.map(f => ({
+                  key: f.key,
+                  label: f.label,
+                  render: (value: unknown, row: Record<string, unknown>) => renderCellValue(f, row),
+                })),
+                { key: '_actions', label: 'إجراءات', render: (_v, row) => (
+                  <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                    <button className="btn btn-xs" onClick={() => openEdit(row)} title="تعديل (Enter للتأكيد)">
+                      <i className="ti ti-pencil" />
+                    </button>
+                    <button className="btn btn-xs btn-r" onClick={() => setDelItem(row)} title="حذف">
+                      <i className="ti ti-trash" />
+                    </button>
+                  </div>
+                )},
+              ]}
+              data={filtered}
+              rowKey="id"
+              emptyText={search ? 'لا توجد نتائج للبحث' : (emptyText ?? `لا توجد ${title} بعد`)}
+              onRowClick={(row) => openEdit(row)}
+            />
           </div>
         )}
 
@@ -982,7 +961,7 @@ export default function LookupPage({
             </span>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* ── Modal النموذج ── */}
       {modal && (

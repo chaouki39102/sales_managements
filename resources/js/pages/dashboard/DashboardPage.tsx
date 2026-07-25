@@ -8,6 +8,7 @@ import Avatar       from '@/components/ui/Avatar';
 import AlertBar     from '@/components/ui/AlertBar';
 import Button       from '@/components/ui/Button';
 import ProgressBar  from '@/components/ui/ProgressBar';
+import SimpleTable  from '@/components/ui/SimpleTable';
 
 // ── Types ─────────────────────────────────────
 interface Invoice {
@@ -319,49 +320,34 @@ export default function DashboardPage() {
             </Button>
           }
         >
-          <div className="tw">
-            <table>
-              <thead>
-                <tr>
-                  <th>رقم</th>
-                  <th>الزبون</th>
-                  <th>المبلغ</th>
-                  <th>TVA</th>
-                  <th>الحالة</th>
-                  <th>التاريخ</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {INVOICES.map((inv) => (
-                  <tr key={inv.id}>
-                    <td className="m">{inv.id}</td>
-                    <td>
-                      <div className="flex items-center gap-2">
-                        <Avatar initials={inv.clientInitial} color={inv.avatarColor} size={26} />
-                        <span className={`s ${inv.status === 'cancelled' ? 'line-through text-t4' : ''}`}>
-                          {inv.client}
-                        </span>
-                      </div>
-                    </td>
-                    <td className={inv.status === 'cancelled' ? 'r line-through' : 'e'}>
-                      {inv.amount}
-                    </td>
-                    <td className="m text-t4">{inv.tva}</td>
-                    <td>{statusBadge(inv.status)}</td>
-                    <td className="text-xs text-t4">{inv.date}</td>
-                    <td>
-                      <button className="btn btn-xs">
-                        <span className="ic ic-xs">
-                          <i className={`ti ${actionIcon(inv.action)}`}/>
-                        </span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <SimpleTable
+            columns={[
+              { key: 'id', label: 'رقم', className: 'm' },
+              { key: 'client', label: 'الزبون', render: (_v, row) => (
+                <div className="flex items-center gap-2">
+                  <Avatar initials={row.clientInitial as string} color={row.avatarColor as 1|2|3|4|5|6|7} size={26} />
+                  <span className={`s ${row.status === 'cancelled' ? 'line-through text-t4' : ''}`}>
+                    {row.client as string}
+                  </span>
+                </div>
+              )},
+              { key: 'amount', label: 'المبلغ', render: (v, row) => (
+                <span className={row.status === 'cancelled' ? 'r line-through' : 'e'}>{String(v)}</span>
+              )},
+              { key: 'tva', label: 'TVA', className: 'm text-t4' },
+              { key: 'status', label: 'الحالة', render: (v) => statusBadge(v as Invoice['status']) },
+              { key: 'date', label: 'التاريخ', className: 'text-xs text-t4' },
+              { key: 'action', label: '', render: (v) => (
+                <button className="btn btn-xs">
+                  <span className="ic ic-xs">
+                    <i className={`ti ${actionIcon(v as string)}`}/>
+                  </span>
+                </button>
+              )},
+            ]}
+            data={INVOICES}
+            rowKey="id"
+          />
         </Card>
 
         {/* Right column */}

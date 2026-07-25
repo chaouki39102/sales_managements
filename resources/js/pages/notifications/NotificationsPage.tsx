@@ -4,6 +4,7 @@ import Card               from '@/components/ui/Card';
 import Button             from '@/components/ui/Button';
 import Badge              from '@/components/ui/Badge';
 import EmptyState         from '@/components/ui/EmptyState';
+import SimpleTable        from '@/components/ui/SimpleTable';
 import Skeleton           from '@/components/ui/Skeleton';
 import Pagination         from '@/components/ui/Pagination';
 import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal';
@@ -42,14 +43,7 @@ const TYPE_FILTER_OPTIONS: { value: RemoteNotificationType | 'all'; label: strin
 
 const PER_PAGE = 20;
 
-const thStyle: React.CSSProperties = {
-  padding: '10px 12px', textAlign: 'right', fontWeight: 700,
-  fontSize: 11, color: 'var(--t3)', whiteSpace: 'nowrap',
-};
 
-const tdStyle: React.CSSProperties = {
-  padding: '9px 12px', verticalAlign: 'middle',
-};
 
 export default function NotificationsPage() {
   const notify = useNotification();
@@ -254,49 +248,38 @@ export default function NotificationsPage() {
             />
           </div>
         ) : (
-          <div style={{ overflow: 'hidden', opacity: isFetching ? 0.6 : 1, transition: 'opacity .15s' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead>
-                <tr style={{ background: 'var(--bg3)' }}>
-                  <th style={{ ...thStyle, width: 36, textAlign: 'center' }} />
-                  <th style={{ ...thStyle, width: 1 }}>النوع</th>
-                  <th style={thStyle}>المحتوى</th>
-                  <th style={{ ...thStyle, width: 100 }}>التاريخ</th>
-                  <th style={{ ...thStyle, width: 80, textAlign: 'center' }}>الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {notifications.map((n) => (
-                  <tr
-                    key={n.id}
-                    style={{
-                      borderBottom: '1px solid var(--b1)',
-                      background: !n.is_read ? 'var(--emb)' : undefined,
-                      transition: 'background .1s',
-                    }}
-                    onMouseEnter={e => {
-                      if (n.is_read) e.currentTarget.style.background = 'var(--bg2)';
-                    }}
-                    onMouseLeave={e => {
-                      if (n.is_read) e.currentTarget.style.background = '';
-                    }}
-                  >
-                    <td style={{ ...tdStyle, textAlign: 'center' }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(n.id)}
-                        onChange={() => toggleSelect(n.id)}
-                        style={{ accentColor: 'var(--em)', cursor: 'pointer', width: 15, height: 15 }}
-                      />
-                    </td>
-
-                    <td style={{ ...tdStyle, textAlign: 'center' }}>
-                      <span className="ic ic-sm" style={{ color: NOTIFICATION_TYPE_COLOR[n.type] }}>
-                        <i className={`ti ${NOTIFICATION_TYPE_ICON[n.type]}`} />
-                      </span>
-                    </td>
-
-                    <td style={tdStyle}>
+          <>
+          <style>{`.ntf-unread{background:var(--emb)}.ntf-read:hover{background:var(--bg2)}`}</style>
+          <SimpleTable
+            columns={[
+              {
+                key: 'checkbox', label: '',
+                render: (_v, row) => {
+                  const n = row as any;
+                  return (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(n.id)}
+                      onChange={() => toggleSelect(n.id)}
+                      style={{ accentColor: 'var(--em)', cursor: 'pointer', width: 15, height: 15 }}
+                    />
+                  );
+                },
+              },
+              {
+                key: 'type', label: 'النوع', align: 'center',
+                render: (v) => (
+                  <span className="ic ic-sm" style={{ color: NOTIFICATION_TYPE_COLOR[v as RemoteNotificationType] }}>
+                    <i className={`ti ${NOTIFICATION_TYPE_ICON[v as RemoteNotificationType]}`} />
+                  </span>
+                ),
+              },
+              {
+                key: 'content', label: 'المحتوى',
+                render: (_v, row) => {
+                  const n = row as any;
+                  return (
+                    <>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <span style={{ fontWeight: 700, color: 'var(--t1)', fontSize: 12.5 }}>
                           {n.title}
@@ -316,34 +299,24 @@ export default function NotificationsPage() {
                           {n.message}
                         </div>
                       )}
-                    </td>
-
-                    <td style={{ ...tdStyle, color: 'var(--t4)', fontSize: 11 }}>
-                      <time>{n.created_at_human}</time>
-                    </td>
-
-                    <td style={{ ...tdStyle, textAlign: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                        {!n.is_read && (
-                          <button
-                            onClick={() => handleMarkOneAsRead(n.id)}
-                            title="تحديد كمقروء"
-                            style={{
-                              width: 28, height: 28, borderRadius: 6,
-                              border: '1px solid var(--b2)', background: 'var(--bg3)',
-                              cursor: 'pointer', display: 'inline-flex',
-                              alignItems: 'center', justifyContent: 'center',
-                              color: 'var(--t4)', transition: 'all .15s',
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.background = 'var(--emb)'; e.currentTarget.style.color = 'var(--em)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg3)'; e.currentTarget.style.color = 'var(--t4)'; }}
-                          >
-                            <i className="ti ti-check" style={{ fontSize: 14 }} />
-                          </button>
-                        )}
+                    </>
+                  );
+                },
+              },
+              {
+                key: 'created_at_human', label: 'التاريخ',
+                render: (v) => <span style={{ color: 'var(--t4)', fontSize: 11 }}><time>{v as string}</time></span>,
+              },
+              {
+                key: 'actions', label: 'الإجراءات', align: 'center',
+                render: (_v, row) => {
+                  const n = row as any;
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                      {!n.is_read && (
                         <button
-                          onClick={() => openDeleteSingle(n.id)}
-                          title="حذف"
+                          onClick={() => handleMarkOneAsRead(n.id)}
+                          title="تحديد كمقروء"
                           style={{
                             width: 28, height: 28, borderRadius: 6,
                             border: '1px solid var(--b2)', background: 'var(--bg3)',
@@ -351,18 +324,37 @@ export default function NotificationsPage() {
                             alignItems: 'center', justifyContent: 'center',
                             color: 'var(--t4)', transition: 'all .15s',
                           }}
-                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--redb)'; e.currentTarget.style.color = 'var(--red)'; }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--emb)'; e.currentTarget.style.color = 'var(--em)'; }}
                           onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg3)'; e.currentTarget.style.color = 'var(--t4)'; }}
                         >
-                          <i className="ti ti-trash" style={{ fontSize: 14 }} />
+                          <i className="ti ti-check" style={{ fontSize: 14 }} />
                         </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      )}
+                      <button
+                        onClick={() => openDeleteSingle(n.id)}
+                        title="حذف"
+                        style={{
+                          width: 28, height: 28, borderRadius: 6,
+                          border: '1px solid var(--b2)', background: 'var(--bg3)',
+                          cursor: 'pointer', display: 'inline-flex',
+                          alignItems: 'center', justifyContent: 'center',
+                          color: 'var(--t4)', transition: 'all .15s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--redb)'; e.currentTarget.style.color = 'var(--red)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg3)'; e.currentTarget.style.color = 'var(--t4)'; }}
+                      >
+                        <i className="ti ti-trash" style={{ fontSize: 14 }} />
+                      </button>
+                    </div>
+                  );
+                },
+              },
+            ]}
+            data={notifications as any}
+            rowKey="id"
+            rowClassName={(row) => (row as any).is_read ? 'ntf-read' : 'ntf-unread'}
+          />
+          </>
         )}
 
         {meta && meta.last_page > 1 && (

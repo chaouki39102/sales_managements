@@ -7,6 +7,7 @@ import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import SimpleTable from '@/components/ui/SimpleTable';
 
 const def = REPORT_DEFAULTS;
 
@@ -38,35 +39,30 @@ export default function MarginReportPage() {
           <KpiCard variant="purple" icon="ti-percentage"    label="نسبة الهامش"     value={`${data.summary.margin_pct}%`}/>
         </div>
         <Card noHeader style={{ padding: 0, marginTop: 16 }}>
-          <div className="tw">
-            <table>
-              <thead><tr><th>#</th><th>المنتج</th><th>المرجع</th><th>الكمية</th><th>الإيراد HT</th><th>التكلفة</th><th>الهامش</th><th>%</th></tr></thead>
-              <tbody>
-                {data.items.map((row, i) => (
-                  <tr key={i}>
-                    <td style={{ color: 'var(--t4)', fontSize: 12 }}>{i + 1}</td>
-                    <td style={{ fontWeight: 700 }}>{row.product_name}</td>
-                    <td style={{ color: 'var(--t4)', fontSize: 12 }}>{row.product_ref}</td>
-                    <td>{row.total_qty}</td>
-                    <td>{FMT(row.total_ht)}</td>
-                    <td>{FMT(row.cost_total)}</td>
-                    <td style={{ color: row.margin_amount >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(row.margin_amount)}</td>
-                    <td style={{ color: row.margin_pct >= 0 ? 'var(--em)' : 'var(--red)' }}>{row.margin_pct}%</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr style={{ fontWeight: 800, background: 'var(--bg2)' }}>
-                  <td colSpan={3}>الإجمالي ({data.items.length} منتج)</td>
-                  <td>{data.items.reduce((s, r) => s + r.total_qty, 0)}</td>
-                  <td>{FMT(data.summary.total_ht)}</td>
-                  <td>{FMT(data.summary.total_cost)}</td>
-                  <td style={{ color: data.summary.total_margin >= 0 ? 'var(--em)' : 'var(--red)' }}>{FMT(data.summary.total_margin)}</td>
-                  <td style={{ color: data.summary.margin_pct >= 0 ? 'var(--em)' : 'var(--red)' }}>{data.summary.margin_pct}%</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          <SimpleTable
+            columns={[
+              { key: '_idx', label: '#', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v as number}</span> },
+              { key: 'product_name', label: 'المنتج', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
+              { key: 'product_ref', label: 'المرجع', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v as string}</span> },
+              { key: 'total_qty', label: 'الكمية' },
+              { key: 'total_ht', label: 'الإيراد HT', render: (v) => FMT(v as number) },
+              { key: 'cost_total', label: 'التكلفة', render: (v) => FMT(v as number) },
+              { key: 'margin_amount', label: 'الهامش', render: (v, row) => {
+                const val = v as number;
+                return <span style={{ color: (row.margin_amount as number) >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(val)}</span>;
+              }},
+              { key: 'margin_pct', label: '%', render: (v, row) => {
+                const val = v as number;
+                return <span style={{ color: (row.margin_pct as number) >= 0 ? 'var(--em)' : 'var(--red)' }}>{val}%</span>;
+              }},
+            ]}
+            data={[
+              ...data.items.map((row, i) => ({ ...row, _idx: i + 1 })),
+              { _isFooter: true, _idx: '', product_name: `الإجمالي (${data.items.length} منتج)`, product_ref: '', total_qty: data.items.reduce((s, r) => s + r.total_qty, 0), total_ht: data.summary.total_ht, cost_total: data.summary.total_cost, margin_amount: data.summary.total_margin, margin_pct: data.summary.margin_pct },
+            ]}
+            rowKey={(row) => row._isFooter ? 'footer' : `row-${row._idx}`}
+            rowClassName={(row) => row._isFooter ? 'font-extrabold bg-2' : undefined}
+          />
         </Card>
       </>
     )}

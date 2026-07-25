@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/admin';
 import { adminKeys } from '@/lib/api/core/queryKeys';
 import { useDebounce } from '@/hooks/useDebounce';
+import PageHeader from '@/components/ui/PageHeader';
 import type { ActivityLog } from '@/types/admin';
 
 const EVENT_COLORS: Record<string, string> = {
@@ -51,18 +52,15 @@ export default function AdminActivityPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--t1)' }}>سجل النشاطات</div>
-          <div style={{ fontSize: 12, color: 'var(--t4)', marginTop: 2 }}>
-            {meta ? `${meta.total} حدث` : '—'}
-          </div>
-        </div>
-        <button className="btn" onClick={() => refetch()} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <i className="ti ti-refresh" /> تحديث
-        </button>
-      </div>
+      <PageHeader
+        title="سجل النشاطات"
+        description={meta ? `${meta.total} حدث` : '—'}
+        actions={
+          <button className="btn" onClick={() => refetch()} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-refresh" /> تحديث
+          </button>
+        }
+      />
 
       {/* Filters */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 10, flexWrap: 'wrap' }}>

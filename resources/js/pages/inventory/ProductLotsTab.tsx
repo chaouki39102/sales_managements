@@ -14,6 +14,7 @@ import Skeleton from '@/components/ui/Skeleton';
 import Modal from '@/components/ui/Modal';
 import Pagination from '@/components/ui/Pagination';
 import SearchInput from '@/components/ui/SearchInput';
+import SimpleTable from '@/components/ui/SimpleTable';
 import type { BackendMeta } from '@/hooks/usePagination';
 import type { ProductLot } from '@/lib/api/core/types';
 
@@ -349,67 +350,75 @@ export default function ProductLotsTab() {
             action={<Button variant="primary" size="sm" icon={<i className="ti ti-plus" />} onClick={openCreate}>{"\u0625\u0646\u0634\u0627\u0621 \u062f\u0641\u0639\u0629"}</Button>} />
         ) : (
           <>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="plt-tbl">
-                <thead>
-                  <tr>
-                    <th className="plt-th">{"\u0631\u0642\u0645 \u0627\u0644\u062f\u0641\u0639\u0629"}</th>
-                    <th className="plt-th">{"\u0627\u0644\u0645\u0646\u062a\u062c"}</th>
-                    <th className="plt-th">{"\u0627\u0644\u0645\u0633\u062a\u0648\u062f\u0639"}</th>
-                    <th className="plt-th" style={{ textAlign: 'left' }}>{"\u0627\u0644\u0643\u0645\u064a\u0629"}</th>
-                    <th className="plt-th" style={{ textAlign: 'left' }}>{"\u0627\u0644\u0645\u062a\u0628\u0642\u064a"}</th>
-                    <th className="plt-th">{"\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0634\u0631\u0627\u0621"}</th>
-                    <th className="plt-th">{"\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0627\u0646\u062a\u0647\u0627\u0621"}</th>
-                    <th className="plt-th">{"\u0627\u0644\u062d\u0627\u0644\u0629"}</th>
-                    <th className="plt-th" style={{ textAlign: 'center', width: 80 }}>{"\u0625\u062c\u0631\u0627\u0621\u0627\u062a"}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map(lot => {
-                    const st = getLotStatus(lot);
-                    const rem = Number(lot.remaining_quantity ?? 0);
-                    const orig = Number(lot.original_quantity ?? 0);
-                    const pct = orig > 0 ? (rem / orig) * 100 : 0;
-                    return (
-                      <tr key={lot.id} className="plt-tr-hover">
-                        <td className="plt-td" style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: 11 }}>{lot.lot_number}</td>
-                        <td className="plt-td">
-                          <div style={{ fontWeight: 600 }}>{lot.product?.name ?? '\u2014'}</div>
-                          {lot.product?.ref && <div style={{ fontSize: 10, color: 'var(--t4)' }}>{lot.product.ref}</div>}
-                        </td>
-                        <td className="plt-td" style={{ color: 'var(--t3)' }}>{lot.warehouse?.name ?? '\u2014'}</td>
-                        <td className="plt-td" style={{ textAlign: 'left', fontFamily: 'monospace', fontSize: 12 }}>{fmtNum(orig)}</td>
-                        <td className="plt-td" style={{ textAlign: 'left' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: 12, color: rem <= 0 ? 'var(--t4)' : pct < 20 ? 'var(--red)' : 'var(--t1)' }}>{fmtNum(rem)}</span>
-                            <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--bg4)', overflow: 'hidden' }}>
-                              <div style={{ width: `${pct}%`, height: '100%', borderRadius: 2, background: pct < 20 ? 'var(--red)' : pct < 50 ? 'var(--gold)' : 'var(--em)', transition: 'width .3s' }} />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="plt-td" style={{ color: 'var(--t3)', fontSize: 12 }}>{fmtDate(lot.purchase_date)}</td>
-                        <td className="plt-td" style={{ fontSize: 12 }}>
-                          {lot.expiration_date ? (
-                            <span style={{ color: st.variant === 'danger' ? 'var(--red)' : st.variant === 'warning' ? 'var(--gold)' : 'var(--t3)' }}>{fmtDate(lot.expiration_date)}</span>
-                          ) : '\u2014'}
-                        </td>
-                        <td className="plt-td">
-                          <Badge variant={st.variant} noDot>
-                            <i className={`ti ${st.icon}`} style={{ marginLeft: 4, fontSize: 10 }} />{st.label}
-                          </Badge>
-                        </td>
-                        <td className="plt-td" style={{ textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                            <button onClick={() => openEdit(lot)} title="\u062a\u0639\u062f\u064a\u0644" className="plt-action-btn plt-action-btn--edit"><i className="ti ti-pencil" /></button>
-                            <button onClick={() => handleDelete(lot.id, lot.lot_number)} title="\u062d\u0630\u0641" className="plt-action-btn plt-action-btn--delete"><i className="ti ti-trash" /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <SimpleTable
+              className="plt-tbl"
+              columns={[
+                { key: 'lot_number', label: "\u0631\u0642\u0645 \u0627\u0644\u062f\u0641\u0639\u0629", render: (v) => (
+                  <span style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: 11 }}>{v as string}</span>
+                )},
+                { key: 'product', label: "\u0627\u0644\u0645\u0646\u062a\u062c", render: (_v, row) => {
+                  const lot = row as unknown as ProductLot;
+                  return (
+                    <>
+                      <div style={{ fontWeight: 600 }}>{lot.product?.name ?? '\u2014'}</div>
+                      {lot.product?.ref && <div style={{ fontSize: 10, color: 'var(--t4)' }}>{lot.product.ref}</div>}
+                    </>
+                  );
+                }},
+                { key: 'warehouse', label: "\u0627\u0644\u0645\u0633\u062a\u0648\u062f\u0639", render: (_v, row) => {
+                  const lot = row as unknown as ProductLot;
+                  return <span style={{ color: 'var(--t3)' }}>{lot.warehouse?.name ?? '\u2014'}</span>;
+                }},
+                { key: 'original_quantity', label: "\u0627\u0644\u0643\u0645\u064a\u0629", align: 'start', render: (v) => (
+                  <span style={{ textAlign: 'left', fontFamily: 'monospace', fontSize: 12 }}>{fmtNum(Number(v))}</span>
+                )},
+                { key: '_remaining', label: "\u0627\u0644\u0645\u062a\u0628\u0642\u064a", align: 'start', render: (_v, row) => {
+                  const lot = row as unknown as ProductLot;
+                  const rem = Number(lot.remaining_quantity ?? 0);
+                  const orig = Number(lot.original_quantity ?? 0);
+                  const pct = orig > 0 ? (rem / orig) * 100 : 0;
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: 12, color: rem <= 0 ? 'var(--t4)' : pct < 20 ? 'var(--red)' : 'var(--t1)' }}>{fmtNum(rem)}</span>
+                      <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--bg4)', overflow: 'hidden' }}>
+                        <div style={{ width: `${pct}%`, height: '100%', borderRadius: 2, background: pct < 20 ? 'var(--red)' : pct < 50 ? 'var(--gold)' : 'var(--em)', transition: 'width .3s' }} />
+                      </div>
+                    </div>
+                  );
+                }},
+                { key: 'purchase_date', label: "\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0634\u0631\u0627\u0621", render: (v) => (
+                  <span style={{ color: 'var(--t3)', fontSize: 12 }}>{fmtDate(v as string)}</span>
+                )},
+                { key: 'expiration_date', label: "\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0627\u0646\u062a\u0647\u0627\u0621", render: (v, row) => {
+                  const lot = row as unknown as ProductLot;
+                  const st = getLotStatus(lot);
+                  return lot.expiration_date ? (
+                    <span style={{ fontSize: 12, color: st.variant === 'danger' ? 'var(--red)' : st.variant === 'warning' ? 'var(--gold)' : 'var(--t3)' }}>{fmtDate(v as string)}</span>
+                  ) : '\u2014';
+                }},
+                { key: '_status', label: "\u0627\u0644\u062d\u0627\u0644\u0629", render: (_v, row) => {
+                  const lot = row as unknown as ProductLot;
+                  const st = getLotStatus(lot);
+                  return (
+                    <Badge variant={st.variant} noDot>
+                      <i className={`ti ${st.icon}`} style={{ marginLeft: 4, fontSize: 10 }} />{st.label}
+                    </Badge>
+                  );
+                }},
+                { key: 'actions', label: "\u0625\u062c\u0631\u0627\u0621\u0627\u062a", render: (_v, row) => {
+                  const lot = row as unknown as ProductLot;
+                  return (
+                    <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                      <button onClick={() => openEdit(lot)} title="\u062a\u0639\u062f\u064a\u0644" className="plt-action-btn plt-action-btn--edit"><i className="ti ti-pencil" /></button>
+                      <button onClick={() => handleDelete(lot.id, lot.lot_number)} title="\u062d\u0630\u0641" className="plt-action-btn plt-action-btn--delete"><i className="ti ti-trash" /></button>
+                    </div>
+                  );
+                }},
+              ]}
+              data={items as unknown as Record<string, unknown>[]}
+              rowKey="id"
+              emptyText="\u0644\u0627 \u062a\u0648\u062c\u062f \u062f\u0641\u0639\u0627\u062a"
+            />
             {meta && meta.last_page > 1 && (
               <div style={{ padding: '0 16px', borderTop: '1px solid var(--b1)' }}>
                 <Pagination meta={meta} onPageChange={setPage}

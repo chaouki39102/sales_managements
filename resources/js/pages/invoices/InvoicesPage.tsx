@@ -27,6 +27,7 @@ import Modal from "@/components/ui/Modal";
 import KpiCard from "@/components/ui/KpiCard";
 import Avatar from "@/components/ui/Avatar";
 import EmptyState from "@/components/ui/EmptyState";
+import SimpleTable from "@/components/ui/SimpleTable";
 import type {
     CommercialDocument,
     CommercialDocumentLine,
@@ -324,15 +325,16 @@ export default function InvoicesPage() {
                     </div>
                 </div>
 
-                <div className="tw">
-                    {isLoading ? (
+                {isLoading ? (
+                    <div className="tw">
                         <div className="empty">
                             <div className="empty-ic">
                                 <i className="ti ti-loader" />
                             </div>
                             <div className="empty-tx">جاري التحميل...</div>
                         </div>
-                    ) : invoices.length === 0 ? (
+                    </div>
+                ) : invoices.length === 0 ? (
                         <EmptyState
                             icon="ti-file-invoice"
                             text="لا توجد فواتير"
@@ -347,138 +349,145 @@ export default function InvoicesPage() {
                             }
                         />
                     ) : (
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th style={{ width: 36 }}></th>
-                                    <th>رقم الفاتورة</th>
-                                    <th>الزبون</th>
-                                    <th>HT</th>
-                                    <th>TVA</th>
-                                    <th>TTC</th>
-                                    <th>المدفوع</th>
-                                    <th>الرصيد</th>
-                                    <th>الحالة</th>
-                                    <th>التاريخ</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {invoices.map((inv) => {
-                                    const sb =
-                                        STATUS_BADGE[inv.status] ??
-                                        STATUS_BADGE.draft;
-                                    const hasBalance = inv.remaining_amount > 0;
-                                    return (
-                                        <tr
-                                            key={inv.id}
-                                            onClick={() => openDetail(inv)}
-                                        >
-                                            <td
-                                                onClick={(e) =>
-                                                    e.stopPropagation()
-                                                }
+                        <SimpleTable
+                            columns={[
+                                {
+                                    key: "_select",
+                                    label: "",
+                                    render: (_v, row) => {
+                                        const inv = row as unknown as CommercialDocument;
+                                        return (
+                                            <input
+                                                type="checkbox"
+                                                style={{
+                                                    width: "auto",
+                                                    cursor: "pointer",
+                                                }}
+                                                checked={selected.has(inv.id)}
+                                                onChange={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleSelect(inv.id);
+                                                }}
+                                            />
+                                        );
+                                    },
+                                },
+                                {
+                                    key: "document_number",
+                                    label: "رقم الفاتورة",
+                                    className: "m",
+                                },
+                                {
+                                    key: "party",
+                                    label: "الزبون",
+                                    render: (_v, row) => {
+                                        const inv = row as unknown as CommercialDocument;
+                                        return (
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: 7,
+                                                }}
                                             >
-                                                <input
-                                                    type="checkbox"
-                                                    style={{
-                                                        width: "auto",
-                                                        cursor: "pointer",
-                                                    }}
-                                                    checked={selected.has(
-                                                        inv.id,
-                                                    )}
-                                                    onChange={() =>
-                                                        toggleSelect(inv.id)
+                                                <Avatar
+                                                    initials={
+                                                        inv.party
+                                                            ?.name?.[0] ??
+                                                        "?"
                                                     }
+                                                    color={1}
+                                                    size={26}
                                                 />
-                                            </td>
-                                            <td className="m">
-                                                {inv.document_number}
-                                            </td>
-                                            <td>
-                                                <div
-                                                    style={{
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        gap: 7,
-                                                    }}
-                                                >
-                                                    <Avatar
-                                                        initials={
-                                                            inv.party
-                                                                ?.name?.[0] ??
-                                                            "?"
-                                                        }
-                                                        color={1}
-                                                        size={26}
-                                                    />
-                                                    <div>
-                                                        <div className="s">
-                                                            {inv.party?.name ??
-                                                                "عابر"}
-                                                        </div>
-                                                        {(inv.party?.balance ??
-                                                            0) > 0 && (
-                                                            <div
-                                                                style={{
-                                                                    fontSize: 10,
-                                                                    color: "var(--red)",
-                                                                }}
-                                                            >
-                                                                ⚠️ دين{" "}
-                                                                {inv.party!.balance!.toLocaleString(
-                                                                    "fr-DZ",
-                                                                )}{" "}
-                                                                دج
-                                                            </div>
-                                                        )}
+                                                <div>
+                                                    <div className="s">
+                                                        {inv.party?.name ??
+                                                            "عابر"}
                                                     </div>
+                                                    {(inv.party?.balance ??
+                                                        0) > 0 && (
+                                                        <div
+                                                            style={{
+                                                                fontSize: 10,
+                                                                color: "var(--red)",
+                                                            }}
+                                                        >
+                                                            ⚠️ دين{" "}
+                                                            {inv.party!.balance!.toLocaleString(
+                                                                "fr-DZ",
+                                                            )}{" "}
+                                                            دج
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            </td>
-                                            <td style={{ color: "var(--t3)" }}>
-                                                {inv.total_ht.toLocaleString(
-                                                    "fr-DZ",
-                                                    {
-                                                        maximumFractionDigits: 0,
-                                                    },
-                                                )}{" "}
-                                                دج
-                                            </td>
-                                            <td
-                                                className="m"
-                                                style={{ color: "var(--t4)" }}
-                                            >
-                                                {inv.total_tva.toLocaleString(
-                                                    "fr-DZ",
-                                                    {
-                                                        maximumFractionDigits: 0,
-                                                    },
-                                                )}{" "}
-                                                دج
-                                            </td>
-                                            <td className="e">
-                                                {inv.total_ttc.toLocaleString(
-                                                    "fr-DZ",
-                                                    {
-                                                        maximumFractionDigits: 0,
-                                                    },
-                                                )}{" "}
-                                                دج
-                                            </td>
-                                            <td className="e">
-                                                {inv.paid_amount.toLocaleString(
-                                                    "fr-DZ",
-                                                    {
-                                                        maximumFractionDigits: 0,
-                                                    },
-                                                )}{" "}
-                                                دج
-                                            </td>
-                                            <td
-                                                className={
-                                                    hasBalance ? "r" : ""
-                                                }
+                                            </div>
+                                        );
+                                    },
+                                },
+                                {
+                                    key: "total_ht",
+                                    label: "HT",
+                                    render: (_v, row) => (
+                                        <span style={{ color: "var(--t3)" }}>
+                                            {(row as unknown as CommercialDocument).total_ht.toLocaleString(
+                                                "fr-DZ",
+                                                {
+                                                    maximumFractionDigits: 0,
+                                                },
+                                            )}{" "}
+                                            دج
+                                        </span>
+                                    ),
+                                },
+                                {
+                                    key: "total_tva",
+                                    label: "TVA",
+                                    className: "m",
+                                    render: (_v, row) => (
+                                        <span style={{ color: "var(--t4)" }}>
+                                            {(row as unknown as CommercialDocument).total_tva.toLocaleString(
+                                                "fr-DZ",
+                                                {
+                                                    maximumFractionDigits: 0,
+                                                },
+                                            )}{" "}
+                                            دج
+                                        </span>
+                                    ),
+                                },
+                                {
+                                    key: "total_ttc",
+                                    label: "TTC",
+                                    className: "e",
+                                    render: (_v, row) =>
+                                        (row as unknown as CommercialDocument).total_ttc.toLocaleString(
+                                            "fr-DZ",
+                                            {
+                                                maximumFractionDigits: 0,
+                                            },
+                                        ) + " دج",
+                                },
+                                {
+                                    key: "paid_amount",
+                                    label: "المدفوع",
+                                    className: "e",
+                                    render: (_v, row) =>
+                                        (row as unknown as CommercialDocument).paid_amount.toLocaleString(
+                                            "fr-DZ",
+                                            {
+                                                maximumFractionDigits: 0,
+                                            },
+                                        ) + " دج",
+                                },
+                                {
+                                    key: "remaining_amount",
+                                    label: "الرصيد",
+                                    render: (_v, row) => {
+                                        const inv = row as unknown as CommercialDocument;
+                                        const hasBalance = inv.remaining_amount > 0;
+                                        return (
+                                            <span
+                                                className={hasBalance ? "r" : ""}
                                                 style={{
                                                     color: hasBalance
                                                         ? undefined
@@ -488,72 +497,98 @@ export default function InvoicesPage() {
                                                 {hasBalance
                                                     ? `${inv.remaining_amount.toLocaleString("fr-DZ", { maximumFractionDigits: 0 })} دج`
                                                     : "—"}
-                                            </td>
-                                            <td>
-                                                <Badge variant={sb.variant}>
-                                                    {sb.label}
-                                                </Badge>
-                                            </td>
-                                            <td
+                                            </span>
+                                        );
+                                    },
+                                },
+                                {
+                                    key: "status",
+                                    label: "الحالة",
+                                    render: (_v, row) => {
+                                        const sb =
+                                            STATUS_BADGE[
+                                                (row as unknown as CommercialDocument).status
+                                            ] ?? STATUS_BADGE.draft;
+                                        return (
+                                            <Badge variant={sb.variant}>
+                                                {sb.label}
+                                            </Badge>
+                                        );
+                                    },
+                                },
+                                {
+                                    key: "document_date",
+                                    label: "التاريخ",
+                                    render: (_v, row) => (
+                                        <span
+                                            style={{
+                                                fontSize: 11,
+                                                color: "var(--t4)",
+                                            }}
+                                        >
+                                            {new Date(
+                                                (row as unknown as CommercialDocument).document_date,
+                                            ).toLocaleDateString("fr-DZ")}
+                                        </span>
+                                    ),
+                                },
+                                {
+                                    key: "_actions",
+                                    label: "",
+                                    render: (_v, row) => {
+                                        const inv = row as unknown as CommercialDocument;
+                                        return (
+                                            <div
                                                 style={{
-                                                    fontSize: 11,
-                                                    color: "var(--t4)",
+                                                    display: "flex",
+                                                    gap: 3,
                                                 }}
-                                            >
-                                                {new Date(
-                                                    inv.document_date,
-                                                ).toLocaleDateString("fr-DZ")}
-                                            </td>
-                                            <td
                                                 onClick={(e) =>
                                                     e.stopPropagation()
                                                 }
                                             >
-                                                <div
-                                                    style={{
-                                                        display: "flex",
-                                                        gap: 3,
-                                                    }}
-                                                >
+                                                <Button
+                                                    size="xs"
+                                                    icon={
+                                                        <i className="ti ti-eye" />
+                                                    }
+                                                    onClick={() =>
+                                                        openDetail(inv)
+                                                    }
+                                                />
+                                                <Button
+                                                    size="xs"
+                                                    icon={
+                                                        <i className="ti ti-printer" />
+                                                    }
+                                                />
+                                                {inv.status ===
+                                                    "validated" && (
                                                     <Button
                                                         size="xs"
+                                                        variant="primary"
                                                         icon={
-                                                            <i className="ti ti-eye" />
+                                                            <i className="ti ti-cash" />
                                                         }
                                                         onClick={() =>
-                                                            openDetail(inv)
+                                                            validateMut.mutate(
+                                                                inv.id,
+                                                            )
                                                         }
                                                     />
-                                                    <Button
-                                                        size="xs"
-                                                        icon={
-                                                            <i className="ti ti-printer" />
-                                                        }
-                                                    />
-                                                    {inv.status ===
-                                                        "validated" && (
-                                                        <Button
-                                                            size="xs"
-                                                            variant="primary"
-                                                            icon={
-                                                                <i className="ti ti-cash" />
-                                                            }
-                                                            onClick={() =>
-                                                                validateMut.mutate(
-                                                                    inv.id,
-                                                                )
-                                                            }
-                                                        />
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                                                )}
+                                            </div>
+                                        );
+                                    },
+                                },
+                            ]}
+                            data={invoices}
+                            rowKey="id"
+                            onRowClick={(row) =>
+                                openDetail(row as unknown as CommercialDocument)
+                            }
+                        />
                     )}
-                </div>
 
                 {/* Pagination */}
                 {meta && meta.last_page > 1 && (
@@ -784,107 +819,112 @@ function InvoiceDetailModal({
             </div>
 
             {/* Lines table */}
-            <table
-                style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    fontSize: 13,
-                    marginBottom: 14,
-                }}
-            >
-                <thead style={{ background: "var(--bg3)" }}>
-                    <tr>
-                        {[
-                            "المنتج",
-                            "الكمية",
-                            "سعر HT",
-                            "TVA",
-                            "خصم",
-                            "TTC",
-                        ].map((h) => (
-                            <th
-                                key={h}
+            <SimpleTable
+                columns={[
+                    {
+                        key: "product",
+                        label: "المنتج",
+                        render: (_v, row) => {
+                            const line =
+                                row as unknown as CommercialDocumentLine;
+                            return (
+                                <span style={{ fontWeight: 700 }}>
+                                    {line.product_variant?.product?.name ??
+                                        line.description ??
+                                        "—"}
+                                </span>
+                            );
+                        },
+                    },
+                    {
+                        key: "quantity",
+                        label: "الكمية",
+                        render: (_v, row) => (
+                            <span style={{ color: "var(--t3)" }}>
+                                {
+                                    (row as unknown as CommercialDocumentLine)
+                                        .quantity
+                                }
+                            </span>
+                        ),
+                    },
+                    {
+                        key: "unit_price_ht",
+                        label: "سعر HT",
+                        render: (_v, row) => (
+                            <span style={{ fontFamily: "monospace" }}>
+                                {(
+                                    row as unknown as CommercialDocumentLine
+                                ).unit_price_ht.toFixed(2)}{" "}
+                                دج
+                            </span>
+                        ),
+                    },
+                    {
+                        key: "tva_rate",
+                        label: "TVA",
+                        render: (_v, row) => (
+                            <span
                                 style={{
-                                    padding: "9px 12px",
-                                    textAlign: "right",
-                                    fontSize: 11,
-                                    color: "var(--t4)",
-                                }}
-                            >
-                                {h}
-                            </th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {(invoice.lines ?? []).map((line, i) => (
-                        <tr
-                            key={i}
-                            style={{ borderBottom: "1px solid var(--b1)" }}
-                        >
-                            <td
-                                style={{
-                                    padding: "10px 12px",
-                                    fontWeight: 700,
-                                }}
-                            >
-                                {line.product_variant?.product?.name ??
-                                    line.description ??
-                                    "—"}
-                            </td>
-                            <td
-                                style={{
-                                    padding: "10px 12px",
-                                    color: "var(--t3)",
-                                }}
-                            >
-                                {line.quantity}
-                            </td>
-                            <td
-                                style={{
-                                    padding: "10px 12px",
-                                    fontFamily: "monospace",
-                                }}
-                            >
-                                {line.unit_price_ht.toFixed(2)} دج
-                            </td>
-                            <td
-                                style={{
-                                    padding: "10px 12px",
                                     fontSize: 12,
                                     color: "var(--t4)",
                                 }}
                             >
-                                {line.tva_rate}%
-                            </td>
-                            <td
+                                {(row as unknown as CommercialDocumentLine)
+                                    .tva_rate}
+                                %
+                            </span>
+                        ),
+                    },
+                    {
+                        key: "discount_percentage",
+                        label: "خصم",
+                        render: (_v, row) => {
+                            const line =
+                                row as unknown as CommercialDocumentLine;
+                            return (
+                                <span
+                                    style={{
+                                        fontSize: 12,
+                                        color: "var(--red)",
+                                    }}
+                                >
+                                    {line.discount_percentage > 0
+                                        ? `${line.discount_percentage}%`
+                                        : "—"}
+                                </span>
+                            );
+                        },
+                    },
+                    {
+                        key: "total_ttc",
+                        label: "TTC",
+                        render: (_v, row) => (
+                            <span
                                 style={{
-                                    padding: "10px 12px",
-                                    fontSize: 12,
-                                    color: "var(--red)",
-                                }}
-                            >
-                                {line.discount_percentage > 0
-                                    ? `${line.discount_percentage}%`
-                                    : "—"}
-                            </td>
-                            <td
-                                style={{
-                                    padding: "10px 12px",
                                     color: "var(--em)",
                                     fontWeight: 800,
                                     fontFamily: "monospace",
                                 }}
                             >
-                                {line.total_ttc.toLocaleString("fr-DZ", {
+                                {(
+                                    row as unknown as CommercialDocumentLine
+                                ).total_ttc.toLocaleString("fr-DZ", {
                                     maximumFractionDigits: 0,
                                 })}{" "}
                                 دج
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+                            </span>
+                        ),
+                    },
+                ]}
+                data={
+                    (invoice.lines ?? []).map((line, i) => ({
+                        ...line,
+                        _key: `line-${i}`,
+                    })) as unknown as Record<string, unknown>[]
+                }
+                rowKey="_key"
+            />
 
             {/* Totals */}
             <div style={{ display: "flex", justifyContent: "flex-end" }}>

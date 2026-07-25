@@ -24,6 +24,8 @@ import { BulkImportModal } from './components/BulkImportModal';
 import { ShippingInfoSection } from './components/ShippingInfoSection';
 import { PaymentTermsTable } from './components/PaymentTermsTable';
 import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { useConfirm } from '@/hooks/useConfirm';
 
 import { useCommercialDocumentController } from './hooks/useCommercialDocumentController';
 
@@ -35,6 +37,7 @@ export default function CommercialDocumentPage() {
 
   const onClose = useCallback(() => navigate(-1), [navigate]);
   const onSaved = useCallback(() => navigate(`/documents/${typeCode}`), [navigate, typeCode]);
+  const { confirm, confirmDialogProps } = useConfirm();
 
   const { data: docType } = useQuery({
     queryKey: [slug, 'document-type-by-code', typeCode],
@@ -259,8 +262,8 @@ export default function CommercialDocumentPage() {
                 currentId={Number((existingDoc as Record<string, unknown>).id)}
                 allowedTargets={allowedTargets}
                 isReadOnly={isReadOnly}
-                onConvert={(targetCode) => {
-                  if (!window.confirm(`تحويل هذا المستند إلى ${targetCode}؟`)) return;
+                onConvert={async (targetCode) => {
+                  if (!await confirm(`تحويل هذا المستند إلى ${targetCode}؟`)) return;
                   convertMutation.mutate(
                     { documentId: Number((existingDoc as Record<string, unknown>).id), targetTypeCode: targetCode },
                     { onSuccess: () => { onSaved(); onClose(); } },
@@ -470,6 +473,8 @@ export default function CommercialDocumentPage() {
           />
         </Suspense>
       )}
+
+      <ConfirmDialog {...confirmDialogProps} />
     </div>
   );
 }

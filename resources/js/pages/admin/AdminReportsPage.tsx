@@ -16,6 +16,7 @@ import { useAdminDashboard } from '@/hooks/admin';
 import { Spinner } from '@/components/admin/shared';
 import PageHeader from '@/components/ui/PageHeader';
 import Card       from '@/components/ui/Card';
+import SimpleTable from '@/components/ui/SimpleTable';
 
 type Period = '7d' | '30d' | '90d';
 
@@ -142,37 +143,23 @@ export default function AdminReportsPage() {
       {/* جدول آخر الشركات */}
       {(stats?.recent_companies?.length ?? 0) > 0 && (
         <Card title="آخر الشركات المسجّلة" style={{ marginTop: 16 }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  {['الشركة', 'الخطة', 'الإنشاء'].map(h => (
-                    <th key={h} style={{
-                      padding: '8px 12px', textAlign: 'right',
-                      fontSize: 11, color: 'var(--t4)', fontWeight: 700,
-                    }}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {stats!.recent_companies.map(co => (
-                  <tr key={co.id} style={{ borderTop: '1px solid var(--b1)' }}>
-                    <td style={{ padding: '8px 12px', fontSize: 13, color: 'var(--t1)', fontWeight: 600 }}>
-                      {co.name}
-                    </td>
-                    <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--t4)' }}>
-                      {co.plan}
-                    </td>
-                    <td style={{ padding: '8px 12px', fontSize: 11, color: 'var(--t4)' }}>
-                      {new Date(co.created_at).toLocaleDateString('ar-DZ')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <SimpleTable
+            columns={[
+              { key: 'name', label: 'الشركة', render: (v) => (
+                <span style={{ fontSize: 13, color: 'var(--t1)', fontWeight: 600 }}>{v as string}</span>
+              )},
+              { key: 'plan', label: 'الخطة', render: (v) => (
+                <span style={{ fontSize: 12, color: 'var(--t4)' }}>{v as string}</span>
+              )},
+              { key: 'created_at', label: 'الإنشاء', render: (v) => (
+                <span style={{ fontSize: 11, color: 'var(--t4)' }}>
+                  {new Date(v as string).toLocaleDateString('ar-DZ')}
+                </span>
+              )},
+            ]}
+            data={stats!.recent_companies}
+            rowKey="id"
+          />
         </Card>
       )}
     </div>

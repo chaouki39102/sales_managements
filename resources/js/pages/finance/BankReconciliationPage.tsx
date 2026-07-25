@@ -11,6 +11,7 @@ import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
 import Skeleton from '@/components/ui/Skeleton';
 import { useConfirm } from '@/hooks/useConfirm';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 const fmtDZD = (n: number) =>
   n.toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -228,6 +229,7 @@ export default function BankReconciliationPage() {
       )}
 
 
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </div>
   );
 }

@@ -24,6 +24,8 @@ import { BulkImportModal } from '../components/BulkImportModal';
 import { ShippingInfoSection } from '../components/ShippingInfoSection';
 import { PaymentTermsTable } from '../components/PaymentTermsTable';
 import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { useConfirm } from '@/hooks/useConfirm';
 
 import { useCommercialDocumentController } from '../hooks/useCommercialDocumentController';
 
@@ -44,6 +46,7 @@ export default function CommercialDocumentModal({
 }: CommercialDocumentModalProps) {
 
   const [alertsOpen, setAlertsOpen] = React.useState(true);
+  const { confirm, confirmDialogProps } = useConfirm();
 
   const ctrl = useCommercialDocumentController({
     documentType,
@@ -221,8 +224,8 @@ export default function CommercialDocumentModal({
               currentId={Number(existingDocument?.id)}
               allowedTargets={allowedTargets}
               isReadOnly={isReadOnly}
-              onConvert={(targetCode) => {
-                if (!window.confirm(`تحويل هذا المستند إلى ${targetCode}؟`)) return;
+              onConvert={async (targetCode) => {
+                if (!await confirm(`تحويل هذا المستند إلى ${targetCode}؟`)) return;
                 convertMutation.mutate(
                   { documentId: Number(existingDocument!.id), targetTypeCode: targetCode },
                   { onSuccess: () => { onSaved(); onClose(); } },
@@ -521,6 +524,8 @@ export default function CommercialDocumentModal({
           />
         </Suspense>
       )}
+
+      <ConfirmDialog {...confirmDialogProps} />
     </>
   );
 

@@ -8,6 +8,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
+import SimpleTable from '@/components/ui/SimpleTable';
 
 const def = REPORT_DEFAULTS;
 
@@ -42,29 +43,24 @@ export default function StockMovementsReportPage() {
           </div>
           {d.movements.length > 0 && (
             <Card noHeader style={{ padding: 0, marginTop: 16 }}>
-              <div className="tw">
-                <table>
-                  <thead><tr><th>#</th><th>التاريخ</th><th>المنتج</th><th>المستودع</th><th>النوع</th><th>الاتجاه</th><th>الكمية</th><th>القيمة</th></tr></thead>
-                  <tbody>
-                    {d.movements.map((m, i) => (
-                      <tr key={m.id}>
-                        <td style={{ color: 'var(--t4)', fontSize: 12 }}>{i + 1}</td>
-                        <td>{m.movement_date}</td>
-                        <td style={{ fontWeight: 700 }}>{m.product_name}</td>
-                        <td>{m.warehouse_name ?? '—'}</td>
-                        <td>{m.type_label ?? '—'}</td>
-                        <td>
-                          <Badge variant={m.direction === 1 ? 'success' : m.direction === -1 ? 'danger' : 'warning'} noDot>
-                            {m.direction === 1 ? 'وارد' : m.direction === -1 ? 'صادر' : 'تسوية'}
-                          </Badge>
-                        </td>
-                        <td className="num">{FMT(m.quantity)}</td>
-                        <td className="num">{MONEY(m.total_price)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <SimpleTable
+                columns={[
+                  { key: '_idx', label: '#', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v}</span> },
+                  { key: 'movement_date', label: 'التاريخ' },
+                  { key: 'product_name', label: 'المنتج', render: (v) => <span style={{ fontWeight: 700 }}>{v}</span> },
+                  { key: 'warehouse_name', label: 'المستودع', render: (v) => v ?? '—' },
+                  { key: 'type_label', label: 'النوع', render: (v) => v ?? '—' },
+                  { key: '_direction', label: 'الاتجاه', render: (_v, row) => (
+                    <Badge variant={row.direction === 1 ? 'success' : row.direction === -1 ? 'danger' : 'warning'} noDot>
+                      {row.direction === 1 ? 'وارد' : row.direction === -1 ? 'صادر' : 'تسوية'}
+                    </Badge>
+                  )},
+                  { key: 'quantity', label: 'الكمية', className: 'num', render: (v) => FMT(v as number) },
+                  { key: 'total_price', label: 'القيمة', className: 'num', render: (v) => MONEY(v as number) },
+                ]}
+                data={d.movements.map((m, i) => ({ ...m, _idx: i + 1 }))}
+                rowKey="id"
+              />
             </Card>
           )}
         </>

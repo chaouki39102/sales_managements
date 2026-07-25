@@ -2646,29 +2646,8 @@ body.dark .pay-hero-amount { text-shadow: none; }
 .al-r { background: var(--redb); border-color: var(--redbo); color: var(--red); }
 .al-g { background: var(--emb);  border-color: var(--embo);  color: var(--em);  }
 
-/* Buttons */
-.btn {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 7px 14px;
-  border-radius: var(--r2);
-  border: 1px solid var(--b3);
-  background: var(--bg3);
-  color: var(--t2);
-  font-size: 12.5px;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: 'Tajawal', sans-serif;
-  transition: .13s;
-  white-space: nowrap;
-}
-.btn:hover { background: var(--bg4); color: var(--t1); }
+/* Buttons (base defined in components.css) */
 .btn:disabled { opacity: .4; cursor: not-allowed; }
-.btn-p { background: var(--em); border-color: var(--em); color: #fff; box-shadow: var(--emglow); }
-.btn-p:hover { background: var(--em2); }
-.btn-r { background: var(--redb); border-color: var(--redbo); color: var(--red); }
-.btn-r:hover { background: var(--red); color: #fff; border-color: var(--red); }
-.btn-sm { padding: 5px 11px; font-size: 11.5px; }
-.btn-xs { padding: 4px 9px; font-size: 11px; }
 
 /* Spinner */
 @keyframes spin { to { transform: rotate(360deg); } }

@@ -11,6 +11,7 @@ import { useProductLots } from '@/lib/api/endpoints/inventory';
 import { fmt }           from './inventoryTypes';
 import { Th }            from './InventoryShared';
 import Pagination        from '@/components/ui/Pagination';
+import SimpleTable       from '@/components/ui/SimpleTable';
 import type { StockAtRow } from '@/lib/api/endpoints/inventory';
 import type { ProductLot } from '@/lib/api/core/types';
 import type { Warehouse }  from '@/lib/api/core/types';
@@ -71,59 +72,65 @@ function LotsSubRow({
           ) : lots.length === 0 ? (
             <div style={{ fontSize: 12, color: 'var(--t4)', padding: 10 }}>{"\u0644\u0627 \u062a\u0648\u062c\u062f \u062f\u0641\u0639\u0627\u062a \u0644\u0647\u0630\u0627 \u0627\u0644\u0645\u0646\u062a\u062c"}</div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead>
-                <tr style={{ color: 'var(--t4)' }}>
-                  <th style={{ textAlign: 'right', padding: '4px 8px', fontWeight: 600 }}>{"\u0627\u0644\u062f\u0641\u0639\u0629"}</th>
-                  <th style={{ textAlign: 'right', padding: '4px 8px', fontWeight: 600 }}>{"\u0627\u0644\u0645\u0633\u062a\u0648\u062f\u0639"}</th>
-                  <th style={{ textAlign: 'left',  padding: '4px 8px', fontWeight: 600 }}>{"\u0627\u0644\u0623\u0635\u0644\u064a\u0629"}</th>
-                  <th style={{ textAlign: 'left',  padding: '4px 8px', fontWeight: 600 }}>{"\u0627\u0644\u0645\u062a\u0628\u0642\u064a\u0629"}</th>
-                  <th style={{ textAlign: 'right', padding: '4px 8px', fontWeight: 600 }}>{"\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0627\u0646\u062a\u0647\u0627\u0621"}</th>
-                  <th style={{ textAlign: 'right', padding: '4px 8px', fontWeight: 600 }}>{"\u0627\u0644\u062d\u0627\u0644\u0629"}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lots.map((lt) => {
+            <SimpleTable
+              columns={[
+                { key: 'lot_number', label: "\u0627\u0644\u062f\u0641\u0639\u0629", render: (v) => (
+                  <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{v as string}</span>
+                )},
+                { key: 'warehouse_name', label: "\u0627\u0644\u0645\u0633\u062a\u0648\u062f\u0639", render: (_v, row) => (
+                  <span style={{ color: 'var(--t3)' }}>{((row as any).warehouse?.name) ?? '\u2014'}</span>
+                )},
+                { key: '_original', label: "\u0627\u0644\u0623\u0635\u0644\u064a\u0629", align: 'start', render: (_v, row) => {
+                  const lt = row as ProductLot;
+                  return Number(lt.original_quantity ?? 0);
+                }},
+                { key: '_remaining', label: "\u0627\u0644\u0645\u062a\u0628\u0642\u064a", align: 'start', render: (_v, row) => {
+                  const lt = row as ProductLot;
                   const remaining = Number(lt.remaining_quantity ?? 0);
-                  const original  = Number(lt.original_quantity ?? 0);
-                  const pct       = original > 0 ? (remaining / original) * 100 : 0;
-                  const depleted  = remaining <= 0;
-                  const expired   = !!lt.expiration_date && new Date(lt.expiration_date).getTime() < Date.now();
-                  const expiring  = !depleted && !expired && !!lt.expiration_date &&
-                    (new Date(lt.expiration_date).getTime() - Date.now()) < 30 * 86400000;
+                  const original = Number(lt.original_quantity ?? 0);
+                  const pct = original > 0 ? (remaining / original) * 100 : 0;
+                  const depleted = remaining <= 0;
                   return (
-                    <tr key={lt.id} style={{ borderTop: '1px solid var(--b1)' }}>
-                      <td style={{ padding: '5px 8px', fontFamily: 'monospace', fontSize: 11 }}>{lt.lot_number}</td>
-                      <td style={{ padding: '5px 8px', color: 'var(--t3)' }}>{(lt as any).warehouse?.name ?? '\u2014'}</td>
-                      <td style={{ padding: '5px 8px', textAlign: 'left' }}>{original}</td>
-                      <td style={{ padding: '5px 8px', textAlign: 'left' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
-                          <span style={{ fontWeight: 700, color: depleted ? 'var(--t4)' : pct < 20 ? 'var(--red)' : 'var(--t1)' }}>{remaining}</span>
-                          <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--bg4)', overflow: 'hidden' }}>
-                            <div style={{
-                              width: `${pct}%`, height: '100%',
-                              background: pct < 20 ? 'var(--red)' : pct < 50 ? 'var(--gold)' : 'var(--green)',
-                            }} />
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{ padding: '5px 8px', color: expired ? 'var(--red)' : expiring ? 'var(--gold)' : 'var(--t3)' }}>
-                        {lt.expiration_date ? new Date(lt.expiration_date).toLocaleDateString('ar-DZ') : '\u2014'}
-                      </td>
-                      <td style={{ padding: '5px 8px' }}>
-                        <span style={{
-                          padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700,
-                          color:      depleted ? 'var(--t4)' : expired ? 'var(--red)' : expiring ? 'var(--gold)' : 'var(--green)',
-                          background: depleted ? 'var(--bg3)' : expired ? 'var(--redb)' : expiring ? 'var(--goldb)' : 'var(--greenb)',
-                        }}>
-                          {depleted ? '\u0641\u0627\u0631\u063a\u0629' : expired ? '\u0645\u0646\u062a\u0647\u064a\u0629' : expiring ? '\u062a\u0646\u062a\u0647\u064a' : '\u0646\u0634\u0637\u0629'}
-                        </span>
-                      </td>
-                    </tr>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+                      <span style={{ fontWeight: 700, color: depleted ? 'var(--t4)' : pct < 20 ? 'var(--red)' : 'var(--t1)' }}>{remaining}</span>
+                      <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--bg4)', overflow: 'hidden' }}>
+                        <div style={{ width: `${pct}%`, height: '100%', background: pct < 20 ? 'var(--red)' : pct < 50 ? 'var(--gold)' : 'var(--green)' }} />
+                      </div>
+                    </div>
                   );
-                })}
-              </tbody>
-            </table>
+                }},
+                { key: 'expiration_date', label: "\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0627\u0646\u062a\u0647\u0627\u0621", render: (v, row) => {
+                  const lt = row as ProductLot;
+                  const remaining = Number(lt.remaining_quantity ?? 0);
+                  const depleted = remaining <= 0;
+                  const expired = !!lt.expiration_date && new Date(lt.expiration_date).getTime() < Date.now();
+                  const expiring = !depleted && !expired && !!lt.expiration_date && (new Date(lt.expiration_date).getTime() - Date.now()) < 30 * 86400000;
+                  return (
+                    <span style={{ color: expired ? 'var(--red)' : expiring ? 'var(--gold)' : 'var(--t3)' }}>
+                      {lt.expiration_date ? new Date(lt.expiration_date).toLocaleDateString('ar-DZ') : '\u2014'}
+                    </span>
+                  );
+                }},
+                { key: '_status', label: "\u0627\u0644\u062d\u0627\u0644\u0629", render: (_v, row) => {
+                  const lt = row as ProductLot;
+                  const remaining = Number(lt.remaining_quantity ?? 0);
+                  const depleted = remaining <= 0;
+                  const expired = !!lt.expiration_date && new Date(lt.expiration_date).getTime() < Date.now();
+                  const expiring = !depleted && !expired && !!lt.expiration_date && (new Date(lt.expiration_date).getTime() - Date.now()) < 30 * 86400000;
+                  return (
+                    <span style={{
+                      padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700,
+                      color:      depleted ? 'var(--t4)' : expired ? 'var(--red)' : expiring ? 'var(--gold)' : 'var(--green)',
+                      background: depleted ? 'var(--bg3)' : expired ? 'var(--redb)' : expiring ? 'var(--goldb)' : 'var(--greenb)',
+                    }}>
+                      {depleted ? '\u0641\u0627\u0631\u063a\u0629' : expired ? '\u0645\u0646\u062a\u0647\u064a\u0629' : expiring ? '\u062a\u0646\u062a\u0647\u064a' : '\u0646\u0634\u0637\u0629'}
+                    </span>
+                  );
+                }},
+              ]}
+              data={lots as unknown as Record<string, unknown>[]}
+              rowKey="id"
+            />
           )}
         </div>
       </td>

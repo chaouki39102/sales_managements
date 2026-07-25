@@ -7,8 +7,10 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
+import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
 import KpiCard from "@/components/ui/KpiCard";
 import EmptyState from "@/components/ui/EmptyState";
+import SimpleTable from "@/components/ui/SimpleTable";
 import AlertBar from "@/components/ui/AlertBar";
 import Switch from "@/components/ui/Switch";
 import { expensesApi } from "@/lib/api/endpoints/expenses";
@@ -292,33 +294,15 @@ export default function ExpensesPage() {
                     noHeader
                     style={{ padding: 0, opacity: isFetching ? 0.7 : 1 }}
                 >
-                    <div className="tw">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>الوصف</th>
-                                    <th>الفئة</th>
-                                    <th>المستفيد</th>
-                                    <th>المبلغ</th>
-                                    <th>طريقة الدفع</th>
-                                    <th>مدفوعة؟</th>
-                                    <th>التاريخ</th>
-                                    <th
-                                        style={{
-                                            textAlign: "center",
-                                            width: 120,
-                                        }}
-                                    ></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {expenses.map((exp) => (
-                                    <tr
-                                        key={exp.id}
-                                        onClick={() => openEdit(exp)}
-                                        style={{ cursor: "pointer" }}
-                                    >
-                                        <td>
+                    <SimpleTable
+                        columns={[
+                            {
+                                key: "description",
+                                label: "الوصف",
+                                render: (_v, row) => {
+                                    const exp = row as unknown as Expense;
+                                    return (
+                                        <>
                                             <div style={{ fontWeight: 700 }}>
                                                 {exp.description}
                                             </div>
@@ -332,87 +316,130 @@ export default function ExpensesPage() {
                                                     Ref: {exp.reference}
                                                 </div>
                                             )}
-                                        </td>
-                                        <td>
-                                            <Badge variant="warning" noDot>
-                                                {getCategoryName(
-                                                    exp.expense_category_id,
-                                                )}
-                                            </Badge>
-                                        </td>
-                                        <td>{getPartyName(exp.party_id)}</td>
-                                        <td
-                                            className="e"
-                                            style={{
-                                                direction: "ltr",
-                                                textAlign: "right",
-                                            }}
+                                        </>
+                                    );
+                                },
+                            },
+                            {
+                                key: "expense_category_id",
+                                label: "الفئة",
+                                render: (_v, row) => (
+                                    <Badge variant="warning" noDot>
+                                        {getCategoryName(
+                                            (row as unknown as Expense)
+                                                .expense_category_id,
+                                        )}
+                                    </Badge>
+                                ),
+                            },
+                            {
+                                key: "party_id",
+                                label: "المستفيد",
+                                render: (_v, row) =>
+                                    getPartyName(
+                                        (row as unknown as Expense).party_id,
+                                    ),
+                            },
+                            {
+                                key: "amount",
+                                label: "المبلغ",
+                                align: "end",
+                                render: (_v, row) => (
+                                    <span style={{ direction: "ltr" }}>
+                                        {formatDZD(
+                                            (row as unknown as Expense).amount,
+                                        )}
+                                    </span>
+                                ),
+                            },
+                            {
+                                key: "payment_mode_id",
+                                label: "طريقة الدفع",
+                                render: (_v, row) =>
+                                    getPaymentName(
+                                        (row as unknown as Expense)
+                                            .payment_mode_id,
+                                    ),
+                            },
+                            {
+                                key: "is_paid",
+                                label: "مدفوعة؟",
+                                render: (_v, row) => {
+                                    const exp = row as unknown as Expense;
+                                    return (
+                                        <Badge
+                                            variant={
+                                                exp.is_paid
+                                                    ? "success"
+                                                    : "danger"
+                                            }
                                         >
-                                            {formatDZD(exp.amount)}
-                                        </td>
-                                        <td>
-                                            {getPaymentName(
-                                                exp.payment_mode_id,
-                                            )}
-                                        </td>
-                                        <td>
-                                            <Badge
-                                                variant={
-                                                    exp.is_paid
-                                                        ? "success"
-                                                        : "danger"
+                                            {exp.is_paid
+                                                ? "مدفوعة"
+                                                : "غير مدفوعة"}
+                                        </Badge>
+                                    );
+                                },
+                            },
+                            {
+                                key: "date",
+                                label: "التاريخ",
+                                render: (_v, row) => (
+                                    <span
+                                        style={{
+                                            fontSize: 12,
+                                            color: "var(--t4)",
+                                        }}
+                                    >
+                                        {new Date(
+                                            (row as unknown as Expense).date,
+                                        ).toLocaleDateString("fr-DZ")}
+                                    </span>
+                                ),
+                            },
+                            {
+                                key: "_actions",
+                                label: "",
+                                render: (_v, row) => {
+                                    const exp = row as unknown as Expense;
+                                    return (
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                gap: 4,
+                                            }}
+                                            onClick={(e) =>
+                                                e.stopPropagation()
+                                            }
+                                        >
+                                            <Button
+                                                size="xs"
+                                                icon={
+                                                    <i className="ti ti-pencil" />
                                                 }
-                                            >
-                                                {exp.is_paid
-                                                    ? "مدفوعة"
-                                                    : "غير مدفوعة"}
-                                            </Badge>
-                                        </td>
-                                        <td
-                                            style={{
-                                                fontSize: 12,
-                                                color: "var(--t4)",
-                                            }}
-                                        >
-                                            {new Date(
-                                                exp.date,
-                                            ).toLocaleDateString("fr-DZ")}
-                                        </td>
-                                        <td
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            <div
-                                                style={{
-                                                    display: "flex",
-                                                    gap: 4,
-                                                }}
-                                            >
-                                                <Button
-                                                    size="xs"
-                                                    icon={
-                                                        <i className="ti ti-pencil" />
-                                                    }
-                                                    onClick={() =>
-                                                        openEdit(exp)
-                                                    }
-                                                />
-                                                <Button
-                                                    size="xs"
-                                                    variant="danger"
-                                                    icon={
-                                                        <i className="ti ti-trash" />
-                                                    }
-                                                    onClick={() =>
-                                                        handleDelete(exp.id)
-                                                    }
-                                                />
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                                onClick={() => openEdit(exp)}
+                                            />
+                                            <Button
+                                                size="xs"
+                                                variant="danger"
+                                                icon={
+                                                    <i className="ti ti-trash" />
+                                                }
+                                                onClick={() =>
+                                                    handleDelete(exp.id)
+                                                }
+                                            />
+                                        </div>
+                                    );
+                                },
+                            },
+                        ]}
+                        data={expenses}
+                        rowKey="id"
+                        onRowClick={(row) =>
+                            openEdit(row as unknown as Expense)
+                        }
+                    />
                     {meta && meta.last_page > 1 && (
                         <div
                             style={{
@@ -798,63 +825,4 @@ function ExpenseModal({
     );
 }
 
-function ConfirmDeleteModal({
-    open,
-    onClose,
-    onConfirm,
-    loading,
-}: {
-    open: boolean;
-    onClose: () => void;
-    onConfirm: () => void;
-    loading: boolean;
-}) {
-    return (
-        <Modal open={open} onClose={onClose} size="sm" title="تأكيد الحذف">
-            <div style={{ textAlign: "center", padding: 16 }}>
-                <i
-                    className="ti ti-alert-triangle"
-                    style={{ fontSize: 40, color: "var(--red)" }}
-                />
-                <div
-                    style={{
-                        fontWeight: 800,
-                        fontSize: 15,
-                        margin: "12px 0 6px",
-                    }}
-                >
-                    هل أنت متأكد؟
-                </div>
-                <div style={{ fontSize: 13, color: "var(--t4)" }}>
-                    لا يمكن التراجع عن حذف المصروف.
-                </div>
-            </div>
-            <div
-                style={{
-                    display: "flex",
-                    gap: 8,
-                    justifyContent: "center",
-                    padding: "8px 0 0",
-                }}
-            >
-                <Button onClick={onClose} disabled={loading}>
-                    إلغاء
-                </Button>
-                <Button
-                    variant="danger"
-                    onClick={onConfirm}
-                    disabled={loading}
-                    icon={
-                        loading ? (
-                            <i className="ti ti-loader" />
-                        ) : (
-                            <i className="ti ti-trash" />
-                        )
-                    }
-                >
-                    {loading ? "جاري الحذف..." : "حذف"}
-                </Button>
-            </div>
-        </Modal>
-    );
-}
+

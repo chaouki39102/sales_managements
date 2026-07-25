@@ -8,6 +8,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
+import SimpleTable from '@/components/ui/SimpleTable';
 
 const def = REPORT_DEFAULTS;
 
@@ -45,36 +46,28 @@ export default function AgingReportPage() {
         )}
         {data.rows.length > 0 && (
           <Card noHeader style={{ padding: 0, marginTop: 16 }}>
-            <div className="tw">
-              <table>
-                <thead><tr><th>#</th><th>الزبون</th><th>إجمالي المستحق</th><th>عدد الفواتير</th><th>أقدم (يوم)</th><th>التصنيف</th></tr></thead>
-                <tbody>
-                  {data.rows.map((row, i) => (
-                    <tr key={i}>
-                      <td style={{ color: 'var(--t4)', fontSize: 12 }}>{i + 1}</td>
-                      <td style={{ fontWeight: 700 }}>{row.party_name}</td>
-                      <td style={{ fontWeight: 700 }}>{FMT(row.total_due)}</td>
-                      <td>{row.invoice_count}</td>
-                      <td>{row.max_days}</td>
-                      <td>
-                        {row.bucket === '90_plus' ? <Badge variant="danger" noDot>أكثر من 90 يوم</Badge>
-                          : row.bucket === '61_90' ? <Badge variant="warning" noDot>61–90 يوم</Badge>
-                          : row.bucket === '31_60' ? <Badge variant="info" noDot>31–60 يوم</Badge>
-                          : <Badge variant="success" noDot>0–30 يوم</Badge>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr style={{ fontWeight: 800, background: 'var(--bg2)' }}>
-                    <td colSpan={2}>الإجمالي</td>
-                    <td>{FMT(data.summary.total_due)}</td>
-                    <td>{data.summary.total_count}</td>
-                    <td></td><td></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+            <SimpleTable
+              columns={[
+                { key: '_idx', label: '#', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v as number}</span> },
+                { key: 'party_name', label: 'الزبون', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
+                { key: 'total_due', label: 'إجمالي المستحق', render: (v) => <span style={{ fontWeight: 700 }}>{FMT(v as number)}</span> },
+                { key: 'invoice_count', label: 'عدد الفواتير' },
+                { key: 'max_days', label: 'أقدم (يوم)' },
+                { key: 'bucket', label: 'التصنيف', render: (v) => {
+                  const b = v as string;
+                  return b === '90_plus' ? <Badge variant="danger" noDot>أكثر من 90 يوم</Badge>
+                    : b === '61_90' ? <Badge variant="warning" noDot>61–90 يوم</Badge>
+                    : b === '31_60' ? <Badge variant="info" noDot>31–60 يوم</Badge>
+                    : <Badge variant="success" noDot>0–30 يوم</Badge>;
+                }},
+              ]}
+              data={[
+                ...data.rows.map((row, i) => ({ ...row, _idx: i + 1 })),
+                { _isFooter: true, _idx: '', party_name: 'الإجمالي', total_due: data.summary.total_due, invoice_count: data.summary.total_count, max_days: '', bucket: '' },
+              ]}
+              rowKey={(row) => row._isFooter ? 'footer' : `row-${row._idx}`}
+              rowClassName={(row) => row._isFooter ? 'font-extrabold bg-2' : undefined}
+            />
           </Card>
         )}
       </>

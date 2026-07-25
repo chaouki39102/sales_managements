@@ -7,6 +7,7 @@ import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import SimpleTable from '@/components/ui/SimpleTable';
 
 const def = REPORT_DEFAULTS;
 
@@ -38,37 +39,25 @@ export default function ProductsReportPage() {
           <KpiCard variant="purple" icon="ti-trending-up"        label="إجمالي المبيعات HT" value={MONEY(data.summary.total_sales_ht)}/>
         </div>
         <Card noHeader style={{ padding: 0, marginTop: 16 }}>
-          <div className="tw">
-            <table>
-              <thead><tr><th>#</th><th>المنتج</th><th>المرجع</th><th>العائلة</th><th>المخزون</th><th>التكلفة</th><th>المباع</th><th>المبيعات HT</th><th>الهامش</th><th>%</th></tr></thead>
-              <tbody>
-                {data.products.map((row, i) => (
-                  <tr key={row.id}>
-                    <td style={{ color: 'var(--t4)', fontSize: 12 }}>{i + 1}</td>
-                    <td style={{ fontWeight: 700 }}>{row.name}</td>
-                    <td style={{ color: 'var(--t4)', fontSize: 12 }}>{row.ref}</td>
-                    <td>{row.family ?? '—'}</td>
-                    <td>{row.stock_quantity}</td>
-                    <td>{FMT(row.sales_cost)}</td>
-                    <td>{row.total_sold}</td>
-                    <td>{FMT(row.sales_ht)}</td>
-                    <td style={{ color: row.margin_value >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(row.margin_value)}</td>
-                    <td style={{ color: row.margin_pct >= 0 ? 'var(--em)' : 'var(--red)' }}>{row.margin_pct}%</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr style={{ fontWeight: 800, background: 'var(--bg2)' }}>
-                  <td colSpan={5}>الإجمالي ({data.products.length} منتج)</td>
-                  <td>{FMT(data.products.reduce((s, r) => s + r.sales_cost, 0))}</td>
-                  <td>{data.products.reduce((s, r) => s + r.total_sold, 0)}</td>
-                  <td>{FMT(data.summary.total_sales_ht)}</td>
-                  <td>{FMT(data.products.reduce((s, r) => s + r.margin_value, 0))}</td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          <SimpleTable
+            columns={[
+              { key: '_idx', label: '#', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v}</span> },
+              { key: 'name', label: 'المنتج', render: (v, row) => row.id === '__summary' ? <span style={{ fontWeight: 800 }}>{v}</span> : <span style={{ fontWeight: 700 }}>{v}</span> },
+              { key: 'ref', label: 'المرجع', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v}</span> },
+              { key: 'family', label: 'العائلة' },
+              { key: 'stock_quantity', label: 'المخزون', className: 'num' },
+              { key: 'sales_cost', label: 'التكلفة', className: 'num', render: (v, row) => row.id === '__summary' ? <span style={{ fontWeight: 800 }}>{FMT(v as number)}</span> : FMT(v as number) },
+              { key: 'total_sold', label: 'المباع', className: 'num', render: (v, row) => row.id === '__summary' ? <span style={{ fontWeight: 800 }}>{v}</span> : v },
+              { key: 'sales_ht', label: 'المبيعات HT', className: 'num', render: (v, row) => row.id === '__summary' ? <span style={{ fontWeight: 800 }}>{FMT(v as number)}</span> : FMT(v as number) },
+              { key: 'margin_value', label: 'الهامش', className: 'num', render: (v, row) => row.id === '__summary' ? <span style={{ fontWeight: 800 }}>{FMT(v as number)}</span> : <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(v as number)}</span> },
+              { key: 'margin_pct', label: '%', render: (v, row) => row.id === '__summary' ? null : <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)' }}>{v}%</span> },
+            ]}
+            data={[
+              ...data.products.map((r, i) => ({ ...r, _idx: i + 1 })),
+              { id: '__summary', _idx: null, name: `الإجمالي (${data.products.length} منتج)`, ref: '', family: '', stock_quantity: '', sales_cost: data.products.reduce((s, r) => s + r.sales_cost, 0), total_sold: data.products.reduce((s, r) => s + r.total_sold, 0), sales_ht: data.summary.total_sales_ht, margin_value: data.products.reduce((s, r) => s + r.margin_value, 0), margin_pct: '' },
+            ]}
+            rowKey="id"
+          />
         </Card>
       </>
     )}

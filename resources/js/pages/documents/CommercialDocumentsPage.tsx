@@ -57,6 +57,8 @@ import { useApprovalCheckBatch } from "@/lib/api/endpoints/approvals";
 import { SendDocumentMailModal } from "./components/SendDocumentMailModal";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { useConfirm } from "@/hooks/useConfirm";
 import type { DocumentType, CommercialDocument } from "@/lib/api/core/types";
 
 // أنماط SmartFilter الخاصة بالمشروع (مفصولة عن library)
@@ -541,6 +543,7 @@ export default function CommercialDocumentsPage() {
     const { data: printTemplates = [] }      = usePrintTemplatesList();
     const { selectedYear, isReadOnly }       = useFiscalYear() as { selectedYear?: { id: number; name: string }; isReadOnly?: boolean };
     const { show: showToast, ToastContainer } = useToast();
+    const { confirm, confirmDialogProps } = useConfirm();
 
     // ── Modal state ───────────────────────────────────────────────────────────
     type ModalMode = "add" | "edit" | "view" | "quick" | null;
@@ -862,15 +865,15 @@ export default function CommercialDocumentsPage() {
                                     : "مقفل — انقر مرتين لفتح القفل"
                                 : "غير مقفل — انقر مرتين للقفل"
                         }
-                        onDoubleClick={() => {
+                        onDoubleClick={async () => {
                             if (isReadOnly) return;
                             if (locked) {
                                 if (isExported) { showToast("لا يمكن فتح قفل مستند مُصدَّر للمحاسبة", "error"); return; }
-                                if (window.confirm("تأكيد فتح قفل هذا المستند؟")) unlockMut.mutate(row.id);
+                                if (await confirm("تأكيد فتح قفل هذا المستند؟")) unlockMut.mutate(row.id);
                             } else {
                                 const status = getDocStatus(row);
                                 if (status === "cancelled") { showToast("لا يمكن قفل مستند ملغى", "error"); return; }
-                                if (window.confirm("تأكيد قفل هذا المستند؟ لن يمكن تعديله بعد القفل.")) lockMut.mutate(row.id);
+                                if (await confirm("تأكيد قفل هذا المستند؟ لن يمكن تعديله بعد القفل.")) lockMut.mutate(row.id);
                             }
                         }}
                         style={{
@@ -1475,8 +1478,8 @@ export default function CommercialDocumentsPage() {
                 editActions.push({
                     label: "قفل المستند",
                     icon: "lock",
-                    onClick: () => {
-                        if (row && window.confirm("تأكيد قفل هذا المستند؟")) lockMut.mutate(row.id);
+                    onClick: async () => {
+                        if (row && await confirm("تأكيد قفل هذا المستند؟")) lockMut.mutate(row.id);
                     },
                 });
             }
@@ -1484,8 +1487,8 @@ export default function CommercialDocumentsPage() {
                 editActions.push({
                     label: "فتح قفل المستند",
                     icon: "lock-open",
-                    onClick: () => {
-                        if (row && window.confirm("تأكيد فتح قفل هذا المستند؟")) unlockMut.mutate(row.id);
+                    onClick: async () => {
+                        if (row && await confirm("تأكيد فتح قفل هذا المستند؟")) unlockMut.mutate(row.id);
                     },
                 });
             }
@@ -1534,8 +1537,8 @@ export default function CommercialDocumentsPage() {
                 menuItems.push({
                     label: `قفل الكل (${lockable.length} مستند)`,
                     icon: "lock",
-                    onClick: () => {
-                        if (!window.confirm(`تأكيد قفل ${lockable.length} مستند في هذه الصفحة؟`)) return;
+                    onClick: async () => {
+                        if (!await confirm(`تأكيد قفل ${lockable.length} مستند في هذه الصفحة؟`)) return;
                         lockable.reduce(
                             (chain, doc) => chain.then(() => lockMut.mutateAsync(doc.id).catch(() => null)),
                             Promise.resolve(null as unknown),
@@ -1548,8 +1551,8 @@ export default function CommercialDocumentsPage() {
                 menuItems.push({
                     label: `فتح قفل الكل (${unlockable.length} مستند)`,
                     icon: "lock-open",
-                    onClick: () => {
-                        if (!window.confirm(`تأكيد فتح قفل ${unlockable.length} مستند في هذه الصفحة؟`)) return;
+                    onClick: async () => {
+                        if (!await confirm(`تأكيد فتح قفل ${unlockable.length} مستند في هذه الصفحة؟`)) return;
                         unlockable.reduce(
                             (chain, doc) => chain.then(() => unlockMut.mutateAsync(doc.id).catch(() => null)),
                             Promise.resolve(null as unknown),
@@ -1631,8 +1634,8 @@ export default function CommercialDocumentsPage() {
                     <ActionBtn
                         icon="ti-lock" title="قفل المستند" color="var(--orange)"
                         disabled={lockMut.isPending}
-                        onClick={() => {
-                            if (window.confirm("تأكيد قفل هذا المستند؟ لن يمكن تعديله بعد القفل."))
+                        onClick={async () => {
+                            if (await confirm("تأكيد قفل هذا المستند؟ لن يمكن تعديله بعد القفل."))
                                 lockMut.mutate(row.id);
                         }}
                     />
@@ -1643,8 +1646,8 @@ export default function CommercialDocumentsPage() {
                     <ActionBtn
                         icon="ti-lock-open" title="فتح القفل" color="var(--blue)"
                         disabled={unlockMut.isPending}
-                        onClick={() => {
-                            if (window.confirm("تأكيد فتح قفل هذا المستند؟"))
+                        onClick={async () => {
+                            if (await confirm("تأكيد فتح قفل هذا المستند؟"))
                                 unlockMut.mutate(row.id);
                         }}
                     />
@@ -1696,8 +1699,8 @@ export default function CommercialDocumentsPage() {
             {initialSnapshot && (
                 <button
                     title="إعادة ضبط تخطيط الأعمدة (الترتيب، العرض، المخفي، الفلاتر)"
-                    onClick={() => {
-                        if (window.confirm("إعادة ضبط تخطيط الجدول للإعدادات الافتراضية؟")) {
+                    onClick={async () => {
+                        if (await confirm("إعادة ضبط تخطيط الجدول للإعدادات الافتراضية؟")) {
                             resetColState();
                             window.location.reload();
                         }
@@ -2027,6 +2030,7 @@ export default function CommercialDocumentsPage() {
             )}
 
             <ToastContainer />
+            <ConfirmDialog {...confirmDialogProps} />
         </>
     );
 }

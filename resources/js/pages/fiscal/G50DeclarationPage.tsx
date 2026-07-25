@@ -3,6 +3,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
+import SimpleTable from '@/components/ui/SimpleTable';
 import KpiCard from '@/components/ui/KpiCard';
 import Skeleton from '@/components/ui/Skeleton';
 import Modal from '@/components/ui/Modal';
@@ -163,23 +164,21 @@ export default function G50DeclarationPage() {
 
       {history && history.length > 0 && (
         <Card title="سابق التصريحات" subtitle="G50 للأشهر السابقة">
-          <div className="tw">
-            <table>
-              <thead><tr><th>الشهر</th><th>المبلغ</th><th>الحالة</th><th>تاريخ التقديم</th></tr></thead>
-              <tbody>
-                {history.map((h) => (
-                  <tr key={h.id}>
-                    <td>{MONTHS[(h.month ?? 1) - 1]}</td>
-                    <td className="m">{h.amount_due?.toLocaleString('fr-DZ')} دج</td>
-                    <td><Badge variant={h.status === 'paid' ? 'success' : h.status === 'submitted' ? 'info' : 'warning'}>
-                      {h.status === 'paid' ? 'مدفوع' : h.status === 'submitted' ? 'مقدم' : 'مسودة'}
-                    </Badge></td>
-                    <td>{h.submitted_at ? new Date(h.submitted_at).toLocaleDateString('ar-DZ') : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <SimpleTable
+            columns={[
+              { key: 'month', label: 'الشهر', render: (v) => MONTHS[((v as number) ?? 1) - 1] },
+              { key: 'amount_due', label: 'المبلغ', className: 'm', render: (v) => `${(v as number)?.toLocaleString('fr-DZ')} دج` },
+              { key: 'status', label: 'الحالة', render: (v) => (
+                <Badge variant={v === 'paid' ? 'success' : v === 'submitted' ? 'info' : 'warning'}>
+                  {v === 'paid' ? 'مدفوع' : v === 'submitted' ? 'مقدم' : 'مسودة'}
+                </Badge>
+              )},
+              { key: 'submitted_at', label: 'تاريخ التقديم', render: (v) => v ? new Date(v as string).toLocaleDateString('ar-DZ') : '—' },
+            ]}
+            data={history}
+            rowKey="id"
+            emptyText="لا توجد تصريحات سابقة"
+          />
         </Card>
       )}
 

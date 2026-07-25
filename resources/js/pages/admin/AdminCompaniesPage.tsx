@@ -29,6 +29,7 @@ import PageHeader  from '@/components/ui/PageHeader';
 import Card        from '@/components/ui/Card';
 import Button      from '@/components/ui/Button';
 import SearchInput from '@/components/ui/SearchInput';
+import SimpleTable from '@/components/ui/SimpleTable';
 import type { AdminCompany, AdminPlan, AdminCompaniesFilter, Paginated } from '@/types/admin';
 
 const PLAN_COLORS: Record<string, string> = {
@@ -152,103 +153,69 @@ export default function AdminCompaniesPage() {
 
       {/* ── الجدول ────────────────────────────────────────────────────────── */}
       <Card padding={0}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: 'var(--bg3)', borderBottom: '1px solid var(--b2)' }}>
-                {[
-                  { label: 'الشركة',     col: 'name'         as typeof sortBy | null },
-                  { label: 'الخطة',      col: null },
-                  { label: 'المستخدمون', col: 'users_count'  as typeof sortBy | null },
-                  { label: 'الحالة',     col: null },
-                  { label: 'الإنشاء',    col: 'created_at'   as typeof sortBy | null },
-                  { label: '',           col: null },
-                ].map((th, i) => (
-                  <th
-                    key={i}
-                    onClick={() => th.col && toggleSort(th.col)}
-                    style={{
-                      padding: '10px 14px', textAlign: 'right',
-                      fontSize: 11, fontWeight: 800, color: 'var(--t4)',
-                      letterSpacing: .4, textTransform: 'uppercase',
-                      cursor: th.col ? 'pointer' : 'default',
-                      userSelect: 'none', whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {th.label}
-                    {th.col && sortBy === th.col && (
-                      <i className={`ti ti-sort-${sortDir === 'asc' ? 'ascending' : 'descending'}`}
-                         style={{ marginRight: 4, fontSize: 10 }} />
-                    )}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr><td colSpan={6} style={{ padding: 40 }}><Spinner /></td></tr>
-              ) : companies.length === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{ padding: 40 }}>
-                    <EmptyState icon="ti-building-off" text="لا توجد شركات" />
-                  </td>
-                </tr>
-              ) : companies.map(co => (
-                <tr
-                  key={co.id}
-                  onClick={() => setSelected(co)}
-                  style={{
-                    borderBottom: '1px solid var(--b1)',
-                    cursor: 'pointer', transition: 'background .1s',
-                  }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}
-                >
-                  <td style={{ padding: '10px 14px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <Avatar id={co.id} name={co.name} size={32} radius={9} />
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>{co.name}</div>
-                        <div style={{ fontSize: 10, color: 'var(--t4)' }}>
-                          /{co.slug}{co.owner ? ` · ${co.owner.name}` : ''}
-                        </div>
-                      </div>
+        <SimpleTable
+          isLoading={isLoading}
+          className="plt-tbl"
+          columns={[
+            { key: 'name', label: sortBy === 'name' ? `الشركة ${sortDir === 'asc' ? '▲' : '▼'}` : 'الشركة', render: (_v, row) => {
+              const co = row as unknown as AdminCompany;
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Avatar id={co.id} name={co.name} size={32} radius={9} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>{co.name}</div>
+                    <div style={{ fontSize: 10, color: 'var(--t4)' }}>
+                      /{co.slug}{co.owner ? ` · ${co.owner.name}` : ''}
                     </div>
-                  </td>
-                  <td style={{ padding: '10px 14px' }}>
-                    <span style={{
-                      fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
-                      background: (PLAN_COLORS[co.plan] ?? '#6b7280') + '22',
-                      color: PLAN_COLORS[co.plan] ?? '#6b7280',
-                    }}>
-                      {planLabels[co.plan] ?? co.plan}
-                    </span>
-                  </td>
-                  <td style={{ padding: '10px 14px', fontSize: 13, color: 'var(--t2)', fontWeight: 600 }}>
-                    {co.users_count ?? 0}
-                    <span style={{ fontSize: 10, color: 'var(--t4)', marginRight: 3 }}>
-                      / {co.max_users || '∞'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '10px 14px' }}>
-                    <StatusBadge active={co.active} suspended={co.is_suspended} />
-                    {co.verified_at && (
-                      <i className="ti ti-shield-check"
-                         style={{ marginRight: 6, fontSize: 12, color: '#10b981' }}
-                         title="موثّق" />
-                    )}
-                  </td>
-                  <td style={{ padding: '10px 14px', fontSize: 11, color: 'var(--t4)' }}>
-                    {fmtDate(co.created_at)}
-                  </td>
-                  <td style={{ padding: '10px 14px' }}>
-                    <i className="ti ti-chevron-left" style={{ fontSize: 14, color: 'var(--t4)' }} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                </div>
+              );
+            }},
+            { key: 'plan', label: 'الخطة', render: (v) => (
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+                background: (PLAN_COLORS[v as string] ?? '#6b7280') + '22',
+                color: PLAN_COLORS[v as string] ?? '#6b7280',
+              }}>
+                {planLabels[v as string] ?? (v as string)}
+              </span>
+            )},
+            { key: 'users_count', label: 'المستخدمون', render: (v, row) => {
+              const co = row as unknown as AdminCompany;
+              return (
+                <span style={{ fontSize: 13, color: 'var(--t2)', fontWeight: 600 }}>
+                  {(v as number) ?? 0}
+                  <span style={{ fontSize: 10, color: 'var(--t4)', marginRight: 3 }}>
+                    / {co.max_users || '∞'}
+                  </span>
+                </span>
+              );
+            }},
+            { key: 'active', label: 'الحالة', render: (_v, row) => {
+              const co = row as unknown as AdminCompany;
+              return (
+                <>
+                  <StatusBadge active={co.active} suspended={co.is_suspended} />
+                  {co.verified_at && (
+                    <i className="ti ti-shield-check"
+                       style={{ marginRight: 6, fontSize: 12, color: '#10b981' }}
+                       title="موثّق" />
+                  )}
+                </>
+              );
+            }},
+            { key: 'created_at', label: sortBy === 'created_at' ? `الإنشاء ${sortDir === 'asc' ? '▲' : '▼'}` : 'الإنشاء', render: (v) => (
+              <span style={{ fontSize: 11, color: 'var(--t4)' }}>{fmtDate(v as string)}</span>
+            )},
+            { key: 'chevron', label: '', render: () => (
+              <i className="ti ti-chevron-left" style={{ fontSize: 14, color: 'var(--t4)' }} />
+            )},
+          ]}
+          data={companies}
+          rowKey="id"
+          emptyText="لا توجد شركات"
+          onRowClick={(row) => setSelected(row as unknown as AdminCompany)}
+        />
 
         {/* Pagination */}
         {meta && meta.last_page > 1 && (

@@ -8,6 +8,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
+import SimpleTable from '@/components/ui/SimpleTable';
 
 const STATUS_LABEL: Record<string, { text: string; variant: string }> = {
   out_of_stock: { text: 'نفد المخزون', variant: 'danger' },
@@ -45,35 +46,29 @@ export default function InventoryReportPage() {
           <KpiCard variant="red"  icon="ti-package-off"        label="نفد المخزون"    value={data.summary.out_of_stock_count}/>
         </div>
         <Card noHeader style={{ padding: 0, marginTop: 16 }}>
-          <div className="tw">
-            <table>
-              <thead><tr><th>#</th><th>المنتج</th><th>المرجع</th><th>العائلة</th><th>الكمية</th><th>سعر الشراء HT</th><th>التكلفة</th><th>القيمة</th><th>الحالة</th></tr></thead>
-              <tbody>
-                {data.products.map((row, i) => (
-                  <tr key={row.id}>
-                    <td style={{ color: 'var(--t4)', fontSize: 12 }}>{i + 1}</td>
-                    <td style={{ fontWeight: 700 }}>{row.name}</td>
-                    <td style={{ color: 'var(--t4)', fontSize: 12 }}>{row.ref}</td>
-                    <td>{row.family ?? '—'}</td>
-                    <td>{row.stock_quantity}</td>
-                    <td>{FMT(row.purchase_price_ht)}</td>
-                    <td>{FMT(row.current_cost_price)}</td>
-                    <td>{FMT(row.stock_value)}</td>
-                    <td><Badge variant={STATUS_LABEL[row.status]?.variant as 'danger' | 'warning' | 'success' ?? 'info'} noDot>{STATUS_LABEL[row.status]?.text ?? row.status}</Badge></td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr style={{ fontWeight: 800, background: 'var(--bg2)' }}>
-                  <td colSpan={4}>الإجمالي ({data.products.length} منتج)</td>
-                  <td>{data.products.reduce((s, r) => s + r.stock_quantity, 0)}</td>
-                  <td></td><td></td>
-                  <td>{FMT(data.summary.total_value)}</td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          <SimpleTable
+            columns={[
+              { key: '_idx', label: '#', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v as number}</span> },
+              { key: 'name', label: 'المنتج', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
+              { key: 'ref', label: 'المرجع', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v as string}</span> },
+              { key: 'family', label: 'العائلة' },
+              { key: 'stock_quantity', label: 'الكمية' },
+              { key: 'purchase_price_ht', label: 'سعر الشراء HT', render: (v) => FMT(v as number) },
+              { key: 'current_cost_price', label: 'التكلفة', render: (v) => FMT(v as number) },
+              { key: 'stock_value', label: 'القيمة', render: (v) => FMT(v as number) },
+              { key: 'status', label: 'الحالة', render: (v) => {
+                const s = v as string;
+                const info = STATUS_LABEL[s];
+                return <Badge variant={(info?.variant ?? 'info') as 'danger' | 'warning' | 'success' | 'info'} noDot>{info?.text ?? s}</Badge>;
+              }},
+            ]}
+            data={[
+              ...data.products.map((row, i) => ({ ...row, _idx: i + 1, family: row.family ?? '—' })),
+              { _isFooter: true, _idx: '', name: `الإجمالي (${data.products.length} منتج)`, ref: '', family: '', stock_quantity: data.products.reduce((s, r) => s + r.stock_quantity, 0), purchase_price_ht: '', current_cost_price: '', stock_value: data.summary.total_value, status: '' },
+            ]}
+            rowKey={(row) => row._isFooter ? 'footer' : (row as Record<string, unknown>).id ?? `row-${row._idx}`}
+            rowClassName={(row) => row._isFooter ? 'font-extrabold bg-2' : undefined}
+          />
         </Card>
       </>
     )}

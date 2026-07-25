@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/ui';
 import { useModal } from '@/hooks/useModal';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useNotification } from '@/hooks/useNotification';
+import SimpleTable from '@/components/ui/SimpleTable';
 import type { Check } from '@/lib/api/core/types';
 
 const fmt = (n: number) =>
@@ -32,14 +33,6 @@ function inputStyle(): React.CSSProperties {
   };
 }
 
-function Th({ children }: { children: React.ReactNode }) {
-  return (
-    <th style={{
-      padding: '10px 12px', textAlign: 'right', fontWeight: 700,
-      fontSize: 11, color: 'var(--t3)', whiteSpace: 'nowrap',
-    }}>{children}</th>
-  );
-}
 
 type CheckFormData = {
   check_number:   string;
@@ -223,112 +216,74 @@ export default function ChecksPage() {
 
       {/* ── Table ─────────────────────────────────────────────────────── */}
       <div style={{ padding: '0 20px' }}>
-        {isLoading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--t4)' }}>
-            <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div style={{
-            padding: 40, textAlign: 'center', color: 'var(--t4)',
-            background: 'var(--bg2)', borderRadius: 'var(--r3)',
-          }}>
-            <i className="ti ti-ban" style={{ fontSize: 32, opacity: 0.4, marginBottom: 8 }} />
-            <div>لا توجد شيكات</div>
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{
-              width: '100%', borderCollapse: 'collapse',
-              fontSize: 12, background: 'var(--bg1)', borderRadius: 'var(--r3)',
-              overflow: 'hidden',
-            }}>
-              <thead>
-                <tr style={{ background: 'var(--bg3)' }}>
-                  <Th>رقم الشيك</Th>
-                  <Th>تاريخ الإصدار</Th>
-                  <Th>تاريخ الاستحقاق</Th>
-                  <Th>المبلغ</Th>
-                  <Th>البنك</Th>
-                  <Th>الساحب</Th>
-                  <Th>الطرف</Th>
-                  <Th>الحالة</Th>
-                  <Th style={{ textAlign: 'center' }}>إجراءات</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((c: any) => {
-                  const st = STATUS_CONFIG[c.status] ?? STATUS_CONFIG.pending;
-                  const partyName = c.party?.name ?? c.drawer_name ?? '—';
-                  return (
-                    <tr key={c.id} style={{
-                      borderBottom: '1px solid var(--b1)',
-                      transition: 'background .1s',
-                    }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg2)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      <td style={{ padding: '9px 12px', fontWeight: 600, direction: 'ltr' }}>
-                        {c.check_number}
-                      </td>
-                      <td style={{ padding: '9px 12px', color: 'var(--t3)' }}>
-                        {fmtDate(c.check_date)}
-                      </td>
-                      <td style={{ padding: '9px 12px', color: c.due_date && new Date(c.due_date) < new Date() && c.status === 'pending' ? 'var(--red)' : 'var(--t3)' }}>
-                        {c.due_date ? (
-                          <span style={{ fontWeight: c.due_date && new Date(c.due_date) < new Date() && c.status === 'pending' ? 700 : 400 }}>
-                            {fmtDate(c.due_date)}
-                          </span>
-                        ) : '—'}
-                      </td>
-                      <td style={{ padding: '9px 12px', fontWeight: 700, direction: 'ltr' }}>
-                        {fmt(Number(c.amount))}
-                      </td>
-                      <td style={{ padding: '9px 12px', color: 'var(--t3)' }}>
-                        {c.bank_name || '—'}
-                      </td>
-                      <td style={{ padding: '9px 12px', color: 'var(--t3)' }}>
-                        {c.drawer_name || '—'}
-                      </td>
-                      <td style={{ padding: '9px 12px' }}>
-                        {partyName}
-                      </td>
-                      <td style={{ padding: '9px 12px' }}>
-                        <Badge variant={st.variant}>
-                          <i className={`ti ${st.icon}`} style={{ marginLeft: 4, fontSize: 11 }} />
-                          {st.label}
-                        </Badge>
-                      </td>
-                      <td style={{ padding: '9px 12px', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                          {c.status === 'pending' && (
-                            <>
-                              <button onClick={() => markCleared.mutate(c.id)} title="تصفية"
-                                style={actionBtnStyle('var(--green)')}>
-                                <i className="ti ti-circle-check" style={{ fontSize: 14, color: 'var(--green)' }} />
-                              </button>
-                              <button onClick={() => openBounce(c.id)} title="إرجاع"
-                                style={actionBtnStyle('var(--red)')}>
-                                <i className="ti ti-circle-x" style={{ fontSize: 14, color: 'var(--red)' }} />
-                              </button>
-                            </>
-                          )}
-                          <button onClick={() => openEdit(c)} title="تعديل"
-                            style={actionBtnStyle('var(--blue)')}>
-                            <i className="ti ti-pencil" style={{ fontSize: 14, color: 'var(--blue)' }} />
-                          </button>
-                          <button onClick={async () => { if (await deleteConfirm.confirm('حذف الشيك؟')) deleteMutation.mutate(c.id); }} title="حذف"
-                            style={actionBtnStyle('var(--t4)')}>
-                            <i className="ti ti-trash" style={{ fontSize: 14, color: 'var(--t4)' }} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <SimpleTable
+          isLoading={isLoading}
+          columns={[
+            { key: 'check_number', label: 'رقم الشيك', render: (v) => <span style={{ fontWeight: 600, direction: 'ltr' }}>{v as string}</span> },
+            { key: 'check_date', label: 'تاريخ الإصدار', render: (v) => <span style={{ color: 'var(--t3)' }}>{fmtDate(v as string)}</span> },
+            {
+              key: 'due_date', label: 'تاريخ الاستحقاق',
+              render: (_v, row) => {
+                const c = row as any;
+                const overdue = c.due_date && new Date(c.due_date) < new Date() && c.status === 'pending';
+                return c.due_date
+                  ? <span style={{ color: overdue ? 'var(--red)' : 'var(--t3)', fontWeight: overdue ? 700 : 400 }}>{fmtDate(c.due_date)}</span>
+                  : '—';
+              },
+            },
+            { key: 'amount', label: 'المبلغ', render: (v) => <span style={{ fontWeight: 700, direction: 'ltr' }}>{fmt(Number(v))}</span> },
+            { key: 'bank_name', label: 'البنك', render: (v) => <span style={{ color: 'var(--t3)' }}>{(v as string) || '—'}</span> },
+            { key: 'drawer_name', label: 'الساحب', render: (v) => <span style={{ color: 'var(--t3)' }}>{(v as string) || '—'}</span> },
+            {
+              key: 'party', label: 'الطرف',
+              render: (_v, row) => (row as any).party?.name ?? (row as any).drawer_name ?? '—',
+            },
+            {
+              key: 'status', label: 'الحالة',
+              render: (v) => {
+                const st = STATUS_CONFIG[v as string] ?? STATUS_CONFIG.pending;
+                return (
+                  <Badge variant={st.variant}>
+                    <i className={`ti ${st.icon}`} style={{ marginLeft: 4, fontSize: 11 }} />
+                    {st.label}
+                  </Badge>
+                );
+              },
+            },
+            {
+              key: 'actions', label: 'إجراءات',
+              render: (_v, row) => {
+                const c = row as any;
+                return (
+                  <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                    {c.status === 'pending' && (
+                      <>
+                        <button onClick={() => markCleared.mutate(c.id)} title="تصفية"
+                          style={actionBtnStyle('var(--green)')}>
+                          <i className="ti ti-circle-check" style={{ fontSize: 14, color: 'var(--green)' }} />
+                        </button>
+                        <button onClick={() => openBounce(c.id)} title="إرجاع"
+                          style={actionBtnStyle('var(--red)')}>
+                          <i className="ti ti-circle-x" style={{ fontSize: 14, color: 'var(--red)' }} />
+                        </button>
+                      </>
+                    )}
+                    <button onClick={() => openEdit(c)} title="تعديل"
+                      style={actionBtnStyle('var(--blue)')}>
+                      <i className="ti ti-pencil" style={{ fontSize: 14, color: 'var(--blue)' }} />
+                    </button>
+                    <button onClick={async () => { if (await deleteConfirm.confirm('حذف الشيك؟')) deleteMutation.mutate(c.id); }} title="حذف"
+                      style={actionBtnStyle('var(--t4)')}>
+                      <i className="ti ti-trash" style={{ fontSize: 14, color: 'var(--t4)' }} />
+                    </button>
+                  </div>
+                );
+              },
+            },
+          ]}
+          data={filtered}
+          emptyText="لا توجد شيكات"
+        />
       </div>
 
       {/* ── Create / Edit Modal ────────────────────────────────────────── */}

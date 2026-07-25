@@ -3,6 +3,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
+import SimpleTable from '@/components/ui/SimpleTable';
 import KpiCard from '@/components/ui/KpiCard';
 import Skeleton from '@/components/ui/Skeleton';
 import Modal from '@/components/ui/Modal';
@@ -210,24 +211,22 @@ export default function IFUDeclarationPage() {
 
       {history && history.length > 0 && (
         <Card title="سابق التصريحات" subtitle={`IFU للأعوام السابقة`}>
-          <div className="tw">
-            <table>
-              <thead><tr><th>السنة</th><th>النموذج</th><th>المبلغ</th><th>الحالة</th><th>تاريخ التقديم</th></tr></thead>
-              <tbody>
-                {history.map((h) => (
-                  <tr key={h.id}>
-                    <td>{h.year ?? '—'}</td>
-                    <td>{h.form_type?.toUpperCase()}</td>
-                    <td className="m">{h.amount_due?.toLocaleString('fr-DZ')} دج</td>
-                    <td><Badge variant={h.status === 'paid' ? 'success' : h.status === 'submitted' ? 'info' : 'warning'}>
-                      {h.status === 'paid' ? 'مدفوع' : h.status === 'submitted' ? 'مقدم' : 'مسودة'}
-                    </Badge></td>
-                    <td>{h.submitted_at ? new Date(h.submitted_at).toLocaleDateString('ar-DZ') : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <SimpleTable
+            columns={[
+              { key: 'year', label: 'السنة', render: (v) => v ?? '—' },
+              { key: 'form_type', label: 'النموذج', render: (v) => (v as string)?.toUpperCase() },
+              { key: 'amount_due', label: 'المبلغ', className: 'm', render: (v) => `${(v as number)?.toLocaleString('fr-DZ')} دج` },
+              { key: 'status', label: 'الحالة', render: (v) => (
+                <Badge variant={v === 'paid' ? 'success' : v === 'submitted' ? 'info' : 'warning'}>
+                  {v === 'paid' ? 'مدفوع' : v === 'submitted' ? 'مقدم' : 'مسودة'}
+                </Badge>
+              )},
+              { key: 'submitted_at', label: 'تاريخ التقديم', render: (v) => v ? new Date(v as string).toLocaleDateString('ar-DZ') : '—' },
+            ]}
+            data={history}
+            rowKey="id"
+            emptyText="لا توجد تصريحات سابقة"
+          />
         </Card>
       )}
 

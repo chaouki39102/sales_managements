@@ -6,8 +6,10 @@ import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
+import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal';
 import KpiCard from '@/components/ui/KpiCard';
 import EmptyState from '@/components/ui/EmptyState';
+import SimpleTable from '@/components/ui/SimpleTable';
 import AlertBar from '@/components/ui/AlertBar';
 import Switch from '@/components/ui/Switch';
 import { useTenantQueryPaginated, useTenantQuery, useTenantMutation } from '@/hooks/useTenantQuery';
@@ -154,6 +156,106 @@ export default function NumberingSeriesPage() {
   const openAdd = () => { setEditing(null); modal.openModal(); };
   const openEdit = (item: NumberingSeriesRecord) => { setEditing(item); modal.openModal(); };
 
+  const numberingColumns = [
+    {
+      key: 'docType', label: 'نوع المستند',
+      render: (_v: unknown, row: Record<string, unknown>) => {
+        const item = row as unknown as NumberingSeriesRecord;
+        const dt = item.document_type;
+        const wh = item.warehouse;
+        return (
+          <>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>{dt?.name ?? '—'}</div>
+            {dt?.code && <div style={{ fontSize: 11, color: 'var(--t4)', fontFamily: 'monospace' }}>{dt.code}</div>}
+            {wh && <div style={{ fontSize: 10, color: 'var(--t3)' }}><i className="ti ti-building-warehouse" style={{ fontSize: 12, verticalAlign: 'middle', marginLeft: 2 }} /> {wh.name}</div>}
+          </>
+        );
+      },
+    },
+    {
+      key: 'prefix', label: 'البادئة',
+      render: (v: unknown) => (
+        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--em)' }}>
+          {(v as string) || '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'format', label: 'الصيغة',
+      render: (v: unknown) => (
+        <code style={{ fontSize: 11, background: 'var(--bg3)', padding: '2px 6px', borderRadius: 4 }}>
+          {v as string}
+        </code>
+      ),
+    },
+    {
+      key: 'effectiveLastNumber', label: 'الرقم الحالي', align: 'center' as const,
+      render: (_v: unknown, row: Record<string, unknown>) => {
+        const item = row as unknown as NumberingSeriesRecord;
+        const hasDocuments = haveDocumentsBeenCreated(item);
+        const effectiveLastNumber = Math.max(
+          item.last_number,
+          item.start_number + ((item.commercial_documents_count ?? 0) - 1)
+        );
+        return hasDocuments ? (
+          <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 14 }}>{effectiveLastNumber}</span>
+        ) : (
+          <span style={{ color: 'var(--t4)', fontWeight: 400, fontSize: 12 }}>لم يصدر بعد</span>
+        );
+      },
+    },
+    {
+      key: 'nextNumber', label: 'الرقم التالي ⏭', align: 'center' as const,
+      render: (_v: unknown, row: Record<string, unknown>) => {
+        const item = row as unknown as NumberingSeriesRecord;
+        const hasDocuments = haveDocumentsBeenCreated(item);
+        const effectiveLastNumber = Math.max(
+          item.last_number,
+          item.start_number + ((item.commercial_documents_count ?? 0) - 1)
+        );
+        return (
+          <span style={{
+            fontFamily: 'monospace', fontSize: 12, fontWeight: 700,
+            background: 'var(--emb)', padding: '2px 8px', borderRadius: 10,
+            color: 'var(--em)', whiteSpace: 'nowrap', direction: 'ltr',
+          }}>
+            {hasDocuments ? simulateNumber({ ...item, last_number: effectiveLastNumber }, true) : '—'}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'reset_yearly', label: 'إعادة سنوية',
+      render: (v: unknown) => <Badge variant={v ? 'success' : 'gray'}>{v ? 'نعم' : 'لا'}</Badge>,
+    },
+    {
+      key: 'active', label: 'نشط',
+      render: (v: unknown) => <Badge variant={v ? 'success' : 'danger'}>{v ? 'نشط' : 'موقوف'}</Badge>,
+    },
+    {
+      key: 'is_locked', label: 'مقفل',
+      render: (v: unknown) => <Badge variant={v ? 'danger' : 'success'}>{v ? 'مقفل' : 'مفتوح'}</Badge>,
+    },
+    {
+      key: 'actions', label: 'إجراءات', align: 'center' as const,
+      render: (_v: unknown, row: Record<string, unknown>) => {
+        const item = row as unknown as NumberingSeriesRecord;
+        return (
+          <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={(e: React.MouseEvent) => { e.stopPropagation(); openEdit(item); }} disabled={item.is_locked} />
+            {item.is_locked ? (
+              <Button size="xs" variant="warning" icon={<i className="ti ti-lock-open" />} onClick={(e: React.MouseEvent) => { e.stopPropagation(); unlockMutation.mutate(item.id); }} />
+            ) : (
+              <Button size="xs" variant="info" icon={<i className="ti ti-lock" />} onClick={(e: React.MouseEvent) => { e.stopPropagation(); lockMutation.mutate(item.id); }} />
+            )}
+            <Button size="xs" variant="danger" icon={<i className="ti ti-trash" />} onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleDelete(item.id); }} disabled={item.is_locked} />
+            <Button size="xs" icon={<i className="ti ti-refresh" />} onClick={(e: React.MouseEvent) => { e.stopPropagation(); syncMutation.mutate(item.id); }} title="مزامنة الرقم بعد حذف مستند" />
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="page on" id="p-numbering-series">
       <PageHeader
@@ -197,90 +299,12 @@ export default function NumberingSeriesPage() {
         <EmptyState icon="ti-list-numbers" text="لا توجد سلاسل ترقيم" sub="أضف أول سلسلة ترقيم" action={<Button variant="primary" onClick={openAdd}>إضافة</Button>} />
       ) : (
         <Card noHeader style={{ padding: 0, opacity: isFetching ? 0.7 : 1 }}>
-          <div className="tw">
-            <table>
-              <thead>
-                <tr>
-                  <th>نوع المستند</th>
-                  <th>البادئة</th>
-                  <th>الصيغة</th>
-                  <th style={{ textAlign: 'center' }}>الرقم الحالي</th>
-                  <th style={{ textAlign: 'center' }}>الرقم التالي ⏭</th>
-                  <th>إعادة سنوية</th>
-                  <th>نشط</th>
-                  <th>مقفل</th>
-                  <th style={{ textAlign: 'center', width: 190 }}>إجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => {
-                  const docType = item.document_type;
-                  const warehouse = item.warehouse;
-                  const hasDocuments = haveDocumentsBeenCreated(item);
-                  // الرقم الفعلي: أعلى قيمة بين last_number (من DB) و count-based number
-                  const effectiveLastNumber = Math.max(
-                    item.last_number,
-                    item.start_number + ((item.commercial_documents_count ?? 0) - 1)
-                  );
-                  return (
-                    <tr key={item.id} onDoubleClick={() => openEdit(item)} style={{ cursor: 'pointer' }}>
-                      <td>
-                        <div style={{ fontWeight: 700, fontSize: 13 }}>{docType?.name ?? '—'}</div>
-                        {docType?.code && <div style={{ fontSize: 11, color: 'var(--t4)', fontFamily: 'monospace' }}>{docType.code}</div>}
-                        {warehouse && <div style={{ fontSize: 10, color: 'var(--t3)' }}><i className="ti ti-building-warehouse" style={{ fontSize: 12, verticalAlign: 'middle', marginLeft: 2 }} /> {warehouse.name}</div>}
-                      </td>
-                      <td>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--em)' }}>
-                          {item.prefix || '—'}
-                        </span>
-                      </td>
-                      <td>
-                        <code style={{ fontSize: 11, background: 'var(--bg3)', padding: '2px 6px', borderRadius: 4 }}>
-                          {item.format}
-                        </code>
-                      </td>
-                      <td style={{ textAlign: 'center', fontFamily: 'monospace', fontWeight: 800, fontSize: 14 }}>
-                        {hasDocuments ? (
-                          effectiveLastNumber
-                        ) : (
-                          <span style={{ color: 'var(--t4)', fontWeight: 400, fontSize: 12 }}>لم يصدر بعد</span>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'center', direction: 'ltr' }}>
-                        <span style={{
-                          fontFamily: 'monospace',
-                          fontSize: 12,
-                          fontWeight: 700,
-                          background: 'var(--emb)',
-                          padding: '2px 8px',
-                          borderRadius: 10,
-                          color: 'var(--em)',
-                          whiteSpace: 'nowrap',
-                        }}>
-                          {hasDocuments ? simulateNumber({ ...item, last_number: effectiveLastNumber }, true) : '—'}
-                        </span>
-                      </td>
-                      <td><Badge variant={item.reset_yearly ? 'success' : 'gray'}>{item.reset_yearly ? 'نعم' : 'لا'}</Badge></td>
-                      <td><Badge variant={item.active ? 'success' : 'danger'}>{item.active ? 'نشط' : 'موقوف'}</Badge></td>
-                      <td><Badge variant={item.is_locked ? 'danger' : 'success'}>{item.is_locked ? 'مقفل' : 'مفتوح'}</Badge></td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
-                          <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={() => openEdit(item)} disabled={item.is_locked} />
-                          {item.is_locked ? (
-                            <Button size="xs" variant="warning" icon={<i className="ti ti-lock-open" />} onClick={() => unlockMutation.mutate(item.id)} />
-                          ) : (
-                            <Button size="xs" variant="info" icon={<i className="ti ti-lock" />} onClick={() => lockMutation.mutate(item.id)} />
-                          )}
-                          <Button size="xs" variant="danger" icon={<i className="ti ti-trash" />} onClick={() => handleDelete(item.id)} disabled={item.is_locked} />
-                          <Button size="xs" icon={<i className="ti ti-refresh" />} onClick={() => syncMutation.mutate(item.id)} title="مزامنة الرقم بعد حذف مستند" />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <SimpleTable
+            columns={numberingColumns}
+            data={items as unknown as Record<string, unknown>[]}
+            rowKey="id"
+            onRowClick={(_row) => openEdit(_row as unknown as NumberingSeriesRecord)}
+          />
 
           {/* Pagination */}
           {meta && meta.last_page > 1 && (
@@ -321,26 +345,7 @@ export default function NumberingSeriesPage() {
   );
 }
 
-// =============== Confirm Delete Modal ===============
-function ConfirmDeleteModal({ open, onClose, onConfirm, loading }: {
-  open: boolean; onClose: () => void; onConfirm: () => void; loading: boolean;
-}) {
-  return (
-    <Modal open={open} onClose={onClose} size="sm" title="تأكيد الحذف">
-      <div style={{ textAlign: 'center', padding: 16 }}>
-        <i className="ti ti-alert-triangle" style={{ fontSize: 40, color: 'var(--red)' }} />
-        <div style={{ fontWeight: 800, fontSize: 15, margin: '12px 0 6px' }}>هل أنت متأكد؟</div>
-        <div style={{ fontSize: 13, color: 'var(--t4)' }}>لا يمكن التراجع عن حذف سلسلة الترقيم.</div>
-      </div>
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', padding: '8px 0 0' }}>
-        <Button onClick={onClose} disabled={loading}>إلغاء</Button>
-        <Button variant="danger" onClick={onConfirm} disabled={loading} icon={loading ? <i className="ti ti-loader" /> : <i className="ti ti-trash" />}>
-          {loading ? 'جاري الحذف...' : 'حذف'}
-        </Button>
-      </div>
-    </Modal>
-  );
-}
+
 
 // =============== NumberingSeries Modal (محسّن) ===============
 function NumberingSeriesModal({

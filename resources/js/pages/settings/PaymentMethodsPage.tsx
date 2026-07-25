@@ -5,7 +5,9 @@ import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
+import SimpleTable from '@/components/ui/SimpleTable';
 import Modal from '@/components/ui/Modal';
+import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal';
 import KpiCard from '@/components/ui/KpiCard';
 import EmptyState from '@/components/ui/EmptyState';
 import AlertBar from '@/components/ui/AlertBar';
@@ -139,47 +141,34 @@ export default function PaymentMethodsPage() {
         />
       ) : (
         <Card noHeader style={{ padding: 0, opacity: isFetching ? 0.7 : 1 }}>
-          <div className="tw">
-            <table>
-              <thead>
-                <tr>
-                  <th>الاسم</th>
-                  <th>الكود</th>
-                  <th>الحساب المالي</th>
-                  <th>نقدي</th>
-                  <th>يتطلب مرجع</th>
-                  <th>الترتيب</th>
-                  <th>نشط</th>
-                  <th style={{ textAlign: 'center', width: 130 }}>إجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {methods.map(item => (
-                  <tr key={item.id}>
-                    <td className="s">{item.name}</td>
-                    <td><code style={{ fontSize: 12, background: 'var(--bg3)', padding: '2px 6px', borderRadius: 4 }}>{item.code}</code></td>
-                    <td style={{ fontSize: 12, color: 'var(--t3)' }}>
-                      {item.relations?.treasuryAccount?.name ?? '—'}
-                    </td>
-                    <td><Badge variant={item.is_cash ? 'success' : 'gray'}>{item.is_cash ? 'نعم' : 'لا'}</Badge></td>
-                    <td>
-                      {item.requires_reference ? (
-                        <span className="ic ic-xs" style={{ color: 'var(--em)' }}><i className="ti ti-circle-check" /></span>
-                      ) : '—'}
-                    </td>
-                    <td style={{ textAlign: 'center' }}>{item.display_order}</td>
-                    <td><Badge variant={item.active ? 'success' : 'danger'}>{item.active ? 'نشط' : 'موقوف'}</Badge></td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                        <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={() => openEdit(item)} />
-                        <Button size="xs" variant="danger" icon={<i className="ti ti-trash" />} onClick={() => handleDelete(item.id)} />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <SimpleTable
+            columns={[
+              { key: 'name', label: 'الاسم', className: 's' },
+              { key: 'code', label: 'الكود', render: (v) => <code style={{ fontSize: 12, background: 'var(--bg3)', padding: '2px 6px', borderRadius: 4 }}>{v as string}</code> },
+              { key: '_treasury', label: 'الحساب المالي', render: (_, row) => {
+                const item = row as PaymentMethod;
+                return <span style={{ fontSize: 12, color: 'var(--t3)' }}>{item.relations?.treasuryAccount?.name ?? '—'}</span>;
+              }},
+              { key: 'is_cash', label: 'نقدي', render: (v) => <Badge variant={v ? 'success' : 'gray'}>{v ? 'نعم' : 'لا'}</Badge> },
+              { key: 'requires_reference', label: 'يتطلب مرجع', render: (v) => v ? (
+                <span className="ic ic-xs" style={{ color: 'var(--em)' }}><i className="ti ti-circle-check" /></span>
+              ) : '—' },
+              { key: 'display_order', label: 'الترتيب', align: 'center' },
+              { key: 'active', label: 'نشط', render: (v) => <Badge variant={v ? 'success' : 'danger'}>{v ? 'نشط' : 'موقوف'}</Badge> },
+              { key: '_actions', label: 'إجراءات', align: 'center', render: (_, row) => {
+                const item = row as PaymentMethod;
+                return (
+                  <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                    <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={() => openEdit(item)} />
+                    <Button size="xs" variant="danger" icon={<i className="ti ti-trash" />} onClick={() => handleDelete(item.id)} />
+                  </div>
+                );
+              }},
+            ]}
+            data={methods}
+            rowKey="id"
+            emptyText="لا توجد طرق دفع"
+          />
 
           {meta && meta.last_page > 1 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 16px', borderTop: '1px solid var(--b1)' }}>
@@ -218,26 +207,7 @@ export default function PaymentMethodsPage() {
   );
 }
 
-// =============== Confirm Delete Modal ===============
-function ConfirmDeleteModal({ open, onClose, onConfirm, loading }: {
-  open: boolean; onClose: () => void; onConfirm: () => void; loading: boolean;
-}) {
-  return (
-    <Modal open={open} onClose={onClose} size="sm" title="تأكيد الحذف">
-      <div style={{ textAlign: 'center', padding: 16 }}>
-        <i className="ti ti-alert-triangle" style={{ fontSize: 40, color: 'var(--red)' }} />
-        <div style={{ fontWeight: 800, fontSize: 15, margin: '12px 0 6px' }}>هل أنت متأكد؟</div>
-        <div style={{ fontSize: 13, color: 'var(--t4)' }}>لن تتمكن من استعادة طريقة الدفع بعد الحذف.</div>
-      </div>
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', padding: '8px 0 0' }}>
-        <Button onClick={onClose} disabled={loading}>إلغاء</Button>
-        <Button variant="danger" onClick={onConfirm} disabled={loading} icon={loading ? <i className="ti ti-loader" /> : <i className="ti ti-trash" />}>
-          {loading ? 'جاري الحذف...' : 'حذف'}
-        </Button>
-      </div>
-    </Modal>
-  );
-}
+
 
 // =============== Add/Edit Modal ===============
 function PaymentMethodModal({

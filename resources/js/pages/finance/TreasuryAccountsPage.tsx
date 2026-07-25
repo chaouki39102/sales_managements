@@ -10,8 +10,10 @@ import Card        from '@/components/ui/Card';
 import Badge       from '@/components/ui/Badge';
 import Button      from '@/components/ui/Button';
 import Modal       from '@/components/ui/Modal';
+import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal';
 import KpiCard     from '@/components/ui/KpiCard';
 import EmptyState  from '@/components/ui/EmptyState';
+import SimpleTable from '@/components/ui/SimpleTable';
 import AlertBar    from '@/components/ui/AlertBar';
 import Switch      from '@/components/ui/Switch';
 import { useTenantQuery, useTenantMutation } from '@/hooks/useTenantQuery';
@@ -278,66 +280,63 @@ export default function TreasuryAccountsPage() {
         />
       ) : (
         <Card noHeader style={{ padding: 0, marginTop: 0 }}>
-          <div className="tw">
-            <table>
-              <thead>
-                <tr>
-                  <th>الاسم</th>
-                  <th>النوع</th>
-                  <th>الكود</th>
-                  <th>البنك / التفاصيل</th>
-                  <th>رقم الحساب</th>
-                  <th>الرصيد الحالي</th>
-                  <th>افتراضي</th>
-                  <th>الحالة</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(acc => (
-                  <tr key={acc.id}>
-                    <td className="s">{acc.name}</td>
-                    <td>
-                      <Badge variant="gray" style={{ fontSize: 10 }}>
-                        <i className={`ti ${typeIcon(acc._typeCode || '')}`} style={{ marginLeft: 4 }}/>
-                        {acc._typeName || '—'}
-                      </Badge>
-                    </td>
-                    <td className="m">{acc.code || '—'}</td>
-                    <td style={{ fontSize: 12, color: 'var(--t3)' }}>
-                      {acc.bank_name || '—'}
-                    </td>
-                    <td className="m" style={{ fontSize: 11, fontFamily: 'monospace' }}>
-                      {acc.account_number || acc.rib || acc.iban || '—'}
-                    </td>
-                    <td className="e">
-                      {(acc.current_balance || 0).toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج
-                    </td>
-                    <td>
-                      {acc.is_default
-                        ? <span className="ic ic-xs" style={{ color: 'var(--em)' }}><i className="ti ti-circle-check"/></span>
-                        : '—'}
-                    </td>
-                    <td>
-                      <Badge variant={acc.active ? 'success' : 'danger'}>
-                        {acc.active ? 'نشط' : 'موقوف'}
-                      </Badge>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 3 }}>
-                        <Button size="xs" icon={<i className="ti ti-pencil"/>} onClick={() => openEdit(acc)}/>
-                        <Button
-                          size="xs" variant="danger"
-                          icon={<i className="ti ti-trash"/>}
-                          onClick={() => askDelete(acc.id)}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <SimpleTable
+            columns={[
+              { key: 'name', label: 'الاسم', className: 's' },
+              {
+                key: '_typeName', label: 'النوع',
+                render: (_v, row) => {
+                  const acc = row as any;
+                  return (
+                    <Badge variant="gray" style={{ fontSize: 10 }}>
+                      <i className={`ti ${typeIcon(acc._typeCode || '')}`} style={{ marginLeft: 4 }}/>
+                      {acc._typeName || '—'}
+                    </Badge>
+                  );
+                },
+              },
+              { key: 'code', label: 'الكود', className: 'm' },
+              {
+                key: 'bank_name', label: 'البنك / التفاصيل',
+                render: (v) => <span style={{ fontSize: 12, color: 'var(--t3)' }}>{(v as string) || '—'}</span>,
+              },
+              {
+                key: 'accountNumber', label: 'رقم الحساب', className: 'm',
+                render: (_v, row) => {
+                  const acc = row as any;
+                  return <span style={{ fontSize: 11, fontFamily: 'monospace' }}>{acc.account_number || acc.rib || acc.iban || '—'}</span>;
+                },
+              },
+              {
+                key: 'current_balance', label: 'الرصيد الحالي', className: 'e',
+                render: (v) => <>{((v as number) || 0).toLocaleString('fr-DZ', { maximumFractionDigits: 0 })} دج</>,
+              },
+              {
+                key: 'is_default', label: 'افتراضي',
+                render: (v) => v
+                  ? <span className="ic ic-xs" style={{ color: 'var(--em)' }}><i className="ti ti-circle-check"/></span>
+                  : '—',
+              },
+              {
+                key: 'active', label: 'الحالة',
+                render: (v) => <Badge variant={v ? 'success' : 'danger'}>{v ? 'نشط' : 'موقوف'}</Badge>,
+              },
+              {
+                key: 'actions', label: '', align: 'center',
+                render: (_v, row) => {
+                  const acc = row as any;
+                  return (
+                    <div style={{ display: 'flex', gap: 3 }}>
+                      <Button size="xs" icon={<i className="ti ti-pencil"/>} onClick={() => openEdit(acc)}/>
+                      <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>} onClick={() => askDelete(acc.id)}/>
+                    </div>
+                  );
+                },
+              },
+            ]}
+            data={filtered as any}
+            rowKey="id"
+          />
         </Card>
       )}
 
@@ -619,39 +618,4 @@ function TreasuryAccountModal({
   );
 }
 
-// ════════════════════════════════════════════════════════════════════
-// CONFIRM DELETE MODAL
-// ════════════════════════════════════════════════════════════════════
-function ConfirmDeleteModal({
-  open, onClose, onConfirm, loading,
-}: {
-  open:      boolean;
-  onClose:   () => void;
-  onConfirm: () => void;
-  loading:   boolean;
-}) {
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      size="sm"
-      title="تأكيد الحذف"
-      footer={
-        <>
-          <Button onClick={onClose} disabled={loading}>إلغاء</Button>
-          <Button variant="danger" onClick={onConfirm} disabled={loading}>
-            {loading ? 'جاري الحذف...' : 'حذف'}
-          </Button>
-        </>
-      }
-    >
-      <p style={{ textAlign: 'center', padding: '12px 0', color: 'var(--t2)' }}>
-        هل أنت متأكد من حذف هذا الحساب؟
-        <br/>
-        <span style={{ fontSize: 13, color: 'var(--t4)' }}>
-          لا يمكن التراجع عن هذا الإجراء.
-        </span>
-      </p>
-    </Modal>
-  );
-}
+

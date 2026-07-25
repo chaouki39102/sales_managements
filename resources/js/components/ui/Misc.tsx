@@ -68,28 +68,6 @@ export function EmptyState({ icon, title, sub, action }: {
 }
 
 // ════════════════════════════════════════════════════════════
-// PAGE HEADER
-// ════════════════════════════════════════════════════════════
-export function PageHeader({
-  title, sub, actions, className,
-}: {
-  title: string
-  sub?: string
-  actions?: React.ReactNode
-  className?: string
-}) {
-  return (
-    <div className={cn('flex items-start justify-between mb-5 gap-3 flex-wrap', className)}>
-      <div>
-        <h1 className="text-[20px] font-black text-[var(--t1)] mb-[3px]">{title}</h1>
-        {sub && <p className="text-[12.5px] text-[var(--t4)]">{sub}</p>}
-      </div>
-      {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}
-    </div>
-  )
-}
-
-// ════════════════════════════════════════════════════════════
 // SEPARATOR
 // ════════════════════════════════════════════════════════════
 export function Sep({ className }: { className?: string }) {
