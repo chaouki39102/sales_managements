@@ -7,13 +7,15 @@ export interface SimpleColumn {
   /** Unique key matching data row property */
   key: string;
   /** Header label */
-  label: string;
+  label: React.ReactNode;
   /** Extra className for <th> and <td> */
   className?: string;
   /** Right-align numeric columns */
   align?: 'start' | 'center' | 'end';
   /** Custom render function — receives cell value, entire row, and column key */
   render?: (value: unknown, row: Record<string, unknown>, columnKey: string) => React.ReactNode;
+  /** Click handler on the column header */
+  onHeaderClick?: () => void;
 }
 
 interface SimpleTableProps {
@@ -58,7 +60,7 @@ export default function SimpleTable({
           <thead>
             <tr>
               {columns.map(c => (
-                <th key={c.key} className={c.className}>{c.label}</th>
+                <th key={c.key} className={c.className} onClick={c.onHeaderClick} style={c.onHeaderClick ? { cursor: 'pointer', userSelect: 'none' } : undefined}>{c.label}</th>
               ))}
             </tr>
           </thead>
@@ -95,7 +97,7 @@ export default function SimpleTable({
         <thead>
           <tr>
             {columns.map(c => (
-              <th key={c.key} className={c.className}>{c.label}</th>
+              <th key={c.key} className={c.className} onClick={c.onHeaderClick} style={c.onHeaderClick ? { cursor: 'pointer', userSelect: 'none' } : undefined}>{c.label}</th>
             ))}
           </tr>
         </thead>

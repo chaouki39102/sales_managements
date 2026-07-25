@@ -25,6 +25,7 @@ import Switch       from '@/components/ui/Switch';
 import EmptyState   from '@/components/ui/EmptyState';
 import AlertBar     from '@/components/ui/AlertBar';
 import Avatar       from '@/components/ui/Avatar';
+import SimpleTable  from '@/components/ui/SimpleTable';
 import { useOpeningParties, useOpeningTreasury, openingBalancesApi } from '@/lib/api/endpoints/openingBalances';
 import { ConfirmDialog } from '@/components/ui';
 import { ComboBox } from '@/pages/documents/components/DocumentUIPrimitives';
@@ -453,54 +454,43 @@ function AccountsTab({
                         action={<Button variant="primary" onClick={openAddAccount}>إضافة حساب</Button>} />
                 ) : (
                     <Card noHeader style={{ padding: 0 }}>
-                        <div className="tw">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>الاسم</th><th>النوع</th><th>الكود</th>
-                                        <th>البنك</th><th>رقم الحساب</th>
-                                        <th>الرصيد الحالي</th><th>الافتراضي</th><th>الحالة</th><th></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredAccounts.map((acc: any) => (
-                                        <tr key={acc.id}>
-                                            <td className="s">{acc.name}</td>
-                                            <td>
-                                                <Badge variant="gray" style={{ fontSize: 10 }}>
-                                                    <i className={`ti ${typeIcon(acc._typeCode)}`} style={{ marginLeft: 4 }}/>
-                                                    {acc._typeName || '—'}
-                                                </Badge>
-                                            </td>
-                                            <td className="m">{acc.code || '—'}</td>
-                                            <td style={{ fontSize: 12, color: 'var(--t3)' }}>{acc.bank_name || '—'}</td>
-                                            <td className="m" style={{ fontSize: 11, fontFamily: 'monospace' }}>
-                                                {acc.account_number || acc.rib || acc.iban || '—'}
-                                            </td>
-                                            <td className="e">{fmt(Number(acc.current_balance) || 0)} دج</td>
-                                            <td>
-                                                {acc.is_default
-                                                    ? <span className="ic ic-xs" style={{ color: 'var(--em)' }}><i className="ti ti-circle-check"/></span>
-                                                    : '—'}
-                                            </td>
-                                            <td>
-                                                <Badge variant={acc.active ? 'success' : 'danger'}>
-                                                    {acc.active ? 'نشط' : 'موقوف'}
-                                                </Badge>
-                                            </td>
-                                            <td>
-                                                <div style={{ display: 'flex', gap: 3 }}>
-                                                    <Button size="xs" icon={<i className="ti ti-pencil"/>}
-                                                        onClick={() => openEditAccount(acc)}/>
-                                                    <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>}
-                                                        onClick={async () => { if (await deleteConfirm.confirm('حذف الحساب؟')) deleteAccount.mutate(acc.id); }}/>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                        <SimpleTable
+                            columns={[
+                                { key: 'name', label: 'الاسم', className: 's' },
+                                { key: '_typeCode', label: 'النوع', render: (_v: any, row: any) => (
+                                    <Badge variant="gray" style={{ fontSize: 10 }}>
+                                        <i className={`ti ${typeIcon(row._typeCode)}`} style={{ marginLeft: 4 }}/>
+                                        {row._typeName || '—'}
+                                    </Badge>
+                                )},
+                                { key: 'code', label: 'الكود', className: 'm', render: (v: any) => v || '—' },
+                                { key: 'bank_name', label: 'البنك', render: (v: any) => (
+                                    <span style={{ fontSize: 12, color: 'var(--t3)' }}>{v || '—'}</span>
+                                )},
+                                { key: 'account_number', label: 'رقم الحساب', className: 'm', render: (_v: any, row: any) => (
+                                    <span style={{ fontSize: 11, fontFamily: 'monospace' }}>
+                                        {row.account_number || row.rib || row.iban || '—'}
+                                    </span>
+                                )},
+                                { key: 'current_balance', label: 'الرصيد الحالي', className: 'e', render: (v: any) => `${fmt(Number(v) || 0)} دج` },
+                                { key: 'is_default', label: 'الافتراضي', render: (v: any) => v
+                                    ? <span className="ic ic-xs" style={{ color: 'var(--em)' }}><i className="ti ti-circle-check"/></span>
+                                    : '—' },
+                                { key: 'active', label: 'الحالة', render: (v: any) => (
+                                    <Badge variant={v ? 'success' : 'danger'}>{v ? 'نشط' : 'موقوف'}</Badge>
+                                )},
+                                { key: '_actions', label: '', render: (_v: any, row: any) => (
+                                    <div style={{ display: 'flex', gap: 3 }}>
+                                        <Button size="xs" icon={<i className="ti ti-pencil"/>}
+                                            onClick={() => openEditAccount(row)}/>
+                                        <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>}
+                                            onClick={async () => { if (await deleteConfirm.confirm('حذف الحساب؟')) deleteAccount.mutate(row.id); }}/>
+                                    </div>
+                                )},
+                            ]}
+                            data={filteredAccounts}
+                            rowKey="id"
+                        />
                     </Card>
                 )}
             </div>
@@ -535,51 +525,39 @@ function PaymentModesTab({ paymentModes, loadingModes, openEditMode, deleteMode,
                     action={<Button variant="primary" onClick={openAddMode}>طريقة دفع جديدة</Button>} />
             ) : (
                 <Card noHeader style={{ padding: 0 }}>
-                    <div className="tw">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>الاسم</th><th>الكود</th><th>الحساب</th>
-                                    <th>نقدي</th><th>مرجع</th><th>الترتيب</th><th>الحالة</th><th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {paymentModes.map((mode: any) => (
-                                    <tr key={mode.id}>
-                                        <td className="s">{mode.name}</td>
-                                        <td className="m" style={{ fontFamily: 'monospace' }}>{mode.code}</td>
-                                        <td style={{ fontSize: 12, color: 'var(--t3)' }}>
-                                            {mode.treasury_account?.name || '—'}
-                                        </td>
-                                        <td>
-                                            <Badge variant={mode.is_cash ? 'success' : 'gray'}>
-                                                {mode.is_cash ? 'نعم' : 'لا'}
-                                            </Badge>
-                                        </td>
-                                        <td>
-                                            {mode.requires_reference
-                                                ? <span className="ic ic-xs" style={{ color: 'var(--em)' }}><i className="ti ti-circle-check"/></span>
-                                                : '—'}
-                                        </td>
-                                        <td className="m">{mode.display_order ?? 0}</td>
-                                        <td>
-                                            <Badge variant={mode.active ? 'success' : 'danger'}>
-                                                {mode.active ? 'نشط' : 'موقوف'}
-                                            </Badge>
-                                        </td>
-                                        <td>
-                                            <div style={{ display: 'flex', gap: 3 }}>
-                                                <Button size="xs" icon={<i className="ti ti-pencil"/>}
-                                                    onClick={() => openEditMode(mode)}/>
-                                                <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>}
-                                                    onClick={async () => { if (await deleteConfirm.confirm('حذف طريقة الدفع؟')) deleteMode.mutate(mode.id); }}/>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <SimpleTable
+                        columns={[
+                            { key: 'name', label: 'الاسم', className: 's' },
+                            { key: 'code', label: 'الكود', className: 'm', render: (v: any) => (
+                                <span style={{ fontFamily: 'monospace' }}>{v}</span>
+                            )},
+                            { key: 'treasury_account', label: 'الحساب', render: (v: any) => (
+                                <span style={{ fontSize: 12, color: 'var(--t3)' }}>
+                                    {v?.name || '—'}
+                                </span>
+                            )},
+                            { key: 'is_cash', label: 'نقدي', render: (v: any) => (
+                                <Badge variant={v ? 'success' : 'gray'}>{v ? 'نعم' : 'لا'}</Badge>
+                            )},
+                            { key: 'requires_reference', label: 'مرجع', render: (v: any) => v
+                                ? <span className="ic ic-xs" style={{ color: 'var(--em)' }}><i className="ti ti-circle-check"/></span>
+                                : '—' },
+                            { key: 'display_order', label: 'الترتيب', className: 'm', render: (v: any) => v ?? 0 },
+                            { key: 'active', label: 'الحالة', render: (v: any) => (
+                                <Badge variant={v ? 'success' : 'danger'}>{v ? 'نشط' : 'موقوف'}</Badge>
+                            )},
+                            { key: '_actions', label: '', render: (_v: any, row: any) => (
+                                <div style={{ display: 'flex', gap: 3 }}>
+                                    <Button size="xs" icon={<i className="ti ti-pencil"/>}
+                                        onClick={() => openEditMode(row)}/>
+                                    <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>}
+                                        onClick={async () => { if (await deleteConfirm.confirm('حذف طريقة الدفع؟')) deleteMode.mutate(row.id); }}/>
+                                </div>
+                            )},
+                        ]}
+                        data={paymentModes}
+                        rowKey="id"
+                    />
                 </Card>
             )}
 
