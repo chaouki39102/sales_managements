@@ -6,11 +6,11 @@
 import { apiGet, apiPost, apiPut, apiDelete } from '../core/client';
 
 import { useTenantQuery, useTenantMutation } from '@/hooks/useTenantQuery';
-import type { Employee } from '../core/types';
+import type { Employee, PaginatedResponse } from '../core/types';
 
 // ─── API ─────────────────────────────────────────────────────────────────────
 export const employeesApi = {
-  list:   (params?: Record<string, unknown>)       => apiGet<Employee[]>('/employees', params),
+  list:   (params?: Record<string, unknown>)       => apiGet<PaginatedResponse<Employee>>('/employees', params),
   show:   (id: number)                             => apiGet<Employee>(`/employees/${id}`),
   create: (data: Partial<Employee>)                => apiPost<Employee>('/employees', data),
   update: (id: number, data: Partial<Employee>)    => apiPut<Employee>(`/employees/${id}`, data),
@@ -19,7 +19,7 @@ export const employeesApi = {
 
 // ─── Query hooks ─────────────────────────────────────────────────────────────
 export function useEmployeesList(params?: { search?: string; employment_status?: string }) {
-  return useTenantQuery<Employee[]>(
+  return useTenantQuery<PaginatedResponse<Employee>>(
     (slug) => [slug, 'employees', params?.search ?? '', params?.employment_status ?? ''] as const,
     () => employeesApi.list({
       search: params?.search || undefined,

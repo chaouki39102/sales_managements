@@ -23,7 +23,7 @@ export default function EmployeesPage() {
     const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
     const modal = useModal();
 
-    const { data: employees, isLoading, error } = useTenantQuery<Employee[]>(
+    const { data: response, isLoading, error } = useTenantQuery(
         (slug) => [slug, 'employees', search, statusFilter] as const,
         () => employeesApi.list({
             search: search || undefined,
@@ -31,9 +31,10 @@ export default function EmployeesPage() {
         }),
     );
 
-    const activeEmployees = employees?.filter((emp: any) => emp.employment_status === 'active') || [];
-    const suspendedEmployees = employees?.filter((emp: any) => emp.employment_status === 'suspended') || [];
-    const terminatedEmployees = employees?.filter((emp: any) => emp.employment_status === 'terminated') || [];
+    const employees = response?.data ?? [];
+    const activeEmployees = employees.filter((emp: any) => emp.employment_status === 'active');
+    const suspendedEmployees = employees.filter((emp: any) => emp.employment_status === 'suspended');
+    const terminatedEmployees = employees.filter((emp: any) => emp.employment_status === 'terminated');
 
     const deleteMutation = useTenantMutation(
         (id: number) => employeesApi.delete(id),
@@ -47,7 +48,7 @@ export default function EmployeesPage() {
         <div className="page on" id="p-employees">
             <PageHeader
                 title="الموظفون"
-                subtitle={`إدارة بيانات الموظفين — ${employees?.length || 0} موظف`}
+                subtitle={`إدارة بيانات الموظفين — ${employees.length} موظف`}
                 actions={
                     <Button variant="primary" size="sm" icon={<i className="ti ti-user-plus"/>} onClick={openAdd}>
                         موظف جديد
@@ -57,7 +58,7 @@ export default function EmployeesPage() {
 
             {/* KPIs */}
             <div className="kpis" style={{ marginBottom: 20 }}>
-                <KpiCard variant="green" icon="ti-users" label="إجمالي الموظفين" value={employees?.length || 0} />
+                <KpiCard variant="green" icon="ti-users" label="إجمالي الموظفين" value={employees.length} />
                 <KpiCard variant="blue" icon="ti-user-check" label="نشطون" value={activeEmployees.length} />
                 <KpiCard variant="gold" icon="ti-user-pause" label="معلقون" value={suspendedEmployees.length} />
                 <KpiCard variant="red" icon="ti-user-off" label="منتهي خدمتهم" value={terminatedEmployees.length} />
@@ -88,7 +89,7 @@ export default function EmployeesPage() {
             {/* Content */}
             {isLoading ? (
                 <div className="empty"><div className="empty-ic"><i className="ti ti-loader"/></div><div className="empty-tx">جاري التحميل...</div></div>
-            ) : !employees || employees.length === 0 ? (
+            ) : employees.length === 0 ? (
                 <EmptyState icon="ti-users" text="لا يوجد موظفون" sub="أضف أول موظف" action={<Button variant="primary" onClick={openAdd}>موظف جديد</Button>} />
             ) : (
                 <Card noHeader style={{ padding: 0 }}>
@@ -150,7 +151,7 @@ export default function EmployeesPage() {
                                 },
                             },
                         ]}
-                        data={employees as any}
+                        data={employees}
                         rowKey="id"
                     />
                 </Card>
@@ -191,7 +192,7 @@ function EmployeeModal({ open, employee, onClose }: {
     // Fetch genders
     const { data: genders } = useTenantQuery(
         (slug) => tenantKeys.lookups.genders(slug),
-        () => apiGet('/genders').then(r => r.data.data),
+        () => apiGet('/genders').then(r => Array.isArray(r) ? r : (r as any)?.data ?? []),
         { staleTime: 10 * 60_000, enabled: open },
     );
 
