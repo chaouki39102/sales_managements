@@ -524,7 +524,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 }
             }
 
-            $totals = $this->computeLineTotals($lineData);
+            // Observer calculates total_ht, discount_amount, total_tva, total_ttc from discount_percentage
 
             $document->lines()->create([
                 'company_id'             => $document->company_id,
@@ -541,10 +541,6 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 'packaging_units_snapshot' => $packagingUnitsSnapshot,
                 'stock_lot_id'           => $lineData['stock_lot_id'] ?? null,
                 'line_attributes'        => $this->buildLineAttributes($lineData),
-                'total_ht'               => $totals['total_ht'],
-                'discount_amount'        => $totals['discount_amount'],
-                'total_tva'              => $totals['total_tva'],
-                'total_ttc'              => $totals['total_ttc'],
             ]);
         }
     }

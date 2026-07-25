@@ -288,7 +288,7 @@ class Product extends Model
             $query->where('price_level_id', $priceLevelId);
         }
 
-        return $query->orderBy('tier_order')->first();
+        return $query->orderByDesc('min_qty')->first();
     }
 
     public function finalPrice(int $priceLevelId, float $qty = 1, ?int $packagingId = null): float

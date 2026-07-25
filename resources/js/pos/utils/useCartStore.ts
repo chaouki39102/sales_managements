@@ -41,7 +41,7 @@ function findQuantityDiscount(discounts: QuantityDiscount[] | undefined, qty: nu
   if (!discounts?.length) return 0;
   const sorted = [...discounts]
     .filter(d => d.active)
-    .sort((a, b) => b.tier_order - a.tier_order);
+    .sort((a, b) => b.min_qty - a.min_qty);
   const match = sorted.find(d =>
     qty >= d.min_qty &&
     (d.max_qty === null || d.max_qty === undefined || qty <= d.max_qty)

@@ -63,10 +63,12 @@ class CommercialDocumentLineObserver
         $discPct    = (float) ($line->discount_percentage ?? 0);
         $discAmount = (float) ($line->discount_amount     ?? 0);
 
-        // discount_amount (per-unit) is the source of truth for fixed discounts.
-        // When provided, derive discount_percentage from it — this preserves the
-        // exact fixed DZD value the user entered, even if compounding changed the percentage.
-        if ($discAmount > 0 && $price > 0) {
+        // Fixed-amount mode: when only discount_amount is provided (no percentage),
+        // derive the percentage from the per-unit amount.
+        // NOTE: computeLineTotals() stores TOTAL line discount in discount_amount —
+        //       we must NOT treat that as per-unit. Only the frontend-sent per-unit
+        //       value (before createDocumentLines merges it) should trigger this path.
+        if ($discPct <= 0 && $discAmount > 0 && $price > 0) {
             $discPct = ($discAmount / $price) * 100;
         }
 
