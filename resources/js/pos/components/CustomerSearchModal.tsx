@@ -17,6 +17,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost } from '@/lib/api/core/client';
 import { useActiveSlug }   from '@/lib/store/appStore';
 import { formatCurrency }  from '@/lib/utils';
+import Modal from '@/components/ui/Modal';
 import type { Party }      from '@/types';
 import type { PaginatedResponse, PartyBalance } from '@/lib/api/core/types';
 
@@ -217,39 +218,44 @@ export default function CustomerSearchModal({
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="ov on" onClick={onClose}>
-      <div
-        className="modal modal-md"
-        onClick={e => e.stopPropagation()}
-        style={{ maxWidth: 520 }}
-      >
-        {/* Header */}
-        <div className="m-hd">
-          <div className="m-title">
-            <i className="ti ti-users" style={{ marginLeft: 6 }} />
-            {showCreate ? 'زبون جديد' : 'اختيار الزبون'}
-          </div>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            {!showCreate && (
-              <button
-                className="btn btn-xs btn-p"
-                onClick={() => setShowCreate(true)}
-                type="button"
-              >
-                <i className="ti ti-plus" /> جديد
-              </button>
-            )}
-            <div className="m-x" onClick={onClose}><i className="ti ti-x" /></div>
-          </div>
-        </div>
+    <Modal
+      open
+      onClose={onClose}
+      title={showCreate ? 'زبون جديد' : 'اختيار الزبون'}
+      size="md"
+      footer={showCreate ? (
+        <>
+          <button
+            className="btn"
+            onClick={() => { setShowCreate(false); setFormError(''); }}
+            type="button"
+          >
+            <i className="ti ti-arrow-right" /> رجوع
+          </button>
+          <button
+            className="btn btn-p"
+            onClick={handleCreate}
+            disabled={createMutation.isPending || !form.name.trim()}
+            type="button"
+          >
+            {createMutation.isPending
+              ? <><i className="ti ti-loader-2 spin" /> جارٍ الإنشاء...</>
+              : <><i className="ti ti-user-plus" /> إنشاء وتحديد</>
+            }
+          </button>
+        </>
+      ) : (
+        <button className="btn" onClick={onClose} type="button">إغلاق</button>
+      )}
+    >
+      <div style={{ padding: '0 0 4px', minHeight: 420 }}>
 
-        <div className="m-body" style={{ padding: 16, minHeight: 420 }}>
-
-          {/* ════ وضع البحث ════ */}
-          {!showCreate && (
-            <>
-              {/* شريط البحث */}
-              <div className="pos-inp" style={{ marginBottom: 12 }}>
+        {/* ════ وضع البحث ════ */}
+        {!showCreate && (
+          <>
+            {/* شريط البحث + زر جديد */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+              <div className="pos-inp" style={{ flex: 1, marginBottom: 0 }}>
                 <i className="ti ti-search" style={{ fontSize: 14, color: 'var(--t4)' }} />
                 <input
                   ref={searchRef}
@@ -272,199 +278,179 @@ export default function CustomerSearchModal({
                   </button>
                 )}
               </div>
-
-              {/* زبون عابر */}
               <button
-                className={`cust-row cust-anon ${!currentClient ? 'on' : ''} ${highlightedIdx === 0 ? 'hl' : ''}`}
-                onClick={() => onSelect(null)}
+                className="btn btn-xs btn-p"
+                onClick={() => setShowCreate(true)}
                 type="button"
+                style={{ flexShrink: 0 }}
               >
-                <div className="cust-av">
-                  <i className="ti ti-user-off" style={{ fontSize: 16 }} />
-                </div>
-                <div className="cust-info">
-                  <div className="cust-name">زبون عابر</div>
-                  <div className="cust-meta">بدون تسجيل</div>
-                </div>
-                {!currentClient && <i className="ti ti-check cust-check" />}
+                <i className="ti ti-plus" /> جديد
               </button>
+            </div>
 
-              {/* عنوان القائمة */}
-              <div className="cust-list-title">
-                {isSearching
-                  ? searching ? 'جارٍ البحث...' : `${displayList.length} نتيجة`
-                  : 'آخر الزبائن'
-                }
+            {/* زبون عابر */}
+            <button
+              className={`cust-row cust-anon ${!currentClient ? 'on' : ''} ${highlightedIdx === 0 ? 'hl' : ''}`}
+              onClick={() => onSelect(null)}
+              type="button"
+            >
+              <div className="cust-av">
+                <i className="ti ti-user-off" style={{ fontSize: 16 }} />
               </div>
+              <div className="cust-info">
+                <div className="cust-name">زبون عابر</div>
+                <div className="cust-meta">بدون تسجيل</div>
+              </div>
+              {!currentClient && <i className="ti ti-check cust-check" />}
+            </button>
 
-              {/* القائمة */}
-              <div className="cust-list" ref={listRef}>
-                {displayList.length === 0 && !searching && isSearching && (
-                  <div className="cust-empty">
-                    <i className="ti ti-search-off" style={{ fontSize: 28, opacity: 0.3 }} />
-                    <div>لا توجد نتائج</div>
-                    <button
-                      className="btn btn-xs btn-p"
-                      onClick={() => { setShowCreate(true); setForm(f => ({ ...f, name: query })); }}
-                      type="button"
-                      style={{ marginTop: 8 }}
-                    >
-                      <i className="ti ti-plus" /> إنشاء &ldquo;{query}&rdquo;
-                    </button>
-                  </div>
-                )}
+            {/* عنوان القائمة */}
+            <div className="cust-list-title">
+              {isSearching
+                ? searching ? 'جارٍ البحث...' : `${displayList.length} نتيجة`
+                : 'آخر الزبائن'
+              }
+            </div>
 
-                {displayList.map((c, i) => (
+            {/* القائمة */}
+            <div className="cust-list" ref={listRef}>
+              {displayList.length === 0 && !searching && isSearching && (
+                <div className="cust-empty">
+                  <i className="ti ti-search-off" style={{ fontSize: 28, opacity: 0.3 }} />
+                  <div>لا توجد نتائج</div>
                   <button
-                    key={c.id}
-                    ref={highlightedIdx === i + 1 ? (el) => el?.scrollIntoView({ block: 'nearest' }) : undefined}
-                    className={`cust-row ${currentClient?.id === c.id ? 'on' : ''} ${highlightedIdx === i + 1 ? 'hl' : ''}`}
-                    onClick={() => onSelect(c)}
+                    className="btn btn-xs btn-p"
+                    onClick={() => { setShowCreate(true); setForm(f => ({ ...f, name: query })); }}
                     type="button"
+                    style={{ marginTop: 8 }}
                   >
-                    <div className="cust-av">
-                      {(c.name?.[0] ?? '؟').toUpperCase()}
-                    </div>
-                    <div className="cust-info">
-                      <div className="cust-name">{c.name}</div>
-                      <div className="cust-meta">
-                        {c.phone && <span><i className="ti ti-phone" style={{ fontSize: 10 }} /> {c.phone}</span>}
-                        {c.nif   && <span>NIF: {c.nif}</span>}
-                      </div>
-                      <BalanceLabel balance={balanceMap.get(c.id)} />
-                    </div>
-                    {currentClient?.id === c.id && (
-                      <i className="ti ti-check cust-check" />
-                    )}
+                    <i className="ti ti-plus" /> إنشاء &ldquo;{query}&rdquo;
                   </button>
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* ════ وضع الإنشاء ════ */}
-          {showCreate && (
-            <div className="fgrid">
-              {/* الاسم */}
-              <div className="fg s2">
-                <label className="req">الاسم / السبب الاجتماعي</label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={e => setField('name', e.target.value)}
-                  placeholder="اسم الزبون"
-                  autoFocus
-                  onKeyDown={e => e.key === 'Enter' && handleCreate()}
-                />
-              </div>
-
-              {/* الهاتف */}
-              <div className="fg">
-                <label>الهاتف</label>
-                <input
-                  type="tel"
-                  value={form.phone}
-                  onChange={e => setField('phone', e.target.value)}
-                  placeholder="06XXXXXXXX"
-                />
-              </div>
-
-              {/* البريد */}
-              <div className="fg">
-                <label>البريد الإلكتروني</label>
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={e => setField('email', e.target.value)}
-                  placeholder="exemple@mail.com"
-                />
-              </div>
-
-              {/* الاسم التجاري */}
-              <div className="fg">
-                <label>الاسم التجاري</label>
-                <input
-                  type="text"
-                  value={form.trade_name}
-                  onChange={e => setField('trade_name', e.target.value)}
-                  placeholder="اختياري"
-                />
-              </div>
-
-              {/* NIF */}
-              <div className="fg">
-                <label>رقم التعريف الجبائي (NIF)</label>
-                <input
-                  type="text"
-                  value={form.nif}
-                  onChange={e => setField('nif', e.target.value)}
-                  placeholder="اختياري"
-                />
-              </div>
-
-              {/* نوع الطرف */}
-              <div className="fg s2">
-                <label>النوع</label>
-                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      checked={form.is_client}
-                      onChange={() => setField('is_client', true)}
-                    />
-                    زبون
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      checked={!form.is_client}
-                      onChange={() => setField('is_client', false)}
-                    />
-                    مورد
-                  </label>
-                </div>
-              </div>
-
-              {/* خطأ */}
-              {formError && (
-                <div className="fg s2">
-                  <div className="al al-r">
-                    <i className="ti ti-alert-circle" /> {formError}
-                  </div>
                 </div>
               )}
-            </div>
-          )}
-        </div>
 
-        {/* Footer */}
-        <div className="m-foot">
-          {showCreate ? (
-            <>
-              <button
-                className="btn"
-                onClick={() => { setShowCreate(false); setFormError(''); }}
-                type="button"
-              >
-                <i className="ti ti-arrow-right" /> رجوع
-              </button>
-              <button
-                className="btn btn-p"
-                onClick={handleCreate}
-                disabled={createMutation.isPending || !form.name.trim()}
-                type="button"
-              >
-                {createMutation.isPending
-                  ? <><i className="ti ti-loader-2 spin" /> جارٍ الإنشاء...</>
-                  : <><i className="ti ti-user-plus" /> إنشاء وتحديد</>
-                }
-              </button>
-            </>
-          ) : (
-            <button className="btn" onClick={onClose} type="button">إغلاق</button>
-          )}
-        </div>
+              {displayList.map((c, i) => (
+                <button
+                  key={c.id}
+                  ref={highlightedIdx === i + 1 ? (el) => el?.scrollIntoView({ block: 'nearest' }) : undefined}
+                  className={`cust-row ${currentClient?.id === c.id ? 'on' : ''} ${highlightedIdx === i + 1 ? 'hl' : ''}`}
+                  onClick={() => onSelect(c)}
+                  type="button"
+                >
+                  <div className="cust-av">
+                    {(c.name?.[0] ?? '؟').toUpperCase()}
+                  </div>
+                  <div className="cust-info">
+                    <div className="cust-name">{c.name}</div>
+                    <div className="cust-meta">
+                      {c.phone && <span><i className="ti ti-phone" style={{ fontSize: 10 }} /> {c.phone}</span>}
+                      {c.nif   && <span>NIF: {c.nif}</span>}
+                    </div>
+                    <BalanceLabel balance={balanceMap.get(c.id)} />
+                  </div>
+                  {currentClient?.id === c.id && (
+                    <i className="ti ti-check cust-check" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* ════ وضع الإنشاء ════ */}
+        {showCreate && (
+          <div className="fgrid">
+            {/* الاسم */}
+            <div className="fg s2">
+              <label className="req">الاسم / السبب الاجتماعي</label>
+              <input
+                type="text"
+                value={form.name}
+                onChange={e => setField('name', e.target.value)}
+                placeholder="اسم الزبون"
+                autoFocus
+                onKeyDown={e => e.key === 'Enter' && handleCreate()}
+              />
+            </div>
+
+            {/* الهاتف */}
+            <div className="fg">
+              <label>الهاتف</label>
+              <input
+                type="tel"
+                value={form.phone}
+                onChange={e => setField('phone', e.target.value)}
+                placeholder="06XXXXXXXX"
+              />
+            </div>
+
+            {/* البريد */}
+            <div className="fg">
+              <label>البريد الإلكتروني</label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={e => setField('email', e.target.value)}
+                placeholder="exemple@mail.com"
+              />
+            </div>
+
+            {/* الاسم التجاري */}
+            <div className="fg">
+              <label>الاسم التجاري</label>
+              <input
+                type="text"
+                value={form.trade_name}
+                onChange={e => setField('trade_name', e.target.value)}
+                placeholder="اختياري"
+              />
+            </div>
+
+            {/* NIF */}
+            <div className="fg">
+              <label>رقم التعريف الجبائي (NIF)</label>
+              <input
+                type="text"
+                value={form.nif}
+                onChange={e => setField('nif', e.target.value)}
+                placeholder="اختياري"
+              />
+            </div>
+
+            {/* نوع الطرف */}
+            <div className="fg s2">
+              <label>النوع</label>
+              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    checked={form.is_client}
+                    onChange={() => setField('is_client', true)}
+                  />
+                  زبون
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    checked={!form.is_client}
+                    onChange={() => setField('is_client', false)}
+                  />
+                  مورد
+                </label>
+              </div>
+            </div>
+
+            {/* خطأ */}
+            {formError && (
+              <div className="fg s2">
+                <div className="al al-r">
+                  <i className="ti ti-alert-circle" /> {formError}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }

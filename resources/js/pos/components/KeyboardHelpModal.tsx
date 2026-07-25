@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { readOverrides, saveOverrides, KB_DEFAULTS, normalizeEventKey } from '@/pos/hooks/useKeyboardMap';
+import Modal from '@/components/ui/Modal';
 
 interface KeyboardHelpModalProps {
   onClose: () => void;
@@ -199,85 +200,73 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
   }
 
   return (
-    <div className="ov on" onClick={onClose}
-      onKeyDown={handleKeyCapture}
-      tabIndex={-1}
-      ref={el => el?.focus()}
-    >
-      <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-        <div className="m-hd">
-          <div className="m-title"><i className="ti ti-keyboard" style={{ marginLeft: 6 }} /> تخصيص الاختصارات</div>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            {Object.keys(overrides).length > 0 && (
-              <button className="btn btn-xs btn-w" onClick={resetAll} type="button">
-                <i className="ti ti-refresh" /> إعادة ضبط
-              </button>
-            )}
-            <div className="m-x" onClick={onClose}><i className="ti ti-x" /></div>
+    <Modal open onClose={onClose} title="تخصيص الاختصارات" size="lg"
+      footer={<button className="btn" onClick={onClose} type="button">إغلاق</button>}>
+      <div onKeyDown={handleKeyCapture} tabIndex={-1} ref={el => el?.focus()}>
+        {listening && editing && (
+          <div className="al al-i" style={{ marginBottom: 12 }}>
+            <i className="ti ti-keyboard" /> اضغط المفتاح الذي تريد تعيينه لـ &ldquo;<b>{groups.flatMap(g => g.items).find(i => i.action === editing)?.desc}</b>&rdquo; — <b>Esc</b> للإلغاء — يمكنك استخدام تركيبة مثل <kbd style={{background:'var(--bg4)',padding:'1px 5px',borderRadius:3}}>Ctrl+K</kbd>
           </div>
-        </div>
-        <div className="m-body">
-          {listening && editing && (
-            <div className="al al-i" style={{ marginBottom: 12 }}>
-              <i className="ti ti-keyboard" /> اضغط المفتاح الذي تريد تعيينه لـ &ldquo;<b>{groups.flatMap(g => g.items).find(i => i.action === editing)?.desc}</b>&rdquo; — <b>Esc</b> للإلغاء — يمكنك استخدام تركيبة مثل <kbd style={{background:'var(--bg4)',padding:'1px 5px',borderRadius:3}}>Ctrl+K</kbd>
-            </div>
-          )}
-          {conflict && (
-            <div className="al al-r" style={{ marginBottom: 12 }}>
-              <i className="ti ti-alert-triangle" /> هذا المفتاح مستخدم بالفعل لـ &ldquo;<b>{conflict}</b>&rdquo;
-            </div>
-          )}
-          <div className="kb-help-groups">
-            {groups.map(g => (
-              <div key={g.title} className="kb-group">
-                <div className="kb-group-title">{g.title}</div>
-                <div className="kb-help-grid">
-                  {g.items.map(s => {
-                    const cur = displayKey(s);
-                    const isEditing = editing === s.action;
-                    return (
-                      <div key={s.action} className={`kb-help-row ${isEditing ? 'kb-edit-on' : ''}`}>
-                        {isEditing ? (
-                          <kbd className="kb-key kb-capture" ref={captureRef}>
-                            <i className="ti ti-corner-down-left" style={{ fontSize: 12 }} /> انتظر...
-                          </kbd>
-                        ) : (
-                          <kbd
-                            className="kb-key kb-key-clickable"
-                            onClick={() => startEdit(s.action)}
-                            title="اضغط لتعديل الاختصار"
-                          >
-                            {keyLabel(cur)}
-                            <i className="ti ti-edit" style={{ fontSize: 9, marginRight: 3 }} />
-                          </kbd>
-                        )}
-                        <span className="kb-desc">{s.desc}</span>
-                        {!isEditing && cur !== '—' && (
-                          <button
-                            className="kb-clear-btn"
-                            onClick={() => {
-                              setOverrides(prev => {
-                                const next = { ...prev, [s.action]: '' };
-                                return next;
-                              });
-                            }}
-                            title="إلغاء تعيين الاختصار"
-                          >
-                            ✕
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+        )}
+        {conflict && (
+          <div className="al al-r" style={{ marginBottom: 12 }}>
+            <i className="ti ti-alert-triangle" /> هذا المفتاح مستخدم بالفعل لـ &ldquo;<b>{conflict}</b>&rdquo;
+          </div>
+        )}
+        {Object.keys(overrides).length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <button className="btn btn-xs btn-w" onClick={resetAll} type="button">
+              <i className="ti ti-refresh" /> إعادة ضبط
+            </button>
+          </div>
+        )}
+        <div className="kb-help-groups">
+          {groups.map(g => (
+            <div key={g.title} className="kb-group">
+              <div className="kb-group-title">{g.title}</div>
+              <div className="kb-help-grid">
+                {g.items.map(s => {
+                  const cur = displayKey(s);
+                  const isEditing = editing === s.action;
+                  return (
+                    <div key={s.action} className={`kb-help-row ${isEditing ? 'kb-edit-on' : ''}`}>
+                      {isEditing ? (
+                        <kbd className="kb-key kb-capture" ref={captureRef}>
+                          <i className="ti ti-corner-down-left" style={{ fontSize: 12 }} /> انتظر...
+                        </kbd>
+                      ) : (
+                        <kbd
+                          className="kb-key kb-key-clickable"
+                          onClick={() => startEdit(s.action)}
+                          title="اضغط لتعديل الاختصار"
+                        >
+                          {keyLabel(cur)}
+                          <i className="ti ti-edit" style={{ fontSize: 9, marginRight: 3 }} />
+                        </kbd>
+                      )}
+                      <span className="kb-desc">{s.desc}</span>
+                      {!isEditing && cur !== '—' && (
+                        <button
+                          className="kb-clear-btn"
+                          onClick={() => {
+                            setOverrides(prev => {
+                              const next = { ...prev, [s.action]: '' };
+                              return next;
+                            });
+                          }}
+                          title="إلغاء تعيين الاختصار"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        </div>
-        <div className="m-foot">
-          <button className="btn" onClick={onClose} type="button">إغلاق</button>
+            </div>
+          ))}
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
