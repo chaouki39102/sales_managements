@@ -4,7 +4,41 @@
 - **Always respond in English**, regardless of the language the user writes in.
 
 ## Date
-2026-07-23
+2026-07-25
+
+### Phase 25 — Document-Level total_discount Bug: Per-Unit vs Total Discount Sum (July 25)
+
+**Bug**: Document-level `total_discount` field was showing per-unit discount (e.g., ~1 DZD) instead of total line discount (e.g., ~10 DZD for qty=10). This affected all document total summaries and party balance reports.
+
+**Root cause**: Four locations summed `discount_amount` (per-unit value, e.g., 0.996 DZD/unit) instead of `total_discount_amount` (total line discount, e.g., 9.96 DZD for qty=10):
+
+| Location | File | Impact |
+|----------|------|--------|
+| `calculateDocumentTotals()` | `CommercialDocumentObserver.php:71` | Observer saving hook — document totals on every save |
+| `recalculateTotals()` | `CommercialDocumentService.php:601` | Service method — called after line creation/update |
+| `recalculateParentDocument()` | `CommercialDocumentLineService.php:86` | Individual line CRUD hooks |
+| Product stats query | `PartyBalanceService.php:377` | SQL SUM in party balance reporting |
+
+**Schema context**: `discount_amount` = per-unit discount (decimal(15,4)), `total_discount_amount` = qty × per-unit (decimal(15,4)). The document-level `total_discount` should represent the total discount across ALL lines, not the sum of per-unit values.
+
+**Fix (2 changes)**:
+
+1. **`sum('discount_amount')` → `sum('total_discount_amount')`** in all 4 locations. Verified via tinker test: old code returns 0.996 (per-unit), new code returns 9.96 (correct for qty=10).
+
+2. **`discount_percentage` column precision** — migration from `decimal(8,2)` to `decimal(8,4)` on `commercial_document_lines`. Prevents truncation of computed tier percentages (0.8333% → 0.83% caused ~0.4% precision loss).
+
+**Files modified:**
+- `app/Observers/CommercialDocumentObserver.php` — line 71: `sum('discount_amount')` → `sum('total_discount_amount')`
+- `app/Services/CommercialDocumentService.php` — line 601: same fix
+- `app/Services/CommercialDocumentLineService.php` — line 86: same fix
+- `app/Services/PartyBalanceService.php` — line 377: same fix in SQL raw query
+- `database/migrations/2026_07_25_100000_increase_discount_percentage_precision_on_commercial_document_lines.php` — NEW: `decimal(8,2)` → `decimal(8,4)`
+
+**Verification**: `php -l` — 0 syntax errors. `npm run build` — 0 errors, 1108 modules. `npm test` — 160/160 pass. Tinker test confirms old code returns 0.996 (wrong), new code returns 9.96 (correct).
+
+**Key architectural rule**: `discount_amount` on `commercial_document_lines` stores the PER-UNIT discount (price × discPct/100). `total_discount_amount` stores the TOTAL line discount (qty × per-unit). Document-level `total_discount` must always sum `total_discount_amount`, never `discount_amount`.
+
+---
 
 ### Phase 24 — Balance Snapshot Write-Once Fix: Editing POS Invoice Destroys Historical Snapshots (July 23)
 
