@@ -10,7 +10,7 @@ interface SourceProduct {
   ref?: string | null;
   barcode?: string | null;
   packagings?:        ProductPackaging[];
-  quantityDiscounts?: QuantityDiscount[];
+  quantity_discounts?: QuantityDiscount[];
 }
 
 interface CopyConfigResult {
@@ -171,7 +171,7 @@ export default function CopyConfigModal({
       packagings: copyPackaging ? (selected.packagings ?? []).map(pkg => ({
         ...pkg, id: undefined,
       })) : [],
-      quantity_discounts: copyDiscounts ? (selected.quantityDiscounts ?? []).map(d => ({
+      quantity_discounts: copyDiscounts ? (selected.quantity_discounts ?? []).map(d => ({
         price_level_id:      d.price_level_id,
         min_qty:             d.min_qty,
         max_qty:             d.max_qty ?? null,
@@ -186,7 +186,7 @@ export default function CopyConfigModal({
   };
 
   const pkgCount = selected?.packagings?.length ?? 0;
-  const discounts = selected?.quantityDiscounts ?? [];
+  const discounts = selected?.quantity_discounts ?? [];
   const discCount = discounts.length;
   const previewDiscounts = discounts.slice(0, 6);
   const discountAmountSummary = (() => {
@@ -384,7 +384,7 @@ export default function CopyConfigModal({
 
           {!loadingAll && filtered.map(p => {
             const pc = p.packagings?.length ?? 0;
-            const pd = p.quantityDiscounts ?? [];
+            const pd = p.quantity_discounts ?? [];
             const isActive = selected?.id === p.id;
             const discSummary = (() => {
               if (pd.length === 0) return null;
