@@ -721,106 +721,69 @@ function PaymentsTab({ slug, selectedYearId, accounts, paymentModes: _paymentMod
                 <EmptyState icon="ti-cash" text="لا توجد دفعات" sub="أضف أول دفعة" />
             ) : (
                 <Card noHeader style={{ padding: 0 }}>
-                    <div className="tw">
-                        <table>
-                            <thead>
-                                <tr>
-                                    {([
-                                        ['payment_number', 'الرقم'],
-                                        ['payment_date',   'التاريخ'],
-                                        ['party',          'المتعامل'],
-                                        ['direction',      'الاتجاه'],
-                                        ['amount',         'المبلغ'],
-                                        ['status',         'الحالة'],
-                                    ] as [SortKey, string][]).map(([key, label]) => (
-                                        <th key={key}
-                                            onClick={() => toggleSort(key)}
-                                            style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
-                                            {label}
-                                            {sortKey === key && (
-                                                <i className={`ti ti-arrow-${sortDir === 'asc' ? 'up' : 'down'}`}
-                                                    style={{ marginLeft: 4, fontSize: 11, opacity: 0.6 }}/>
-                                            )}
-                                        </th>
-                                    ))}
-                                    <th>طريقة الدفع</th>
-                                    <th>الحساب</th>
-                                    <th>مرجع</th>
-                                    <th>مسوَّاة</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {payments.map((p: any, i: number) => (
-                                    <tr key={p.id}>
-                                        <td className="m" style={{ fontFamily: 'monospace', fontSize: 12 }}>
-                                            {p.payment_number || `#${p.id}`}
-                                        </td>
-                                        <td style={{ fontSize: 12 }}>{fmtDate(p.payment_date)}</td>
-                                        <td>
-                                            {p.party ? (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                    <Avatar initials={p.party.name?.[0] || '?'}
-                                                        color={((i % 7) + 1) as 1|2|3|4|5|6|7} size={24}/>
-                                                    <span className="s">{p.party.name}</span>
-                                                </div>
-                                            ) : (
-                                                <span style={{ color: 'var(--t4)', fontSize: 12 }}>—</span>
-                                            )}
-                                        </td>
-                                        <td>
-                                            <Badge variant={p.direction === 'in' ? 'success' : 'danger'}>
-                                                <i className={`ti ti-arrow-${p.direction === 'in' ? 'down' : 'up'}-circle`}
-                                                    style={{ marginLeft: 4 }}/>
-                                                {p.direction === 'in' ? 'مقبوض' : 'مدفوع'}
-                                            </Badge>
-                                        </td>
-                                        <td className="e" style={{
-                                            color: p.direction === 'in' ? 'var(--em)' : 'var(--red)',
-                                            fontWeight: 700,
-                                        }}>
-                                            {p.direction === 'out' ? '−' : '+'}
-                                            {fmt(Number(p.amount_local || p.amount || 0))} دج
-                                        </td>
-                                        <td>
-                                            <Badge variant={STATUS_VARIANT[p.status] ?? 'gray'}>
-                                                {STATUS_LABEL[p.status] ?? p.status}
-                                            </Badge>
-                                        </td>
-                                        <td style={{ fontSize: 12, color: 'var(--t3)' }}>
-                                            {p.payment_mode?.name || '—'}
-                                        </td>
-                                        <td style={{ fontSize: 12, color: 'var(--t3)' }}>
-                                            {p.treasury_account?.name || '—'}
-                                        </td>
-                                        <td className="m" style={{ fontSize: 11, color: 'var(--t4)' }}>
-                                            {p.reference || p.bank_reference || '—'}
-                                        </td>
-                                        <td>
-                                            {p.is_reconciled
-                                                ? <span className="ic ic-xs" style={{ color: 'var(--em)' }}><i className="ti ti-circle-check"/></span>
-                                                : <span style={{ color: 'var(--t4)', fontSize: 12 }}>لا</span>}
-                                        </td>
-                                        <td>
-                                            <div style={{ display: 'flex', gap: 3 }}>
-                                                {p.status === 'pending' && (
-                                                    <Button size="xs" variant="primary"
-                                                        icon={<i className="ti ti-check"/>}
-                                                        onClick={() => confirmPayment.mutate(p.id)}>
-                                                        تأكيد
-                                                    </Button>
-                                                )}
-                                                <Button size="xs" icon={<i className="ti ti-pencil"/>}
-                                                    onClick={() => openEditPayment(p)}/>
-                                                <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>}
-                                                    onClick={async () => { if (await deleteConfirm.confirm('حذف الدفعة؟')) deletePayment.mutate(p.id); }}/>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <SimpleTable
+                        columns={[
+                            { key: 'payment_number', label: <>الرقم{sortKey === 'payment_number' && <i className={`ti ti-arrow-${sortDir === 'asc' ? 'up' : 'down'}`} style={{ marginLeft: 4, fontSize: 11, opacity: 0.6 }}/>}</>, className: 'm', onHeaderClick: () => toggleSort('payment_number'), render: (v: any, row: any) => (
+                                <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{v || `#${row.id}`}</span>
+                            )},
+                            { key: 'payment_date', label: <>التاريخ{sortKey === 'payment_date' && <i className={`ti ti-arrow-${sortDir === 'asc' ? 'up' : 'down'}`} style={{ marginLeft: 4, fontSize: 11, opacity: 0.6 }}/>}</>, onHeaderClick: () => toggleSort('payment_date'), render: (v: any) => (
+                                <span style={{ fontSize: 12 }}>{fmtDate(v)}</span>
+                            )},
+                            { key: 'party', label: <>المتعامل{sortKey === 'party' && <i className={`ti ti-arrow-${sortDir === 'asc' ? 'up' : 'down'}`} style={{ marginLeft: 4, fontSize: 11, opacity: 0.6 }}/>}</>, onHeaderClick: () => toggleSort('party'), render: (_v: any, row: any) => row.party ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <Avatar initials={row.party.name?.[0] || '?'}
+                                        color={((Number(row.id ?? 0) % 7) + 1) as 1|2|3|4|5|6|7} size={24}/>
+                                    <span className="s">{row.party.name}</span>
+                                </div>
+                            ) : (
+                                <span style={{ color: 'var(--t4)', fontSize: 12 }}>—</span>
+                            )},
+                            { key: 'direction', label: <>الاتجاه{sortKey === 'direction' && <i className={`ti ti-arrow-${sortDir === 'asc' ? 'up' : 'down'}`} style={{ marginLeft: 4, fontSize: 11, opacity: 0.6 }}/>}</>, onHeaderClick: () => toggleSort('direction'), render: (v: any) => (
+                                <Badge variant={v === 'in' ? 'success' : 'danger'}>
+                                    <i className={`ti ti-arrow-${v === 'in' ? 'down' : 'up'}-circle`} style={{ marginLeft: 4 }}/>
+                                    {v === 'in' ? 'مقبوض' : 'مدفوع'}
+                                </Badge>
+                            )},
+                            { key: 'amount', label: <>المبلغ{sortKey === 'amount' && <i className={`ti ti-arrow-${sortDir === 'asc' ? 'up' : 'down'}`} style={{ marginLeft: 4, fontSize: 11, opacity: 0.6 }}/>}</>, className: 'e', onHeaderClick: () => toggleSort('amount'), render: (_v: any, row: any) => (
+                                <span style={{ color: row.direction === 'in' ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>
+                                    {row.direction === 'out' ? '−' : '+'}
+                                    {fmt(Number(row.amount_local || row.amount || 0))} دج
+                                </span>
+                            )},
+                            { key: 'status', label: <>الحالة{sortKey === 'status' && <i className={`ti ti-arrow-${sortDir === 'asc' ? 'up' : 'down'}`} style={{ marginLeft: 4, fontSize: 11, opacity: 0.6 }}/>}</>, onHeaderClick: () => toggleSort('status'), render: (v: any) => (
+                                <Badge variant={STATUS_VARIANT[v] ?? 'gray'}>{STATUS_LABEL[v] ?? v}</Badge>
+                            )},
+                            { key: 'payment_mode', label: 'طريقة الدفع', render: (_v: any, row: any) => (
+                                <span style={{ fontSize: 12, color: 'var(--t3)' }}>{row.payment_mode?.name || '—'}</span>
+                            )},
+                            { key: 'treasury_account', label: 'الحساب', render: (_v: any, row: any) => (
+                                <span style={{ fontSize: 12, color: 'var(--t3)' }}>{row.treasury_account?.name || '—'}</span>
+                            )},
+                            { key: 'reference', label: 'مرجع', className: 'm', render: (_v: any, row: any) => (
+                                <span style={{ fontSize: 11, color: 'var(--t4)' }}>{row.reference || row.bank_reference || '—'}</span>
+                            )},
+                            { key: 'is_reconciled', label: 'مسوَّاة', render: (v: any) => v
+                                ? <span className="ic ic-xs" style={{ color: 'var(--em)' }}><i className="ti ti-circle-check"/></span>
+                                : <span style={{ color: 'var(--t4)', fontSize: 12 }}>لا</span> },
+                            { key: '_actions', label: '', render: (_v: any, row: any) => (
+                                <div style={{ display: 'flex', gap: 3 }}>
+                                    {row.status === 'pending' && (
+                                        <Button size="xs" variant="primary"
+                                            icon={<i className="ti ti-check"/>}
+                                            onClick={() => confirmPayment.mutate(row.id)}>
+                                            تأكيد
+                                        </Button>
+                                    )}
+                                    <Button size="xs" icon={<i className="ti ti-pencil"/>}
+                                        onClick={() => openEditPayment(row)}/>
+                                    <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>}
+                                        onClick={async () => { if (await deleteConfirm.confirm('حذف الدفعة؟')) deletePayment.mutate(row.id); }}/>
+                                </div>
+                            )},
+                        ]}
+                        data={payments}
+                        rowKey="id"
+                    />
                     {data?.meta && (
                         <div style={{ padding: '8px 16px', fontSize: 12, color: 'var(--t4)',
                             borderTop: '1px solid var(--b1)', display: 'flex', justifyContent: 'space-between' }}>

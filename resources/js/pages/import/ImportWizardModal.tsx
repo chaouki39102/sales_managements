@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import { apiPost } from '@/lib/api/core/client';
+import SimpleTable from '@/components/ui/SimpleTable';
 import type { EntityConfig, ImportField } from './entityConfig';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -246,25 +247,12 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
       {rawRows.length > 0 && (
         <div style={{ marginTop: 16, textAlign: 'right' }}>
           <p style={{ fontWeight: 600, marginBottom: 8 }}>معاينة (أول 5 أسطر):</p>
-          <div style={{ overflowX: 'auto', fontSize: 13 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  {Object.keys(rawRows[0]).map((h) => (
-                    <th key={h} style={{ border: '1px solid var(--b3)', padding: '6px 8px', background: 'var(--bg3)', whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rawRows.slice(0, 5).map((row, i) => (
-                  <tr key={i}>
-                    {Object.values(row).map((val, j) => (
-                      <td key={j} style={{ border: '1px solid var(--b3)', padding: '4px 8px' }}>{String(val ?? '')}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div style={{ fontSize: 13 }}>
+            <SimpleTable
+              columns={Object.keys(rawRows[0]).map(h => ({ key: h, label: h }))}
+              data={rawRows.slice(0, 5).map((row, i) => ({ ...row, _idx: i }))}
+              rowKey="_idx"
+            />
           </div>
         </div>
       )}
@@ -384,27 +372,12 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
         {validCount > 0 && (
           <div style={{ marginBottom: 16 }}>
             <p style={{ fontWeight: 600, marginBottom: 8, color: 'var(--green)' }}>معاينة البيانات الصحيحة (أول 5 أسطر):</p>
-            <div style={{ overflowX: 'auto', fontSize: 12 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    {Object.keys(validated[0]).map((k) => (
-                      <th key={k} style={{ border: '1px solid var(--b3)', padding: '4px 6px', background: 'var(--bg3)', whiteSpace: 'nowrap' }}>
-                        {config.fields.find((f) => f.key === k)?.label ?? k}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {validated.slice(0, 5).map((row, i) => (
-                    <tr key={i}>
-                      {Object.values(row).map((val, j) => (
-                        <td key={j} style={{ border: '1px solid var(--b3)', padding: '3px 6px' }}>{String(val ?? '')}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div style={{ fontSize: 12 }}>
+              <SimpleTable
+                columns={Object.keys(validated[0]).map(k => ({ key: k, label: config.fields.find((f) => f.key === k)?.label ?? k }))}
+                data={validated.slice(0, 5).map((row, i) => ({ ...row, _idx: i }))}
+                rowKey="_idx"
+              />
             </div>
           </div>
         )}

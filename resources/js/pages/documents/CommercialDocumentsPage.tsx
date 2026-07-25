@@ -57,6 +57,7 @@ import { useApprovalCheckBatch } from "@/lib/api/endpoints/approvals";
 import { SendDocumentMailModal } from "./components/SendDocumentMailModal";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
+import SimpleTable from "@/components/ui/SimpleTable";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useConfirm } from "@/hooks/useConfirm";
 import type { DocumentType, CommercialDocument } from "@/lib/api/core/types";
@@ -266,58 +267,50 @@ function ExpandedLines({ doc }: { doc: CommercialDocument }) {
 
     const TRACKS_DELIVERY = docCode === 'BCC';
 
+    const simpleColumns = [
+        { key: '_idx', label: '#' },
+        { key: 'product_name', label: 'المنتج', render: (_v: unknown, row: Record<string, unknown>) => {
+            const name =
+                ((row.product as Record<string, unknown> | undefined)?.name as string) ??
+                (row.description as string) ?? "—";
+            return <span style={{ fontWeight: 600 }}>{name}</span>;
+        }},
+        { key: 'quantity', label: 'الكمية', render: (_v: unknown, row: Record<string, unknown>) => String(row.quantity ?? "") },
+        ...(TRACKS_DELIVERY ? [{
+            key: 'delivery', label: 'التسليم',
+            render: (_v: unknown, row: Record<string, unknown>) => {
+                const qty = Number(row.quantity ?? 1);
+                const delivered = Number(row.delivered_quantity ?? 0);
+                const returned = Number(row.returned_quantity ?? 0);
+                return <DeliveryProgressBar quantity={qty} deliveredQuantity={delivered} returnedQuantity={returned} />;
+            },
+        }] : []),
+        { key: 'unit_price_ht', label: 'سعر HT', render: (_v: unknown, row: Record<string, unknown>) => (
+            <MoneyCell value={row.unit_price_ht as number} />
+        )},
+        { key: 'discount', label: 'خصم', render: (_v: unknown, row: Record<string, unknown>) => {
+            const disc = parseFloat(String(row.discount_percentage ?? 0));
+            return disc > 0
+                ? <span style={{ color: "var(--red)", fontWeight: 700 }}>-{disc}%</span>
+                : <span style={{ color: "var(--t4)" }}>—</span>;
+        }},
+        { key: 'tva_rate', label: 'TVA%', render: (_v: unknown, row: Record<string, unknown>) => (
+            <span style={{ color: "var(--t4)" }}>{String(row.tva_rate ?? "")}%</span>
+        )},
+        { key: 'total_ttc', label: 'الإجمالي TTC', render: (_v: unknown, row: Record<string, unknown>) => (
+            <MoneyCell value={row.total_ttc as number} bold accent="var(--em)" />
+        )},
+    ];
+
+    const tableData = lines.map((line, idx) => ({ ...line, _idx: idx + 1 }));
+
     return (
-        <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                <thead>
-                    <tr style={{ background: "var(--bg3)" }}>
-                        {["#", "المنتج", "الكمية"].concat(
-                            TRACKS_DELIVERY ? ["التسليم"] : [],
-                            ["سعر HT", "خصم", "TVA%", "الإجمالي TTC"]
-                        ).map(h => (
-                            <th key={h} style={{ padding: "5px 12px", textAlign: "right", fontWeight: 700, color: "var(--t4)", fontSize: 10, whiteSpace: "nowrap" }}>{h}</th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {lines.map((line, idx) => {
-                        const name =
-                            ((line.product as Record<string, unknown> | undefined)?.name as string) ??
-                            (line.description as string) ?? "—";
-                        const disc = parseFloat(String(line.discount_percentage ?? 0));
-                        const qty = Number(line.quantity ?? 1);
-                        const delivered = Number((line as Record<string, unknown>).delivered_quantity ?? 0);
-                        const returned  = Number((line as Record<string, unknown>).returned_quantity ?? 0);
-                        return (
-                            <tr key={String(line.id ?? idx)} style={{ borderBottom: "1px solid var(--b1)" }}>
-                                <td style={{ padding: "6px 12px", color: "var(--t4)" }}>{idx + 1}</td>
-                                <td style={{ padding: "6px 12px", fontWeight: 600 }}>{name}</td>
-                                <td style={{ padding: "6px 12px", textAlign: "left" }}>{String(line.quantity ?? "")}</td>
-                                {TRACKS_DELIVERY && (
-                                    <td style={{ padding: "6px 12px" }}>
-                                        <DeliveryProgressBar
-                                            quantity={qty}
-                                            deliveredQuantity={delivered}
-                                            returnedQuantity={returned}
-                                        />
-                                    </td>
-                                )}
-                                <td style={{ padding: "6px 12px", direction: "ltr", textAlign: "left" }}>
-                                    <MoneyCell value={line.unit_price_ht as number} />
-                                </td>
-                                <td style={{ padding: "6px 12px", textAlign: "left" }}>
-                                    {disc > 0 ? <span style={{ color: "var(--red)", fontWeight: 700 }}>-{disc}%</span> : <span style={{ color: "var(--t4)" }}>—</span>}
-                                </td>
-                                <td style={{ padding: "6px 12px", color: "var(--t4)", textAlign: "left" }}>{line.tva_rate}%</td>
-                                <td style={{ padding: "6px 12px", direction: "ltr", textAlign: "left" }}>
-                                    <MoneyCell value={line.total_ttc as number} bold accent="var(--em)" />
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-        </div>
+        <SimpleTable
+            columns={simpleColumns}
+            data={tableData}
+            rowKey="_idx"
+            emptyText="لا توجد أسطر"
+        />
     );
 }
 

@@ -167,26 +167,26 @@ export function BulkImportModal({ open, onClose, onImport, products }: BulkImpor
             <div style={{ maxHeight: 300, overflow: 'auto' }}>
               <SimpleTable
                 columns={[
-                  { key: 'idx', label: '#', render: (_v, _r, _k, i) => (i ?? 0) + 1 },
-                  { key: 'product_name', label: 'المنتج', render: (v, r) => (r as ParsedRow).product_name ?? (r as ParsedRow).product_ref ?? '—' },
+                  { key: '_idx', label: '#' },
+                  { key: 'product_name', label: 'المنتج', render: (_v, row) => { const r = row as unknown as ParsedRow; return r.product_name ?? r.product_ref ?? '—'; } },
                   { key: 'quantity', label: 'الكمية' },
                   { key: 'unit_price_ht', label: 'السعر', render: (v) => (v as number)?.toLocaleString('fr-DZ') ?? '—' },
                   {
                     key: '_match', label: 'الحالة',
-                    render: (_v, r) => {
-                      const row = r as ParsedRow;
-                      return row._match
-                        ? <span style={{ color: 'var(--green)', fontSize: 11 }}>✓ {row._match.name}</span>
+                    render: (_v, row) => {
+                      const r = row as unknown as ParsedRow;
+                      return r._match
+                        ? <span style={{ color: 'var(--green)', fontSize: 11 }}>✓ {r._match.name}</span>
                         : <span style={{ color: 'var(--orange)', fontSize: 11 }}>⚠ بدون مطابقة</span>;
                     },
                   },
                   { key: 'line_note', label: 'ملاحظة', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{(v as string) ?? ''}</span> },
                 ]}
-                data={rows as unknown as Record<string, unknown>[]}
-                rowKey={(_r, i) => i}
-                rowClassName={(r) => {
-                  const row = r as unknown as ParsedRow;
-                  return row._errors ? 'tw-row--error' : !row._match ? 'tw-row--warn' : '';
+                data={rows.map((r, i) => ({ ...r, _idx: i + 1 })) as unknown as Record<string, unknown>[]}
+                rowKey="_idx"
+                rowClassName={(row) => {
+                  const r = row as unknown as ParsedRow;
+                  return r._errors ? 'tw-row--error' : !r._match ? 'tw-row--warn' : '';
                 }}
               />
             </div>

@@ -5,6 +5,8 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import { fmtNumber, fmtDate } from '@/lib/utils';
+import SimpleTable from '@/components/ui/SimpleTable';
+import type { SimpleColumn } from '@/components/ui/SimpleTable';
 
 type TxTypeFilter = 'all' | 'document' | 'payment';
 type ModalTab = 'transactions' | 'products' | 'detailed';
@@ -98,6 +100,124 @@ export function TransactionHistoryModal({
     const totalCost   = useMemo(() => filteredTransactions.reduce((s, t) => s + t.doc_cost_ht, 0), [filteredTransactions]);
     const finalBalance = computedFromBalance + totalDocs - totalPays;
 
+    const txColumns: SimpleColumn[] = useMemo(() => [
+        { key: '#', label: '#', render: (v, row) => {
+            if (row._rowType === 'opening' || row._rowType === 'summary') return null;
+            return <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>{v as React.ReactNode}</span>;
+        }},
+        { key: 'date', label: 'التاريخ والوقت', render: (v, row) => {
+            if (row._rowType !== 'data') return v;
+            const tx = row._tx as any;
+            return (
+                <div style={{ lineHeight: 1.3 }}>
+                    <div>{fmtDate(tx.date)}</div>
+                    {tx.datetime && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{new Date(tx.datetime).toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' })}</div>}
+                </div>
+            );
+        }},
+        { key: 'label', label: 'البيان', render: (v, row) => {
+            if (row._rowType === 'opening') return <div><i className="ti ti-building-bank" style={{ marginLeft: 4 }} /> {v as string}</div>;
+            if (row._rowType === 'summary') return <div><i className="ti ti-calculator" style={{ marginLeft: 4 }} /> {v as string}</div>;
+            const tx = row._tx as any;
+            return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {tx.type === 'document' && tx.type_code ? (
+                        <button onClick={() => { navigate(`/documents/${tx.type_code}/${tx.id}/edit`); onClose(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'monospace', fontSize: 12, color: 'var(--text-info, var(--blue))', textDecoration: 'underline', padding: 0 }}>{tx.reference}</button>
+                    ) : (
+                        <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--color-text-secondary)' }}>{tx.reference || '—'}</span>
+                    )}
+                    <Badge variant={tx.type === 'document' ? 'danger' : 'success'} style={{ fontSize: 11 }}>{tx.label}</Badge>
+                    {row._isOverdue && tx.remaining > 0 && (
+                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: row._agingBg as string, color: row._agingColor as string, fontWeight: 600 }}>{row._agingLabel as string}</span>
+                    )}
+                </div>
+            );
+        }},
+        { key: 'doc_amount', label: 'المستندات', align: 'center', render: (v, row) => {
+            if (row._rowType === 'opening' || row._rowType === 'summary') return v;
+            const amount = v as number;
+            return amount !== 0 ? <span style={{ color: amount > 0 ? 'var(--em)' : 'var(--red)', fontWeight: amount > 0 ? 600 : undefined }}>{fmtNumber(amount)} دج</span> : '—';
+        }},
+        { key: 'cost', label: 'التكلفة', align: 'center', render: (v, row) => {
+            if (row._rowType === 'opening' || row._rowType === 'summary') {
+                if (row._rowType === 'summary') return <span style={{ fontWeight: 700 }}>{fmtNumber(v as number)} دج</span>;
+                return v;
+            }
+            const cost = v as number;
+            return cost > 0 ? <span style={{ color: 'var(--color-text-secondary)', fontSize: 12 }}>{fmtNumber(cost)} دج</span> : '—';
+        }},
+        { key: 'margin', label: 'الهامش', align: 'center', render: (v, row) => {
+            const margin = v as number;
+            if (row._rowType === 'summary') {
+                return <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: margin >= 0 ? 'var(--greenb)' : 'var(--redb)', color: margin >= 0 ? 'var(--em)' : 'var(--red)' }}>{fmtNumber(margin)} دج</span>;
+            }
+            if (row._rowType === 'opening') return '—';
+            return margin !== 0 ? <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: margin >= 0 ? 'var(--greenb)' : 'var(--redb)', color: margin >= 0 ? 'var(--em)' : 'var(--red)' }}>{fmtNumber(margin)} دج</span> : '—';
+        }},
+        { key: 'payment', label: 'الدفعات', align: 'center', render: (v, row) => {
+            if (row._rowType === 'opening') return '—';
+            if (row._rowType === 'summary') return <span style={{ color: 'var(--red)', fontWeight: 700 }}>{fmtNumber(v as number)} دج</span>;
+            const pay = v as number;
+            return pay > 0 ? <span style={{ color: 'var(--red)', fontWeight: 600 }}>{fmtNumber(pay)} دج</span> : '—';
+        }},
+        { key: 'running_balance', label: 'الرصيد', align: 'center', render: (v, row) => {
+            if (row._rowType === 'opening') return <span style={{ fontWeight: 700 }}>{fmtNumber(v as number)} دج</span>;
+            if (row._rowType === 'summary') return <span style={{ fontWeight: 800, fontSize: 14, color: (v as number) >= 0 ? 'var(--red)' : 'var(--green)' }}>{fmtNumber(v as number)} دج</span>;
+            const tx = row._tx as any;
+            const running = v as number;
+            return (
+                <>
+                    <span style={{ color: running >= 0 ? 'var(--red)' : 'var(--green)', fontWeight: 700 }}>{fmtNumber(running)} دج</span>
+                    {tx.remaining > 0 && (
+                        <div style={{ display: 'block', marginTop: 3 }}>
+                            <span style={{ fontSize: 10, color: 'var(--red)' }}>متبقي {fmtNumber(tx.remaining)}</span>
+                            {row._isOverdue && (row._daysOld as number) > 0 && (
+                                <span style={{ display: 'inline-block', fontSize: 10, marginLeft: 4, padding: '1px 6px', borderRadius: 8, background: row._agingBg as string, color: row._agingColor as string, fontWeight: 600, lineHeight: '16px' }}>{row._agingLabel as string}</span>
+                            )}
+                        </div>
+                    )}
+                </>
+            );
+        }},
+    ], [navigate, onClose]);
+
+    const txTableData = useMemo(() => {
+        const openingRow: Record<string, unknown> = {
+            _rowType: 'opening', '#': '—', date: '—',
+            label: fromDate ? `رصيد حتى ${fmtDate(subtractDays(fromDate, 1))}` : 'رصيد افتتاحي',
+            doc_amount: '—', cost: '—', margin: '—', payment: '—', running_balance: computedFromBalance,
+        };
+        const dataRows = txWithBalance.map((tx, i) => {
+            const isOverdue = tx.type === 'document' && tx.remaining > 0;
+            const txDate = new Date(tx.date);
+            const now = new Date();
+            const daysOld = Math.floor((now.getTime() - txDate.getTime()) / 86400000);
+            let agingColor = 'var(--color-text-tertiary)';
+            let agingBg = 'transparent';
+            let agingLabel = '';
+            if (isOverdue && tx.remaining > 0) {
+                if (daysOld > 90) { agingColor = 'var(--red)'; agingBg = 'var(--redb)'; agingLabel = `${daysOld} يوم — متأخر جداً`; }
+                else if (daysOld > 60) { agingColor = '#ea580c'; agingBg = 'rgba(234,88,12,0.08)'; agingLabel = `${daysOld} يوم — متأخر`; }
+                else if (daysOld > 30) { agingColor = 'var(--gold)'; agingBg = 'var(--goldb)'; agingLabel = `${daysOld} يوم`; }
+                else if (daysOld > 0) { agingColor = 'var(--color-text-secondary)'; agingBg = 'transparent'; agingLabel = `${daysOld} يوم`; }
+            }
+            return {
+                _rowType: 'data', _tx: tx, _i: i, _isOverdue: isOverdue, _daysOld: daysOld,
+                _agingColor: agingColor, _agingBg: agingBg, _agingLabel: agingLabel,
+                '#': tx.seq, date: tx.date, label: tx.label,
+                doc_amount: tx.document_amount, cost: tx.doc_cost_ht, margin: tx.margin_value,
+                payment: tx.payment_amount, running_balance: tx.running_balance, remaining: tx.remaining,
+            };
+        });
+        const summaryRow: Record<string, unknown> = {
+            _rowType: 'summary', '#': '', date: '',
+            label: `الإجمالي (${filteredTransactions.length} معاملة)`,
+            doc_amount: totalDocs, cost: totalCost, margin: totalMargin,
+            payment: totalPays, running_balance: finalBalance,
+        };
+        return [openingRow, ...dataRows, summaryRow];
+    }, [txWithBalance, fromDate, filteredTransactions.length, totalDocs, totalPays, totalMargin, totalCost, finalBalance, computedFromBalance]);
+
     const excelColumns: Column<Record<string, unknown>>[] = useMemo(() => [
         { key: '#',              header: '#',               width: 50 },
         { key: 'date',           header: 'التاريخ',         width: 120 },
@@ -145,6 +265,90 @@ export function TransactionHistoryModal({
 
     const recapProducts = recapData?.products ?? [];
     const recapSummary = recapData?.summary;
+
+    const recapColumns: SimpleColumn[] = useMemo(() => [
+        { key: '#', label: '#', render: (v) => <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>{v ? String(v) : ''}</span> },
+        { key: 'ref', label: 'المرجع', render: (v, row) => row._rowType === 'summary' ? null : <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{v as string}</span> },
+        { key: 'name', label: 'المنتج', render: (v, row) => {
+            if (row._rowType === 'summary') return <div><i className="ti ti-calculator" style={{ marginLeft: 4 }} /> {v as string}</div>;
+            return v as string;
+        }},
+        { key: 'family', label: 'المجموعة', render: (v, row) => row._rowType === 'summary' ? null : <span style={{ color: 'var(--color-text-secondary)' }}>{v as string}</span> },
+        { key: 'brand', label: 'العلامة التجارية', render: (v, row) => row._rowType === 'summary' ? null : <span style={{ color: 'var(--color-text-secondary)' }}>{v as string}</span> },
+        { key: 'unit', label: 'الوحدة', align: 'center', render: (v, row) => row._rowType === 'summary' ? '—' : <span style={{ color: 'var(--color-text-secondary)' }}>{v as string}</span> },
+        { key: 'sale_qty', label: 'كمية البيع', align: 'center', render: (v, row) => {
+            const qty = v as number;
+            if (row._rowType === 'summary') return <span style={{ color: 'var(--em)', fontWeight: 700 }}>{fmtNumber(qty)}</span>;
+            return qty > 0 ? fmtNumber(qty) : '—';
+        }},
+        { key: 'sale_ht', label: 'مبيعات HT', align: 'center', render: (v, row) => {
+            const val = v as number;
+            if (row._rowType === 'summary') return <span style={{ color: 'var(--em)', fontWeight: 700 }}>{fmtNumber(val)} دج</span>;
+            return val > 0 ? <span style={{ color: 'var(--em)' }}>{fmtNumber(val)} دج</span> : '—';
+        }},
+        { key: 'purchase_qty', label: 'كمية الشراء', align: 'center', render: (v, row) => {
+            const qty = v as number;
+            if (row._rowType === 'summary') return <span style={{ color: 'var(--red)', fontWeight: 700 }}>{fmtNumber(qty)}</span>;
+            return qty > 0 ? fmtNumber(qty) : '—';
+        }},
+        { key: 'purchase_ht', label: 'مشتريات HT', align: 'center', render: (v, row) => {
+            const val = v as number;
+            if (row._rowType === 'summary') return <span style={{ color: 'var(--red)', fontWeight: 700 }}>{fmtNumber(val)} دج</span>;
+            return val > 0 ? <span style={{ color: 'var(--red)' }}>{fmtNumber(val)} دج</span> : '—';
+        }},
+        { key: 'cost_ht', label: 'التكلفة', align: 'center', render: (v, row) => {
+            const val = v as number;
+            if (row._rowType === 'summary') return <span style={{ fontWeight: 700 }}>{fmtNumber(val)} دج</span>;
+            return val > 0 ? <span style={{ color: 'var(--color-text-secondary)' }}>{fmtNumber(val)} دج</span> : '—';
+        }},
+        { key: 'total_ttc', label: 'الإجمالي TTC', align: 'center', render: (v, row) => {
+            const val = v as number;
+            if (row._rowType === 'summary') return <span style={{ fontWeight: 800, fontSize: 14, color: 'var(--text-info, var(--blue))' }}>{fmtNumber(val)} دج</span>;
+            return <span style={{ fontWeight: 700 }}>{fmtNumber(val)} دج</span>;
+        }},
+        { key: 'margin_value', label: 'الهامش', align: 'center', render: (v) => {
+            const val = v as number;
+            return <span style={{ fontWeight: 600, color: val >= 0 ? 'var(--em)' : 'var(--red)' }}>{fmtNumber(val)} دج</span>;
+        }},
+        { key: 'margin_pct', label: 'نسبة الهامش', align: 'center', render: (v) => {
+            const val = v as number;
+            return <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: val >= 0 ? 'var(--greenb)' : 'var(--redb)', color: val >= 0 ? 'var(--em)' : 'var(--red)' }}>{val}%</span>;
+        }},
+        { key: 'doc_count', label: 'المستندات', align: 'center', render: (v, row) => {
+            if (row._rowType === 'summary') return '—';
+            return <span style={{ color: 'var(--color-text-secondary)' }}>{v as number}</span>;
+        }},
+    ], []);
+
+    const recapTableData = useMemo(() => {
+        const dataRows = recapProducts.map((p, i) => ({
+            _rowType: 'data',
+            '#': i + 1, ref: p.product_ref || '—', name: p.product_name,
+            family: p.family_name || '—', brand: p.brand_name || '—', unit: p.unit_name || '—',
+            sale_qty: p.sale_qty || 0, sale_ht: p.sale_ht || 0,
+            purchase_qty: p.purchase_qty || 0, purchase_ht: p.purchase_ht || 0,
+            cost_ht: p.cost_ht || 0, total_ttc: p.total_ttc,
+            margin_value: p.margin_value, margin_pct: p.margin_pct, doc_count: p.doc_count,
+        }));
+        if (recapSummary) {
+            const summaryRow: Record<string, unknown> = {
+                _rowType: 'summary', '#': '', ref: '',
+                name: `الإجمالي (${recapSummary.product_count} منتج)`,
+                family: '', brand: '', unit: '—',
+                sale_qty: recapProducts.reduce((s, p) => s + (p.sale_qty || 0), 0),
+                sale_ht: recapSummary.total_sale_ht,
+                purchase_qty: recapProducts.reduce((s, p) => s + (p.purchase_qty || 0), 0),
+                purchase_ht: recapSummary.total_purchase_ht,
+                cost_ht: recapSummary.total_cost_ht,
+                total_ttc: recapSummary.total_sale_ttc + recapSummary.total_purchase_ttc,
+                margin_value: recapSummary.total_margin_value,
+                margin_pct: recapSummary.total_margin_pct,
+                doc_count: '—',
+            };
+            return [...dataRows, summaryRow];
+        }
+        return dataRows;
+    }, [recapProducts, recapSummary]);
 
     const recapExcelColumns: Column<Record<string, unknown>>[] = useMemo(() => [
         { key: '#',              header: '#',               width: 50 },
@@ -493,130 +697,12 @@ export function TransactionHistoryModal({
                                 </span>
                             </div>
 
-                            <div style={{ overflowX: 'auto', maxHeight: MODAL_CONTENT_HEIGHT, overflowY: 'auto' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                                    <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-                                        <tr style={{ borderBottom: '2px solid var(--color-border-secondary)', background: 'var(--color-background-primary)' }}>
-                                            <th style={thStyle}>#</th>
-                                            <th style={thStyle}>التاريخ والوقت</th>
-                                            <th style={thStyle}>البيان</th>
-                                            <th style={{ ...thStyle, textAlign: 'center' }}>المستندات</th>
-                                            <th style={{ ...thStyle, textAlign: 'center' }}>التكلفة</th>
-                                            <th style={{ ...thStyle, textAlign: 'center' }}>الهامش</th>
-                                            <th style={{ ...thStyle, textAlign: 'center' }}>الدفعات</th>
-                                            <th style={{ ...thStyle, textAlign: 'center' }}>الرصيد</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr style={{ background: 'var(--color-background-secondary)', fontWeight: 600 }}>
-                                            <td style={tdStyle}>—</td>
-                                            <td style={tdStyle}>—</td>
-                                            <td style={tdStyle}><i className="ti ti-building-bank" style={{ marginLeft: 4 }} /> {fromDate ? `رصيد حتى ${fmtDate(subtractDays(fromDate, 1))}` : 'رصيد افتتاحي'}</td>
-                                            <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
-                                            <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
-                                            <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
-                                            <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
-                                            <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>{fmtNumber(computedFromBalance)} دج</td>
-                                        </tr>
-
-                                        {txWithBalance.map((tx, i) => {
-                                            const isOverdue = tx.type === 'document' && tx.remaining > 0;
-                                            const txDate = new Date(tx.date);
-                                            const now = new Date();
-                                            const daysOld = Math.floor((now.getTime() - txDate.getTime()) / 86400000);
-
-                                            let agingColor = 'var(--color-text-tertiary)';
-                                            let agingBg = 'transparent';
-                                            let agingLabel = '';
-                                            if (isOverdue && tx.remaining > 0) {
-                                                if (daysOld > 90) { agingColor = 'var(--red)'; agingBg = 'var(--redb)'; agingLabel = `${daysOld} يوم — متأخر جداً`; }
-                                                else if (daysOld > 60) { agingColor = '#ea580c'; agingBg = 'rgba(234,88,12,0.08)'; agingLabel = `${daysOld} يوم — متأخر`; }
-                                                else if (daysOld > 30) { agingColor = 'var(--gold)'; agingBg = 'var(--goldb)'; agingLabel = `${daysOld} يوم`; }
-                                                else if (daysOld > 0) { agingColor = 'var(--color-text-secondary)'; agingBg = 'transparent'; agingLabel = `${daysOld} يوم`; }
-                                            }
-
-                                            return (
-                                                <tr
-                                                    key={`${tx.type}-${tx.id}`}
-                                                    style={{
-                                                        borderBottom: '1px solid var(--color-border-tertiary)',
-                                                        background: isOverdue && daysOld > 90 ? 'var(--redb)' : i % 2 === 0 ? 'transparent' : 'var(--color-background-secondary)',
-                                                    }}
-                                                >
-                                                    <td style={{ ...tdStyle, color: 'var(--color-text-tertiary)', fontSize: 11 }}>{tx.seq}</td>
-                                                    <td style={tdStyle}>
-                                                        <div style={{ lineHeight: 1.3 }}>
-                                                            <div>{fmtDate(tx.date)}</div>
-                                                            {tx.datetime && (
-                                                                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-                                                                    {new Date(tx.datetime).toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' })}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td style={tdStyle}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                            {tx.type === 'document' && tx.type_code ? (
-                                                                <button
-                                                                    onClick={() => { navigate(`/documents/${tx.type_code}/${tx.id}/edit`); onClose(); }}
-                                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'monospace', fontSize: 12, color: 'var(--text-info, var(--blue))', textDecoration: 'underline', padding: 0 }}
-                                                                >
-                                                                    {tx.reference}
-                                                                </button>
-                                                            ) : (
-                                                                <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--color-text-secondary)' }}>{tx.reference || '—'}</span>
-                                                            )}
-                                                            <Badge variant={tx.type === 'document' ? 'danger' : 'success'} style={{ fontSize: 11 }}>{tx.label}</Badge>
-                                                            {isOverdue && tx.remaining > 0 && (
-                                                                <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: agingBg, color: agingColor, fontWeight: 600 }}>{agingLabel}</span>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: tx.document_amount > 0 ? 600 : undefined }}>
-                                                        {tx.document_amount !== 0 ? <span style={{ color: tx.document_amount > 0 ? 'var(--em)' : 'var(--red)' }}>{fmtNumber(tx.document_amount)} دج</span> : '—'}
-                                                    </td>
-                                                    <td style={{ ...tdStyle, textAlign: 'center', fontSize: 12 }}>
-                                                        {tx.doc_cost_ht > 0 ? <span style={{ color: 'var(--color-text-secondary)' }}>{fmtNumber(tx.doc_cost_ht)} دج</span> : '—'}
-                                                    </td>
-                                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
-                                                        {tx.margin_value !== 0 ? (
-                                                            <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: tx.margin_value >= 0 ? 'var(--greenb)' : 'var(--redb)', color: tx.margin_value >= 0 ? 'var(--em)' : 'var(--red)' }}>
-                                                                {fmtNumber(tx.margin_value)} دج
-                                                            </span>
-                                                        ) : '—'}
-                                                    </td>
-                                                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: tx.payment_amount > 0 ? 600 : undefined }}>
-                                                        {tx.payment_amount > 0 ? <span style={{ color: 'var(--red)' }}>{fmtNumber(tx.payment_amount)} دج</span> : '—'}
-                                                    </td>
-                                                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>
-                                                        <span style={{ color: tx.running_balance >= 0 ? 'var(--red)' : 'var(--green)' }}>{fmtNumber(tx.running_balance)} دج</span>
-                                                        {tx.remaining > 0 && (
-                                                            <div style={{ display: 'block', marginTop: 3 }}>
-                                                                <span style={{ fontSize: 10, color: 'var(--red)' }}>متبقي {fmtNumber(tx.remaining)}</span>
-                                                                {isOverdue && daysOld > 0 && (
-                                                                    <span style={{ display: 'inline-block', fontSize: 10, marginLeft: 4, padding: '1px 6px', borderRadius: 8, background: agingBg, color: agingColor, fontWeight: 600, lineHeight: '16px' }}>{agingLabel}</span>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-
-                                        <tr style={{ fontWeight: 700, background: 'var(--color-background-secondary)', borderTop: '2px solid var(--color-border-secondary)' }}>
-                                            <td style={tdStyle} colSpan={3}><i className="ti ti-calculator" style={{ marginLeft: 4 }} /> الإجمالي ({filteredTransactions.length} معاملة)</td>
-                                            <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--em)', fontWeight: 700 }}>{fmtNumber(totalDocs)} دج</td>
-                                            <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>{fmtNumber(totalCost)} دج</td>
-                                            <td style={{ ...tdStyle, textAlign: 'center' }}>
-                                                <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: totalMargin >= 0 ? 'var(--greenb)' : 'var(--redb)', color: totalMargin >= 0 ? 'var(--em)' : 'var(--red)' }}>
-                                                    {fmtNumber(totalMargin)} دج
-                                                </span>
-                                            </td>
-                                            <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--red)', fontWeight: 700 }}>{fmtNumber(totalPays)} دج</td>
-                                            <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 800, fontSize: 14, color: finalBalance >= 0 ? 'var(--red)' : 'var(--green)' }}>{fmtNumber(finalBalance)} دج</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                            <div style={{ maxHeight: MODAL_CONTENT_HEIGHT, overflowY: 'auto' }}>
+                                <SimpleTable
+                                    columns={txColumns}
+                                    data={txTableData}
+                                    rowKey={(row) => row._rowType === 'data' ? `${(row._tx as any).type}-${(row._tx as any).id}` : String(row._rowType)}
+                                />
                             </div>
                         </>
                     )}
@@ -846,65 +932,12 @@ export function TransactionHistoryModal({
                                         </div>
                                     )}
 
-                                    <div style={{ overflowX: 'auto', maxHeight: '55vh', overflowY: 'auto' }}>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                                            <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-                                                <tr style={{ borderBottom: '2px solid var(--color-border-secondary)', background: 'var(--color-background-primary)' }}>
-                                                    <th style={thStyle}>#</th>
-                                                    <th style={thStyle}>المرجع</th>
-                                                    <th style={thStyle}>المنتج</th>
-                                                    <th style={thStyle}>المجموعة</th>
-                                                    <th style={thStyle}>العلامة التجارية</th>
-                                                    <th style={{ ...thStyle, textAlign: 'center' }}>الوحدة</th>
-                                                    <th style={{ ...thStyle, textAlign: 'center' }}>كمية البيع</th>
-                                                    <th style={{ ...thStyle, textAlign: 'center' }}>مبيعات HT</th>
-                                                    <th style={{ ...thStyle, textAlign: 'center' }}>كمية الشراء</th>
-                                                    <th style={{ ...thStyle, textAlign: 'center' }}>مشتريات HT</th>
-                                                    <th style={{ ...thStyle, textAlign: 'center' }}>التكلفة</th>
-                                                    <th style={{ ...thStyle, textAlign: 'center' }}>الإجمالي TTC</th>
-                                                    <th style={{ ...thStyle, textAlign: 'center' }}>الهامش</th>
-                                                    <th style={{ ...thStyle, textAlign: 'center' }}>نسبة الهامش</th>
-                                                    <th style={{ ...thStyle, textAlign: 'center' }}>المستندات</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {recapProducts.map((p, i) => (
-                                                    <tr key={p.product_id} style={{ borderBottom: '1px solid var(--color-border-tertiary)', background: i % 2 === 0 ? 'transparent' : 'var(--color-background-secondary)' }}>
-                                                        <td style={{ ...tdStyle, color: 'var(--color-text-tertiary)', fontSize: 11 }}>{i + 1}</td>
-                                                        <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: 12 }}>{p.product_ref || '—'}</td>
-                                                        <td style={tdStyle}>{p.product_name}</td>
-                                                        <td style={{ ...tdStyle, color: 'var(--color-text-secondary)' }}>{p.family_name || '—'}</td>
-                                                        <td style={{ ...tdStyle, color: 'var(--color-text-secondary)' }}>{p.brand_name || '—'}</td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-secondary)' }}>{p.unit_name || '—'}</td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center' }}>{p.sale_qty > 0 ? fmtNumber(p.sale_qty) : '—'}</td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: p.sale_ht > 0 ? 600 : undefined }}>{p.sale_ht > 0 ? <span style={{ color: 'var(--em)' }}>{fmtNumber(p.sale_ht)} دج</span> : '—'}</td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center' }}>{p.purchase_qty > 0 ? fmtNumber(p.purchase_qty) : '—'}</td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: p.purchase_ht > 0 ? 600 : undefined }}>{p.purchase_ht > 0 ? <span style={{ color: 'var(--red)' }}>{fmtNumber(p.purchase_ht)} دج</span> : '—'}</td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-secondary)' }}>{p.cost_ht > 0 ? <span>{fmtNumber(p.cost_ht)} دج</span> : '—'}</td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>{fmtNumber(p.total_ttc)} دج</td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 600 }}><span style={{ color: p.margin_value >= 0 ? 'var(--em)' : 'var(--red)' }}>{fmtNumber(p.margin_value)} دج</span></td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center' }}><span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: p.margin_value >= 0 ? 'var(--greenb)' : 'var(--redb)', color: p.margin_value >= 0 ? 'var(--em)' : 'var(--red)' }}>{p.margin_pct}%</span></td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-secondary)' }}>{p.doc_count}</td>
-                                                    </tr>
-                                                ))}
-                                                {recapSummary && (
-                                                    <tr style={{ fontWeight: 700, background: 'var(--color-background-secondary)', borderTop: '2px solid var(--color-border-secondary)' }}>
-                                                        <td style={tdStyle} colSpan={2} />
-                                                        <td style={tdStyle} colSpan={3}><i className="ti ti-calculator" style={{ marginLeft: 4 }} /> الإجمالي ({recapSummary.product_count} منتج)</td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--em)', fontWeight: 700 }}>{fmtNumber(recapProducts.reduce((s, p) => s + p.sale_qty, 0))}</td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--em)', fontWeight: 700 }}>{fmtNumber(recapSummary.total_sale_ht)} دج</td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--red)', fontWeight: 700 }}>{fmtNumber(recapProducts.reduce((s, p) => s + p.purchase_qty, 0))}</td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--red)', fontWeight: 700 }}>{fmtNumber(recapSummary.total_purchase_ht)} دج</td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>{fmtNumber(recapSummary.total_cost_ht)} دج</td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 800, fontSize: 14, color: 'var(--text-info, var(--blue))' }}>{fmtNumber(recapSummary.total_sale_ttc + recapSummary.total_purchase_ttc)} دج</td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}><span style={{ color: recapSummary.total_margin_value >= 0 ? 'var(--em)' : 'var(--red)' }}>{fmtNumber(recapSummary.total_margin_value)} دج</span></td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center' }}><span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: recapSummary.total_margin_value >= 0 ? 'var(--greenb)' : 'var(--redb)', color: recapSummary.total_margin_value >= 0 ? 'var(--em)' : 'var(--red)' }}>{recapSummary.total_margin_pct}%</span></td>
-                                                        <td style={{ ...tdStyle, textAlign: 'center' }}>—</td>
-                                                    </tr>
-                                                )}
-                                            </tbody>
-                                        </table>
+                                    <div style={{ maxHeight: '55vh', overflowY: 'auto' }}>
+                                        <SimpleTable
+                                            columns={recapColumns}
+                                            data={recapTableData}
+                                            rowKey={(row) => row._rowType === 'summary' ? 'summary' : String(row['#'])}
+                                        />
                                     </div>
                                 </>
                             )}

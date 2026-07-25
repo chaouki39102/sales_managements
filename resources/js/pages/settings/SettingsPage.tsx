@@ -50,6 +50,7 @@ import { useFiscalYear } from "@/context/FiscalYearContext";
 import { useAuth } from "@/context/AuthContext";
 import { useModal } from "@/hooks/useModal";
 import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
+import SimpleTable from "@/components/ui/SimpleTable";
 import type { Company, ActiveCompany } from "@/lib/api/core/types";
 import ImagePreviewModal from './print-settings/components/ImagePreviewModal';
 import { isWebUsbSupported, getConnectedPrinters } from '@/pos/utils/printService';
@@ -4650,198 +4651,81 @@ function UsersTab() {
                         <i className="ti ti-loader" /> تحميل...
                     </div>
                 ) : (
-                    <div className="tw">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>المستخدم</th>
-                                    <th>الدور</th>
-                                    <th>انضم في</th>
-                                    <th>الحالة</th>
-                                    <th style={{ width: 80 }}></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {(members as any[]).length === 0 ? (
-                                    <tr>
-                                        <td
-                                            colSpan={5}
-                                            style={{
-                                                textAlign: "center",
-                                                color: "var(--t4)",
-                                                padding: 20,
-                                            }}
-                                        >
-                                            لا يوجد أعضاء
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    (members as any[]).map((m: any) => {
-                                        const role = roleLabel[m.role] ?? {
-                                            label: m.role,
-                                            color: "var(--t3)",
-                                        };
-                                        return (
-                                            <tr key={m.id ?? m.user_id}>
-                                                <td>
-                                                    <div
-                                                        style={{
-                                                            display: "flex",
-                                                            alignItems:
-                                                                "center",
-                                                            gap: 10,
-                                                        }}
-                                                    >
-                                                        <div
-                                                            style={{
-                                                                width: 32,
-                                                                height: 32,
-                                                                borderRadius:
-                                                                    "50%",
-                                                                background:
-                                                                    "var(--emb)",
-                                                                display: "flex",
-                                                                alignItems:
-                                                                    "center",
-                                                                justifyContent:
-                                                                    "center",
-                                                                fontWeight: 700,
-                                                                fontSize: 13,
-                                                                color: "var(--em)",
-                                                                flexShrink: 0,
-                                                            }}
-                                                        >
-                                                            {(m.user?.name ??
-                                                                m.name ??
-                                                                "?")[0].toUpperCase()}
-                                                        </div>
-                                                        <div>
-                                                            <div
-                                                                style={{
-                                                                    fontWeight: 600,
-                                                                    fontSize: 13,
-                                                                }}
-                                                            >
-                                                                {m.user?.name ??
-                                                                    m.name}
-                                                            </div>
-                                                            <div
-                                                                style={{
-                                                                    fontSize: 11,
-                                                                    color: "var(--t4)",
-                                                                }}
-                                                            >
-                                                                {m.user
-                                                                    ?.email ??
-                                                                    m.email}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <span
-                                                        style={{
-                                                            fontSize: 11,
-                                                            fontWeight: 700,
-                                                            padding: "3px 10px",
-                                                            borderRadius: 10,
-                                                            background: `color-mix(in srgb, ${role.color} 15%, transparent)`,
-                                                            color: role.color,
-                                                        }}
-                                                    >
-                                                        {role.label}
-                                                    </span>
-                                                </td>
-                                                <td
-                                                    style={{
-                                                        fontSize: 12,
-                                                        color: "var(--t4)",
-                                                    }}
-                                                >
-                                                    {m.joined_at
-                                                        ? new Date(
-                                                              m.joined_at,
-                                                          ).toLocaleDateString(
-                                                              "fr-DZ",
-                                                          )
-                                                        : "—"}
-                                                </td>
-                                                <td>
-                                                    <Badge
-                                                        variant={
-                                                            m.active
-                                                                ? "success"
-                                                                : "danger"
-                                                        }
-                                                    >
-                                                        {m.active
-                                                            ? "نشط"
-                                                            : "معطّل"}
-                                                    </Badge>
-                                                </td>
-                                                <td>
-                                                    <div
-                                                        style={{
-                                                            display: "flex",
-                                                            gap: 4,
-                                                        }}
-                                                    >
-                                                        {m.active ? (
-                                                            <Button
-                                                                size="xs"
-                                                                variant="warning"
-                                                                icon={
-                                                                    <i className="ti ti-user-off" />
-                                                                }
-                                                                onClick={() =>
-                                                                    mutations.deactivate.mutateAsync(
-                                                                        m.user
-                                                                            ?.id ??
-                                                                            m.id,
-                                                                    )
-                                                                }
-                                                            />
-                                                        ) : (
-                                                            <Button
-                                                                size="xs"
-                                                                variant="success"
-                                                                icon={
-                                                                    <i className="ti ti-user-check" />
-                                                                }
-                                                                onClick={() =>
-                                                                    mutations.activate.mutateAsync(
-                                                                        m.user
-                                                                            ?.id ??
-                                                                            m.id,
-                                                                    )
-                                                                }
-                                                            />
-                                                        )}
-                                                        {m.role !== "owner" && (
-                                                            <Button
-                                                                size="xs"
-                                                                variant="danger"
-                                                                icon={
-                                                                    <i className="ti ti-user-minus" />
-                                                                }
-                                                                onClick={() =>
-                                                                    mutations.remove.mutateAsync(
-                                                                        m.user
-                                                                            ?.id ??
-                                                                            m.id,
-                                                                    )
-                                                                }
-                                                            />
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                    <SimpleTable
+                        columns={[
+                            {
+                                key: "name",
+                                label: "المستخدم",
+                                render: (_v, row) => {
+                                    const m = row as any;
+                                    return (
+                                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                            <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--emb)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13, color: "var(--em)", flexShrink: 0 }}>
+                                                {(m.user?.name ?? m.name ?? "?")[0].toUpperCase()}
+                                            </div>
+                                            <div>
+                                                <div style={{ fontWeight: 600, fontSize: 13 }}>{m.user?.name ?? m.name}</div>
+                                                <div style={{ fontSize: 11, color: "var(--t4)" }}>{m.user?.email ?? m.email}</div>
+                                            </div>
+                                        </div>
+                                    );
+                                },
+                            },
+                            {
+                                key: "role",
+                                label: "الدور",
+                                render: (v) => {
+                                    const role = roleLabel[v as string] ?? { label: v as string, color: "var(--t3)" };
+                                    return (
+                                        <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 10, background: `color-mix(in srgb, ${role.color} 15%, transparent)`, color: role.color }}>
+                                            {role.label}
+                                        </span>
+                                    );
+                                },
+                            },
+                            {
+                                key: "joined_at",
+                                label: "انضم في",
+                                render: (v) => (
+                                    <span style={{ fontSize: 12, color: "var(--t4)" }}>
+                                        {v ? new Date(v as string).toLocaleDateString("fr-DZ") : "—"}
+                                    </span>
+                                ),
+                            },
+                            {
+                                key: "active",
+                                label: "الحالة",
+                                render: (v) => (
+                                    <Badge variant={v ? "success" : "danger"}>
+                                        {v ? "نشط" : "معطّل"}
+                                    </Badge>
+                                ),
+                            },
+                            {
+                                key: "id",
+                                label: "",
+                                render: (_v, row) => {
+                                    const m = row as any;
+                                    const userId = m.user?.id ?? m.id;
+                                    return (
+                                        <div style={{ display: "flex", gap: 4 }}>
+                                            {m.active ? (
+                                                <Button size="xs" variant="warning" icon={<i className="ti ti-user-off" />} onClick={() => mutations.deactivate.mutateAsync(userId)} />
+                                            ) : (
+                                                <Button size="xs" variant="success" icon={<i className="ti ti-user-check" />} onClick={() => mutations.activate.mutateAsync(userId)} />
+                                            )}
+                                            {m.role !== "owner" && (
+                                                <Button size="xs" variant="danger" icon={<i className="ti ti-user-minus" />} onClick={() => mutations.remove.mutateAsync(userId)} />
+                                            )}
+                                        </div>
+                                    );
+                                },
+                            },
+                        ]}
+                        data={(members as any[])}
+                        rowKey={(row) => String(row.id ?? row.user_id)}
+                        emptyText="لا يوجد أعضاء"
+                    />
                 )}
             </Card>
 
