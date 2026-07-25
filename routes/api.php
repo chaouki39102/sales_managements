@@ -374,6 +374,7 @@ Route::prefix('v1')->group(function () {
                 Route::apiResource('inventory-valuation-methods', InventoryValuationMethodController::class, ['except' => ['index', 'show']]);
 
                 // منتجات وأطراف ومستودعات - كتابة
+                Route::post('products/copy-config',    [ProductController::class, 'copyConfig']);
                 Route::apiResource('products',          ProductController::class,             ['except' => ['index', 'show']]);
                 Route::apiResource('barcodes',          BarcodeController::class,             ['except' => ['index', 'show']]);
                 Route::apiResource('product-variants',  ProductVariantController::class,      ['except' => ['index', 'show']]);

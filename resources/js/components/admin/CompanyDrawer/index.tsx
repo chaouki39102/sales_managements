@@ -2,12 +2,13 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  DrawerShell, TabBar, FlashBar, Avatar, StatusBadge, ActionBtn,
+  DrawerShell, TabBar, Avatar, StatusBadge, ActionBtn,
   InfoRow, SectionTitle, EmptyState, Spinner, fmtDate,
 } from '../shared';
 import type { TabDef } from '../shared';
 import { companiesApi, plansApi } from '@/lib/api/admin';
 import { useCompanyMutations } from '@/hooks/admin';
+import { useNotification } from '@/hooks/useNotification';
 import { useConfirm } from '@/hooks/useConfirm';
 import { ConfirmDialog } from '@/components/ui';
 import type { AdminCompany, AdminUser, AdminPlan } from '@/types/admin';
@@ -35,7 +36,6 @@ interface Props {
 
 export default function CompanyDrawer({ company: co, onClose }: Props) {
   const [tab,           setTab]           = useState('info');
-  const [flash,         setFlash]         = useState<{ ok: boolean; msg: string } | null>(null);
   const [suspendReason, setSuspendReason] = useState('');
   const [showSuspend,   setShowSuspend]   = useState(false);
   const [notes,         setNotes]         = useState(co.notes ?? '');
@@ -48,6 +48,7 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
 
   const muts = useCompanyMutations();
   const deleteConfirm = useConfirm();
+  const notify = useNotification();
   const close = (refresh = false) => onClose(refresh);
 
   const { data: plans = [] } = useQuery<AdminPlan[]>({
@@ -57,12 +58,6 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
   });
 
   const planMap = Object.fromEntries(plans.map(p => [p.key, p]));
-
-  // ─── Flash helper ────────────────────────────────────────────────────────────
-  const flash$ = (ok: boolean, msg: string) => {
-    setFlash({ ok, msg });
-    setTimeout(() => setFlash(null), 4000);
-  };
 
   // ─── Error helper — يستخرج رسالة الخطأ من ApiError أو أي كائن آخر ──────────
   const errMsg = (e: unknown): string => {
@@ -80,10 +75,10 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
   ) => {
     mutation.mutate(value, {
       onSuccess: () => {
-        flash$(true, successMsg);
+        notify.success(successMsg);
         if (refreshOnSuccess) close(true);
       },
-      onError: (e: unknown) => flash$(false, errMsg(e)),
+      onError: (e: unknown) => notify.error(errMsg(e)),
     });
   };
 
@@ -109,7 +104,7 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
       await companiesApi.toggleUser(co.id, u.id);
       refetchMembers();
     } catch (e) {
-      flash$(false, errMsg(e));
+      notify.error(errMsg(e));
     }
   };
 
@@ -118,9 +113,9 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
     try {
       await companiesApi.removeUser(co.id, u.id);
       refetchMembers();
-      flash$(true, 'تم إزالة المستخدم');
+      notify.success('تم إزالة المستخدم');
     } catch (e) {
-      flash$(false, errMsg(e));
+      notify.error(errMsg(e));
     }
   };
 
@@ -139,7 +134,6 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
       }
       badge={<StatusBadge active={co.active} suspended={co.is_suspended} />}
     >
-      {flash && <FlashBar ok={flash.ok} msg={flash.msg} />}
       <TabBar tabs={TABS} active={tab} onChange={setTab} />
 
       {/* ══ INFO ═══════════════════════════════════════════════════════════════ */}
@@ -374,7 +368,7 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
               if (!await deleteConfirm.confirm(`حذف شركة "${co.name}" نهائياً؟`)) return;
               muts.remove.mutate(co.id, {
                 onSuccess: () => close(true),
-                onError:   (e: unknown) => flash$(false, errMsg(e)),
+                onError:   (e: unknown) => notify.error(errMsg(e)),
               });
             }}
             loading={muts.remove.isPending} />

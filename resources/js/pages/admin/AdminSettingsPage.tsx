@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/admin';
 import PageHeader from '@/components/ui/PageHeader';
 import type { SystemSettings } from '@/types/admin';
+import { useNotification } from '@/hooks/useNotification';
 
 // ─── Toggle ───────────────────────────────────────────────────────────────────
 function Toggle({ checked, onChange, label, desc, color = 'var(--em)' }: {
@@ -86,13 +87,8 @@ function NumField({ label, desc, value, onChange, min = 0 }: {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminSettingsPage() {
   const qc = useQueryClient();
-  const [flash, setFlash] = useState<{ ok: boolean; msg: string } | null>(null);
+  const notify = useNotification();
   const [form, setForm]   = useState<SystemSettings | null>(null);
-
-  const showFlash = (msg: string, ok = true) => {
-    setFlash({ msg, ok });
-    setTimeout(() => setFlash(null), 3500);
-  };
 
   // ── Queries ────────────────────────────────────────────────────────────────
   const { data: _settings, isLoading } = useQuery<SystemSettings>({
@@ -133,15 +129,15 @@ export default function AdminSettingsPage() {
     mutationFn: (data: Partial<SystemSettings>) => adminApi.updateSettings(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'system', 'settings'] });
-      showFlash('تم حفظ الإعدادات بنجاح ✓');
+      notify.success('تم حفظ الإعدادات بنجاح ✓');
     },
-    onError: (e: any) => showFlash(e?.message ?? 'فشل الحفظ', false),
+    onError: (e: any) => notify.error(e?.message ?? 'فشل الحفظ'),
   });
 
   const cacheMut = useMutation({
     mutationFn: adminApi.clearCache,
-    onSuccess: () => showFlash('تم مسح الكاش بنجاح ✓'),
-    onError: () => showFlash('فشل مسح الكاش', false),
+    onSuccess: () => notify.success('تم مسح الكاش بنجاح ✓'),
+    onError: () => notify.error('فشل مسح الكاش'),
   });
 
   const maintMut = useMutation({
@@ -150,12 +146,12 @@ export default function AdminSettingsPage() {
       : adminApi.enableMaintenance('الموقع في وضع الصيانة'),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'system', 'maintenance'] });
-      showFlash((maintenance as any)?.maintenance_mode ? 'تم إلغاء الصيانة' : 'تم تفعيل الصيانة');
+      notify.success((maintenance as any)?.maintenance_mode ? 'تم إلغاء الصيانة' : 'تم تفعيل الصيانة');
     },
   });
 
-  const bootWilMut  = useMutation({ mutationFn: adminApi.bootWilayas,     onSuccess: () => showFlash('تم تثبيت الولايات والبلديات ✓') });
-  const bootPermMut = useMutation({ mutationFn: adminApi.bootPermissions, onSuccess: () => showFlash('تم تثبيت الصلاحيات ✓') });
+  const bootWilMut  = useMutation({ mutationFn: adminApi.bootWilayas,     onSuccess: () => notify.success('تم تثبيت الولايات والبلديات ✓') });
+  const bootPermMut = useMutation({ mutationFn: adminApi.bootPermissions, onSuccess: () => notify.success('تم تثبيت الصلاحيات ✓') });
 
   const setF = (key: keyof SystemSettings, value: any) =>
     setForm(f => f ? { ...f, [key]: value } : f);
@@ -171,20 +167,6 @@ export default function AdminSettingsPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 800 }}>
-
-      {/* Toast */}
-      {flash && (
-        <div style={{
-          position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 9999, padding: '10px 20px', borderRadius: 12,
-          background: flash.ok ? 'var(--green)' : 'var(--red)',
-          color: '#fff', fontSize: 13, fontWeight: 700,
-          boxShadow: '0 4px 20px rgba(0,0,0,.25)',
-          display: 'flex', alignItems: 'center', gap: 8,
-        }}>
-          <i className={`ti ${flash.ok ? 'ti-check' : 'ti-x'}`} />{flash.msg}
-        </div>
-      )}
 
       <PageHeader
         title="إعدادات النظام"
@@ -393,7 +375,7 @@ export default function AdminSettingsPage() {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                   credentials: 'include',
-                }).then(r => r.json()).then(d => showFlash(d.message || 'تم تثبيت الخطط ✓'));
+                }).then(r => r.json()).then(d => notify.success(d.message || 'تم تثبيت الخطط ✓'));
               });
             }}
             style={{

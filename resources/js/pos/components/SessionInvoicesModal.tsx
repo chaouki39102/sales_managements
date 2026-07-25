@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import Modal from '@/components/ui/Modal';
 import type { CommercialDocument } from '@/lib/api/core/types';
 import type { PosSession } from '@/lib/api/endpoints/posSession';
 import { documentsApi } from '@/lib/api/endpoints/documents';
@@ -63,7 +64,6 @@ export default function SessionInvoicesModal({ session, onClose, onOpen }: Props
     return list;
   }, [docs, sortField, sortDir]);
 
-  // أعد تعيين التحديد بعد الترتيب
   useEffect(() => {
     setSelectedIndex(0);
   }, [sorted.length]);
@@ -103,11 +103,7 @@ export default function SessionInvoicesModal({ session, onClose, onOpen }: Props
       onOpen(selected.id);
       return;
     }
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      onClose();
-    }
-  }, [sorted, selectedIndex, onOpen, onClose]);
+  }, [sorted, selectedIndex, onOpen]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown as EventListener);
@@ -129,86 +125,84 @@ export default function SessionInvoicesModal({ session, onClose, onOpen }: Props
   }, [sorted]);
 
   return (
-    <div className="ov on" onClick={onClose}>
-      <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-        <div className="m-hd">
-          <div className="m-title">
-            <i className="ti ti-receipt ml-2" />
-            فواتير الجلسة
-          </div>
-          <div className="m-x" onClick={onClose}><i className="ti ti-x" /></div>
-        </div>
-        <div className="m-body si-modal-body">
-          {loading ? (
-            <div className="si-empty si-empty-lg">
-              <i className="ti ti-loader" />
-              <div>جاري تحميل الفواتير...</div>
-            </div>
-          ) : docs.length === 0 ? (
-            <div className="si-empty si-empty-sm">
-              <i className="ti ti-receipt-off" />
-              <div>لا توجد فواتير في هذه الجلسة</div>
-            </div>
-          ) : (
-            <table className="tbl tbl-sm si-modal-tbl w-full">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th className="si-th-sort" onClick={() => toggleSort('document_number')}>
-                    <i className={`${sortIcon('document_number')} si-sort-ic`} /> رقم الفاتورة
-                  </th>
-                  <th className="si-col-client">العميل</th>
-                  <th className="si-th-sort" onClick={() => toggleSort('document_date')}>
-                    <i className={`${sortIcon('document_date')} si-sort-ic`} /> التاريخ
-                  </th>
-                  <th className="si-th-sort" onClick={() => toggleSort('total_ttc')}>
-                    <i className={`${sortIcon('total_ttc')} si-sort-ic`} /> الإجمالي
-                  </th>
-                  <th className="si-th-sort" onClick={() => toggleSort('paid_amount')}>
-                    <i className={`${sortIcon('paid_amount')} si-sort-ic`} /> المدفوع
-                  </th>
-                  <th className="si-th-sort" onClick={() => toggleSort('remaining_amount')}>
-                    <i className={`${sortIcon('remaining_amount')} si-sort-ic`} /> المتبقي
-                  </th>
-                </tr>
-              </thead>
-              <tbody ref={listRef}>
-                {sorted.map((doc, i) => (
-                  <tr
-                    key={doc.id}
-                    onClick={() => handleRowClick(doc)}
-                    className={`si-row cursor-pointer${i === selectedIndex ? ' si-row-sel' : ''}`}
-                  >
-                    <td>{i + 1}</td>
-                    <td><strong>{doc.document_number}</strong></td>
-                    <td className="si-col-client">{doc.party?.name ?? <span className="si-null">—</span>}</td>
-                    <td className="si-date-cell">{doc.created_at?.slice(0, 16).replace('T', ' ') ?? doc.document_date?.slice(0, 16).replace('T', ' ')}</td>
-                    <td className="si-ttc-cell">{formatDZD(doc.total_ttc)}</td>
-                    <td className="si-paid-cell">{formatDZD(doc.paid_amount ?? 0)}</td>
-                    <td className={`si-remain-cell ${Number(doc.remaining_amount ?? 0) > 0 ? 'si-remain-pos' : 'si-remain-neg'}`}>
-                      {formatDZD(doc.remaining_amount ?? 0)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="si-foot-row">
-                  <td colSpan={4} className="text-left">المجموع</td>
-                  <td className="si-ttc-cell">{formatDZD(totals.ttc)}</td>
-                  <td className="si-paid-cell">{formatDZD(totals.paid)}</td>
-                  <td className={totals.remaining > 0 ? 'si-remain-pos' : 'si-remain-neg'}>{formatDZD(totals.remaining)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          )}
-        </div>
-        <div className="m-foot">
+    <Modal
+      open
+      onClose={onClose}
+      title={<><i className="ti ti-receipt ml-2" /> فواتير الجلسة</>}
+      size="lg"
+      footer={
+        <>
           <span className="si-foot-hint">
             ↑↓ للتنقل · Enter لفتح الفاتورة · Esc للإغلاق
           </span>
           <button className="btn" onClick={onClose}>إغلاق</button>
-        </div>
+        </>
+      }
+    >
+      <div className="si-modal-body">
+        {loading ? (
+          <div className="si-empty si-empty-lg">
+            <i className="ti ti-loader" />
+            <div>جاري تحميل الفواتير...</div>
+          </div>
+        ) : docs.length === 0 ? (
+          <div className="si-empty si-empty-sm">
+            <i className="ti ti-receipt-off" />
+            <div>لا توجد فواتير في هذه الجلسة</div>
+          </div>
+        ) : (
+          <table className="tbl tbl-sm si-modal-tbl w-full">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th className="si-th-sort" onClick={() => toggleSort('document_number')}>
+                  <i className={`${sortIcon('document_number')} si-sort-ic`} /> رقم الفاتورة
+                </th>
+                <th className="si-col-client">العميل</th>
+                <th className="si-th-sort" onClick={() => toggleSort('document_date')}>
+                  <i className={`${sortIcon('document_date')} si-sort-ic`} /> التاريخ
+                </th>
+                <th className="si-th-sort" onClick={() => toggleSort('total_ttc')}>
+                  <i className={`${sortIcon('total_ttc')} si-sort-ic`} /> الإجمالي
+                </th>
+                <th className="si-th-sort" onClick={() => toggleSort('paid_amount')}>
+                  <i className={`${sortIcon('paid_amount')} si-sort-ic`} /> المدفوع
+                </th>
+                <th className="si-th-sort" onClick={() => toggleSort('remaining_amount')}>
+                  <i className={`${sortIcon('remaining_amount')} si-sort-ic`} /> المتبقي
+                </th>
+              </tr>
+            </thead>
+            <tbody ref={listRef}>
+              {sorted.map((doc, i) => (
+                <tr
+                  key={doc.id}
+                  onClick={() => handleRowClick(doc)}
+                  className={`si-row cursor-pointer${i === selectedIndex ? ' si-row-sel' : ''}`}
+                >
+                  <td>{i + 1}</td>
+                  <td><strong>{doc.document_number}</strong></td>
+                  <td className="si-col-client">{doc.party?.name ?? <span className="si-null">—</span>}</td>
+                  <td className="si-date-cell">{doc.created_at?.slice(0, 16).replace('T', ' ') ?? doc.document_date?.slice(0, 16).replace('T', ' ')}</td>
+                  <td className="si-ttc-cell">{formatDZD(doc.total_ttc)}</td>
+                  <td className="si-paid-cell">{formatDZD(doc.paid_amount ?? 0)}</td>
+                  <td className={`si-remain-cell ${Number(doc.remaining_amount ?? 0) > 0 ? 'si-remain-pos' : 'si-remain-neg'}`}>
+                    {formatDZD(doc.remaining_amount ?? 0)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="si-foot-row">
+                <td colSpan={4} className="text-left">المجموع</td>
+                <td className="si-ttc-cell">{formatDZD(totals.ttc)}</td>
+                <td className="si-paid-cell">{formatDZD(totals.paid)}</td>
+                <td className={totals.remaining > 0 ? 'si-remain-pos' : 'si-remain-neg'}>{formatDZD(totals.remaining)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }

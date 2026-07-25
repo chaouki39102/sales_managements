@@ -53,6 +53,13 @@ export default function SimpleTable({
     return (row: Record<string, unknown>) => String(row[rowKey] ?? '');
   }, [rowKey]);
 
+  const thStyle = (c: SimpleColumn): React.CSSProperties | undefined => {
+    const s: React.CSSProperties = {};
+    if (c.align) s.textAlign = c.align;
+    if (c.onHeaderClick) { s.cursor = 'pointer'; s.userSelect = 'none'; }
+    return Object.keys(s).length ? s : undefined;
+  };
+
   if (isLoading) {
     return (
       <div className="tw">
@@ -60,7 +67,7 @@ export default function SimpleTable({
           <thead>
             <tr>
               {columns.map(c => (
-                <th key={c.key} className={c.className} onClick={c.onHeaderClick} style={c.onHeaderClick ? { cursor: 'pointer', userSelect: 'none' } : undefined}>{c.label}</th>
+                <th key={c.key} className={c.className} onClick={c.onHeaderClick} style={thStyle(c)}>{c.label}</th>
               ))}
             </tr>
           </thead>
@@ -97,7 +104,7 @@ export default function SimpleTable({
         <thead>
           <tr>
             {columns.map(c => (
-              <th key={c.key} className={c.className} onClick={c.onHeaderClick} style={c.onHeaderClick ? { cursor: 'pointer', userSelect: 'none' } : undefined}>{c.label}</th>
+              <th key={c.key} className={c.className} onClick={c.onHeaderClick} style={thStyle(c)}>{c.label}</th>
             ))}
           </tr>
         </thead>
@@ -109,7 +116,7 @@ export default function SimpleTable({
               onClick={onRowClick ? () => onRowClick(row, idx) : undefined}
             >
               {columns.map(c => (
-                <td key={c.key} className={c.className}>
+                <td key={c.key} className={c.className} style={c.align ? { textAlign: c.align } : undefined}>
                   {c.render ? c.render(row[c.key], row, c.key) : (row[c.key] as React.ReactNode) ?? '—'}
                 </td>
               ))}

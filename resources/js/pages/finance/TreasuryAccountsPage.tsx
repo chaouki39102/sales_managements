@@ -10,7 +10,8 @@ import Card        from '@/components/ui/Card';
 import Badge       from '@/components/ui/Badge';
 import Button      from '@/components/ui/Button';
 import Modal       from '@/components/ui/Modal';
-import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal';
+import { useConfirm } from '@/hooks/useConfirm';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import KpiCard     from '@/components/ui/KpiCard';
 import EmptyState  from '@/components/ui/EmptyState';
 import SimpleTable from '@/components/ui/SimpleTable';
@@ -74,8 +75,7 @@ export default function TreasuryAccountsPage() {
   const [typeTabId,   setTypeTabId]   = useState<number | null>(null);
   const [editing,     setEditing]     = useState<TreasuryAccount | null>(null);
   const modal       = useModal();
-  const deleteModal = useModal();
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const deleteConfirm = useConfirm();
 
   // ── أنواع الحسابات (مسار عام — بدون slug) ─────────────────────────────────
   const { data: rawTypes } = useQuery({
@@ -155,17 +155,10 @@ export default function TreasuryAccountsPage() {
   const deleteMutation = useTenantMutation(
     (id: number) => treasuryAccountsApi.delete(id),
     (slug) => tenantKeys.lookups.treasuryAccounts(slug),
-    {
-      onSuccess: () => {
-        deleteModal.closeModal();
-        setDeletingId(null);
-      },
-    },
   );
 
   const openAdd  = () => { setEditing(null); modal.openModal(); };
   const openEdit = (acc: TreasuryAccount) => { setEditing(acc); modal.openModal(); };
-  const askDelete = (id: number) => { setDeletingId(id); deleteModal.openModal(); };
 
   // ── Sub-tab style ─────────────────────────────────────────────────────────
   const subTabStyle = (active: boolean): React.CSSProperties => ({
@@ -328,7 +321,7 @@ export default function TreasuryAccountsPage() {
                   return (
                     <div style={{ display: 'flex', gap: 3 }}>
                       <Button size="xs" icon={<i className="ti ti-pencil"/>} onClick={() => openEdit(acc)}/>
-                      <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>} onClick={() => askDelete(acc.id)}/>
+                      <Button size="xs" variant="danger" icon={<i className="ti ti-trash"/>} onClick={async () => { if (await deleteConfirm.confirm('حذف الحساب المالي؟')) deleteMutation.mutate(acc.id); }}/>
                     </div>
                   );
                 },
@@ -349,12 +342,7 @@ export default function TreasuryAccountsPage() {
       />
 
       {/* مودال تأكيد الحذف */}
-      <ConfirmDeleteModal
-        open={deleteModal.open}
-        onClose={() => { deleteModal.closeModal(); setDeletingId(null); }}
-        onConfirm={() => { if (deletingId) deleteMutation.mutate(deletingId); }}
-        loading={deleteMutation.isPending}
-      />
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import Modal from '@/components/ui/Modal';
 import type { HeldCart, CartItem } from '@/types';
 import { formatDZD } from '../utils/calculations';
 
@@ -61,10 +62,6 @@ export default function HeldCartsModal({
       onDelete(selected.id);
       return;
     }
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      onClose();
-    }
   }, [filtered, selectedIndex, onRestore, onRestoreAndPay, onDelete, onClose]);
 
   useEffect(() => {
@@ -73,58 +70,55 @@ export default function HeldCartsModal({
   }, [handleKeyDown]);
 
   return (
-    <div className="ov on" onClick={onClose}>
-      <div className="modal modal-md" onClick={e => e.stopPropagation()}>
-        <div className="m-hd">
-          <div className="m-title"><i className="ti ti-clock-pause" style={{ marginLeft: 6 }} /> الفواتير المعلقة ({carts.length})</div>
-          <div className="m-x" onClick={onClose}><i className="ti ti-x" /></div>
+    <Modal
+      open
+      onClose={onClose}
+      title={<><i className="ti ti-clock-pause" style={{ marginLeft: 6 }} /> الفواتير المعلقة ({carts.length})</>}
+      size="md"
+      footer={
+        <button className="btn" onClick={onClose}>إغلاق</button>
+      }
+    >
+      {carts.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--t4)' }}>
+          <i className="ti ti-clock-pause" style={{ fontSize: 40, display: 'block', marginBottom: 10, opacity: 0.3 }} />
+          لا توجد فواتير معلقة
         </div>
-        <div className="m-body">
-          {carts.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--t4)' }}>
-              <i className="ti ti-clock-pause" style={{ fontSize: 40, display: 'block', marginBottom: 10, opacity: 0.3 }} />
-              لا توجد فواتير معلقة
-            </div>
-          ) : (
-            <>
-              <div className="pos-inp" style={{ marginBottom: 12 }}>
-                <i className="ti ti-search" style={{ fontSize: 13, color: 'var(--t4)' }} />
-                <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث في المعلقة..." />
-              </div>
-              <div className="held-list" ref={listRef}>
-                {filtered.map((c: HeldCart, i: number) => (
-                  <div
-                    key={c.id}
-                    className={`held-card${i === selectedIndex ? ' held-sel' : ''}`}
-                    onClick={() => onRestore(c.id)}
-                    onDoubleClick={() => { if (onRestoreAndPay) onRestoreAndPay(c.id); else onRestore(c.id); }}
-                  >
-                    <div className="hc-info">
-                      <div className="hc-client">{c.client?.name ?? 'زبون عابر'}</div>
-                      <div className="hc-meta">
-                        {c.items?.length ?? 0} صنف
-                        · {formatDZD(c.totals.total_ttc ?? 0)}
-                      </div>
-                      <div className="hc-time">{new Date(c.created_at).toLocaleTimeString('ar-DZ')}</div>
-                    </div>
-                    <div className="hc-acts">
-                      <button className="btn btn-sm btn-p" onClick={e => { e.stopPropagation(); onRestore(c.id); }}>
-                        <i className="ti ti-restore" /> استرجاع
-                      </button>
-                      <button className="btn btn-sm btn-r" onClick={e => { e.stopPropagation(); onDelete(c.id); }}>
-                        <i className="ti ti-trash" />
-                      </button>
-                    </div>
+      ) : (
+        <>
+          <div className="pos-inp" style={{ marginBottom: 12 }}>
+            <i className="ti ti-search" style={{ fontSize: 13, color: 'var(--t4)' }} />
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث في المعلقة..." />
+          </div>
+          <div className="held-list" ref={listRef}>
+            {filtered.map((c: HeldCart, i: number) => (
+              <div
+                key={c.id}
+                className={`held-card${i === selectedIndex ? ' held-sel' : ''}`}
+                onClick={() => onRestore(c.id)}
+                onDoubleClick={() => { if (onRestoreAndPay) onRestoreAndPay(c.id); else onRestore(c.id); }}
+              >
+                <div className="hc-info">
+                  <div className="hc-client">{c.client?.name ?? 'زبون عابر'}</div>
+                  <div className="hc-meta">
+                    {c.items?.length ?? 0} صنف
+                    · {formatDZD(c.totals.total_ttc ?? 0)}
                   </div>
-                ))}
+                  <div className="hc-time">{new Date(c.created_at).toLocaleTimeString('ar-DZ')}</div>
+                </div>
+                <div className="hc-acts">
+                  <button className="btn btn-sm btn-p" onClick={e => { e.stopPropagation(); onRestore(c.id); }}>
+                    <i className="ti ti-restore" /> استرجاع
+                  </button>
+                  <button className="btn btn-sm btn-r" onClick={e => { e.stopPropagation(); onDelete(c.id); }}>
+                    <i className="ti ti-trash" />
+                  </button>
+                </div>
               </div>
-            </>
-          )}
-        </div>
-        <div className="m-foot">
-          <button className="btn" onClick={onClose}>إغلاق</button>
-        </div>
-      </div>
-    </div>
+            ))}
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }

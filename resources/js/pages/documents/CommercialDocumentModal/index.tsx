@@ -23,7 +23,6 @@ import { ReturnDocumentModal } from '../components/ReturnDocumentModal';
 import { BulkImportModal } from '../components/BulkImportModal';
 import { ShippingInfoSection } from '../components/ShippingInfoSection';
 import { PaymentTermsTable } from '../components/PaymentTermsTable';
-import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useConfirm } from '@/hooks/useConfirm';
 
@@ -86,7 +85,7 @@ export default function CommercialDocumentModal({
     selectedTemplateId, setSelectedTemplateId, selectedTemplate,
     printModalOpen, setPrintModalOpen, handlePrint,
     visibleCols, lineMode, handleColsChange, setLineMode,
-    showDeleteModal, setShowDeleteModal,
+    deleteConfirm,
     deleteMut,
     handleSave, handleDelete, handleExport, handlePartyChangeWithWarning,
     isPending,
@@ -496,17 +495,6 @@ export default function CommercialDocumentModal({
       )}
 
       {/* تأكيد الحذف */}
-      <ConfirmDeleteModal
-        open={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        onConfirm={() => {
-          setShowDeleteModal(false);
-          deleteMut.mutate();
-        }}
-        loading={deleteMut.isPending}
-        itemName={existingDocument?.document_number ? `#${existingDocument.document_number}` : undefined}
-        warning="ملاحظة: الحذف غير مدعوم — استخدم الإلغاء."
-      />
 
       {/* طباعة حسب القالب */}
       {printModalOpen && existingDocument && companyInfo && (
@@ -526,6 +514,7 @@ export default function CommercialDocumentModal({
       )}
 
       <ConfirmDialog {...confirmDialogProps} />
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </>
   );
 

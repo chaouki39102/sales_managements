@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import Modal from '@/components/ui/Modal';
 import type { CartItem } from '@/types';
 
 interface QtySetModalProps {
@@ -13,49 +14,44 @@ export default function QtySetModal({ item, onClose, onConfirm }: QtySetModalPro
 
   useEffect(() => { inpRef.current?.focus(); inpRef.current?.select(); }, []);
 
-  const handleKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleOk();
-    if (e.key === 'Escape') onClose();
-  };
-
   const handleOk = () => {
     const qty = parseFloat(val);
     if (qty > 0) onConfirm(qty);
   };
 
   return (
-    <div className="ov on" onClick={onClose}>
-      <div className="modal modal-sm" onClick={e => e.stopPropagation()} onKeyDown={handleKey}>
-        <div className="m-hd">
-          <div className="m-title"><i className="ti ti-edit ml-2" /> تعديل الكمية</div>
-          <div className="m-x" onClick={onClose}><i className="ti ti-x" /></div>
-        </div>
-        <div className="m-body">
-          <div className="qsm-product">
-            {item.product_name}
-          </div>
-          <div className="fg">
-            <label>الكمية</label>
-            <input
-              ref={inpRef}
-              type="number"
-              className="form-control qsm-inp"
-              value={val}
-              onChange={e => setVal(e.target.value)}
-              min="0.001"
-              step="1"
-            />
-          </div>
-          <div className="qsm-hint">
-            <div><kbd className="qsm-kbd">Enter</kbd> تأكيد · <kbd className="qsm-kbd">Esc</kbd> إلغاء</div>
-            <div className="qsm-hint-row"><kbd className="qsm-kbd">Ctrl++</kbd> زيادة · <kbd className="qsm-kbd">Ctrl+-</kbd> نقصان · <kbd className="qsm-kbd">↑↓</kbd> تنقل · <kbd className="qsm-kbd">Del</kbd> حذف</div>
-          </div>
-        </div>
-        <div className="m-foot">
+    <Modal
+      open
+      onClose={onClose}
+      title={<><i className="ti ti-edit ml-2" /> تعديل الكمية</>}
+      size="sm"
+      footer={
+        <>
           <button className="btn" onClick={onClose}>إلغاء</button>
           <button className="btn btn-p" onClick={handleOk}><i className="ti ti-check" /> موافق</button>
-        </div>
+        </>
+      }
+    >
+      <div className="qsm-product">
+        {item.product_name}
       </div>
-    </div>
+      <div className="fg">
+        <label>الكمية</label>
+        <input
+          ref={inpRef}
+          type="number"
+          className="form-control qsm-inp"
+          value={val}
+          onChange={e => setVal(e.target.value)}
+          min="0.001"
+          step="1"
+          onKeyDown={e => e.key === 'Enter' && handleOk()}
+        />
+      </div>
+      <div className="qsm-hint">
+        <div><kbd className="qsm-kbd">Enter</kbd> تأكيد · <kbd className="qsm-kbd">Esc</kbd> إلغاء</div>
+        <div className="qsm-hint-row"><kbd className="qsm-kbd">Ctrl++</kbd> زيادة · <kbd className="qsm-kbd">Ctrl+-</kbd> نقصان · <kbd className="qsm-kbd">↑↓</kbd> تنقل · <kbd className="qsm-kbd">Del</kbd> حذف</div>
+      </div>
+    </Modal>
   );
 }

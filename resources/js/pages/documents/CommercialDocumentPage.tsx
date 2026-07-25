@@ -23,7 +23,6 @@ import { ReturnDocumentModal } from './components/ReturnDocumentModal';
 import { BulkImportModal } from './components/BulkImportModal';
 import { ShippingInfoSection } from './components/ShippingInfoSection';
 import { PaymentTermsTable } from './components/PaymentTermsTable';
-import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useConfirm } from '@/hooks/useConfirm';
 
@@ -95,9 +94,9 @@ export default function CommercialDocumentPage() {
     selectedTemplateId, setSelectedTemplateId, selectedTemplate,
     printModalOpen, setPrintModalOpen, handlePrint,
     visibleCols, lineMode, handleColsChange, setLineMode,
-    showDeleteModal, setShowDeleteModal,
+    deleteConfirm,
     deleteMut,
-    handleSave, _handleDelete, handleExport, handlePartyChangeWithWarning,
+    handleSave, handleDelete, handleExport, handlePartyChangeWithWarning,
     isPending,
     isPartyExempt, partyOptions, priceLevelOptions,
     paymentModeOptions, treasuryAccountMap, selectedParty,
@@ -184,7 +183,7 @@ export default function CommercialDocumentPage() {
         selectedTemplateId={selectedTemplateId}
         onTemplateChange={setSelectedTemplateId}
         handleExport={handleExport}
-        handleDelete={() => setShowDeleteModal(true)}
+        handleDelete={handleDelete}
         onReturnClick={() => setShowReturnModal(true)}
         RETURNABLE_CODES={RETURNABLE_CODES}
       />
@@ -449,15 +448,6 @@ export default function CommercialDocumentPage() {
         />
       )}
 
-      <ConfirmDeleteModal
-        open={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        onConfirm={() => { setShowDeleteModal(false); deleteMut.mutate(); }}
-        loading={deleteMut.isPending}
-        itemName={(existingDoc as Record<string, unknown> | undefined)?.document_number ? `#${(existingDoc as Record<string, unknown>).document_number}` : undefined}
-        warning="ملاحظة: الحذف غير مدعوم — استخدم الإلغاء."
-      />
-
       {printModalOpen && existingDoc && companyInfo && (
         <Suspense fallback={null}>
           <TemplatePrintModal
@@ -475,6 +465,7 @@ export default function CommercialDocumentPage() {
       )}
 
       <ConfirmDialog {...confirmDialogProps} />
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </div>
   );
 }

@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { useReconciliationQueries, useReconciliationMutations } from '@/lib/api/endpoints/reconciliation';
 import PageHeader from '@/components/ui/PageHeader';
+import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
@@ -59,7 +60,7 @@ export default function BankReconciliationPage() {
       />
 
       {/* ── Tabs ────────────────────────────────────────────────────── */}
-      <div className="card" style={{ marginBottom: 16 }}>
+      <Card noHeader padding={12} style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 4 }}>
           <button
             onClick={() => setTab('unreconciled')}
@@ -92,17 +93,17 @@ export default function BankReconciliationPage() {
             </span>
           </button>
         </div>
-      </div>
+      </Card>
 
       {/* ── Unreconciled Tab ────────────────────────────────────────── */}
       {tab === 'unreconciled' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {unreconciled.isLoading ? (
-            <div className="card"><Skeleton variant="table" rows={4} /></div>
+            <Card noHeader><Skeleton variant="table" rows={4} /></Card>
           ) : unreconciledCount === 0 ? (
-            <div className="card">
+            <Card noHeader>
               <EmptyState icon="ti-circle-check" text="جميع المدفوعات مطابقة" sub="لا توجد مدفوعات في انتظار المطابقة" />
-            </div>
+            </Card>
           ) : (
             unreconciled.data?.map((p) => (
               <div key={p.id} className="card recon-card" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -169,11 +170,11 @@ export default function BankReconciliationPage() {
       {tab === 'reconciled' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {reconciled.isLoading ? (
-            <div className="card"><Skeleton variant="table" rows={4} /></div>
+            <Card noHeader><Skeleton variant="table" rows={4} /></Card>
           ) : reconciledCount === 0 ? (
-            <div className="card">
+            <Card noHeader>
               <EmptyState icon="ti-arrows-exchange" text="لا توجد مطابقات سابقة" sub="لم يتم مطابقة أي مدفوعات بعد" />
-            </div>
+            </Card>
           ) : (
             reconciled.data?.map((p) => (
               <div key={p.id} className="card recon-card" style={{ display: 'flex', alignItems: 'center', gap: 14, opacity: 0.85 }}>

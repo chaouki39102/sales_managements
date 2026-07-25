@@ -1,8 +1,9 @@
 import { useState, useCallback } from 'react';
+import Modal from '@/components/ui/Modal';
 import type { CommercialDocument, CommercialDocumentLine, DocumentType } from '@/types';
 import { documentsApi } from '@/lib/api/endpoints/documents';
 import { formatDZD } from '../utils/calculations';
-import { toast } from 'sonner';
+import { useNotification } from '@/hooks/useNotification';
 
 interface ReturnsModalProps {
   documentTypes: DocumentType[];
@@ -25,6 +26,7 @@ export default function ReturnsModal({
   const [doc, setDoc] = useState<CommercialDocument | null>(null);
   const [selected, setSelected] = useState<SelectedLine[]>([]);
   const [creating, setCreating] = useState(false);
+  const notify = useNotification();
 
   const avcType = documentTypes.find(t => t.code === 'AVC');
 
@@ -40,14 +42,14 @@ export default function ReturnsModal({
       } as any);
       const found = Array.isArray(res) ? res : res.data ?? [];
       if (found.length === 0) {
-        toast.error('لا توجد فاتورة بهذا الرقم');
+        notify.error('لا توجد فاتورة بهذا الرقم');
         setDoc(null);
       } else {
         setDoc(found[0] as CommercialDocument);
         setSelected([]);
       }
     } catch {
-      toast.error('فشل البحث عن الفاتورة');
+      notify.error('فشل البحث عن الفاتورة');
     }
     setSearching(false);
   }, [search]);
@@ -68,11 +70,11 @@ export default function ReturnsModal({
 
   const handleCreateReturn = useCallback(async () => {
     if (!avcType || !doc || !defaultWarehouseId || !fiscalYearId) {
-      toast.error('بيانات غير مكتملة لإنشاء المرتجع');
+      notify.error('بيانات غير مكتملة لإنشاء المرتجع');
       return;
     }
     if (selected.length === 0) {
-      toast.error('اختر أصنافاً للإرجاع');
+      notify.error('اختر أصنافاً للإرجاع');
       return;
     }
     setCreating(true);
@@ -94,86 +96,22 @@ export default function ReturnsModal({
           packaging_id: (s.line as any).packaging_id ?? null,
         })),
       });
-      toast.success('تم إنشاء المرتجع بنجاح');
+      notify.success('تم إنشاء المرتجع بنجاح');
       onDone();
     } catch {
-      toast.error('فشل إنشاء المرتجع');
+      notify.error('فشل إنشاء المرتجع');
     }
     setCreating(false);
   }, [avcType, doc, defaultWarehouseId, fiscalYearId, selected, onDone]);
 
   return (
-    <div className="ov on" onClick={onClose}>
-      <div className="modal modal-md" onClick={e => e.stopPropagation()}>
-        <div className="m-hd">
-          <div className="m-title">
-            <i className="ti ti-receipt-refund ml-2" />
-            مرتجع مبيعات
-          </div>
-          <div className="m-x" onClick={onClose}><i className="ti ti-x" /></div>
-        </div>
-        <div className="m-body si-modal-body">
-          <div className="ret-search">
-            <div className="flex gap-8 mb-4">
-              <input
-                type="text"
-                className="inp flex-1"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
-                placeholder="رقم الفاتورة..."
-              />
-              <button className="btn btn-p" onClick={handleSearch} disabled={searching}>
-                {searching ? '...' : 'بحث'}
-              </button>
-            </div>
-          </div>
-
-          {doc && (
-            <div className="ret-doc">
-              <div className="ret-doc-hd">
-                <strong>الفاتورة: {doc.document_number}</strong>
-                <span className="ret-doc-meta">
-                  {doc.party?.name} — {formatDZD(doc.total_ttc)}
-                </span>
-              </div>
-              <div className="ret-lines">
-                {doc.lines?.map(line => {
-                  const sel = selected.find(s => s.line.id === line.id);
-                  return (
-                    <div key={line.id} className={`ret-line ${sel ? 'ret-line-sel' : ''}`}>
-                      <label className="ret-line-lbl">
-                        <input
-                          type="checkbox"
-                          checked={!!sel}
-                          onChange={() => toggleLine(line)}
-                        />
-                        <span className="ret-line-name">{line.description ?? `صنف #${line.product_variant_id}`}</span>
-                        <span className="ret-line-qty">الكمية: {line.quantity}</span>
-                        <span className="ret-line-amt">{formatDZD(line.total_ht)}</span>
-                      </label>
-                      {sel && (
-                        <div className="ret-line-qty-inp">
-                          <span>كمية الإرجاع:</span>
-                          <input
-                            type="number"
-                            className="inp ret-inp-w"
-                            value={sel.qty}
-                            min={1}
-                            max={line.quantity}
-                            onChange={e => updateReturnQty(line.id, parseInt(e.target.value) || 0)}
-                          />
-                          <span className="text-sm text-t4">/ {line.quantity}</span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="m-foot">
+    <Modal
+      open
+      onClose={onClose}
+      title={<><i className="ti ti-receipt-refund ml-2" /> مرتجع مبيعات</>}
+      size="md"
+      footer={
+        <>
           <button className="btn" onClick={onClose}>إلغاء</button>
           <button
             className="btn btn-p"
@@ -182,8 +120,70 @@ export default function ReturnsModal({
           >
             {creating ? 'جاري الإنشاء...' : 'إنشاء المرتجع'}
           </button>
+        </>
+      }
+    >
+      <div className="si-modal-body">
+        <div className="ret-search">
+          <div className="flex gap-8 mb-4">
+            <input
+              type="text"
+              className="inp flex-1"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
+              placeholder="رقم الفاتورة..."
+            />
+            <button className="btn btn-p" onClick={handleSearch} disabled={searching}>
+              {searching ? '...' : 'بحث'}
+            </button>
+          </div>
         </div>
+
+        {doc && (
+          <div className="ret-doc">
+            <div className="ret-doc-hd">
+              <strong>الفاتورة: {doc.document_number}</strong>
+              <span className="ret-doc-meta">
+                {doc.party?.name} — {formatDZD(doc.total_ttc)}
+              </span>
+            </div>
+            <div className="ret-lines">
+              {doc.lines?.map(line => {
+                const sel = selected.find(s => s.line.id === line.id);
+                return (
+                  <div key={line.id} className={`ret-line ${sel ? 'ret-line-sel' : ''}`}>
+                    <label className="ret-line-lbl">
+                      <input
+                        type="checkbox"
+                        checked={!!sel}
+                        onChange={() => toggleLine(line)}
+                      />
+                      <span className="ret-line-name">{line.description ?? `صنف #${line.product_variant_id}`}</span>
+                      <span className="ret-line-qty">الكمية: {line.quantity}</span>
+                      <span className="ret-line-amt">{formatDZD(line.total_ht)}</span>
+                    </label>
+                    {sel && (
+                      <div className="ret-line-qty-inp">
+                        <span>كمية الإرجاع:</span>
+                        <input
+                          type="number"
+                          className="inp ret-inp-w"
+                          value={sel.qty}
+                          min={1}
+                          max={line.quantity}
+                          onChange={e => updateReturnQty(line.id, parseInt(e.target.value) || 0)}
+                        />
+                        <span className="text-sm text-t4">/ {line.quantity}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }

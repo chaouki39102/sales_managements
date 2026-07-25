@@ -18,6 +18,7 @@ import apiClient from '@/lib/api/core/client';
 import { useAuth } from '@/context/AuthContext';
 import { appActions } from '@/lib/store/appStore';
 import { useConfirm } from '@/hooks/useConfirm';
+import { useNotification } from '@/hooks/useNotification';
 import { ConfirmDialog } from '@/components/ui';
 // ✅ المودال الجديد الشامل
 import { CreateCompanyModal } from '@/components/modals/CreateCompanyModal';
@@ -453,8 +454,8 @@ function AdminModal({
   const [editTarget, setEditTarget] = useState<Company | null>(null);
   const [search, setSearch]         = useState('');
   const [saving, setSaving]         = useState(false);
-  const [toast, setToast]           = useState('');
   const deleteConfirm = useConfirm();
+  const notify = useNotification();
 
   // إعدادات Super Admin
   const [settings, setSettings] = useState({
@@ -485,11 +486,6 @@ function AdminModal({
       .catch(() => setCompanies([]))
       .finally(() => setLoadingAdmin(false));
   }, []);
-
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(''), 2500);
-  };
 
   const openEdit = (co: Company) => {
     setForm({
@@ -524,9 +520,9 @@ function AdminModal({
         c.id === editTarget.id ? { ...c, ...form } : c
       ));
       setEditTarget(null);
-      showToast(`تم حفظ ${form.name}`);
+      notify.success(`تم حفظ ${form.name}`);
     } catch (e: any) {
-      showToast(e?.response?.data?.message ?? 'فشل الحفظ');
+      notify.error(e?.response?.data?.message ?? 'فشل الحفظ');
     } finally {
       setSaving(false);
     }
@@ -544,9 +540,9 @@ function AdminModal({
       setCompanies(prev => prev.map(c =>
         c.id === co.id ? { ...c, is_suspended: !isSuspended } : c
       ));
-      showToast(isSuspended ? 'تم رفع التعليق' : 'تم تعليق الشركة');
+      notify.success(isSuspended ? 'تم رفع التعليق' : 'تم تعليق الشركة');
     } catch {
-      showToast('فشلت العملية');
+      notify.error('فشلت العملية');
     }
   };
 
@@ -559,9 +555,9 @@ function AdminModal({
       setCompanies(prev => prev.map(c =>
         c.id === co.id ? { ...c, is_verified: !isVerified } : c
       ));
-      showToast(isVerified ? 'تم إلغاء التوثيق' : 'تم توثيق الشركة');
+      notify.success(isVerified ? 'تم إلغاء التوثيق' : 'تم توثيق الشركة');
     } catch {
-      showToast('فشلت العملية');
+      notify.error('فشلت العملية');
     }
   };
 
@@ -572,9 +568,9 @@ function AdminModal({
       setCompanies(prev => prev.map(c =>
         c.id === co.id ? { ...c, plan } : c
       ));
-      showToast(`تم تغيير خطة ${co.name} إلى ${PLAN_LABELS[plan]}`);
+      notify.success(`تم تغيير خطة ${co.name} إلى ${PLAN_LABELS[plan]}`);
     } catch {
-      showToast('فشل تغيير الخطة');
+      notify.error('فشل تغيير الخطة');
     }
   };
 
@@ -587,9 +583,9 @@ function AdminModal({
       setCompanies(prev => prev.map(c =>
         c.id === editTarget.id ? { ...c, notes: form.notes } : c
       ));
-      showToast('تم حفظ الملاحظات');
+      notify.success('تم حفظ الملاحظات');
     } catch {
-      showToast('فشل حفظ الملاحظات');
+      notify.error('فشل حفظ الملاحظات');
     } finally {
       setSaving(false);
     }
@@ -927,12 +923,12 @@ function AdminModal({
                   <div style={{ fontSize:11, fontWeight:800, color:'var(--t3)', textTransform:'uppercase', letterSpacing:1, marginBottom:12 }}>عمليات النظام</div>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                     {[
-                      { label:'مسح الكاش العام',        icon:'ti-refresh',         color:'var(--em)',   bg:'var(--emb)',   action:() => showToast('تم مسح الكاش') },
-                      { label:'نسخ احتياطي فوري',       icon:'ti-database-export', color:'var(--gold)', bg:'var(--goldb)', action:() => showToast('النسخة تُنشأ...') },
-                      { label:'تصدير اللوج',            icon:'ti-download',        color:'var(--blue)', bg:'var(--blueb)', action:() => showToast('جارٍ التصدير') },
-                      { label:'إرسال إشعار للكل',       icon:'ti-speakerphone',    color:'var(--gold)', bg:'var(--goldb)', action:() => showToast('تم الإرسال') },
-                      { label:'تفعيل وضع الصيانة',      icon:'ti-alert-triangle',  color:'var(--red)',  bg:'var(--redb)',  action:async () => { if (await deleteConfirm.confirm('تفعيل وضع الصيانة؟')) showToast('مفعّل') } },
-                      { label:'تشغيل المهام المجدولة',  icon:'ti-clock-play',      color:'var(--blue)', bg:'var(--blueb)', action:() => showToast('تم تشغيل المهام') },
+                      { label:'مسح الكاش العام',        icon:'ti-refresh',         color:'var(--em)',   bg:'var(--emb)',   action:() => notify.success('تم مسح الكاش') },
+                      { label:'نسخ احتياطي فوري',       icon:'ti-database-export', color:'var(--gold)', bg:'var(--goldb)', action:() => notify.success('النسخة تُنشأ...') },
+                      { label:'تصدير اللوج',            icon:'ti-download',        color:'var(--blue)', bg:'var(--blueb)', action:() => notify.success('جارٍ التصدير') },
+                      { label:'إرسال إشعار للكل',       icon:'ti-speakerphone',    color:'var(--gold)', bg:'var(--goldb)', action:() => notify.success('تم الإرسال') },
+                      { label:'تفعيل وضع الصيانة',      icon:'ti-alert-triangle',  color:'var(--red)',  bg:'var(--redb)',  action:async () => { if (await deleteConfirm.confirm('تفعيل وضع الصيانة؟')) notify.success('مفعّل') } },
+                      { label:'تشغيل المهام المجدولة',  icon:'ti-clock-play',      color:'var(--blue)', bg:'var(--blueb)', action:() => notify.success('تم تشغيل المهام') },
                     ].map(op => (
                       <button key={op.label} onClick={op.action}
                         style={{ padding:'10px 12px', borderRadius:10, border:`1px solid ${op.bg}`, background:op.bg, color:op.color, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'Tajawal, sans-serif', display:'flex', alignItems:'center', gap:7, transition:'.13s' }}
@@ -962,7 +958,7 @@ function AdminModal({
                 </button>
               </>
             ) : tab === 'super' ? (
-              <button onClick={() => showToast('تم حفظ الإعدادات')} style={{ padding:'9px 22px', borderRadius:10, border:'none', background:'var(--em)', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:'Tajawal, sans-serif', boxShadow:'var(--emglow)', display:'flex', alignItems:'center', gap:7 }}>
+              <button onClick={() => notify.success('تم حفظ الإعدادات')} style={{ padding:'9px 22px', borderRadius:10, border:'none', background:'var(--em)', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:'Tajawal, sans-serif', boxShadow:'var(--emglow)', display:'flex', alignItems:'center', gap:7 }}>
                 <i className="ti ti-device-floppy" />حفظ الإعدادات
               </button>
             ) : (
@@ -973,13 +969,6 @@ function AdminModal({
           </div>
         </div>
       </div>
-
-      {/* Toast */}
-      {toast && (
-        <div style={{ position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)', background:'#2c2c2a', color:'#fff', padding:'10px 22px', borderRadius:20, fontSize:13, fontFamily:'Tajawal, sans-serif', zIndex:10020, animation:'slideup .2s ease' }}>
-          {toast}
-        </div>
-      )}
 
       <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </>

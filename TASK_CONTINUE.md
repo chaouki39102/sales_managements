@@ -4,14 +4,14 @@
 
 ---
 
-## Date: 2026-07-24
+## Date: 2026-07-25
 
 ## Mission
 Unify all UI elements across the site: confirm dialogs, tables, cards, buttons, icons, page headers. Remove duplicates and dead code.
 
 ---
 
-## COMPLETED (Session 1)
+## COMPLETED (Session 1 — July 24)
 
 ### 1. Confirm Dialogs — Unified ✅
 - **Fixed broken renders**: `BankReconciliationPage.tsx`, `AdminApprovalsPage.tsx` — `useConfirm()` was called but `<ConfirmDialog>` was never rendered. Added the missing `<ConfirmDialog {...confirmDialogProps} />` in JSX.
@@ -36,95 +36,72 @@ Unify all UI elements across the site: confirm dialogs, tables, cards, buttons, 
 - `PageHeader` export from `Misc.tsx` — deleted (18 lines, dead duplicate).
 - Barrel exports cleaned in `components/ui/index.ts` and `components/index.ts`.
 
-### Build Status
+### Build Status (Session 1)
 - `npm run build` — 0 errors, 1107 modules
 - `npm test` — 160/160 pass
 
 ---
 
-## REMAINING (Session 2+)
+## COMPLETED (Session 2 — July 25)
 
-### Priority 1: Table Unification (HIGH — ~40 tables across ~30 pages)
+### 6. SimpleTable — Fixed align prop + empty state CSS ✅
+- **Fixed `align` prop**: Was declared on `SimpleColumn` interface but never applied to `<th>` or `<td>` elements. Added `thStyle()` helper that merges `align` and `onHeaderClick` styles. Added `style={{ textAlign: c.align }}` to `<td>`.
+- **Added `.tbl-empty` CSS**: SimpleTable's empty state used `.tbl-empty`, `.tbl-empty__inner`, `.tbl-empty__icon` classes that had zero CSS definitions anywhere. Added proper centering, flex layout, and opacity styling to `components.css`.
+- **Impact**: Fixes alignment on all 50+ pages using SimpleTable's `align: 'end'` or `align: 'center'` columns.
 
-**Problem**: ~30 pages render raw `<table>` elements with no shared abstraction. Each manually renders `<thead>`, `<tbody>`, sorts, paginates. There is no consistent table styling — some use `className="table"`, some use `className="audit-tbl"`, most use bare `<table>` with inline styles.
+### 7. Card Migration — BankReconciliationPage ✅
+- **5 raw `<div className="card">`** replaced with `<Card>` component:
+  - Tabs bar → `<Card noHeader padding={12}>`
+  - 2 loading states → `<Card noHeader><Skeleton /></Card>`
+  - 2 empty states → `<Card noHeader><EmptyState /></Card>`
+- Added `Card` import from `@/components/ui/Card`.
 
-**Solution**: Create a `SimpleTable` component in `components/ui/SimpleTable.tsx` that wraps the common pattern:
+### 8. Card Migration — ProductLotsTab ✅
+- **1 raw `<div className="card" style={{ padding: 0, overflow: 'hidden' }}>`** replaced with `<Card noHeader padding={0} style={{ overflow: 'hidden' }}>`.
+- Added `Card` import from `@/components/ui/Card`.
 
-```tsx
-// Proposed API
-<SimpleTable
-  columns={[{ key: 'name', label: 'الاسم', className: '...' }]}
-  data={rows}
-  onRowClick={handleClick}
-  emptyText="لا توجد بيانات"
-  isLoading={loading}
-/>
-```
+### 9. Header Migration — InventoryPage ✅
+- **Replaced 17-line inline header** (icon square + `<h1>` + `<p>`) with `<PageHeader title="إدارة المخزون" description="..." tabs={...} />`.
+- Tabs moved into PageHeader's `tabs` prop for consistent layout.
+- Added `PageHeader` import, changed wrapper to `className="page on" id="p-inventory"`.
 
-**Files to migrate** (grouped by complexity):
+### 10. Dead CSS Cleanup — Verified ✅
+- `.tbl-outer`, `.tbl-head`, `.tbl-th`, `.tbl-row`, `.tbl-cell`, `.tbl-checkbox`, `.tbl-skel`, `.tbl-sort-inactive` — **already absent** from `components.css`. No action needed.
+- `.tbl` and `.tbl-sm` in `pos.css` — **actively used** by `SessionInvoicesModal.tsx`. Not dead.
 
-**Group A — Simple tables (no sorting, no pagination) — ~20 files:**
-These are the easiest. They just render data in a flat table.
-- `SubsidizedProductsPage.tsx` (2 tables)
-- `RegulatedProductsPage.tsx`
-- `IFUDeclarationPage.tsx`
-- `G50DeclarationPage.tsx`
-- `EmployeesPage.tsx`
-- `PaymentMethodsPage.tsx`
-- `DocumentTypesPage.tsx`
-- `NumberingSeriesPage.tsx`
-- `TaxSettingsPage.tsx` (5 tables)
-- `StockTab.tsx` (2 tables)
-- All report pages (~20 files, each 1-3 tables): `SalesReportPage`, `PurchasesReportPage`, `CashFlowReportPage`, `ExpensesReportPage`, `CustomersReportPage`, `ReturnsReportPage`, `PaymentsReportPage`, `AgingReportPage`, `CreativeReportPage`, `DailyReportPage`, `InventoryReportPage`, `MarginReportPage`, `ProductMovementPage`, `ProductsReportPage`, `ProfitLossPage`, `StockMovementsReportPage`, `SuppliersReportPage`, `VelocityReportPage`, `SalesTrendReportPage`
+### Build Status (Session 2)
+- `npm run build` — 0 errors, 1109 modules
+- `npm test` — 160/160 pass
 
-**Group B — Tables with sorting + pagination — ~8 files:**
-These need `onSort`, `sortKey`, `sortDir`, `page`, `onPageChange`, `totalPages`.
-- `PartiesPage.tsx` (uses `className="table"`)
-- `ClientsPage.tsx` (uses `className="table"`)
-- `ProductsPage.tsx`
-- `ExpensesPage.tsx`
-- `FinancePage.tsx` (5 tables)
-- `TreasuryAccountsPage.tsx`
-- `FiscalYearsPage.tsx`
-- `ChecksPage.tsx`
+---
 
-**Group C — Special tables (leave as-is):**
-- `CommercialDocumentsPage.tsx` — uses full `DataTable` (different component, keep)
-- `DebtsPage.tsx` — uses full `DataTable` (keep)
-- `PosSessionsTable.tsx` — POS-specific with sparklines (keep)
-- `PaymentTermsTable.tsx` — inline editable (keep)
-- Print preview tables — document rendering (keep)
-- `DocumentLinesSection.tsx` — document editor (keep)
-- `ImportWizardModal.tsx` — import wizard (keep)
+## REMAINING (Session 3+)
 
-### Priority 2: Card Unification (MEDIUM — 5 files)
+### Priority 1: Complex Tables (DEFERRED — features beyond SimpleTable scope)
 
-**Problem**: 5 pages use raw `<div className="card">` instead of the `<Card>` component.
+These tables have advanced features (expandable rows, column visibility, checkbox selection, inline editing) that SimpleTable does not support. They are already functional and well-structured. Migrating them would require SimpleTable enhancements that add complexity rather than reduce it.
 
-**Files to fix:**
-- `AuditLogPage.tsx` — 2 instances of `<div className="card">`
-- `BankReconciliationPage.tsx` — 5 instances
-- `AlertsPage.tsx` — 3 instances (including `alert-card` variant)
-- `LookupPage.tsx` — 1 instance
-- `ProductLotsTab.tsx` — 1 instance
+| File | Why Deferred |
+|------|-------------|
+| `StockTab.tsx` | Expandable rows (`LotsSubRow`), `<tfoot>` totals, 11 columns |
+| `ProductsPage.tsx` | Checkbox selection, column visibility toggle, server-side sort/pagination, inline Switch |
+| `FinancePage.tsx` (2 tables) | Inline `<select>`/`<ComboBox>` editors for opening balances — interactive editing tables |
 
-**Solution**: Replace with `<Card>` from `@/components/ui/Card`. The Card component supports `title`, `subtitle`, `actions`, `noHeader`, `padding` props.
+**If SimpleTable gains sort/pagination/expandable support in the future, these should be revisited.**
 
-### Priority 3: Dead CSS Cleanup (LOW)
+### Priority 2: Remaining Card/Headless Migrations (LOW)
 
-**Problem**: `components.css` has `.tbl-*` classes (lines 513-549) that were only used by the deleted `Table.tsx`. No raw tables use these classes.
+| File | Issue | Complexity |
+|------|-------|-----------|
+| `LookupPage.tsx` | Inline icon+title header (generic component with props: `title`, `icon`, `color`) | Low — but header is per-section, not page-level |
+| `ProfilePage.tsx` | Inline name/jobtitle in profile card layout — NOT a page header | Skip — intentional layout |
+| `BankReconciliationPage.tsx` (documents/) | May have inline `<h2>` — already uses PageHeader on main page | Verify only |
 
-**Solution**: Remove `.tbl-outer`, `.tbl`, `.tbl-head`, `.tbl-th`, `.tbl-row`, `.tbl-cell`, `.tbl-empty`, `.tbl-checkbox`, `.tbl-skel`, `.tbl-sort-inactive` from `components.css`.
+### Priority 3: Table CSS Refinements (LOW)
 
-### Priority 4: Remaining Inline Headers (LOW — ~6 pages)
-
-Pages that still have ad-hoc `<h1 style={{fontSize:...}}` instead of `<PageHeader>`:
-- `InventoryPage.tsx` — `<h1 style={{fontSize:20, fontWeight:700}}>`
-- `LookupPage.tsx` — inline icon + title div
-- `ProfilePage.tsx` — inline `<div style={{fontSize:22, fontWeight:900}}>`
-- `BankReconciliationPage.tsx` (documents/) — inline `<h2 style={{fontSize:18}}>`
-
-**Note**: Some pages like `POSPage`, `POSKioskPage`, `PrintSettingsPage`, `OnboardingPage`, `SetupWizard`, `SetupHub` are full-screen layouts and should NOT use PageHeader.
+- `SimpleTable` empty state has no loading spinner (just icon + text). Could add animated `spin` icon.
+- `SimpleTable` has no sticky `<thead>` for tall tables. Browser `position: sticky` on `<thead th>` would help.
+- Report pages use `rowClassName` returning `'tw-sr'` for summary rows — this pattern works but relies on the global `.tw-sr` class being defined.
 
 ---
 
@@ -160,7 +137,7 @@ pos-cart-v4.css → POS cart
 
 ### Component Locations
 ```
-components/ui/          → Shared: Button, Modal, Card, PageHeader, ConfirmDialog, etc.
+components/ui/          → Shared: Button, Modal, Card, PageHeader, ConfirmDialog, SimpleTable
 components/modals/      → Feature modals: ClientModal, CreateCompanyModal, etc.
 components/layouts/     → DashboardLayout
 components/admin/       → Admin shared components
@@ -195,6 +172,23 @@ import Button from '@/components/ui/Button';
 <Button variant="primary" size="sm" icon="ti-plus">إضافة</Button>
 // Variants: default, primary, danger, warning, info, outline, secondary, success
 // Sizes: xs, sm, md
+```
+
+### SimpleTable Pattern
+```tsx
+import SimpleTable from '@/components/ui/SimpleTable';
+<SimpleTable
+  columns={[
+    { key: 'name', label: 'الاسم' },
+    { key: 'amount', label: 'المبلغ', align: 'end', render: (v) => fmt(v) },
+    { key: '_actions', label: '', render: (_, row) => <Button ... /> },
+  ]}
+  data={items}
+  rowKey="id"
+  onRowClick={handleClick}
+  isLoading={loading}
+  emptyText="لا توجد بيانات"
+/>
 ```
 
 ### Modal Pattern

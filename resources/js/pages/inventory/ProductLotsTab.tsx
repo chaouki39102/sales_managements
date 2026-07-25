@@ -8,6 +8,7 @@ import { useNotification } from '@/hooks/useNotification';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useModal } from '@/hooks/useModal';
 import Badge from '@/components/ui/Badge';
+import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
 import Skeleton from '@/components/ui/Skeleton';
@@ -341,7 +342,7 @@ export default function ProductLotsTab() {
         </Button>
       </div>
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <Card noHeader padding={0} style={{ overflow: 'hidden' }}>
         {isLoading ? (
           <div style={{ padding: 24 }}><Skeleton variant="table" rows={6} /></div>
         ) : items.length === 0 ? (
@@ -427,7 +428,7 @@ export default function ProductLotsTab() {
             )}
           </>
         )}
-      </div>
+      </Card>
 
       <Modal open={createModal.open} onClose={createModal.closeModal} title={"\u0625\u0646\u0634\u0627\u0621 \u062f\u0641\u0639\u0629 \u062c\u062f\u064a\u062f\u0629"}
         footer={<><Button variant="default" onClick={createModal.closeModal}>{"\u0625\u0644\u063a\u0627\u0621"}</Button><Button variant="primary" onClick={handleSave} loading={mutations.createLot.isPending}>{"\u062d\u0641\u0638"}</Button></>}>

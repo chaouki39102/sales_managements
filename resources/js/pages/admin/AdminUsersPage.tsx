@@ -8,6 +8,7 @@ import { adminApi } from '@/lib/admin';
 import { adminKeys } from '@/lib/api/core/queryKeys';
 import { tokenStorage } from '@/lib/api/core/client';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useNotification } from '@/hooks/useNotification';
 import PageHeader from '@/components/ui/PageHeader';
 import SimpleTable from '@/components/ui/SimpleTable';
 import type { AdminUser, AdminCompany } from '@/types/admin';
@@ -30,9 +31,9 @@ type UTab = 'info' | 'companies' | 'password' | 'danger';
 
 function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: boolean) => void }) {
   const qc   = useQueryClient();
+  const notify = useNotification();
   const [tab,   setTab]   = useState<UTab>('info');
   const [busy,  setBusy]  = useState<string | null>(null);
-  const [flash, setFlash] = useState<{ ok: boolean; msg: string } | null>(null);
   const [pwd,   setPwd]   = useState('');
   const [pwd2,  setPwd2]  = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
@@ -45,21 +46,21 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: bo
   });
 
   const run = async (key: string, fn: () => Promise<unknown>, msg: string, refresh = true) => {
-    setBusy(key); setFlash(null);
+    setBusy(key);
     try {
       await fn();
-      setFlash({ ok: true, msg });
+      notify.success(msg);
       if (refresh) {
         qc.invalidateQueries({ queryKey: adminKeys.users.list() });
         setTimeout(() => onClose(true), 1200);
       }
     } catch (e: any) {
-      setFlash({ ok: false, msg: e?.message ?? 'حدث خطأ' });
+      notify.error(e?.message ?? 'حدث خطأ');
     } finally { setBusy(null); }
   };
 
   const handleImpersonate = async () => {
-    setBusy('imp'); setFlash(null);
+    setBusy('imp');
     try {
       const res: any = await adminApi.impersonate(user.id);
       const token = res?.token ?? res?.data?.token;
@@ -68,14 +69,14 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: bo
         window.location.href = '/dashboard';
       }
     } catch (e: any) {
-      setFlash({ ok: false, msg: e?.message ?? 'فشل الانتحال' });
+      notify.error(e?.message ?? 'فشل الانتحال');
       setBusy(null);
     }
   };
 
   const handleResetPwd = async () => {
-    if (pwd !== pwd2) { setFlash({ ok: false, msg: 'كلمتا المرور غير متطابقتين' }); return; }
-    if (pwd.length < 8) { setFlash({ ok: false, msg: 'يجب أن تكون 8 أحرف على الأقل' }); return; }
+    if (pwd !== pwd2) { notify.error('كلمتا المرور غير متطابقتين'); return; }
+    if (pwd.length < 8) { notify.error('يجب أن تكون 8 أحرف على الأقل'); return; }
     await run('pwd', () => adminApi.resetPassword(user.id, pwd), 'تم تغيير كلمة المرور بنجاح', false);
     setPwd(''); setPwd2('');
   };
@@ -137,18 +138,6 @@ function UserDrawer({ user, onClose }: { user: AdminUser; onClose: (refresh?: bo
             <i className="ti ti-x" />
           </button>
         </div>
-
-        {/* Flash */}
-        {flash && (
-          <div style={{
-            padding: '9px 20px', fontSize: 12, fontWeight: 700, flexShrink: 0,
-            background: flash.ok ? 'var(--greenb)' : 'var(--redb)',
-            color: flash.ok ? 'var(--green)' : 'var(--red)',
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            <i className={`ti ${flash.ok ? 'ti-check' : 'ti-alert-circle'}`} />{flash.msg}
-          </div>
-        )}
 
         {/* Tabs */}
         <div style={{

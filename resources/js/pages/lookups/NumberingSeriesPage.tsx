@@ -6,7 +6,8 @@ import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal';
+import { useConfirm } from '@/hooks/useConfirm';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import KpiCard from '@/components/ui/KpiCard';
 import EmptyState from '@/components/ui/EmptyState';
 import SimpleTable from '@/components/ui/SimpleTable';
@@ -77,8 +78,7 @@ export default function NumberingSeriesPage() {
   const [page, setPage] = useState(1);
   const [perPage] = useState(15);
   const modal = useModal();
-  const deleteModal = useModal();
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const deleteConfirm = useConfirm();
   const [syncError, setSyncError] = useState<string | null>(null);
   const slug = useActiveSlug();
 
@@ -116,8 +116,8 @@ export default function NumberingSeriesPage() {
     (id: number) => numberingSeriesApi.delete(id),
     (slug) => tenantKeys.lookups.numberingSeries(slug),
     {
-      onSuccess: () => { deleteModal.closeModal(); setSyncError(null); },
-      onError: (err: any) => { setSyncError(err?.response?.data?.message || 'فشل حذف السلسلة'); deleteModal.closeModal(); },
+      onSuccess: () => { setSyncError(null); },
+      onError: (err: any) => { setSyncError(err?.response?.data?.message || 'فشل حذف السلسلة'); },
     },
   );
 
@@ -146,12 +146,9 @@ export default function NumberingSeriesPage() {
     },
   );
 
-  const handleDelete = (id: number) => {
-    setDeletingId(id);
-    deleteModal.openModal();
-  };
-  const confirmDelete = () => {
-    if (deletingId) deleteMutation.mutate(deletingId);
+  const handleDelete = async (id: number) => {
+    if (!await deleteConfirm.confirm('حذفسلسلة الترقيم؟')) return;
+    deleteMutation.mutate(id);
   };
   const openAdd = () => { setEditing(null); modal.openModal(); };
   const openEdit = (item: NumberingSeriesRecord) => { setEditing(item); modal.openModal(); };
@@ -335,12 +332,7 @@ export default function NumberingSeriesPage() {
         onClose={modal.closeModal}
       />
 
-      <ConfirmDeleteModal
-        open={deleteModal.open}
-        onClose={deleteModal.closeModal}
-        onConfirm={confirmDelete}
-        loading={deleteMutation.isPending}
-      />
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { toast } from 'sonner';
+import { useNotification } from '@/hooks/useNotification';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete, apiUpload } from '@/lib/api/core/client';
 import { useActiveCompany, useActiveSlug } from '@/lib/store/appStore';
 import type { ApiClient } from '@/pages/settings/print-settings/contracts/ApiClient';
@@ -17,14 +17,15 @@ const hostApiClient: ApiClient = {
   upload:   <T,>(url: string, fd: FormData, onProgress?: (p: number) => void) => apiUpload<T>(url, fd, onProgress),
 };
 
-const hostNotifier: Notifier = {
-  success: (msg: string) => toast.success(msg),
-  error:   (msg: string) => toast.error(msg),
-};
-
 export default function PrintSettingsPageAdapter() {
   const activeCompany = useActiveCompany();
   const slug          = useActiveSlug();
+  const notify        = useNotification();
+
+  const hostNotifier: Notifier = useMemo(() => ({
+    success: (msg: string) => notify.success(msg),
+    error:   (msg: string) => notify.error(msg),
+  }), [notify]);
 
   const dependencies = useMemo(() => ({
     apiClient:         hostApiClient,
@@ -49,7 +50,7 @@ export default function PrintSettingsPageAdapter() {
       logoUrl:         activeCompany.avatar          ?? null,
     } : null,
     slug,
-  }), [activeCompany, slug]);
+  }), [activeCompany, slug, hostNotifier]);
 
   return (
     <PrintSettingsProvider value={dependencies}>

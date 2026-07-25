@@ -23,7 +23,6 @@ import React, {
     useCallback,
     useMemo,
     useEffect,
-    useRef,
 } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -60,6 +59,7 @@ import Button from "@/components/ui/Button";
 import SimpleTable from "@/components/ui/SimpleTable";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useConfirm } from "@/hooks/useConfirm";
+import { useNotification } from '@/hooks/useNotification';
 import type { DocumentType, CommercialDocument } from "@/lib/api/core/types";
 
 // أنماط SmartFilter الخاصة بالمشروع (مفصولة عن library)
@@ -315,44 +315,6 @@ function ExpandedLines({ doc }: { doc: CommercialDocument }) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// TOAST
-// ════════════════════════════════════════════════════════════════════════════
-
-interface ToastItem { id: number; msg: string; type: "success" | "error" | "info" }
-
-function useToast() {
-    const [toasts, setToasts] = useState<ToastItem[]>([]);
-    const counterRef = useRef(0);
-
-    const show = useCallback((msg: string, type: "success" | "error" | "info" = "success") => {
-        const id = ++counterRef.current;
-        setToasts(p => [...p, { id, msg, type }]);
-        setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 3500);
-    }, []);
-
-    const ToastContainer = useCallback(() => (
-        <div style={{ position: "fixed", bottom: 24, left: 24, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" }}>
-            {toasts.map(t => (
-                <div key={t.id} style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    padding: "10px 16px", borderRadius: 10,
-                    background: t.type === "error" ? "color-mix(in srgb, var(--red) 15%, var(--bg1))" : t.type === "info" ? "color-mix(in srgb, var(--blue) 12%, var(--bg1))" : "color-mix(in srgb, var(--em) 12%, var(--bg1))",
-                    border: `1px solid ${t.type === "error" ? "var(--red)" : t.type === "info" ? "var(--blue)" : "var(--em)"}`,
-                    boxShadow: "0 8px 24px rgba(0,0,0,.14)", fontSize: 13, fontWeight: 600, color: "var(--t1)",
-                    animation: "cdp-toast-in .2s ease",
-                }}>
-                    <i className={`ti ${t.type === "error" ? "ti-alert-circle" : t.type === "info" ? "ti-info-circle" : "ti-circle-check"}`}
-                       style={{ color: t.type === "error" ? "var(--red)" : t.type === "info" ? "var(--blue)" : "var(--em)" }} aria-hidden="true" />
-                    {t.msg}
-                </div>
-            ))}
-        </div>
-    ), [toasts]);
-
-    return { show, ToastContainer };
-}
-
-// ════════════════════════════════════════════════════════════════════════════
 // ROW ACTION BUTTON
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -535,7 +497,7 @@ export default function CommercialDocumentsPage() {
     const companyInfo                        = useMemo(() => mapCompany(activeCompany), [activeCompany]);
     const { data: printTemplates = [] }      = usePrintTemplatesList();
     const { selectedYear, isReadOnly }       = useFiscalYear() as { selectedYear?: { id: number; name: string }; isReadOnly?: boolean };
-    const { show: showToast, ToastContainer } = useToast();
+    const notify = useNotification();
     const { confirm, confirmDialogProps } = useConfirm();
 
     // ── Modal state ───────────────────────────────────────────────────────────
@@ -767,19 +729,19 @@ export default function CommercialDocumentsPage() {
     // ── Mutations ─────────────────────────────────────────────────────────────
     const lockMut = useMutation({
         mutationFn: (id: number) => apiPost(`/documents/${id}/lock`),
-        onSuccess: () => { showToast("تم قفل المستند"); invalidateDocs(); },
-        onError:   () => showToast("فشل القفل", "error"),
+        onSuccess: () => { notify.success("تم قفل المستند"); invalidateDocs(); },
+        onError:   () => notify.error("فشل القفل"),
     });
     const unlockMut = useMutation({
         mutationFn: (id: number) => apiPost(`/documents/${id}/unlock`),
-        onSuccess: () => { showToast("تم فتح قفل المستند"); invalidateDocs(); },
-        onError:   () => showToast("فشل فتح القفل", "error"),
+        onSuccess: () => { notify.success("تم فتح قفل المستند"); invalidateDocs(); },
+        onError:   () => notify.error("فشل فتح القفل"),
     });
     const cancelMut = useMutation({
         mutationFn: ({ id, reason }: { id: number; reason: string }) =>
             apiPost(`/documents/${id}/cancel`, { cancellation_reason: reason }),
-        onSuccess: () => { showToast("تم إلغاء المستند"); invalidateDocs(); },
-        onError:   () => showToast("فشل الإلغاء", "error"),
+        onSuccess: () => { notify.success("تم إلغاء المستند"); invalidateDocs(); },
+        onError:   () => notify.error("فشل الإلغاء"),
     });
 
     // ── Edit modal ────────────────────────────────────────────────────────────
@@ -793,11 +755,11 @@ export default function CommercialDocumentsPage() {
             setEditDocFull(full);
             setModal("edit");
         } catch {
-            showToast("فشل تحميل بيانات المستند", "error");
+            notify.error("فشل تحميل بيانات المستند");
         } finally {
             setLoadingEdit(false);
         }
-    }, [showToast]);
+    }, []);
 
     const closeModal = useCallback(() => { setModal(null); setViewDocId(null); setEditDocFull(null); }, []);
 
@@ -861,11 +823,11 @@ export default function CommercialDocumentsPage() {
                         onDoubleClick={async () => {
                             if (isReadOnly) return;
                             if (locked) {
-                                if (isExported) { showToast("لا يمكن فتح قفل مستند مُصدَّر للمحاسبة", "error"); return; }
+                                if (isExported) { notify.error("لا يمكن فتح قفل مستند مُصدَّر للمحاسبة"); return; }
                                 if (await confirm("تأكيد فتح قفل هذا المستند؟")) unlockMut.mutate(row.id);
                             } else {
                                 const status = getDocStatus(row);
-                                if (status === "cancelled") { showToast("لا يمكن قفل مستند ملغى", "error"); return; }
+                                if (status === "cancelled") { notify.error("لا يمكن قفل مستند ملغى"); return; }
                                 if (await confirm("تأكيد قفل هذا المستند؟ لن يمكن تعديله بعد القفل.")) lockMut.mutate(row.id);
                             }
                         }}
@@ -1365,7 +1327,7 @@ export default function CommercialDocumentsPage() {
                     onClick: () => {
                         const cellEl = document.querySelector(`[data-row-index="${ctx.rowIndex}"][data-col-key="${colKey}"]`);
                         const text   = cellEl?.textContent?.trim() ?? String(value ?? "");
-                        if (text) { navigator.clipboard.writeText(text); showToast("تم نسخ القيمة", "info"); }
+                        if (text) { navigator.clipboard.writeText(text); notify.info("تم نسخ القيمة"); }
                     },
                 },
                 { label: "", divider: true, onClick: () => {} },
@@ -1377,7 +1339,7 @@ export default function CommercialDocumentsPage() {
                         if (colKey && value !== undefined) {
                             setServerFilters(prev => ({ ...prev, [colKey]: String(value) }));
                             setPage(1);
-                            showToast(`تم تطبيق فلتر على: ${colKey}`, "info");
+                            notify.info(`تم تطبيق فلتر على: ${colKey}`);
                         }
                     },
                 },
@@ -1418,7 +1380,7 @@ export default function CommercialDocumentsPage() {
                     onClick: () => {
                         if (row?.document_number) {
                             navigator.clipboard.writeText(String(row.document_number));
-                            showToast("تم نسخ رقم المستند", "info");
+                            notify.info("تم نسخ رقم المستند");
                         }
                     },
                 },
@@ -1515,7 +1477,7 @@ export default function CommercialDocumentsPage() {
                             ? hiddenColumnKeys.filter(k => k !== colKey)
                             : [...hiddenColumnKeys, colKey];
                         handleHiddenColumnsChange(colKey, !isHidden, updated);
-                        showToast(isHidden ? "تم إظهار العمود" : "تم إخفاء العمود", "info");
+                        notify.info(isHidden ? "تم إظهار العمود" : "تم إخفاء العمود");
                     }
                 },
             });
@@ -1535,7 +1497,7 @@ export default function CommercialDocumentsPage() {
                         lockable.reduce(
                             (chain, doc) => chain.then(() => lockMut.mutateAsync(doc.id).catch(() => null)),
                             Promise.resolve(null as unknown),
-                        ).then(() => showToast(`تم قفل ${lockable.length} مستند`, "success"));
+                        ).then(() => notify.success(`تم قفل ${lockable.length} مستند`));
                     },
                 });
             }
@@ -1549,14 +1511,14 @@ export default function CommercialDocumentsPage() {
                         unlockable.reduce(
                             (chain, doc) => chain.then(() => unlockMut.mutateAsync(doc.id).catch(() => null)),
                             Promise.resolve(null as unknown),
-                        ).then(() => showToast(`تم فتح قفل ${unlockable.length} مستند`, "success"));
+                        ).then(() => notify.success(`تم فتح قفل ${unlockable.length} مستند`));
                     },
                 });
             }
         }
 
         return menuItems;
-    }, [hiddenColumnsSet, hiddenColumnKeys, handleHiddenColumnsChange, isReadOnly, lockMut, unlockMut, cancelMut, items, showToast, navigate, typeCode]);
+    }, [hiddenColumnsSet, hiddenColumnKeys, handleHiddenColumnsChange, isReadOnly, lockMut, unlockMut, cancelMut, items, navigate, typeCode]);
 
     // ════════════════════════════════════════════════════════════════════════
     // SMART FILTER CALLBACK
@@ -1567,14 +1529,14 @@ export default function CommercialDocumentsPage() {
             setServerFilters(prev => ({ ...prev, ...result.filters }));
             setPage(1);
             const count = Object.keys(result.filters).length;
-            showToast(`✓ ${count} فلتر من: "${query}"`, "success");
+            notify.success(`✓ ${count} فلتر من: "${query}"`);
         } else if (result.success) {
             // تطابق نمط بدون فلاتر (مثل sort فقط)
-            showToast(`✓ فُرِّز حسب: "${query}"`, "info");
+            notify.info(`✓ فُرِّز حسب: "${query}"`);
         } else {
-            showToast(`لم يُتعرف على: "${query}"`, "info");
+            notify.info(`لم يُتعرف على: "${query}"`);
         }
-    }, [showToast]);
+    }, []);
 
     // ════════════════════════════════════════════════════════════════════════
     // ROW ACTIONS
@@ -1894,7 +1856,7 @@ export default function CommercialDocumentsPage() {
                     onSaved={() => {
                         closeModal();
                         invalidateDocs();
-                        showToast(modal === "add" ? "تم إنشاء المستند بنجاح" : "تم تحديث المستند بنجاح");
+                        notify.success(modal === "add" ? "تم إنشاء المستند بنجاح" : "تم تحديث المستند بنجاح");
                     }}
                 />
             )}
@@ -1906,7 +1868,7 @@ export default function CommercialDocumentsPage() {
                     onSaved={(state: Record<string, unknown>) => {
                         closeModal();
                         invalidateDocs();
-                        showToast(`تم إنشاء ${String(state.document_number ?? "المستند")} بنجاح`);
+                        notify.success(`تم إنشاء ${String(state.document_number ?? "المستند")} بنجاح`);
                     }}
                 />
             )}
@@ -1931,7 +1893,7 @@ export default function CommercialDocumentsPage() {
                 <ConvertDocumentModal
                     isOpen
                     onClose={() => setConvertDocId(null)}
-                    onDone={() => { invalidateDocs(); showToast('تم تحويل المستند بنجاح', 'success'); }}
+                    onDone={() => { invalidateDocs(); notify.success('تم تحويل المستند بنجاح'); }}
                     documentId={convertDocId}
                     sourceCode={convertSourceCode}
                     sourceDate={convertSourceDate}
@@ -2022,7 +1984,6 @@ export default function CommercialDocumentsPage() {
                 />
             )}
 
-            <ToastContainer />
             <ConfirmDialog {...confirmDialogProps} />
         </>
     );

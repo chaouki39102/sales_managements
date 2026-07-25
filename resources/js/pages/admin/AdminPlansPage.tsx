@@ -5,7 +5,8 @@ import PageHeader from '@/components/ui/PageHeader';
 import Card       from '@/components/ui/Card';
 import Button     from '@/components/ui/Button';
 import Modal      from '@/components/ui/Modal';
-import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal';
+import { useConfirm } from '@/hooks/useConfirm';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useModal } from '@/hooks/useModal';
 import type { AdminPlan } from '@/types/admin';
 
@@ -26,10 +27,9 @@ export default function AdminPlansPage() {
   const muts = usePlanMutations();
   const byPlan = stats?.companies?.by_plan ?? {};
   const editModal = useModal();
-  const deleteModal = useModal();
   const [form, setForm] = useState<Partial<AdminPlan>>(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const deleteConfirm = useConfirm();
 
   const openCreate = () => {
     setEditingId(null);
@@ -55,14 +55,6 @@ export default function AdminPlansPage() {
       await muts.create.mutateAsync(form);
     }
     editModal.closeModal();
-  };
-
-  const handleDelete = () => {
-    if (deletingId) {
-      muts.remove.mutate(deletingId, {
-        onSuccess: () => deleteModal.closeModal(),
-      });
-    }
   };
 
   const f = (k: string) => (form as any)[k] ?? '';
@@ -144,7 +136,7 @@ export default function AdminPlansPage() {
                       <i className="ti ti-edit" />
                     </button>
                     <button
-                      onClick={() => { setDeletingId(plan.id); deleteModal.openModal(); }}
+                      onClick={async () => { if (!await deleteConfirm.confirm('حذف هذه الخطة؟')) return; muts.remove.mutate(plan.id); }}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', padding: 4 }}
                       title="حذف"
                     >
@@ -246,14 +238,7 @@ export default function AdminPlansPage() {
         </div>
       </Modal>
 
-      <ConfirmDeleteModal
-        open={deleteModal.open}
-        onClose={deleteModal.closeModal}
-        onConfirm={handleDelete}
-        loading={muts.remove.isPending}
-        itemName="هذه الخطة"
-        warning="لن يمكن حذف الخطة إذا كانت مستخدمة من قبل شركات."
-      />
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </div>
   );
 }

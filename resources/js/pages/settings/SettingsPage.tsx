@@ -49,7 +49,8 @@ import { useActiveSlug, useAppStore } from "@/lib/store/appStore";
 import { useFiscalYear } from "@/context/FiscalYearContext";
 import { useAuth } from "@/context/AuthContext";
 import { useModal } from "@/hooks/useModal";
-import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
+import { useConfirm } from "@/hooks/useConfirm";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import SimpleTable from "@/components/ui/SimpleTable";
 import type { Company, ActiveCompany } from "@/lib/api/core/types";
 import ImagePreviewModal from './print-settings/components/ImagePreviewModal';
@@ -1378,7 +1379,7 @@ function CompanyTab({
     const updateMutation = useUpdateCompany();
     const deactivateMutation = useDeactivateCompany();
     const navigate = useNavigate();
-    const deleteModal = useModal();
+    const deleteConfirm = useConfirm();
     const _qc = useQueryClient();
     const { isDirty, markDirty, markClean } = useDirtyState();
 
@@ -1806,24 +1807,18 @@ function CompanyTab({
                     <p style={{ fontSize: 12, color: "var(--t4)", lineHeight: 1.5 }}>
                       سيتم تعطيل الشركة ولن تظهر في قائمة الشركات. يمكنك التواصل مع الدعم لاستعادتها.
                     </p>
-                    <Button variant="danger" fullWidth onClick={deleteModal.openModal}>
+                    <Button variant="danger" fullWidth onClick={() => deleteConfirm.confirm(`هل تريد تعطيل الشركة «${company?.name}»؟`).then(ok => {
+                      if (!ok) return;
+                      deactivateMutation.mutateAsync(slug).then(() => {
+                        useAppStore.getState().setActiveCompany(null);
+                        navigate("/onboarding", { replace: true });
+                      }).catch(() => {});
+                    })}>
                       تعطيل الشركة
                     </Button>
                   </div>
                 </Card>
-                <ConfirmDeleteModal
-                  open={deleteModal.open}
-                  onClose={deleteModal.closeModal}
-                  onConfirm={async () => {
-                    try {
-                      await deactivateMutation.mutateAsync(slug);
-                      useAppStore.getState().setActiveCompany(null);
-                      navigate("/onboarding", { replace: true });
-                    } catch {}
-                  }}
-                  loading={deactivateMutation.isPending}
-                  itemName={company?.name}
-                />
+                <ConfirmDialog {...deleteConfirm.confirmDialogProps} loading={deactivateMutation.isPending} />
             </div>
         </div>
     );

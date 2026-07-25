@@ -20,7 +20,8 @@ import { DocumentDataBuilder } from './types/data/DocumentDataBuilder';
 import { resolveTemplate } from './runtime';
 import type { UniversalDocumentData } from './types/data';
 import { TemplateLibraryModal } from './template-library';
-import DeleteConfirmModal from './components/DeleteConfirmModal';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { useConfirm } from '@/hooks/useConfirm';
 import { useApiClient, useNotifier, useCompany, useSlug } from './providers/PrintSettingsContext';
 import { validateTemplateIntegrity } from './services/SettingsSerializer';
 
@@ -62,7 +63,7 @@ export default function PrintSettingsPage() {
   const [canRedo,       setCanRedo]       = useState(false);
   const [editingName,   setEditingName]   = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [deleteTarget,  setDeleteTarget]  = useState<number | null>(null);
+  const deleteConfirm = useConfirm();
   const [useRealData,       setUseRealData]       = useState(true);
   const [showLibrary,       setShowLibrary]       = useState(false);
 
@@ -259,8 +260,12 @@ export default function PrintSettingsPage() {
   }, [mutations, notifier]);
 
   const handleDelete = useCallback(async (id: number) => {
-    setDeleteTarget(id);
-  }, []);
+    if (!await deleteConfirm.confirm('هل تريد حذف هذا القالب نهائياً؟')) return;
+    setActionLoading(`delete-${id}`);
+    try { await mutations.remove.mutateAsync(id); notifier.success('تم الحذف'); }
+    catch { notifier.error('فشل الحذف'); }
+    finally { setActionLoading(null); }
+  }, [deleteConfirm, mutations, notifier]);
 
   const handleToggleActive = useCallback(async (tpl: PrintTemplate) => {
     if (!tpl.id) return;
@@ -270,16 +275,6 @@ export default function PrintSettingsPage() {
     catch { notifier.error('فشل التحديث'); }
     finally { setActionLoading(null); }
   }, [mutations, localTpl, notifier]);
-
-  const confirmDelete = useCallback(async () => {
-    if (deleteTarget === null) return;
-    const id = deleteTarget;
-    setActionLoading(`delete-${id}`);
-    setDeleteTarget(null);
-    try { await mutations.remove.mutateAsync(id); notifier.success('تم الحذف'); }
-    catch { notifier.error('فشل الحذف'); }
-    finally { setActionLoading(null); }
-  }, [deleteTarget, mutations, notifier]);
 
   const handleNewTemplate = useCallback(() => {
     setShowLibrary(true);
@@ -777,12 +772,7 @@ export default function PrintSettingsPage() {
         activeDoc={activeDoc}
       />
 
-      <DeleteConfirmModal
-        deleteTarget={deleteTarget}
-        actionLoading={actionLoading}
-        onConfirm={confirmDelete}
-        onCancel={() => setDeleteTarget(null)}
-      />
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </>
   );
 }

@@ -20,8 +20,10 @@ import apiClient from '@/lib/api/core/client';
 import { useAuth } from '@/context/AuthContext';
 import { useProductAggregatedLookups } from '@/lib/api/endpoints/lookups';
 import { useConfirm } from '@/hooks/useConfirm';
+import { useNotification } from '@/hooks/useNotification';
 import { ConfirmDialog } from '@/components/ui';
 import type { Column } from '@/components/ui/DataTable';
+import CopyConfigModal from '@/components/products/CopyConfigModal';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types — مطابقة للـ DB الحقيقي (لا variants جدول منفصل)
@@ -178,13 +180,9 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deletingId, setDeletingId]         = useState<number | null>(null);
 
-  // Toast
-  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const deleteConfirm = useConfirm();
-  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
-  };
+  const notify = useNotification();
+  const [copyModalOpen, setCopyModalOpen] = useState(false);
 
   // Tooltip للتعبئات والأسعار
   const [_priceTooltip, _setPriceTooltip] = useState<number | null>(null);
@@ -235,12 +233,12 @@ export default function ProductsPage() {
     mutationFn: (id: number) => apiClient.delete(`/products/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [slug, 'products'] });
-      showToast('تم حذف المنتج بنجاح');
+      notify.success('تم حذف المنتج بنجاح');
       deleteModal.closeModal();
       setDeletingId(null);
     },
     onError: (err: any) => {
-      showToast(err?.response?.data?.message ?? 'فشل الحذف — قد يكون للمنتج حركات مخزون أو مستندات مرتبطة', 'error');
+      notify.error(err?.response?.data?.message ?? 'فشل الحذف — قد يكون للمنتج حركات مخزون أو مستندات مرتبطة');
       deleteModal.closeModal();
       setDeletingId(null);
     },
@@ -250,7 +248,7 @@ export default function ProductsPage() {
     mutationFn: ({ id, active }: { id: number; active: boolean }) =>
       apiClient.put(`/products/${id}`, { active }).then(r => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products', slug] }),
-    onError: () => showToast('فشل تغيير الحالة', 'error'),
+    onError: () => notify.error('فشل تغيير الحالة'),
   });
 
   // ── Handlers ──
@@ -379,7 +377,7 @@ export default function ProductsPage() {
   const bulkToggle = async (active: boolean) => {
     await Promise.all(selectedIds.map(id => toggleActiveMutation.mutateAsync({ id, active })));
     qc.invalidateQueries({ queryKey: [slug, 'products'] });
-    showToast(`تم ${active ? 'تفعيل' : 'تعطيل'} ${selectedIds.length} منتج`);
+    notify.success(`تم ${active ? 'تفعيل' : 'تعطيل'} ${selectedIds.length} منتج`);
     setSelectedIds([]);
   };
 
@@ -387,27 +385,27 @@ export default function ProductsPage() {
     if (!await deleteConfirm.confirm(`حذف ${selectedIds.length} منتج؟`)) return;
     await Promise.all(selectedIds.map(id => apiClient.delete(`/products/${id}`)));
     qc.invalidateQueries({ queryKey: [slug, 'products'] });
-    showToast(`تم حذف ${selectedIds.length} منتج`);
+    notify.success(`تم حذف ${selectedIds.length} منتج`);
+    setSelectedIds([]);
+  };
+
+  const bulkCopyConfig = async (source: any, opts: { copy_packaging: boolean; copy_discounts: boolean; replace_packaging: boolean; replace_discounts: boolean }) => {
+    await apiClient.post('/products/copy-config', {
+      source_product_id:   source.id,
+      target_product_ids:  selectedIds,
+      copy_packaging:      opts.copy_packaging,
+      copy_discounts:      opts.copy_discounts,
+      replace_packaging:   opts.replace_packaging,
+      replace_discounts:   opts.replace_discounts,
+    });
+    qc.invalidateQueries({ queryKey: [slug, 'products'] });
+    notify.success(`تم نسخ التكوين إلى ${selectedIds.length} منتج`);
     setSelectedIds([]);
   };
 
   // ── Render ──
   return (
     <div className="page on" id="p-products">
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 9999, padding: '10px 22px', borderRadius: 'var(--r3)',
-          background: toast.type === 'success' ? 'var(--em)' : 'var(--red)',
-          color: '#fff', fontSize: 13, fontWeight: 700,
-          display: 'flex', alignItems: 'center', gap: 8,
-          boxShadow: '0 4px 24px rgba(0,0,0,.2)',
-        }}>
-          <i className={`ti ${toast.type === 'success' ? 'ti-check' : 'ti-x'}`} /> {toast.msg}
-        </div>
-      )}
-
       <PageHeader
         title="المنتجات"
         subtitle={`إدارة المنتجات — ${meta.total} منتج`}
@@ -474,6 +472,7 @@ export default function ProductsPage() {
             تم تحديد {selectedIds.length} منتج
           </span>
           <div style={{ display: 'flex', gap: 8 }}>
+            <Button size="xs" icon={<i className="ti ti-copy" />} onClick={() => setCopyModalOpen(true)}>نسخ التكوين</Button>
             <Button size="xs" icon={<i className="ti ti-check" />} onClick={() => bulkToggle(true)}>تفعيل</Button>
             <Button size="xs" icon={<i className="ti ti-x" />} onClick={() => bulkToggle(false)}>تعطيل</Button>
             <Button size="xs" variant="danger" icon={<i className="ti ti-trash" />} onClick={bulkDelete}>حذف</Button>
@@ -604,7 +603,7 @@ export default function ProductsPage() {
           product={editingProduct}
           onClose={() => { modal.closeModal(); setEditingProduct(null); }}
           onSaved={() => {
-            showToast(editingProduct ? 'تم تعديل المنتج بنجاح' : 'تمت إضافة المنتج بنجاح');
+            notify.success(editingProduct ? 'تم تعديل المنتج بنجاح' : 'تمت إضافة المنتج بنجاح');
           }}
         />
       </Suspense>
@@ -637,6 +636,14 @@ export default function ProductsPage() {
         />
       </Suspense>
       <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
+      <CopyConfigModal
+        open={copyModalOpen}
+        onClose={() => setCopyModalOpen(false)}
+        onApply={() => {}}
+        mode="bulk"
+        bulkCount={selectedIds.length}
+        onBulkApply={bulkCopyConfig}
+      />
     </div>
   );
 }

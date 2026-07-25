@@ -7,7 +7,8 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
-import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
+import { useConfirm } from "@/hooks/useConfirm";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import KpiCard from "@/components/ui/KpiCard";
 import EmptyState from "@/components/ui/EmptyState";
 import SimpleTable from "@/components/ui/SimpleTable";
@@ -71,8 +72,7 @@ export default function ExpensesPage() {
     }, [selectedYear?.id]);
     const [editing, setEditing] = useState<Expense | null>(null);
     const modal = useModal();
-    const deleteModal = useModal();
-    const [deletingId, setDeletingId] = useState<number | null>(null);
+    const deleteConfirm = useConfirm();
     const [error, setError] = useState<string | null>(null);
 
     const {
@@ -137,23 +137,14 @@ export default function ExpensesPage() {
         (slug) => tenantKeys.expenses.all(slug),
         {
             onSuccess: () => {
-                deleteModal.closeModal();
                 setError(null);
             },
             onError: (err: any) => {
                 setError(err?.response?.data?.message || "فشل الحذف");
-                deleteModal.closeModal();
             },
         },
     );
 
-    const handleDelete = (id: number) => {
-        setDeletingId(id);
-        deleteModal.openModal();
-    };
-    const confirmDelete = () => {
-        if (deletingId) deleteMutation.mutate(deletingId);
-    };
     const openAdd = () => {
         setEditing(null);
         modal.openModal();
@@ -426,7 +417,7 @@ export default function ExpensesPage() {
                                                     <i className="ti ti-trash" />
                                                 }
                                                 onClick={() =>
-                                                    handleDelete(exp.id)
+                                                    async () => { if (await deleteConfirm.confirm('حذف المصروف؟')) deleteMutation.mutate(exp.id); }
                                                 }
                                             />
                                         </div>
@@ -502,12 +493,7 @@ export default function ExpensesPage() {
                 onClose={modal.closeModal}
             />
 
-            <ConfirmDeleteModal
-                open={deleteModal.open}
-                onClose={deleteModal.closeModal}
-                onConfirm={confirmDelete}
-                loading={deleteMutation.isPending}
-            />
+            <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
         </div>
     );
 }

@@ -28,6 +28,7 @@ import { tenantKeys }  from '@/lib/api/core/queryKeys';
 import { useActiveSlug } from '@/lib/store/appStore';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useConfirm } from '@/hooks/useConfirm';
+import CopyConfigModal from '@/components/products/CopyConfigModal';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -415,6 +416,7 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
   const [kwInput,   setKwInput]   = useState('');
   const [copied,    setCopied]    = useState(false);
   const [imageInput, setImageInput] = useState('');
+  const [copyModalOpen, setCopyModalOpen] = useState(false);
 
   // ── اقتراح صورة من الإنترنت ──
   const [showImgSuggest, setShowImgSuggest] = useState(false);
@@ -614,6 +616,47 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
       const next = [...f.packagings];
       [next[idx], next[to]] = [next[to], next[idx]];
       return { ...f, packagings: next.map((p, i) => ({ ...p, display_order: i })) };
+    });
+    setIsDirty(true);
+  }
+
+  function handleCopyConfig(result: { copy_packaging: boolean; copy_discounts: boolean; replace_packaging: boolean; replace_discounts: boolean; packagings: any[]; quantity_discounts: any[] }) {
+    setForm(f => {
+      const next = { ...f };
+      if (result.copy_packaging && result.packagings.length > 0) {
+        const base = result.replace_packaging ? [] : f.packagings;
+        const startOrder = base.length;
+        next.packagings = [
+          ...base,
+          ...result.packagings.map((pkg: any, i: number) => ({
+            code: pkg.code ?? '',
+            label: pkg.label ?? '',
+            quantity: pkg.quantity ?? 1,
+            barcode: pkg.barcode ?? '',
+            is_default: pkg.is_default ?? false,
+            active: pkg.active ?? true,
+            display_order: startOrder + i,
+          })),
+        ];
+      }
+      if (result.copy_discounts && result.quantity_discounts.length > 0) {
+        const base = result.replace_discounts ? [] : f.quantity_discounts;
+        next.quantity_discounts = [
+          ...base,
+          ...result.quantity_discounts.map((d: any) => ({
+            price_level_id:      d.price_level_id,
+            min_qty:             d.min_qty,
+            max_qty:             d.max_qty ?? null,
+            discount_amount:     d.discount_amount ?? null,
+            discount_percentage: d.discount_percentage ?? null,
+            tier_order:          d.tier_order ?? 0,
+            is_blocked:          d.is_blocked ?? false,
+            active:              d.active ?? true,
+          })),
+        ];
+        next.manages_quantity_discounts = true;
+      }
+      return next;
     });
     setIsDirty(true);
   }
@@ -1095,12 +1138,20 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
           <div style={{ fontSize: 12, color: 'var(--t3)' }}>
             {form.packagings.length === 0 ? 'المنتج يُباع بوحدته الأساسية' : `${form.packagings.length} وحدة تعبئة مُعرَّفة`}
           </div>
-          <button
-            onClick={addPackaging}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 'var(--r2)', border: '1px solid var(--em)', background: 'var(--emb)', color: 'var(--em)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-          >
-            <i className="ti ti-plus" style={{ fontSize: 14 }} /> إضافة تعبئة
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => setCopyModalOpen(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 'var(--r2)', border: '1px solid var(--b3)', background: 'var(--bg3)', color: 'var(--t2)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            >
+              <i className="ti ti-copy" style={{ fontSize: 14 }} /> نسخ من منتج آخر
+            </button>
+            <button
+              onClick={addPackaging}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 'var(--r2)', border: '1px solid var(--em)', background: 'var(--emb)', color: 'var(--em)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            >
+              <i className="ti ti-plus" style={{ fontSize: 14 }} /> إضافة تعبئة
+            </button>
+          </div>
         </div>
 
         {form.packagings.length === 0 ? (
@@ -1349,6 +1400,15 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
     return (
       <div style={s.section}>
         <SectionHeader icon="ti-discount" title="خصومات الكمية" subtitle="تحديد خصومات تلقائية حسب الكمية المباعة لكل مستوى سعر" />
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            onClick={() => setCopyModalOpen(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 'var(--r2)', border: '1px solid var(--b3)', background: 'var(--bg3)', color: 'var(--t2)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+          >
+            <i className="ti ti-copy" style={{ fontSize: 14 }} /> نسخ من منتج آخر
+          </button>
+        </div>
 
         <div style={{ fontSize: 12, color: 'var(--t3)', ...s.card }}>
           <i className="ti ti-info-circle" style={{ fontSize: 13, marginLeft: 5 }} />
@@ -2075,6 +2135,12 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
 
       </div>
       <ConfirmDialog {...confirmDialogProps} />
+      <CopyConfigModal
+        open={copyModalOpen}
+        onClose={() => setCopyModalOpen(false)}
+        onApply={handleCopyConfig}
+        mode="inline"
+      />
     </div>
   );
 }

@@ -134,6 +134,11 @@ td.r{color:var(--red);font-weight:600;}
 td.g{color:var(--gold);font-weight:600;}
 td.b{color:var(--blue);font-weight:600;}
 
+/* ═══ TABLE EMPTY STATE ═══ */
+.tbl-empty{display:flex;align-items:center;justify-content:center;padding:48px 20px;}
+.tbl-empty__inner{display:flex;flex-direction:column;align-items:center;gap:10px;color:var(--t4);font-size:13px;}
+.tbl-empty__icon{opacity:.45;}
+
 /* ═══ BADGES / CHIPS ═══ */
 .bx{
   display:inline-flex;align-items:center;gap:4px;

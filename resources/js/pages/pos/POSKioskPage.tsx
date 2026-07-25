@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { Toaster, toast }             from 'sonner';
+import { useNotification }             from '@/hooks/useNotification';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { usePOS }                     from '@/pos/hooks/usePOS';
 import {
@@ -56,6 +56,7 @@ export default function POSKioskPage() {
     : (fiscalStampVal === true || fiscalStampVal === 1 || fiscalStampVal === '1'
       || String(fiscalStampVal).toLowerCase() === 'true');
   const pos        = usePOS(fiscalStampEnabled);
+  const notify     = useNotification();
   const company    = useActiveCompany();
   const fiscalYear = useSelectedFiscalYear();
   const qc         = useQueryClient();
@@ -179,7 +180,7 @@ export default function POSKioskPage() {
     const fiscalYearId = fiscalYear?.id;
 
     if (!invType || !defaultWarehouse || !fiscalYearId) {
-      toast.error('بيانات الفاتورة غير مكتملة');
+      notify.error('بيانات الفاتورة غير مكتملة');
       return { ok: false, message: 'بيانات الفاتورة غير مكتملة' };
     }
 
@@ -250,14 +251,14 @@ export default function POSKioskPage() {
           if (!snap || !template) return;
           const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? {} as any);
           const r = await printThermalViaWebUSBFromTemplate(template, data, res.document_number);
-          if (!r.ok) toast.error(r.message);
+          if (!r.ok) notify.error(r.message);
         }, 500);
       }
 
       return { ok: true, docNumber: res.document_number };
 
     } catch (err: any) {
-      toast.error(err?.message ?? 'فشل حفظ الفاتورة');
+      notify.error(err?.message ?? 'فشل حفظ الفاتورة');
       return { ok: false, message: String(err?.message ?? '') };
     }
   };
@@ -402,11 +403,6 @@ export default function POSKioskPage() {
         />
       )}
 
-      <Toaster
-        position="top-center"
-        richColors
-        toastOptions={{ style: { fontFamily: 'Tajawal, sans-serif', fontSize: 16 } }}
-      />
     </div>
   );
 }

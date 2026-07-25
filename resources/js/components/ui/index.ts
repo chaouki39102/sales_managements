@@ -17,7 +17,6 @@ export { default as SimpleTable }                        from './SimpleTable'
 export { Alert }                                         from './Alert'
 export { default as Avatar }                             from './Avatar'
 export { default as ConfirmDialog }                      from './ConfirmDialog'
-export { default as ConfirmDeleteModal }                 from './ConfirmDeleteModal'
 export {
   Input, Select, Textarea, Label,
   FormField, FormGrid, InputRow,

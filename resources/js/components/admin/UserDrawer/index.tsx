@@ -22,7 +22,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  DrawerShell, TabBar, FlashBar, Avatar, StatusBadge,
+  DrawerShell, TabBar, Avatar, StatusBadge,
   ActionBtn, InfoRow, SectionTitle, EmptyState, Spinner,
   fmtDate,
 } from '../shared';
@@ -30,6 +30,7 @@ import type { TabDef } from '../shared';
 import { companiesApi } from '@/lib/api/admin';
 import { useCompanyMutations } from '@/hooks/admin';
 import type { AdminCompany, AdminUser } from '@/types/admin';
+import { useNotification } from '@/hooks/useNotification';
 import { useConfirm } from '@/hooks/useConfirm';
 import { ConfirmDialog } from '@/components/ui';
 
@@ -53,7 +54,6 @@ interface Props {
 
 export default function CompanyDrawer({ company: co, onClose }: Props) {
   const [tab,          setTab]          = useState('info');
-  const [flash,        setFlash]        = useState<{ ok: boolean; msg: string } | null>(null);
   const [suspendReason, setSuspendReason] = useState('');
   const [showSuspend,  setShowSuspend]  = useState(false);
   const [notes,        setNotes]        = useState(co.notes ?? '');
@@ -66,12 +66,8 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
 
   const muts  = useCompanyMutations();
   const close = (refresh = false) => onClose(refresh);
+  const notify = useNotification();
   const deleteConfirm = useConfirm();
-
-  const flash$ = (ok: boolean, msg: string) => {
-    setFlash({ ok, msg });
-    setTimeout(() => setFlash(null), 3000);
-  };
 
   // ── أعضاء الشركة ──────────────────────────────────────────────────────────
   // ✅ companiesApi.listUsers أُضيفت في companies.ts
@@ -104,7 +100,6 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
       }
       badge={<StatusBadge active={co.active} suspended={co.is_suspended} />}
     >
-      {flash && <FlashBar ok={flash.ok} msg={flash.msg} />}
       <TabBar tabs={TABS} active={tab} onChange={setTab} />
 
       {/* ══ INFO ══════════════════════════════════════════════════════════════ */}
@@ -127,8 +122,8 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
               <ActionBtn
                 icon="ti-player-play" label="رفع التعليق" variant="success"
                 onClick={() => muts.unsuspend.mutate(co.id, {
-                  onSuccess: () => { flash$(true, 'تم رفع التعليق'); close(true); },
-                  onError:   (e: any) => flash$(false, e?.message ?? 'فشل رفع التعليق'),
+                  onSuccess: () => { notify.success( 'تم رفع التعليق'); close(true); },
+                  onError:   (e: any) => notify.error( e?.message ?? 'فشل رفع التعليق'),
                 })}
                 loading={muts.unsuspend.isPending}
               />
@@ -144,8 +139,8 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
               <ActionBtn
                 icon="ti-x" label="إيقاف التفعيل"
                 onClick={() => muts.deactivate.mutate(co.id, {
-                  onSuccess: () => { flash$(true, 'تم الإيقاف'); close(true); },
-                  onError:   (e: any) => flash$(false, e?.message ?? 'فشل الإيقاف'),
+                  onSuccess: () => { notify.success( 'تم الإيقاف'); close(true); },
+                  onError:   (e: any) => notify.error( e?.message ?? 'فشل الإيقاف'),
                 })}
                 loading={muts.deactivate.isPending}
               />
@@ -153,8 +148,8 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
               <ActionBtn
                 icon="ti-check" label="تفعيل" variant="success"
                 onClick={() => muts.activate.mutate(co.id, {
-                  onSuccess: () => { flash$(true, 'تم التفعيل'); close(true); },
-                  onError:   (e: any) => flash$(false, e?.message ?? 'فشل التفعيل'),
+                  onSuccess: () => { notify.success( 'تم التفعيل'); close(true); },
+                  onError:   (e: any) => notify.error( e?.message ?? 'فشل التفعيل'),
                 })}
                 loading={muts.activate.isPending}
               />
@@ -165,8 +160,8 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
               <ActionBtn
                 icon="ti-shield-check" label="توثيق" variant="success"
                 onClick={() => muts.verify.mutate(co.id, {
-                  onSuccess: () => { flash$(true, 'تم التوثيق'); close(true); },
-                  onError:   (e: any) => flash$(false, e?.message ?? 'فشل التوثيق'),
+                  onSuccess: () => { notify.success( 'تم التوثيق'); close(true); },
+                  onError:   (e: any) => notify.error( e?.message ?? 'فشل التوثيق'),
                 })}
                 loading={muts.verify.isPending}
               />
@@ -174,8 +169,8 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
               <ActionBtn
                 icon="ti-shield-off" label="إلغاء التوثيق"
                 onClick={() => muts.unverify.mutate(co.id, {
-                  onSuccess: () => { flash$(true, 'تم الإلغاء'); close(true); },
-                  onError:   (e: any) => flash$(false, e?.message ?? 'فشل إلغاء التوثيق'),
+                  onSuccess: () => { notify.success( 'تم الإلغاء'); close(true); },
+                  onError:   (e: any) => notify.error( e?.message ?? 'فشل إلغاء التوثيق'),
                 })}
                 loading={muts.unverify.isPending}
               />
@@ -212,8 +207,8 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
                     muts.suspend.mutate(
                       { id: co.id, reason: suspendReason },
                       {
-                        onSuccess: () => { flash$(true, 'تم التعليق'); close(true); },
-                        onError:   (e: any) => flash$(false, e?.message ?? 'فشل التعليق'),
+                        onSuccess: () => { notify.success( 'تم التعليق'); close(true); },
+                        onError:   (e: any) => notify.error( e?.message ?? 'فشل التعليق'),
                       }
                     )
                   }
@@ -268,7 +263,7 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
                         if (!await deleteConfirm.confirm(`إزالة ${u.name}؟`)) return;
                         await companiesApi.removeUser(co.id, u.id);
                         refetchMembers();
-                        flash$(true, 'تم الإزالة');
+                        notify.success( 'تم الإزالة');
                       }}
                       style={{ ...iBtn, color: '#ef4444', borderColor: '#ef444433' }}
                     >
@@ -323,8 +318,8 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
               muts.changePlan.mutate(
                 { id: co.id, ...planForm },
                 {
-                  onSuccess: () => { flash$(true, 'تم تغيير الخطة'); close(true); },
-                  onError:   (e: any) => flash$(false, e?.message ?? 'فشل تغيير الخطة'),
+                  onSuccess: () => { notify.success( 'تم تغيير الخطة'); close(true); },
+                  onError:   (e: any) => notify.error( e?.message ?? 'فشل تغيير الخطة'),
                 }
               )
             }
@@ -356,8 +351,8 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
               muts.updateNotes.mutate(
                 { id: co.id, notes },
                 {
-                  onSuccess: () => flash$(true, 'تم الحفظ'),
-                  onError:   (e: any) => flash$(false, e?.message ?? 'فشل الحفظ'),
+                  onSuccess: () => notify.success( 'تم الحفظ'),
+                  onError:   (e: any) => notify.error( e?.message ?? 'فشل الحفظ'),
                 }
               )
             }
@@ -382,8 +377,8 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
             icon="ti-database" label="بذر البيانات الأساسية"
             onClick={() =>
               muts.seed.mutate(co.id, {
-                onSuccess: () => flash$(true, 'تم البذر بنجاح'),
-                onError:   (e: any) => flash$(false, e?.message ?? 'فشل البذر'),
+                onSuccess: () => notify.success( 'تم البذر بنجاح'),
+                onError:   (e: any) => notify.error( e?.message ?? 'فشل البذر'),
               })
             }
             loading={muts.seed.isPending}
@@ -395,7 +390,7 @@ export default function CompanyDrawer({ company: co, onClose }: Props) {
               if (!await deleteConfirm.confirm(`حذف شركة "${co.name}" نهائياً؟`)) return;
               muts.remove.mutate(co.id, {
                 onSuccess: () => close(true),
-                onError:   (e: any) => flash$(false, e?.message ?? 'فشل الحذف'),
+                onError:   (e: any) => notify.error( e?.message ?? 'فشل الحذف'),
               });
             }}
             loading={muts.remove.isPending}

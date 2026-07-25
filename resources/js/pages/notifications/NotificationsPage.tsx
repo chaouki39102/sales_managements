@@ -7,7 +7,8 @@ import EmptyState         from '@/components/ui/EmptyState';
 import SimpleTable        from '@/components/ui/SimpleTable';
 import Skeleton           from '@/components/ui/Skeleton';
 import Pagination         from '@/components/ui/Pagination';
-import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal';
+import { useConfirm } from '@/hooks/useConfirm';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useModal } from '@/hooks/useModal';
 import {
   useNotificationsQuery,
@@ -54,9 +55,7 @@ export default function NotificationsPage() {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const deleteModal = useModal();
-  const [deleteTarget, setDeleteTarget] = useState<'single' | 'bulk'>('single');
-  const [deletingId, setDeletingId]     = useState<string | null>(null);
+  const deleteConfirm = useConfirm();
 
   const filters = {
     type:     typeFilter === 'all' ? undefined : typeFilter,
@@ -129,29 +128,23 @@ export default function NotificationsPage() {
     }
   };
 
-  const openDeleteSingle = (id: string) => {
-    setDeleteTarget('single');
-    setDeletingId(id);
-    deleteModal.openModal();
-  };
-
-  const openDeleteBulk = () => {
-    setDeleteTarget('bulk');
-    deleteModal.openModal();
-  };
-
-  const handleConfirmDelete = async () => {
+  const openDeleteSingle = async (id: string) => {
+    if (!await deleteConfirm.confirm('حذف هذا الإشعار؟')) return;
     try {
-      if (deleteTarget === 'single' && deletingId) {
-        await deleteOneMutation.mutateAsync(deletingId);
-        notify.success('تم الحذف', 'تم حذف الإشعار بنجاح');
-      } else if (deleteTarget === 'bulk') {
-        const ids = Array.from(selectedIds);
-        await deleteManyMutation.mutateAsync(ids);
-        notify.success('تم الحذف', `تم حذف ${ids.length} إشعار بنجاح`);
-        clearSelection();
-      }
-      deleteModal.closeModal();
+      await deleteOneMutation.mutateAsync(id);
+      notify.success('تم الحذف', 'تم حذف الإشعار بنجاح');
+    } catch {
+      notify.error('خطأ', 'فشل حذف الإشعار');
+    }
+  };
+
+  const openDeleteBulk = async () => {
+    if (!await deleteConfirm.confirm(`حذف ${selectedIds.size} إشعار؟`)) return;
+    try {
+      const ids = Array.from(selectedIds);
+      await deleteManyMutation.mutateAsync(ids);
+      notify.success('تم الحذف', `تم حذف ${ids.length} إشعار بنجاح`);
+      clearSelection();
     } catch {
       notify.error('خطأ', 'فشل حذف الإشعار(ات)');
     }
@@ -385,18 +378,7 @@ export default function NotificationsPage() {
         </div>
       )}
 
-      <ConfirmDeleteModal
-        open={deleteModal.open}
-        onClose={deleteModal.closeModal}
-        onConfirm={handleConfirmDelete}
-        loading={isDeleting}
-        itemName={
-          deleteTarget === 'bulk' ? `${selectedIds.size} إشعار` : undefined
-        }
-        warning={
-          deleteTarget === 'bulk' ? 'سيتم حذف جميع الإشعارات المحددة نهائياً.' : undefined
-        }
-      />
+      <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </div>
   );
 }

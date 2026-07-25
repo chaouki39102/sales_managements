@@ -108,20 +108,6 @@ export function TabBar({ tabs, active, onChange }: TabBarProps) {
   );
 }
 
-// ─── FlashBar ─────────────────────────────────────────────────────────────────
-
-export function FlashBar({ ok, msg }: { ok: boolean; msg: string }) {
-  return (
-    <div style={{
-      padding: '8px 20px', fontSize: 12, fontWeight: 600,
-      background: ok ? '#10b9811a' : '#ef44441a',
-      color: ok ? '#10b981' : '#ef4444',
-    }}>
-      {ok ? '✓' : '✗'} {msg}
-    </div>
-  );
-}
-
 // ─── InfoRow ──────────────────────────────────────────────────────────────────
 
 export function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {

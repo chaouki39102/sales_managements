@@ -11,6 +11,7 @@ import { useRemoteLabels } from '@/hooks/useRemoteLabels';
 import apiClient           from '@/lib/api/core/client';
 import Card                from '@/components/ui/Card';
 import SimpleTable          from '@/components/ui/SimpleTable';
+import { useNotification } from '@/hooks/useNotification';
 
 // ── Types ──────────────────────────────────────
 export interface FieldDef {
@@ -470,38 +471,6 @@ function ConfirmModal({ name, onConfirm, onClose, saving }: {
 }
 
 // ════════════════════════════════════════════════
-// Toast
-// ════════════════════════════════════════════════
-function Toast({ msg, type, onDone }: { msg: string; type: 'success' | 'error'; onDone: () => void }) {
-  useEffect(() => {
-    const t = setTimeout(onDone, 3500);
-    return () => clearTimeout(t);
-  }, [onDone]);
-
-  return (
-    <div style={{
-      position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
-      zIndex: 9999, padding: '11px 20px', borderRadius: 'var(--r3)',
-      background: type === 'success' ? 'var(--em)' : 'var(--red)',
-      color: '#fff', fontSize: 13, fontWeight: 700,
-      boxShadow: type === 'success' ? 'var(--emglow2)' : '0 8px 32px rgba(212,43,43,.35)',
-      display: 'flex', alignItems: 'center', gap: 9,
-      animation: 'toastIn .3s cubic-bezier(.34,1.4,.64,1)',
-      whiteSpace: 'nowrap',
-    }}>
-      <i className={`ti ${type === 'success' ? 'ti-check' : 'ti-alert-circle'}`} />
-      {msg}
-      <button onClick={onDone} style={{
-        background: 'none', border: 'none', cursor: 'pointer',
-        color: 'rgba(255,255,255,.7)', marginRight: -4, padding: '0 2px',
-      }}>
-        <i className="ti ti-x" style={{ fontSize: 12 }} />
-      </button>
-    </div>
-  );
-}
-
-// ════════════════════════════════════════════════
 // Error helpers — تحويل أخطاء Laravel التقنية إلى رسائل عربية
 // ════════════════════════════════════════════════
 function parseTechError(msg: string, fields: FieldDef[]): string {
@@ -562,6 +531,8 @@ export default function LookupPage({
 }: LookupPageProps) {
   const { items, loading, error, saving, refetch, create, update, remove } = useLookup<any>(endpoint);
 
+  const notify = useNotification();
+
   const [search,    setSearch]    = useState('');
   const [modal,     setModal]     = useState<'add' | 'edit' | null>(null);
   const [editItem,  setEditItem]  = useState<any | null>(null);
@@ -569,7 +540,6 @@ export default function LookupPage({
   const [formErr,   setFormErr]   = useState<string | null>(null);
   const [fieldErrs, setFieldErrs] = useState<Record<string, string>>({});
   const [delItem,   setDelItem]   = useState<any | null>(null);
-  const [toast,     setToast]     = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [sortKey,   setSortKey]   = useState<string | null>(null);
   const [sortAsc,   setSortAsc]   = useState(true);
 
@@ -678,7 +648,7 @@ export default function LookupPage({
     try {
       if (modal === 'add') {
         await create(formData);
-        showToast(`✓ تمت إضافة ${resource} بنجاح`);
+        notify.success(`✓ تمت إضافة ${resource} بنجاح`);
         if (closeAfterSave) {
           setModal(null);
         } else {
@@ -690,7 +660,7 @@ export default function LookupPage({
         }
       } else if (modal === 'edit' && editItem) {
         await update(editItem.id, formData);
-        showToast(`✓ تم تعديل ${resource} بنجاح`);
+        notify.success(`✓ تم تعديل ${resource} بنجاح`);
         if (closeAfterSave) {
           setModal(null);
         } else {
@@ -728,17 +698,13 @@ export default function LookupPage({
     if (!delItem) return;
     try {
       await remove(delItem.id);
-      showToast(`تم حذف ${resource}`);
+      notify.success(`تم حذف ${resource}`);
     } catch (e: any) {
       const resp = e?.response?.data;
       const raw  = resp?.message ?? resp?.error ?? e?.message ?? '';
-      showToast(parseTechError(raw, fields), 'error');
+      notify.error(parseTechError(raw, fields));
     }
     setDelItem(null);
-  }
-
-  function showToast(msg: string, type: 'success' | 'error' = 'success') {
-    setToast({ msg, type });
   }
 
   // ── اختصارات لوحة المفاتيح ──
@@ -826,11 +792,6 @@ export default function LookupPage({
     <div className="page on" style={{ padding: '18px 20px' }}>
 
 
-
-      {/* Toast */}
-      {toast && (
-        <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />
-      )}
 
       {/* ── Header ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, gap: 12 }}>

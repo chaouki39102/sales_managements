@@ -6,6 +6,7 @@ import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
 import { settingsApi } from '@/lib/api/endpoints/settings';
 import { useFiscalYear } from '@/context/FiscalYearContext';
+import { useConfirm } from '@/hooks/useConfirm';
 import type { DocumentType } from '@/lib/api/core/types';
 import { usePrintTemplatesList, mapCompany } from '@/pages/settings/print-settings/runtime';
 import { resolveTemplateById } from '@/pages/settings/print-settings/runtime/TemplateResolver';
@@ -353,13 +354,12 @@ export function useCommercialDocumentController({
     setPrintModalOpen(true);
   }, [existingDocument, companyInfo]);
 
-  // ─── Delete confirmation modal ────────────────────────────────────────────
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  // ─── Delete confirmation ────────────────────────────────────────────────
+  const deleteConfirm = useConfirm();
 
   // تنظيف حالة الـ sub-modals عند الإغلاق — منع الوميض
   useEffect(() => {
     if (!active) {
-      setShowDeleteModal(false);
       setShowReturnModal(false);
       setShowBulkImport(false);
     }
@@ -478,8 +478,9 @@ export function useCommercialDocumentController({
     if (validate()) saveMut.mutate();
   };
 
-  const handleDelete = () => {
-    setShowDeleteModal(true);
+  const handleDelete = async () => {
+    if (!await deleteConfirm.confirm('هل تريد حذف هذا المستند؟', { title: 'تأكيد الحذف', confirmText: 'حذف' })) return;
+    deleteMut.mutate();
   };
 
   const handleExport = (format: 'excel' | 'pdf' | 'json' | 'xml') => {
@@ -697,7 +698,7 @@ export function useCommercialDocumentController({
     printModalOpen, setPrintModalOpen, handlePrint,
 
     // Delete
-    showDeleteModal, setShowDeleteModal,
+    deleteConfirm,
     deleteMut,
 
     // Actions
