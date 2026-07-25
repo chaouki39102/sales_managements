@@ -6,6 +6,30 @@
 ## Date
 2026-07-25
 
+### Phase 26 — POS Cart Discount Self-Corrupting State (July 25)
+
+**Bug**: POS cart discount badge and payment modal showed static per-unit discount (e.g., 1.00 DZD) regardless of quantity. Changing quantity from 1→10 did not scale the displayed discount.
+
+**Root cause**: `recalcItem()` in `useCartStore.ts` used `item.discount_amount > 0` as the signal to distinguish "user manually entered a fixed discount amount" from "discount comes from `discount_percentage`". But `recalcItem` also wrote its own computed result back into `discount_amount` on every call. After the first recalculation (auto quantity-tier at add-time computed `discount_amount = 0.996`), the computed value became the input signal on the next call (qty change), permanently locking `discount_amount` at the old value and corrupting `discount_percentage` to `0.083%` on every subsequent recalculation.
+
+**Self-corruption cycle**:
+1. Add item at qty=1 → `discount_percentage=0.8333%`, `discount_amount=0`
+2. `recalcItem` → `discount_amount=1.00` (correct for qty=1)
+3. Change qty to 10 → `recalcItem` reads `discount_amount=1.00 > 0` (wrong branch!) → locks at 1.00 → derives `discount_percentage=0.083%`
+
+**Fix**: Added explicit `discount_mode?: 'percentage' | 'fixed_amount'` field to `CartItem` type. `recalcItem()` now branches on `discount_mode` instead of `discount_amount > 0`. This breaks the self-corruption cycle because `discount_amount` is now purely an **output** in percentage mode, never re-read as an input signal.
+
+**Files modified:**
+- `resources/js/lib/api/core/types.ts` — added `discount_mode` to `CartItem` interface
+- `resources/js/pos/utils/useCartStore.ts` — rewrote `recalcItem()`, added `discount_mode` to `addItem` (new + merge), `updateDiscount`, `updateDiscountAmount`
+- `resources/js/pages/pos/POSPage.tsx` — `handleOpenInvoice` sets `discount_mode: 'fixed_amount'`
+
+**Verification**: Build 0 errors, 1108 modules. Tests 160/160 pass.
+
+**Architectural rule**: Never use a computed output field as an input signal for branching logic. If two modes exist, use an explicit mode flag — not "which field is non-zero?".
+
+---
+
 ### Phase 25 — Document-Level total_discount Bug: Per-Unit vs Total Discount Sum (July 25)
 
 **Bug**: Document-level `total_discount` field was showing per-unit discount (e.g., ~1 DZD) instead of total line discount (e.g., ~10 DZD for qty=10). This affected all document total summaries and party balance reports.
