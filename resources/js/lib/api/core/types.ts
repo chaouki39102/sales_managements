@@ -493,6 +493,8 @@ export interface CommercialDocumentLine extends BaseModel {
   unit_price_ht:          number;
   discount_percentage:    number;
   discount_amount:        number;
+  discount_amount_per_unit?: number | null;
+  total_discount_amount?: number;
   tva_rate:               number;
   total_ht:               number;
   total_tva:              number;

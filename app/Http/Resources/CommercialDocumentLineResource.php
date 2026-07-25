@@ -22,6 +22,7 @@ class CommercialDocumentLineResource extends JsonResource
             'unit_price_ht'            => $this->unit_price_ht,
             'discount_percentage'      => $this->discount_percentage,
             'discount_amount'          => $this->discount_amount,
+            'discount_amount_per_unit' => $this->discount_amount_per_unit,
             'tva_rate'                 => $this->tva_rate,
             'total_ht'                 => $this->total_ht,
             'total_tva'                => $this->total_tva,

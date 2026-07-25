@@ -514,17 +514,21 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
                 if ($tier) {
                     $unitPriceForCalc = (float) $lineData['unit_price_ht'];
-                    $discountedPrice  = $tier->calculateDiscountedPrice($unitPriceForCalc);
-                    $qtyDiscountPct   = $unitPriceForCalc > 0
-                        ? round((($unitPriceForCalc - $discountedPrice) / $unitPriceForCalc) * 100, 4)
-                        : 0.0;
 
-                    $lineData['discount_percentage'] = $qtyDiscountPct;  // overrides manual value
+                    if ($tier->discount_amount !== null && (float) $tier->discount_amount > 0) {
+                        // Native fixed-amount tier — store as-is, no percentage conversion, ever.
+                        $lineData['discount_amount_per_unit'] = (float) $tier->discount_amount;
+                        $lineData['discount_percentage']      = 0;
+                    } elseif ($tier->discount_percentage !== null && (float) $tier->discount_percentage > 0) {
+                        $lineData['discount_percentage']      = (float) $tier->discount_percentage;
+                        $lineData['discount_amount_per_unit'] = null;
+                    }
                     $quantityDiscountId = $tier->id;
                 }
             }
 
-            // Observer calculates total_ht, discount_amount, total_tva, total_ttc from discount_percentage
+            // Observer calculates total_ht, discount_amount, total_tva, total_ttc
+            // from discount_amount_per_unit (fixed) or discount_percentage (pct)
 
             $document->lines()->create([
                 'company_id'             => $document->company_id,
@@ -535,6 +539,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 'quantity'               => (float) $lineData['quantity'],
                 'unit_price_ht'          => (float) $lineData['unit_price_ht'],
                 'discount_percentage'    => (float) ($lineData['discount_percentage'] ?? 0),
+                'discount_amount_per_unit' => isset($lineData['discount_amount_per_unit']) ? (float) $lineData['discount_amount_per_unit'] : null,
                 'quantity_discount_id'   => $quantityDiscountId,
                 'tva_rate'               => (float) ($lineData['tva_rate'] ?? 0),
                 'packaging_id'           => $lineData['packaging_id'] ?? null,
@@ -547,21 +552,30 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     private function computeLineTotals(array $line): array
     {
-        $qty     = (float) ($line['quantity']            ?? 0);
-        $price   = (float) ($line['unit_price_ht']       ?? 0);
-        $discPct = (float) ($line['discount_percentage'] ?? 0);
-        $tvaRate = (float) ($line['tva_rate']            ?? 0);
+        $qty            = (float) ($line['quantity']                ?? 0);
+        $price          = (float) ($line['unit_price_ht']           ?? 0);
+        $discPct        = (float) ($line['discount_percentage']     ?? 0);
+        $discAmtPerUnit = (float) ($line['discount_amount_per_unit'] ?? 0);
+        $tvaRate        = (float) ($line['tva_rate']                ?? 0);
 
-        $gross    = $qty * $price;
-        $discount = $gross * ($discPct / 100);
-        $ht       = $gross - $discount;
-        $tva      = $ht * ($tvaRate / 100);
+        $gross = $qty * $price;
+
+        if ($discAmtPerUnit > 0) {
+            $discount = $discAmtPerUnit * $qty;
+        } else {
+            $discount = $gross * ($discPct / 100);
+        }
+
+        $ht  = $gross - $discount;
+        $tva = $ht * ($tvaRate / 100);
 
         return [
-            'total_ht'        => round($ht,       2),
-            'discount_amount' => round($discount,  2),
-            'total_tva'       => round($tva,       2),
-            'total_ttc'       => round($ht + $tva, 2),
+            'total_ht'              => round($ht,       4),
+            'discount_amount'       => round($discAmtPerUnit > 0 ? $discAmtPerUnit : ($price * ($discPct / 100)), 4),
+            'discount_amount_per_unit' => $discAmtPerUnit > 0 ? round($discAmtPerUnit, 4) : null,
+            'total_discount_amount' => round($discount, 4),
+            'total_tva'             => round($tva,       4),
+            'total_ttc'             => round($ht + $tva, 4),
         ];
     }
 

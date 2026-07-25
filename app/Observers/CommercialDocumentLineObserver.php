@@ -9,30 +9,20 @@ use App\Models\CommercialDocumentLine;
  * CommercialDocumentLineObserver
  * ══════════════════════════════════════════════════════════════════════════════
  *
- * المسؤولية: حساب إجماليات السطر عند الحفظ المباشر.
+ * Responsible: compute line totals on save.
  *
- * ══ نموذج الحساب (مطابق لـ CommercialDocumentService::computeLineTotals) ══
+ * ══ TWO MUTUALLY-EXCLUSIVE DISCOUNT PATHS ═══════════════════════════════════
  *
- *   quantity         = وحدات أساسية (الفرونتند يُرسل displayQty × packQty)
- *   unit_price_ht    = سعر الوحدة الأساسية
- *   discount_percentage = نسبة الخصم %
- *   discount_amount  = مبلغ خصم الوحدة الواحدة = unit_price_ht × discPct/100
- *                      (يُحسَب هنا ويُخزَّن — للمرجع)
+ *  Path A — Native fixed-amount (discount_amount_per_unit > 0):
+ *    discount_amount_per_unit = frozen per-unit DZD from quantity tier
+ *    discount_percentage     = 0
+ *    total_discount          = discount_amount_per_unit × quantity
+ *    NO percentage conversion — ever.
  *
- *   gross    = quantity × unit_price_ht
- *   discount = gross × discount_percentage / 100
- *   total_ht = gross - discount
- *   total_tva = total_ht × tva_rate / 100
- *   total_ttc = total_ht + total_tva
- *
- * ══ الأولوية ═════════════════════════════════════════════════════════════════
- *
- *  1. discount_percentage (الأساسي — يُحسَب الباقي منه)
- *  2. discount_amount (للمرجع — يُحسَب من discPct)
- *
- *  ⚠️ إذا أرسل الفرونتند discount_amount بدون discount_percentage
- *     (وضع fixed)، نحسب discPct = (discount_amount / unit_price_ht) × 100
- *     ثم نعيد حساب discount_amount بالمنطق الموحَّد.
+ *  Path B — Percentage (discount_amount_per_unit is null):
+ *    discount_percentage = user-supplied or tier percentage
+ *    total_discount      = gross × (discount_percentage / 100)
+ *    discount_amount     = unit_price_ht × (discount_percentage / 100) — per-unit ref
  *
  * ══════════════════════════════════════════════════════════════════════════════
  */
@@ -45,6 +35,7 @@ class CommercialDocumentLineObserver
             'quantity',
             'unit_price_ht',
             'discount_percentage',
+            'discount_amount_per_unit',
             'discount_amount',
             'tva_rate',
         ])) {
@@ -56,37 +47,34 @@ class CommercialDocumentLineObserver
 
     private function calculateLineTotals(CommercialDocumentLine $line): void
     {
-        $qty      = (float) ($line->quantity        ?? 0);
-        $price    = (float) ($line->unit_price_ht   ?? 0);
-        $tvaRate  = (float) ($line->tva_rate        ?? 0);
+        $qty     = (float) ($line->quantity              ?? 0);
+        $price   = (float) ($line->unit_price_ht          ?? 0);
+        $tvaRate = (float) ($line->tva_rate               ?? 0);
 
-        $discPct    = (float) ($line->discount_percentage ?? 0);
-        $discAmount = (float) ($line->discount_amount     ?? 0);
+        $discAmtPerUnit = (float) ($line->discount_amount_per_unit ?? 0);
+        $discPct        = (float) ($line->discount_percentage     ?? 0);
 
-        // Fixed-amount mode: when only discount_amount is provided (no percentage),
-        // derive the percentage from the per-unit amount.
-        // NOTE: computeLineTotals() stores TOTAL line discount in discount_amount —
-        //       we must NOT treat that as per-unit. Only the frontend-sent per-unit
-        //       value (before createDocumentLines merges it) should trigger this path.
-        if ($discPct <= 0 && $discAmount > 0 && $price > 0) {
-            $discPct = ($discAmount / $price) * 100;
+        $gross = $qty * $price;
+
+        // Native fixed-amount path: discount_amount_per_unit is the frozen per-unit
+        // discount from a quantity tier. NEVER convert to/from percentage here.
+        if ($discAmtPerUnit > 0) {
+            $discountTotal = $discAmtPerUnit * $qty;
+            $unitDiscount  = $discAmtPerUnit;
+        } else {
+            $discountTotal = $gross * ($discPct / 100);
+            $unitDiscount  = $price * ($discPct / 100);
         }
 
-        $gross          = $qty * $price;
-        $discountTotal  = $gross * ($discPct / 100);
-        $ht             = $gross - $discountTotal;
-        $tva            = $ht * ($tvaRate / 100);
+        $ht  = $gross - $discountTotal;
+        $tva = $ht * ($tvaRate / 100);
 
-        // discount_amount = خصم الوحدة الواحدة (للمرجع)
-        $unitDiscountAmount = $price * ($discPct / 100);
-
-        $line->discount_percentage  = round($discPct,             4);
-        $line->discount_amount      = round($unitDiscountAmount,   4);
-        $line->total_ht             = round($ht,                  4);
-        $line->total_tva            = round($tva,                  4);
-        $line->total_ttc            = round($ht + $tva,            4);
-
-        // total_discount_amount = إجمالي الخصم على الوحدات كلها (للعرض)
-        $line->total_discount_amount = round($discountTotal, 4);
+        $line->discount_amount_per_unit = $discAmtPerUnit > 0 ? round($discAmtPerUnit, 4) : null;
+        $line->discount_percentage      = round($discPct, 4);
+        $line->discount_amount          = round($unitDiscount, 4);
+        $line->total_ht                 = round($ht, 4);
+        $line->total_tva                = round($tva, 4);
+        $line->total_ttc                = round($ht + $tva, 4);
+        $line->total_discount_amount    = round($discountTotal, 4);
     }
 }

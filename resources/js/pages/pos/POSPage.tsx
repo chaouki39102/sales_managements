@@ -704,10 +704,21 @@ function POSPage() {
         const priceHt  = Number(line.unit_price_ht);
         const discPct  = Number(line.discount_percentage);
         const gross    = qty * priceHt;
-        // total_discount_amount = the EXACT total discount computed by the Observer
-        // (discount_amount in DB is per-unit, discount_percentage is rounded to 2 decimals)
-        const apiTotalDisc = Number((line as any).total_discount_amount) || 0;
-        const totalDisc = apiTotalDisc > 0 ? apiTotalDisc : gross * (discPct / 100);
+        // Native fixed-amount path: if discount_amount_per_unit is populated, use it
+        // directly — NO percentage conversion, NO round-trip.
+        const frozenPerUnit = Number((line as any).discount_amount_per_unit) || 0;
+        let discountAmount: number;
+        let discountMode: 'percentage' | 'fixed_amount';
+        if (frozenPerUnit > 0) {
+          // Native fixed-amount tier — exact total, zero round-trip error
+          discountAmount = frozenPerUnit * qty;
+          discountMode   = 'fixed_amount';
+        } else {
+          // Percentage-based line — use DB-computed total_discount_amount or derive from %
+          const apiTotalDisc = Number((line as any).total_discount_amount) || 0;
+          discountAmount = apiTotalDisc > 0 ? apiTotalDisc : gross * (discPct / 100);
+          discountMode   = 'percentage';
+        }
         return {
           id:                  nanoid(8),
           product_id:          line.product_id ?? prod?.id ?? 0,
@@ -723,9 +734,9 @@ function POSPage() {
           selling_price_ttc:   htToTtc(priceHt, Number(line.tva_rate)),
           tva_rate:            Number(line.tva_rate),
           tva_id:              v?.tva_id ?? null,
-          discount_percentage: 0,
-          discount_amount:     Math.round(totalDisc * 100) / 100,
-          discount_mode:       'fixed_amount',
+          discount_percentage: discPct,
+          discount_amount:     Math.round(discountAmount * 100) / 100,
+          discount_mode:       discountMode,
           total_ht:            Number(line.total_ht),
           total_ttc:           Number(line.total_ttc),
           max_stock:           null,
@@ -1018,21 +1029,32 @@ const handleCompleteSale = useCallback(async (params: {
       const linesPayload = currentItems.map(i => {
         const compoundedDisc = compoundDiscountPct(i.discount_percentage, currentInvDisc);
         const lineDiscAmount = i.quantity > 0 ? Math.round((i.discount_amount / i.quantity) * 100) / 100 : 0;
+        const isFixedAmount  = i.discount_mode === 'fixed_amount' && lineDiscAmount > 0;
         return {
-          product_id:          i.product_id,
-          quantity:            i.quantity,
-          unit_price_ht:       i.unit_price_ht,
-          discount_percentage: Math.min(100, compoundedDisc),
-          discount_amount:     lineDiscAmount,
-          tva_rate:            clientIsTvaExempt ? 0 : i.tva_rate,
-          packaging_id:        i.packaging_id ?? null,
+          product_id:               i.product_id,
+          quantity:                 i.quantity,
+          unit_price_ht:            i.unit_price_ht,
+          discount_percentage:      isFixedAmount ? 0 : Math.min(100, compoundedDisc),
+          discount_amount:          lineDiscAmount,
+          discount_amount_per_unit: isFixedAmount ? lineDiscAmount : null,
+          tva_rate:                 clientIsTvaExempt ? 0 : i.tva_rate,
+          packaging_id:             i.packaging_id ?? null,
         };
       });
 
-      const effectiveTotalHt = linesPayload.reduce((s, l) =>
-        s + l.quantity * l.unit_price_ht * (1 - l.discount_percentage / 100), 0);
+      const effectiveTotalHt = linesPayload.reduce((s, l) => {
+        const gross = l.quantity * l.unit_price_ht;
+        const disc = l.discount_amount_per_unit
+          ? l.discount_amount_per_unit * l.quantity
+          : gross * (l.discount_percentage / 100);
+        return s + gross - disc;
+      }, 0);
       const effectiveTotalTva = linesPayload.reduce((s, l) => {
-        const lineHt = l.quantity * l.unit_price_ht * (1 - l.discount_percentage / 100);
+        const gross = l.quantity * l.unit_price_ht;
+        const disc = l.discount_amount_per_unit
+          ? l.discount_amount_per_unit * l.quantity
+          : gross * (l.discount_percentage / 100);
+        const lineHt = gross - disc;
         return s + lineHt * l.tva_rate / 100;
       }, 0);
       const effectiveTotalTtc = effectiveTotalHt + effectiveTotalTva + snapshot.totals.fiscal_stamp;
