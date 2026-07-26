@@ -39,6 +39,7 @@ class PartyResource extends JsonResource
             'credit_limit'           => $this->credit_limit,
             'default_price_level_id' => $this->default_price_level_id,
             'credit_days'            => $this->credit_days,
+            'allow_credit_sale'      => $this->allow_credit_sale,
             'is_tva_exempt'          => $this->is_tva_exempt,
             'is_taxable'             => $this->is_taxable,
             'tax_option'             => $this->tax_option,

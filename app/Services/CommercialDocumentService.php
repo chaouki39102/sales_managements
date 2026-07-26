@@ -184,6 +184,25 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $this->payments()->syncPayments($item, $payments);
         }
 
+        // ✅ التحقق من البيع بالدين: إذا كان التعامل لا يُسمح له بالبيع بالدين
+        //    فيجب أن تساوي الدفعات المبلغ الإجمالي كاملاً
+        if (!empty($data['party_id'])) {
+            $party = \App\Models\Party::find($data['party_id']);
+            if ($party && !$party->allow_credit_sale) {
+                $totalPaid = $item->fresh()?->payments()->sum('amount')
+                    ?? collect($request?->input('payments') ?? $data['payments'] ?? [])->sum('amount');
+                $totalTtc = (float) $item->total_ttc;
+                if ($totalPaid + 0.01 < $totalTtc) {
+                    throw new BusinessRuleException(
+                        "التعامل «{$party->name}» لا يُسمح له بالبيع بالدين. " .
+                        "المبلغ المدفوع (" . number_format($totalPaid, 2) . " دج) أقل من الإجمالي (" .
+                        number_format($totalTtc, 2) . " دج).",
+                        422
+                    );
+                }
+            }
+        }
+
         // ✅ Freeze balance snapshots inside the transaction (SSOT for receipt reprinting)
         $this->persistBalanceSnapshots($item);
     }

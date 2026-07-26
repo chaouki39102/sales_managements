@@ -468,6 +468,13 @@ export function useCommercialDocumentController({
       setDocNumberErr('رقم المستند إلزامي'); return;
     }
     if (docNumberErr) { setApiErr('رجاء التحقق من رقم المستند'); return; }
+    if (selectedParty && selectedParty.allow_credit_sale === false) {
+      const totalPaid = payments.reduce((acc, p) => acc + toNum(p.amount), 0);
+      if (totalPaid + 0.01 < totals.netToPay) {
+        setApiErr(`التعامل «${selectedParty.name}» لا يُسمح له بالبيع بالدين — يجب دفع المبلغ كاملاً (${fmtDZD(totals.netToPay)} دج)`);
+        return;
+      }
+    }
     if (creditCheck?.will_exceed) {
       if (!creditCheck.can_proceed) {
         setApiErr('تجاوز حد الائتمان — يتطلب موافقة المدير');

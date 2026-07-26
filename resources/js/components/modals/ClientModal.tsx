@@ -40,7 +40,7 @@ export default function ClientModal({ open, party, onClose, onSaved, isSubmittin
     commune_id: null as number | null,
     wilaya_id:  null as number | null,
     phone: '', mobile: '', fax: '', email: '', bank_name: '', rib: '',
-    initial_balance: 0, credit_limit: 0, credit_days: 30,
+    initial_balance: 0,     credit_limit: 0, credit_days: 30, allow_credit_sale: true,
     default_price_level_id: null as number | null,
     is_tva_exempt: false, is_taxable: true, tax_option: null as string | null,
     cnas_number: '', tax_regime: null as string | null,
@@ -81,6 +81,7 @@ export default function ClientModal({ open, party, onClose, onSaved, isSubmittin
       initial_balance:        nn(p.initial_balance),
       credit_limit:           nn(p.credit_limit),
       credit_days:            nn(p.credit_days, 30),
+      allow_credit_sale:      p.allow_credit_sale ?? true,
       is_tva_exempt:          p.is_tva_exempt    ?? false,
       is_taxable:             p.is_taxable       ?? true,
       is_final_consumer:      p.is_final_consumer ?? false,
@@ -159,6 +160,7 @@ export default function ClientModal({ open, party, onClose, onSaved, isSubmittin
         commune_id:            form.commune_id,
         credit_limit:          form.credit_limit,
         credit_days:           form.credit_days,
+        allow_credit_sale:     form.allow_credit_sale,
         default_price_level_id: form.default_price_level_id,
         is_tva_exempt:         form.is_tva_exempt,
         is_taxable:            form.is_taxable,
@@ -411,6 +413,12 @@ export default function ClientModal({ open, party, onClose, onSaved, isSubmittin
             <div className="fg">
               <label>تاريخ التسجيل في TVA</label>
               <input type="date" value={form.vat_registration_date || ''} onChange={e => set('vat_registration_date', e.target.value)} />
+            </div>
+            <div className="fg">
+              <label className="flex between">
+                البيع بالدين
+                <Switch checked={form.allow_credit_sale} onChange={v => set('allow_credit_sale', v)} />
+              </label>
             </div>
             <div className="fg">
               <label className="flex between">

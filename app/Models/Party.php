@@ -51,6 +51,7 @@ class Party extends Model
         'credit_limit',
         'default_price_level_id',
         'credit_days',
+        'allow_credit_sale',
         'is_tva_exempt',
         'is_taxable',
         'tax_option',
@@ -68,6 +69,7 @@ class Party extends Model
         'rc_date'              => 'date',
         'credit_limit'         => 'decimal:4',
         'credit_days'          => 'integer',
+        'allow_credit_sale'    => 'boolean',
         'is_tva_exempt'        => 'boolean',
         'is_taxable'           => 'boolean',
         'is_final_consumer'    => 'boolean',
@@ -86,7 +88,7 @@ class Party extends Model
     public static array $filterable = [
         'party_type_id', 'legal_form_id', 'commune_id', 'wilaya_id',
         'default_price_level_id', 'is_tva_exempt', 'is_taxable',
-        'is_final_consumer', 'is_vat_registered', 'active',
+        'is_final_consumer', 'is_vat_registered', 'active', 'allow_credit_sale',
     ];
     public static array $sortable        = ['id', 'code', 'name', 'commercial_name', 'created_at', 'updated_at'];
     public static array $defaultWith     = [];

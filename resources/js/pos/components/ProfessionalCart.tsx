@@ -58,6 +58,7 @@ interface ProfessionalCartProps {
   slug?:                string | null;
   cartRef?:             React.RefObject<HTMLDivElement>;
   onClientModalClose?:  () => void;
+  allowCreditSale?:     boolean;
 }
 
 /** واجهة برمجية للتحكم بالسلة من المكوّن الأب (POSPage) — بديل عن querySelectorAll */
@@ -83,6 +84,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
   onHold, onSell, onQuickSell, onClear, onHeld, totalTtcFinal, remainingToPay,
   invoiceDiscountPct = 0, onInvoiceDiscountChange, invoiceDiscountAmount = 0,
   onUndoClear, canUndoClear, undoClearSecondsLeft = 0, clientBalance, slug, cartRef, onClientModalClose,
+  allowCreditSale = true,
 }, ref) {
 
   const [showNote,         setShowNote]         = useState(false);
@@ -537,22 +539,24 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
             <i className="ti ti-clock-pause" /> تعليق
             {kb('holdCart') && <span className="tb-txt"> {kb('holdCart')}</span>}
           </button>
-          <button
-            className="cart-sell-btn"
-            onClick={onSell}
-            disabled={isEmpty}
-            title={`دفع والإتمام — ${kb('payment')}`}
-          >
-            <i className="ti ti-circle-check" />
-            <span>
-              {isEmpty ? 'السلة فارغة' : (
-                remainingToPay <= 0
-                  ? 'مدفوعة ✓'
-                  : `دفع — ${formatDZD(remainingToPay)}`
-              )}
-            </span>
-            {kb('payment') && <span className="tb-txt" style={{ fontSize: 13 }}> {kb('payment')}</span>}
-          </button>
+          {allowCreditSale && (
+            <button
+              className="cart-sell-btn"
+              onClick={onSell}
+              disabled={isEmpty}
+              title={`دفع والإتمام — ${kb('payment')}`}
+            >
+              <i className="ti ti-circle-check" />
+              <span>
+                {isEmpty ? 'السلة فارغة' : (
+                  remainingToPay <= 0
+                    ? 'مدفوعة ✓'
+                    : `دفع — ${formatDZD(remainingToPay)}`
+                )}
+              </span>
+              {kb('payment') && <span className="tb-txt" style={{ fontSize: 13 }}> {kb('payment')}</span>}
+            </button>
+          )}
           {!isEmpty && (
             <button
               className="cart-sell-btn cart-quick-sell"

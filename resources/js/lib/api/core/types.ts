@@ -315,6 +315,7 @@ export interface Party extends BaseModel {
   initial_balance:        number;
   credit_limit:           number;
   credit_days?:           number | null;
+  allow_credit_sale?:     boolean;
   default_price_level_id?:number | null;
   is_tva_exempt:          boolean;
   is_taxable?:            boolean;

@@ -444,6 +444,7 @@ function POSPage() {
 
   // ── Client balance ──────────────────────────────────────────────────────────
   const clientId = pos.client?.id;
+  const allowCreditSale = pos.client?.allow_credit_sale ?? true;
   const { data: clientBalance } = useQuery({
     queryKey: tenantKeys.partyBalances.detail(slug ?? '', clientId!),
     queryFn:  () => partyBalancesApi.getOne(clientId!),
@@ -1548,7 +1549,7 @@ const handleCompleteSale = useCallback(async (params: {
         activeTab={mobTab} onTab={setMobTab}
         itemsCount={pos.totals.items_count}
         totalTtc={adjustedTotalTtcFinal}
-        isEmpty={isEmpty} onSell={() => setModal('payment')}
+        isEmpty={isEmpty} onSell={() => { if (allowCreditSale) setModal('payment'); }}
       />
 
       <div
@@ -1618,7 +1619,7 @@ const handleCompleteSale = useCallback(async (params: {
           packagingsMap={packagingsMap}
           onSetClient={pos.setClient}
           onNoteChange={setCartNote} onHold={() => { clearEditingState(); pos.holdCart(); }}
-          onSell={() => setModal('payment')} onQuickSell={handleQuickCash} onClear={handleClearCart} onHeld={() => setModal('held')}
+          onSell={() => { if (allowCreditSale) setModal('payment'); }} onQuickSell={handleQuickCash} onClear={handleClearCart} onHeld={() => setModal('held')}
           totalTtcFinal={adjustedTotalTtcFinal}
           remainingToPay={remainingToPay}
           invoiceDiscountPct={pos.invoiceDiscountPct}
@@ -1642,6 +1643,7 @@ const handleCompleteSale = useCallback(async (params: {
           slug={slug}
           cartRef={cartRef}
           onClientModalClose={() => { setTimeout(() => searchRef.current?.focus(), 100); }}
+          allowCreditSale={allowCreditSale}
         />
       </div>
 
@@ -1679,7 +1681,7 @@ const handleCompleteSale = useCallback(async (params: {
             carts={pos.heldCarts} onClose={() => setModal('none')}
             onRestore={id => { clearEditingState(); pos.restoreCart(id); setModal('none'); }}
             onDelete={pos.deleteHeldCart}
-            onRestoreAndPay={id => { clearEditingState(); pos.restoreCart(id); setModal('payment'); }}
+            onRestoreAndPay={id => { clearEditingState(); pos.restoreCart(id); if (allowCreditSale) setModal('payment'); }}
           />
         </Suspense>
       )}
