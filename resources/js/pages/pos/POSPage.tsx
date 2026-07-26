@@ -1773,6 +1773,7 @@ const handleCompleteSale = useCallback(async (params: {
           <WeightEntryModal
             productName={weightModalVariant.current.product?.name ?? weightModalVariant.current.variant_name ?? ''}
             unitSymbol={weightModalVariant.current.unit?.abbreviation ?? 'كغ'}
+            unitPrice={weightModalVariant.current.default_selling_price_ht ?? 0}
             onClose={() => { weightModalVariant.current = null; setModal('none'); }}
             onConfirm={qty => {
               const v = weightModalVariant.current!;

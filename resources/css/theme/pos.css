@@ -3285,7 +3285,10 @@ body.dark .thermal-status.err { background: #7f1d1d; color: #fecaca; }
 }
 
 /* ═══ WEIGHT ENTRY MODAL ═══ */
-.wem-product{margin-bottom:16px;font-weight:600;font-size:15px;color:var(--t1);}
+.wem-product{margin-bottom:4px;font-weight:600;font-size:15px;color:var(--t1);}
+.wem-unit-price{font-size:12px;color:var(--t3);margin-bottom:12px;display:flex;align-items:center;gap:4px;}
+.wem-unit-price strong{color:var(--em);margin:0 3px;}
+.wem-unit-price-per{font-size:11px;color:var(--t4);}
 .wem-quick-btns{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;justify-content:center;}
 .wem-quick-btn{
   padding:6px 12px;border-radius:8px;border:1px solid var(--b3);
@@ -3294,8 +3297,12 @@ body.dark .thermal-status.err { background: #7f1d1d; color: #fecaca; }
 }
 .wem-quick-btn:hover{border-color:var(--accent);color:var(--accent);}
 .wem-quick-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.wem-field-group{margin-bottom:12px;}
+.wem-field-label{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--t3);margin-bottom:6px;}
+.wem-field-label i{font-size:13px;}
 .wem-input-row{display:flex;align-items:center;gap:6px;justify-content:center;}
 .wem-inp{font-size:22px;padding:10px 12px;text-align:center;width:140px;font-weight:600;}
+.wem-inp-price{width:130px;}
 .wem-unit{font-size:14px;color:var(--t3);font-weight:600;min-width:30px;}
 .wem-adj-btn{
   display:flex;flex-direction:column;align-items:center;gap:1px;
@@ -3306,6 +3313,14 @@ body.dark .thermal-status.err { background: #7f1d1d; color: #fecaca; }
 .wem-adj-btn:hover{border-color:var(--accent);color:var(--accent);}
 .wem-adj-btn i{font-size:14px;}
 .wem-adj-label{font-size:9px;color:var(--t4);font-family:monospace;}
+.wem-summary{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:10px;margin-top:4px;border-radius:var(--r2);
+  background:var(--emb);border:1px solid var(--embo);
+}
+.wem-summary-qty{font-size:15px;font-weight:700;color:var(--em);}
+.wem-summary i{font-size:14px;color:var(--t4);}
+.wem-summary-price{font-size:18px;font-weight:800;color:var(--em);}
 .wem-hint{margin-top:12px;font-size:11px;color:var(--t3);text-align:center;}
 
 /* ═══ RETURNS MODAL ═══ */
