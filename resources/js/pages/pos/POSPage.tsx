@@ -695,7 +695,7 @@ function POSPage() {
     if (!isEmpty && cartState._isDirty) posRef.current.holdCart();
     try {
       const doc = await apiGet<CommercialDocument>(`/documents/${docId}`, {
-        include: 'party,documentType,lines,lines.product,lines.product_variant,lines.packaging,payments,payments.payment_mode',
+        include: 'party,documentType,lines,lines.product,lines.product.quantityDiscounts,lines.product_variant,lines.packaging,payments,payments.payment_mode',
       });
       if (!doc?.lines?.length) {
         safeToast.error('لا توجد أصناف في هذه الفاتورة');

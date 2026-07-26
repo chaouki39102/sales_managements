@@ -49,6 +49,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     protected array $showWith = [
         'payments',
+        'lines.product.quantityDiscounts',
     ];
 
     protected function getResourceName(): string

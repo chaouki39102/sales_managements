@@ -67,14 +67,24 @@ export const useCartStore = create<CartState>()(
           if (existing) {
             const newQty   = existing.quantity + safeQty;
             const existPackQty = existing.pack_qty ?? 1;
-            const resolved = resolveQuantityTier(variant.quantity_discounts, newQty, existPackQty);
-            const updated  = recalcItem({
-              ...existing,
-              quantity:            newQty,
-              discount_percentage: resolved?.discount_percentage ?? 0,
-              discount_amount:     resolved?.mode === 'fixed_amount' ? resolved.discount_amount : 0,
-              discount_mode:       resolved?.mode ?? 'percentage',
-            });
+            const hasTiers = (variant.quantity_discounts ?? existing.quantity_discounts)?.length > 0;
+            const tierSource = variant.quantity_discounts ?? existing.quantity_discounts ?? [];
+
+            let discPatch: Partial<Pick<CartItem, 'discount_percentage' | 'discount_amount' | 'discount_mode'>>;
+
+            if (hasTiers) {
+              const resolved = resolveQuantityTier(tierSource, newQty, existPackQty);
+              discPatch = {
+                discount_percentage: resolved?.discount_percentage ?? 0,
+                discount_amount:     resolved?.mode === 'fixed_amount' ? resolved.discount_amount : 0,
+                discount_mode:       resolved?.mode ?? 'percentage',
+              };
+            } else {
+              // No tier data — preserve existing discount
+              discPatch = {};
+            }
+
+            const updated  = recalcItem({ ...existing, quantity: newQty, ...discPatch });
             return {
               items: state.items.map(i =>
                 i.variant_id === variant.id && (i.packaging_id ?? null) === packId ? updated : i,
@@ -135,21 +145,29 @@ export const useCartStore = create<CartState>()(
           const rounded = isWeight ? qty : Math.round(qty);
           const safeQty = Math.max(isWeight ? 0.001 : 1, rounded);
 
-          // Strict tier re-evaluation on every qty change.
-          // The backend ALWAYS re-evaluates tiers in createDocumentLines(),
-          // so the frontend must mirror this to keep cart display consistent.
           const packQty = item.pack_qty ?? 1;
-          const resolved = item.quantity_discounts?.length
-            ? resolveQuantityTier(item.quantity_discounts, safeQty, packQty)
-            : null;
+          const hasTiers = item.quantity_discounts?.length > 0;
 
-          const updated = recalcItem({
-            ...item,
-            quantity:            safeQty,
-            discount_percentage: resolved?.discount_percentage ?? 0,
-            discount_amount:     resolved?.mode === 'fixed_amount' ? resolved.discount_amount : 0,
-            discount_mode:       resolved?.mode ?? 'percentage',
-          });
+          let discPatch: Partial<Pick<CartItem, 'discount_percentage' | 'discount_amount' | 'discount_mode'>>;
+
+          if (hasTiers) {
+            // We have tier data — re-evaluate strictly on every qty change.
+            // The backend ALWAYS re-evaluates tiers in createDocumentLines().
+            const resolved = resolveQuantityTier(item.quantity_discounts, safeQty, packQty);
+            discPatch = {
+              discount_percentage: resolved?.discount_percentage ?? 0,
+              discount_amount:     resolved?.mode === 'fixed_amount' ? resolved.discount_amount : 0,
+              discount_mode:       resolved?.mode ?? 'percentage',
+            };
+          } else {
+            // No tier data loaded (e.g. item from reopened invoice without
+            // quantityDiscounts relationship) — preserve the existing discount
+            // values exactly as they are. Zeroing them out destroys the
+            // discount that was already calculated server-side.
+            discPatch = {};
+          }
+
+          const updated = recalcItem({ ...item, quantity: safeQty, ...discPatch });
           return { items: state.items.map(i => i.id === id ? updated : i), _isDirty: true };
         }),
 
