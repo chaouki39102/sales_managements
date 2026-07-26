@@ -1,7 +1,9 @@
 // ════════════════════════════════════════════════
 // pos/utils/calculations.ts — حسابات POS
+// مصدر واحد فقط لكل الحسابات
 // ════════════════════════════════════════════════
 import type { CartItem, CartTotals } from '@/types';
+import type { QuantityDiscount } from '@/types/product';
 
 /** حساب سعر TTC من HT + TVA */
 export function htToTtc(ht: number, tvaRate: number): number {
@@ -119,4 +121,102 @@ export function checkStock(item: CartItem, newQty: number): { ok: boolean; messa
 /** تقريب للمبلغ */
 export function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+// ══════════════════════════════════════════════════════════════
+// Quantity Tiers — مصدر واحد لجميع مكونات POS
+// ══════════════════════════════════════════════════════════════
+
+export interface ResolvedTier {
+  mode:               'percentage' | 'fixed_amount';
+  discount_percentage: number;
+  discount_amount:     number;
+  quantity_discount_id?: number | null;
+}
+
+/** حساب الكمية الأساسية (الكمية × packQty) — يطابق الباكند */
+export function resolveQuantityTier(
+  discounts: QuantityDiscount[] | undefined,
+  qty: number,
+  packQty: number,
+): ResolvedTier | null {
+  if (!discounts?.length) return null;
+  const baseQty = qty * (packQty || 1);
+  const sorted = [...discounts]
+    .filter(d => d.active && !d.is_blocked)
+    .sort((a, b) => Number(b.min_qty) - Number(a.min_qty));
+  const match = sorted.find(d =>
+    baseQty >= Number(d.min_qty) &&
+    (d.max_qty == null || baseQty <= Number(d.max_qty)),
+  );
+  if (!match) return null;
+
+  if (match.discount_amount != null && Number(match.discount_amount) > 0) {
+    return {
+      mode:               'fixed_amount',
+      discount_percentage: 0,
+      discount_amount:     Number(match.discount_amount) * baseQty,
+      quantity_discount_id: match.id,
+    };
+  }
+  if (match.discount_percentage != null && Number(match.discount_percentage) > 0) {
+    const pct = Math.min(100, Number(match.discount_percentage));
+    return {
+      mode:               'percentage',
+      discount_percentage: pct,
+      discount_amount:     0,
+      quantity_discount_id: match.id,
+    };
+  }
+  return null;
+}
+
+/** حساب إجمالي سطر العربة — مصدر واحد فقط */
+export function recalcItem(item: CartItem): CartItem {
+  const gross = item.unit_price_ht * item.quantity;
+  let discAmount: number;
+  if (item.discount_mode === 'fixed_amount') {
+    discAmount = Math.min(gross, item.discount_amount);
+    item = { ...item, discount_percentage: gross > 0 ? round2((discAmount / gross) * 100) : 0 };
+  } else {
+    discAmount = gross * (item.discount_percentage / 100);
+  }
+  const totalHt  = gross - discAmount;
+  const totalTva = totalHt * (item.tva_rate / 100);
+  return {
+    ...item,
+    discount_amount: round2(discAmount),
+    total_ht:        round2(totalHt),
+    total_ttc:       round2(totalHt + totalTva),
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
+// Weight Entry Modal — حسابات الميزان
+// ══════════════════════════════════════════════════════════════
+
+/** حساب سعر الوزن = weight × unitPriceHt */
+export function calcWeightTotal(weightKg: number, unitPriceHt: number): number {
+  return round2(weightKg * unitPriceHt);
+}
+
+/** حساب السعر مع التخفيض */
+export function calcWeightDiscounted(
+  originalTotal: number,
+  tier: ResolvedTier | null,
+  weight: number,
+): number | null {
+  if (!tier || weight <= 0 || originalTotal <= 0) return null;
+  if (tier.discount_percentage > 0) {
+    return round2(originalTotal * (1 - tier.discount_percentage / 100));
+  }
+  if (tier.discount_amount > 0) {
+    return round2(Math.max(0, originalTotal - tier.discount_amount));
+  }
+  return null;
+}
+
+/** حساب الوزن من السعر */
+export function calcWeightFromPrice(price: number, unitPriceHt: number): number {
+  return unitPriceHt > 0 ? parseFloat((price / unitPriceHt).toFixed(6)) : 0;
 }

@@ -1,180 +1,51 @@
-# TODO — Missing Frontend Implementations
-
-> Generated: 2026-07-13 | Backend endpoints with no (or orphaned) frontend UI
-
----
-
-## Priority 1 — Missing (0% frontend, needs full implementation)
-
-### P1.1 Document Approval Workflow
-**Backend:** `ApprovalController.php` — 6 endpoints
-**Frontend:** None
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `GET /approvals/check/{documentId}` | Check if doc needs approval |
-| `POST /approvals/submit/{documentId}` | Submit doc for approval |
-| `POST /approvals/{documentId}/approve` | Approve document |
-| `POST /approvals/{documentId}/reject` | Reject with reason |
-| `GET /approvals/thresholds` | List approval thresholds |
-| `POST /approvals/thresholds` | Create/update threshold |
-
-**Plan:**
-- [ ] Create `endpoints/approvals.ts` — API functions + hooks
-- [ ] Create `components/ApprovalWorkflow.tsx` — approve/reject buttons in document page
-- [ ] Create `components/ApprovalThresholdsModal.tsx` — threshold management
-- [ ] Add approval status indicator to document list page
-
----
-
-### P1.2 Document Mail
-**Backend:** `DocumentMailController.php` — 1 endpoint
-**Frontend:** None
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `POST /documents/{id}/send-mail` | Send document via email |
-
-**Plan:**
-- [ ] Create `components/SendDocumentMailModal.tsx` — recipient, subject, body, send
-- [ ] Add "Send by Email" button to document detail/action bar
-
----
-
-### P1.3 Audit Trail
-**Backend:** `AuditController.php` — 4 endpoints
-**Frontend:** None
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `GET /audits` | List audit logs |
-| `GET /audits/{id}` | Show single audit entry |
-| `GET /audits/user/{user}` | Filter by user |
-| `GET /audits/event/{event}` | Filter by event type |
-
-**Plan:**
-- [ ] Create `endpoints/audits.ts` — API functions + hooks
-- [ ] Create `pages/audit/AuditLogPage.tsx` — searchable/filterable audit table
-- [ ] Add route `/audit-log` to router
-
----
-
-## Priority 2 — Orphaned (code exists but unreachable)
-
-### P2.1 Bank Reconciliation
-**Backend:** `BankReconciliationController.php` — 6 endpoints
-**Frontend:** `BankReconciliationPage.tsx` exists but is **never routed**
-
-| Endpoint | Frontend Status |
-|----------|----------------|
-| `GET /reconciliation/unreconciled` | Called in orphaned component |
-| `GET /reconciliation/reconciled` | Called in orphaned component |
-| `POST /reconciliation/reconcile` | Called in orphaned component |
-| `POST /reconciliation/bulk-reconcile` | **MISSING** |
-| `POST /reconciliation/suggest-matches` | **MISSING** |
-| `POST /reconciliation/{id}/unreconcile` | **MISSING** |
-
-**Plan:**
-- [ ] Move `BankReconciliationPage.tsx` to `pages/finance/` or `pages/reconciliation/`
-- [ ] Add route to router
-- [ ] Add missing API functions (`bulkReconcile`, `suggestMatches`, `unreconcile`)
-- [ ] Add reconcile-all button + suggest-matches button to UI
-
----
-
-### P2.2 Alerts System
-**Backend:** `AlertController.php` — 6 endpoints
-**Frontend:** `useAlerts.ts` + `AlertBell.tsx` exist but are **never rendered**
-
-| Endpoint | Frontend Status |
-|----------|----------------|
-| `GET /alerts/unread` | Called in orphaned hook |
-| `POST /alerts/{id}/read` | Called in orphaned hook |
-| `POST /alerts/mark-all-read` | Called in orphaned hook |
-| `GET /alerts/all` | **MISSING** |
-| `GET /alerts/count` | **MISSING** |
-| `POST /alerts/run-daily` | **MISSING** |
-
-**Plan:**
-- [ ] Integrate `AlertBell.tsx` into the topbar (alongside NotificationBell)
-- [ ] Create `pages/alerts/AlertsPage.tsx` — list all alerts
-- [ ] Add missing API functions + hooks
-- [ ] Add route to router
-
----
-
-## Priority 3 — Missing UI (hooks exist, no page)
-
-### P3.1 Product Lots Page
-**Backend:** `ProductLotController.php` — 7 endpoints (CRUD + `available` + `expiring`)
-**Frontend:** Hooks defined in `inventory.ts` but **never imported by any page**
-
-**Plan:**
-- [ ] Create `pages/inventory/ProductLotsTab.tsx` — tab in InventoryPage
-- [ ] Show expiring lots alert
-- [ ] Show available lots per product/warehouse
-- [ ] Wire navigation from InventoryPage tabs
-
----
-
-## Priority 4 — Minor gaps
-
-### P4.1 Exchange Rate Latest
-**Backend:** `ExchangeRateController::latest()` — `GET /exchange-rates/latest`
-**Frontend:** No consumer (only list endpoint used)
-
-**Plan:**
-- [ ] Add `latest()` to `lookups.ts` exchange rate API
-- [ ] Use in document creation (auto-fill exchange rate for foreign currencies)
-
----
-
-### P4.2 Document Compute Totals
-**Backend:** `DocumentComputeController::computeTotals()` — `POST /documents/compute-totals`
-**Frontend:** Not called (all other compute endpoints are used)
-
-**Plan:**
-- [ ] Add `computeTotals` function to documents API
-- [ ] Use in document form when batch-editing lines
-
----
-
-### P4.3 Attachment Management
-**Backend:** `AttachmentController.php` — 3 endpoints
-**Frontend:** Only `POST /attachments` used for logo upload in setup wizard
-
-| Endpoint | Frontend Status |
-|----------|----------------|
-| `POST /attachments` | Used (logo only) |
-| `GET /attachments` (list) | **MISSING** |
-| `GET /attachments/{id}/download` | **MISSING** |
-
-**Plan:**
-- [ ] Add attachment list + download to document detail view
-- [ ] Show attached files in document sidebar
-
----
-
-## Summary
-
-| Priority | Count | Status |
-|----------|-------|--------|
-| P1 — Full implementation needed | 3 | Approval, Mail, Audit |
-| P2 — Orphaned code to integrate | 2 | Reconciliation, Alerts |
-| P3 — UI missing, hooks exist | 1 | Product Lots |
-| P4 — Minor gaps | 3 | Exchange rate, Compute totals, Attachments |
-| **Total** | **9** | |
-
-## Estimated Complexity
-
-| Feature | New Files | Estimated Lines | Difficulty |
-|---------|-----------|-----------------|------------|
-| Approval Workflow | 3 | ~400 | Medium |
-| Document Mail | 2 | ~150 | Low |
-| Audit Trail | 2 | ~300 | Medium |
-| Bank Reconciliation | 2 (move + complete) | ~200 | Medium |
-| Alerts | 2 | ~250 | Low |
-| Product Lots | 1 | ~200 | Low |
-| Exchange Rate Latest | 1 (extend) | ~30 | Trivial |
-| Compute Totals | 1 (extend) | ~30 | Trivial |
-| Attachment Management | 1 | ~100 | Low |
+تقييم Migration الأخير: 2026_07_25_100144
+ملخص الـ Migration
+$table->decimal('discount_amount_per_unit', 15, 4)->nullable()
+      ->after('discount_percentage')
+      ->comment('Frozen per-unit discount from a quantity tier, stored natively — never derived from discount_percentage.');
+يضيف عمود discount_amount_per_unit لتخزين خصم الوحدة الثابتة (الذي يأتي من تسعير الكميات) بشكل "مجمد" — لا يُشتق من discount_percentage.
+هل تم الاعتماد عليها في المشروع؟
+نعم، بشكل كامل ومتسق. البحث يظهر:
+الطبقة	الملف
+Model	CommercialDocumentLine.php:33,63
+Observer	CommercialDocumentLineObserver.php:38,54,74
+Service	CommercialDocumentService.php:518,522,528,546,562,581
+ComputeLine	ComputeLineService.php:326,367
+API Resource	CommercialDocumentLineResource.php:25
+Frontend Type	types.ts:496
+POS Page	POSPage.tsx:707,1042,1051-1060
+تقييم: 8/10 ✅
+نقاط إيجابية
+1. حل مشكلة حقيقية وخطيرة — bug التلف الذاتي (self-corruption) كان يُعيد حساب discount_percentage بشكل خاطئ عند تغيير الكمية. الحل يفصل بين "المُدخل" و"المُحسب" بشكل جذري.
+2. تمييز واضح بين مسارين متنافيين — Observer يُ implement منطق Path A (ثابت) / Path B (نسبة) بشكل نظيف:
+if ($discAmtPerUnit > 0) { /* ثابت */ } else { /* نسبة */ }
+3. العمود nullable بالتصميم — لا يملأ إلا في حالة fixed-amount. في حالة النسبة يبقى null. هذا صحيح لأن percentages لا تحتاج تخزين ثابت.
+4. الـ Comment وصفي ودقيق — يُوضّح الغرض والقيود بوضوح.
+5. Migration مُعاكس (down()) — يحذف العمود عند التراجع. بسيط ونظيف.
+6. المigration مُنسق زمنياً مع 100000 — الـ precision migration (100000) يسبق الـ new column (100144). الترتيب صحيح لأن change() على العمود الموجود يي أولاً.
+7. التكامل الكامل مع discount_mode في Frontend — CartItem uses discount_mode: 'fixed_amount' | 'percentage' which maps cleanly to the backend's discount_amount_per_unit > 0 vs null branching.
+نقاط سلبية / ملاحظات
+1. ⚠️ لا يوجد Data Migration للبيانات القديمة — الأسطر الموجودة قبل هذا الـ migration ستحصل على NULL في discount_amount_per_unit. هذا مقبول فقط إذا:
+- لا توجد أسطر قديمة بـ fixed-amount discount محفوظة في discount_percentage
+- أو أن الأسطر القديمة كانت دائماً percentages
+التحقق مطلوب: هل هناك أسطر قديمة كان خصمها ثابت (fixed) مُخزَّن في discount_percentage كنسبة مُحوّلة؟ إذا نعم، تحتاج Data Migration.
+2. ⚠️ decimal(15,4) vs discount_amount الأصلي — العمود الجديد يستخدم (15,4) بينما discount_amount الأصلي في الجدول (من migration 2025_10_15_093437) قد يكون (12,4) أو (15,4). عدم تساوي الـ precision قد يسبب خسائر في الحسابات إذا لم يكن discount_amount الأصلي (15,4) also.
+3. ⚠️ لا يوجد Index — لا يوجد index على discount_amount_per_unit. هذا مقبول حالياً لأن لا يوجد استعلام يُصفّي بهذا العمود. لكن إذا احتجت مستقبلاً:
+WHERE discount_amount_per_unit IS NOT NULL
+ستحتاج index.
+4. ⚠️ تداخل أسماء محتمل — discount_amount (العمود القديم) و discount_amount_per_unit (الجديد) متشابهان جداً في الاسم. في السياق:
+- discount_amount = خصم الوحدة المُحسَّب من النسبة (unit_price_ht × pct/100)
+- discount_amount_per_unit = خصم الوحدة الثابت من tier
+قد يُسبب لبسًا للمطورين الجدد. اسم مثل frozen_discount_per_unit أو tier_discount_per_unit كان أوضح.
+5. ⚠️ لا يوجد $table->index() على quantity_discount_id — العمود المُضاف في migration يوم 2026_07_24 (quantity_discount_id) أيضاً لا يبدو أنه عليه index، وهو يُستخدم في JOINs.
+6. ملاحظة بسيطة: الـ comment يقول "never derived from discount_percentage" — لكن في Observer سطر 76:
+$line->discount_amount = round($unitDiscount, 4);
+discount_amount يُشتق من discount_percentage في Path B. هذا صحيح، لكن الـ comment على العمود الجديد قد يُوهم أن discount_amount لا علاقة له بالنسبة.
+هل تم دمجها بالشكل الصحيح؟
+نعم، بالمجمل. التكامل مُكتمل عبر جميع الطبقات:
+- DB → Model → Observer → Service → API Resource → Frontend Type → POS Page
+ال Observer هو النقطة المحورية ويُ implementing المنطق بشكل صحيح:
+- discount_amount_per_unit > 0 → Path A (ثابت، لا تحويل)
+- discount_amount_per_unit null/0 → Path B (نسبة)
+ملخص التقييم: Migration جيد يحل مشكلة معمارية حقيقية. النقاط السلبية محدودة وقابلة للتحسين (rename محتمل، data migration check، index). الكود المُدمج متسق ومكتمل عبر الطبقات.
+▣  Build · Big Pickle · 12m 19s

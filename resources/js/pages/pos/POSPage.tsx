@@ -1788,6 +1788,7 @@ const handleCompleteSale = useCallback(async (params: {
             unitSymbol={weightModalVariant.current.unit?.abbreviation ?? 'كغ'}
             unitPrice={weightModalVariant.current.default_selling_price_ht ?? 0}
             initialWeight={weightEditItemId.current ? (pos.items.find(i => i.id === weightEditItemId.current)?.quantity ?? undefined) : undefined}
+            quantityDiscounts={weightModalVariant.current.quantity_discounts}
             onClose={() => { weightModalVariant.current = null; weightEditItemId.current = null; setModal('none'); }}
             onConfirm={qty => {
               const v = weightModalVariant.current!;

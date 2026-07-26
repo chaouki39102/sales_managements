@@ -12,7 +12,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { CartItem, ProductPackaging } from '@/types';
-import { formatDZD, ttcToHt } from '../utils/calculations';
+import { formatDZD, ttcToHt, htToTtc } from '../utils/calculations';
 
 interface CartRowProps {
   item:             CartItem;
@@ -171,7 +171,7 @@ export default function CartRow({
   function basePriceLabel(pkg: ProductPackaging, ci: CartItem): string {
     const baseHt = ci.base_price_ht ?? (ci.unit_price_ht / (ci.pack_qty || 1));
     const pkgQty = Math.max(1, Number(pkg.quantity) || 1);
-    const priceTtc = baseHt * pkgQty * (1 + ci.tva_rate / 100);
+    const priceTtc = htToTtc(baseHt * pkgQty, ci.tva_rate);
     return priceTtc.toLocaleString('fr-DZ', { maximumFractionDigits: 0 }) + ' دج';
   }
 
@@ -201,7 +201,9 @@ export default function CartRow({
 
   const commitQty = () => {
     const n = parseFloat(qtyVal);
-    if (!isNaN(n) && n > 0) onQty(n);
+    if (!isNaN(n) && n > 0) {
+      onQty(isWeight ? n : Math.round(n));
+    }
     setEditQty(false);
   };
 
@@ -313,7 +315,7 @@ export default function CartRow({
             type="button"
           >
             <span className="cr-price-num">
-              {(item.unit_price_ht * (1 + tvaRate / 100)).toLocaleString('fr-DZ', { maximumFractionDigits: 2 })}
+              {htToTtc(item.unit_price_ht, tvaRate).toLocaleString('fr-DZ', { maximumFractionDigits: 2 })}
             </span>
             <span className="cr-price-unit">TTC</span>
             <span className="cr-price-edit-ic">✎</span>
@@ -539,7 +541,7 @@ export default function CartRow({
         </div>
         {hasDisc && (
           <div className="cr-ht cr-ht--strike" style={{ direction: 'ltr' }}>
-            {(item.unit_price_ht * item.quantity * (1 + tvaRate / 100))
+            {htToTtc(item.unit_price_ht * item.quantity, tvaRate)
               .toLocaleString('fr-DZ', { maximumFractionDigits: 0 })}
           </div>
         )}

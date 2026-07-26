@@ -47,6 +47,9 @@ function colValue(col: ColumnKey, line: DocumentLine, _tpl: PrintTemplate, idx: 
     const display = _tpl.show_line_total_ttc ? line.totalTtc : line.totalHt;
     return Number(display).toFixed(2);
   }
+  if (col === 'quantity' && typeof val === 'number') {
+    return Number.isInteger(val) ? String(val) : val.toFixed(3);
+  }
   return formatCellValue(val);
 }
 
