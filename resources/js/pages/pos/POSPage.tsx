@@ -275,6 +275,9 @@ function POSPage() {
     currencyId?: number | null;
   }>(null);
 
+  // هل يُسمح بتعليق السلة الحالية؟ فقط للفواتير المُسترجعة أو المفتوحة — السلة الجديدة لا تُعلَّق
+  const [canHold, setCanHold] = useState(false);
+
   const clearEditingState = useCallback(() => {
     setEditingDocumentId(null);
     setEditingDocStatus(null);
@@ -282,6 +285,7 @@ function POSPage() {
     setEditingDocumentNumber(null);
     editingPrevBalanceRef.current = undefined;
     editingDocMetaRef.current = null;
+    setCanHold(false);
   }, []);
 
 
@@ -768,6 +772,7 @@ function POSPage() {
       setEditingDocStatus(doc.status);
       setEditingDocumentDate(doc.document_date ?? null);
       setEditingDocumentNumber(doc.document_number ?? null);
+      setCanHold(true);
       editingPrevBalanceRef.current = doc.balance_data?.previous_balance;
       editingDocMetaRef.current = {
         dueDate:   doc.due_date ?? null,
@@ -1644,6 +1649,7 @@ const handleCompleteSale = useCallback(async (params: {
           cartRef={cartRef}
           onClientModalClose={() => { setTimeout(() => searchRef.current?.focus(), 100); }}
           allowCreditSale={allowCreditSale}
+          canHold={canHold}
         />
       </div>
 
@@ -1679,9 +1685,9 @@ const handleCompleteSale = useCallback(async (params: {
         <Suspense fallback={null}>
           <HeldCartsModal
             carts={pos.heldCarts} onClose={() => setModal('none')}
-            onRestore={id => { clearEditingState(); pos.restoreCart(id); setModal('none'); }}
+            onRestore={id => { clearEditingState(); pos.restoreCart(id); setCanHold(true); setModal('none'); }}
             onDelete={pos.deleteHeldCart}
-            onRestoreAndPay={id => { clearEditingState(); pos.restoreCart(id); if (allowCreditSale) setModal('payment'); }}
+            onRestoreAndPay={id => { clearEditingState(); pos.restoreCart(id); setCanHold(true); if (allowCreditSale) setModal('payment'); }}
           />
         </Suspense>
       )}

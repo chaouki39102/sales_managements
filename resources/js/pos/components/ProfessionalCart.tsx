@@ -59,6 +59,7 @@ interface ProfessionalCartProps {
   cartRef?:             React.RefObject<HTMLDivElement>;
   onClientModalClose?:  () => void;
   allowCreditSale?:     boolean;
+  canHold?:             boolean;
 }
 
 /** واجهة برمجية للتحكم بالسلة من المكوّن الأب (POSPage) — بديل عن querySelectorAll */
@@ -85,6 +86,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
   invoiceDiscountPct = 0, onInvoiceDiscountChange, invoiceDiscountAmount = 0,
   onUndoClear, canUndoClear, undoClearSecondsLeft = 0, clientBalance, slug, cartRef, onClientModalClose,
   allowCreditSale = true,
+  canHold = true,
 }, ref) {
 
   const [showNote,         setShowNote]         = useState(false);
@@ -531,9 +533,9 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
 
         <div className="cart-actions">
           <button
-            className="btn btn-sm"
+            className="cart-hold-btn"
             onClick={onHold}
-            disabled={isEmpty}
+            disabled={isEmpty || !canHold}
             title="تعليق الفاتورة"
           >
             <i className="ti ti-clock-pause" /> تعليق
