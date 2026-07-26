@@ -9,6 +9,7 @@
 import { useEffect, type RefObject } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { matchOverrideFrom } from './useKeyboardMap';
+import { useCartStore } from '../utils/useCartStore';
 import type { POSSaleSnapshot } from '@/pages/settings/print-settings/types/data';
 import type { CartItem } from '@/types';
 import type { ActiveModal } from '../utils/posHelpers';
@@ -128,7 +129,7 @@ export function useKeyboardShortcuts(
       if (matchOverrideFrom(overrides, 'returns', e))      { e.preventDefault(); setters.setModal('returns'); }
       if (matchOverrideFrom(overrides, 'openDrawer', e))   { e.preventDefault(); actions.handleOpenDrawer(); }
       if (matchOverrideFrom(overrides, 'undoClear', e))    { e.preventDefault(); actions.handleUndoClear(); }
-      if (matchOverrideFrom(overrides, 'newSale', e))      { e.preventDefault(); if (state.isEmpty) { refs.posRef.current!.clearCart(); } else { refs.posRef.current!.holdCart(); } }
+      if (matchOverrideFrom(overrides, 'newSale', e))      { e.preventDefault(); const cs = useCartStore.getState(); if (state.isEmpty || !cs._isDirty) { refs.posRef.current!.clearCart(); } else { refs.posRef.current!.holdCart(); } }
       if (matchOverrideFrom(overrides, 'settings', e))     { e.preventDefault(); setters.setShowSettings(true); }
       if (matchOverrideFrom(overrides, 'toggleQuickbar', e)) { e.preventDefault(); actions.handleToggleQuickbar(); }
       if (matchOverrideFrom(overrides, 'kioskMode', e))    { e.preventDefault(); navigate('/pos/kiosk'); }

@@ -1489,7 +1489,8 @@ const handleCompleteSale = useCallback(async (params: {
         onHeld={() => setModal('held')}
         onNewSale={() => {
           clearEditingState();
-          if (isEmpty) pos.clearCart(); else pos.holdCart();
+          const cartState = useCartStore.getState();
+          if (isEmpty || !cartState._isDirty) pos.clearCart(); else pos.holdCart();
         }}
         onManual={() => setModal('manual')}
         onReturn={() => setModal('returns')}
