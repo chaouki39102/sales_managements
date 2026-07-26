@@ -99,7 +99,7 @@ export default function HeldCartsModal({
                 onDoubleClick={() => { if (onRestoreAndPay) onRestoreAndPay(c.id); else onRestore(c.id); }}
               >
                 <div className="hc-info">
-                  <div className="hc-client">{c.client?.name ?? 'زبون عابر'}</div>
+                  <div className="hc-client">{c.client?.name ?? 'زبون الصندوق'}</div>
                   <div className="hc-meta">
                     {c.items?.length ?? 0} صنف
                     · {formatDZD(c.totals.total_ttc ?? 0)}

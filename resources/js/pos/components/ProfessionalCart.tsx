@@ -448,7 +448,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
               </div>
               <div className="ctv2-info">
                 <div className="ctv2-name">
-                  {client ? client.name : 'زبون عابر'}
+                  {client?.name ?? 'زبون الصندوق'}
                 </div>
                 {client?.phone && (
                   <div className="ctv2-meta">

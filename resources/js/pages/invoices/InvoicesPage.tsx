@@ -1110,7 +1110,7 @@ function NewInvoiceModal({
                         value={clientId}
                         onChange={(e) => setClientId(e.target.value)}
                     >
-                        <option value="">👤 زبون عابر</option>
+                        <option value="">👤 زبون الصندوق (Client Cash)</option>
                         {customers.map((c) => (
                             <option key={c.id} value={c.id}>
                                 {c.name}

@@ -16,6 +16,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost } from '@/lib/api/core/client';
 import { useActiveSlug }   from '@/lib/store/appStore';
+import { useCashClient }   from '@/lib/api/endpoints/parties';
 import { formatCurrency }  from '@/lib/utils';
 import Modal from '@/components/ui/Modal';
 import type { Party }      from '@/types';
@@ -81,6 +82,7 @@ export default function CustomerSearchModal({
   const slug          = useActiveSlug();
   const qc            = useQueryClient();
   const searchRef     = useRef<HTMLInputElement>(null);
+  const { data: cashClient } = useCashClient();
 
   const [query,      setQuery]      = useState('');
   const [showCreate, setShowCreate] = useState(false);
@@ -151,9 +153,11 @@ export default function CustomerSearchModal({
     return m;
   }, [balances]);
 
-  const displayList: Party[] = isSearching
-    ? (searchResults ?? [])
-    : (recentClients ?? []);
+  const displayList: Party[] = useMemo(() => {
+    const list = isSearching ? (searchResults ?? []) : (recentClients ?? []);
+    if (!cashClient) return list;
+    return list.filter(p => p.id !== cashClient.id);
+  }, [isSearching, searchResults, recentClients, cashClient]);
 
   // Escape يُغلق + Arrow navigation + Enter to select
   useEffect(() => {
@@ -170,13 +174,13 @@ export default function CustomerSearchModal({
         setHighlightedIdx(prev => prev <= 0 ? total - 1 : prev - 1);
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        if (highlightedIdx === 0) onSelect(null);
+        if (highlightedIdx === 0) onSelect(cashClient ?? null);
         else if (highlightedIdx > 0 && highlightedIdx <= displayList.length) onSelect(displayList[highlightedIdx - 1]);
       }
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [onClose, showCreate, displayList, highlightedIdx, onSelect]);
+  }, [onClose, showCreate, displayList, highlightedIdx, onSelect, cashClient]);
 
   // Reset highlight on query change
   useEffect(() => { setHighlightedIdx(-1); }, [debouncedQuery]);
@@ -288,20 +292,20 @@ export default function CustomerSearchModal({
               </button>
             </div>
 
-            {/* زبون عابر */}
+            {/* زبون الصندوق — Client Cash (مثبّت في الأعلى) */}
             <button
-              className={`cust-row cust-anon ${!currentClient ? 'on' : ''} ${highlightedIdx === 0 ? 'hl' : ''}`}
-              onClick={() => onSelect(null)}
+              className={`cust-row cust-anon ${currentClient?.id === cashClient?.id ? 'on' : ''} ${highlightedIdx === 0 ? 'hl' : ''}`}
+              onClick={() => cashClient && onSelect(cashClient)}
               type="button"
             >
               <div className="cust-av">
-                <i className="ti ti-user-off" style={{ fontSize: 16 }} />
+                <i className="ti ti-wallet" style={{ fontSize: 16 }} />
               </div>
               <div className="cust-info">
-                <div className="cust-name">زبون عابر</div>
-                <div className="cust-meta">بدون تسجيل</div>
+                <div className="cust-name">{cashClient?.name ?? 'زبون الصندوق'}</div>
+                <div className="cust-meta">بيع نقدي</div>
               </div>
-              {!currentClient && <i className="ti ti-check cust-check" />}
+              {currentClient?.id === cashClient?.id && <i className="ti ti-check cust-check" />}
             </button>
 
             {/* عنوان القائمة */}
