@@ -45,7 +45,7 @@ export default function WeightEntryModal({
   }, [priceStr]);
 
   const computedPrice = unitPrice > 0 ? Math.round(weight * unitPrice) : 0;
-  const computedWeight = unitPrice > 0 ? Math.round((price / unitPrice) * 1000) / 1000 : 0;
+  const computedWeight = unitPrice > 0 ? parseFloat((price / unitPrice).toFixed(6)) : 0;
 
   const handleWeightChange = useCallback((raw: string) => {
     setWeightStr(raw);
@@ -61,7 +61,7 @@ export default function WeightEntryModal({
     lockRef.current = 'price';
     const v = parseFloat(raw);
     if (!isNaN(v) && v > 0 && unitPrice > 0) {
-      setWeightStr(String(Math.round((v / unitPrice) * 1000) / 1000));
+      setWeightStr(String(parseFloat((v / unitPrice).toFixed(6))));
     }
   }, [unitPrice]);
 
