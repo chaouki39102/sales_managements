@@ -446,6 +446,8 @@ export interface Product extends BaseModel {
   min_stock_alert?:          number;
   max_stock_alert?:          number | null;
   manages_quantity_discounts:boolean;
+  is_subsidized?:            boolean;
+  regulated_product_config_id?: number | null;
   weight?:                   number;
   volume?:                   number;
   length?:                   number;
@@ -456,8 +458,12 @@ export interface Product extends BaseModel {
   images?:                   string[] | null;
   meta_title?:               string | null;
   meta_description?:         string | null;
+  meta_keywords?:            string[] | null;
   active:                    boolean;
   company_id:                number;
+  // Computed accessors (backend-generated)
+  current_stock?:            number;
+  is_low_stock?:             boolean;
   // Relations
   family?:       Family;
   brand?:        Brand;
@@ -466,6 +472,7 @@ export interface Product extends BaseModel {
   unit?:         Unit;
   variants?:     ProductVariant[];
   packagings?:   ProductPackaging[];
+  prices?:       ProductPrice[];
 }
 
 export interface ProductPackaging {
@@ -479,6 +486,17 @@ export interface ProductPackaging {
   is_default:     boolean;
   active:         boolean;
   display_order:  number;
+}
+
+export interface ProductPrice {
+  id:              number;
+  price_level_id:  number;
+  pricing_method:  'fixed' | 'rate' | 'margin';
+  price:           number | null;
+  rate:            number | null;
+  margin:          number | null;
+  active:          boolean;
+  price_level?:    PriceLevel;
 }
 
 // ─── Commercial Documents ─────────────────────────────────────────────────────

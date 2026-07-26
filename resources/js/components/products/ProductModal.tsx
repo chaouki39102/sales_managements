@@ -29,17 +29,14 @@ import { useActiveSlug } from '@/lib/store/appStore';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useConfirm } from '@/hooks/useConfirm';
 import CopyConfigModal from '@/components/products/CopyConfigModal';
+import type { Product, Family, Brand, ProductType, PriceLevel } from '@/lib/api/core/types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════════
 
-interface Family          { id: number; name: string; }
-interface Brand           { id: number; name: string; }
-interface ProductType     { id: number; name: string; manages_stock: boolean; }
 interface Unit            { id: number; name: string; symbol: string; }
 interface TvaRate         { id: number; rate: number; is_default?: boolean; }
-interface PriceLevel      { id: number; name: string; }
 interface ValuationMethod { id: number; name: string; method?: string; }
 
 interface ProductPrice {
@@ -126,9 +123,9 @@ interface ProductForm {
 
 interface ProductModalProps {
   open:       boolean;
-  product?:   any | null;
+  product?:   Product | null;
   onClose:    () => void;
-  onSaved:    (product: any) => void;
+  onSaved:    (product: Product) => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

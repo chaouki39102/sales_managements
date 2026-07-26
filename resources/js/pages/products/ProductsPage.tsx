@@ -17,90 +17,20 @@ const ProductModal = React.lazy(() => import('@/components/products/ProductModal
 const ImportWizardModal = React.lazy(() => import('@/pages/import/ImportWizardModal'));
 import { PRODUCT_IMPORT_CONFIG } from '@/pages/import/entityConfig';
 import apiClient from '@/lib/api/core/client';
-import { useAuth } from '@/context/AuthContext';
+import { useActiveSlug } from '@/lib/store/appStore';
+import { productsApi } from '@/lib/api/endpoints/products';
+import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { useProductAggregatedLookups } from '@/lib/api/endpoints/lookups';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useNotification } from '@/hooks/useNotification';
 import { ConfirmDialog } from '@/components/ui';
 import type { Column } from '@/components/ui/DataTable';
+import type { Product, PaginatedResponse } from '@/lib/api/core/types';
 import CopyConfigModal from '@/components/products/CopyConfigModal';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Types — مطابقة للـ DB الحقيقي (لا variants جدول منفصل)
+// Types
 // ═══════════════════════════════════════════════════════════════════════════
-
-interface Family     { id: number; name: string; }
-interface Brand      { id: number; name: string; }
-interface PriceLevel { id: number; name: string; }
-
-interface ProductPrice {
-  id: number;
-  price_level_id: number;
-  pricing_method: 'fixed' | 'rate' | 'margin';
-  price:   number | null;
-  rate:    number | null;
-  margin:  number | null;
-  active:  boolean;
-  price_level?: PriceLevel;
-}
-
-interface ProductPackaging {
-  id: number;
-  code: string;
-  label: string;
-  quantity: number;
-  barcode: string | null;
-  is_default: boolean;
-  active: boolean;
-}
-
-// Product مطابق لـ ProductResource.php + جدول products
-interface Product {
-  id: number;
-  name: string;
-  slug: string;
-  ref: string | null;
-  barcode: string | null;
-  description: string | null;
-  family_id: number | null;
-  brand_id:  number | null;
-  product_type_id: number | null;
-  tva_id:    number | null;
-  unit_id:   number | null;
-  is_subsidized: boolean;
-  purchase_price_ht:   number;
-  current_cost_price:  number;
-  current_stock:       number;  // appended accessor
-  is_low_stock:        boolean; // appended accessor
-  manages_stock:       boolean;
-  allow_negative_stock: boolean;
-  has_lots:            boolean;
-  has_expiration_date: boolean;
-  min_stock_alert:     number;
-  max_stock_alert:     number;
-  manages_quantity_discounts: boolean;
-  active: boolean;
-  created_at: string;
-  updated_at: string;
-  // Relations via include=
-  family?:       Family | null;
-  brand?:        Brand  | null;
-  product_type?: { id: number; name: string } | null;
-  prices?:       ProductPrice[];
-  packagings?:   ProductPackaging[];
-}
-
-interface ApiResponse<T> {
-  data: T[];
-  meta: {
-    current_page: number;
-    last_page: number;
-    per_page: number;
-    total: number;
-    from: number;
-    to: number;
-  };
-}
 
 interface TableCol {
   key: string;
@@ -120,7 +50,6 @@ interface TableCol {
 const formatDZD = (n: number) =>
   new Intl.NumberFormat('fr-DZ', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n) + ' دج';
 
-// أول سعر بيع ثابت نشط للمنتج
 function getMinPrice(product: Product): number {
   const fixedPrices = (product.prices ?? [])
     .filter(p => p.active && p.pricing_method === 'fixed' && p.price !== null && p.price! > 0)
@@ -140,8 +69,7 @@ const StockBadge = ({ qty, min = 0 }: { qty: number; min?: number }) => {
 
 export default function ProductsPage() {
   const qc = useQueryClient();
-  const { activeCompany } = useAuth();
-  const slug = activeCompany?.slug ?? '';
+  const slug = useActiveSlug() ?? '';
 
   const { exportData } = useERPExport({ defaultFileName: 'المنتجات', defaultCurrency: 'DZD' });
   const [hiddenCols, setHiddenCols]       = useState<Set<string>>(new Set(['barcode', 'description', 'has_lots', 'has_expiration', 'min_stock_alert', 'created_at']));
@@ -184,19 +112,14 @@ export default function ProductsPage() {
   const notify = useNotification();
   const [copyModalOpen, setCopyModalOpen] = useState(false);
 
-  // Tooltip للتعبئات والأسعار
-  const [_priceTooltip, _setPriceTooltip] = useState<number | null>(null);
-
   // ── Lookups — single aggregated request (7 HTTP → 1) ──
-  const { data: productLookups, isLoading: _lookupsLoading } = useProductAggregatedLookups();
+  const { data: productLookups } = useProductAggregatedLookups();
   const families = productLookups?.families ?? [];
   const brands   = productLookups?.brands ?? [];
 
-  // ── Products Query — include الصحيح بدون variants ──
-  // NOTE: Key prefix MUST match tenantKeys.products.all(slug) = [slug, 'products']
-  // so that ProductModal's qc.invalidateQueries works correctly (prefix matching).
+  // ── Products Query ──
   const { data: response, isLoading, isFetching } = useQuery({
-    queryKey: [slug, 'products', debouncedSearch, familyFilter, brandFilter, activeFilter, page, perPage, sortField, sortDir],
+    queryKey: tenantKeys.products.list(slug, { search: debouncedSearch, family_id: familyFilter, brand_id: brandFilter, active: activeFilter, page, per_page: perPage, sort: sortField, sortDir }),
     queryFn: () => {
       const params: Record<string, any> = {
         sort: sortDir === 'desc' ? `-${sortField}` : sortField,
@@ -208,7 +131,7 @@ export default function ProductsPage() {
       if (familyFilter)    params['filter[family_id]'] = familyFilter;
       if (brandFilter)     params['filter[brand_id]']  = brandFilter;
       if (activeFilter)    params['filter[active]']     = activeFilter;
-      return apiClient.get<ApiResponse<Product>>('/products', { params }).then(r => r.data);
+      return apiClient.get<PaginatedResponse<Product>>('/products', { params }).then(r => r.data);
     },
     placeholderData: keepPreviousData,
     staleTime: 30_000,
@@ -218,7 +141,7 @@ export default function ProductsPage() {
   const products: Product[] = response?.data ?? [];
   const meta = response?.meta ?? { current_page: 1, last_page: 1, total: 0, from: 0, to: 0 };
 
-  // ── Stats ──
+  // ── Stats (computed from server total + current page data) ──
   const stats = {
     totalProducts:  meta.total,
     activeProducts: products.filter(p => p.active).length,
@@ -228,11 +151,11 @@ export default function ProductsPage() {
     withPrices:     products.filter(p => (p.prices ?? []).some(x => x.active)).length,
   };
 
-  // ── Mutations ──
+  // ── Mutations (using shared API layer for correct invalidation) ──
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiClient.delete(`/products/${id}`),
+    mutationFn: (id: number) => productsApi.delete(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [slug, 'products'] });
+      qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
       notify.success('تم حذف المنتج بنجاح');
       deleteModal.closeModal();
       setDeletingId(null);
@@ -246,8 +169,8 @@ export default function ProductsPage() {
 
   const toggleActiveMutation = useMutation({
     mutationFn: ({ id, active }: { id: number; active: boolean }) =>
-      apiClient.put(`/products/${id}`, { active }).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['products', slug] }),
+      productsApi.update(id, { active }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) }),
     onError: () => notify.error('فشل تغيير الحالة'),
   });
 
@@ -376,15 +299,15 @@ export default function ProductsPage() {
   // ── Bulk ──
   const bulkToggle = async (active: boolean) => {
     await Promise.all(selectedIds.map(id => toggleActiveMutation.mutateAsync({ id, active })));
-    qc.invalidateQueries({ queryKey: [slug, 'products'] });
+    qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
     notify.success(`تم ${active ? 'تفعيل' : 'تعطيل'} ${selectedIds.length} منتج`);
     setSelectedIds([]);
   };
 
   const bulkDelete = async () => {
     if (!await deleteConfirm.confirm(`حذف ${selectedIds.length} منتج؟`)) return;
-    await Promise.all(selectedIds.map(id => apiClient.delete(`/products/${id}`)));
-    qc.invalidateQueries({ queryKey: [slug, 'products'] });
+    await Promise.all(selectedIds.map(id => productsApi.delete(id)));
+    qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
     notify.success(`تم حذف ${selectedIds.length} منتج`);
     setSelectedIds([]);
   };
@@ -398,7 +321,7 @@ export default function ProductsPage() {
       replace_packaging:   opts.replace_packaging,
       replace_discounts:   opts.replace_discounts,
     });
-    qc.invalidateQueries({ queryKey: [slug, 'products'] });
+    qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
     notify.success(`تم نسخ التكوين إلى ${selectedIds.length} منتج`);
     setSelectedIds([]);
   };
@@ -453,11 +376,11 @@ export default function ProductsPage() {
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 14, marginBottom: 16 }}>
         <KpiCard variant="green"  icon="ti-package"        label="إجمالي المنتجات"  value={stats.totalProducts} />
-        <KpiCard variant="blue"   icon="ti-check"          label="نشطة"              value={stats.activeProducts} />
+        <KpiCard variant="blue"   icon="ti-check"          label="نشطة (بالصفحة)"   value={stats.activeProducts} />
         <KpiCard variant="orange" icon="ti-alert-triangle" label="مخزون منخفض"      value={stats.lowStock} />
-        <KpiCard variant="teal"   icon="ti-box"            label="إجمالي المخزون"    value={stats.totalStock} suffix=" وحدة" />
-        <KpiCard variant="purple" icon="ti-tag"            label="لها أسعار"          value={stats.withPrices} />
-        <KpiCard variant="indigo" icon="ti-trending-up"    label="أعلى سعر"          value={formatDZD(stats.highestPrice)} />
+        <KpiCard variant="teal"   icon="ti-box"            label="مخزون (بالصفحة)"  value={stats.totalStock} suffix=" وحدة" />
+        <KpiCard variant="purple" icon="ti-tag"            label="لها أسعار"         value={stats.withPrices} />
+        <KpiCard variant="indigo" icon="ti-trending-up"    label="أعلى سعر"         value={formatDZD(stats.highestPrice)} />
       </div>
 
       {/* Bulk Actions */}
@@ -631,7 +554,7 @@ export default function ProductsPage() {
       <Suspense fallback={null}>
         <ImportWizardModal
           open={importModal.open}
-          onClose={() => { importModal.closeModal(); qc.invalidateQueries({ queryKey: [slug, 'products'] }); }}
+          onClose={() => { importModal.closeModal(); qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) }); }}
           config={PRODUCT_IMPORT_CONFIG}
         />
       </Suspense>
