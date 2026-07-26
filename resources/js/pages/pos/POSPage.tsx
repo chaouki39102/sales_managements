@@ -1315,8 +1315,7 @@ const handleCompleteSale = useCallback(async (params: {
     quickItems.some(q => q.variantId === variantId), [quickItems]);
 
   const handleAddItem = useCallback((v: ProductVariant, qty?: number, packaging?: ProductPackaging | null) => {
-    const isWeightProduct = v.product?.is_sold_by_weight;
-    if (isWeightProduct && qty === undefined) {
+    if (v.product?.is_sold_by_weight) {
       weightModalVariant.current = v;
       setModal('weight');
       return;
