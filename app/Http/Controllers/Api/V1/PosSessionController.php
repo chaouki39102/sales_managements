@@ -90,7 +90,7 @@ class PosSessionController extends Controller
             'items'               => 'nullable|array',
             'items.*.product_id'  => 'required|integer',
             'items.*.product_name'=> 'required|string',
-            'items.*.quantity'    => 'required|numeric|min:0',
+            'items.*.quantity'    => 'required|numeric|min:0.001',
             'items.*.total_ht'    => 'required|numeric|min:0',
             'items.*.total_ttc'   => 'required|numeric|min:0',
         ]);

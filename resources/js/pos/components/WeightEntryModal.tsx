@@ -21,9 +21,10 @@ export default function WeightEntryModal({
   onClose,
   onConfirm,
 }: WeightEntryModalProps) {
-  const [weightStr, setWeightStr] = useState(() => initialWeight && initialWeight > 0 ? String(initialWeight) : '');
+  const [weightStr, setWeightStr] = useState(() => initialWeight && initialWeight > 0 ? String(initialWeight) : '0.001');
   const [priceStr, setPriceStr] = useState(() => {
     if (initialWeight && initialWeight > 0 && unitPrice > 0) return String(Math.round(initialWeight * unitPrice));
+    if (unitPrice > 0) return String(Math.round(0.001 * unitPrice));
     return '';
   });
   const [customMode, setCustomMode] = useState(false);
