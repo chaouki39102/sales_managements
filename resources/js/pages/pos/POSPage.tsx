@@ -63,6 +63,7 @@ const OpenSessionModal         = React.lazy(() => import('@/pos/components/OpenS
 const CloseSessionModal        = React.lazy(() => import('@/pos/components/CloseSessionModal'));
 const SessionStatsModal        = React.lazy(() => import('@/pos/components/SessionStatsModal'));
 const ReturnsModal             = React.lazy(() => import('@/pos/components/ReturnsModal'));
+const WeightEntryModal         = React.lazy(() => import('@/pos/components/WeightEntryModal'));
 const SessionInvoicesModal     = React.lazy(() => import('@/pos/components/SessionInvoicesModal'));
 const KeyboardHelpModal        = React.lazy(() => import('@/pos/components/KeyboardHelpModal'));
 const POSSettingsModal          = React.lazy(() => import('@/pos/components/POSSettingsModal'));
@@ -353,6 +354,7 @@ function POSPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const cartApiRef   = useRef<ProfessionalCartHandle>(null);
   const barcodeTimer = useRef<ReturnType<typeof setTimeout>>();
+  const weightModalVariant = useRef<ProductVariant | null>(null);
   // ── Auto-focus search + select last cart row on page mount / invoice reopen ──
   useEffect(() => {
     if (!currentSession?.id) return;
@@ -746,6 +748,7 @@ function POSPage() {
           total_ttc:           Number(line.total_ttc),
           max_stock:           null,
           manages_stock:       false,
+          is_sold_by_weight:   prod?.is_sold_by_weight ?? false,
           packaging_id:        line.packaging_id ?? null,
           pack_qty:            pkg ? Number(pkg.quantity) : (pkgSnap ? Number(pkgSnap) : 1),
           packaging_label:     pkg?.label ?? null,
@@ -1312,6 +1315,12 @@ const handleCompleteSale = useCallback(async (params: {
     quickItems.some(q => q.variantId === variantId), [quickItems]);
 
   const handleAddItem = useCallback((v: ProductVariant, qty?: number, packaging?: ProductPackaging | null) => {
+    const isWeightProduct = v.product?.is_sold_by_weight;
+    if (isWeightProduct && qty === undefined) {
+      weightModalVariant.current = v;
+      setModal('weight');
+      return;
+    }
     posRef.current.addItem(v, qty, packaging);
     setRecentProducts(prev => {
       const filtered = prev.filter(p => p.id !== v.id);
@@ -1755,6 +1764,34 @@ const handleCompleteSale = useCallback(async (params: {
               if (selectedCartItemId) {
                 requestAnimationFrame(() => cartApiRef.current?.scrollToItemId(selectedCartItemId));
               }
+            }}
+          />
+        </Suspense>
+      )}
+
+      {modal === 'weight' && weightModalVariant.current && (
+        <Suspense fallback={null}>
+          <WeightEntryModal
+            productName={weightModalVariant.current.product?.name ?? weightModalVariant.current.variant_name ?? ''}
+            unitSymbol={weightModalVariant.current.unit?.abbreviation ?? 'كغ'}
+            onClose={() => { weightModalVariant.current = null; setModal('none'); }}
+            onConfirm={qty => {
+              const v = weightModalVariant.current!;
+              weightModalVariant.current = null;
+              setModal('none');
+              posRef.current.addItem(v, qty, null);
+              const items = useCartStore.getState().items;
+              const added = items.find(i => i.variant_id === v.id);
+              if (added) setSelectedCartItemId(added.id);
+              safeToast.success(v.product?.name ?? 'تمت الإضافة', { id: 'pos-last-added', duration: 1500 });
+              requestAnimationFrame(() => {
+                if (added) cartApiRef.current?.scrollToItemId(added.id);
+                requestAnimationFrame(() => {
+                  requestAnimationFrame(() => {
+                    requestAnimationFrame(() => { searchRef.current?.focus(); searchRef.current?.select(); });
+                  });
+                });
+              });
             }}
           />
         </Suspense>

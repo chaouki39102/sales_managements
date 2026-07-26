@@ -27,6 +27,7 @@ import {
 import { tenantKeys }  from '@/lib/api/core/queryKeys';
 import { useActiveSlug } from '@/lib/store/appStore';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import QuickAddLookupButton from '@/components/ui/QuickAddLookupButton';
 import { useConfirm } from '@/hooks/useConfirm';
 import CopyConfigModal from '@/components/products/CopyConfigModal';
 import type { Product, Family, Brand, ProductType, PriceLevel } from '@/lib/api/core/types';
@@ -114,6 +115,8 @@ interface ProductForm {
   meta_keywords:    string[];
   // ── الصور ──
   images:  string[];
+  // ── الوزن ──
+  is_sold_by_weight:       boolean;
   // ── الدعم (المواد المدعمة) ──
   is_subsidized:           boolean;
   regulated_product_config_id: number | null;
@@ -198,7 +201,7 @@ function emptyForm(priceLevels: PriceLevel[] = [], defaultTvaId: number | null =
     weight: '', volume: '', length: '', width: '', height: '',
     specifications: {}, images: [],
     meta_title: '', meta_description: '', meta_keywords: [],
-    is_subsidized: false, regulated_product_config_id: null,
+    is_sold_by_weight: false, is_subsidized: false, regulated_product_config_id: null,
     active: true,
     prices: priceLevels.map(pl => ({
       price_level_id: pl.id, pricing_method: 'fixed', price: '', rate: '', margin: '', active: true,
@@ -227,7 +230,7 @@ function productToForm(p: any, priceLevels: PriceLevel[]): ProductForm {
     images: p.images ?? [],
     meta_title: p.meta_title ?? '', meta_description: p.meta_description ?? '',
     meta_keywords: Array.isArray(p.meta_keywords) ? p.meta_keywords : (p.meta_keywords ? String(p.meta_keywords).split(',').map((k: string) => k.trim()).filter(Boolean) : []),
-    is_subsidized: p.is_subsidized ?? false,
+    is_sold_by_weight: p.is_sold_by_weight ?? false, is_subsidized: p.is_subsidized ?? false,
     regulated_product_config_id: p.regulated_product_config_id ?? null,
     active: p.active ?? true,
     prices: priceLevels.map(pl => {
@@ -282,6 +285,7 @@ function buildPayload(form: ProductForm) {
     meta_title: form.meta_title.trim() || null,
     meta_description: form.meta_description.trim() || null,
     meta_keywords: form.meta_keywords.length ? form.meta_keywords : null,
+    is_sold_by_weight: form.is_sold_by_weight,
     is_subsidized: form.is_subsidized,
     regulated_product_config_id: form.regulated_product_config_id || null,
     active: form.active,
@@ -435,7 +439,7 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
   const regulatedProducts = productLookups?.regulatedProducts ?? [];
 
   const defaultTvaId = useMemo(
-    () => (tvas as TvaRate[]).find(t => t.is_default)?.id ?? null,
+    () => (tvas as TvaRate[]).find(t => t.rate === 0)?.id ?? (tvas as TvaRate[]).find(t => t.is_default)?.id ?? null,
     [tvas],
   );
 
@@ -543,6 +547,24 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
       const timer = setTimeout(() => nameRef.current?.focus(), 80);
       return () => clearTimeout(timer);
     }
+  }, [open]);
+
+  // ── منع scroll في الصفحة الخلفية عند فتح المودل ──
+  useEffect(() => {
+    if (!open) return;
+    const scrollY = window.scrollY;
+    const body = document.body;
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.width = '100%';
+    body.style.overflow = 'hidden';
+    return () => {
+      body.style.position = '';
+      body.style.top = '';
+      body.style.width = '';
+      body.style.overflow = '';
+      window.scrollTo(0, scrollY);
+    };
   }, [open]);
 
   // ── Switch Tab مع Scroll للأعلى ──
@@ -878,31 +900,60 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
         {/* family + brand + type */}
         <div style={s.row3}>
           <Field label="التصنيف (Family)">
-            <select style={s.sel()} value={form.family_id ?? ''} onChange={e => set('family_id', e.target.value ? Number(e.target.value) : null)}>
-              <option value="">— لا يوجد —</option>
-              {(families as Family[]).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-            </select>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'stretch' }}>
+              <select style={{ ...s.sel(), flex: 1 }} value={form.family_id ?? ''} onChange={e => set('family_id', e.target.value ? Number(e.target.value) : null)}>
+                <option value="">— لا يوجد —</option>
+                {(families as Family[]).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+              <QuickAddLookupButton
+                title="إضافة تصنيف جديد"
+                resourcePath="families"
+                fields={[{ name: 'name', label: 'اسم التصنيف', required: true }]}
+                onCreated={item => set('family_id', item.id)}
+              />
+            </div>
           </Field>
           <Field label="العلامة التجارية">
-            <select style={s.sel()} value={form.brand_id ?? ''} onChange={e => set('brand_id', e.target.value ? Number(e.target.value) : null)}>
-              <option value="">— لا يوجد —</option>
-              {(brands as Brand[]).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'stretch' }}>
+              <select style={{ ...s.sel(), flex: 1 }} value={form.brand_id ?? ''} onChange={e => set('brand_id', e.target.value ? Number(e.target.value) : null)}>
+                <option value="">— لا يوجد —</option>
+                {(brands as Brand[]).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+              <QuickAddLookupButton
+                title="إضافة علامة تجارية جديدة"
+                resourcePath="brands"
+                fields={[{ name: 'name', label: 'اسم العلامة التجارية', required: true }]}
+                onCreated={item => set('brand_id', item.id)}
+              />
+            </div>
           </Field>
           <Field label="نوع المنتج">
-            <select
-              style={s.sel()}
-              value={form.product_type_id ?? ''}
-              onChange={e => {
-                const id = e.target.value ? Number(e.target.value) : null;
-                const pt = (productTypes as ProductType[]).find(t => t.id === id);
-                setForm(f => ({ ...f, product_type_id: id, manages_stock: pt?.manages_stock ?? f.manages_stock }));
-                setIsDirty(true);
-              }}
-            >
-              <option value="">— اختر —</option>
-              {(productTypes as ProductType[]).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'stretch' }}>
+              <select
+                style={{ ...s.sel(), flex: 1 }}
+                value={form.product_type_id ?? ''}
+                onChange={e => {
+                  const id = e.target.value ? Number(e.target.value) : null;
+                  const pt = (productTypes as ProductType[]).find(t => t.id === id);
+                  setForm(f => ({ ...f, product_type_id: id, manages_stock: pt?.manages_stock ?? f.manages_stock }));
+                  setIsDirty(true);
+                }}
+              >
+                <option value="">— اختر —</option>
+                {(productTypes as ProductType[]).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              <QuickAddLookupButton
+                title="إضافة نوع منتج جديد"
+                resourcePath="product-types"
+                fields={[{ name: 'name', label: 'اسم النوع', required: true }]}
+                onCreated={item => {
+                  set('product_type_id', item.id);
+                  if (item.manages_stock !== undefined) {
+                    setForm(f => ({ ...f, product_type_id: item.id, manages_stock: item.manages_stock }));
+                  }
+                }}
+              />
+            </div>
           </Field>
         </div>
 
@@ -935,17 +986,50 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
         {/* TVA + Unit + سعر الشراء + الهامش الأدنى */}
         <div style={s.row2}>
           <Field label="معدل TVA" error={errors.tva_id} required>
-            <select style={s.sel(!!errors.tva_id)} value={form.tva_id ?? ''} onChange={e => set('tva_id', e.target.value ? Number(e.target.value) : null)}>
-              <option value="">— اختر —</option>
-              {(tvas as TvaRate[]).map(t => <option key={t.id} value={t.id}>{t.rate}%{t.is_default ? ' ✓' : ''}</option>)}
-            </select>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'stretch' }}>
+              <select style={{ ...s.sel(!!errors.tva_id), flex: 1 }} value={form.tva_id ?? ''} onChange={e => set('tva_id', e.target.value ? Number(e.target.value) : null)}>
+                <option value="">— اختر —</option>
+                {(tvas as TvaRate[]).map(t => <option key={t.id} value={t.id}>{t.rate}%{t.is_default ? ' ✓' : ''}</option>)}
+              </select>
+              <QuickAddLookupButton
+                title="إضافة معدل TVA جديد"
+                resourcePath="tvas"
+                fields={[
+                  { name: 'rate', label: 'النسبة %', type: 'number', required: true },
+                ]}
+                onCreated={item => set('tva_id', item.id)}
+              />
+            </div>
           </Field>
           <Field label="وحدة القياس">
-            <select style={s.sel()} value={form.unit_id ?? ''} onChange={e => set('unit_id', e.target.value ? Number(e.target.value) : null)}>
-              <option value="">— اختر —</option>
-              {(units as Unit[]).map(u => <option key={u.id} value={u.id}>{u.name} ({u.symbol})</option>)}
-            </select>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'stretch' }}>
+              <select style={{ ...s.sel(), flex: 1 }} value={form.unit_id ?? ''} onChange={e => set('unit_id', e.target.value ? Number(e.target.value) : null)}>
+                <option value="">— اختر —</option>
+                {(units as Unit[]).map(u => <option key={u.id} value={u.id}>{u.name} ({u.symbol})</option>)}
+              </select>
+              <QuickAddLookupButton
+                title="إضافة وحدة قياس جديدة"
+                resourcePath="units"
+                fields={[
+                  { name: 'name', label: 'اسم الوحدة', required: true },
+                  { name: 'symbol', label: 'الرمز (مثل: كغ، لتر، قطعة)', required: true },
+                ]}
+                onCreated={item => set('unit_id', item.id)}
+              />
+            </div>
           </Field>
+        </div>
+
+        {/* يُباع بالوزن */}
+        <div style={{ ...s.card, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+          <div style={{ flex: 1 }}>
+            <Toggle
+              checked={form.is_sold_by_weight}
+              onChange={v => set('is_sold_by_weight', v)}
+              label="يُباع بالوزن (Weight)"
+            />
+            <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 4, marginRight: 44 }}>في الـ POS يُفتح نافذة إدخال الوزن بدلاً من الكمية — للمنتجات المشروطة والموزونة</div>
+          </div>
         </div>
 
         <div style={s.row2}>
@@ -1337,16 +1421,24 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
             طريقة تقييم المخزون
           </div>
           <Field label="طريقة التقييم" hint="تُستخدم لحساب تكلفة البضاعة المباعة وقيمة المخزون">
-            <select
-              style={s.sel()}
-              value={form.valuation_method_id ?? ''}
-              onChange={e => set('valuation_method_id', e.target.value ? Number(e.target.value) : null)}
-            >
-              <option value="">— استخدام الإعداد الافتراضي للشركة —</option>
-              {(valuationMethods as ValuationMethod[]).map(vm => (
-                <option key={vm.id} value={vm.id}>{vm.name}{vm.method ? ` (${vm.method})` : ''}</option>
-              ))}
-            </select>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'stretch' }}>
+              <select
+                style={{ ...s.sel(), flex: 1 }}
+                value={form.valuation_method_id ?? ''}
+                onChange={e => set('valuation_method_id', e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">— استخدام الإعداد الافتراضي للشركة —</option>
+                {(valuationMethods as ValuationMethod[]).map(vm => (
+                  <option key={vm.id} value={vm.id}>{vm.name}{vm.method ? ` (${vm.method})` : ''}</option>
+                ))}
+              </select>
+              <QuickAddLookupButton
+                title="إضافة طريقة تقييم جديدة"
+                resourcePath="valuation-methods"
+                fields={[{ name: 'name', label: 'اسم الطريقة', required: true }]}
+                onCreated={item => set('valuation_method_id', item.id)}
+              />
+            </div>
           </Field>
 
           {/* مخزون حالي (read-only عند التعديل) */}

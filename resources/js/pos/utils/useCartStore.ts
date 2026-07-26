@@ -183,6 +183,7 @@ export const useCartStore = create<CartState>()(
             total_ht:            0,
             total_ttc:           0,
             manages_stock:       variant.manages_stock,
+            is_sold_by_weight:   variant.is_sold_by_weight ?? variant.product?.is_sold_by_weight ?? false,
             max_stock:           variant.manages_stock
               ? (variant.current_stock ?? null)
               : null,

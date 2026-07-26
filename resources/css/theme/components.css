@@ -932,3 +932,50 @@ body.dark .al-p{background:var(--purb);border-color:var(--purbo);color:var(--pur
 .lkp-bool-item{display:flex;align-items:center;gap:10px;}
 .lkp-bool-lbl{font-size:12px;font-weight:700;color:var(--t2);}
 .lkp-btn-save-close:focus,.lkp-btn-save-new:focus{outline:2px solid var(--em);outline-offset:2px;}
+
+/* ═══ QUICK ADD LOOKUP BUTTON ═══ */
+.qalb-btn{
+  width:34px;min-width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--b3);border-radius:var(--r2);background:var(--bg1);color:var(--t3);
+  font-size:18px;font-weight:700;cursor:pointer;transition:all .15s;flex-shrink:0;
+  line-height:1;padding:0;
+}
+.qalb-btn:hover{border-color:var(--em);color:var(--em);background:var(--emb);}
+.qalb-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;
+  display:flex;align-items:center;justify-content:center;
+  animation:fadeIn .15s;
+}
+.qalb-modal{
+  background:var(--bg1);border-radius:var(--r3);box-shadow:0 12px 40px rgba(0,0,0,.2);
+  width:360px;max-width:90vw;overflow:hidden;animation:slideUp .2s;
+}
+.qalb-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-bottom:1px solid var(--b2);
+}
+.qalb-title{font-size:15px;font-weight:700;color:var(--t1);}
+.qalb-close{
+  width:28px;height:28px;display:flex;align-items:center;justify-content:center;
+  border:none;background:none;color:var(--t4);cursor:pointer;border-radius:var(--r2);
+  font-size:16px;transition:all .15s;
+}
+.qalb-close:hover{background:var(--bg3);color:var(--t1);}
+.qalb-body{padding:16px 18px;display:flex;flex-direction:column;gap:12px;}
+.qalb-field{display:flex;flex-direction:column;gap:4px;}
+.qalb-label{font-size:12px;font-weight:700;color:var(--t2);}
+.qalb-req{color:var(--red);margin-right:2px;}
+.qalb-input{
+  padding:8px 10px;border-radius:var(--r2);border:1px solid var(--b3);
+  background:var(--bg2);color:var(--t1);font-size:13px;
+  outline:none;font-family:inherit;width:100%;box-sizing:border-box;
+  transition:border-color .15s;
+}
+.qalb-input:focus{border-color:var(--em);}
+.qalb-error{font-size:12px;color:var(--red);padding:4px 0;}
+.qalb-footer{
+  display:flex;justify-content:flex-end;gap:8px;
+  padding:12px 18px;border-top:1px solid var(--b2);
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}

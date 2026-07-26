@@ -3284,6 +3284,30 @@ body.dark .thermal-status.err { background: #7f1d1d; color: #fecaca; }
   border:1px solid var(--b3);margin:0 1px;
 }
 
+/* ═══ WEIGHT ENTRY MODAL ═══ */
+.wem-product{margin-bottom:16px;font-weight:600;font-size:15px;color:var(--t1);}
+.wem-quick-btns{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;justify-content:center;}
+.wem-quick-btn{
+  padding:6px 12px;border-radius:8px;border:1px solid var(--b3);
+  background:var(--b1);color:var(--t2);font-size:13px;cursor:pointer;
+  transition:all .15s;
+}
+.wem-quick-btn:hover{border-color:var(--accent);color:var(--accent);}
+.wem-quick-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.wem-input-row{display:flex;align-items:center;gap:6px;justify-content:center;}
+.wem-inp{font-size:22px;padding:10px 12px;text-align:center;width:140px;font-weight:600;}
+.wem-unit{font-size:14px;color:var(--t3);font-weight:600;min-width:30px;}
+.wem-adj-btn{
+  display:flex;flex-direction:column;align-items:center;gap:1px;
+  padding:6px 8px;border-radius:6px;border:1px solid var(--b3);
+  background:var(--b1);color:var(--t2);cursor:pointer;font-size:12px;
+  transition:all .15s;min-width:38px;
+}
+.wem-adj-btn:hover{border-color:var(--accent);color:var(--accent);}
+.wem-adj-btn i{font-size:14px;}
+.wem-adj-label{font-size:9px;color:var(--t4);font-family:monospace;}
+.wem-hint{margin-top:12px;font-size:11px;color:var(--t3);text-align:center;}
+
 /* ═══ RETURNS MODAL ═══ */
 .ret-inp-w{width:80px;}
 .ret-doc-meta{color:var(--t4);font-size:12px;}

@@ -281,6 +281,8 @@ export const useTvaMutations              = () => useLookupMutations<Tva>('tvas'
 export const useUnitMutations             = () => useLookupMutations<Unit>('units',                              tenantKeys.lookups.units);
 export const useFamilyMutations           = () => useLookupMutations<Family>('families',                         tenantKeys.lookups.families);
 export const useBrandMutations            = () => useLookupMutations<Brand>('brands',                            tenantKeys.lookups.brands);
+export const useProductTypeMutations       = () => useLookupMutations<ProductType>('product-types',               tenantKeys.lookups.productTypes);
+export const useValuationMethodMutations   = () => useLookupMutations<InventoryValuationMethod>('inventory-valuation-methods', tenantKeys.lookups.valuationMethods);
 export const usePriceLevelMutations       = () => useLookupMutations<PriceLevel>('price-levels',                 tenantKeys.lookups.priceLevels);
 export const useWarehouseMutations        = () => useLookupMutations<Warehouse>('warehouses',                    tenantKeys.lookups.warehouses);
 export const usePaymentModeMutations      = () => useLookupMutations<PaymentMode>('payment-modes',               tenantKeys.lookups.paymentModes);

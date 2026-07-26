@@ -410,6 +410,7 @@ export interface ProductVariant extends BaseModel {
   max_stock_alert?:          number | null;
   manages_quantity_discounts:boolean;
   active:                    boolean;
+  is_sold_by_weight?:        boolean;
   company_id:                number;
   // Relations
   product?:            Product;
@@ -446,6 +447,7 @@ export interface Product extends BaseModel {
   min_stock_alert?:          number;
   max_stock_alert?:          number | null;
   manages_quantity_discounts:boolean;
+  is_sold_by_weight?:        boolean;
   is_subsidized?:            boolean;
   regulated_product_config_id?: number | null;
   weight?:                   number;
@@ -699,6 +701,7 @@ export interface CartItem {
   total_ttc:           number;
   max_stock?:          number | null;
   manages_stock:       boolean;
+  is_sold_by_weight:   boolean;
   packaging_id?:       number | null;
   pack_qty?:           number;
   packaging_label?:    string | null;

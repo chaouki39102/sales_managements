@@ -69,6 +69,7 @@ class StoreProductRequest extends FormRequest
             'min_stock_alert'            => 'nullable|numeric|min:0',
             'max_stock_alert'            => 'nullable|numeric|min:0',
             'manages_quantity_discounts' => 'nullable|boolean',
+            'is_sold_by_weight'          => 'nullable|boolean',
 
             // ── الأبعاد ──
             'weight' => 'nullable|numeric|min:0',

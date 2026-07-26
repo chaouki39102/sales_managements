@@ -68,6 +68,7 @@ class UpdateProductRequest extends FormRequest
             'min_stock_alert'            => 'nullable|numeric|min:0',
             'max_stock_alert'            => 'nullable|numeric|min:0',
             'manages_quantity_discounts' => 'nullable|boolean',
+            'is_sold_by_weight'          => 'nullable|boolean',
 
             'weight' => 'nullable|numeric|min:0',
             'volume' => 'nullable|numeric|min:0',

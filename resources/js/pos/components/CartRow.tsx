@@ -204,6 +204,8 @@ export default function CartRow({
   };
 
   // ── Derived values ────────────────────────────────────────────────────────
+  const isWeight  = item.is_sold_by_weight;
+  const qtyStep   = isWeight ? 0.001 : 1;
   const maxQty    = item.max_stock ?? Infinity;
   const stockFull = item.manages_stock && item.quantity >= maxQty;
   const hasDisc   = item.discount_percentage > 0 || item.discount_amount > 0;
@@ -469,7 +471,7 @@ export default function CartRow({
         <button
           className="cq-btn cq-btn--minus"
           onClick={() => {
-            const next = item.quantity - 1;
+            const next = Math.round((item.quantity - qtyStep) * 1000) / 1000;
             if (next <= 0) onRemove();
             else onQty(next);
           }}
@@ -487,6 +489,7 @@ export default function CartRow({
             value={qtyVal}
             onChange={e => setQtyVal(e.target.value)}
             onBlur={commitQty}
+            step={isWeight ? 0.001 : 1}
             onKeyDown={e => {
               if (e.key === 'Enter')  commitQty();
               if (e.key === 'Escape') setEditQty(false);
@@ -498,13 +501,13 @@ export default function CartRow({
             onClick={() => { setEditQty(true); setQtyVal(String(item.quantity)); }}
             title="انقر لتعديل الكمية"
           >
-            {item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(2)}
+            {item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(isWeight ? 3 : 2)}
           </span>
         )}
 
         <button
           className="cq-btn cq-btn--plus"
-          onClick={() => { if (!stockFull) onQty(item.quantity + 1); }}
+          onClick={() => { if (!stockFull) onQty(Math.round((item.quantity + qtyStep) * 1000) / 1000); }}
           disabled={stockFull}
           title={stockFull ? `الحد الأقصى: ${item.max_stock}` : 'زيادة'}
           type="button"
