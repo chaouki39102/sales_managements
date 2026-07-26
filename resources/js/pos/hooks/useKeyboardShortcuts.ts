@@ -44,6 +44,7 @@ export interface KeyboardShortcutsState {
   pinModal:              { requestedDiscount: number; reason: string; onSuccess: () => void } | null;
   selectedCartItemId:    string | null;
   families:              Array<{ id: number }>;
+  openClientOnNewSale:  boolean;
 }
 
 export interface KeyboardShortcutsSetters {
@@ -129,7 +130,7 @@ export function useKeyboardShortcuts(
       if (matchOverrideFrom(overrides, 'returns', e))      { e.preventDefault(); setters.setModal('returns'); }
       if (matchOverrideFrom(overrides, 'openDrawer', e))   { e.preventDefault(); actions.handleOpenDrawer(); }
       if (matchOverrideFrom(overrides, 'undoClear', e))    { e.preventDefault(); actions.handleUndoClear(); }
-      if (matchOverrideFrom(overrides, 'newSale', e))      { e.preventDefault(); const cs = useCartStore.getState(); if (state.isEmpty || !cs._isDirty) { refs.posRef.current!.clearCart(); } else { refs.posRef.current!.holdCart(); } }
+      if (matchOverrideFrom(overrides, 'newSale', e))      { e.preventDefault(); const cs = useCartStore.getState(); if (state.isEmpty || !cs._isDirty) { refs.posRef.current!.clearCart(); } else { refs.posRef.current!.holdCart(); } if (state.openClientOnNewSale) { setTimeout(() => refs.cartApiRef.current?.openCustomerModal(), 100); } }
       if (matchOverrideFrom(overrides, 'settings', e))     { e.preventDefault(); setters.setShowSettings(true); }
       if (matchOverrideFrom(overrides, 'toggleQuickbar', e)) { e.preventDefault(); actions.handleToggleQuickbar(); }
       if (matchOverrideFrom(overrides, 'kioskMode', e))    { e.preventDefault(); navigate('/pos/kiosk'); }
@@ -216,7 +217,7 @@ export function useKeyboardShortcuts(
   }, [
     state.isEmpty, state.modal, state.showFilter, state.showSessionInvoices,
     state.showSettings, state.showCloseSession, state.pinModal,
-    state.families, state.selectedCartItemId,
+    state.families, state.selectedCartItemId, state.openClientOnNewSale,
     actions.toggleFullscreen, actions.handleClearCart, actions.handleOpenDrawer,
     actions.handleUndoClear, actions.handleToggleQuickbar, actions.handleSearchEscape,
     navigate,

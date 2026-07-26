@@ -858,7 +858,7 @@ function POSPage() {
   const handleQuickCashRef = useRef<() => void>(() => {});
   useKeyboardShortcuts(
     { posRef, overridesRef: kbOverridesRef, searchRef, cartRef, cartApiRef },
-    { isEmpty, modal, showFilter, showSessionInvoices, showSettings, showCloseSession, pinModal, selectedCartItemId, families },
+    { isEmpty, modal, showFilter, showSessionInvoices, showSettings, showCloseSession, pinModal, selectedCartItemId, families, openClientOnNewSale: settings.openClientOnNewSale },
     { setModal, setFilter: setShowFilter, setShowSessionInvoices, setShowSettings, setShowCloseSession, setPinModal, setSelectedCartItemId, setView, setGridSize, setReceiptSnapshot },
     { toggleFullscreen, handleClearCart, handleOpenDrawer, handleUndoClear, handleToggleQuickbar, handleSearchEscape, deleteConfirm, handleQuickCash: () => handleQuickCashRef.current() },
   );
@@ -1491,6 +1491,9 @@ const handleCompleteSale = useCallback(async (params: {
           clearEditingState();
           const cartState = useCartStore.getState();
           if (isEmpty || !cartState._isDirty) pos.clearCart(); else pos.holdCart();
+          if (settings.openClientOnNewSale) {
+            requestAnimationFrame(() => cartApiRef.current?.openCustomerModal());
+          }
         }}
         onManual={() => setModal('manual')}
         onReturn={() => setModal('returns')}
@@ -1711,6 +1714,9 @@ const handleCompleteSale = useCallback(async (params: {
               setReceiptSnapshot(null);
               clearEditingState();
               pos.clearCart();
+              if (settings.openClientOnNewSale) {
+                requestAnimationFrame(() => cartApiRef.current?.openCustomerModal());
+              }
             }}
           />
         </Suspense>

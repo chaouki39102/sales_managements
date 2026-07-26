@@ -108,6 +108,9 @@ export interface POSSettings {
   toastDuration:        number;
   /** مكان ظهور الإشعارات (toast) */
   toastPosition:        'top-left' | 'top-center' | 'top-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
+  // ── سلوك جديدة ─────────────────────────────────────────────────────────
+  /** فتح مودال اختيار الزبون تلقائياً عند بدء بيع جديد */
+  openClientOnNewSale:  boolean;
 }
 
 // ─── Default Settings ─────────────────────────────────────────────────────────
@@ -148,6 +151,7 @@ export const DEFAULT_POS_SETTINGS: POSSettings = {
   toastEnabled:         true,
   toastDuration:        3000,
   toastPosition:        'top-left',
+  openClientOnNewSale:  false,
 };
 
 // ─── Storage key ──────────────────────────────────────────────────────────────
