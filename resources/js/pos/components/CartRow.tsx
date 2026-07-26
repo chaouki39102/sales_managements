@@ -32,6 +32,8 @@ interface CartRowProps {
   /** يُستدعى بعنصر DOM الجذري للصف — يُستخدم من ProfessionalCart
    *  لبناء خريطة id→عنصر تُمكّن التمرير/التركيز على صف معيّن برمجياً. */
   registerNode?:    (id: string, el: HTMLDivElement | null) => void;
+  /** استدعاء عند النقر على كمية صنف ميزان — يفتح WeightEntryModal بدل المحرر المضمن */
+  onWeightEdit?:    () => void;
 }
 
 type DiscMode  = 'pct' | 'amount';
@@ -41,7 +43,7 @@ export default function CartRow({
   item, idx, isSelected, onSelect,
   onQty, onDiscount, onDiscountAmount, onPrice, onRemove,
   onUpdatePackaging, availablePackagings = [],
-  density = 'comfortable', registerNode,
+  density = 'comfortable', registerNode, onWeightEdit,
 }: CartRowProps) {
   const compact = density === 'compact';
   const [popup,      setPopup]      = useState<PopupType>(null);
@@ -498,10 +500,13 @@ export default function CartRow({
         ) : (
           <span
             className="cq-val"
-            onClick={() => { setEditQty(true); setQtyVal(String(item.quantity)); }}
+            onClick={() => {
+              if (isWeight && onWeightEdit) onWeightEdit();
+              else { setEditQty(true); setQtyVal(String(item.quantity)); }
+            }}
             title="انقر لتعديل الكمية"
           >
-            {item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(isWeight ? 3 : 2)}
+            {item.quantity.toFixed(3)}
           </span>
         )}
 

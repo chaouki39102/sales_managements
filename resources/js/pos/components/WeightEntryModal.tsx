@@ -5,6 +5,8 @@ interface WeightEntryModalProps {
   productName: string;
   unitSymbol?: string | null;
   unitPrice: number;
+  /** الكمية الأولية عند فتح المودال للتعديل */
+  initialWeight?: number;
   onClose: () => void;
   onConfirm: (qty: number) => void;
 }
@@ -15,11 +17,15 @@ export default function WeightEntryModal({
   productName,
   unitSymbol = 'كغ',
   unitPrice,
+  initialWeight,
   onClose,
   onConfirm,
 }: WeightEntryModalProps) {
-  const [weightStr, setWeightStr] = useState('');
-  const [priceStr, setPriceStr] = useState('');
+  const [weightStr, setWeightStr] = useState(() => initialWeight && initialWeight > 0 ? String(initialWeight) : '');
+  const [priceStr, setPriceStr] = useState(() => {
+    if (initialWeight && initialWeight > 0 && unitPrice > 0) return String(Math.round(initialWeight * unitPrice));
+    return '';
+  });
   const [customMode, setCustomMode] = useState(false);
   const weightRef = useRef<HTMLInputElement>(null);
   const priceRef = useRef<HTMLInputElement>(null);
@@ -237,7 +243,7 @@ export default function WeightEntryModal({
       {/* ── Summary ── */}
       {weight > 0 && unitPrice > 0 && (
         <div className="wem-summary">
-          <span className="wem-summary-qty">{weight} {unitSymbol}</span>
+          <span className="wem-summary-qty">{weight.toFixed(3)} {unitSymbol}</span>
           <i className="ti ti-arrow-left" />
           <span className="wem-summary-price">{computedPrice.toLocaleString('ar-DZ')} دج</span>
         </div>

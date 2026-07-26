@@ -355,6 +355,7 @@ function POSPage() {
   const cartApiRef   = useRef<ProfessionalCartHandle>(null);
   const barcodeTimer = useRef<ReturnType<typeof setTimeout>>();
   const weightModalVariant = useRef<ProductVariant | null>(null);
+  const weightEditItemId   = useRef<string | null>(null);
   // ── Auto-focus search + select last cart row on page mount / invoice reopen ──
   useEffect(() => {
     if (!currentSession?.id) return;
@@ -1359,6 +1360,17 @@ const handleCompleteSale = useCallback(async (params: {
     });
   }, [settings.clearSearchOnAdd, settings.advanceOnAdd, settings.playSoundOnAdd, settings.soundPreset, settings.soundVolume, filteredVariants, safeToast]);
 
+  // ── فتح مودال الميزان لتعديل كمية صنف موجود بالسلة ────────────────────────
+  const handleWeightEdit = useCallback((cartItemId: string) => {
+    const item = pos.items.find(i => i.id === cartItemId);
+    if (!item) return;
+    const variant = allVariants.find(v => v.id === item.variant_id);
+    if (!variant) return;
+    weightModalVariant.current = variant;
+    weightEditItemId.current = cartItemId;
+    setModal('weight');
+  }, [pos.items, allVariants]);
+
   // ── Barcode scanner — unified with handleAddItem ──────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -1667,6 +1679,7 @@ const handleCompleteSale = useCallback(async (params: {
           onClientModalClose={() => { setTimeout(() => searchRef.current?.focus(), 100); }}
           allowCreditSale={allowCreditSale}
           canHold={canHold}
+          onWeightEdit={handleWeightEdit}
         />
       </div>
 
@@ -1774,24 +1787,44 @@ const handleCompleteSale = useCallback(async (params: {
             productName={weightModalVariant.current.product?.name ?? weightModalVariant.current.variant_name ?? ''}
             unitSymbol={weightModalVariant.current.unit?.abbreviation ?? 'كغ'}
             unitPrice={weightModalVariant.current.default_selling_price_ht ?? 0}
-            onClose={() => { weightModalVariant.current = null; setModal('none'); }}
+            initialWeight={weightEditItemId.current ? (pos.items.find(i => i.id === weightEditItemId.current)?.quantity ?? undefined) : undefined}
+            onClose={() => { weightModalVariant.current = null; weightEditItemId.current = null; setModal('none'); }}
             onConfirm={qty => {
               const v = weightModalVariant.current!;
+              const editId = weightEditItemId.current;
               weightModalVariant.current = null;
+              weightEditItemId.current = null;
               setModal('none');
-              posRef.current.addItem(v, qty, null);
-              const items = useCartStore.getState().items;
-              const added = items.find(i => i.variant_id === v.id);
-              if (added) setSelectedCartItemId(added.id);
-              safeToast.success(v.product?.name ?? 'تمت الإضافة', { id: 'pos-last-added', duration: 1500 });
-              requestAnimationFrame(() => {
-                if (added) cartApiRef.current?.scrollToItemId(added.id);
+
+              if (editId) {
+                posRef.current.updateQty(editId, qty);
+                const items = useCartStore.getState().items;
+                const updated = items.find(i => i.id === editId);
+                if (updated) setSelectedCartItemId(updated.id);
+                safeToast.success(v.product?.name ?? 'تم التحديث', { id: 'pos-last-added', duration: 1500 });
                 requestAnimationFrame(() => {
+                  if (updated) cartApiRef.current?.scrollToItemId(updated.id);
                   requestAnimationFrame(() => {
-                    requestAnimationFrame(() => { searchRef.current?.focus(); searchRef.current?.select(); });
+                    requestAnimationFrame(() => {
+                      requestAnimationFrame(() => { searchRef.current?.focus(); searchRef.current?.select(); });
+                    });
                   });
                 });
-              });
+              } else {
+                posRef.current.addItem(v, qty, null);
+                const items = useCartStore.getState().items;
+                const added = items.find(i => i.variant_id === v.id);
+                if (added) setSelectedCartItemId(added.id);
+                safeToast.success(v.product?.name ?? 'تمت الإضافة', { id: 'pos-last-added', duration: 1500 });
+                requestAnimationFrame(() => {
+                  if (added) cartApiRef.current?.scrollToItemId(added.id);
+                  requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                      requestAnimationFrame(() => { searchRef.current?.focus(); searchRef.current?.select(); });
+                    });
+                  });
+                });
+              }
             }}
           />
         </Suspense>

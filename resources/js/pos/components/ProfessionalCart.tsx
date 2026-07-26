@@ -60,6 +60,7 @@ interface ProfessionalCartProps {
   onClientModalClose?:  () => void;
   allowCreditSale?:     boolean;
   canHold?:             boolean;
+  onWeightEdit?:        (id: string) => void;
 }
 
 /** واجهة برمجية للتحكم بالسلة من المكوّن الأب (POSPage) — بديل عن querySelectorAll */
@@ -84,9 +85,10 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
   onSetClient, onNoteChange,
   onHold, onSell, onQuickSell, onClear, onHeld, totalTtcFinal, remainingToPay,
   invoiceDiscountPct = 0, onInvoiceDiscountChange, invoiceDiscountAmount = 0,
-  onUndoClear, canUndoClear, undoClearSecondsLeft = 0, clientBalance, slug, cartRef, onClientModalClose,
+  onUndoClear, canUndoClear, undoClearSecondsLeft = 0, clientBalance, slug, cartRef,   onClientModalClose,
   allowCreditSale = true,
   canHold = true,
+  onWeightEdit,
 }, ref) {
 
   const [showNote,         setShowNote]         = useState(false);
@@ -310,7 +312,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
           <div className={`cart-hero ${isEmpty ? '' : 'has-items'}`}>
             <div className="ch-top">
               <span className="ch-label"><i className="ti ti-wallet" /> الإجمالي المستحق</span>
-              <span className="ch-badge">{totalQty % 1 === 0 ? totalQty : totalQty.toFixed(2)} قطعة</span>
+              <span className="ch-badge">{totalQty % 1 === 0 ? totalQty : totalQty.toFixed(3)} قطعة</span>
             </div>
             <div className="ch-amount">{formatDZD(totalTtcFinal)}</div>
             {/* <div className="ch-stats">
@@ -523,6 +525,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                       availablePackagings={packagingsMap.get(item.variant_id) ?? packagingsMap.get(item.product_id) ?? []}
                       density={density}
                       registerNode={registerRowNode}
+                      onWeightEdit={onWeightEdit ? () => onWeightEdit(item.id) : undefined}
                     />
                   </div>
                 );
