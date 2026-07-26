@@ -566,6 +566,7 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
             >
               <i className="ti ti-bolt" />
               <span>سريع</span>
+              {kb('quickCash') && <span className="tb-txt" style={{ fontSize: 13 }}> {kb('quickCash')}</span>}
             </button>
           )}
         </div>
