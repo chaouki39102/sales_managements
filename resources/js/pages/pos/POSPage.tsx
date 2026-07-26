@@ -1239,6 +1239,11 @@ const handleCompleteSale = useCallback(async (params: {
       // Haptic feedback on successful sale
       try { navigator.vibrate?.(100); } catch {}
 
+      // Auto-open client modal after sale if setting is enabled
+      if (settings.openClientOnNewSale) {
+        setTimeout(() => cartApiRef.current?.openCustomerModal(), 300);
+      }
+
       // Auto-focus search after sale
       setTimeout(() => searchRef.current?.focus(), 200);
 

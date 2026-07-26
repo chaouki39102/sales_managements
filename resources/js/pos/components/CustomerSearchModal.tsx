@@ -88,8 +88,24 @@ export default function CustomerSearchModal({
   const [showCreate, setShowCreate] = useState(false);
   const [form,       setForm]       = useState<NewClientForm>(EMPTY_FORM);
   const [formError,  setFormError]  = useState('');
-  const [highlightedIdx, setHighlightedIdx] = useState(-1);
+  const [highlightedIdx, setHighlightedIdx] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // ── Pinned clients (localStorage per slug) ────────────────────────────────
+  const pinnedKey = `pos-pinned-clients-${slug}`;
+  const [pinnedIds, setPinnedIds] = useState<number[]>(() => {
+    try { return JSON.parse(localStorage.getItem(pinnedKey) ?? '[]'); } catch { return []; }
+  });
+  const togglePin = useCallback((id: number) => {
+    setPinnedIds(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [id, ...prev];
+      localStorage.setItem(pinnedKey, JSON.stringify(next));
+      return next;
+    });
+    qc.invalidateQueries({ queryKey: [slug, 'customers', 'pos-recent'] });
+    qc.invalidateQueries({ queryKey: [slug, 'customers', 'pos-search'] });
+    if (listRef.current) listRef.current.scrollTop = 0;
+  }, [pinnedKey, qc, slug]);
 
   const debouncedQuery = useDebounce(query.trim(), 250);
   const isSearching    = debouncedQuery.length >= 2;
@@ -155,9 +171,12 @@ export default function CustomerSearchModal({
 
   const displayList: Party[] = useMemo(() => {
     const list = isSearching ? (searchResults ?? []) : (recentClients ?? []);
-    if (!cashClient) return list;
-    return list.filter(p => p.id !== cashClient.id);
-  }, [isSearching, searchResults, recentClients, cashClient]);
+    const filtered = list.filter(p => p.id !== cashClient?.id);
+    if (pinnedIds.length === 0) return filtered;
+    const pinned = filtered.filter(p => pinnedIds.includes(p.id));
+    const unpinned = filtered.filter(p => !pinnedIds.includes(p.id));
+    return [...pinned, ...unpinned];
+  }, [isSearching, searchResults, recentClients, cashClient, pinnedIds]);
 
   // Escape يُغلق + Arrow navigation + Enter to select
   useEffect(() => {
@@ -183,7 +202,7 @@ export default function CustomerSearchModal({
   }, [onClose, showCreate, displayList, highlightedIdx, onSelect, cashClient]);
 
   // Reset highlight on query change
-  useEffect(() => { setHighlightedIdx(-1); }, [debouncedQuery]);
+  useEffect(() => { setHighlightedIdx(0); }, [debouncedQuery]);
 
   // ── إنشاء زبون جديد ───────────────────────────────────────────────────────
   const createMutation = useMutation({
@@ -352,6 +371,11 @@ export default function CustomerSearchModal({
                     </div>
                     <BalanceLabel balance={balanceMap.get(c.id)} />
                   </div>
+                  <i
+                    className={`ti ti-pin cust-pin ${pinnedIds.includes(c.id) ? 'pinned' : ''}`}
+                    onClick={(e) => { e.stopPropagation(); togglePin(c.id); }}
+                    title={pinnedIds.includes(c.id) ? 'إلغاء التثبيت' : 'تثبيت في الأعلى'}
+                  />
                   {currentClient?.id === c.id && (
                     <i className="ti ti-check cust-check" />
                   )}
