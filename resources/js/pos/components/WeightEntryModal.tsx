@@ -49,6 +49,7 @@ export default function WeightEntryModal({
 
   const weightRef = useRef<HTMLInputElement>(null);
   const priceRef = useRef<HTMLInputElement>(null);
+  const exactWeightRef = useRef<number | null>(null);
 
   const cardRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
@@ -68,8 +69,8 @@ export default function WeightEntryModal({
       const dx = ev.clientX - dragRef.current.startX;
       const dy = ev.clientY - dragRef.current.startY;
       setCardStyle({
-        width: Math.max(360, dragRef.current.startW - dx),
-        height: Math.max(300, dragRef.current.startH - dy),
+        width: Math.max(360, dragRef.current.startW + dx),
+        height: Math.max(300, dragRef.current.startH + dy),
       });
     };
     const onUp = () => {
@@ -95,10 +96,10 @@ export default function WeightEntryModal({
 
   const activeTier = useMemo(() => resolveQuantityTier(quantityDiscounts, weight, 1), [quantityDiscounts, weight]);
 
-  const originalTotal = useMemo(
-    () => calcWeightTotal(weight, unitPrice),
-    [weight, unitPrice],
-  );
+  const originalTotal = useMemo(() => {
+    if (lastEdited === 'price' && price > 0) return price;
+    return calcWeightTotal(weight, unitPrice);
+  }, [lastEdited, price, weight, unitPrice]);
 
   const discountedTotal = useMemo(
     () => calcWeightDiscounted(originalTotal, activeTier, weight),
@@ -112,6 +113,7 @@ export default function WeightEntryModal({
 
   const handleWeightChange = useCallback((raw: string) => {
     setLastEdited('weight');
+    exactWeightRef.current = null;
     const v = parseFloat(raw);
     if (isNaN(v) || v < 0 || raw === '') {
       setWeightStr(raw);
@@ -138,10 +140,12 @@ export default function WeightEntryModal({
       setPriceStr(raw);
       setWeightStr('');
       setGramNotice('');
+      exactWeightRef.current = null;
       return;
     }
     const w = calcWeightFromPrice(p, unitPrice);
-    setWeightStr(w > 0 ? w.toFixed(3) : String(w));
+    exactWeightRef.current = w;
+    setWeightStr(w > 0 ? w.toFixed(6) : '');
     setPriceStr(raw);
     setGramNotice('');
   }, [unitPrice]);
@@ -167,12 +171,20 @@ export default function WeightEntryModal({
   const handleOk = useCallback(() => {
     if (weight > 0) {
       setSubmitPulse(true);
-      setTimeout(() => onConfirm(weight), 120);
+      setTimeout(() => onConfirm(exactWeightRef.current ?? weight), 120);
     }
   }, [weight, onConfirm]);
 
   const finalTotal = discountedTotal ?? originalTotal;
   const hasDiscount = discountedTotal != null && savings > 0;
+
+  const effectiveDiscountPct = activeTier
+    ? activeTier.discount_percentage > 0
+      ? activeTier.discount_percentage
+      : activeTier.discount_amount > 0 && originalTotal > 0
+        ? Math.round((activeTier.discount_amount / originalTotal) * 1000) / 10
+        : 0
+    : 0;
 
   return (
     <div className="wem-overlay" onClick={onClose}>
@@ -208,12 +220,12 @@ export default function WeightEntryModal({
                 .sort((a, b) => a.min_qty - b.min_qty)
                 .map(d => {
                   const isActive = activeTier?.id === d.id;
-                  const pct = Number(activeTier?.discount_percentage) > 0
-                    ? Number(activeTier.discount_percentage)
+                  const tierPct = d.discount_percentage != null && Number(d.discount_percentage) > 0
+                    ? Number(d.discount_percentage)
                     : Number(d.discount_amount) > 0 && unitPrice > 0
                       ? (Number(d.discount_amount) / unitPrice) * 100
                       : 0;
-                  const displayPct = Math.round(pct * 10) / 10;
+                  const displayPct = Math.round(tierPct * 10) / 10;
                   const fmtQty = (v: number | string) => {
                     const n = Number(v);
                     return Number.isInteger(n) ? String(n) : parseFloat(n.toFixed(3)).toString();
@@ -237,8 +249,8 @@ export default function WeightEntryModal({
               <div className="wem-discount-icon"><i className="ti ti-discount" /></div>
               <div className="wem-discount-text">
                 <span className="wem-discount-title">
-                  خصم {activeTier?.discount_percentage != null
-                    ? `${activeTier.discount_percentage}%`
+                  خصم {effectiveDiscountPct > 0
+                    ? `${effectiveDiscountPct}%`
                     : `${Number(activeTier?.discount_amount).toFixed(2)} دج/${unitSymbol}`}
                 </span>
                 <span className="wem-discount-detail">
@@ -323,15 +335,18 @@ export default function WeightEntryModal({
               <label className="wem-field-label wem-field-label--price">
                 <i className="ti ti-coins" /> السعر الإجمالي
               </label>
-              <div className={`wem-price-row ${lastEdited === 'price' ? 'focused' : ''}`}>
+              <div className={`wem-hero-input wem-hero-input--price ${lastEdited === 'price' ? 'focused' : ''}`}>
+                <button className="wem-adj wem-adj--lg" onClick={() => handlePriceChange(String(Math.max(0, price - 100)))} type="button" title="-100">
+                  <i className="ti ti-minus" /><span>100</span>
+                </button>
                 <button className="wem-adj" onClick={() => handlePriceChange(String(Math.max(0, price - 10)))} type="button" title="-10">
                   <i className="ti ti-minus" /><span>10</span>
                 </button>
-                <div className="wem-price-field">
+                <div className="wem-hero-field">
                   <input
                     ref={priceRef}
                     type="number" inputMode="decimal" step="1" min="0"
-                    className="wem-inp wem-inp--price"
+                    className="wem-inp wem-inp--price-hero"
                     value={priceStr}
                     onChange={e => handlePriceChange(e.target.value)}
                     placeholder="0"
@@ -346,10 +361,13 @@ export default function WeightEntryModal({
                       }
                     }}
                   />
-                  <span className="wem-price-unit">دج</span>
+                  <span className="wem-hero-unit wem-hero-unit--price">دج</span>
                 </div>
                 <button className="wem-adj" onClick={() => handlePriceChange(String(price + 10))} type="button" title="+10">
                   <span>10</span><i className="ti ti-plus" />
+                </button>
+                <button className="wem-adj wem-adj--lg" onClick={() => handlePriceChange(String(price + 100))} type="button" title="+100">
+                  <span>100</span><i className="ti ti-plus" />
                 </button>
               </div>
             </div>

@@ -218,5 +218,5 @@ export function calcWeightDiscounted(
 
 /** حساب الوزن من السعر */
 export function calcWeightFromPrice(price: number, unitPriceHt: number): number {
-  return unitPriceHt > 0 ? parseFloat((price / unitPriceHt).toFixed(6)) : 0;
+  return unitPriceHt > 0 ? parseFloat((price / unitPriceHt).toFixed(10)) : 0;
 }

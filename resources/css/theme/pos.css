@@ -3337,14 +3337,15 @@ body.dark .thermal-status.err { background: #7f1d1d; color: #fecaca; }
 }
 .wem-header-meta { display: flex; gap: 6px; margin-top: 4px; }
 .wem-tag {
-  font-size: 10px; font-weight: 700;
+  font-size: 16px; font-weight: 900;
   padding: 2px 8px; border-radius: 10px;
   background: rgba(255,255,255,.12); color: rgba(255,255,255,.7);
   font-family: 'JetBrains Mono', monospace;
 }
 .wem-tag--price {
-  background: rgba(251,191,36,.2); color: #fbbf24;
-  border: 1px solid rgba(251,191,36,.25);
+  background: rgb(255 255 255 / 20%);
+    color: #ffffff;
+    border: 1px solid rgb(255 255 255 / 25%);
 }
 
 /* ── Body ── */
@@ -3420,7 +3421,7 @@ body.dark .thermal-status.err { background: #7f1d1d; color: #fecaca; }
 /* ── Field labels (shared) ── */
 .wem-field-label {
   display: flex; align-items: center; gap: 4px;
-  font-size: 10px; font-weight: 700; color: var(--t3);
+  font-size: 16px; font-weight: 700; color: var(--t3);
   margin-bottom: 4px; padding: 0 2px;
 }
 .wem-field-label i { font-size: 11px; }
@@ -3457,6 +3458,27 @@ body.dark .thermal-status.err { background: #7f1d1d; color: #fecaca; }
   background: var(--emb); padding: 2px 8px; border-radius: 8px;
   font-family: 'JetBrains Mono', monospace;
   letter-spacing: 0.5px; flex-shrink: 0;
+}
+
+/* ── Price hero input (same as weight) ── */
+.wem-hero-input--price { border-color: rgba(251,191,36,.3); }
+.wem-hero-input--price.focused {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(251,191,36,.12);
+}
+.wem-hero-field .wem-inp--price-hero {
+  flex: 1; min-width: 0;
+  background: transparent; border: none; outline: none;
+  padding: 12px 4px;
+  font-size: 36px !important; font-weight: 900;
+  font-family: 'JetBrains Mono', monospace !important;
+  color: var(--gold); text-align: center;
+  letter-spacing: -1px;
+}
+.wem-hero-field .wem-inp--price-hero::placeholder { color: var(--t4); font-weight: 400; font-size: 16px; letter-spacing: 0; }
+.wem-hero-unit--price {
+  color: var(--gold);
+  background: rgba(251,191,36,.12);
 }
 
 /* ── Adjust buttons ── */
