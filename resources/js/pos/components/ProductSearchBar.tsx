@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { ViewMode, GridSize, SortMode } from '../utils/posHelpers';
 import { getEffectiveShortcut, useKbOverrides } from '../hooks/useKeyboardMap';
+import { FloatingTooltip } from '@/components/ui/FloatingTooltip';
 
 const SORT_OPTIONS: { value: SortMode; icon: string; label: string }[] = [
   { value: 'name',      icon: 'ti ti-text-caption',    label: 'أ-ي' },
@@ -75,9 +76,11 @@ export default function ProductSearchBar({
           }}
         />
         {query && (
-          <button className="srch-clear" onClick={() => onQuery('')} title="مسح (Escape)">
-            <i className="ti ti-x" />
-          </button>
+          <FloatingTooltip content="مسح (Escape)">
+            <button className="srch-clear" onClick={() => onQuery('')}>
+              <i className="ti ti-x" />
+            </button>
+          </FloatingTooltip>
         )}
         {!query && (
           <span className="srch-hint"><kbd>{kb('searchFocus')}</kbd></span>
@@ -94,9 +97,11 @@ export default function ProductSearchBar({
       )}
 
       <div className="pos-sort-wrap" ref={sortRef}>
-        <button className="pos-sort-btn" onClick={() => setSortOpen(o => !o)} title="ترتيب المنتجات">
-          <i className={sortIcon[sortBy]} />
-        </button>
+        <FloatingTooltip content="ترتيب المنتجات">
+          <button className="pos-sort-btn" onClick={() => setSortOpen(o => !o)}>
+            <i className={sortIcon[sortBy]} />
+          </button>
+        </FloatingTooltip>
         {sortOpen && (
           <div className="pos-sort-drop">
             {SORT_OPTIONS.map(opt => (
@@ -113,44 +118,47 @@ export default function ProductSearchBar({
         )}
       </div>
 
-      <button
-        className={`pos-tool-icon ${filterActive ? 'pos-tool-icon--active' : ''}`}
-        onClick={onFilter}
-        title={`فلتر متقدم — ${kb('filter')}`}
-        style={{ width: 34, height: 34 }}
-      >
-        <i className="ti ti-adjustments-horizontal" />
-        {filterActive && <span className="filter-dot" />}
-      </button>
+      <FloatingTooltip content={`فلتر متقدم — ${kb('filter')}`}>
+        <button
+          className={`pos-tool-icon ${filterActive ? 'pos-tool-icon--active' : ''}`}
+          onClick={onFilter}
+          style={{ width: 34, height: 34 }}
+        >
+          <i className="ti ti-adjustments-horizontal" />
+          {filterActive && <span className="filter-dot" />}
+        </button>
+      </FloatingTooltip>
 
       <div className="pos-view-btns">
-        <button
-          className={`pvb ${view === 'grid' ? 'on' : ''}`}
-          onClick={() => onView('grid')}
-          title="عرض شبكة"
-        >
-          <i className="ti ti-layout-grid" />
-        </button>
-        <button
-          className={`pvb ${view === 'list' ? 'on' : ''}`}
-          onClick={() => onView('list')}
-          title="عرض قائمة"
-        >
-          <i className="ti ti-list" />
-        </button>
+        <FloatingTooltip content="عرض شبكة">
+          <button
+            className={`pvb ${view === 'grid' ? 'on' : ''}`}
+            onClick={() => onView('grid')}
+          >
+            <i className="ti ti-layout-grid" />
+          </button>
+        </FloatingTooltip>
+        <FloatingTooltip content="عرض قائمة">
+          <button
+            className={`pvb ${view === 'list' ? 'on' : ''}`}
+            onClick={() => onView('list')}
+          >
+            <i className="ti ti-list" />
+          </button>
+        </FloatingTooltip>
       </div>
 
       {view === 'grid' && (
         <div className="pos-grid-size">
           {(['xs', 'sm', 'md', 'lg'] as GridSize[]).map(s => (
-            <button
-              key={s}
-              className={`pgs ${gridSize === s ? 'on' : ''}`}
-              onClick={() => onGridSize(s)}
-              title={`حجم ${s}`}
-            >
-              {s === 'xs' ? 'S' : s === 'sm' ? 'M' : s === 'md' ? 'L' : 'XL'}
-            </button>
+            <FloatingTooltip key={`tooltip-${s}`} content={`حجم ${s}`}>
+              <button
+                className={`pgs ${gridSize === s ? 'on' : ''}`}
+                onClick={() => onGridSize(s)}
+              >
+                {s === 'xs' ? 'S' : s === 'sm' ? 'M' : s === 'md' ? 'L' : 'XL'}
+              </button>
+            </FloatingTooltip>
           ))}
         </div>
       )}

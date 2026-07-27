@@ -24,6 +24,7 @@ import { formatDZD } from '../utils/calculations';
 import { getEffectiveShortcut } from '../hooks/useKeyboardMap';
 import CartRow from './CartRow';
 import CustomerSearchModal from './CustomerSearchModal';
+import { FloatingTooltip } from '@/components/ui/FloatingTooltip';
 
 interface ProfessionalCartProps {
   items:                CartItem[];
@@ -59,7 +60,7 @@ interface ProfessionalCartProps {
   cartRef?:             React.RefObject<HTMLDivElement>;
   onClientModalClose?:  () => void;
   allowCreditSale?:     boolean;
-  canHold?:             boolean;
+
   onWeightEdit?:        (id: string) => void;
 }
 
@@ -87,7 +88,6 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
   invoiceDiscountPct = 0, onInvoiceDiscountChange, invoiceDiscountAmount = 0,
   onUndoClear, canUndoClear, undoClearSecondsLeft = 0, clientBalance, slug, cartRef,   onClientModalClose,
   allowCreditSale = true,
-  canHold = true,
   onWeightEdit,
 }, ref) {
 
@@ -253,59 +253,67 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
               </span>
             </div>
             <div className="cart-acts2">
-              <button
-                className="btn btn-xs"
-                onClick={zoomOut}
-                disabled={cartZoom <= 0.75}
-                title={`تصغير النص — ${kb('zoomOut')}`}
-              >
-                <i className="ti ti-minus" />
-              </button>
-              <button
-                className="btn btn-xs"
-                onClick={zoomIn}
-                disabled={cartZoom >= 1.25}
-                title={`تكبير النص — ${kb('zoomIn')}`}
-              >
-                <i className="ti ti-plus" />
-              </button>
-              <button
-                className={`btn btn-xs density-toggle-btn ${density === 'compact' ? 'on' : ''}`}
-                onClick={toggleDensity}
-                title={density === 'compact' ? 'التبديل لعرض مريح (بطاقات أكبر)' : 'التبديل لعرض مضغوط (منتجات أكثر بدون تمرير)'}
-                type="button"
-              >
-                <i className={`ti ${density === 'compact' ? 'ti-list-details' : 'ti-list'}`} />
-              </button>
-              <button className="btn btn-xs" onClick={onHeld} title="الفواتير المعلقة">
-                <i className="ti ti-clock-pause" />
-                {kb('heldCarts') && <span className="tb-txt"> {kb('heldCarts')}</span>}
-              </button>
-              <button
-                className={`btn btn-xs ${note ? 'btn-p' : ''}`}
-                onClick={() => setShowNote(s => !s)}
-                title="ملاحظة على الفاتورة"
-              >
-                <i className="ti ti-notes" />
-              </button>
-              <button
-                className={`btn btn-xs btn-warn ${undoClearSecondsLeft > 0 ? 'btn-pulse' : ''}`}
-                onClick={onUndoClear}
-                disabled={!canUndoClear}
-                title={`تراجع عن آخر مسح — ${kb('undoClear')}${undoClearSecondsLeft > 0 ? ` (${undoClearSecondsLeft}s)` : ''}`}
-              >
-                <i className="ti ti-arrow-back-up" />
-                {undoClearSecondsLeft > 0 && <span className="undo-ct">{undoClearSecondsLeft}</span>}
-              </button>
-              <button
-                className="btn btn-xs btn-r"
-                onClick={onClear}
-                disabled={isEmpty}
-                title="مسح السلة"
-              >
-                <i className="ti ti-trash" />
-                {kb('clearCart') && <span className="tb-txt"> {kb('clearCart')}</span>}
-              </button>
+              <FloatingTooltip content={`تصغير النص — ${kb('zoomOut')}`}>
+                <button
+                  className="btn btn-xs"
+                  onClick={zoomOut}
+                  disabled={cartZoom <= 0.75}
+                >
+                  <i className="ti ti-minus" />
+                </button>
+              </FloatingTooltip>
+              <FloatingTooltip content={`تكبير النص — ${kb('zoomIn')}`}>
+                <button
+                  className="btn btn-xs"
+                  onClick={zoomIn}
+                  disabled={cartZoom >= 1.25}
+                >
+                  <i className="ti ti-plus" />
+                </button>
+              </FloatingTooltip>
+              <FloatingTooltip content={density === 'compact' ? 'التبديل لعرض مريح (بطاقات أكبر)' : 'التبديل لعرض مضغوط (منتجات أكثر بدون تمرير)'}>
+                <button
+                  className={`btn btn-xs density-toggle-btn ${density === 'compact' ? 'on' : ''}`}
+                  onClick={toggleDensity}
+                  type="button"
+                >
+                  <i className={`ti ${density === 'compact' ? 'ti-list-details' : 'ti-list'}`} />
+                </button>
+              </FloatingTooltip>
+              <FloatingTooltip content="الفواتير المعلقة">
+                <button className="btn btn-xs" onClick={onHeld}>
+                  <i className="ti ti-clock-pause" />
+                  {kb('heldCarts') && <span className="tb-txt"> {kb('heldCarts')}</span>}
+                </button>
+              </FloatingTooltip>
+              <FloatingTooltip content="ملاحظة على الفاتورة">
+                <button
+                  className={`btn btn-xs ${note ? 'btn-p' : ''}`}
+                  onClick={() => setShowNote(s => !s)}
+                >
+                  <i className="ti ti-notes" />
+                </button>
+              </FloatingTooltip>
+              <FloatingTooltip content={`تراجع عن آخر مسح — ${kb('undoClear')}${undoClearSecondsLeft > 0 ? ` (${undoClearSecondsLeft}s)` : ''}`}>
+                <button
+                  className={`btn btn-xs btn-warn ${undoClearSecondsLeft > 0 ? 'btn-pulse' : ''}`}
+                  onClick={onUndoClear}
+                  disabled={!canUndoClear}
+                >
+                  <i className="ti ti-arrow-back-up" />
+                  {undoClearSecondsLeft > 0 && <span className="undo-ct">{undoClearSecondsLeft}</span>}
+                </button>
+              </FloatingTooltip>
+              <FloatingTooltip content="مسح السلة">
+                <button
+                  className="btn btn-xs btn-r"
+                  onClick={onClear}
+                  disabled={isEmpty}
+                >
+                  <i className="ti ti-trash" />
+                  {kb('clearCart') && <span className="tb-txt"> {kb('clearCart')}</span>}
+                </button>
+              </FloatingTooltip>
             </div>
           </div>
 
@@ -410,14 +418,15 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                         -{formatDZD(invoiceDiscountAmount)}
                       </span>
                     )}
-                    <button
-                      onClick={toggleTotals}
-                      type="button"
-                      style={{ background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.2)', color: '#fff', cursor: 'pointer', padding: '2px 6px', borderRadius: 4, fontSize: 13, display: 'flex', alignItems: 'center', gap: 3 }}
-                      title="إخفاء التفاصيل"
-                    >
-                      <i className="ti ti-eye-off" style={{ fontSize: 13 }} />
-                    </button>
+                    <FloatingTooltip content="إخفاء التفاصيل">
+                      <button
+                        onClick={toggleTotals}
+                        type="button"
+                        style={{ background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.2)', color: '#fff', cursor: 'pointer', padding: '2px 6px', borderRadius: 4, fontSize: 13, display: 'flex', alignItems: 'center', gap: 3 }}
+                      >
+                        <i className="ti ti-eye-off" style={{ fontSize: 13 }} />
+                      </button>
+                    </FloatingTooltip>
                   </div>
                 )}
               </div>
@@ -437,48 +446,54 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
           )}
 
           <div className="cart-client-v2">
-            <div
-              className={`client-trigger-v2 ${client ? 'has-client' : ''}`}
-              onClick={() => setShowCustModal(true)}
-              title="اختيار أو تغيير الزبون — بحث أو إنشاء زبون جديد"
-            >
-              <div className="ctv2-av">
-                {client
-                  ? <span>{(client.name?.[0] ?? '?').toUpperCase()}</span>
-                  : <i className="ti ti-user" />
-                }
-              </div>
-              <div className="ctv2-info">
-                <div className="ctv2-name">
-                  {client?.name ?? 'زبون الصندوق'}
+            <FloatingTooltip content="اختيار أو تغيير الزبون — بحث أو إنشاء زبون جديد">
+              <div
+                className={`client-trigger-v2 ${client ? 'has-client' : ''}`}
+                onClick={() => setShowCustModal(true)}
+              >
+                <div className="ctv2-av">
+                  {client
+                    ? <span>{(client.name?.[0] ?? '?').toUpperCase()}</span>
+                    : <i className="ti ti-user" />
+                  }
                 </div>
-                {client?.phone && (
-                  <div className="ctv2-meta">
-                    <i className="ti ti-phone" style={{ fontSize: 10 }} /> {client.phone}
+                <div className="ctv2-info">
+                  <div className="ctv2-name">
+                    {client?.name ?? 'زبون الصندوق'}
                   </div>
+                  {client?.phone && (
+                    <div className="ctv2-meta">
+                      <i className="ti ti-phone" style={{ fontSize: 10 }} /> {client.phone}
+                    </div>
+                  )}
+                </div>
+
+                {client?.balance !== undefined && Number(client.balance) > 0 && (
+                  <span className="ctv2-debt">
+                    <FloatingTooltip content={`رصيد الدين: ${formatDZD(Number(client.balance))}`} placement="top">
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        <i className="ti ti-alert-circle" style={{ fontSize: 11 }} />
+                        {formatDZD(Number(client.balance))}
+                      </span>
+                    </FloatingTooltip>
+                  </span>
                 )}
+
+                <i className="ti ti-chevron-down ctv2-arrow" />
               </div>
-
-              {client?.balance !== undefined && Number(client.balance) > 0 && (
-                <span className="ctv2-debt" title={`رصيد الدين: ${formatDZD(Number(client.balance))}`}>
-                  <i className="ti ti-alert-circle" style={{ fontSize: 11 }} />
-                  {formatDZD(Number(client.balance))}
-                </span>
-              )}
-
-              <i className="ti ti-chevron-down ctv2-arrow" />
-            </div>
+            </FloatingTooltip>
 
             {client && (
               <div className="ctv2-actions">
-                <button
-                  className="btn btn-xs btn-r"
-                  onClick={() => onSetClient(null)}
-                  title="إلغاء اختيار الزبون"
-                  type="button"
-                >
-                  <i className="ti ti-x" />
-                </button>
+                <FloatingTooltip content="إلغاء اختيار الزبون">
+                  <button
+                    className="btn btn-xs btn-r"
+                    onClick={() => onSetClient(null)}
+                    type="button"
+                  >
+                    <i className="ti ti-x" />
+                  </button>
+                </FloatingTooltip>
               </div>
             )}
           </div>
@@ -535,44 +550,47 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
         </div>
 
         <div className="cart-actions">
-          <button
-            className="cart-hold-btn"
-            onClick={onHold}
-            disabled={isEmpty || !canHold}
-            title="تعليق الفاتورة"
-          >
-            <i className="ti ti-clock-pause" /> تعليق
-            {kb('holdCart') && <span className="tb-txt"> {kb('holdCart')}</span>}
-          </button>
-          {allowCreditSale && (
+          <FloatingTooltip content="تعليق الفاتورة">
             <button
-              className="cart-sell-btn"
-              onClick={onSell}
+              className="cart-hold-btn"
+              onClick={onHold}
               disabled={isEmpty}
-              title={`دفع والإتمام — ${kb('payment')}`}
             >
-              <i className="ti ti-circle-check" />
-              <span>
-                {isEmpty ? 'السلة فارغة' : (
-                  remainingToPay <= 0
-                    ? 'مدفوعة ✓'
-                    : `دفع — ${formatDZD(remainingToPay)}`
-                )}
-              </span>
-              {kb('payment') && <span className="tb-txt" style={{ fontSize: 13 }}> {kb('payment')}</span>}
+              <i className="ti ti-clock-pause" /> تعليق
+              {kb('holdCart') && <span className="tb-txt"> {kb('holdCart')}</span>}
             </button>
+          </FloatingTooltip>
+          {allowCreditSale && (
+            <FloatingTooltip content={`دفع والإتمام — ${kb('payment')}`}>
+              <button
+                className="cart-sell-btn"
+                onClick={onSell}
+                disabled={isEmpty}
+              >
+                <i className="ti ti-circle-check" />
+                <span>
+                  {isEmpty ? 'السلة فارغة' : (
+                    remainingToPay <= 0
+                      ? 'مدفوعة ✓'
+                      : `دفع — ${formatDZD(remainingToPay)}`
+                  )}
+                </span>
+                {kb('payment') && <span className="tb-txt" style={{ fontSize: 13 }}> {kb('payment')}</span>}
+              </button>
+            </FloatingTooltip>
           )}
           {!isEmpty && (
-            <button
-              className="cart-sell-btn cart-quick-sell"
-              onClick={onQuickSell}
-              title="دفع نقدي سريع — المبلغ كامل نقدياً بدون مودال"
-              type="button"
-            >
-              <i className="ti ti-bolt" />
-              <span>بيع سريع</span>
-              {kb('quickCash') && <span className="tb-txt" style={{ fontSize: 13 }}> {kb('quickCash')}</span>}
-            </button>
+            <FloatingTooltip content="دفع نقدي سريع — المبلغ كامل نقدياً بدون مودال">
+              <button
+                className="cart-sell-btn cart-quick-sell"
+                onClick={onQuickSell}
+                type="button"
+              >
+                <i className="ti ti-bolt" />
+                <span>بيع سريع</span>
+                {kb('quickCash') && <span className="tb-txt" style={{ fontSize: 13 }}> {kb('quickCash')}</span>}
+              </button>
+            </FloatingTooltip>
           )}
         </div>
       </div>

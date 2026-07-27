@@ -13,6 +13,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { CartItem, ProductPackaging } from '@/types';
 import { formatDZD, ttcToHt, htToTtc } from '../utils/calculations';
+import { FloatingTooltip } from '@/components/ui/FloatingTooltip';
 
 interface CartRowProps {
   item:             CartItem;
@@ -252,17 +253,18 @@ export default function CartRow({
 
           {/* ── Packaging badge (clickable when multiple options exist) ── */}
           {availablePackagings.length > 1 && (
-            <button
-              ref={pkgBtnRef}
-              className={`cr-pkg-badge cr-pkg-badge--selectable ${popup === 'pkg' ? 'cr-pkg-badge--active' : ''}`}
-              onClick={e => { e.stopPropagation(); setPopup(p => p === 'pkg' ? null : 'pkg'); }}
-              title="تغيير الوحدة"
-              type="button"
-            >
-              {item.packaging_label ?? item.unit_symbol}
-              {item.pack_qty && item.pack_qty > 1 && <span className="cr-pkg-multi"> ×{item.pack_qty}</span>}
-              <i className="ti ti-chevron-down cr-pkg-chevron" />
-            </button>
+            <FloatingTooltip content="تغيير الوحدة">
+              <button
+                ref={pkgBtnRef}
+                className={`cr-pkg-badge cr-pkg-badge--selectable ${popup === 'pkg' ? 'cr-pkg-badge--active' : ''}`}
+                onClick={e => { e.stopPropagation(); setPopup(p => p === 'pkg' ? null : 'pkg'); }}
+                type="button"
+              >
+                {item.packaging_label ?? item.unit_symbol}
+                {item.pack_qty && item.pack_qty > 1 && <span className="cr-pkg-multi"> ×{item.pack_qty}</span>}
+                <i className="ti ti-chevron-down cr-pkg-chevron" />
+              </button>
+            </FloatingTooltip>
           )}
           {availablePackagings.length <= 1 && item.packaging_label && (
             <span className="cr-pkg-badge">
@@ -308,40 +310,43 @@ export default function CartRow({
         <div className="cr-price-row">
 
           {/* ── السعر قابل للتعديل ── */}
-          <button
-            className={`cr-price ${popup === 'price' ? 'cr-price--active' : ''}`}
-            onClick={openPrice}
-            title="انقر لتعديل السعر TTC"
-            type="button"
-          >
-            <span className="cr-price-num">
-              {htToTtc(item.unit_price_ht, tvaRate).toLocaleString('fr-DZ', { maximumFractionDigits: 2 })}
-            </span>
-            <span className="cr-price-unit">TTC</span>
-            <span className="cr-price-edit-ic">✎</span>
-          </button>
+          <FloatingTooltip content="انقر لتعديل السعر TTC">
+            <button
+              className={`cr-price ${popup === 'price' ? 'cr-price--active' : ''}`}
+              onClick={openPrice}
+              type="button"
+            >
+              <span className="cr-price-num">
+                {htToTtc(item.unit_price_ht, tvaRate).toLocaleString('fr-DZ', { maximumFractionDigits: 2 })}
+              </span>
+              <span className="cr-price-unit">TTC</span>
+              <span className="cr-price-edit-ic">✎</span>
+            </button>
+          </FloatingTooltip>
 
           {/* ── الخصم ── */}
           {hasDisc ? (
-            <button
-              className={`cr-disc ${popup === 'disc' ? 'cr-disc--active' : ''}`}
-              onClick={openDisc}
-              title="انقر لتعديل الخصم"
-              type="button"
-            >
-              <i className="ti ti-discount" />
-              {discLabel}
-            </button>
+            <FloatingTooltip content="انقر لتعديل الخصم">
+              <button
+                className={`cr-disc ${popup === 'disc' ? 'cr-disc--active' : ''}`}
+                onClick={openDisc}
+                type="button"
+              >
+                <i className="ti ti-discount" />
+                {discLabel}
+              </button>
+            </FloatingTooltip>
           ) : (
-            <button
-              className={`cr-disc-add ${popup === 'disc' ? 'cr-disc-add--active' : ''}`}
-              onClick={openDisc}
-              title="إضافة خصم"
-              type="button"
-            >
-              <i className="ti ti-tag" />
-              خصم
-            </button>
+            <FloatingTooltip content="إضافة خصم">
+              <button
+                className={`cr-disc-add ${popup === 'disc' ? 'cr-disc-add--active' : ''}`}
+                onClick={openDisc}
+                type="button"
+              >
+                <i className="ti ti-tag" />
+                خصم
+              </button>
+            </FloatingTooltip>
           )}
           <div ref={popupAnchorRef} style={{ position: 'relative', width: 0, height: 0, flex: '0 0 0' }} />
 
@@ -411,14 +416,15 @@ export default function CartRow({
             {/* أزرار تأكيد */}
             <div className="cr-popup-actions">
               {hasDisc && (
-                <button
-                  className="cr-popup-clear"
-                  onClick={() => { onDiscount(0); onDiscountAmount(0); setPopup(null); }}
-                  type="button"
-                  title="إزالة الخصم"
-                >
-                  <i className="ti ti-x" /> إزالة
-                </button>
+                <FloatingTooltip content="إزالة الخصم">
+                  <button
+                    className="cr-popup-clear"
+                    onClick={() => { onDiscount(0); onDiscountAmount(0); setPopup(null); }}
+                    type="button"
+                  >
+                    <i className="ti ti-x" /> إزالة
+                  </button>
+                </FloatingTooltip>
               )}
               <button className="cr-popup-cancel" onClick={() => setPopup(null)} type="button">
                 إلغاء
@@ -472,18 +478,19 @@ export default function CartRow({
 
       {/* ── تحكم الكمية ── */}
       <div className="cr-qty-ctrl" onClick={e => e.stopPropagation()}>
-        <button
-          className="cq-btn cq-btn--minus"
-          onClick={() => {
-            const next = Math.round((item.quantity - qtyStep) * 1000) / 1000;
-            if (next <= 0) onRemove();
-            else onQty(next);
-          }}
-          title="إنقاص"
-          type="button"
-        >
-          <i className="ti ti-minus" />
-        </button>
+        <FloatingTooltip content="إنقاص">
+          <button
+            className="cq-btn cq-btn--minus"
+            onClick={() => {
+              const next = Math.round((item.quantity - qtyStep) * 1000) / 1000;
+              if (next <= 0) onRemove();
+              else onQty(next);
+            }}
+            type="button"
+          >
+            <i className="ti ti-minus" />
+          </button>
+        </FloatingTooltip>
 
         {editQty ? (
           <input
@@ -506,30 +513,32 @@ export default function CartRow({
               if (isWeight && onWeightEdit) onWeightEdit();
               else { setEditQty(true); setQtyVal(String(item.quantity)); }
             }}
-            title="انقر لتعديل الكمية"
           >
             {item.quantity.toFixed(3)}
           </span>
         )}
 
-        <button
-          className="cq-btn cq-btn--plus"
-          onClick={() => { if (!stockFull) onQty(Math.round((item.quantity + qtyStep) * 1000) / 1000); }}
-          disabled={stockFull}
-          title={stockFull ? `الحد الأقصى: ${item.max_stock}` : 'زيادة'}
-          type="button"
-        >
-          <i className="ti ti-plus" />
-        </button>
+        <FloatingTooltip content={stockFull ? `الحد الأقصى: ${item.max_stock}` : 'زيادة'}>
+          <button
+            className="cq-btn cq-btn--plus"
+            onClick={() => { if (!stockFull) onQty(Math.round((item.quantity + qtyStep) * 1000) / 1000); }}
+            disabled={stockFull}
+            type="button"
+          >
+            <i className="ti ti-plus" />
+          </button>
+        </FloatingTooltip>
 
         {item.unit_symbol && (
           <span className="cq-unit">{item.unit_symbol}</span>
         )}
 
         {stockFull && (
-          <span className="cq-stock-warn" title={`المخزون المتاح: ${item.max_stock}`}>
-            <i className="ti ti-alert-triangle" />
-          </span>
+          <FloatingTooltip content={`المخزون المتاح: ${item.max_stock}`}>
+            <span className="cq-stock-warn">
+              <i className="ti ti-alert-triangle" />
+            </span>
+          </FloatingTooltip>
         )}
       </div>
 
@@ -548,14 +557,15 @@ export default function CartRow({
       </div>
 
       {/* ── حذف ── */}
-      <button
-        className="cr-del"
-        onClick={e => { e.stopPropagation(); onRemove(); }}
-        title="حذف (Del)"
-        type="button"
-      >
-        <i className="ti ti-x" />
-      </button>
+      <FloatingTooltip content="حذف (Del)">
+        <button
+          className="cr-del"
+          onClick={e => { e.stopPropagation(); onRemove(); }}
+          type="button"
+        >
+          <i className="ti ti-x" />
+        </button>
+      </FloatingTooltip>
     </div>
     </div>
   );

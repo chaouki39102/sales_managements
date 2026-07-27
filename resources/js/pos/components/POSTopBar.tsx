@@ -4,6 +4,7 @@ import type { CartTotals, PriceLevel } from '@/types';
 import type { PosSession }           from '@/lib/api/endpoints/posSession';
 import { formatDZD }                 from '../utils/calculations';
 import { getEffectiveShortcut } from '../hooks/useKeyboardMap';
+import { FloatingTooltip } from '@/components/ui/FloatingTooltip';
 
 const MARGIN_VIS_KEY = 'pos-margin-visible';
 
@@ -98,62 +99,68 @@ export default function POSTopBar({
     <div className="pos-topbar">
       <div className="pos-stats-row">
 
-        <div
-          className="pos-chip g clickable"
-          onClick={onSessionInvoices}
-          title={`فواتير الجلسة — ${kb('sessionInvoices')}`}
-        >
-          <i className="ti ti-receipt pic-ic" />
-          <div className="pos-chip-inner">
-            <span className="pos-chip-label">فواتير الجلسة</span>
-            <strong className="pos-chip-val">{invoicesCount}</strong>
-          </div>
-        </div>
-
-        <div
-          className="pos-chip o clickable"
-          onClick={onSession}
-          title={`إحصاءات الجلسة — ${kb('sessionStats')}`}
-        >
-          <i className="ti ti-cash pic-ic" />
-          <div className="pos-chip-inner">
-            <span className="pos-chip-label">مبيعات الجلسة</span>
-            <strong className="pos-chip-val">{formatDZD(netSales)}</strong>
-          </div>
-        </div>
-
-        {heldCount > 0 && (
+        <FloatingTooltip content={`فواتير الجلسة — ${kb('sessionInvoices')}`}>
           <div
-            className="pos-chip b clickable"
-            onClick={onHeld}
-            title={`الفواتير المعلقة — ${kb('heldCarts')}`}
+            className="pos-chip g clickable"
+            onClick={onSessionInvoices}
           >
-            <i className="ti ti-clock-pause pic-ic" />
+            <i className="ti ti-receipt pic-ic" />
             <div className="pos-chip-inner">
-              <span className="pos-chip-label">معلقة</span>
-              <strong className="pos-chip-val">{heldCount}</strong>
+              <span className="pos-chip-label">فواتير الجلسة</span>
+              <strong className="pos-chip-val">{invoicesCount}</strong>
             </div>
           </div>
+        </FloatingTooltip>
+
+        <FloatingTooltip content={`إحصاءات الجلسة — ${kb('sessionStats')}`}>
+          <div
+            className="pos-chip o clickable"
+            onClick={onSession}
+          >
+            <i className="ti ti-cash pic-ic" />
+            <div className="pos-chip-inner">
+              <span className="pos-chip-label">مبيعات الجلسة</span>
+              <strong className="pos-chip-val">{formatDZD(netSales)}</strong>
+            </div>
+          </div>
+        </FloatingTooltip>
+
+        {heldCount > 0 && (
+          <FloatingTooltip content={`الفواتير المعلقة — ${kb('heldCarts')}`}>
+            <div
+              className="pos-chip b clickable"
+              onClick={onHeld}
+            >
+              <i className="ti ti-clock-pause pic-ic" />
+              <div className="pos-chip-inner">
+                <span className="pos-chip-label">معلقة</span>
+                <strong className="pos-chip-val">{heldCount}</strong>
+              </div>
+            </div>
+          </FloatingTooltip>
         )}
 
         {!isEmpty && (
-          <div className="pos-chip p" title="متوسط هامش الربح — السلة الحالية">
-            <button
-              onClick={e => { e.stopPropagation(); toggleMargin(); }}
-              style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, display: 'flex', fontSize: 13, opacity: 0.6 }}
-              title={showMargin ? 'إخفاء هامش الربح' : 'إظهار هامش الربح'}
-              type="button"
-            >
-              <i className={`ti ti-eye${showMargin ? '' : '-off'}`} />
-            </button>
-            {showMargin && (
-              <>
-                <i className="ti ti-trending-up pic-ic" />
-                <span className="pos-chip-label">هامش الربح</span>
-                <strong className="pos-chip-val">{avgMargin.toFixed(1)}%</strong>
-              </>
-            )}
-          </div>
+          <FloatingTooltip content="متوسط هامش الربح — السلة الحالية">
+            <div className="pos-chip p">
+              <button
+                onClick={e => { e.stopPropagation(); toggleMargin(); }}
+                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, display: 'flex', fontSize: 13, opacity: 0.6 }}
+                type="button"
+              >
+                <FloatingTooltip content={showMargin ? 'إخفاء هامش الربح' : 'إظهار هامش الربح'} placement="bottom">
+                  <i className={`ti ti-eye${showMargin ? '' : '-off'}`} />
+                </FloatingTooltip>
+              </button>
+              {showMargin && (
+                <>
+                  <i className="ti ti-trending-up pic-ic" />
+                  <span className="pos-chip-label">هامش الربح</span>
+                  <strong className="pos-chip-val">{avgMargin.toFixed(1)}%</strong>
+                </>
+              )}
+            </div>
+          </FloatingTooltip>
         )}
 
         {!isEmpty && (
@@ -167,23 +174,27 @@ export default function POSTopBar({
         )}
 
         {!isEmpty && (
-          <div className="pos-chip em" title="إجمالي الفاتورة الحالية">
-            <i className="ti ti-calculator pic-ic" />
-            <div className="pos-chip-inner">
-              <span className="pos-chip-label">الإجمالي</span>
-              <strong className="pos-chip-val">{formatDZD(totalTtcFinal)}</strong>
+          <FloatingTooltip content="إجمالي الفاتورة الحالية">
+            <div className="pos-chip em">
+              <i className="ti ti-calculator pic-ic" />
+              <div className="pos-chip-inner">
+                <span className="pos-chip-label">الإجمالي</span>
+                <strong className="pos-chip-val">{formatDZD(totalTtcFinal)}</strong>
+              </div>
             </div>
-          </div>
+          </FloatingTooltip>
         )}
 
         {editingDocumentNumber && (
-          <div className="pos-chip editing" title="جاري تعديل فاتورة">
-            <i className="ti ti-edit pic-ic" />
-            <div className="pos-chip-inner">
-              <span className="pos-chip-label">تعديل فاتورة</span>
-              <strong className="pos-chip-val">{editingDocumentNumber}</strong>
+          <FloatingTooltip content="جاري تعديل فاتورة">
+            <div className="pos-chip editing">
+              <i className="ti ti-edit pic-ic" />
+              <div className="pos-chip-inner">
+                <span className="pos-chip-label">تعديل فاتورة</span>
+                <strong className="pos-chip-val">{editingDocumentNumber}</strong>
+              </div>
             </div>
-          </div>
+          </FloatingTooltip>
         )}
       </div>
 
@@ -191,17 +202,18 @@ export default function POSTopBar({
 
         {priceLevels.length > 0 && (
           <div className="tarif-wrap" ref={tarifRef}>
-            <button
-              ref={btnRef}
-              className={`btn btn-xs ${selectedPriceLevelId !== null ? 'btn-p' : ''}`}
-              onClick={() => { if (showTarifDrop) { setShowTarifDrop(false); } else { openDrop(); } }}
-              type="button"
-              title="تغيير تعريفة السعر (تجزئة / نصف جملة / جملة)"
-            >
-              <i className="ti ti-tag" />
-              <span className="tb-txt"> {selectedTarifLabel}</span>
-              <i className="ti ti-chevron-down" style={{ fontSize: 10, opacity: 0.6 }} />
-            </button>
+            <FloatingTooltip content="تغيير تعريفة السعر (تجزئة / نصف جملة / جملة)">
+              <button
+                ref={btnRef}
+                className={`btn btn-xs ${selectedPriceLevelId !== null ? 'btn-p' : ''}`}
+                onClick={() => { if (showTarifDrop) { setShowTarifDrop(false); } else { openDrop(); } }}
+                type="button"
+              >
+                <i className="ti ti-tag" />
+                <span className="tb-txt"> {selectedTarifLabel}</span>
+                <i className="ti ti-chevron-down" style={{ fontSize: 10, opacity: 0.6 }} />
+              </button>
+            </FloatingTooltip>
 
             {showTarifDrop && createPortal(
               <div className="tarif-drop" style={{ position: 'fixed', top: dropPos.top, left: dropPos.left }}>
@@ -234,89 +246,106 @@ export default function POSTopBar({
 
         <span className="tb-sep" aria-hidden="true" />
 
-        <button className="btn btn-xs" onClick={onNewSale} title="بيع جديد / تعليق">
-          <i className="ti ti-plus" />
-          <span className="tb-txt"> جديد</span>
-          {kb('holdCart') && <span className="tb-txt"> {kb('holdCart')}</span>}
-        </button>
-        <button className="btn btn-xs" onClick={onReturn} title="مرتجع">
-          <i className="ti ti-receipt-refund" />
-          <span className="tb-txt"> مرتجع</span>
-          {kb('returns') && <span className="tb-txt"> {kb('returns')}</span>}
-        </button>
-        <button className="btn btn-xs" onClick={onManual} title="إضافة يدوي">
-          <i className="ti ti-keyboard" />
-          <span className="tb-txt"> يدوي</span>
-          {kb('manualProduct') && <span className="tb-txt"> {kb('manualProduct')}</span>}
-        </button>
-        <button
-          className="btn btn-xs"
-          onClick={onReceipt}
-          disabled={isEmpty}
-          title="معاينة الإيصال"
-        >
-          <i className="ti ti-printer" />
-          {kb('preview') && <span className="tb-txt"> {kb('preview')}</span>}
-        </button>
+        <FloatingTooltip content="بيع جديد / تعليق">
+          <button className="btn btn-xs" onClick={onNewSale}>
+            <i className="ti ti-plus" />
+            <span className="tb-txt"> جديد</span>
+            {kb('holdCart') && <span className="tb-txt"> {kb('holdCart')}</span>}
+          </button>
+        </FloatingTooltip>
+        <FloatingTooltip content="مرتجع">
+          <button className="btn btn-xs" onClick={onReturn}>
+            <i className="ti ti-receipt-refund" />
+            <span className="tb-txt"> مرتجع</span>
+            {kb('returns') && <span className="tb-txt"> {kb('returns')}</span>}
+          </button>
+        </FloatingTooltip>
+        <FloatingTooltip content="إضافة يدوي">
+          <button className="btn btn-xs" onClick={onManual}>
+            <i className="ti ti-keyboard" />
+            <span className="tb-txt"> يدوي</span>
+            {kb('manualProduct') && <span className="tb-txt"> {kb('manualProduct')}</span>}
+          </button>
+        </FloatingTooltip>
+        <FloatingTooltip content="معاينة الإيصال">
+          <button
+            className="btn btn-xs"
+            onClick={onReceipt}
+            disabled={isEmpty}
+          >
+            <i className="ti ti-printer" />
+            {kb('preview') && <span className="tb-txt"> {kb('preview')}</span>}
+          </button>
+        </FloatingTooltip>
 
         <span className="tb-sep" aria-hidden="true" />
 
-        <button
-          className={`btn btn-xs ${showQuickbar ? 'btn-p' : ''}`}
-          onClick={onToggleQuickbar}
-          title="شريط المنتجات السريعة"
-        >
-          <i className="ti ti-pin" />
-        </button>
-        <button
-          className="btn btn-xs"
-          onClick={onOpenDrawer}
-          title="فتح درج النقود"
-        >
-          <i className="ti ti-cash-banknote" />
-          {kb('openDrawer') && <span className="tb-txt"> {kb('openDrawer')}</span>}
-        </button>
+        <FloatingTooltip content="شريط المنتجات السريعة">
+          <button
+            className={`btn btn-xs ${showQuickbar ? 'btn-p' : ''}`}
+            onClick={onToggleQuickbar}
+          >
+            <i className="ti ti-pin" />
+          </button>
+        </FloatingTooltip>
+        <FloatingTooltip content="فتح درج النقود">
+          <button
+            className="btn btn-xs"
+            onClick={onOpenDrawer}
+          >
+            <i className="ti ti-cash-banknote" />
+            {kb('openDrawer') && <span className="tb-txt"> {kb('openDrawer')}</span>}
+          </button>
+        </FloatingTooltip>
 
         <span className="tb-sep" aria-hidden="true" />
 
-        <button
-          className={`btn btn-xs ${toastEnabled ? 'btn-p' : ''}`}
-          onClick={onToggleToast}
-          title={toastEnabled ? 'تعطيل الإشعارات' : 'تفعيل الإشعارات'}
-        >
-          <i className={`ti ${toastEnabled ? 'ti-bell' : 'ti-bell-off'}`} />
-        </button>
-        <button
-          className={`btn btn-xs ${clearSearchOnAdd ? 'btn-p' : ''}`}
-          onClick={onToggleClearSearch}
-          title={clearSearchOnAdd ? 'إيقاف تفريغ البحث تلقائياً' : 'تفريغ البحث بعد كل إضافة'}
-        >
-          <i className={`ti ${clearSearchOnAdd ? 'ti-letter-case-toggle' : 'ti-letter-case'}`} />
-        </button>
+        <FloatingTooltip content={toastEnabled ? 'تعطيل الإشعارات' : 'تفعيل الإشعارات'}>
+          <button
+            className={`btn btn-xs ${toastEnabled ? 'btn-p' : ''}`}
+            onClick={onToggleToast}
+          >
+            <i className={`ti ${toastEnabled ? 'ti-bell' : 'ti-bell-off'}`} />
+          </button>
+        </FloatingTooltip>
+        <FloatingTooltip content={clearSearchOnAdd ? 'إيقاف تفريغ البحث تلقائياً' : 'تفريغ البحث بعد كل إضافة'}>
+          <button
+            className={`btn btn-xs ${clearSearchOnAdd ? 'btn-p' : ''}`}
+            onClick={onToggleClearSearch}
+          >
+            <i className={`ti ${clearSearchOnAdd ? 'ti-letter-case-toggle' : 'ti-letter-case'}`} />
+          </button>
+        </FloatingTooltip>
 
-        <button
-          className="btn btn-xs"
-          onClick={onSettings}
-          title="إعدادات POS"
-        >
-          <i className="ti ti-settings-2" />
-        </button>
-        <button
-          className="btn btn-xs"
-          onClick={onFullscreen}
-          title={isFullscreen ? 'خروج من ملء الشاشة' : 'ملء الشاشة'}
-        >
-          <i className={`ti ${isFullscreen ? 'ti-minimize' : 'ti-maximize'}`} />
-          {kb('fullscreen') && <span className="tb-txt"> {kb('fullscreen')}</span>}
-        </button>
-        <button className="btn btn-xs" onClick={onKbHelp} title="اختصارات لوحة المفاتيح">
-          <i className="ti ti-keyboard" />
-          <span className="tb-txt"> {kb('kbHelp') || 'F1'}</span>
-        </button>
-        <button className="btn btn-xs" onClick={onKioskMode} title="وضع الكاشير">
-          <i className="ti ti-device-ipad-horizontal" />
-          <span className="tb-txt"> كاشير</span>
-        </button>
+        <FloatingTooltip content="إعدادات POS">
+          <button
+            className="btn btn-xs"
+            onClick={onSettings}
+          >
+            <i className="ti ti-settings-2" />
+          </button>
+        </FloatingTooltip>
+        <FloatingTooltip content={isFullscreen ? 'خروج من ملء الشاشة' : 'ملء الشاشة'}>
+          <button
+            className="btn btn-xs"
+            onClick={onFullscreen}
+          >
+            <i className={`ti ${isFullscreen ? 'ti-minimize' : 'ti-maximize'}`} />
+            {kb('fullscreen') && <span className="tb-txt"> {kb('fullscreen')}</span>}
+          </button>
+        </FloatingTooltip>
+        <FloatingTooltip content="اختصارات لوحة المفاتيح">
+          <button className="btn btn-xs" onClick={onKbHelp}>
+            <i className="ti ti-keyboard" />
+            <span className="tb-txt"> {kb('kbHelp') || 'F1'}</span>
+          </button>
+        </FloatingTooltip>
+        <FloatingTooltip content="وضع الكاشير">
+          <button className="btn btn-xs" onClick={onKioskMode}>
+            <i className="ti ti-device-ipad-horizontal" />
+            <span className="tb-txt"> كاشير</span>
+          </button>
+        </FloatingTooltip>
       </div>
     </div>
   );

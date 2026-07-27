@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import type { ProductVariant, ProductPackaging, PriceLevel } from '@/types';
 import { formatDZD } from '../utils/calculations';
 import { getVariantPrice, familyStyleFromName, isVariantOutOfStock } from '../utils/posHelpers';
+import { FloatingTooltip } from '@/components/ui/FloatingTooltip';
 
 interface ProductCardProps {
   variant:               ProductVariant;
@@ -296,33 +297,39 @@ function ProductCardInner({
       </div>
 
       <div className="pcard-actions">
-        <button
-          className={`pcard-pin ${isPinned ? 'on' : ''}`}
-          onClick={handlePin}
-          title={isPinned ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}
-        >
-          <i className={`ti ti-star${isPinned ? '-filled' : ''}`} />
-        </button>
+        <FloatingTooltip content={isPinned ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}>
+          <button
+            className={`pcard-pin ${isPinned ? 'on' : ''}`}
+            onClick={handlePin}
+          >
+            <i className={`ti ti-star${isPinned ? '-filled' : ''}`} />
+          </button>
+        </FloatingTooltip>
 
         {inCart && onQty ? (
           <div className="pcard-qty-ctrl">
-            <button className="pcard-qty-btn" onClick={handleDec} title="تقليل">
-              <i className="ti ti-minus" />
-            </button>
+            <FloatingTooltip content="تقليل">
+              <button className="pcard-qty-btn" onClick={handleDec}>
+                <i className="ti ti-minus" />
+              </button>
+            </FloatingTooltip>
             <span className="pcard-qty-val" key={qtyInCart}>{qtyInCart}</span>
-            <button className="pcard-qty-btn pcard-qty-inc" onClick={handleInc} title="زيادة" disabled={outStock}>
-              <i className="ti ti-plus" />
-            </button>
+            <FloatingTooltip content="زيادة">
+              <button className="pcard-qty-btn pcard-qty-inc" onClick={handleInc} disabled={outStock}>
+                <i className="ti ti-plus" />
+              </button>
+            </FloatingTooltip>
           </div>
         ) : (
-          <button
-            className="pcard-add"
-            onClick={handleAddBtn}
-            disabled={outStock}
-            title="إضافة للسلة"
-          >
-            <i className={`ti ${justAdded ? 'ti-check' : 'ti-plus'}`} />
-          </button>
+          <FloatingTooltip content="إضافة للسلة">
+            <button
+              className="pcard-add"
+              onClick={handleAddBtn}
+              disabled={outStock}
+            >
+              <i className={`ti ${justAdded ? 'ti-check' : 'ti-plus'}`} />
+            </button>
+          </FloatingTooltip>
         )}
       </div>
 

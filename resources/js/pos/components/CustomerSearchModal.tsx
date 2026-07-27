@@ -19,6 +19,7 @@ import { useActiveSlug }   from '@/lib/store/appStore';
 import { useCashClient }   from '@/lib/api/endpoints/parties';
 import { formatCurrency }  from '@/lib/utils';
 import Modal from '@/components/ui/Modal';
+import { PinnedList, type PinnedListItem } from '@/components/ui/PinnedList';
 import type { Party }      from '@/types';
 import type { PaginatedResponse, PartyBalance } from '@/lib/api/core/types';
 
@@ -89,22 +90,22 @@ export default function CustomerSearchModal({
   const [form,       setForm]       = useState<NewClientForm>(EMPTY_FORM);
   const [formError,  setFormError]  = useState('');
   const [highlightedIdx, setHighlightedIdx] = useState(0);
-  const listRef = useRef<HTMLDivElement>(null);
 
   // ── Pinned clients (localStorage per slug) ────────────────────────────────
   const pinnedKey = `pos-pinned-clients-${slug}`;
   const [pinnedIds, setPinnedIds] = useState<number[]>(() => {
     try { return JSON.parse(localStorage.getItem(pinnedKey) ?? '[]'); } catch { return []; }
   });
-  const togglePin = useCallback((id: number) => {
+  const pinnedIdsSet = useMemo(() => new Set(pinnedIds), [pinnedIds]);
+  const togglePin = useCallback((id: string | number) => {
+    const numId = Number(id);
     setPinnedIds(prev => {
-      const next = prev.includes(id) ? prev.filter(x => x !== id) : [id, ...prev];
+      const next = prev.includes(numId) ? prev.filter(x => x !== numId) : [numId, ...prev];
       localStorage.setItem(pinnedKey, JSON.stringify(next));
       return next;
     });
     qc.invalidateQueries({ queryKey: [slug, 'customers', 'pos-recent'] });
     qc.invalidateQueries({ queryKey: [slug, 'customers', 'pos-search'] });
-    if (listRef.current) listRef.current.scrollTop = 0;
   }, [pinnedKey, qc, slug]);
 
   const debouncedQuery = useDebounce(query.trim(), 250);
@@ -171,12 +172,8 @@ export default function CustomerSearchModal({
 
   const displayList: Party[] = useMemo(() => {
     const list = isSearching ? (searchResults ?? []) : (recentClients ?? []);
-    const filtered = list.filter(p => p.id !== cashClient?.id);
-    if (pinnedIds.length === 0) return filtered;
-    const pinned = filtered.filter(p => pinnedIds.includes(p.id));
-    const unpinned = filtered.filter(p => !pinnedIds.includes(p.id));
-    return [...pinned, ...unpinned];
-  }, [isSearching, searchResults, recentClients, cashClient, pinnedIds]);
+    return list.filter(p => p.id !== cashClient?.id);
+  }, [isSearching, searchResults, recentClients, cashClient]);
 
   // Escape يُغلق + Arrow navigation + Enter to select
   useEffect(() => {
@@ -336,7 +333,7 @@ export default function CustomerSearchModal({
             </div>
 
             {/* القائمة */}
-            <div className="cust-list" ref={listRef}>
+            <div className="cust-list">
               {displayList.length === 0 && !searching && isSearching && (
                 <div className="cust-empty">
                   <i className="ti ti-search-off" style={{ fontSize: 28, opacity: 0.3 }} />
@@ -352,35 +349,51 @@ export default function CustomerSearchModal({
                 </div>
               )}
 
-              {displayList.map((c, i) => (
-                <button
-                  key={c.id}
-                  ref={highlightedIdx === i + 1 ? (el) => el?.scrollIntoView({ block: 'nearest' }) : undefined}
-                  className={`cust-row ${currentClient?.id === c.id ? 'on' : ''} ${highlightedIdx === i + 1 ? 'hl' : ''}`}
-                  onClick={() => onSelect(c)}
-                  type="button"
-                >
-                  <div className="cust-av">
-                    {(c.name?.[0] ?? '؟').toUpperCase()}
-                  </div>
-                  <div className="cust-info">
-                    <div className="cust-name">{c.name}</div>
-                    <div className="cust-meta">
-                      {c.phone && <span><i className="ti ti-phone" style={{ fontSize: 10 }} /> {c.phone}</span>}
-                      {c.nif   && <span>NIF: {c.nif}</span>}
+              <PinnedList
+                items={displayList.map(c => ({
+                  id: c.id,
+                  name: c.name,
+                  subtitle: [c.phone, c.nif ? `NIF: ${c.nif}` : ''].filter(Boolean).join(' · '),
+                }))}
+                pinnedIds={pinnedIdsSet}
+                onTogglePin={togglePin}
+                selectedId={currentClient?.id ?? null}
+                onSelect={(item) => {
+                  const party = displayList.find(c => c.id === item.id);
+                  if (party) onSelect(party);
+                }}
+                pinnedLabel="المثبّتة"
+                allLabel={isSearching ? (searching ? 'جارٍ البحث...' : `${displayList.length} نتيجة`) : 'آخر الزبائن'}
+                renderItem={(item, pinned, onToggle) => {
+                  const c = displayList.find(p => p.id === item.id);
+                  if (!c) return null;
+                  return (
+                    <div
+                      className={`cust-row ${currentClient?.id === c.id ? 'on' : ''}`}
+                    >
+                      <div className="cust-av">
+                        {(c.name?.[0] ?? '؟').toUpperCase()}
+                      </div>
+                      <div className="cust-info">
+                        <div className="cust-name">{c.name}</div>
+                        <div className="cust-meta">
+                          {c.phone && <span><i className="ti ti-phone" style={{ fontSize: 10 }} /> {c.phone}</span>}
+                          {c.nif   && <span>NIF: {c.nif}</span>}
+                        </div>
+                        <BalanceLabel balance={balanceMap.get(c.id)} />
+                      </div>
+                      <i
+                        className={`ti ti-pin cust-pin ${pinned ? 'pinned' : ''}`}
+                        onClick={(e) => { e.stopPropagation(); onToggle(); }}
+                        title={pinned ? 'إلغاء التثبيت' : 'تثبيت في الأعلى'}
+                      />
+                      {currentClient?.id === c.id && (
+                        <i className="ti ti-check cust-check" />
+                      )}
                     </div>
-                    <BalanceLabel balance={balanceMap.get(c.id)} />
-                  </div>
-                  <i
-                    className={`ti ti-pin cust-pin ${pinnedIds.includes(c.id) ? 'pinned' : ''}`}
-                    onClick={(e) => { e.stopPropagation(); togglePin(c.id); }}
-                    title={pinnedIds.includes(c.id) ? 'إلغاء التثبيت' : 'تثبيت في الأعلى'}
-                  />
-                  {currentClient?.id === c.id && (
-                    <i className="ti ti-check cust-check" />
-                  )}
-                </button>
-              ))}
+                  );
+                }}
+              />
             </div>
           </>
         )}

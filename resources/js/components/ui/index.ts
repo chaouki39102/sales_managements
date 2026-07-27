@@ -26,3 +26,8 @@ export {
   Sep, DotSep, IconButton, Tabs, SummaryRow,
   Grid2, Grid3, Grid4, Grid65, KpiGrid,
 }                                                        from './Misc'
+export { FloatingTooltip }                               from './FloatingTooltip'
+export { FileTree }                                      from './FileTree'
+export type { FileTreeElement, FileTreeProps }            from './FileTree'
+export { PinnedList }                                    from './PinnedList'
+export type { PinnedListItem, PinnedListProps }           from './PinnedList'
