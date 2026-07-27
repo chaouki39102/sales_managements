@@ -37,12 +37,15 @@ interface ProductSearchBarProps {
   onEscape?: () => void;
   keyboardNavEnabled?: boolean;
   slug?: string | null;
+  clearSearchOnAdd?: boolean;
+  onToggleClearSearch?: () => void;
 }
 
 export default function ProductSearchBar({
   query, onQuery, view, gridSize, onView, onGridSize,
   onFilter, filterActive, inputRef, sortBy, onSort, resultsCount, onEnterFirst,
   highlightedIndex, onArrowUp, onArrowDown, onEscape, keyboardNavEnabled, slug,
+  clearSearchOnAdd, onToggleClearSearch,
 }: ProductSearchBarProps) {
   const [sortOpen, setSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
@@ -79,6 +82,17 @@ export default function ProductSearchBar({
           <FloatingTooltip content="مسح (Escape)">
             <button className="srch-clear" onClick={() => onQuery('')}>
               <i className="ti ti-x" />
+            </button>
+          </FloatingTooltip>
+        )}
+        {!query && onToggleClearSearch && (
+          <FloatingTooltip content={clearSearchOnAdd ? 'إيقاف تفريغ البحث تلقائياً' : 'تفريغ البحث بعد كل إضافة'}>
+            <button
+              className={`srch-clear ${clearSearchOnAdd ? 'srch-clear--on' : ''}`}
+              onClick={onToggleClearSearch}
+              style={{ fontSize: 12, opacity: clearSearchOnAdd ? 1 : 0.4 }}
+            >
+              <i className={`ti ${clearSearchOnAdd ? 'ti-letter-case-toggle' : 'ti-letter-case'}`} />
             </button>
           </FloatingTooltip>
         )}

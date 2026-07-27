@@ -3,6 +3,7 @@ import type { ProductVariant } from '@/types';
 import type { QuickItem } from '../utils/posHelpers';
 import { formatDZD } from '../utils/calculations';
 import { isVariantOutOfStock } from '../utils/posHelpers';
+import { FloatingTooltip } from '@/components/ui/FloatingTooltip';
 
 interface QuickItemsBarProps {
   quickItems: QuickItem[];
@@ -62,7 +63,7 @@ export default function QuickItemsBar({
           const variant = allVariants.find(v => v.id === q.variantId);
           const outStock = variant ? isVariantOutOfStock(variant, allowNegativeStock) : false;
           return (
-            <div key={q.variantId} className="pqb-item" title={q.name}>
+            <div key={q.variantId} className="pqb-item">
               <button
                 className="pqb-add"
                 onClick={() => variant && !outStock && onAdd(variant)}
@@ -71,9 +72,11 @@ export default function QuickItemsBar({
                 <span className="pqb-name">{q.name}</span>
                 <span className="pqb-price">{formatDZD(q.priceHt * (1 + q.tvaRate / 100))}</span>
               </button>
-              <button className="pqb-rm" onClick={() => onRemove(q.variantId)} title="إزالة من المفضلة">
-                <i className="ti ti-x" />
-              </button>
+              <FloatingTooltip content="إزالة من المفضلة">
+                <button className="pqb-rm" onClick={() => onRemove(q.variantId)}>
+                  <i className="ti ti-x" />
+                </button>
+              </FloatingTooltip>
             </div>
           );
         })}

@@ -1,4 +1,5 @@
 import Badge      from '@/components/ui/Badge';
+import { FloatingTooltip } from '@/components/ui/FloatingTooltip';
 import { STATUS_VARIANT, STATUS_LABEL } from '@/pos/hooks/usePosSessions';
 import { formatDZD } from '@/pos/utils/calculations';
 import Sparkline     from './Sparkline';
@@ -106,13 +107,17 @@ export default function PosSessionsTable({
 
               <td onClick={e => e.stopPropagation()}>
                 <div className="pss-row-actions">
-                  <button className="pss-action-btn" title="عرض التفاصيل" onClick={() => onStats(sess.id)}>
-                    <i className="ti ti-chart-bar" />
-                  </button>
-                  {sess.status === 'open' && (
-                    <button className="pss-action-btn pss-action-btn--danger" title="إغلاق الجلسة" onClick={() => onClose(sess.id)}>
-                      <i className="ti ti-door-exit" />
+                  <FloatingTooltip content="عرض التفاصيل">
+                    <button className="pss-action-btn" onClick={() => onStats(sess.id)}>
+                      <i className="ti ti-chart-bar" />
                     </button>
+                  </FloatingTooltip>
+                  {sess.status === 'open' && (
+                    <FloatingTooltip content="إغلاق الجلسة">
+                      <button className="pss-action-btn pss-action-btn--danger" onClick={() => onClose(sess.id)}>
+                        <i className="ti ti-door-exit" />
+                      </button>
+                    </FloatingTooltip>
                   )}
                 </div>
               </td>

@@ -3,6 +3,7 @@ import React from 'react';
 const STORAGE_KEY = 'pos-kb-override-';
 const KB_CHANGE_EVENT = 'pos-kb-changed';
 
+/** Default shortcuts — single key string per action */
 export const KB_DEFAULTS: Record<string, string> = {
   newSale: '',
   settings: '',
@@ -43,6 +44,8 @@ export const KB_DEFAULTS: Record<string, string> = {
   quickCash: 'F3',
 };
 
+// ─── Normalization ──────────────────────────────────────────────────────────
+
 export function normalizeEventKey(e: KeyboardEvent): string {
   const parts: string[] = [];
   if (e.ctrlKey) parts.push('Ctrl');
@@ -54,43 +57,109 @@ export function normalizeEventKey(e: KeyboardEvent): string {
   return parts.join('+');
 }
 
-export function readOverrides(slug: string | null): Record<string, string> {
-  if (!slug) return {};
+// ─── Storage (string[] per action) ──────────────────────────────────────────
+
+export type KbOverrides = Record<string, string[]>;
+
+function migrateRaw(raw: string | null): Record<string, string[]> {
+  if (!raw) return {};
   try {
-    const raw = localStorage.getItem(`${STORAGE_KEY}${slug}`);
-    return raw ? JSON.parse(raw) : {};
+    const parsed = JSON.parse(raw);
+    const result: Record<string, string[]> = {};
+    for (const [action, val] of Object.entries(parsed)) {
+      if (Array.isArray(val)) {
+        result[action] = val.filter((v): v is string => typeof v === 'string' && v.length > 0);
+      } else if (typeof val === 'string') {
+        result[action] = val ? [val] : [];
+      }
+    }
+    return result;
   } catch { return {}; }
 }
 
-/** Persist overrides and notify all components */
-export function saveOverrides(slug: string | null, overrides: Record<string, string>): void {
+export function readOverrides(slug: string | null): KbOverrides {
+  if (!slug) return {};
+  try {
+    const raw = localStorage.getItem(`${STORAGE_KEY}${slug}`);
+    return migrateRaw(raw);
+  } catch { return {}; }
+}
+
+export function saveOverrides(slug: string | null, overrides: KbOverrides): void {
   if (!slug) return;
   localStorage.setItem(`${STORAGE_KEY}${slug}`, JSON.stringify(overrides));
   window.dispatchEvent(new CustomEvent(KB_CHANGE_EVENT, { detail: { slug } }));
 }
 
-/** Like matchOverride but takes pre-read overrides — avoids 25× localStorage reads per keypress */
+// ─── Matching ───────────────────────────────────────────────────────────────
+
+/** Check if event matches ANY shortcut assigned to the action */
 export function matchOverrideFrom(
-  overrides: Record<string, string>,
+  overrides: KbOverrides,
   action: string,
-  e: KeyboardEvent
+  e: KeyboardEvent,
 ): boolean {
-  const expected = overrides[action] ?? KB_DEFAULTS[action];
-  if (!expected) return false;
-  return normalizeEventKey(e) === expected;
+  const combo = normalizeEventKey(e);
+  const assigned = overrides[action];
+  if (assigned && assigned.length > 0) {
+    return assigned.includes(combo);
+  }
+  const def = KB_DEFAULTS[action];
+  return def ? combo === def : false;
 }
 
-/** Get effective shortcut for an action (override or default, null if disabled) */
+// ─── Display helpers ────────────────────────────────────────────────────────
+
+/** Get the first/primary shortcut for badge display */
 export function getEffectiveShortcut(slug: string | null, action: string): string | null {
   if (!slug) return null;
   const overrides = readOverrides(slug);
-  const val = overrides[action];
-  if (val === '') return null;
-  return val ?? KB_DEFAULTS[action] ?? null;
+  const arr = overrides[action];
+  if (arr && arr.length > 0) return arr[0];
+  const def = KB_DEFAULTS[action];
+  return def || null;
 }
 
-/** React hook — returns current overrides, updates on saveOverrides() */
-export function useKbOverrides(slug: string | null): Record<string, string> {
+/** Get all shortcuts for an action */
+export function getEffectiveShortcuts(slug: string | null, action: string): string[] {
+  if (!slug) return [];
+  const overrides = readOverrides(slug);
+  const arr = overrides[action];
+  if (arr && arr.length > 0) return arr;
+  const def = KB_DEFAULTS[action];
+  return def ? [def] : [];
+}
+
+// ─── CRUD helpers ───────────────────────────────────────────────────────────
+
+/** Add a shortcut to an action. Returns true if added, false if duplicate. */
+export function addShortcut(overrides: KbOverrides, action: string, combo: string): KbOverrides {
+  const existing = overrides[action] ?? [];
+  if (existing.includes(combo)) return overrides;
+  return { ...overrides, [action]: [...existing, combo] };
+}
+
+/** Remove a specific shortcut from an action */
+export function removeShortcut(overrides: KbOverrides, action: string, combo: string): KbOverrides {
+  const existing = overrides[action] ?? [];
+  const next = existing.filter(k => k !== combo);
+  const result = { ...overrides };
+  if (next.length === 0) {
+    result[action] = [];
+  } else {
+    result[action] = next;
+  }
+  return result;
+}
+
+/** Clear all shortcuts for an action (sets to empty array) */
+export function clearShortcuts(overrides: KbOverrides, action: string): KbOverrides {
+  return { ...overrides, [action]: [] };
+}
+
+// ─── React hook ─────────────────────────────────────────────────────────────
+
+export function useKbOverrides(slug: string | null): KbOverrides {
   const [v, setV] = React.useState(0);
   React.useEffect(() => {
     const handler = () => setV(x => x + 1);

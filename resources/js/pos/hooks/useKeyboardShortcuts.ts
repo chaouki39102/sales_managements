@@ -28,7 +28,7 @@ export interface POSApi {
 
 export interface KeyboardShortcutsRefs {
   posRef:         RefObject<POSApi>;
-  overridesRef:   RefObject<Record<string, string>>;
+  overridesRef:   RefObject<Record<string, string[]>>;
   searchRef:      RefObject<HTMLInputElement | null>;
   cartRef:        RefObject<HTMLDivElement | null>;
   cartApiRef:     RefObject<{ scrollToItemId: (id: string) => void; openCustomerModal: () => void } | null>;

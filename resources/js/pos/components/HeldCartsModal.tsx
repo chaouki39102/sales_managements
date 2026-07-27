@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Modal from '@/components/ui/Modal';
 import { PinnedList } from '@/components/ui/PinnedList';
+import { FloatingTooltip } from '@/components/ui/FloatingTooltip';
 import type { HeldCart, CartItem } from '@/types';
 import { formatDZD } from '../utils/calculations';
 
@@ -127,12 +128,13 @@ export default function HeldCartsModal({
                       </div>
                     </div>
                     <div className="hc-acts" style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
-                      <i
-                        className={`ti ti-pin cust-pin ${pinned ? 'pinned' : ''}`}
-                        onClick={(e) => { e.stopPropagation(); onToggle(); }}
-                        title={pinned ? 'إلغاء التثبيت' : 'تثبيت في الأعلى'}
-                        style={{ cursor: 'pointer', fontSize: 13, color: pinned ? 'var(--em)' : 'var(--t4)', transition: 'color .15s' }}
-                      />
+                      <FloatingTooltip content={pinned ? 'إلغاء التثبيت' : 'تثبيت في الأعلى'}>
+                        <i
+                          className={`ti ti-pin cust-pin ${pinned ? 'pinned' : ''}`}
+                          onClick={(e) => { e.stopPropagation(); onToggle(); }}
+                          style={{ cursor: 'pointer', fontSize: 13, color: pinned ? 'var(--em)' : 'var(--t4)', transition: 'color .15s' }}
+                        />
+                      </FloatingTooltip>
                       <button className="btn btn-sm btn-p" onClick={(e) => { e.stopPropagation(); onRestore(c.id); }}>
                         <i className="ti ti-restore" /> استرجاع
                       </button>

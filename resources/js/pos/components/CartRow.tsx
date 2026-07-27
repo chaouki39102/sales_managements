@@ -102,16 +102,18 @@ export default function CartRow({
     isSwiping.current = false;
   }, [swipeX]);
 
-  const measurePopupAnchor = useCallback(() => {
-    if (popupAnchorRef.current) {
-      const r = popupAnchorRef.current.getBoundingClientRect();
-      const popupW = 220;
-      let left = r.left;
-      if (left + popupW > window.innerWidth - 8) left = window.innerWidth - popupW - 8;
-      if (left < 8) left = 8;
-      setPopupPos({ top: r.bottom + 12, left, right: window.innerWidth - left - popupW });
-    }
+  const measureFromElement = useCallback((el: HTMLElement) => {
+    const r = el.getBoundingClientRect();
+    const popupW = 220;
+    let left = r.left;
+    if (left + popupW > window.innerWidth - 8) left = window.innerWidth - popupW - 8;
+    if (left < 8) left = 8;
+    setPopupPos({ top: r.bottom + 12, left, right: window.innerWidth - left - popupW });
   }, []);
+
+  const measurePopupAnchor = useCallback(() => {
+    if (popupAnchorRef.current) measureFromElement(popupAnchorRef.current);
+  }, [measureFromElement]);
 
   // focus + select input عند فتح الـ popup أو تبديل الوضع
   useEffect(() => {
@@ -125,13 +127,8 @@ export default function CartRow({
       priceInpRef.current?.focus();
       priceInpRef.current?.select();
     }
-    if (popup === 'pkg' && pkgBtnRef.current) {
-      const r = pkgBtnRef.current.getBoundingClientRect();
-      const popupW = 220;
-      let left = r.left;
-      if (left + popupW > window.innerWidth - 8) left = window.innerWidth - popupW - 8;
-      if (left < 8) left = 8;
-      setPopupPos({ top: r.bottom + 12, left, right: window.innerWidth - left - popupW });
+    if (popup === 'pkg') {
+      pkgBtnRef.current?.focus();
     }
   }, [popup, discMode, measurePopupAnchor]);
 
@@ -257,7 +254,11 @@ export default function CartRow({
               <button
                 ref={pkgBtnRef}
                 className={`cr-pkg-badge cr-pkg-badge--selectable ${popup === 'pkg' ? 'cr-pkg-badge--active' : ''}`}
-                onClick={e => { e.stopPropagation(); setPopup(p => p === 'pkg' ? null : 'pkg'); }}
+                onClick={e => {
+                  e.stopPropagation();
+                  if (pkgBtnRef.current) measureFromElement(pkgBtnRef.current);
+                  setPopup(p => p === 'pkg' ? null : 'pkg');
+                }}
                 type="button"
               >
                 {item.packaging_label ?? item.unit_symbol}

@@ -18,6 +18,7 @@ import type {
 } from '@/types';
 import type { DocumentPayment } from '@/pos/utils/useCartStore';
 import { formatDZD } from '../utils/calculations';
+import { FloatingTooltip } from '@/components/ui/FloatingTooltip';
 import { partyBalancesApi } from '@/lib/api/endpoints/partyBalances';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -637,14 +638,15 @@ export default function ProfessionalPaymentModal({
                         placeholder="0.00"
                         dir="ltr"
                       />
-                      <button
-                        className="plv2-fill"
-                        onClick={e => { e.stopPropagation(); fillRemaining(line.id); }}
-                        title="تعبئة المتبقي"
-                        type="button"
-                      >
-                        ≈
-                      </button>
+                      <FloatingTooltip content="تعبئة المتبقي">
+                        <button
+                          className="plv2-fill"
+                          onClick={e => { e.stopPropagation(); fillRemaining(line.id); }}
+                          type="button"
+                        >
+                          ≈
+                        </button>
+                      </FloatingTooltip>
                     </div>
 
                     {/* مرجع */}
@@ -741,7 +743,6 @@ export default function ProfessionalPaymentModal({
             className="btn btn-p pay-btn-confirm"
             onClick={handleSubmit}
             disabled={!canSubmit}
-            title="تأكيد الدفع — Ctrl+Enter"
             type="button"
           >
             {submitting

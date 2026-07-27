@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { QuantityDiscount } from '@/types/product';
+import { FloatingTooltip } from '@/components/ui/FloatingTooltip';
 import { resolveQuantityTier, calcWeightTotal, calcWeightDiscounted, calcWeightFromPrice } from '../utils/calculations';
 
 interface WeightEntryModalProps {
@@ -121,16 +122,9 @@ export default function WeightEntryModal({
       setGramNotice('');
       return;
     }
-    if (v >= 50) {
-      const kg = v / 1000;
-      setWeightStr(kg.toFixed(3));
-      setPriceStr(unitPrice > 0 ? String(calcWeightTotal(kg, unitPrice)) : '');
-      setGramNotice(`تم تحويل ${v} غ → ${kg.toFixed(3)} كغ`);
-    } else {
-      setWeightStr(raw);
-      setPriceStr(unitPrice > 0 ? String(calcWeightTotal(v, unitPrice)) : '');
-      setGramNotice('');
-    }
+    setWeightStr(raw);
+    setPriceStr(unitPrice > 0 ? String(calcWeightTotal(v, unitPrice)) : '');
+    setGramNotice('');
   }, [unitPrice]);
 
   const handlePriceChange = useCallback((raw: string) => {
@@ -274,12 +268,16 @@ export default function WeightEntryModal({
               <i className="ti ti-scale-outline" /> الوزن
             </label>
             <div className={`wem-hero-input ${lastEdited === 'weight' ? 'focused' : ''}`}>
-              <button className="wem-adj wem-adj--lg" onClick={() => adjust(-0.100)} type="button" title="-100 غ">
-                <i className="ti ti-minus" /><span>100</span>
-              </button>
-              <button className="wem-adj" onClick={() => adjust(-0.010)} type="button" title="-10 غ">
-                <i className="ti ti-minus" /><span>10</span>
-              </button>
+              <FloatingTooltip content="-100 غ">
+                <button className="wem-adj wem-adj--lg" onClick={() => adjust(-0.100)} type="button">
+                  <i className="ti ti-minus" /><span>100</span>
+                </button>
+              </FloatingTooltip>
+              <FloatingTooltip content="-10 غ">
+                <button className="wem-adj" onClick={() => adjust(-0.010)} type="button">
+                  <i className="ti ti-minus" /><span>10</span>
+                </button>
+              </FloatingTooltip>
               <div className="wem-hero-field">
                 <input
                   ref={weightRef}
@@ -301,12 +299,16 @@ export default function WeightEntryModal({
                 />
                 <span className="wem-hero-unit">{unitSymbol}</span>
               </div>
-              <button className="wem-adj" onClick={() => adjust(0.010)} type="button" title="+10 غ">
-                <span>10</span><i className="ti ti-plus" />
-              </button>
-              <button className="wem-adj wem-adj--lg" onClick={() => adjust(0.100)} type="button" title="+100 غ">
-                <span>100</span><i className="ti ti-plus" />
-              </button>
+              <FloatingTooltip content="+10 غ">
+                <button className="wem-adj" onClick={() => adjust(0.010)} type="button">
+                  <span>10</span><i className="ti ti-plus" />
+                </button>
+              </FloatingTooltip>
+              <FloatingTooltip content="+100 غ">
+                <button className="wem-adj wem-adj--lg" onClick={() => adjust(0.100)} type="button">
+                  <span>100</span><i className="ti ti-plus" />
+                </button>
+              </FloatingTooltip>
             </div>
           </div>
 
@@ -336,12 +338,16 @@ export default function WeightEntryModal({
                 <i className="ti ti-coins" /> السعر الإجمالي
               </label>
               <div className={`wem-hero-input wem-hero-input--price ${lastEdited === 'price' ? 'focused' : ''}`}>
-                <button className="wem-adj wem-adj--lg" onClick={() => handlePriceChange(String(Math.max(0, price - 100)))} type="button" title="-100">
+                <FloatingTooltip content="-100 دج">
+                <button className="wem-adj wem-adj--lg" onClick={() => handlePriceChange(String(Math.max(0, price - 100)))} type="button">
                   <i className="ti ti-minus" /><span>100</span>
                 </button>
-                <button className="wem-adj" onClick={() => handlePriceChange(String(Math.max(0, price - 10)))} type="button" title="-10">
+              </FloatingTooltip>
+              <FloatingTooltip content="-10 دج">
+                <button className="wem-adj" onClick={() => handlePriceChange(String(Math.max(0, price - 10)))} type="button">
                   <i className="ti ti-minus" /><span>10</span>
                 </button>
+              </FloatingTooltip>
                 <div className="wem-hero-field">
                   <input
                     ref={priceRef}
@@ -363,12 +369,16 @@ export default function WeightEntryModal({
                   />
                   <span className="wem-hero-unit wem-hero-unit--price">دج</span>
                 </div>
-                <button className="wem-adj" onClick={() => handlePriceChange(String(price + 10))} type="button" title="+10">
-                  <span>10</span><i className="ti ti-plus" />
-                </button>
-                <button className="wem-adj wem-adj--lg" onClick={() => handlePriceChange(String(price + 100))} type="button" title="+100">
-                  <span>100</span><i className="ti ti-plus" />
-                </button>
+                <FloatingTooltip content="+10 دج">
+                  <button className="wem-adj" onClick={() => handlePriceChange(String(price + 10))} type="button">
+                    <span>10</span><i className="ti ti-plus" />
+                  </button>
+                </FloatingTooltip>
+                <FloatingTooltip content="+100 دج">
+                  <button className="wem-adj wem-adj--lg" onClick={() => handlePriceChange(String(price + 100))} type="button">
+                    <span>100</span><i className="ti ti-plus" />
+                  </button>
+                </FloatingTooltip>
               </div>
             </div>
           )}
@@ -420,9 +430,11 @@ export default function WeightEntryModal({
         </div>
 
         {/* ── Resize handle ── */}
-        <div className="wem-resize" onMouseDown={onResizeDown} title="سحب لتغيير الحجم">
-          <i className="ti ti-grip-vertical" />
-        </div>
+        <FloatingTooltip content="سحب لتغيير الحجم">
+          <div className="wem-resize" onMouseDown={onResizeDown}>
+            <i className="ti ti-grip-vertical" />
+          </div>
+        </FloatingTooltip>
       </div>
     </div>
   );

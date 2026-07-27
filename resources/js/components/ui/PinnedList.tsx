@@ -1,5 +1,4 @@
 import * as React from 'react';
-import { motion, AnimatePresence, LayoutGroup, type Variants } from 'motion/react';
 import { Pin } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -17,49 +16,16 @@ export interface PinnedListProps {
   className?: string;
   pinnedLabel?: string;
   allLabel?: string;
-  /** Controlled pinned ids — if omitted, PinnedList manages its own state */
   pinnedIds?: Set<string | number>;
-  /** Called when a pin is toggled (required if pinnedIds is provided) */
   onTogglePin?: (id: string | number) => void;
-  /** Custom item renderer — receives the item, whether it's pinned, and toggle callback */
   renderItem?: (item: PinnedListItem, pinned: boolean, onToggle: () => void) => React.ReactNode;
-  /** Highlighted item id (for selection / keyboard nav) */
   selectedId?: string | number | null;
-  /** Callback when an item is clicked */
   onSelect?: (item: PinnedListItem) => void;
 }
 
-// ─── Animation variants ──────────────────────────────────────────────────────
-
-const itemVariants: Variants = {
-  hidden: { opacity: 0, scale: 0.96, y: -6 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    y: 0,
-    transition: { type: 'spring', stiffness: 380, damping: 20, mass: 0.8 },
-  },
-  exit: {
-    opacity: 0,
-    scale: 0.96,
-    y: -4,
-    transition: { duration: 0.18, ease: 'easeIn' },
-  },
-};
-
-const headingVariants: Variants = {
-  hidden: { opacity: 0, y: -6 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { type: 'spring', stiffness: 400, damping: 22 },
-  },
-  exit: { opacity: 0, y: -4, transition: { duration: 0.15, ease: 'easeIn' } },
-};
-
 // ─── Default item card ───────────────────────────────────────────────────────
 
-function DefaultItemCard({
+const DefaultItemCard = React.memo(function DefaultItemCard({
   item,
   pinned,
   onToggle,
@@ -71,17 +37,12 @@ function DefaultItemCard({
   selected: boolean;
 }) {
   return (
-    <motion.div
-      layoutId={String(item.id)}
-      layout
-      variants={itemVariants}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
+    <div
       className={cn(
         'flex items-center gap-3 rounded-[var(--r3)] px-3 py-3',
         'bg-[var(--bg3)] text-[var(--t3)]',
         'border border-transparent',
+        'transition-all duration-150 ease-out',
         pinned && 'bg-[var(--em)]/5 border-[var(--em)]/20',
         selected && 'bg-[var(--em)]/10 border-[var(--em)]/30',
       )}
@@ -129,7 +90,71 @@ function DefaultItemCard({
           )}
         />
       </button>
-    </motion.div>
+    </div>
+  );
+});
+
+// ─── Animated item wrapper (CSS transitions) ─────────────────────────────────
+
+function AnimatedItem({
+  children,
+  id,
+  items,
+  onSelect,
+}: {
+  children: React.ReactNode;
+  id: string | number;
+  items: PinnedListItem[];
+  onSelect?: (item: PinnedListItem) => void;
+}) {
+  const [state, setState] = React.useState<'entering' | 'idle' | 'exiting'>('entering');
+  const mountedRef = React.useRef(true);
+
+  React.useEffect(() => {
+    requestAnimationFrame(() => requestAnimationFrame(() => setState('idle')));
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  return (
+    <div
+      onClick={onSelect ? () => { const item = items.find(i => i.id === id); if (item) onSelect(item); } : undefined}
+      className={cn(
+        onSelect && 'cursor-pointer',
+        'transition-all duration-150 ease-out',
+        state === 'entering' && 'opacity-0 translate-y-[-4px]',
+        state === 'idle' && 'opacity-100 translate-y-0',
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ─── Section heading (CSS transition) ────────────────────────────────────────
+
+function SectionHeading({
+  label,
+  color,
+  show,
+  compact,
+}: {
+  label: string;
+  color: 'em' | 't4';
+  show: boolean;
+  compact: boolean;
+}) {
+  if (!show) return null;
+  return (
+    <p
+      className={cn(
+        'px-1 pb-0.5 text-[11px] font-semibold uppercase tracking-wider',
+        'transition-all duration-150 ease-out',
+        color === 'em' ? 'text-[var(--em)]' : 'text-[var(--t4)]',
+        compact ? 'pt-3' : 'pt-1',
+      )}
+    >
+      {label}
+    </p>
   );
 }
 
@@ -164,130 +189,45 @@ export function PinnedList({
     }
   }, [onTogglePin]);
 
-  const pinned = items.filter((i) => pinnedIds.has(i.id));
-  const unpinned = items.filter((i) => !pinnedIds.has(i.id));
+  const pinned = React.useMemo(() => items.filter((i) => pinnedIds.has(i.id)), [items, pinnedIds]);
+  const unpinned = React.useMemo(() => items.filter((i) => !pinnedIds.has(i.id)), [items, pinnedIds]);
 
-  const [showPinnedSection, setShowPinnedSection] = React.useState(pinned.length > 0);
-  const pinnedLengthRef = React.useRef(pinned.length);
-  pinnedLengthRef.current = pinned.length;
-
-  const [showAllSection, setShowAllSection] = React.useState(true);
-  const unpinnedLengthRef = React.useRef(unpinned.length);
-  unpinnedLengthRef.current = unpinned.length;
-
-  React.useEffect(() => {
-    if (pinned.length > 0) setShowPinnedSection(true);
-  }, [pinned.length]);
-
-  React.useEffect(() => {
-    if (unpinned.length > 0) setShowAllSection(true);
-  }, [unpinned.length]);
-
-  const render = renderItem ?? ((item, p, toggle) => (
+  const render = React.useMemo(() => renderItem ?? ((item: PinnedListItem, p: boolean, toggle: () => void) => (
     <DefaultItemCard
       item={item}
       pinned={p}
       onToggle={toggle}
       selected={selectedId === item.id}
     />
-  ));
+  )), [renderItem, selectedId]);
+
+  const hasPinned = pinned.length > 0;
+  const hasUnpinned = unpinned.length > 0;
 
   return (
-    <LayoutGroup>
-      <motion.div
-        layout
-        className={cn('flex w-full flex-col gap-1', className)}
-      >
-        <AnimatePresence onExitComplete={() => setShowPinnedSection(false)}>
-          {showPinnedSection && pinned.length > 0 && (
-            <motion.div
-              key="pinned-section"
-              layout
-              variants={headingVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              className="flex flex-col gap-1"
-            >
-              <motion.p
-                layout="position"
-                className="px-1 pb-0.5 pt-1 text-[11px] font-semibold text-[var(--em)] uppercase tracking-wider"
-              >
-                {pinnedLabel}
-              </motion.p>
-              <AnimatePresence
-                mode="popLayout"
-                onExitComplete={() => {
-                  if (pinnedLengthRef.current === 0) setShowPinnedSection(false);
-                }}
-              >
-                {pinned.map((item) => (
-                  <motion.div
-                    key={item.id}
-                    layoutId={String(item.id)}
-                    layout
-                    variants={itemVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                    onClick={() => onSelect?.(item)}
-                    className={onSelect ? 'cursor-pointer' : undefined}
-                  >
-                    {render(item, true, () => togglePin(item.id))}
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </motion.div>
-          )}
-        </AnimatePresence>
+    <div className={cn('flex w-full flex-col gap-1', className)}>
+      {hasPinned && (
+        <div className="flex flex-col gap-1">
+          <SectionHeading label={pinnedLabel} color="em" show compact={false} />
+          {pinned.map((item) => (
+            <AnimatedItem key={item.id} id={item.id} items={items} onSelect={onSelect}>
+              {render(item, true, () => togglePin(item.id))}
+            </AnimatedItem>
+          ))}
+        </div>
+      )}
 
-        <AnimatePresence onExitComplete={() => setShowAllSection(false)}>
-          {showAllSection && (
-            <motion.div
-              key="all-section"
-              layout
-              variants={headingVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              className="flex flex-col gap-1"
-            >
-              <motion.p
-                layout="position"
-                className={cn(
-                  'px-1 pb-0.5 text-[11px] font-semibold text-[var(--t4)] uppercase tracking-wider',
-                  pinned.length > 0 ? 'pt-3' : 'pt-1',
-                )}
-              >
-                {allLabel}
-              </motion.p>
-              <AnimatePresence
-                mode="popLayout"
-                onExitComplete={() => {
-                  if (unpinnedLengthRef.current === 0) setShowAllSection(false);
-                }}
-              >
-                {unpinned.map((item) => (
-                  <motion.div
-                    key={item.id}
-                    layoutId={String(item.id)}
-                    layout
-                    variants={itemVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                    onClick={() => onSelect?.(item)}
-                    className={onSelect ? 'cursor-pointer' : undefined}
-                  >
-                    {render(item, false, () => togglePin(item.id))}
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    </LayoutGroup>
+      {hasUnpinned && (
+        <div className="flex flex-col gap-1">
+          <SectionHeading label={allLabel} color="t4" show compact={hasPinned} />
+          {unpinned.map((item) => (
+            <AnimatedItem key={item.id} id={item.id} items={items} onSelect={onSelect}>
+              {render(item, false, () => togglePin(item.id))}
+            </AnimatedItem>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

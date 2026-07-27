@@ -4,6 +4,7 @@ import type { ProductVariant, ProductPackaging, PriceLevel, CartItem } from '@/t
 import type { ViewMode, GridSize } from '../utils/posHelpers';
 import { formatDZD } from '../utils/calculations';
 import { getVariantPrice, isVariantOutOfStock } from '../utils/posHelpers';
+import { FloatingTooltip } from '@/components/ui/FloatingTooltip';
 import ProductCard from './ProductCard';
 
 interface ProductGridProps {
@@ -213,14 +214,17 @@ export default function ProductGrid({
                   <td>
                     <div className="prow-acts">
                       {inCart > 0 && <span className="incart-badge">{inCart}</span>}
-                      <button className={`prow-pin${isPinned(v.id) ? ' on' : ''}`} onClick={e => { e.stopPropagation(); onPin(v); }}
-                        title={isPinned(v.id) ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}>
-                        <i className={`ti ti-star${isPinned(v.id) ? '-filled' : ''}`} />
-                      </button>
-                      <button className="prow-add" onClick={() => !outStock && onAdd(v)}
-                        disabled={outStock} title="إضافة للسلة (دبل كليك)">
-                        <i className="ti ti-plus" />
-                      </button>
+                      <FloatingTooltip content={isPinned(v.id) ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}>
+                        <button className={`prow-pin${isPinned(v.id) ? ' on' : ''}`} onClick={e => { e.stopPropagation(); onPin(v); }}>
+                          <i className={`ti ti-star${isPinned(v.id) ? '-filled' : ''}`} />
+                        </button>
+                      </FloatingTooltip>
+                      <FloatingTooltip content="إضافة للسلة">
+                        <button className="prow-add" onClick={() => !outStock && onAdd(v)}
+                          disabled={outStock}>
+                          <i className="ti ti-plus" />
+                        </button>
+                      </FloatingTooltip>
                     </div>
                   </td>
                 </tr>

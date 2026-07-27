@@ -1600,6 +1600,8 @@ const handleCompleteSale = useCallback(async (params: {
             onEscape={handleSearchEscape}
             keyboardNavEnabled={settings.keyboardNav}
             slug={slug}
+            clearSearchOnAdd={settings.clearSearchOnAdd}
+            onToggleClearSearch={() => setSettings({ clearSearchOnAdd: !settings.clearSearchOnAdd })}
           />
           {showFilter && (
             <FilterPanel

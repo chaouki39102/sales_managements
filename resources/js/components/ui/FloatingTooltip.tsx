@@ -18,6 +18,15 @@ interface FloatingTooltipProps {
 const GAP = 10;
 const MARGIN = 12;
 
+function mergeRefs<T>(...refs: (React.Ref<T> | undefined)[]): React.RefCallback<T> {
+  return (node) => {
+    refs.forEach((ref) => {
+      if (typeof ref === 'function') ref(node);
+      else if (ref && typeof ref === 'object') (ref as React.MutableRefObject<T | null>).current = node;
+    });
+  };
+}
+
 export function FloatingTooltip({
   content,
   children,
@@ -107,8 +116,10 @@ export function FloatingTooltip({
     setPhase('visible');
   }, [phase, preferredPlacement]);
 
+  const childRef = (children as React.ReactElement<{ ref?: React.Ref<HTMLElement> }>).ref;
+
   const childProps = {
-    ref: triggerRef,
+    ref: mergeRefs(triggerRef, childRef),
     onMouseEnter: show,
     onMouseLeave: hide,
     onFocus: show,

@@ -2546,6 +2546,7 @@ body.dark .pay-hero-amount { text-shadow: none; }
 /* ════════════════════════════════════════════════════
    KEYBOARD HELP
 ════════════════════════════════════════════════════ */
+/* ── Keyboard Help Modal ── */
 .kb-help-groups {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2566,12 +2567,30 @@ body.dark .pay-hero-amount { text-shadow: none; }
 .kb-help-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 8px;
   padding: 5px 8px;
   border-radius: var(--r1);
   background: var(--bg3);
   border: 1px solid var(--b1);
   position: relative;
+}
+.kb-desc {
+  font-size: 11.5px;
+  color: var(--t2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+.kb-shortcut-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .kb-key {
   background: var(--bg4);
@@ -2582,34 +2601,75 @@ body.dark .pay-hero-amount { text-shadow: none; }
   font-family: monospace;
   color: var(--t2);
   font-weight: 700;
-  flex-shrink: 0;
-  min-width: 60px;
+  min-width: 40px;
   text-align: center;
 }
-.kb-desc { font-size: 11.5px; color: var(--t2); }
-.kb-clear-btn {
-  position: absolute;
-  left: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: var(--redb);
-  border: 1px solid var(--redbo);
-  border-radius: 50%;
-  width: 18px;
-  height: 18px;
+.kb-key-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px 2px 8px;
+}
+.kb-key-remove {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  width: 14px;
+  height: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--red);
+  color: var(--t4);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 8px;
   line-height: 1;
   padding: 0;
-  opacity: .6;
-  transition: opacity var(--d1);
+  opacity: .4;
+  transition: opacity .1s, color .1s, border-color .1s, background .1s;
+}
+.kb-key-remove:hover {
+  opacity: 1;
+  color: var(--red);
+  border-color: var(--redbo);
+  background: var(--redb);
+}
+.kb-add-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px dashed var(--b3);
+  background: transparent;
+  color: var(--t4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 11px;
+  transition: all .12s;
   flex-shrink: 0;
 }
-.kb-clear-btn:hover { opacity: 1; }
+.kb-add-btn:hover {
+  border-color: var(--em);
+  color: var(--em);
+  background: var(--emb);
+}
+.kb-capture {
+  border-color: var(--em) !important;
+  box-shadow: 0 0 0 3px var(--emb);
+  animation: kbPulse 1.2s ease-in-out infinite;
+}
+.kb-capture-mini {
+  font-size: 9px;
+  padding: 2px 6px;
+}
+@keyframes kbPulse {
+  0%, 100% { box-shadow: 0 0 0 3px var(--emb); }
+  50% { box-shadow: 0 0 0 6px rgba(10,138,92,.1); }
+}
+.kb-edit-on {
+  background: var(--emb);
+  border-color: var(--embo);
+}
 
 /* ════════════════════════════════════════════════════
    GENERIC FORMS & BUTTONS
@@ -3134,30 +3194,9 @@ body.dark .thermal-status.err { background: #7f1d1d; color: #fecaca; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   13. KEYBOARD HELP MODAL
-══════════════════════════════════════════════════════════════════════════════ */
-.kb-capture {
-  border-color: var(--em) !important;
-  box-shadow: 0 0 0 3px var(--emb);
-  animation: kbPulse 1.2s ease-in-out infinite;
-}
-@keyframes kbPulse {
-  0%, 100% { box-shadow: 0 0 0 3px var(--emb); }
-  50% { box-shadow: 0 0 0 6px rgba(10,138,92,.1); }
-}
-.kb-key-clickable {
-  cursor: pointer;
-  transition: all .12s;
-}
-.kb-key-clickable:hover {
-  background: var(--emb);
-  border-color: var(--embo);
-  color: var(--em);
-}
-.kb-edit-on {
-  background: var(--emb);
-  border-radius: var(--r1);
-}
+   13. KEYBOARD HELP MODAL — styles consolidated above near .kb-help-groups
+═════════════════════════════════════════════════════════════════════════════ */
+/* kb-key-clickable removed — replaced by kb-add-btn in new section */
 
 /* ── al-i: alert info variant ── */
 .al-i {

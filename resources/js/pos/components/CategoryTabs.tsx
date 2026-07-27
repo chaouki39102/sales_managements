@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
+import { FloatingTooltip } from '@/components/ui/FloatingTooltip';
 import { familyIcon } from '../utils/posHelpers';
 
 interface CategoryTabsProps {
@@ -72,28 +73,29 @@ export default function CategoryTabs({
         <i className="ti ti-chevron-right" />
       </button>
       <div className="pos-cats" ref={scrollRef}>
-        <button
-          className={`pos-cat ${selected === null ? 'on' : ''}`}
-          onClick={() => onSelect(null)}
-          title="الكل — Alt+0"
-        >
-          <i className="ti ti-layout-2" />
-          <span>الكل</span>
-          <span className="cat-count">{totalCount}</span>
-        </button>
-        {families.map((f, idx) => (
+        <FloatingTooltip content="الكل — Alt+0">
           <button
-            key={f.id}
-            data-cat-id={f.id}
-            className={`pos-cat ${selected === f.id ? 'on' : ''}`}
-            onClick={() => onSelect(f.id)}
-            title={`${f.name} — Alt+${idx + 1}`}
+            className={`pos-cat ${selected === null ? 'on' : ''}`}
+            onClick={() => onSelect(null)}
           >
-            <i className={`ti ${familyIcon(f.name)}`} />
-            <span>{f.name}</span>
-            {counts?.has(f.id) && <span className="cat-count">{counts.get(f.id)}</span>}
-            {idx < 9 && <kbd className="cat-kb">Alt+{idx + 1}</kbd>}
+            <i className="ti ti-layout-2" />
+            <span>الكل</span>
+            <span className="cat-count">{totalCount}</span>
           </button>
+        </FloatingTooltip>
+        {families.map((f, idx) => (
+          <FloatingTooltip key={f.id} content={`${f.name} — Alt+${idx + 1}`}>
+            <button
+              data-cat-id={f.id}
+              className={`pos-cat ${selected === f.id ? 'on' : ''}`}
+              onClick={() => onSelect(f.id)}
+            >
+              <i className={`ti ${familyIcon(f.name)}`} />
+              <span>{f.name}</span>
+              {counts?.has(f.id) && <span className="cat-count">{counts.get(f.id)}</span>}
+              {idx < 9 && <kbd className="cat-kb">Alt+{idx + 1}</kbd>}
+            </button>
+          </FloatingTooltip>
         ))}
       </div>
       <button

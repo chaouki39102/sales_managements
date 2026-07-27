@@ -57,8 +57,16 @@ export const useCartStore = create<CartState>()(
           const isWeight = variant.is_sold_by_weight ?? variant.product?.is_sold_by_weight ?? false;
           const rawQty = isWeight ? qty : Math.round(qty);
           const safeQty = Math.max(isWeight ? 0.001 : 1, rawQty);
-          const packQty = packaging ? Math.max(1, Number(packaging.quantity) || 1) : 1;
-          const packId  = packaging?.id ?? null;
+
+          // Resolve default packaging when none provided
+          const resolvedPkg = packaging ?? (() => {
+            const pkgs = (variant.packagings ?? (variant as any).product?.packagings ?? []) as ProductPackaging[];
+            const active = pkgs.filter((p: ProductPackaging) => p.active !== false);
+            return active.find((p: ProductPackaging) => p.is_default) ?? active[0] ?? null;
+          })();
+
+          const packQty = resolvedPkg ? Math.max(1, Number(resolvedPkg.quantity) || 1) : 1;
+          const packId  = resolvedPkg?.id ?? null;
 
           // Merge only if same product + same packaging
           const existing = state.items.find(
@@ -106,7 +114,7 @@ export const useCartStore = create<CartState>()(
             product_name:        variant.product?.name ?? '',
             variant_name:        variant.variant_name ?? null,
             barcode:             variant.barcode ?? null,
-            unit_symbol:         packaging?.label ?? getUnitSymbol(variant),
+            unit_symbol:         resolvedPkg?.label ?? getUnitSymbol(variant),
             image_url:           (variant as any).image_url ?? variant.product?.images?.[0] ?? null,
             quantity:            safeQty,
             unit_price_ht:       priceHt,
@@ -125,7 +133,7 @@ export const useCartStore = create<CartState>()(
               : null,
             packaging_id:        packId,
             pack_qty:            packQty,
-            packaging_label:     packaging?.label ?? null,
+            packaging_label:     resolvedPkg?.label ?? null,
             base_price_ht:       baseHt,
             quantity_discounts:  variant.quantity_discounts ?? [],
           });
