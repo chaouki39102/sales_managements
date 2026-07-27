@@ -2302,7 +2302,7 @@ body.dark .pay-hero-amount { text-shadow: none; }
 }
 .cust-row:hover { background: var(--bg4); border-color: var(--b2); }
 .cust-row.on { background: var(--emb); border-color: var(--embo); }
-.cust-row.hl  { background: var(--bg4); border-color: var(--b3); box-shadow: inset 0 0 0 1px var(--embo); }
+.cust-row.hl  { background: rgba(10,138,92,.22); border-color: var(--b3); box-shadow: inset 0 0 0 1px var(--embo); }
 .cust-row.cust-anon { margin-bottom: 4px; }
 .cust-av {
   width: 36px; height: 36px;

@@ -175,12 +175,19 @@ export default function CustomerSearchModal({
     return list.filter(p => p.id !== cashClient?.id);
   }, [isSearching, searchResults, recentClients, cashClient]);
 
+  // Visual order: pinned first, then unpinned — matches PinnedList rendering
+  const visualList: Party[] = useMemo(() => {
+    const pinned = displayList.filter(c => pinnedIdsSet.has(c.id));
+    const unpinned = displayList.filter(c => !pinnedIdsSet.has(c.id));
+    return [...pinned, ...unpinned];
+  }, [displayList, pinnedIdsSet]);
+
   // Escape يُغلق + Arrow navigation + Enter to select
   useEffect(() => {
     if (showCreate) return;
     const h = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { onClose(); return; }
-      const total = 1 + displayList.length;
+      const total = 1 + visualList.length;
       if (total <= 0) return;
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -191,15 +198,21 @@ export default function CustomerSearchModal({
       } else if (e.key === 'Enter') {
         e.preventDefault();
         if (highlightedIdx === 0) onSelect(cashClient ?? null);
-        else if (highlightedIdx > 0 && highlightedIdx <= displayList.length) onSelect(displayList[highlightedIdx - 1]);
+        else if (highlightedIdx > 0 && highlightedIdx <= visualList.length) onSelect(visualList[highlightedIdx - 1]);
       }
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [onClose, showCreate, displayList, highlightedIdx, onSelect, cashClient]);
+  }, [onClose, showCreate, visualList, highlightedIdx, onSelect, cashClient]);
 
   // Reset highlight on query change
   useEffect(() => { setHighlightedIdx(0); }, [debouncedQuery]);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    const el = document.querySelector('.cust-row.hl');
+    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [highlightedIdx]);
 
   // ── إنشاء زبون جديد ───────────────────────────────────────────────────────
   const createMutation = useMutation({
@@ -367,9 +380,11 @@ export default function CustomerSearchModal({
                 renderItem={(item, pinned, onToggle) => {
                   const c = displayList.find(p => p.id === item.id);
                   if (!c) return null;
+                  const itemIdx = visualList.indexOf(c) + 1;
+                  const isHighlighted = highlightedIdx === itemIdx;
                   return (
                     <div
-                      className={`cust-row ${currentClient?.id === c.id ? 'on' : ''}`}
+                      className={`cust-row ${currentClient?.id === c.id ? 'on' : ''} ${isHighlighted ? 'hl' : ''}`}
                     >
                       <div className="cust-av">
                         {(c.name?.[0] ?? '؟').toUpperCase()}
