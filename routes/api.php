@@ -282,14 +282,17 @@ Route::prefix('v1')->group(function () {
             Route::get('products/by-brand/{brand}',   [ProductController::class, 'byBrand']);
             Route::get('products/{product}',          [ProductController::class, 'show']);
 
-            Route::get('product-variants',              [ProductVariantController::class, 'index']);
-            Route::get('product-variants/{variant}',    [ProductVariantController::class, 'show']);
-            Route::get('products/{product}/variants',   [ProductVariantController::class, 'indexByProduct']);
-            Route::get('product-variants/barcode-search', [ProductVariantController::class, 'barcodeSearch']);
+            Route::get('product-variants',                  [ProductVariantController::class, 'index']);
+            Route::get('product-variants/barcode-search',  [ProductVariantController::class, 'barcodeSearch']);
+            Route::get('product-variants/{variant}',       [ProductVariantController::class, 'show']);
+            Route::get('products/{product}/variants',      [ProductVariantController::class, 'indexByProduct']);
 
-            Route::get('barcodes',                    [BarcodeController::class, 'index']);
-            Route::get('barcodes/{barcode}',          [BarcodeController::class, 'show']);
-            Route::get('products/{product}/barcodes', [BarcodeController::class, 'indexByProduct']);
+            Route::get('products/{product}/barcodes',  [BarcodeController::class, 'indexByProduct']);
+            Route::get('barcodes',                     [BarcodeController::class, 'index']);
+            Route::get('barcodes/{barcode}',           [BarcodeController::class, 'show']);
+            Route::post('barcodes',                    [BarcodeController::class, 'store']);
+            Route::put('barcodes/{barcode}',           [BarcodeController::class, 'update']);
+            Route::delete('barcodes/{barcode}',        [BarcodeController::class, 'destroy']);
 
             Route::get('warehouses',             [WarehouseController::class, 'index']);
             Route::get('warehouses/{warehouse}', [WarehouseController::class, 'show']);
