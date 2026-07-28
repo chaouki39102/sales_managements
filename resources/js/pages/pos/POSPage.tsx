@@ -422,7 +422,7 @@ function POSPage() {
     queryKey: [slug, 'products', 'pos', { cat: pos.selectedCategory, perPage: filterPerPage }],
     queryFn: () => productsApi.list({
       per_page:  filterPerPage,
-      include:   'tva,unit,family,prices.priceLevel,quantityDiscounts,packagings',
+      include:   'tva,unit,family,prices,quantityDiscounts,packagings,barcodes',
       filter:    { active: 1, ...(queryFamilyId ? { family_id: queryFamilyId } : {}) },
     }),
     enabled:         !!slug,
@@ -841,16 +841,21 @@ function POSPage() {
   const barcodeRef = useRef('');
   useEffect(() => { barcodeRef.current = barcodeBuffer; }, [barcodeBuffer]);
 
-  // ── Fullscreen ─────────────────────────────────────────────────────────────
+  // ── Fullscreen (native API for true fullscreen + CSS fallback) ──────────────
+  // ESC exits native fullscreen (browser behavior, can't prevent).
+  // CSS .pos-fullscreen keeps the visual fullscreen (no scrollbar/gap) after ESC.
   const toggleFullscreen = useCallback(() => {
-    if (!document.fullscreenElement) containerRef.current?.requestFullscreen?.().catch(() => {});
-    else document.exitFullscreen?.().catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    const h = () => setFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', h);
-    return () => document.removeEventListener('fullscreenchange', h);
+    setFullscreen(prev => {
+      if (!prev) {
+        // Enter: native fullscreen + CSS class
+        containerRef.current?.requestFullscreen?.().catch(() => {});
+        return true;
+      } else {
+        // Exit: native fullscreen + remove CSS class
+        document.exitFullscreen?.().catch(() => {});
+        return false;
+      }
+    });
   }, []);
 
   // ── Keyboard Shortcuts ─────────────────────────────────────────────────────
@@ -1389,6 +1394,19 @@ const handleCompleteSale = useCallback(async (params: {
           if (variant && !isVariantOutOfStock(variant, allowNegSetting)) {
             setScannedId(variant.id);
             handleAddItem(variant, 1, packaging);
+          } else {
+            // 3) Try dedicated barcodes table (barcodes relationship)
+            for (const v of allVariants) {
+              const bcList = (v as any).barcodes as { barcode: string }[] | undefined;
+              if (bcList?.some((bc: { barcode: string }) => bc.barcode === buf)) {
+                variant = v;
+                break;
+              }
+            }
+            if (variant && !isVariantOutOfStock(variant, allowNegSetting)) {
+              setScannedId(variant.id);
+              handleAddItem(variant, 1, null);
+            }
           }
         }
         setBarcodeBuffer('');

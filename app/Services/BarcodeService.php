@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Barcode;
+use App\Models\Product;
 use App\Core\Exceptions\BusinessRuleException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -50,6 +51,14 @@ class BarcodeService extends \App\Core\Services\BaseService
         }
 
         return $data;
+    }
+
+    protected function afterCreate(Model $item, array $data, ?Request $request): void
+    {
+        // Auto-sync products.barcode when this barcode is primary
+        if ($item->is_primary && $item->product_id) {
+            Product::where('id', $item->product_id)->update(['barcode' => $item->barcode]);
+        }
     }
 
     protected function beforeUpdate(Model $item, array $data, ?Request $request): void
@@ -108,6 +117,21 @@ class BarcodeService extends \App\Core\Services\BaseService
                 ->where('id', '!=',    $item->id)
                 ->where('is_primary',  true)
                 ->update(['is_primary' => false]);
+
+            // Auto-sync products.barcode when this barcode is primary
+            if ($item->product_id) {
+                Product::where('id', $item->product_id)->update(['barcode' => $item->barcode]);
+            }
+        }
+
+        // If is_primary was removed from this barcode, find new primary and sync
+        if (!$item->is_primary && $item->product_id) {
+            $newPrimary = $this->model::where('company_id', $item->company_id)
+                ->where('product_id', $item->product_id)
+                ->where('is_primary', true)
+                ->first();
+            Product::where('id', $item->product_id)
+                ->update(['barcode' => $newPrimary?->barcode]);
         }
     }
 
@@ -134,11 +158,20 @@ class BarcodeService extends \App\Core\Services\BaseService
         // إذا حُذف الباركود الرئيسي (حالة: كان الوحيد ثم حُذف)
         // نُعيّن أقدم باركود تلقائياً كـ primary إن وُجد
         if ($item->is_primary) {
-            $this->model::where('company_id', $item->company_id)
+            $newPrimary = $this->model::where('company_id', $item->company_id)
                 ->where('product_id', $item->product_id)
                 ->oldest()
-                ->first()
-                ?->update(['is_primary' => true]);
+                ->first();
+
+            if ($newPrimary) {
+                $newPrimary->update(['is_primary' => true]);
+            }
+
+            // Auto-sync products.barcode
+            if ($item->product_id) {
+                Product::where('id', $item->product_id)
+                    ->update(['barcode' => $newPrimary?->barcode]);
+            }
         }
     }
 

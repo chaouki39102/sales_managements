@@ -154,11 +154,21 @@ function scoreVariantEnhanced(
 
   // إذا كان البحث 2-3 حروف، ركّز على البادئة
   if (queryLength <= 3) {
-    // بادئة الباركود
+    // بادئة الباركود (الرئيسي)
     if (
       variant.barcode &&
       normalizeSearchText(variant.barcode).startsWith(normalizedQuery)
     ) {
+      return {
+        score: SCORING.prefix_barcode,
+        matchType: 'prefix',
+        matchedField: 'barcode',
+      };
+    }
+
+    // بادئة الباركودات الإضافية
+    const bcList = (variant as any).barcodes as { barcode: string }[] | undefined;
+    if (bcList?.some(bc => normalizeSearchText(bc.barcode).startsWith(normalizedQuery))) {
       return {
         score: SCORING.prefix_barcode,
         matchType: 'prefix',
@@ -206,6 +216,15 @@ function scoreVariantEnhanced(
       scoreExact: SCORING.barcode_exact,
       scorePartial: SCORING.barcode_partial,
     },
+    // Additional barcodes from the barcodes table
+    ...(((variant as any).barcodes as { barcode: string }[] | undefined)
+      ?.filter(bc => bc.barcode !== variant.barcode)
+      .map(bc => ({
+        name: 'barcode' as const,
+        value: bc.barcode,
+        scoreExact: SCORING.barcode_exact,
+        scorePartial: SCORING.barcode_partial,
+      })) ?? []),
     {
       name: 'ref',
       value: variant.ref,

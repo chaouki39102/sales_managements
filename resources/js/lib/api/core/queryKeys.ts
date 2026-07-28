@@ -113,9 +113,10 @@ export const tenantKeys = {
 
   // ── Products ──────────────────────────────────────────────────────────────
   products: {
-    all:    (slug: string)                              => [slug, 'products']                       as const,
-    list:   (slug: string, p?: Record<string, unknown>) => [slug, 'products', 'list', p]           as const,
-    detail: (slug: string, id: number)                  => [slug, 'products', id]                  as const,
+    all:      (slug: string)                              => [slug, 'products']                       as const,
+    list:     (slug: string, p?: Record<string, unknown>) => [slug, 'products', 'list', p]           as const,
+    detail:   (slug: string, id: number)                  => [slug, 'products', id]                  as const,
+    barcodes: (slug: string, id: number)                  => [slug, 'products', id, 'barcodes']      as const,
   },
 
   // ── Documents ─────────────────────────────────────────────────────────────

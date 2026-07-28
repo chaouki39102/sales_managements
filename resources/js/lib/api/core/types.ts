@@ -475,6 +475,7 @@ export interface Product extends BaseModel {
   variants?:     ProductVariant[];
   packagings?:   ProductPackaging[];
   prices?:       ProductPrice[];
+  barcodes?:     Barcode[];
 }
 
 export interface ProductPackaging {
@@ -499,6 +500,20 @@ export interface ProductPrice {
   margin:          number | null;
   active:          boolean;
   price_level?:    PriceLevel;
+}
+
+export interface Barcode {
+  id:          number;
+  company_id:  number;
+  product_id:  number;
+  variant_id?: number | null;
+  barcode:     string;
+  type:        string;
+  is_primary:  boolean;
+  unit?:       string | null;
+  created_by?: number | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // ─── Commercial Documents ─────────────────────────────────────────────────────

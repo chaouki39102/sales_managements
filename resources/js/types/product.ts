@@ -20,6 +20,7 @@ export interface ProductVariant {
   min_stock_alert?: number | null; max_stock_alert?: number | null; manages_quantity_discounts: boolean;
   valuation_method_id?: number | null; active: boolean;
   prices: ProductVariantPrice[]; quantity_discounts: QuantityDiscount[]; lots?: ProductLot[];
+  barcodes?: { id: number; barcode: string; type: string; is_primary: boolean; unit?: string | null }[];
 }
 export interface Product {
   id: number; name: string; slug: string; description?: string | null;
