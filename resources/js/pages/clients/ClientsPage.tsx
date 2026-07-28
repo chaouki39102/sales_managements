@@ -17,27 +17,15 @@ import Skeleton from '@/components/ui/Skeleton';
 import ClientModal from '@/components/modals/ClientModal';
 import ImportWizardModal from '@/pages/import/ImportWizardModal';
 import { PARTY_IMPORT_CONFIG } from '@/pages/import/entityConfig';
-import apiClient from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
+import { apiGet } from '@/lib/api/core/client';
 import type { Party } from '@/types';
 import type { Column } from '@/components/ui/DataTable';
+import type { PaginatedResponse, PaginationMeta } from '@/lib/api/core/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface PaginationMeta {
-  current_page: number;
-  last_page:    number;
-  per_page:     number;
-  total:        number;
-  from?:        number;
-  to?:          number;
-}
-
-interface ClientsApiResponse {
-  status: 'success' | 'error';
-  data:   Party[];
-  meta:   PaginationMeta;
-}
+type ClientsApiResponse = PaginatedResponse<Party>;
 
 // ─── Pagination Component ──────────────────────────────────────────────────────
 
@@ -203,19 +191,15 @@ function fetchClients(params: {
   sortField?:  string;
   sortDir?:    string;
 }) {
-  return apiClient
-    .get<ClientsApiResponse>('/customers', {
-      params: {
-        per_page: params.perPage,
-        page:     params.page,
-        include:  'wilaya,commune,legalForm,defaultPriceLevel',
-        sort_by:  params.sortField ?? 'name',
-        sort_dir: params.sortDir ?? 'asc',
-        ...(params.search ? { search: params.search } : {}),
-        ...(params.activeParam !== undefined ? { active: params.activeParam } : {}),
-      },
-    })
-    .then((r) => r.data);
+  return apiGet<ClientsApiResponse>('/customers', {
+    per_page: params.perPage,
+    page:     params.page,
+    include:  'wilaya,commune,legalForm,defaultPriceLevel',
+    sort_by:  params.sortField ?? 'name',
+    sort_dir: params.sortDir ?? 'asc',
+    ...(params.search ? { search: params.search } : {}),
+    ...(params.activeParam !== undefined ? { active: params.activeParam } : {}),
+  });
 }
 
 // ─── الصفحة الرئيسية ──────────────────────────────────────────────────────────

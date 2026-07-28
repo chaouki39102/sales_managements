@@ -288,6 +288,6 @@ class BarcodeService extends \App\Core\Services\BaseService
 
     protected function getCurrentCompanyId(): ?int
     {
-        return app(\App\Services\CompanyContextService::class)->getCurrentCompanyId();
+        return app(\App\Services\CompanyContextService::class)->get();
     }
 }

@@ -16,7 +16,7 @@ import ProgressBar from '@/components/ui/ProgressBar';
 const ProductModal = React.lazy(() => import('@/components/products/ProductModal'));
 const ImportWizardModal = React.lazy(() => import('@/pages/import/ImportWizardModal'));
 import { PRODUCT_IMPORT_CONFIG } from '@/pages/import/entityConfig';
-import apiClient from '@/lib/api/core/client';
+import { apiGet, apiPost } from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { productsApi } from '@/lib/api/endpoints/products';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
@@ -131,7 +131,7 @@ export default function ProductsPage() {
       if (familyFilter)    params['filter[family_id]'] = familyFilter;
       if (brandFilter)     params['filter[brand_id]']  = brandFilter;
       if (activeFilter)    params['filter[active]']     = activeFilter;
-      return apiClient.get<PaginatedResponse<Product>>('/products', { params }).then(r => r.data);
+      return apiGet<PaginatedResponse<Product>>('/products', params);
     },
     placeholderData: keepPreviousData,
     staleTime: 30_000,
@@ -313,7 +313,7 @@ export default function ProductsPage() {
   };
 
   const bulkCopyConfig = async (source: any, opts: { copy_packaging: boolean; copy_discounts: boolean; replace_packaging: boolean; replace_discounts: boolean }) => {
-    await apiClient.post('/products/copy-config', {
+    await apiPost('/products/copy-config', {
       source_product_id:   source.id,
       target_product_ids:  selectedIds,
       copy_packaging:      opts.copy_packaging,

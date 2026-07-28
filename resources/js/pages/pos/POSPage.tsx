@@ -33,7 +33,7 @@ import type { PaginatedResponse } from '@/lib/api/core/types';
 import { nanoid }   from 'nanoid';
 import type {
   Product, ProductVariant, ProductPackaging, CartItem,
-  PriceLevel, Party, PaymentMode, DocumentType,
+  PriceLevel, Party, PaymentMode, DocumentType, Barcode,
   CommercialDocument,
 } from '@/types';
 
@@ -583,7 +583,8 @@ function POSPage() {
         (v.product?.name ?? '').toLowerCase().includes(q) ||
         (v.barcode ?? '').toLowerCase().includes(q) ||
         (v.ref ?? '').toLowerCase().includes(q) ||
-        (v.product?.ref ?? '').toLowerCase().includes(q),
+        (v.product?.ref ?? '').toLowerCase().includes(q) ||
+        v.barcodes?.some((bc: Barcode) => bc.barcode.toLowerCase().includes(q)),
       );
     }
     if (settings.hideOutOfStock && !allowNegSetting) list = list.filter(v => !v.manages_stock || v.current_stock === undefined || v.current_stock > 0);
@@ -1397,8 +1398,8 @@ const handleCompleteSale = useCallback(async (params: {
           } else {
             // 3) Try dedicated barcodes table (barcodes relationship)
             for (const v of allVariants) {
-              const bcList = (v as any).barcodes as { barcode: string }[] | undefined;
-              if (bcList?.some((bc: { barcode: string }) => bc.barcode === buf)) {
+              const bcList = v.barcodes;
+              if (bcList?.some((bc: Barcode) => bc.barcode === buf)) {
                 variant = v;
                 break;
               }

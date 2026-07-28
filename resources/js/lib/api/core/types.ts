@@ -420,6 +420,7 @@ export interface ProductVariant extends BaseModel {
   quantity_discounts?: QuantityDiscount[];
   lots?:               ProductLot[];
   packagings?:         ProductPackaging[];
+  barcodes?:           Barcode[];
   // Computed
   current_stock?:      number;
   image_url?:          string | null;

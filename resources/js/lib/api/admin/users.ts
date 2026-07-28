@@ -1,13 +1,12 @@
 // lib/api/admin/users.ts
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api/core/client';
-import { apiGetPaginated }                    from './client';
 import type { AdminUser, AdminCompany, Paginated, AdminUsersFilter } from '@/types/admin';
 
 const BASE = '/admin/users';
 
 export const usersApi = {
   // Paginated
-  list: (f?: AdminUsersFilter) => apiGetPaginated<Paginated<AdminUser>>(BASE, f as any),
+  list: (f?: AdminUsersFilter) => apiGet<Paginated<AdminUser>>(BASE, f as any),
 
   // Single / mutation
   show:          (id: number)                                    => apiGet<AdminUser>(`${BASE}/${id}`),
@@ -30,7 +29,7 @@ export type PendingUser = {
 
 export const approvalApi = {
   pending:  (params?: { search?: string; per_page?: number }) =>
-    apiGetPaginated<Paginated<PendingUser>>('/admin/users/pending-approval', params as any),
+    apiGet<Paginated<PendingUser>>('/admin/users/pending-approval', params as any),
   approve:  (id: number)                          => apiPost(`/admin/users/${id}/approve`),
   reject:   (id: number)                          => apiPost(`/admin/users/${id}/reject`),
   bulkApprove: (ids: number[])                    => apiPost<{ message: string; count: number }>('/admin/users/bulk-approve', { ids }),

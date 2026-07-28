@@ -639,9 +639,7 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
         }] : [],
       };
       const docRes = await apiPost<Record<string, unknown>>('/documents', docPayload);
-      const docNum = String(
-        (docRes as any).document_number ?? (docRes as any).data?.document_number ?? '—'
-      );
+      const docNum = String(docRes?.document_number ?? '—');
 
       return {
         document_number: docNum,

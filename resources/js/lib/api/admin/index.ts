@@ -1,5 +1,4 @@
 // lib/api/admin/index.ts
-export { apiGetPaginated }                                         from './client';
 export { companiesApi }                                            from './companies';
 export { usersApi, impersonateApi, approvalApi }                                from './users';
 export type { PendingUser }                                                    from './users';

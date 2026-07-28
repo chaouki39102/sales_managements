@@ -5,7 +5,7 @@
 // ════════════════════════════════════════════════════════════
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import apiClient from '@/lib/api/core/client';
+import { apiPost } from '@/lib/api/core/client';
 
 // ════════════════════════════════════════════════════════════
 // Types
@@ -325,14 +325,14 @@ export default function SetupHub({ companySlug, onFinish }: Props) {
       addLog(`تشغيل: ${seeder.label}`, 'info');
 
       try {
-        await apiClient.post(`/${companySlug}/seeders/run`, {
+        await apiPost(`/${companySlug}/seeders/run`, {
           seeder: seeder.class,
         });
 
         setStates(prev => ({ ...prev, [seeder.key]: 'done' }));
         addLog(`${seeder.label} — تم بنجاح`, 'success');
       } catch (e: any) {
-        const msg = e?.response?.data?.message ?? 'خطأ غير معروف';
+        const msg = e instanceof Error ? e.message : 'خطأ غير معروف';
         setStates(prev => ({ ...prev, [seeder.key]: 'error' }));
         addLog(`${seeder.label} — فشل: ${msg}`, 'error');
 

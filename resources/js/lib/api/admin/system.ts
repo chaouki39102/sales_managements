@@ -1,6 +1,5 @@
 // lib/api/admin/system.ts
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api/core/client';
-import { apiGetPaginated }         from './client';
 import type {
   AdminDashboardStats,
   AdminPlan,
@@ -50,6 +49,6 @@ export const activityApi = {
     date_to?:   string;
     page?:      number;
     per_page?:  number;
-  }) => apiGetPaginated<Paginated<ActivityLog>>('/admin/activity-log', p as any),
+  }) => apiGet<Paginated<ActivityLog>>('/admin/activity-log', p as any),
   show: (id: number) => apiGet<ActivityLog>(`/admin/activity-log/${id}`),
 } as const;

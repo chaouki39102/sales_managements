@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Modal from '@/components/ui/Modal';
-import apiClient from '@/lib/api/core/client';
+import { apiGet } from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
 import type { ProductPackaging, QuantityDiscount } from '@/lib/api/core/types';
 
@@ -110,11 +110,11 @@ export default function CopyConfigModal({
       return;
     }
     setLoadingAll(true);
-    apiClient.get('/products', {
-      params: { include: 'packagings,quantityDiscounts', per_page: 2000, 'filter[active]': 1 },
+    apiGet<any>('/products', {
+      include: 'packagings,quantityDiscounts', per_page: 2000, 'filter[active]': 1,
     })
-      .then(r => {
-        const items = r.data?.data ?? (Array.isArray(r.data) ? r.data : []);
+      .then(data => {
+        const items = Array.isArray(data) ? data : (data?.data ?? []);
         setAllProducts(items as SourceProduct[]);
       })
       .catch(() => setAllProducts([]))

@@ -279,8 +279,7 @@ export function useCommercialDocumentController({
 
   const { data: docTypes = [] } = useQuery({
     queryKey: [slug, 'document-types'],
-    queryFn:  () => apiGet<DocumentType[]>('/document-types', { per_page: 500 })
-      .then(r => (Array.isArray(r) ? r : (r as unknown as { data: DocumentType[] })?.data ?? [])),
+    queryFn:  () => apiGet<DocumentType[]>('/document-types', { per_page: 500 }),
     staleTime: 10 * 60_000,
     enabled:   !!slug,
   });

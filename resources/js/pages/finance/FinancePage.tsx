@@ -833,18 +833,16 @@ function OpeningBalancesTab({ slug, selectedYear }: {
     });
     const accounts: any[] = Array.isArray(rawAccounts) ? rawAccounts
         : Array.isArray((rawAccounts as any)?.data) ? (rawAccounts as any).data
-        : Array.isArray((rawAccounts as any)?.data?.data) ? (rawAccounts as any).data.data
         : [];
 
     const { data: rawParties } = useQuery({
         queryKey: [slug, 'parties', 'select'],
-        queryFn: () => apiGet<any[]>('/parties', { per_page: 200, active: 1 }),
+        queryFn: () => apiGet<any>('/parties', { per_page: 200, active: 1 }),
         enabled: !!slug,
         staleTime: 60_000,
     });
     const allParties: any[] = Array.isArray(rawParties) ? rawParties
         : Array.isArray((rawParties as any)?.data) ? (rawParties as any).data
-        : Array.isArray((rawParties as any)?.data?.data) ? (rawParties as any).data.data
         : [];
 
     // ── Draft rows ───────────────────────────────────────────────────────────

@@ -13,7 +13,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import client from '@/lib/api/core/client';
+import { apiGet } from '@/lib/api/core/client';
 
 // ─── قائمة الموارد المُراد تحميلها مسبقاً ──────────────────────────────────
 interface BootResource {
@@ -144,9 +144,9 @@ export default function SystemBootModal({
               ? `/wilayas`
               : `/${companySlug}/${res.endpoint}`;
 
-            const data = await client.get(url, { params: { per_page: 500, no_paginate: 1 } });
-            // خزّن في React Query cache مباشرة
-            qc.setQueryData([res.key, companySlug], data.data);
+            const data = await apiGet<any>(url, { per_page: 500, no_paginate: 1 });
+            // خزّن في React Query cache مباشرة — extractData يُزيل الغلاف بالفعل
+            qc.setQueryData([res.key, companySlug], data);
             setItem(res.key, { status: 'done', ms: Date.now() - t0 });
           }
         } catch (e: any) {

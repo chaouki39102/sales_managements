@@ -421,11 +421,12 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
   const [copied,    setCopied]    = useState(false);
   const [imageInput, setImageInput] = useState('');
   const [copyModalOpen, setCopyModalOpen] = useState(false);
+  const [imgUploadPct, setImgUploadPct] = useState(0);
+  const imgFileRef = useRef<HTMLInputElement>(null);
 
   // ── Barcodes ──
   const [barcodeInput, setBarcodeInput] = useState('');
-  const [barcodeType, setBarcodeType]   = useState('primary');
-  const [barcodeUnit, setBarcodeUnit]   = useState('');
+  const [showAddBarcode, setShowAddBarcode] = useState(false);
 
   // ── اقتراح صورة من الإنترنت ──
   const [showImgSuggest, setShowImgSuggest] = useState(false);
@@ -511,6 +512,20 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
     set('images', [...form.images, url]);
   }
 
+  async function handleUploadImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !productId) return;
+    setImgUploadPct(0);
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      const updated = await productsApi.uploadImage(productId, fd, p => setImgUploadPct(p));
+      if (updated?.images) set('images', updated.images);
+    } catch { /* error handled by toast */ }
+    setImgUploadPct(0);
+    if (imgFileRef.current) imgFileRef.current.value = '';
+  }
+
   function toggleImgSuggest() {
     setShowImgSuggest(v => {
       const next = !v;
@@ -528,7 +543,7 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
     setErrors({}); setApiError(''); setActiveTab('basic');
     setIsDirty(false); setSpecKey(''); setSpecVal(''); setKwInput('');
     setImageInput(''); setCopied(false);
-    setBarcodeInput(''); setBarcodeType('primary'); setBarcodeUnit('');
+    setBarcodeInput('');
     setShowImgSuggest(false); setImgQuery(''); setImgResults([]); setImgError(''); setImgLoading(false);
 
     if ((priceLevels as PriceLevel[]).length > 0) {
@@ -659,13 +674,10 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
     barcodeMutations.create.mutate({
       product_id: productId,
       barcode: barcodeInput.trim(),
-      type: barcodeType,
       is_primary: (productBarcodes as Barcode[]).length === 0,
-      unit: barcodeUnit || undefined,
     });
     setBarcodeInput('');
-    setBarcodeType('primary');
-    setBarcodeUnit('');
+    setShowAddBarcode(false);
   }
 
   function updateBarcodeItem(id: number, data: BarcodeUpdateInput) {
@@ -1755,6 +1767,30 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
           </button>
           <button
             type="button"
+            onClick={() => imgFileRef.current?.click()}
+            disabled={!!productId === false || imgUploadPct > 0}
+            style={{
+              padding: '7px 16px', borderRadius: 'var(--r2)',
+              border: '1px solid var(--b3)', background: 'var(--bg2)',
+              color: 'var(--t2)', fontSize: 12, fontWeight: 600,
+              cursor: 'pointer', whiteSpace: 'nowrap',
+              display: 'flex', alignItems: 'center', gap: 6,
+              opacity: !productId || imgUploadPct > 0 ? 0.5 : 1,
+            }}
+          >
+            {imgUploadPct > 0
+              ? <><i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} /> {imgUploadPct}%</>
+              : <><i className="ti ti-upload" /> من الجهاز</>}
+          </button>
+          <input
+            ref={imgFileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            style={{ display: 'none' }}
+            onChange={handleUploadImage}
+          />
+          <button
+            type="button"
             onClick={toggleImgSuggest}
             style={{
               padding: '7px 16px', borderRadius: 'var(--r2)',
@@ -2051,145 +2087,134 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
 
     return (
       <div style={s.section}>
-        <SectionHeader icon="ti-barcode" title="باركودات المنتج" subtitle="إدارة الباركودات المتعددة — باركود رئيسي + باركودات إضافية" />
+        <SectionHeader icon="ti-barcode" title="باركودات المنتج" subtitle="أضف باركود واحد أو أكثر — الباركود الأول يصبح رئيسي تلقائياً" />
 
-        {/* إضافة باركود جديد */}
-        <div style={{ ...s.card, display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <Field label="الباركود" col={3}>
-            <input
-              style={{ ...s.inp(), direction: 'ltr', fontFamily: 'monospace' }}
-              value={barcodeInput}
-              onChange={e => setBarcodeInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && barcodeInput.trim()) addBarcode(); }}
-              placeholder="6121234567890"
-            />
-          </Field>
-          <Field label="النوع" col={2}>
-            <select style={s.sel()} value={barcodeType} onChange={e => setBarcodeType(e.target.value)}>
-              <option value="primary">رئيسي</option>
-              <option value="unit">وحدة</option>
-              <option value="box">كرتون</option>
-              <option value="supplier">مورّد</option>
-            </select>
-          </Field>
-          <Field label="الوحدة" col={2}>
-            <select style={s.sel()} value={barcodeUnit} onChange={e => setBarcodeUnit(e.target.value)}>
-              <option value="">— بدون —</option>
-              <option value="piece">قطعة</option>
-              <option value="kg">كيلو</option>
-              <option value="box">كرتون</option>
-              <option value="pack">ربطة</option>
-            </select>
-          </Field>
-          <button
-            onClick={addBarcode}
-            disabled={!barcodeInput.trim() || barcodeMutations.create.isPending}
-            style={{ padding: '8px 18px', borderRadius: 'var(--r2)', border: '1px solid var(--em)', background: 'var(--emb)', color: 'var(--em)', fontSize: 12, fontWeight: 600, cursor: barcodeInput.trim() ? 'pointer' : 'not-allowed', opacity: barcodeInput.trim() ? 1 : 0.5, whiteSpace: 'nowrap', height: 36, display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            {barcodeMutations.create.isPending
-              ? <i className="ti ti-loader" style={{ fontSize: 13, animation: 'spin 1s linear infinite' }} />
-              : <i className="ti ti-plus" style={{ fontSize: 14 }} />}
-            إضافة
-          </button>
+        {/* Header bar */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 12, color: 'var(--t3)' }}>
+            {barcodes.length === 0
+              ? 'لا توجد باركودات'
+              : `${barcodes.length} باركود`}
+          </div>
+          {!showAddBarcode && (
+            <button
+              onClick={() => { setShowAddBarcode(true); setBarcodeInput(''); }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 'var(--r2)', border: '1px solid var(--em)', background: 'var(--emb)', color: 'var(--em)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            >
+              <i className="ti ti-plus" style={{ fontSize: 14 }} /> إضافة باركود
+            </button>
+          )}
         </div>
 
-        {/* قائمة الباركودات */}
-        {barcodes.length === 0 ? (
+        {/* Inline Add — single input */}
+        {showAddBarcode && (
+          <div style={{ ...s.card, border: '1px solid var(--em)', background: 'var(--bg1)', display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--emb)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <i className="ti ti-plus" style={{ fontSize: 14, color: 'var(--em)' }} />
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>باركود جديد</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+              <Field label="الباركود" col={1}>
+                <input
+                  autoFocus
+                  style={{ ...s.inp(), direction: 'ltr', fontFamily: 'monospace' }}
+                  value={barcodeInput}
+                  onChange={e => setBarcodeInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && barcodeInput.trim()) addBarcode();
+                    if (e.key === 'Escape') setShowAddBarcode(false);
+                  }}
+                  placeholder="6121234567890"
+                />
+              </Field>
+              <div style={{ display: 'flex', gap: 6, paddingBottom: 2 }}>
+                <button
+                  onClick={addBarcode}
+                  disabled={!barcodeInput.trim() || barcodeMutations.create.isPending}
+                  style={{ padding: '8px 18px', borderRadius: 'var(--r2)', border: 'none', background: barcodeInput.trim() ? 'var(--em)' : 'var(--b3)', color: barcodeInput.trim() ? '#fff' : 'var(--t4)', fontSize: 12, fontWeight: 600, cursor: barcodeInput.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: 6, height: 36, whiteSpace: 'nowrap' }}
+                >
+                  {barcodeMutations.create.isPending
+                    ? <i className="ti ti-loader" style={{ fontSize: 13, animation: 'spin 1s linear infinite' }} />
+                    : <i className="ti ti-check" style={{ fontSize: 14 }} />}
+                  حفظ
+                </button>
+                <button
+                  onClick={() => setShowAddBarcode(false)}
+                  style={{ padding: '8px 14px', borderRadius: 'var(--r2)', border: '1px solid var(--b3)', background: 'transparent', color: 'var(--t3)', fontSize: 12, cursor: 'pointer', height: 36 }}
+                >
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Barcode Cards */}
+        {barcodes.length === 0 && !showAddBarcode ? (
           <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--t4)' }}>
             <i className="ti ti-barcode" style={{ fontSize: 40, opacity: 0.3 }} />
             <div style={{ marginTop: 12, fontSize: 13 }}>لا توجد باركودات مُعرَّفة</div>
-            <div style={{ fontSize: 11, marginTop: 4 }}>أضف باركوداً أعلاه — الباركود الأول يصبح تلقائياً رئيسي</div>
+            <div style={{ fontSize: 11, marginTop: 4 }}>أضف باركوداً بالضغط على &ldquo;إضافة باركود&rdquo;</div>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {/* Header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 100px 100px 60px 80px auto', gap: 8, padding: '0 10px' }}>
-              {['', 'الباركود', 'النوع', 'الوحدة', 'رئيسي', 'نسخ', ''].map((h, i) => (
-                <div key={i} style={{ fontSize: 10, fontWeight: 700, color: 'var(--t4)', textTransform: 'uppercase' }}>{h}</div>
-              ))}
-            </div>
+          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
             {barcodes.map((bc) => (
               <div key={bc.id} style={{
-                display: 'grid', gridTemplateColumns: '28px 1fr 100px 100px 60px 80px auto',
-                gap: 8, alignItems: 'center', padding: '10px 10px',
-                borderRadius: 'var(--r2)',
+                padding: '10px 14px',
+                borderRadius: 'var(--r3)',
                 border: `1px solid ${bc.is_primary ? 'var(--embo)' : 'var(--b2)'}`,
                 background: bc.is_primary ? 'var(--emb)' : 'var(--bg2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
               }}>
-                {/* أيقونة */}
-                <div style={{ textAlign: 'center' }}>
-                  {bc.is_primary
-                    ? <i className="ti ti-star" style={{ fontSize: 14, color: 'var(--gold, #c8952c)' }} title="باركود رئيسي" />
-                    : <i className="ti ti-barcode" style={{ fontSize: 14, color: 'var(--t4)' }} />}
-                </div>
-                {/* الباركود */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontFamily: 'monospace', fontSize: 13, direction: 'ltr', color: 'var(--t1)', fontWeight: bc.is_primary ? 700 : 400 }}>
-                    {bc.barcode}
-                  </span>
-                  {bc.is_primary && (
-                    <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 8, background: 'var(--em)', color: '#fff', fontWeight: 700 }}>
-                      رئيسي
+                {/* Left: barcode info */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: bc.is_primary ? 'var(--gold, #c8952c)' : 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <i className={`ti ${bc.is_primary ? 'ti-star' : 'ti-barcode'}`} style={{ fontSize: 15, color: bc.is_primary ? '#fff' : 'var(--t4)' }} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontFamily: 'monospace', fontSize: 14, fontWeight: bc.is_primary ? 700 : 500, direction: 'ltr', color: 'var(--t1)', letterSpacing: '0.05em' }}>
+                      {bc.barcode}
                     </span>
-                  )}
+                    {bc.is_primary && (
+                      <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 8, background: 'var(--em)', color: '#fff', fontWeight: 700 }}>
+                        رئيسي
+                      </span>
+                    )}
+                  </div>
                 </div>
-                {/* النوع */}
-                <select
-                  style={{ ...s.sel(), fontSize: 12 }}
-                  value={bc.type ?? 'primary'}
-                  onChange={e => updateBarcodeItem(bc.id, { type: e.target.value })}
-                >
-                  <option value="primary">رئيسي</option>
-                  <option value="unit">وحدة</option>
-                  <option value="box">كرتون</option>
-                  <option value="supplier">مورّد</option>
-                </select>
-                {/* الوحدة */}
-                <select
-                  style={{ ...s.sel(), fontSize: 12 }}
-                  value={bc.unit ?? ''}
-                  onChange={e => updateBarcodeItem(bc.id, { unit: e.target.value || undefined })}
-                >
-                  <option value="">— بدون —</option>
-                  <option value="piece">قطعة</option>
-                  <option value="kg">كيلو</option>
-                  <option value="box">كرتون</option>
-                  <option value="pack">ربطة</option>
-                </select>
-                {/* رئيسي */}
-                <div style={{ textAlign: 'center' }}>
+
+                {/* Right: action buttons */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                   <button
                     onClick={() => makePrimaryBarcode(bc.id)}
                     disabled={bc.is_primary}
-                    title={bc.is_primary ? 'باركود رئيسي بالفعل' : 'تعيين كرئيسي'}
+                    title={bc.is_primary ? 'رئيسي بالفعل' : 'تعيين كرئيسي'}
                     style={{
-                      padding: '4px 8px', borderRadius: 6, border: 'none', cursor: bc.is_primary ? 'default' : 'pointer',
+                      width: 30, height: 30, borderRadius: 7,
+                      border: bc.is_primary ? 'none' : '1px solid var(--b3)',
                       background: bc.is_primary ? 'var(--gold, #c8952c)' : 'var(--bg3)',
                       color: bc.is_primary ? '#fff' : 'var(--t4)',
-                      fontSize: 12, opacity: bc.is_primary ? 1 : 0.7,
-                      transition: 'all .15s',
+                      cursor: bc.is_primary ? 'default' : 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 13, opacity: bc.is_primary ? 1 : 0.7, transition: 'all .15s',
                     }}
                   >
                     <i className={`ti ${bc.is_primary ? 'ti-star' : 'ti-star-off'}`} />
                   </button>
-                </div>
-                {/* نسخ */}
-                <div style={{ textAlign: 'center' }}>
                   <button
                     onClick={() => copyBarcodeText(bc.barcode)}
-                    style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--b3)', background: 'var(--bg3)', color: 'var(--t3)', cursor: 'pointer', fontSize: 12 }}
-                    title="نسخ الباركود"
+                    title="نسخ"
+                    style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid var(--b3)', background: 'var(--bg3)', color: 'var(--t3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}
                   >
                     <i className="ti ti-copy" />
                   </button>
-                </div>
-                {/* حذف */}
-                <div style={{ textAlign: 'center' }}>
                   <button
                     onClick={() => removeBarcodeItem(bc.id)}
                     disabled={barcodeMutations.remove.isPending}
-                    style={{ padding: '4px 8px', borderRadius: 'var(--r1)', border: '1px solid var(--redbo)', background: 'var(--redb)', color: 'var(--red)', cursor: 'pointer', fontSize: 12 }}
-                    title="حذف الباركود"
+                    title="حذف"
+                    style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid var(--redbo)', background: 'var(--redb)', color: 'var(--red)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}
                   >
                     <i className="ti ti-trash" />
                   </button>
@@ -2199,11 +2224,10 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
           </div>
         )}
 
-        {barcodes.length > 0 && (
+        {barcodes.length > 0 && !showAddBarcode && (
           <div style={{ fontSize: 11, color: 'var(--t4)', padding: '8px 12px', borderRadius: 'var(--r2)', background: 'var(--bg3)', border: '1px solid var(--b2)' }}>
             <i className="ti ti-info-circle" style={{ fontSize: 13, marginLeft: 5 }} />
-            الباركود <strong>الرئيسي</strong> يظهر في فواتير البيع ويعادل حقل &ldquo;باركود&rdquo; في الأساسيات.
-            يمكنك إضافة باركودات إضافية للكارتون أو المورّد أو الوحدات المختلفة.
+            الباركود <strong>الرئيسي</strong> (النجمة الذهبية) يظهر في فواتير البيع.
           </div>
         )}
       </div>

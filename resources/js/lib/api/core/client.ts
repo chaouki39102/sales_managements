@@ -205,28 +205,65 @@ client.interceptors.response.use(
 );
 
 // ─── extractData ──────────────────────────────────────────────────────────────
+// THE single standard bridge between backend → frontend.
+//
+// Backend always returns ONE envelope:
+//   { status, message, timestamp, data, meta?, links? }
+//
+// extractData strips the envelope and returns ONLY the payload:
+//   - Paginated  (has meta): PaginatedResponse<T> = { data: T[], meta, links }
+//   - Single item:           T (the object directly)
+//   - Collection (no meta):  T[] (the array directly)
+//   - Null/delete:           null
+//
+// Consumers NEVER see status/message/timestamp.
+// ──────────────────────────────────────────────────────────────────────────────
+
+import type { PaginationMeta, PaginationLinks } from './types';
+
+export interface ExtractedPaginated<T> {
+  data:  T[];
+  meta:  PaginationMeta;
+  links: PaginationLinks;
+}
+
 export function extractData<T>(response: { data: unknown }): T {
-  const outer = response?.data;
-  if (Array.isArray(outer)) return outer as T;
-  if (outer !== null && typeof outer === 'object') {
-    const obj = outer as Record<string, unknown>;
-    if ('data' in obj) {
-      const inner = obj.data;
-      if (Array.isArray(inner)) {
-        // Paginated response: outer has both 'data'(array) and 'meta' — preserve full shape
-        if ('meta' in obj) return outer as T;
-        return inner as T;
-      }
-      if (inner !== null && typeof inner === 'object') {
-        const io = inner as Record<string, unknown>;
-        if ('data' in io && 'meta' in io) return inner as T; // Nested paginated
-        return inner as T;
-      }
-      if (inner !== undefined) return inner as T;
-    }
-    return outer as T;
+  const raw = response?.data;
+  if (raw === null || raw === undefined) return null as T;
+  if (Array.isArray(raw)) return raw as T;
+  if (typeof raw !== 'object') return raw as T;
+
+  const envelope = raw as Record<string, unknown>;
+
+  // Envelope MUST have a 'data' key — that's the backend contract
+  if (!('data' in envelope)) return raw as T;
+
+  const payload = envelope.data;
+
+  // ── Paginated: { status, data: [...], meta: {...}, links: {...} } ─────────
+  // Strip envelope, return clean { data, meta, links } matching PaginatedResponse<T>
+  if (Array.isArray(payload) && 'meta' in envelope) {
+    return {
+      data:  payload,
+      meta:  envelope.meta,
+      links: envelope.links,
+    } as T;
   }
-  return (outer ?? null) as T;
+
+  // ── Non-paginated: { status, data: <object|array|null> } ──────────────────
+  // Return just the inner payload
+  if (payload !== null && payload !== undefined) {
+    // Nested paginated: { data: { data: [...], meta: {...} } }
+    if (typeof payload === 'object' && !Array.isArray(payload)) {
+      const inner = payload as Record<string, unknown>;
+      if ('data' in inner && 'meta' in inner) {
+        return { data: inner.data, meta: inner.meta, links: inner.links } as T;
+      }
+    }
+    return payload as T;
+  }
+
+  return null as T;
 }
 
 // ─── In-flight dedup ──────────────────────────────────────────────────────────

@@ -44,6 +44,12 @@ import {
     makeGs,
 } from "@/lib/api/endpoints/settings";
 import { apiGet, apiPost, apiUpload } from "@/lib/api/core/client";
+
+function extractList<T = any>(r: any): T[] {
+    if (Array.isArray(r)) return r as T[];
+    if (r?.data && Array.isArray(r.data)) return r.data as T[];
+    return [];
+}
 import { companyKeys, globalKeys, tenantKeys } from "@/lib/api/core/queryKeys";
 import { useActiveSlug, useAppStore } from "@/lib/store/appStore";
 import { useFiscalYear } from "@/context/FiscalYearContext";
@@ -1457,11 +1463,7 @@ function CompanyTab({
     });
     const { data: legalForms = [] } = useQuery({
         queryKey: [...tenantKeys.lookups.legalForms(slug), 'settings-company-tab'],
-        queryFn: () => apiGet<any>("/legal-forms", { per_page: 50 }).then(r => {
-            if (Array.isArray(r)) return r;
-            if (r?.data && Array.isArray(r.data)) return r.data;
-            return [];
-        }),
+        queryFn: () => apiGet<any>("/legal-forms", { per_page: 50 }).then(extractList),
         enabled: !!slug,
         staleTime: 60 * 60_000,
         placeholderData: [],
@@ -2882,11 +2884,7 @@ function FiscalTab({
 
     const { data: currencies = [] } = useQuery({
         queryKey: [...tenantKeys.lookups.currencies(slug), 'settings-fiscal-tab'],
-        queryFn: () => apiGet<any>("/currencies", { per_page: 50 }).then(r => {
-            if (Array.isArray(r)) return r;
-            if (r?.data && Array.isArray(r.data)) return r.data;
-            return [];
-        }),
+        queryFn: () => apiGet<any>("/currencies", { per_page: 50 }).then(extractList),
         enabled: !!slug,
         staleTime: 60 * 60_000,
         placeholderData: [],
@@ -3340,11 +3338,7 @@ function InventoryTab({
 
     const { data: warehouses = [] } = useQuery({
         queryKey: [...tenantKeys.lookups.warehouses(slug), 'inventory-tab'],
-        queryFn: () => apiGet<any>("/warehouses", { per_page: 50 }).then(r => {
-            if (Array.isArray(r)) return r;
-            if (r?.data && Array.isArray(r.data)) return r.data;
-            return [];
-        }),
+        queryFn: () => apiGet<any>("/warehouses", { per_page: 50 }).then(extractList),
         enabled: !!slug,
         staleTime: 10 * 60_000,
         placeholderData: [],
@@ -3717,55 +3711,35 @@ function DocumentsTab({
 
     const { data: warehouses = [] } = useQuery({
         queryKey: [...tenantKeys.lookups.warehouses(slug), 'settings-tab'],
-        queryFn: () => apiGet<any>("/warehouses", { per_page: 50 }).then(r => {
-            if (Array.isArray(r)) return r;
-            if (r?.data && Array.isArray(r.data)) return r.data;
-            return [];
-        }),
+        queryFn: () => apiGet<any>("/warehouses", { per_page: 50 }).then(extractList),
         enabled: !!slug,
         staleTime: 10 * 60_000,
         placeholderData: [],
     });
     const { data: currencies = [] } = useQuery({
         queryKey: [slug, "currencies", "settings-tab"],
-        queryFn: () => apiGet<any>("/currencies", { per_page: 50 }).then(r => {
-            if (Array.isArray(r)) return r;
-            if (r?.data && Array.isArray(r.data)) return r.data;
-            return [];
-        }),
+        queryFn: () => apiGet<any>("/currencies", { per_page: 50 }).then(extractList),
         enabled: !!slug,
         staleTime: 10 * 60_000,
         placeholderData: [],
     });
     const { data: priceLevels = [] } = useQuery({
         queryKey: [slug, "price-levels", "settings-tab"],
-        queryFn: () => apiGet<any>("/price-levels", { per_page: 50 }).then(r => {
-            if (Array.isArray(r)) return r;
-            if (r?.data && Array.isArray(r.data)) return r.data;
-            return [];
-        }),
+        queryFn: () => apiGet<any>("/price-levels", { per_page: 50 }).then(extractList),
         enabled: !!slug,
         staleTime: 10 * 60_000,
         placeholderData: [],
     });
     const { data: paymentModes = [] } = useQuery({
         queryKey: [slug, "payment-modes", "settings-tab"],
-        queryFn: () => apiGet<any>("/payment-modes", { per_page: 50 }).then(r => {
-            if (Array.isArray(r)) return r;
-            if (r?.data && Array.isArray(r.data)) return r.data;
-            return [];
-        }),
+        queryFn: () => apiGet<any>("/payment-modes", { per_page: 50 }).then(extractList),
         enabled: !!slug,
         staleTime: 10 * 60_000,
         placeholderData: [],
     });
     const { data: treasuryAccounts = [] } = useQuery({
         queryKey: [slug, "treasury-accounts", "settings-tab"],
-        queryFn: () => apiGet<any>("/treasury-accounts", { per_page: 50 }).then(r => {
-            if (Array.isArray(r)) return r;
-            if (r?.data && Array.isArray(r.data)) return r.data;
-            return [];
-        }),
+        queryFn: () => apiGet<any>("/treasury-accounts", { per_page: 50 }).then(extractList),
         enabled: !!slug,
         staleTime: 10 * 60_000,
         placeholderData: [],

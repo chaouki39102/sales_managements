@@ -14,7 +14,8 @@
 // ════════════════════════════════════════════════
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import apiClient from '@/lib/api/core/client';
+import { apiGet, apiPost, apiPut, apiPatch } from '@/lib/api/core/client';
+import type { PaginatedResponse } from '@/lib/api/core/types';
 import { useAuth } from '@/context/AuthContext';
 import { appActions } from '@/lib/store/appStore';
 import { useConfirm } from '@/hooks/useConfirm';
@@ -95,16 +96,14 @@ function FiscalYearModal({
   const fetchYears = () => {
     setLoading(true);
     setError(null);
-    apiClient
-      .get(`/${company.slug}/fiscal-years`, { params: { per_page: 50 }, _skipSlug: true } as any)
-      .then(r => {
-        const raw = r.data?.data;
-        const data: FiscalYear[] = Array.isArray(raw) ? raw : (raw?.data ?? []);
-        setYears(data);
-        const current = data.find(y => y.is_current) ?? data.find(y => !y.is_closed) ?? data[0] ?? null;
+    apiGet<any>(`/${company.slug}/fiscal-years`, { per_page: 50, _skipSlug: true } as any)
+      .then(data => {
+        const years: FiscalYear[] = Array.isArray(data) ? data : (data?.data ?? []);
+        setYears(years);
+        const current = years.find(y => y.is_current) ?? years.find(y => !y.is_closed) ?? years[0] ?? null;
         if (current) setSelected(current.id);
       })
-      .catch(e => setError(e?.response?.data?.message ?? 'تعذّر جلب السنوات المالية'))
+      .catch(e => setError(e instanceof Error ? e.message : 'تعذّر جلب السنوات المالية'))
       .finally(() => setLoading(false));
   };
 
@@ -122,7 +121,7 @@ function FiscalYearModal({
     setCreating(true);
     setCreateError(null);
     try {
-      await apiClient.post(`/${company.slug}/fiscal-years`, {
+      await apiPost(`/${company.slug}/fiscal-years`, {
         name,
         start_date: `${year}-01-01`,
         end_date:   `${year}-12-31`,
@@ -478,10 +477,10 @@ function AdminModal({
   // نحاول /admin/users?include=companies أو نكتفي بـ /companies
   useEffect(() => {
     setLoadingAdmin(true);
-    apiClient.get('/companies')
+    apiGet<PaginatedResponse<Company>>('/companies')
       .then(res => {
-        const data = res.data?.data ?? res.data;
-        setCompanies(Array.isArray(data) ? data : []);
+        const list = Array.isArray(res) ? res : (res?.data ?? []);
+        setCompanies(list);
       })
       .catch(() => setCompanies([]))
       .finally(() => setLoadingAdmin(false));
@@ -515,7 +514,7 @@ function AdminModal({
     if (!editTarget) return;
     setSaving(true);
     try {
-      await apiClient.put(`/companies/${editTarget.slug}`, form);
+      await apiPut(`/companies/${editTarget.slug}`, form);
       setCompanies(prev => prev.map(c =>
         c.id === editTarget.id ? { ...c, ...form } : c
       ));
@@ -533,7 +532,7 @@ function AdminModal({
     try {
       const isSuspended = co.is_suspended;
       const endpoint = isSuspended ? 'unsuspend' : 'suspend';
-      await apiClient.post(
+      await apiPost(
         `/admin/companies/${co.slug}/${endpoint}`,
         isSuspended ? {} : { reason: 'قرار إداري' }
       );
@@ -551,7 +550,7 @@ function AdminModal({
     try {
       const isVerified = co.is_verified;
       const endpoint = isVerified ? 'unverify' : 'verify';
-      await apiClient.post(`/admin/companies/${co.slug}/${endpoint}`);
+      await apiPost(`/admin/companies/${co.slug}/${endpoint}`);
       setCompanies(prev => prev.map(c =>
         c.id === co.id ? { ...c, is_verified: !isVerified } : c
       ));
@@ -564,7 +563,7 @@ function AdminModal({
   // ✅ PATCH /admin/companies/{slug}/plan
   const _handleChangePlan = async (co: Company, plan: typeof PLANS[number]) => {
     try {
-      await apiClient.patch(`/admin/companies/${co.slug}/plan`, { plan });
+      await apiPatch(`/admin/companies/${co.slug}/plan`, { plan });
       setCompanies(prev => prev.map(c =>
         c.id === co.id ? { ...c, plan } : c
       ));
@@ -579,7 +578,7 @@ function AdminModal({
     if (!editTarget) return;
     setSaving(true);
     try {
-      await apiClient.patch(`/admin/companies/${editTarget.slug}/notes`, { notes: form.notes });
+      await apiPatch(`/admin/companies/${editTarget.slug}/notes`, { notes: form.notes });
       setCompanies(prev => prev.map(c =>
         c.id === editTarget.id ? { ...c, notes: form.notes } : c
       ));
@@ -998,11 +997,10 @@ export default function OnboardingPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiClient.get('/companies');
-      const data = res.data?.data ?? res.data;
-      setCompanies(Array.isArray(data) ? data : []);
+      const res = await apiGet<PaginatedResponse<Company>>('/companies');
+      setCompanies(Array.isArray(res) ? res : (res?.data ?? []));
     } catch (e: any) {
-      setError(e?.response?.data?.message ?? 'فشل جلب الشركات');
+      setError(e instanceof Error ? e.message : 'فشل جلب الشركات');
     } finally {
       setLoading(false);
     }
@@ -1019,10 +1017,10 @@ export default function OnboardingPage() {
     setSwitching(true);
     setError(null);
     try {
-      await apiClient.post('/companies/switch', { company_id: company.id });
+      await apiPost('/companies/switch', { company_id: company.id });
       setPendingCompany(company);
     } catch (e: any) {
-      setError(e?.response?.data?.message ?? 'فشل الدخول إلى الشركة');
+      setError(e instanceof Error ? e.message : 'فشل الدخول إلى الشركة');
     } finally {
       setSwitching(false);
     }

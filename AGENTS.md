@@ -2,9 +2,51 @@
 
 ## Global Rules
 - **Always respond in English**, regardless of the language the user writes in.
+- **When reading how API data is returned**, ALWAYS check `extractData()` in `resources/js/lib/api/core/client.ts` — it is the single standard bridge between backend and frontend. Never assume the raw HTTP response shape reaches consumers directly.
 
 ## Date
-2026-07-25
+2026-07-28
+
+### Phase 27 — extractData: The Single Standard Bridge (July 28)
+
+**Problem**: Every time a bug involved "the frontend received the wrong data shape", the AI had to investigate how the specific backend endpoint returned data — paginated vs. flat, envelope vs. inner payload. The `admin/client.ts` had a separate `apiGetPaginated` that bypassed `extractData` entirely, creating two different data paths.
+
+**Architecture**: `extractData()` in `resources/js/lib/api/core/client.ts` is the **ONE standard bridge** between backend and frontend. ALL `apiGet`, `apiPost`, `apiPut`, `apiPatch`, `apiUpload` calls go through it.
+
+**Backend envelope** (defined in `app/Core/http/Controllers/Traits/ApiResponders.php`):
+```json
+{
+  "status":    "success" | "error",
+  "message":   "...",
+  "timestamp": "...",
+  "data":      <payload>,
+  "meta":      {...},   // only for paginated responses
+  "links":     {...}    // only for paginated responses
+}
+```
+
+**`extractData` strips the envelope and returns ONLY the payload**:
+
+| Backend response shape | `extractData` returns | Consumer types as |
+|---|---|---|
+| Paginated (has `meta`) | `{ data: T[], meta: PaginationMeta, links: PaginationLinks }` | `PaginatedResponse<T>` |
+| Single object | the object directly | `T` |
+| Collection (array, no `meta`) | the array directly | `T[]` |
+| Nested paginated `{ data: { data, meta } }` | `{ data: T[], meta, links }` | `PaginatedResponse<T>` |
+| Null / delete | `null` | `null` |
+
+**Key rule**: Consumers NEVER see `status`, `message`, or `timestamp`. These exist only in the HTTP response envelope. The `extractData` function strips them.
+
+**When fixing data shape bugs**:
+1. Read `extractData()` to understand what consumers actually receive
+2. Check what the backend `successResponse()` wraps — always `{ status, message, timestamp, data, meta?, links? }`
+3. The fix is almost always in ONE of two places: `extractData` (frontend) or `indexByProduct`/endpoint method (backend using wrong list method)
+4. Never create separate bypass functions — all data passes through `extractData`
+
+**Files**:
+- `resources/js/lib/api/core/client.ts` — `extractData()` definition
+- `app/Core/http/Controllers/Traits/ApiResponders.php` — `successResponse()` backend envelope
+- `resources/js/lib/api/core/types.ts` — `PaginationMeta`, `PaginationLinks`, `PaginatedResponse<T>` types
 
 ### Phase 26 — POS Cart Discount Self-Corrupting State (July 25)
 

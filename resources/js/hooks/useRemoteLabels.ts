@@ -4,7 +4,7 @@
 
 import { useMemo }    from 'react';
 import { useQueries } from '@tanstack/react-query';
-import apiClient      from '@/lib/api/core/client';
+import { apiGet }       from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
 
 // ── Types (مستقلة — لا تستورد من LookupPage) ──
@@ -40,15 +40,9 @@ export function useRemoteLabels(
     queries: remoteFields.map(f => ({
       queryKey: [slug, 'remote-labels', f.remoteEndpoint] as const,
       queryFn: () =>
-        apiClient
-          .get(f.remoteEndpoint!, { params: { per_page: 500 } })
-          .then(res => {
-            const raw = res.data as any;
-            const arr: any[] = Array.isArray(raw?.data)
-              ? raw.data
-              : Array.isArray(raw?.data?.data)
-                ? raw.data.data
-                : [];
+        apiGet<any>(f.remoteEndpoint!, { per_page: 500 })
+          .then(data => {
+            const arr: any[] = Array.isArray(data) ? data : (data?.data ?? []);
             const labelField = f.remoteLabel ?? 'arabic_name';
             const valueField = f.remoteValue ?? 'id';
             const map: Record<string | number, string> = {};

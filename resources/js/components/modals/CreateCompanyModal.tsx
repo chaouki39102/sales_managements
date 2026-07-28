@@ -5,7 +5,7 @@
 //   الخطوة 2: السنة المالية الأولى (إلزامية)
 // ════════════════════════════════════════════════
 import { useState, useEffect, useRef, useCallback } from "react";
-import client from "@/lib/api/core/client";
+import { apiPost } from "@/lib/api/core/client";
 
 
 // ── Types ─────────────────────────────────────────────────────────
@@ -233,8 +233,7 @@ function StepCompany({
             if (rc.trim()) payload.rc = rc.trim();
             if (ai.trim()) payload.ai = ai.trim();
 
-            const res = await client.post("/companies", payload);
-            const company: Company = res.data?.data ?? res.data;
+            const company = await apiPost<Company>("/companies", payload);
             onNext(company);
         } catch (e: any) {
             const msg =
@@ -808,14 +807,12 @@ function StepFiscalYear({
         setLoading(true);
   setError(null);
   try {
-    const res = await client.post(`/${company.slug}/fiscal-years`, {
+    const fy = await apiPost<FiscalYear>(`/${company.slug}/fiscal-years`, {
       name: yearNum,
       start_date: startDate,
       end_date: endDate,
       is_current: true,
-    }, { _skipSlug: true } as any); // ✅ إضافة _skipSlug
-
-    const fy: FiscalYear = res.data?.data ?? res.data;
+    }, { _skipSlug: true } as any);
     onDone(fy);
   } catch (e: any) {
     setError(e?.response?.data?.message ?? "فشل إنشاء السنة المالية");

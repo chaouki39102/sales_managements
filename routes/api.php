@@ -5,7 +5,6 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CompanyController;
 use App\Http\Controllers\Api\V1\UserController;
 
-use App\Http\Controllers\Api\V1\ImageProxyController;
 
 // Tenant Resource Controllers
 use App\Http\Controllers\Api\V1\PartyController;
@@ -277,10 +276,10 @@ Route::prefix('v1')->group(function () {
             Route::get('products',                    [ProductController::class, 'index']);
             Route::get('products/active',             [ProductController::class, 'active']);
             Route::get('products/image-search',       [ProductController::class, 'imageSearch']);
-            Route::get('image-proxy',                  ImageProxyController::class);
             Route::get('products/by-family/{family}', [ProductController::class, 'byFamily']);
             Route::get('products/by-brand/{brand}',   [ProductController::class, 'byBrand']);
             Route::get('products/{product}',          [ProductController::class, 'show']);
+            Route::post('products/{product}/image',   [ProductController::class, 'uploadImage']);
 
             Route::get('product-variants',                  [ProductVariantController::class, 'index']);
             Route::get('product-variants/barcode-search',  [ProductVariantController::class, 'barcodeSearch']);
@@ -383,7 +382,6 @@ Route::prefix('v1')->group(function () {
                 // منتجات وأطراف ومستودعات - كتابة
                 Route::post('products/copy-config',    [ProductController::class, 'copyConfig']);
                 Route::apiResource('products',          ProductController::class,             ['except' => ['index', 'show']]);
-                Route::apiResource('barcodes',          BarcodeController::class,             ['except' => ['index', 'show']]);
                 Route::apiResource('product-variants',  ProductVariantController::class,      ['except' => ['index', 'show']]);
                 Route::apiResource('warehouses',        WarehouseController::class,           ['except' => ['index', 'show']]);
                 Route::apiResource('parties',           PartyController::class,               ['except' => ['index', 'show']]);

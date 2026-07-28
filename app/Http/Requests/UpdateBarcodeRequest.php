@@ -11,7 +11,11 @@ class UpdateBarcodeRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        $barcode = \App\Models\Barcode::find($this->route('barcode'));
+        if (!$barcode) {
+            return false;
+        }
+        return $this->user()->can('update', $barcode);
     }
 
     public function rules(): array

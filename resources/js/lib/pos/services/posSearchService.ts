@@ -8,7 +8,7 @@
 // - تحسينات أداء كبيرة
 // ════════════════════════════════════════════════════════════════════════════
 
-import type { ProductVariant } from '@/lib/api/core/types';
+import type { ProductVariant, Barcode } from '@/lib/api/core/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -167,8 +167,8 @@ function scoreVariantEnhanced(
     }
 
     // بادئة الباركودات الإضافية
-    const bcList = (variant as any).barcodes as { barcode: string }[] | undefined;
-    if (bcList?.some(bc => normalizeSearchText(bc.barcode).startsWith(normalizedQuery))) {
+    const bcList = variant.barcodes;
+    if (bcList?.some((bc: Barcode) => normalizeSearchText(bc.barcode).startsWith(normalizedQuery))) {
       return {
         score: SCORING.prefix_barcode,
         matchType: 'prefix',
@@ -217,9 +217,9 @@ function scoreVariantEnhanced(
       scorePartial: SCORING.barcode_partial,
     },
     // Additional barcodes from the barcodes table
-    ...(((variant as any).barcodes as { barcode: string }[] | undefined)
-      ?.filter(bc => bc.barcode !== variant.barcode)
-      .map(bc => ({
+    ...(variant.barcodes
+      ?.filter((bc: Barcode) => bc.barcode !== variant.barcode)
+      .map((bc: Barcode) => ({
         name: 'barcode' as const,
         value: bc.barcode,
         scoreExact: SCORING.barcode_exact,

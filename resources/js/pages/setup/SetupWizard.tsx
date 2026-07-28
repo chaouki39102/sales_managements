@@ -3,7 +3,7 @@
 // معالج الإعداد الأولي للمؤسسة — 4 خطوات
 // ════════════════════════════════════════════════
 import React, { useState, useCallback } from 'react';
-import apiClient from '@/lib/api/core/client';
+import { apiPost, apiUpload } from '@/lib/api/core/client';
 
 // ── Types ──────────────────────────────────────────
 interface CompanyForm {
@@ -421,7 +421,7 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
 
       // نحفظ الإعدادات بشكل تسلسلي لتجنب race conditions
       for (const s of settings.filter(x => x.value)) {
-        await apiClient.post('/settings', s);
+        await apiPost('/settings', s);
       }
 
       // 2. رفع الشعار (اختياري — لا يوقف الإعداد)
@@ -430,14 +430,12 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
           const fd = new FormData();
           fd.append('file', logo);
           fd.append('type', 'company_logo');
-          await apiClient.post('/attachments', fd, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-          });
+          await apiUpload('/attachments', fd);
         } catch { /* تجاهل خطأ الشعار */ }
       }
 
       // 3. إنشاء السنة المالية
-      await apiClient.post('/fiscal-years', {
+      await apiPost('/fiscal-years', {
         name:       fiscal.name,
         start_date: fiscal.start_date,
         end_date:   fiscal.end_date,
@@ -447,13 +445,8 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
       onComplete();
 
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string; errors?: Record<string,string[]> } } })?.response?.data;
-      if (msg?.errors) {
-        const firstError = Object.values(msg.errors)[0]?.[0];
-        setError(firstError || 'حدث خطأ أثناء الحفظ');
-      } else {
-        setError(msg?.message || 'حدث خطأ أثناء الحفظ. تحقق من الاتصال وأعد المحاولة.');
-      }
+      const msg = err instanceof Error ? err.message : 'حدث خطأ أثناء الحفظ. تحقق من الاتصال وأعد المحاولة.';
+      setError(msg);
     } finally {
       setSaving(false);
     }

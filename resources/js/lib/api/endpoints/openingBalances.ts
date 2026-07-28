@@ -2,23 +2,20 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiGet, apiPost, apiPut, apiDelete } from '../core/client';
 import { tenantKeys } from '../core/queryKeys';
+import type { PaginatedResponse } from '../core/types';
 
-// ✅ يتعامل مع أي شكل استجابة محتمل: مصفوفة مباشرة، {data:[...]}, {data:{data:[...]}}, {items:[...]}
-function toArray(data: any): any[] {
-    if (Array.isArray(data)) return data;
-    if (data && typeof data === 'object') {
-        if (Array.isArray(data.data)) return data.data;
-        if (data.data && typeof data.data === 'object' && Array.isArray(data.data.data)) return data.data.data;
-        if (Array.isArray(data.items)) return data.items;
-    }
+// extractData already strips envelope; paginated → { data: T[], meta }, non-paginated → T[]
+function toArray(result: any): any[] {
+    if (Array.isArray(result)) return result;
+    if (result && typeof result === 'object' && Array.isArray(result.data)) return result.data;
     return [];
 }
 
 export const openingBalancesApi = {
     getParties: (fiscalYearId: number) =>
-        apiGet('/opening-balance-parties', { 'filter[fiscal_year_id]': fiscalYearId, include: 'party', per_page: 200 }),
+        apiGet<PaginatedResponse<any>>('/opening-balance-parties', { 'filter[fiscal_year_id]': fiscalYearId, include: 'party', per_page: 200 }),
     getTreasury: (fiscalYearId: number) =>
-        apiGet('/opening-balance-treasury', { 'filter[fiscal_year_id]': fiscalYearId, include: 'treasuryAccount', per_page: 200 }),
+        apiGet<PaginatedResponse<any>>('/opening-balance-treasury', { 'filter[fiscal_year_id]': fiscalYearId, include: 'treasuryAccount', per_page: 200 }),
 
     createParty: (data: any) =>
         apiPost('/opening-balance-parties', data),

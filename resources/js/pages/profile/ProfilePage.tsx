@@ -3,7 +3,7 @@
 // ════════════════════════════════════════════════════════════
 import React, { useState, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import apiClient from "@/lib/api/core/client";
+import { apiGet, apiPut, apiPost, apiUpload } from "@/lib/api/core/client";
 
 interface Gender   { id: number; name: string; label: string }
 interface Wilaya   { id: number; name: string; arabic_name?: string }
@@ -309,28 +309,28 @@ function InfoTab({ profile, canEdit }: { profile: UserProfile; canEdit: boolean 
 
   const { data: genders }  = useQuery<Gender[]>({
     queryKey: ["genders"],
-    queryFn: () => apiClient.get("/genders").then(r => r.data.data ?? r.data),
+    queryFn: () => apiGet<Gender[]>("/genders"),
     staleTime: 10 * 60_000,
   });
 
   const { data: wilayas }  = useQuery<Wilaya[]>({
     queryKey: ["wilayas"],
-    queryFn: () => apiClient.get("/wilayas", { params: { per_page: 100 } }).then(r => r.data.data ?? r.data),
+    queryFn: () => apiGet<Wilaya[]>("/wilayas", { per_page: 100 }),
     staleTime: 60 * 60_000,
     enabled:  editing,
   });
 
   const { data: communes } = useQuery<Commune[]>({
     queryKey: ["communes", form.wilaya_id],
-    queryFn: () => apiClient.get("/communes", {
-      params: { per_page: 1000, "filter[wilaya_id]": form.wilaya_id },
-    }).then(r => r.data.data ?? r.data),
+    queryFn: () => apiGet<Commune[]>("/communes", {
+      per_page: 1000, "filter[wilaya_id]": form.wilaya_id,
+    }),
     staleTime: 60 * 60_000,
     enabled:  editing && !!form.wilaya_id,
   });
 
   const saveMut = useMutation({
-    mutationFn: (data: ProfileFormData) => apiClient.put("/me", {
+    mutationFn: (data: ProfileFormData) => apiPut("/me", {
       name:       data.name,
       username:   data.username  || undefined,
       phone:      data.phone     || undefined,
@@ -581,7 +581,7 @@ function SecurityTab({ profile, canEdit }: { profile: UserProfile; canEdit: bool
 
   const changeMut = useMutation({
     mutationFn: (data: typeof form) =>
-      apiClient.post(`/me/change-password`, {
+      apiPost(`/me/change-password`, {
         current_password:          data.current_password,
         new_password:              data.new_password,
         new_password_confirmation: data.new_password_confirmation,
@@ -924,7 +924,7 @@ function AvatarUpload({ profile }: { profile: UserProfile }) {
     try {
       const fd = new FormData();
       fd.append("avatar", file);
-      await apiClient.post("/me/avatar", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      await apiUpload("/me/avatar", fd);
       qc.invalidateQueries({ queryKey: ["profile"] });
     } catch (e) {
       setError(err2str(e, "فشل رفع الصورة"));
@@ -984,8 +984,9 @@ export default function ProfilePage() {
     queryKey: ["profile"],
     // GET /{company}/me → UserController::profile() يُحمّل roles+permissions
     // الـ interceptor يُضيف slug تلقائياً لأن /me ليست public path
-    queryFn: () => apiClient.get("/me", { params: { include: "roles,permissions,gender,commune,wilaya" } })
-      .then(r => r.data?.data ?? r.data),
+    queryFn: () => apiGet<UserProfile>("/me", {
+      include: "roles,permissions,gender,commune,wilaya",
+    }),
     staleTime: 30_000,
   });
 

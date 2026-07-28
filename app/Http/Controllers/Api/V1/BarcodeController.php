@@ -34,21 +34,23 @@ class BarcodeController extends BaseApiController
         return Barcode::class;
     }
 
-    public function indexByProduct(Request $request, $productId): JsonResponse
+    public function indexByProduct(Request $request, $productId = null): JsonResponse
     {
         try {
+            $productId = $this->extractId($productId);
             $product = Product::findOrFail($productId);
             $this->authorizeAction('viewAny', Barcode::class);
             $this->authorizeAction('view', $product);
 
-            $data = $this->apiListWithCallback(
-                Barcode::class,
-                fn($query) => $query->where('product_id', $productId),
-                $request,
-                $this->getListConfig(),
-            );
+            $barcodes = Barcode::where('product_id', $productId)
+                ->orderBy('is_primary', 'desc')
+                ->orderBy('id')
+                ->get();
 
-            return $this->successResponse($data, 'تم جلب باركودات المنتج');
+            return $this->successResponse(
+                BarcodeResource::collection($barcodes),
+                'تم جلب باركودات المنتج'
+            );
         } catch (\Throwable $e) {
             return $this->handleError($e, 'indexByProduct');
         }
@@ -59,7 +61,7 @@ class BarcodeController extends BaseApiController
         try {
             $validatedData = app(StoreBarcodeRequest::class)->validated();
 
-            $product = Product::findOrFail($validatedData['product_id']);
+            $product = Product::where('company_id', $request->_company->id)->findOrFail($validatedData['product_id']);
             $this->authorizeAction('create', [Barcode::class, $product]);
 
             $barcode = $this->barcodeService->create($validatedData, $request);

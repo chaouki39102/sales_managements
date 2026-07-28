@@ -10,6 +10,7 @@ use App\Models\ProductPackaging;
 use App\Models\QuantityDiscount;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class ProductController extends BaseApiController
 {
@@ -85,12 +86,45 @@ class ProductController extends BaseApiController
     }
 
     /**
+     * رفع صورة للمنتج من الجهاز — تُخزّن في storage/app/public/products/{id}/
+     * تُضيف URL الصورة إلى مصفوفة images الموجودة.
+     */
+    public function uploadImage(Request $request, $id = null): JsonResponse
+    {
+        try {
+            $id = $this->extractId($id);
+            $product = Product::findOrFail($id);
+            $this->authorizeAction('update', $product);
+
+            $request->validate([
+                'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+            ]);
+
+            $file = $request->file('image');
+            $path = $file->store("products/{$id}", 'public');
+            $url  = Storage::disk('public')->url($path);
+
+            $images = $product->images ?? [];
+            $images[] = $url;
+            $product->update(['images' => $images]);
+
+            return $this->successResponse(
+                new ProductResource($product->fresh()),
+                'تم رفع الصورة بنجاح'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'uploadImage');
+        }
+    }
+
+    /**
      * نسخ تكوين (تعبئات + خصومات كمية) من منتج المصدر إلى منتجات هدف.
      * POST /products/copy-config
      */
     public function copyConfig(Request $request): JsonResponse
     {
         try {
+            $companyId = $request->_company->id;
             $validated = $request->validate([
                 'source_product_id'  => 'required|integer|exists:products,id',
                 'target_product_ids' => 'required|array|min:1',
@@ -101,7 +135,6 @@ class ProductController extends BaseApiController
                 'replace_discounts'  => 'boolean',
             ]);
 
-            $companyId = $request->_company->id;
             $source = Product::with(['packagings', 'quantityDiscounts'])
                 ->where('company_id', $companyId)
                 ->findOrFail($validated['source_product_id']);

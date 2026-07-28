@@ -8,7 +8,7 @@ import React, {
 } from 'react';
 import { useLookup }       from '@/hooks/useLookup';
 import { useRemoteLabels } from '@/hooks/useRemoteLabels';
-import apiClient           from '@/lib/api/core/client';
+import { apiGet }           from '@/lib/api/core/client';
 import Card                from '@/components/ui/Card';
 import SimpleTable          from '@/components/ui/SimpleTable';
 import { useNotification } from '@/hooks/useNotification';
@@ -87,13 +87,12 @@ function useRemoteOptions(
     const params: Record<string, any> = { per_page: 500, ...extraParams };
     if (cascadeParam && parentValue) params[cascadeParam] = parentValue;
 
-    apiClient.get(endpoint, { params })
-      .then(res => {
-        const raw = res.data as any;
-        const items: any[] = Array.isArray(raw?.data)
-          ? raw.data
-          : Array.isArray(raw?.data?.data)
-            ? raw.data.data : [];
+    apiGet<any>(endpoint, params)
+      .then(data => {
+        const items: any[] = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.data)
+            ? data.data : [];
         setOptions(items.map(i => ({
           value: i[valueField] ?? i.id,
           label: i[labelField] ?? i.arabic_name ?? i.name ?? String(i.id),

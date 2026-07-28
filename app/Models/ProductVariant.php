@@ -58,7 +58,18 @@ class ProductVariant extends Model
 
     public function company() { return $this->belongsTo(Company::class); }
     public function product() { return $this->belongsTo(Product::class); }
-    public function barcodes() { return $this->hasMany(Barcode::class); }
+    public function barcodes() {
+        $variantId = $this->id;
+        $productId = $this->product_id;
+
+        return $this->hasMany(Barcode::class)->where(function ($query) use ($variantId, $productId) {
+            $query->where('variant_id', $variantId)
+                  ->orWhere(function ($q) use ($productId) {
+                      $q->whereNull('variant_id')
+                        ->where('product_id', $productId);
+                  });
+        });
+    }
 
     public function getFinalPriceAttribute(): ?float
     {

@@ -33,7 +33,6 @@ export {
   systemBootApi,
   activityApi,
 };
-export { apiGetPaginated } from './api/admin';
 
 // ─── adminApi — wrapper بدون تكرار كود ───────────────────────────────────────
 export const adminApi = {

@@ -9,7 +9,6 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '@/lib/api/core/client';
-import { apiGetPaginated } from './client';
 import type { AdminCompany, AdminUser, Paginated, AdminCompaniesFilter } from '@/types/admin';
 
 const ADMIN = '/admin/companies';
@@ -19,7 +18,7 @@ export const companiesApi = {
 
   // GET  /api/v1/admin/companies
   list: (f?: AdminCompaniesFilter) =>
-    apiGetPaginated<Paginated<AdminCompany>>(ADMIN, f as any),
+    apiGet<Paginated<AdminCompany>>(ADMIN, f as any),
 
   // GET  /api/v1/admin/companies/{id}
   show: (id: number) =>
@@ -85,7 +84,7 @@ export const companiesApi = {
 
   // GET  /api/v1/admin/companies/{id}/users
   listUsers: (id: number, params?: { page?: number; per_page?: number }) =>
-    apiGetPaginated<Paginated<AdminUser>>(`${ADMIN}/${id}/users`, params as any),
+    apiGet<Paginated<AdminUser>>(`${ADMIN}/${id}/users`, params as any),
 
   // POST /api/v1/admin/companies/{id}/users
   addUser: (id: number, userId: number, role?: string) =>

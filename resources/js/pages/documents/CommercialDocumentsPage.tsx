@@ -60,7 +60,7 @@ import SimpleTable from "@/components/ui/SimpleTable";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useNotification } from '@/hooks/useNotification';
-import type { DocumentType, CommercialDocument } from "@/lib/api/core/types";
+import type { DocumentType, CommercialDocument, PaginatedResponse } from "@/lib/api/core/types";
 
 // أنماط SmartFilter الخاصة بالمشروع (مفصولة عن library)
 import { ERP_FILTER_PATTERNS } from "@/lib/datatable-patterns";
@@ -250,7 +250,7 @@ function ExpandedLines({ doc }: { doc: CommercialDocument }) {
         queryFn: () =>
             apiGet<CommercialDocument>(`/documents/${doc.id}`, {
                 include: "lines.product,lines.productVariant",
-            }).then(r => ((r as unknown as Record<string, unknown>).data as CommercialDocument) ?? r),
+            }),
         staleTime: 5 * 60_000,
         enabled: !!doc.id,
     });
@@ -368,7 +368,7 @@ function DocumentViewModal({
         queryFn: () =>
             apiGet<CommercialDocument>(`/documents/${docId}`, {
                 include: ["party","documentStatus","warehouse","fiscalYear","currency","documentType","lines.product","lines.productVariant","validatedBy","payments.paymentMode"].join(","),
-            }).then(r => ((r as unknown as Record<string, unknown>).data as CommercialDocument) ?? r),
+            }),
         staleTime: 2 * 60_000,
     });
 
@@ -612,8 +612,8 @@ export default function CommercialDocumentsPage() {
     const { data: docType } = useQuery<DocumentType | null>({
         queryKey: [slug, "document-type-by-code", typeCode],
         queryFn: () =>
-            apiGet<{ data?: DocumentType[] }>("/document-types", { per_page: 500 }).then(res => {
-                const list = Array.isArray(res) ? (res as DocumentType[]) : (((res as Record<string,unknown>).data as DocumentType[]) ?? []);
+            apiGet<DocumentType[]>("/document-types", { per_page: 500 }).then(res => {
+                const list = Array.isArray(res) ? res : ((res as Record<string,unknown>)?.data as DocumentType[]) ?? [];
                 return list.find(dt => dt.code === typeCode) ?? null;
             }),
         enabled: !!slug && !!typeCode,
@@ -669,7 +669,7 @@ export default function CommercialDocumentsPage() {
     const { data: docsRaw, isLoading, isFetching } = useQuery({
         queryKey: tenantKeys.documents.byType(slug ?? "", typeCode ?? "", queryParams),
         queryFn: () => {
-            return apiGet<{ data: CommercialDocument[]; meta: Record<string, number> }>("/documents", queryParams);
+            return apiGet<PaginatedResponse<CommercialDocument>>("/documents", queryParams);
         },
         enabled: !!slug && !!typeCode && !!selectedYear?.id && !!docType?.id,
         placeholderData: keepPreviousData,
@@ -678,27 +678,18 @@ export default function CommercialDocumentsPage() {
 
     const items = useMemo((): CommercialDocument[] => {
         if (!docsRaw) return [];
+        // extractData returns PaginatedResponse { data: T[], meta } or T[]
         if (Array.isArray(docsRaw)) return docsRaw as CommercialDocument[];
         const raw = docsRaw as unknown as Record<string, unknown>;
-        // بنية مباشرة: { data: [...], meta: {...} }
         if (Array.isArray(raw.data)) return raw.data as CommercialDocument[];
-        // بنية مُغلَّفة: { data: { data: [...], meta: {...} } }
-        const nested = raw.data as Record<string, unknown> | undefined;
-        if (nested && Array.isArray(nested.data)) return nested.data as CommercialDocument[];
         return [];
     }, [docsRaw]);
 
-    // ── استخراج meta مع دعم كل بنى Laravel ──────────────────────────────────
-    // Laravel يُرجع pagination في:
-    //   • { data: [...], meta: { current_page, last_page, total, per_page } }  ← JsonResource::collection
-    //   • { data: { data: [...], meta: {...} } }                                ← لو apiGet يُغلّف
-    //   • { data: [...], current_page, last_page, total }                       ← paginator مباشر
     const meta = useMemo(() => {
         if (!docsRaw || Array.isArray(docsRaw)) return { total: 0, last_page: 1, current_page: 1, per_page: perPage };
 
-        const raw    = docsRaw as unknown as Record<string, unknown>;
-        // الأكثر شيوعاً: meta object على المستوى الأول
-        const m      = (raw.meta ?? (raw.data as Record<string, unknown> | undefined)?.meta) as Record<string, number> | undefined;
+        const raw = docsRaw as unknown as Record<string, unknown>;
+        const m = raw.meta as Record<string, number> | undefined;
 
         if (m && (m.total != null || m.last_page != null)) {
             return {
@@ -706,16 +697,6 @@ export default function CommercialDocumentsPage() {
                 last_page:    Number(m.last_page    ?? 1),
                 current_page: Number(m.current_page ?? 1),
                 per_page:     Number(m.per_page     ?? perPage),
-            };
-        }
-
-        // fallback: pagination مباشرة على الـ root object (بعض الإعدادات)
-        if (raw.total != null || raw.last_page != null) {
-            return {
-                total:        Number(raw.total        ?? 0),
-                last_page:    Number(raw.last_page    ?? 1),
-                current_page: Number(raw.current_page ?? 1),
-                per_page:     Number(raw.per_page     ?? perPage),
             };
         }
 
@@ -866,8 +847,9 @@ export default function CommercialDocumentsPage() {
             filter: {
                 type: "dynamic-multiselect" as const,
                 fetchOptions: async () => {
-                    const res = await apiGet<{ data: { name?: string }[] }>('/parties', { per_page: 9999 });
-                    return [...new Set((res?.data ?? []).map(p => p.name).filter(Boolean))] as string[];
+                    const res = await apiGet<any>('/parties', { per_page: 9999 });
+                    const list = Array.isArray(res) ? res : (res?.data ?? []);
+                    return [...new Set(list.map((p: any) => p.name).filter(Boolean))] as string[];
                 },
             },
             accessor: r => getPartyName(r),
@@ -894,8 +876,9 @@ export default function CommercialDocumentsPage() {
             filter: {
                 type: "dynamic-multiselect" as const,
                 fetchOptions: async () => {
-                    const res = await apiGet<{ data: { name?: string }[] }>('/warehouses', { per_page: 9999 });
-                    return [...new Set((res?.data ?? []).map(w => w.name).filter(Boolean))] as string[];
+                    const res = await apiGet<any>('/warehouses', { per_page: 9999 });
+                    const list = Array.isArray(res) ? res : (res?.data ?? []);
+                    return [...new Set(list.map((w: any) => w.name).filter(Boolean))] as string[];
                 },
             },
             accessor: r => getWarehouseName(r),
@@ -1159,8 +1142,9 @@ export default function CommercialDocumentsPage() {
             filter: {
                 type: "dynamic-multiselect" as const,
                 fetchOptions: async () => {
-                    const res = await apiGet<{ data: { name?: string }[] }>('/users', { per_page: 9999 });
-                    return [...new Set((res?.data ?? []).map(u => u.name).filter(Boolean))] as string[];
+                    const res = await apiGet<any>('/users', { per_page: 9999 });
+                    const list = Array.isArray(res) ? res : (res?.data ?? []);
+                    return [...new Set(list.map((u: any) => u.name).filter(Boolean))] as string[];
                 },
             },
             // validated_by في DB = integer FK — الـ Resource يُرسل العلاقة بـ camelCase
@@ -1184,8 +1168,9 @@ export default function CommercialDocumentsPage() {
             filter: {
                 type: "dynamic-multiselect" as const,
                 fetchOptions: async () => {
-                    const res = await apiGet<{ data: { name?: string }[] }>('/users', { per_page: 9999 });
-                    return [...new Set((res?.data ?? []).map(u => u.name).filter(Boolean))] as string[];
+                    const res = await apiGet<any>('/users', { per_page: 9999 });
+                    const list = Array.isArray(res) ? res : (res?.data ?? []);
+                    return [...new Set(list.map((u: any) => u.name).filter(Boolean))] as string[];
                 },
             },
             // المنشئ = user_id في DB → العلاقة هي user() وليس created_by
@@ -1818,12 +1803,12 @@ export default function CommercialDocumentsPage() {
                             const total = Number(meta.total ?? 0);
                             if (total === 0) return [];
                             const { page: _p, per_page: _pp, ...params } = queryParams;
-                            const res = await apiGet<{ data: CommercialDocument[] }>("/documents", {
+                            const res = await apiGet<PaginatedResponse<CommercialDocument>>("/documents", {
                                 ...params,
                                 per_page: Math.min(total, 10000),
                                 page: 1,
                             });
-                            return Array.isArray(res.data) ? res.data : [];
+                            return res?.data ?? [];
                         }}
 
                         // ── 🆕 Smart Filter عربي — مع أنماط ERP الجزائري ──

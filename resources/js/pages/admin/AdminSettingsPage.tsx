@@ -8,6 +8,7 @@ import { adminApi } from '@/lib/admin';
 import PageHeader from '@/components/ui/PageHeader';
 import type { SystemSettings } from '@/types/admin';
 import { useNotification } from '@/hooks/useNotification';
+import { apiPost } from '@/lib/api/core/client';
 
 // ─── Toggle ───────────────────────────────────────────────────────────────────
 function Toggle({ checked, onChange, label, desc, color = 'var(--em)' }: {
@@ -371,11 +372,8 @@ export default function AdminSettingsPage() {
             disabled={bootPermMut.isPending}
             onClick={() => {
               import('@/lib/admin').then(({ adminApi }) => {
-                fetch('/api/v1/admin/system/boot', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                  credentials: 'include',
-                }).then(r => r.json()).then(d => notify.success(d.message || 'تم تثبيت الخطط ✓'));
+                apiPost('/admin/system/boot')
+                  .then((d: any) => notify.success(d.message || 'تم تثبيت الخطط ✓'));
               });
             }}
             style={{

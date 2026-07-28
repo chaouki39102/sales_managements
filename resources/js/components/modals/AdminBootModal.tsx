@@ -9,7 +9,7 @@
 //   POST /api/v1/admin/system/boot/permissions
 // ════════════════════════════════════════════════════════════════════════════
 import { useEffect, useRef, useState, useCallback } from 'react';
-import client from '@/lib/api/core/client';
+import { apiPost, apiGet } from '@/lib/api/core/client';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -92,10 +92,10 @@ export default function AdminBootModal({
   useEffect(() => {
     const check = async () => {
       try {
-        const res = await client.get<SystemStatus>('/api/v1/admin/system/status');
-        setStatus(res.data);
+        const res = await apiGet<SystemStatus>('/admin/system/status');
+        setStatus(res);
 
-        if (res.data.is_ready) {
+        if (res.is_ready) {
           clearInterval(timerRef.current);
           setPhase('ready');
           setCurrentLabel('النظام مُعدّ ✓');
@@ -135,10 +135,10 @@ export default function AdminBootModal({
 
       const t0 = Date.now();
       try {
-        await client.post(step.endpoint);
+        await apiPost(step.endpoint);
         setStep(step.key, { status: 'done', ms: Date.now() - t0 });
       } catch (e: any) {
-        const msg = e?.response?.data?.message ?? 'خطأ غير معروف';
+        const msg = e instanceof Error ? e.message : 'خطأ غير معروف';
         setStep(step.key, { status: 'error', message: msg });
         errors.push(`${step.label}: ${msg}`);
       }

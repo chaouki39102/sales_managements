@@ -29,7 +29,7 @@ export const rolesApi = {
   create: (data: Partial<Role>) => apiPost<Role>('/roles', data),
   update: (id: number, data: Partial<Role>) => apiPut<Role>(`/roles/${id}`, data),
   delete: (id: number)          => apiDelete(`/roles/${id}`),
-  permissions: async ()         => { const res = await apiGet<{data: Permission[]; meta?: unknown}>('/permissions', { per_page: 500, sort: 'group' }); return res.data; },
+  permissions: async ()         => { const res = await apiGet<PaginatedResponse<Permission>>('/permissions', { per_page: 500, sort: 'group' }); return res?.data ?? []; },
 } as const;
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────

@@ -23,36 +23,21 @@
 import { useState, useCallback } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 
-// ── Types matching backend exactly ──────────────────────────────────────────
+// ── Re-export core types as aliases (single source of truth: api/core/types.ts) ──
+import type {
+  PaginationMeta  as BackendMeta,
+  PaginationLinks as BackendLinks,
+  PaginatedResponse as ExtractedPaginated,
+} from '@/lib/api/core/types';
 
-export interface BackendMeta {
-  current_page:   number;
-  last_page:      number;
-  per_page:       number;
-  total:          number;
-  from:           number | null;
-  to:             number | null;
-  has_more_pages: boolean;
-  is_first_page:  boolean;
-  is_last_page:   boolean;
-}
+export type { BackendMeta, BackendLinks, ExtractedPaginated };
 
-export interface BackendLinks {
-  first:   string | null;
-  last:    string | null;
-  prev:    string | null;
-  next:    string | null;
-  current: string;
-}
-
-export interface BackendListResponse<T> {
-  status:    'success' | 'error';
-  message:   string;
-  timestamp: string;
-  data:      T[];
-  meta:      BackendMeta;
-  links:     BackendLinks;
-}
+/**
+ * BackendListResponse — what the fetcher returns AFTER extractData strips the envelope.
+ * Matches PaginatedResponse<T>: { data: T[], meta, links }
+ * (status/message/timestamp are stripped by extractData)
+ */
+export type BackendListResponse<T> = ExtractedPaginated<T>;
 
 export interface BackendErrorResponse {
   status:    'error';
@@ -201,16 +186,14 @@ export function usePagination<T>({
     refetchOnWindowFocus: false,
   });
 
-  // ── استخراج data/meta/links من الـ response ──────────────────────────────
-  const data  = response?.status === 'success' ? response.data  : [];
-  const meta  = response?.status === 'success' ? response.meta  : null;
-  const links = response?.status === 'success' ? response.links : null;
+  // ── extractData strips the envelope: response = { data: T[], meta, links } ──
+  const data  = (response as BackendListResponse<T> | undefined)?.data  ?? [];
+  const meta  = (response as BackendListResponse<T> | undefined)?.meta  ?? null;
+  const links = (response as BackendListResponse<T> | undefined)?.links ?? null;
 
   const error = queryError
     ? (queryError instanceof Error ? queryError.message : 'حدث خطأ في جلب البيانات')
-    : response?.status === 'error'
-      ? (response.message ?? 'حدث خطأ في جلب البيانات')
-      : null;
+    : null;
 
   // ── updateParams: helper داخلي ────────────────────────────────────────────
   const updateParams = useCallback(

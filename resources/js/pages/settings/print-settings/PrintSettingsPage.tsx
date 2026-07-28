@@ -78,19 +78,18 @@ export default function PrintSettingsPage() {
   const { data: previewDoc, refetch, isFetching } = useQuery({
     queryKey: [slug, 'preview-latest-doc', activeDoc],
     queryFn: async () => {
-      const list = await apiClient.get<Record<string, unknown>>('/documents', {
+      const list = await apiClient.get<{ data: Array<{ id?: number }> }>('/documents', {
         'filter[document_type.code]': activeDoc,
         'page[size]': 1,
         sort: '-id',
         'fields[commercial_documents]': 'id',
       });
-      const docs = (list?.data ?? []) as Array<{ id?: number }>;
+      const docs = list?.data ?? [];
       const first = docs[0];
       if (!first?.id) return null;
-      const full = await apiClient.get<Record<string, unknown>>(`/documents/${first.id}`, {
+      const doc = await apiClient.get<Record<string, unknown>>(`/documents/${first.id}`, {
         include: ['party', 'lines', 'lines.product', 'lines.packaging', 'lines.stockLot', 'payments', 'payments.paymentMode'].join(','),
       });
-      const doc = (full?.data ?? full) as Record<string, unknown>;
       return doc ?? null;
     },
     enabled: !!slug && useRealData,
