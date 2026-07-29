@@ -276,7 +276,7 @@ export default function SessionInvoicesModal({ session, onClose, onOpen, onPrint
         <div className="si-info-bar">
           <span><i className="ti ti-user" /> {session.user?.name}</span>
           <span><i className="ti ti-building-warehouse" /> {session.warehouse?.name}</span>
-          <span><i className="ti ti-calendar" /> {openedDate}</span>
+          <span><i className="ti ti-calendar" /> {session.opened_at?.slice(0, 10)}</span>
           <span><i className="ti ti-clock" /> {formatDuration(session.duration)}</span>
           <span><i className="ti ti-file-invoice" /> {session.invoices_count ?? docs.length} فاتورة</span>
           <span className="si-info-total">{formatDZD(session.net_sales ?? 0)}</span>
