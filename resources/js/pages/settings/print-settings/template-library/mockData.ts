@@ -45,7 +45,9 @@ export function getMockDocumentData(): UniversalDocumentData {
       {
         rowNumber:  1,
         ref:        'REF001',
-        barcode:    '',
+        barcode:    '123456789012',
+        imageUrl:   null,
+        brand:      'ماركة نموذجية',
         name:       'منتج نموذجي 1',
         unit:       'قطعة',
         quantity:   2,

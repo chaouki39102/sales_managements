@@ -12,6 +12,7 @@ import TotalsSectionControls from '../sections/TotalsSection';
 import PaymentsSectionControls from '../sections/PaymentsSection';
 import FooterSectionControls from '../sections/FooterSection';
 import FormattingSectionControls from '../sections/FormattingSection';
+import LabelSectionControls from '../sections/LabelSection';
 import RulesSection from './RulesSection';
 import { isPropertyVisible } from '../services/PropertyVisibilityService';
 
@@ -50,16 +51,26 @@ export function TemplateControls({ tpl, update, companyData }: {
           إظهار / إخفاء الأقسام
         </span>
         <Toggle value={tpl.show_header_section} onChange={v => update('show_header_section', v)} label="الرأس" />
-        <Toggle value={tpl.show_doc_info_section} onChange={v => update('show_doc_info_section', v)} label="المستند" />
-        <Toggle value={tpl.show_items_section} onChange={v => update('show_items_section', v)} label="الجدول" />
-        <Toggle value={tpl.show_totals_section} onChange={v => update('show_totals_section', v)} label="الإجماليات" />
-        <Toggle value={tpl.show_payments_section} onChange={v => update('show_payments_section', v)} label="الدفع" />
-        <Toggle value={tpl.show_footer_section} onChange={v => update('show_footer_section', v)} label="التذييل" />
+        {docType !== 'STK' && (
+          <>
+            <Toggle value={tpl.show_doc_info_section} onChange={v => update('show_doc_info_section', v)} label="المستند" />
+            <Toggle value={tpl.show_items_section} onChange={v => update('show_items_section', v)} label="الجدول" />
+            <Toggle value={tpl.show_totals_section} onChange={v => update('show_totals_section', v)} label="الإجماليات" />
+            <Toggle value={tpl.show_payments_section} onChange={v => update('show_payments_section', v)} label="الدفع" />
+            <Toggle value={tpl.show_footer_section} onChange={v => update('show_footer_section', v)} label="التذييل" />
+          </>
+        )}
       </div>
 
       {sec('show_header_section') && (
         <Section id="s-header" title="رأس الفاتورة — الشعار والشركة" icon="ti-building-store" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
           <HeaderSectionControls tpl={tpl} update={update} company={companyData} />
+        </Section>
+      )}
+
+      {docType === 'STK' && (
+        <Section id="s-label" title="إعدادات الملصق — المنتج والسعر والباركود" icon="ti-tag" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
+          <LabelSectionControls tpl={tpl} update={update} />
         </Section>
       )}
 
@@ -93,18 +104,22 @@ export function TemplateControls({ tpl, update, companyData }: {
         </Section>
       )}
 
-      <Section id="s-format" title="تنسيق الطباعة — الهوامش والمسافات" icon="ti-settings" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
-        <FormattingSectionControls tpl={tpl} update={update}
-          rows={{ doc_info_rows: tpl.doc_info_rows ?? [], customer_info_rows: tpl.customer_info_rows ?? [], company_info_rows: tpl.company_info_rows ?? [] }}
-          onRowsChange={(key, rows) => update(key as keyof PrintTemplate, rows)}
-        />
-      </Section>
+      {docType !== 'STK' && (
+        <Section id="s-format" title="تنسيق الطباعة — الهوامش والمسافات" icon="ti-settings" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
+          <FormattingSectionControls tpl={tpl} update={update}
+            rows={{ doc_info_rows: tpl.doc_info_rows ?? [], customer_info_rows: tpl.customer_info_rows ?? [], company_info_rows: tpl.company_info_rows ?? [] }}
+            onRowsChange={(key, rows) => update(key as keyof PrintTemplate, rows)}
+          />
+        </Section>
+      )}
 
-      <Accordion id="s-rules" title="القواعد — الإظهار/الإخفاء الشرطي" icon="ti-adjustments" collapseVersion={collapseVersion} defaultOpen={!allCollapsed}>
-        <RulesSection tpl={tpl} update={update} />
-      </Accordion>
+      {docType !== 'STK' && (
+        <Accordion id="s-rules" title="القواعد — الإظهار/الإخفاء الشرطي" icon="ti-adjustments" collapseVersion={collapseVersion} defaultOpen={!allCollapsed}>
+          <RulesSection tpl={tpl} update={update} />
+        </Accordion>
+      )}
 
-      {sec('show_report_header') && (
+      {sec('show_report_header') && docType !== 'STK' && (
         <Accordion id="s-report" title="التقارير — الرسوم البيانية والتجميع" icon="ti-report-analytics" collapseVersion={collapseVersion} defaultOpen={!allCollapsed}>
           <Field label="نص رأس التقرير">
             <Input value={tpl.report_header_text} onChange={v => update('report_header_text', v)} />

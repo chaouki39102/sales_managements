@@ -6,7 +6,7 @@ export interface SettingMeta {
   key: keyof PrintTemplate;
   label: string;
   labelAr: string;
-  category: 'global' | 'paper' | 'header' | 'company' | 'document' | 'columns' | 'items' | 'totals' | 'payments' | 'footer' | 'barcode' | 'qr' | 'signature' | 'section-visibility' | 'rules' | 'report' | 'charts' | 'formatting';
+  category: 'global' | 'paper' | 'header' | 'company' | 'document' | 'columns' | 'items' | 'totals' | 'payments' | 'footer' | 'barcode' | 'qr' | 'signature' | 'section-visibility' | 'rules' | 'report' | 'charts' | 'formatting' | 'label';
   component: SettingComponent;
   defaultValue: unknown;
   supportedPapers: PaperSize[];
@@ -24,7 +24,7 @@ export interface SettingMeta {
 
 const ALL_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV', 'DDP', 'BT', 'POS', 'RPT', 'STK'];
 const STICKER_DOCS: DocTypeCode[] = ['STK'];
-const STICKER_LABEL: PaperSize[] = ['400x200mm'];
+const STICKER_LABEL: PaperSize[] = ['40x20mm'];
 const COMMERCIAL_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV'];
 const POS_DOCS: DocTypeCode[] = ['POS', 'RPT'];
 const _WAREHOUSE_DOCS: DocTypeCode[] = ['DDP', 'BT'];
@@ -32,7 +32,7 @@ const REPORT_DOC: DocTypeCode[] = ['RPT'];
 const _NON_REPORT_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV', 'DDP', 'BT', 'POS'];
 const THERMAL: PaperSize[] = ['80mm', '58mm'];
 const PAGE: PaperSize[] = ['A4', 'A5'];
-const ALL_PAPERS: PaperSize[] = ['80mm', '58mm', 'A4', 'A5', '400x200mm'];
+const ALL_PAPERS: PaperSize[] = ['80mm', '58mm', 'A4', 'A5', '40x20mm'];
 
 const ALIGN_OPTS = [
   { v: 'right' as const, l: 'يمين' },
@@ -312,6 +312,16 @@ export const SETTINGS_REGISTRY: Record<string, SettingMeta> = {
   label_border_width:      { key: 'label_border_width', label: 'Label Border Width', labelAr: 'سُمك الحدود', category: 'label', component: 'slider', defaultValue: 1, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, min: 0, max: 5, step: 0.5 },
   label_border_color:      { key: 'label_border_color', label: 'Label Border Color', labelAr: 'لون الحدود', category: 'label', component: 'color', defaultValue: '#333333', supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS },
   label_border_radius:     { key: 'label_border_radius', label: 'Label Border Radius', labelAr: 'تدوير زوايا الملصق', category: 'label', component: 'slider', defaultValue: 4, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, min: 0, max: 20, step: 1 },
+
+  // ── Label / Sticker — extended ──
+  show_label_product_image: { key: 'show_label_product_image', label: 'Show Product Image', labelAr: 'إظهار صورة المنتج', category: 'label', component: 'toggle', defaultValue: false, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, field: 'item.imageUrl' },
+  label_product_image_size: { key: 'label_product_image_size', label: 'Product Image Size', labelAr: 'حجم صورة المنتج', category: 'label', component: 'slider', defaultValue: 40, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, dependsOn: 'show_label_product_image', min: 20, max: 80, step: 2 },
+  show_label_brand:         { key: 'show_label_brand', label: 'Show Brand', labelAr: 'إظهار الماركة', category: 'label', component: 'toggle', defaultValue: false, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, field: 'item.brand' },
+  label_brand_size:         { key: 'label_brand_size', label: 'Brand Font Size', labelAr: 'حجم خط الماركة', category: 'label', component: 'slider', defaultValue: 7, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, dependsOn: 'show_label_brand', min: 6, max: 16, step: 1 },
+  label_brand_color:        { key: 'label_brand_color', label: 'Brand Color', labelAr: 'لون الماركة', category: 'label', component: 'color', defaultValue: '#888888', supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, dependsOn: 'show_label_brand' },
+  label_layout:             { key: 'label_layout', label: 'Label Layout', labelAr: 'تخطيط الملصق', category: 'label', component: 'pills', defaultValue: 'stacked', supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, options: [{ v: 'stacked', l: 'عمودي' }, { v: 'side-by-side', l: 'جنباً إلى جنب' }] },
+  label_hide_currency:      { key: 'label_hide_currency', label: 'Hide Currency Text', labelAr: 'إخفاء نص العملة', category: 'label', component: 'toggle', defaultValue: false, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, dependsOn: 'show_label_price' },
+  label_barcode_format:     { key: 'label_barcode_format', label: 'Barcode Format', labelAr: 'نوع الباركود', category: 'label', component: 'pills', defaultValue: 'code39', supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, dependsOn: 'show_label_barcode', options: [{ v: 'code39', l: 'Code 39' }, { v: 'ean13', l: 'EAN-13' }, { v: 'code128', l: 'Code 128' }] },
 
   // ── Section Dimensions (page papers only) ──
   section_header_width:    { key: 'section_header_width', label: 'Header Width %', labelAr: 'عرض الرأس %', category: 'formatting', component: 'slider', defaultValue: 100, supportedPapers: PAGE, supportedDocs: ALL_DOCS, min: 50, max: 100, step: 5 },

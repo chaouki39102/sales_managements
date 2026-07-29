@@ -34,14 +34,14 @@ export function paperConfig(size: PaperSize): PaperConfig {
         marginSides: A5_MARGIN_SIDES,
         paperWidthMm: 80,
       };
-    case '400x200mm':
+    case '40x20mm':
       return {
-        paperSize: '400x200mm',
+        paperSize: '40x20mm',
         pageOrientation: 'portrait',
-        marginTop: 3,
-        marginBottom: 3,
-        marginSides: 6,
-        paperWidthMm: 400,
+        marginTop: 1,
+        marginBottom: 1,
+        marginSides: 2,
+        paperWidthMm: 40,
       };
     default:
       return {

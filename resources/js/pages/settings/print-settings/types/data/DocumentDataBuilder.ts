@@ -70,6 +70,8 @@ interface ApiDocumentLine {
     name?:       string;
     reference?:  string | null;
     barcode?:    string | null;
+    brand?:      string | null;
+    image_url?:  string | null;
     unit?: { name?: string } | null;
   } | null;
   packaging?: { label?: string; name?: string; quantity?: number } | null;
@@ -167,6 +169,8 @@ export interface POSSaleSnapshot {
   items: Array<{
     name:               string;
     ref?:               string | null;
+    imageUrl?:          string | null;
+    brand?:             string | null;
     qty:                number;
     unit_price_ht:      number;
     unit?:              string | null;
@@ -492,8 +496,10 @@ function buildLineFromApi(line: ApiDocumentLine, index: number): DocumentLine {
     totalHt,
     totalTva,
     totalTtc,
-    lot:   line.stock_lot?.lot_number ?? null,
-    notes: line.notes ?? null,
+    imageUrl: line.product?.image_url ?? null,
+    brand:    line.product?.brand ?? null,
+    lot:      line.stock_lot?.lot_number ?? null,
+    notes:    line.notes ?? null,
   };
 }
 
@@ -525,6 +531,8 @@ function buildLinesFromSnapshot(
       totalHt,
       totalTva,
       totalTtc:     totalHt + totalTva,
+      imageUrl:     item.imageUrl ?? null,
+      brand:        item.brand ?? null,
       lot:          null,
       notes:        null,
     };

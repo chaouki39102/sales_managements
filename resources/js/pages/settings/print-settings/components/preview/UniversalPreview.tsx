@@ -100,8 +100,8 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
     }
     const sz = tpl.paper_size;
     const landscape = !['80mm','58mm'].includes(sz) && tpl.page_orientation === 'landscape';
-    const w = sz === 'A4' ? (landscape ? '297mm' : '210mm') : sz === 'A5' ? (landscape ? '210mm' : '148mm') : sz === '400x200mm' ? '400mm' : sz === '80mm' ? '80mm' : '58mm';
-    const h = sz === 'A4' ? (landscape ? '210mm' : '297mm') : sz === 'A5' ? (landscape ? '148mm' : '210mm') : sz === '400x200mm' ? '200mm' : 'auto';
+    const w = sz === 'A4' ? (landscape ? '297mm' : '210mm') : sz === 'A5' ? (landscape ? '210mm' : '148mm') : sz === '40x20mm' ? '40mm' : sz === '80mm' ? '80mm' : '58mm';
+    const h = sz === 'A4' ? (landscape ? '210mm' : '297mm') : sz === 'A5' ? (landscape ? '148mm' : '210mm') : sz === '40x20mm' ? '20mm' : 'auto';
     el.textContent = `
       @page { size: ${w} ${h}; margin: ${tpl.margin_top ?? 5}mm ${tpl.margin_sides ?? 5}mm ${tpl.margin_bottom ?? 5}mm; }
       body * { visibility: hidden !important; }
@@ -115,13 +115,13 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
   const isThermal   = tpl.paper_size === '80mm' || tpl.paper_size === '58mm';
   const isA4        = tpl.paper_size === 'A4';
   const _isA5        = tpl.paper_size === 'A5';
-  const isLabel     = tpl.paper_size === '400x200mm';
+  const isLabel     = tpl.paper_size === '40x20mm';
   const isDeliveryA5 = tpl.doc_type_code === 'BL' && tpl.paper_size === 'A5';
   const isSticker = tpl.doc_type_code === 'STK';
   const isLandscape = !isThermal && tpl.page_orientation === 'landscape';
 
-  const portraitW = isA4 ? 794 : isLabel ? 1512 : 559;
-  const portraitH = isA4 ? 1123 : isLabel ? 756 : 794;
+  const portraitW = isA4 ? 794 : isLabel ? 320 : 559;
+  const portraitH = isA4 ? 1123 : isLabel ? 160 : 794;
   const paperWidth   = isThermal ? tpl.paper_width_mm * 3.78 : (isLandscape ? portraitH : portraitW);
   const minHeight    = isThermal ? 'auto' : (isLandscape ? portraitW : portraitH);
 

@@ -26,11 +26,11 @@ import { useApiClient, useNotifier, useCompany, useSlug } from './providers/Prin
 import { validateTemplateIntegrity } from './services/SettingsSerializer';
 
 const PAPER_DIM: Record<string, { w: number; h: number }> = {
-  '80mm':      { w: 80,  h: 0   },
-  '58mm':      { w: 58,  h: 0   },
-  'A4':        { w: 210, h: 297 },
-  'A5':        { w: 148, h: 210 },
-  '400x200mm': { w: 400, h: 200 },
+  '80mm':    { w: 80,  h: 0   },
+  '58mm':    { w: 58,  h: 0   },
+  'A4':      { w: 210, h: 297 },
+  'A5':      { w: 148, h: 210 },
+  '40x20mm': { w: 40,  h: 20  },
 };
 
 function paperLabel(size: string, mm: number): string {
@@ -176,7 +176,7 @@ export default function PrintSettingsPage() {
         else if (val === 'A4' || val === 'A5') {
           next.paper_width_mm = 80; // Reset thermal width when switching to page paper
           next.page_orientation = next.page_orientation || 'portrait';
-        } else if (val === '400x200mm') {
+        }         else if (val === '40x20mm') {
           next.page_orientation = next.page_orientation || 'portrait';
         }
       }
@@ -625,7 +625,7 @@ export default function PrintSettingsPage() {
 
                 <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
                   {(activeDoc === 'STK'
-                    ? (['400x200mm'] as const)
+                    ? (['40x20mm'] as const)
                     : (['80mm', '58mm', 'A4', 'A5'] as const)
                   ).map(s => (
                     <button

@@ -1,4 +1,4 @@
-export type PaperSize       = '80mm' | '58mm' | 'A4' | 'A5' | '400x200mm' | 'none';
+export type PaperSize       = '80mm' | '58mm' | 'A4' | 'A5' | '40x20mm' | 'none';
 export type AlignOption     = 'right' | 'center' | 'left';
 export type BorderStyle     = 'solid' | 'dashed' | 'double' | 'none';
 export type PriceMode       = 'ht' | 'ttc';
@@ -388,6 +388,14 @@ export interface PrintTemplate {
   label_border_width:      number;
   label_border_color:      string;
   label_border_radius:     number;
+  show_label_product_image: boolean;
+  label_product_image_size: number;
+  show_label_brand:         boolean;
+  label_brand_size:         number;
+  label_brand_color:        string;
+  label_layout:             'stacked' | 'side-by-side';
+  label_hide_currency:      boolean;
+  label_barcode_format:     'code39' | 'ean13' | 'code128';
 
   show_report_header:        boolean;
   report_header_text:        string;

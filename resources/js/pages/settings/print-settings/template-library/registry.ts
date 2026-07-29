@@ -183,7 +183,7 @@ export function buildTemplate(
           : DELIVERY_TOTALS;
 
   const footer = isSticker
-    ? { footerLine1: '', footerLine2: '', footerLine3: '', footerSeparator: 'none', showThankYou: false, thankYouText: '', thankYouSize: 12, thankYouColor: '#333', showReturnsPolicy: false, returnsPolicyText: '', showBarcode: false, barcodeContent: '', barcodeCustomText: '', showQr: false, qrContent: '', showCashierSignature: false, showClientSignature: false, showStamp: false }
+    ? { footerLine1: '', footerLine2: '', footerLine3: '', footerSeparator: 'none', showThankYou: false, thankYouText: '', thankYouSize: 12, thankYouColor: '#333333', showReturnsPolicy: false, returnsPolicyText: '', showBarcode: false, barcodeContent: '', barcodeCustomText: '', showQr: false, qrContent: '', showCashierSignature: false, showClientSignature: false, showStamp: false }
     : isThermal
       ? POS_RECEIPT_80MM_FOOTER
       : isInvoice
@@ -543,7 +543,7 @@ export function registerBuiltinTemplates(): void {
           { id: 'discount', field: 'totals.discount',  label: 'مجموع التخفيض',     visible: true, order: 1, labelSide: 'start', valueSide: 'end' },
           { id: 'tva',      field: 'totals.tva',       label: 'مجموع الضريبة',     visible: true, order: 2, labelSide: 'start', valueSide: 'end' },
           { id: 'ttc',      field: 'totals.ttc',       label: 'الصافي للدفع',      visible: true, order: 3, labelSide: 'start', valueSide: 'end', bold: true,
-            border: { style: 'double', width: 3, color: '#111', sides: { top: true } } },
+            border: { style: 'double', width: 3, color: '#111111', sides: { top: true } } },
         ],
       } as TotalsGridConfig,
     }),
@@ -690,22 +690,22 @@ export function registerBuiltinTemplates(): void {
   templateRegistry.register({
     meta: createMeta({
       id: 'dz-sticker-label',
-      name: 'Algerian Sticker Label 400x200mm',
-      nameAr: 'ملصق المنتج 400×200 مم',
-      description: 'Product sticker label in 400x200mm landscape format with logo, company name, product name, barcode, reference and price.',
-      descriptionAr: 'ملصق منتج بصيغة 400×200 مم مع الشعار واسم الشركة واسم المنتج والباركود والمرجع والسعر',
+      name: 'Algerian Sticker Label 40x20mm',
+      nameAr: 'ملصق المنتج 40×20 مم',
+      description: 'Product sticker label in 40x20mm format with logo, company name, product name, barcode, reference and price.',
+      descriptionAr: 'ملصق منتج بصيغة 40×20 مم مع الشعار واسم الشركة واسم المنتج والباركود والمرجع والسعر',
       documentType: 'STK',
-      paperSize: '400x200mm',
-      tags: ['algeria', 'arabic', 'sticker', 'label', '400x200mm', 'barcode', 'price-tag'],
+      paperSize: '40x20mm',
+      tags: ['algeria', 'arabic', 'sticker', 'label', '40x20mm', 'barcode', 'price-tag'],
     }),
-    createConfig: () => buildTemplate('ملصق المنتج 400×200 مم', 'STK', '400x200mm', {
+    createConfig: () => buildTemplate('ملصق المنتج 40×20 مم', 'STK', '40x20mm', {
       show_logo: true,
       logo_source: 'company',
-      logo_size: 40,
+      logo_size: 20,
       logo_align: 'center',
       logo_border_radius: 0,
       show_company_name: true,
-      company_name_size: 11,
+      company_name_size: 9,
       company_name_bold: true,
       company_name_align: 'center',
       company_name_color: '#1a1a2e',
@@ -779,27 +779,38 @@ export function registerBuiltinTemplates(): void {
       footer_legal_text: '',
       // Sticker-specific defaults
       show_label_barcode: true,
-      label_barcode_height: 35,
+      label_barcode_height: 20,
       show_label_product_name: true,
-      label_product_name_size: 14,
+      label_product_name_size: 9,
       label_product_name_bold: true,
-      label_product_name_color: '#111',
+      label_product_name_color: '#111111',
       show_label_ref: true,
-      label_ref_size: 9,
-      label_ref_color: '#666',
+      label_ref_size: 6,
+      label_ref_color: '#666666',
       show_label_price: true,
-      label_price_size: 22,
+      label_price_size: 14,
       label_price_bold: true,
       label_price_color: '#c0392b',
       label_price_text: 'د.ج',
       label_price_prefix: '',
       label_border_style: 'solid',
       label_border_width: 1,
-      label_border_color: '#333',
-      label_border_radius: 6,
+      label_border_color: '#333333',
+      label_border_radius: 4,
+      show_label_product_image: false,
+      label_product_image_size: 40,
+      show_label_brand: false,
+      label_brand_size: 7,
+      label_brand_color: '#888888',
+      label_layout: 'stacked',
+      label_hide_currency: false,
+      label_barcode_format: 'code39',
       base_font_size: 12,
       font_family: 'tajawal',
       totals_grid: { enabled: false, columns: [] } as any,
+      sections_order: [
+        { key: 'header', visible: true, order: 0 },
+      ],
     }),
   });
 }

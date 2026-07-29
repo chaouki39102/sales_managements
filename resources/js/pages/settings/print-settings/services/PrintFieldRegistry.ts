@@ -103,6 +103,8 @@ export const PRINT_FIELDS: PrintFieldDefinition[] = [
   { id: 'item.total',              label: 'المجموع',              group: 'item',     type: 'currency',  sourcePath: '',                     align: 'right',   visibleByDefault: true,  isRepeating: true, relativePath: 'totalHt' },
   { id: 'item.lot',                label: 'رقم الدفعة',           group: 'item',     type: 'string',   sourcePath: '',                      align: 'right',   visibleByDefault: false, isRepeating: true, relativePath: 'lot' },
   { id: 'item.notes',              label: 'ملاحظات',              group: 'item',     type: 'string',   sourcePath: '',                      align: 'right',   visibleByDefault: false, isRepeating: true, relativePath: 'notes' },
+  { id: 'item.imageUrl',           label: 'صورة المنتج',          group: 'item',     type: 'image',    sourcePath: '',                      align: 'center',  visibleByDefault: false, isRepeating: true, relativePath: 'imageUrl' },
+  { id: 'item.brand',              label: 'العلامة التجارية',     group: 'item',     type: 'string',   sourcePath: '',                      align: 'right',   visibleByDefault: false, isRepeating: true, relativePath: 'brand' },
 
   // ── Totals ───────────────────────────────────────────────────────────
   { id: 'totals.ht',               label: 'المجموع HT',            group: 'totals',   type: 'currency', sourcePath: 'totals.totalHt',        settingKey: 'show_total_ht',        align: 'right',   visibleByDefault: true },

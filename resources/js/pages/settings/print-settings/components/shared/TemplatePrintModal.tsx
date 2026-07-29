@@ -1,4 +1,5 @@
 import React, { useMemo, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data/UniversalDocumentData';
 import type { PrintTemplate } from '@/pages/settings/print-settings/types';
 import type { CompanyData } from '@/pages/settings/print-settings/components/preview/shared';
@@ -129,6 +130,7 @@ const btnSecondary: React.CSSProperties = {
 // ─── Component ──────────────────────────────────────────────────────────────
 
 function TemplatePrintModal({ open, onClose, document, company, template, templates, docTypeCode, data: overrideData, prevBalance, newBalance }: TemplatePrintModalProps) {
+  const navigate = useNavigate();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
@@ -186,6 +188,15 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
 
         <div style={footerStyle}>
           <button style={btnSecondary} onClick={onClose}>إلغاء</button>
+          {docTypeCode === 'STK' && (
+            <button style={{ ...btnSecondary, color: '#3b82f6' }}
+              onClick={() => {
+                const id = tpl?.id ? `?id=${tpl.id}` : '';
+                navigate(`/settings/stickers${id}`);
+              }}>
+              ✏️ تعديل القالب
+            </button>
+          )}
           <button style={btnPrimary} onClick={handlePrint} disabled={!tpl || !source}>طباعة</button>
         </div>
       </div>

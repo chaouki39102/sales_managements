@@ -125,6 +125,10 @@ export interface DocumentLine {
   totalTva:     number;
   /** Line total TTC after discount */
   totalTtc:     number;
+  /** Product image URL */
+  imageUrl?:    string | null;
+  /** Brand name */
+  brand?:       string | null;
   /** Lot/serial number if applicable */
   lot?:         string | null;
   notes?:       string | null;
