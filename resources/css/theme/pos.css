@@ -3366,6 +3366,7 @@ body.dark .thermal-status.err { background: #7f1d1d; color: #fecaca; }
 .si-badge-unpaid{background:#dc262618;color:#dc2626;}
 .si-badge-cancelled{background:#6b728018;color:#6b7280;}
 .si-badge-returned{background:#dc262618;color:#dc2626;border:1px solid #dc262644;}
+.si-return-amt{color:#dc2626;}
 .si-print-btn{background:none;border:none;cursor:pointer;color:var(--t3);padding:4px;border-radius:4px;transition:all .1s;display:inline-flex;align-items:center;justify-content:center;line-height:1;}
 .si-print-btn:hover{color:var(--em);background:var(--bg3);}
 .si-col-resize{position:absolute;top:0;inset-inline-end:0;width:6px;cursor:col-resize;height:100%;z-index:2;background:transparent;}

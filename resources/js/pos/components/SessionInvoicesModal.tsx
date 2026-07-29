@@ -41,15 +41,19 @@ function formatDuration(iso?: string): string {
 
 function exportCsv(docs: CommercialDocument[]): void {
   const headers = ['رقم الفاتورة', 'العميل', 'التاريخ', 'الإجمالي', 'المدفوع', 'المتبقي', 'الحالة'];
-  const rows = docs.map(d => [
-    d.document_number,
-    d.party?.name ?? '',
-    (d.document_date ?? '').slice(0, 10),
-    String(Number(d.total_ttc ?? 0).toFixed(2)),
-    String(Number(d.paid_amount ?? 0).toFixed(2)),
-    String(Number(d.remaining_amount ?? 0).toFixed(2)),
-    STATUS_META[getDocStatus(d)].label,
-  ]);
+  const rows = docs.map(d => {
+    const isReturn = d.cancellation_of_document_id != null;
+    const sign = isReturn ? -1 : 1;
+    return [
+      d.document_number,
+      d.party?.name ?? '',
+      (d.document_date ?? '').slice(0, 10),
+      String((sign * Number(d.total_ttc ?? 0)).toFixed(2)),
+      String((sign * Number(d.paid_amount ?? 0)).toFixed(2)),
+      String((sign * Number(d.remaining_amount ?? 0)).toFixed(2)),
+      isReturn ? 'مرتجع' : STATUS_META[getDocStatus(d)].label,
+    ];
+  });
   const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n');
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -214,12 +218,17 @@ export default function SessionInvoicesModal({ session, onClose, onOpen, onPrint
     onPrint?.(doc.id);
   }, [onPrint]);
 
+  function isReturnDoc(doc: CommercialDocument): boolean {
+    return doc.cancellation_of_document_id != null;
+  }
+
   const totals = useMemo(() => {
     let ttc = 0, paid = 0, remaining = 0;
     for (const doc of sorted) {
-      ttc       += Number(doc.total_ttc ?? 0);
-      paid      += Number(doc.paid_amount ?? 0);
-      remaining += Number(doc.remaining_amount ?? 0);
+      const sign = isReturnDoc(doc) ? -1 : 1;
+      ttc       += sign * Number(doc.total_ttc ?? 0);
+      paid      += sign * Number(doc.paid_amount ?? 0);
+      remaining += sign * Number(doc.remaining_amount ?? 0);
     }
     return { ttc, paid, remaining };
   }, [sorted]);
@@ -278,7 +287,7 @@ export default function SessionInvoicesModal({ session, onClose, onOpen, onPrint
           <span><i className="ti ti-building-warehouse" /> {session.warehouse?.name}</span>
           <span><i className="ti ti-calendar" /> {session.opened_at?.slice(0, 10)}</span>
           <span><i className="ti ti-clock" /> {formatDuration(session.duration)}</span>
-          <span><i className="ti ti-file-invoice" /> {session.invoices_count ?? docs.length} فاتورة</span>
+          <span><i className="ti ti-file-invoice" /> {sorted.length} فاتورة</span>
           <span className="si-info-total">{formatDZD(session.net_sales ?? 0)}</span>
         </div>
 
@@ -356,32 +365,45 @@ export default function SessionInvoicesModal({ session, onClose, onOpen, onPrint
                 </tr>
               </thead>
               <tbody ref={listRef}>
-                {sorted.map((doc, i) => {
-                  const status = getDocStatus(doc);
-                  const meta = STATUS_META[status];
-                  return (
-                    <tr
-                      key={doc.id}
-                      onClick={() => handleRowClick(doc)}
-                      className={i === selectedIndex ? 'si-row-sel' : undefined}
-                    >
-                      <td>{i + 1}</td>
-                      <td><strong>{doc.document_number}</strong></td>
-                      <td>{doc.party?.name ?? <span className="si-null">\u2014</span>}</td>
-                      <td>{doc.document_date?.slice(0, 10) ?? '\u2014'}</td>
-                      <td>
-                        <span className={`si-badge ${meta.cls}`}><i className={meta.icon} /> {meta.label}</span>
-                        {doc.document_status?.name === 'returned' && (
-                          <span className="si-badge si-badge-returned" style={{marginRight: 4}}>
-                            <i className="ti ti-receipt-refund" /> مسترجع
-                          </span>
-                        )}
-                      </td>
-                      <td className="si-ttc-cell">{formatDZD(doc.total_ttc)}</td>
-                      <td className="si-paid-cell">{formatDZD(doc.paid_amount ?? 0)}</td>
-                      <td className={`si-remain-cell ${Number(doc.remaining_amount ?? 0) > 0 ? 'si-remain-pos' : 'si-remain-neg'}`}>
-                        {formatDZD(doc.remaining_amount ?? 0)}
-                      </td>
+                  {sorted.map((doc, i) => {
+                    const isReturn = isReturnDoc(doc);
+                    const sign = isReturn ? -1 : 1;
+                    const ttc = sign * Number(doc.total_ttc ?? 0);
+                    const paid = sign * Number(doc.paid_amount ?? 0);
+                    const remaining = sign * Number(doc.remaining_amount ?? 0);
+                    const status = isReturn ? 'paid' : getDocStatus(doc);
+                    const meta = STATUS_META[status];
+                    return (
+                      <tr
+                        key={doc.id}
+                        onClick={() => handleRowClick(doc)}
+                        className={i === selectedIndex ? 'si-row-sel' : undefined}
+                      >
+                        <td>{i + 1}</td>
+                        <td><strong>{doc.document_number}</strong></td>
+                        <td>{doc.party?.name ?? <span className="si-null">\u2014</span>}</td>
+                        <td>{doc.document_date?.slice(0, 10) ?? '\u2014'}</td>
+                        <td>
+                          {isReturn ? (
+                            <span className="si-badge si-badge-returned">
+                              <i className="ti ti-receipt-refund" /> مرتجع
+                            </span>
+                          ) : (
+                            <>
+                              <span className={`si-badge ${meta.cls}`}><i className={meta.icon} /> {meta.label}</span>
+                              {doc.document_status?.name === 'returned' && (
+                                <span className="si-badge si-badge-returned" style={{marginRight: 4}}>
+                                  <i className="ti ti-receipt-refund" /> مسترجع
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </td>
+                        <td className={`si-ttc-cell ${isReturn ? 'si-return-amt' : ''}`}>{formatDZD(ttc)}</td>
+                        <td className={`si-paid-cell ${isReturn ? 'si-return-amt' : ''}`}>{formatDZD(paid)}</td>
+                        <td className={`si-remain-cell ${remaining > 0 ? 'si-remain-pos' : remaining < 0 ? 'si-return-amt' : ''}`}>
+                          {formatDZD(remaining)}
+                        </td>
                       {onPrint && (
                         <td>
                           <button className="si-print-btn" onClick={e => handlePrintClick(e, doc)} title="طباعة الفاتورة">

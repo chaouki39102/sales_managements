@@ -79,13 +79,13 @@ export default function ReturnsModal({ sessionId, onClose, onDone }: ReturnsModa
     setSelected(prev => {
       const exists = prev.find(s => s.line.id === line.id);
       if (exists) return prev.filter(s => s.line.id !== line.id);
-      return [...prev, { line, qty: line.quantity }];
+      return [...prev, { line, qty: Math.max(0, line.quantity - line.returned_quantity) }];
     });
   }, []);
 
   const updateReturnQty = useCallback((lineId: number, qty: number) => {
     setSelected(prev => prev.map(s =>
-      s.line.id === lineId ? { ...s, qty: Math.min(Math.max(0, qty), s.line.quantity) } : s
+      s.line.id === lineId ? { ...s, qty: Math.min(Math.max(0, qty), s.line.quantity - s.line.returned_quantity) } : s
     ));
   }, []);
 
@@ -94,7 +94,10 @@ export default function ReturnsModal({ sessionId, onClose, onDone }: ReturnsModa
     if (allSelected) {
       setSelected([]);
     } else {
-      setSelected(doc.lines.map(line => ({ line, qty: line.quantity })));
+      setSelected(doc.lines
+        .filter(line => line.returned_quantity < line.quantity)
+        .map(line => ({ line, qty: Math.max(0, line.quantity - line.returned_quantity) }))
+      );
     }
   }, [doc, allSelected]);
 
@@ -131,8 +134,8 @@ export default function ReturnsModal({ sessionId, onClose, onDone }: ReturnsModa
 
       notify.success('تم إنشاء المرتجع بنجاح');
       onDone();
-    } catch {
-      notify.error('فشل إنشاء المرتجع');
+    } catch (e: any) {
+      notify.error(e?.message ?? 'فشل إنشاء المرتجع');
     }
     setCreating(false);
   }, [doc, reason, selected, sessionId, onDone]);

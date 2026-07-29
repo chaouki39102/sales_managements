@@ -84,6 +84,7 @@ class DocumentReturnService
                 'cancellation_reason'           => $reason,
                 'cancellation_of_document_id'  => $source->id,
                 'source_document_id'            => $source->id,
+                'pos_session_id'                => $source->pos_session_id,
                 'lines'                         => $linesPayload,
             ]);
 

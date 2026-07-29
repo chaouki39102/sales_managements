@@ -536,6 +536,7 @@ export interface CommercialDocumentLine extends BaseModel {
   total_ht:               number;
   total_tva:              number;
   total_ttc:              number;
+  returned_quantity:      number;
   packaging_units_snapshot?: number | null;
   line_order:             number;
   // Relations
@@ -552,6 +553,8 @@ export interface CommercialDocument extends BaseModel {
   warehouse_id:       number;
   fiscal_year_id:     number;
   pos_session_id?:    number | null;
+  source_document_id?:         number | null;
+  cancellation_of_document_id?: number | null;
   document_date:      string;
   due_date?:          string | null;
   status:             DocumentStatusCode;
