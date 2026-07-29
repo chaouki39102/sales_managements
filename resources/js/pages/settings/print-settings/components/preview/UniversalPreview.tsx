@@ -185,7 +185,11 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
         {isDeliveryA5 ? (
           <DeliveryReceiptA5 tpl={tpl} data={data} />
         ) : isSticker ? (
-          <StickerLabel tpl={tpl} data={data} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }}>
+            {data.lines.map((line, idx) => (
+              <StickerLabel key={idx} tpl={tpl} data={{ ...data, lines: [line] }} />
+            ))}
+          </div>
         ) : (
           <>
             {orderedSections.map(meta => {

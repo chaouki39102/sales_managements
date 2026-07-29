@@ -7,36 +7,40 @@ import { useStickerMutations } from './stickerMutations';
 import StickerCanvas from './StickerCanvas';
 import ElementPanel from './ElementPanel';
 import Button from '@/components/ui/Button';
+import { useConfirm } from '@/hooks/useConfirm';
+import { useNotification } from '@/hooks/useNotification';
 
-const DEFAULT_TEMPLATE: PrintTemplate = {
-  id: null as any,
-  doc_type_code: 'STK',
-  paper_size: '40x20mm',
-  paper_width_mm: 40,
-  page_orientation: 'portrait',
-  name: 'ملصق المنتج',
-  is_default: false, is_active: true,
-  margin_top: 6, margin_bottom: 6, margin_sides: 8,
-  base_font_size: 12, font_family: 'tajawal', line_spacing: 1.2,
-  show_header_section: true, show_doc_info_section: false, show_items_section: false,
-  show_totals_section: false, show_payments_section: false, show_footer_section: false,
-  show_logo: true, logo_source: 'company', logo_size: 50, logo_align: 'center', logo_border_radius: 0,
-  show_company_name: true, company_name_text: '', company_name_size: 9, company_name_bold: true, company_name_color: '#1a1a2e', company_name_align: 'center',
-  header_separator: 'dashed',
-  show_label_barcode: true, label_barcode_height: 20, label_barcode_format: 'code39',
-  show_label_product_name: true, label_product_name_size: 9, label_product_name_bold: true, label_product_name_color: '#111111',
-  show_label_product_image: false, label_product_image_size: 40,
-  show_label_brand: false, label_brand_size: 7, label_brand_color: '#888888',
-  show_label_ref: true, label_ref_size: 6, label_ref_color: '#666666',
-  show_label_price: true, label_price_size: 14, label_price_bold: true, label_price_color: '#c0392b', label_price_text: 'د.ج', label_price_prefix: '',
-  label_hide_currency: false, label_layout: 'stacked',
-  label_border_style: 'solid', label_border_width: 1, label_border_color: '#333333', label_border_radius: 4,
-  show_payment_details: false, payment_font_size: 9, payments_align: 'right',
-  rules: [],
-  sections_order: [],
-  page_frame: { enabled: false } as any,
-  watermark: { enabled: false } as any,
-} as unknown as PrintTemplate;
+function createDefaultTpl(name: string): PrintTemplate {
+  return {
+    id: null as any,
+    doc_type_code: 'STK',
+    paper_size: '40x20mm',
+    paper_width_mm: 40,
+    page_orientation: 'portrait',
+    name,
+    is_default: false, is_active: true,
+    margin_top: 6, margin_bottom: 6, margin_sides: 8,
+    base_font_size: 12, font_family: 'tajawal', line_spacing: 1.2,
+    show_header_section: true, show_doc_info_section: false, show_items_section: false,
+    show_totals_section: false, show_payments_section: false, show_footer_section: false,
+    show_logo: true, logo_source: 'company', logo_size: 50, logo_align: 'center', logo_border_radius: 0,
+    show_company_name: true, company_name_text: '', company_name_size: 9, company_name_bold: true, company_name_color: '#1a1a2e', company_name_align: 'center',
+    header_separator: 'dashed',
+    show_label_barcode: true, label_barcode_height: 20, label_barcode_format: 'code39',
+    show_label_product_name: true, label_product_name_size: 9, label_product_name_bold: true, label_product_name_color: '#111111',
+    show_label_product_image: false, label_product_image_size: 40,
+    show_label_brand: false, label_brand_size: 7, label_brand_color: '#888888',
+    show_label_ref: true, label_ref_size: 6, label_ref_color: '#666666',
+    show_label_price: true, label_price_size: 14, label_price_bold: true, label_price_color: '#c0392b', label_price_text: 'د.ج', label_price_prefix: '',
+    label_hide_currency: false, label_layout: 'stacked',
+    label_border_style: 'solid', label_border_width: 1, label_border_color: '#333333', label_border_radius: 4,
+    show_payment_details: false, payment_font_size: 9, payments_align: 'right',
+    rules: [],
+    sections_order: [],
+    page_frame: { enabled: false } as any,
+    watermark: { enabled: false } as any,
+  } as unknown as PrintTemplate;
+}
 
 const MOCK_COMPANY: CompanyData = {
   name: 'شركتي',
@@ -115,6 +119,37 @@ export default function StickerDesignerPage() {
     navigate(-1);
   }, [navigate]);
 
+  const handleSelectTemplate = useCallback((tpl: PrintTemplate) => {
+    navigate(`/settings/stickers?id=${tpl.id}`, { replace: true });
+  }, [navigate]);
+
+  const handleNewTemplate = useCallback(async () => {
+    const name = prompt('اسم القالب الجديد:');
+    if (!name) return;
+    try {
+      const result = await mutations.create.mutateAsync(createDefaultTpl(name));
+      navigate(`/settings/stickers?id=${result.id}`, { replace: true });
+    } catch {
+      console.error('Failed to create template');
+    }
+  }, [mutations, navigate]);
+
+  const deleteConfirm = useConfirm();
+  const notify = useNotification();
+
+  const handleDeleteTemplate = useCallback(async (id: number) => {
+    if (!await deleteConfirm.confirm('حذف هذا القالب؟')) return;
+    try {
+      await mutations.remove.mutateAsync(id);
+      notify.success('تم حذف القالب');
+      if (String(id) === templateId) {
+        navigate('/settings/stickers', { replace: true });
+      }
+    } catch {
+      notify.error('فشل الحذف');
+    }
+  }, [mutations, navigate, templateId, deleteConfirm, notify]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#f5f5f7' }}>
       {/* Header */}
@@ -141,7 +176,21 @@ export default function StickerDesignerPage() {
 
       {/* Body */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {/* Left: Canvas */}
+        {/* Left: Template List */}
+        <div style={{
+          width: 220, background: '#fff', borderLeft: '1px solid #e0e0e0',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0,
+        }}>
+          <TemplateList
+            templates={templates}
+            selectedId={templateId ? Number(templateId) : null}
+            onSelect={handleSelectTemplate}
+            onDelete={handleDeleteTemplate}
+            onNew={handleNewTemplate}
+          />
+        </div>
+
+        {/* Center: Canvas */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 16, overflow: 'auto', alignItems: 'center' }}>
           <div style={{
             width: '100%', maxWidth: 900, background: '#fff', borderRadius: 8, padding: 16,
@@ -178,41 +227,55 @@ export default function StickerDesignerPage() {
 }
 
 function TemplateList({
-  templates, selectedId, onSelect, onDelete,
+  templates, selectedId, onSelect, onDelete, onNew,
 }: {
   templates: PrintTemplate[];
   selectedId: number | null;
   onSelect: (tpl: PrintTemplate) => void;
   onDelete: (id: number) => void;
+  onNew: () => void;
 }) {
   return (
-    <div style={{ background: '#fff', borderRadius: 8, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
-      <h3 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700 }}>قوالب الملصقات</h3>
-      {templates.length === 0 ? (
-        <div style={{ color: '#888', fontSize: 13, textAlign: 'center', padding: 20 }}>
-          لا توجد قوالب. أنشئ واحداً من البداية.
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {templates.map(tpl => (
-            <div key={tpl.id} onClick={() => onSelect(tpl)}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '8px 12px', borderRadius: 6, cursor: 'pointer',
-                background: tpl.id === selectedId ? '#e8f0fe' : '#f8f8f8',
-                border: tpl.id === selectedId ? '1px solid #3b82f6' : '1px solid #e0e0e0',
-              }}>
-              <div style={{ fontSize: 13, fontWeight: tpl.id === selectedId ? 600 : 400 }}>
-                {tpl.name || 'بدون اسم'}
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ padding: '8px 12px', borderBottom: '1px solid #e0e0e0', fontSize: 13, fontWeight: 600, color: '#555' }}>
+        القوالب
+      </div>
+      <div style={{ flex: 1, overflow: 'auto', padding: '8px' }}>
+        {templates.length === 0 ? (
+          <div style={{ color: '#888', fontSize: 12, textAlign: 'center', padding: 16 }}>
+            لا توجد قوالب
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {templates.map(tpl => (
+              <div key={tpl.id} onClick={() => onSelect(tpl)}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '6px 8px', borderRadius: 4, cursor: 'pointer',
+                  background: tpl.id === selectedId ? '#e8f0fe' : 'transparent',
+                  border: '1px solid transparent',
+                  borderColor: tpl.id === selectedId ? '#3b82f6' : 'transparent',
+                }}>
+                <div style={{
+                  fontSize: 12, fontWeight: tpl.id === selectedId ? 600 : 400,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+                }}>
+                  {tpl.name || 'بدون اسم'}
+                </div>
+                <button onClick={(e) => { e.stopPropagation(); onDelete(tpl.id!); }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e74c3c', fontSize: 12, padding: '2px 4px', flexShrink: 0 }}>
+                  🗑
+                </button>
               </div>
-              <button onClick={(e) => { e.stopPropagation(); onDelete(tpl.id!); }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e74c3c', fontSize: 14 }}>
-                🗑
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
+      <div style={{ padding: '8px', borderTop: '1px solid #e0e0e0' }}>
+        <Button size="sm" style={{ width: '100%' }} onClick={onNew}>
+          + قالب جديد
+        </Button>
+      </div>
     </div>
   );
 }

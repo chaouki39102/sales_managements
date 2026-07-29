@@ -119,6 +119,7 @@ export default function ProductsPage() {
 
   // ── Label / Sticker Print ──
   const [labelPrintOpen, setLabelPrintOpen] = useState(false);
+  const [labelPrintQty, setLabelPrintQty] = useState(1);
   const activeCompany = useActiveCompany();
   const companyInfo = useMemo(() => mapCompany(activeCompany as any), [activeCompany]);
   const { data: stickerTemplates = [] } = usePrintTemplatesList('STK');
@@ -376,28 +377,36 @@ export default function ProductsPage() {
     if (!companyInfo) return null;
     const targets = selectedIds.length > 0 ? products.filter(p => selectedIds.includes(p.id)) : products;
     if (targets.length === 0) return null;
+    const baseLines = targets.map((p, i) => ({
+      rowNumber: i + 1,
+      name: p.name,
+      ref: p.ref ?? null,
+      barcode: p.barcode ?? null,
+      quantity: 1,
+      unitPriceHt: p.prices?.find(pr => pr.active && pr.pricing_method === 'fixed')?.price ?? 0,
+      unitPriceTtc: p.prices?.find(pr => pr.active && pr.pricing_method === 'fixed')?.price ?? 0,
+      tvaRate: 0, tvaPct: 0, discountPct: 0, discountAmt: 0,
+      totalHt: 0, totalTva: 0, totalTtc: 0,
+      imageUrl: (p as any).images?.[0] ?? null,
+      brand: (p as any).brand?.name ?? null,
+      unit: null,
+      lot: null, notes: null,
+    }));
+    // Multiply lines by labelPrintQty
+    const lines: typeof baseLines = [];
+    for (let copy = 0; copy < labelPrintQty; copy++) {
+      for (const line of baseLines) {
+        lines.push({ ...line, rowNumber: lines.length + 1 });
+      }
+    }
     return {
       doc: { number: '—', date: new Date().toISOString().slice(0, 10), typeCode: 'STK', status: 'validated' },
       company: companyInfo as any,
-      lines: targets.map((p, i) => ({
-        rowNumber: i + 1,
-        name: p.name,
-        ref: p.ref ?? null,
-        barcode: p.barcode ?? null,
-        quantity: 1,
-        unitPriceHt: p.prices?.find(pr => pr.active && pr.pricing_method === 'fixed')?.price ?? 0,
-        unitPriceTtc: p.prices?.find(pr => pr.active && pr.pricing_method === 'fixed')?.price ?? 0,
-        tvaRate: 0, tvaPct: 0, discountPct: 0, discountAmt: 0,
-        totalHt: 0, totalTva: 0, totalTtc: 0,
-        imageUrl: (p as any).images?.[0] ?? null,
-        brand: (p as any).brand?.name ?? null,
-        unit: null,
-        lot: null, notes: null,
-      })),
+      lines,
       totals: { totalHt: 0, totalTva: 0, totalTtc: 0, fiscalStamp: 0, totalDiscount: 0, paid: 0, change: 0, remaining: 0, netToPay: 0 },
       taxBreakdown: [], payments: [], computed: {},
     };
-  }, [companyInfo, products, selectedIds]);
+  }, [companyInfo, products, selectedIds, labelPrintQty]);
 
   // ── Render ──
   return (
@@ -410,11 +419,20 @@ export default function ProductsPage() {
             <Button size="sm" icon={<i className="ti ti-table-import" />} onClick={importModal.openModal}>
               استيراد
             </Button>
-            <Button size="sm" icon={<i className="ti ti-printer" />}
-              onClick={() => setLabelPrintOpen(true)}
-              disabled={products.length === 0}>
-              طباعة الليبل
-            </Button>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <Button size="sm" icon={<i className="ti ti-printer" />}
+                onClick={() => setLabelPrintOpen(true)}
+                disabled={products.length === 0}>
+                طباعة الليبل
+              </Button>
+              <input type="number" min={1} max={999} value={labelPrintQty}
+                onChange={e => setLabelPrintQty(Math.max(1, parseInt(e.target.value) || 1))}
+                style={{
+                  width: 44, padding: '4px 6px', fontSize: 12, textAlign: 'center',
+                  border: '1px solid var(--b3)', borderRadius: 6, background: 'var(--bg2)',
+                }}
+                title="عدد النسخ لكل منتج" />
+            </div>
             <Button size="sm" icon={<i className="ti ti-table-export" />}
               onClick={async () => { if (products.length) await exportData(products as any, getExportCols() as any); }}>
               تصدير

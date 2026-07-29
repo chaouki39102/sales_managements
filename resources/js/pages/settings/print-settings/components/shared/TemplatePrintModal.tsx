@@ -197,6 +197,11 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
               ✏️ تعديل القالب
             </button>
           )}
+          <div style={{ flex: 1, textAlign: 'center', fontSize: 12, color: 'var(--t4)' }}>
+            {docTypeCode === 'STK' && overrideData && (
+              <span>{overrideData.lines.length} ملصق</span>
+            )}
+          </div>
           <button style={btnPrimary} onClick={handlePrint} disabled={!tpl || !source}>طباعة</button>
         </div>
       </div>
