@@ -83,7 +83,6 @@ export function useColumnResize(initialWidths: Record<string, number>) {
     if (!headerCell) return;
 
     // Measure header text width
-    const _headerClone = headerCell.cloneNode(true) as HTMLElement;
     const measure = document.createElement('div');
     measure.style.cssText = 'position:absolute;top:-9999px;left:-9999px;visibility:hidden;white-space:nowrap;font:inherit;direction:inherit;';
     document.body.appendChild(measure);
@@ -155,7 +154,7 @@ export function useVirtualScroll({
   containerHeight?: number;
   overscan?: number;
 }) {
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   useEffect(() => {
     const el = scrollContainerRef.current;
@@ -818,7 +817,7 @@ export interface SmartFilterPattern {
 export const DEFAULT_SMART_FILTER_PATTERNS: SmartFilterPattern[] = [];
 
 export function useSmartFilter<T>(
-  columns: Column<T>[],
+  _columns: Column<T>[],
   onFilterChange: (filters: Record<string, string>, sorts?: MultiSortState) => void,
   /** أنماط مخصصة — إذا مُررت تحل محل الافتراضية بالكامل */
   customPatterns?: SmartFilterPattern[]
@@ -895,7 +894,7 @@ export function useSavedViews(config: SavedViewsConfig) {
 // ─── useContextMenu (قائمة السياق) ──────────────────────────────────────────
 
 export function useContextMenu<T = Record<string, unknown>>(
-  menuItems: (context: ContextMenuContext) => ContextMenuItem[],
+  _menuItems: (context: ContextMenuContext) => ContextMenuItem[],
   containerRef: React.RefObject<HTMLElement>,
   // ✅ إصلاح: data مطلوبة لملء context.row الذي كان فارغاً دائماً
   data: T[] = [],

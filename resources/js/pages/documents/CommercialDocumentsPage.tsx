@@ -31,7 +31,7 @@ import {
     useQueryClient,
     keepPreviousData,
 } from "@tanstack/react-query";
-import { apiGet, apiPost } from "@/lib/api/core/client";
+import { apiGet, apiPost, apiDelete } from "@/lib/api/core/client";
 import { tenantKeys } from "@/lib/api/core/queryKeys";
 import { useActiveSlug, useActiveCompany } from "@/lib/store/appStore";
 import { useFiscalYear } from "@/context/FiscalYearContext";
@@ -57,6 +57,7 @@ import { SendDocumentMailModal } from "./components/SendDocumentMailModal";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import SimpleTable from "@/components/ui/SimpleTable";
+import type { SimpleColumn } from "@/components/ui/SimpleTable";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useNotification } from '@/hooks/useNotification';
@@ -190,17 +191,17 @@ function SummaryCards({ items = [], opColor }: { items: CommercialDocument[]; op
         count:    items.length,
         totalHt:  items.reduce((s, d) => s + (Number(d.total_ht) || 0), 0),
         totalTtc: items.reduce((s, d) => s + (Number(d.total_ttc) || 0), 0),
-        unpaid:   items.filter(d => {
+        remaining: items.reduce((s, d) => {
             const rem = Number((d as unknown as Record<string, unknown>).remaining_amount ?? 0);
-            return rem > 0.001;
-        }).length,
+            return s + (rem > 0.001 ? rem : 0);
+        }, 0),
     }), [items]);
 
     const cards = [
         { icon: "ti-file-text",         label: "عدد المستندات", value: stats.count.toLocaleString("ar-DZ"),       accent: opColor },
-        { icon: "ti-currency-dinar",     label: "HT (الصفحة)",   value: fmtMoney(stats.totalHt) + " دج",           accent: "var(--blue)", ltr: true },
-        { icon: "ti-receipt",            label: "TTC (الصفحة)",  value: fmtMoney(stats.totalTtc) + " دج",          accent: opColor, ltr: true },
-        { icon: "ti-clock-exclamation",  label: "غير مسدد",      value: stats.unpaid.toLocaleString("ar-DZ"),       accent: stats.unpaid > 0 ? "var(--red)" : "var(--t4)" },
+        { icon: "ti-currency-dinar",     label: "HT",           value: fmtMoney(stats.totalHt) + " دج",           accent: "var(--blue)", ltr: true },
+        { icon: "ti-receipt",            label: "TTC",          value: fmtMoney(stats.totalTtc) + " دج",          accent: opColor, ltr: true },
+        { icon: "ti-trending-up",        label: "الأرباح",      value: fmtMoney(stats.remaining) + " دج",         accent: stats.remaining > 0 ? "var(--red)" : "var(--green)", ltr: true },
     ] as const;
 
     return (
@@ -354,12 +355,12 @@ function getRowPermissions(row: CommercialDocument, isReadOnly: boolean) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// DOCUMENT VIEW MODAL (مختصر — يبقى كما هو تقريباً)
+// DOCUMENT VIEW MODAL (مُحسَّن — كل التفاصيل، كل الأعمدة، كل الوظائف)
 // ════════════════════════════════════════════════════════════════════════════
 
 function DocumentViewModal({
-    docId, docType, onClose, onEdit, isReadOnly,
-}: { docId: number; docType: DocumentType | null; onClose: () => void; onEdit: () => void; isReadOnly: boolean }) {
+    docId, docType, onClose, onEdit, onCancel, isReadOnly, onDeleteDoc, onPrint,
+}: { docId: number; docType: DocumentType | null; onClose: () => void; onEdit: () => void; onCancel?: () => void; isReadOnly: boolean; onDeleteDoc?: () => void; onPrint?: () => void }) {
     const slug    = useActiveSlug();
     const isPurch = PURCHASE_CODES.has(docType?.code ?? "");
 
@@ -367,120 +368,302 @@ function DocumentViewModal({
         queryKey: [slug, "doc-detail-full", docId],
         queryFn: () =>
             apiGet<CommercialDocument>(`/documents/${docId}`, {
-                include: ["party","documentStatus","warehouse","fiscalYear","currency","documentType","lines.product","lines.productVariant","validatedBy","payments.paymentMode"].join(","),
+                include: ["party","documentStatus","warehouse","fiscalYear","currency","documentType","lines.product","lines.product.unit","lines.productVariant","lines.packaging","lines.stockLot","validatedBy","user","payments","payments.paymentMode"].join(","),
             }),
         staleTime: 2 * 60_000,
     });
 
-    useEffect(() => {
-        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-        document.addEventListener("keydown", h);
-        return () => document.removeEventListener("keydown", h);
-    }, [onClose]);
+    const fmt = (n: number) => n.toLocaleString("fr-DZ", { maximumFractionDigits: 2 });
+    const dtf = (d: string | null | undefined) => d ? new Date(d).toLocaleDateString("ar-DZ") : "—";
 
-    const d      = data as unknown as Record<string, unknown> | undefined;
-    const status = d ? getDocStatus(data as CommercialDocument) : "draft";
+    if (isLoading || !data) {
+        return (
+            <Modal open={!!docId} onClose={onClose} size="xl" title={docType?.name ?? "المستند"}>
+                {isLoading && <div className="p-20 text-center text-t4">جارٍ تحميل التفاصيل…</div>}
+                {!isLoading && !data && <div className="p-20 text-center text-t4">المستند غير موجود</div>}
+            </Modal>
+        );
+    }
+
+    const d = data as unknown as Record<string, unknown>;
+    const status = getDocStatus(data);
+    const lines = (d.lines as Record<string, unknown>[] | undefined) ?? [];
+    const payments = (d.payments as Record<string, unknown>[] | undefined) ?? [];
+    const bal = d.balance_data as Record<string, unknown> | undefined;
+
+    const lineColumns: SimpleColumn[] = [
+        { key: "idx", label: "#", className: "m", align: "center",
+            render: (_v, row) => <span className="text-t4 text-sm">{(row._idx as number)}</span> },
+        { key: "product", label: "المنتج",
+            render: (_v, row) => {
+                const pv = row.productVariant as Record<string, unknown> | undefined;
+                const p = row.product as Record<string, unknown> | undefined;
+                const raw = (pv?.product as Record<string, unknown> | undefined)?.name ?? p?.name ?? row.description;
+                const name = String(raw ?? "—");
+                return <span className="truncate block font-bold" title={name}>{name}</span>;
+            }},
+        { key: "packaging", label: "التعبئة", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const pk = row.packaging as Record<string, unknown> | undefined;
+                return <span className="text-t4 text-sm">{pk?.label ? String(pk.label) : "—"}</span>;
+            }},
+        { key: "lot", label: "الحصة", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const lot = row.stockLot as Record<string, unknown> | undefined;
+                return <span className="text-t4 text-sm">{lot?.label ? String(lot.label) : "—"}</span>;
+            }},
+        { key: "quantity", label: "الكمية", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => <span className="text-t3">{String(row.quantity ?? "")}</span> },
+        { key: "total_qty", label: "الكمية الإجمالية", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const qty = Number(row.quantity ?? 1);
+                const pku = Number(row.packaging_units_snapshot ?? 1);
+                return <span className="text-t4 text-sm">{qty * pku}</span>;
+            }},
+        { key: "unit", label: "الوحدة", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const p = row.product as Record<string, unknown> | undefined;
+                const u = p?.unit as Record<string, unknown> | undefined;
+                return <span className="text-t4 text-sm">{u?.abbreviation ? String(u.abbreviation) : "—"}</span>;
+            }},
+        { key: "unit_price", label: "سعر HT", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => <span className="font-mono text-sm">{fmt(Number(row.unit_price_ht ?? 0))} <span className="text-t4">دج</span></span> },
+        { key: "pack_price", label: "سعر التعبئة", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const pp = Number(row.unit_price_ht ?? 0) * Number(row.packaging_units_snapshot ?? 1);
+                return <span className="font-mono text-sm">{fmt(pp)} <span className="text-t4">دج</span></span>;
+            }},
+        { key: "orig_price", label: "السعر الأصلي", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const orig = Number(row.total_ht ?? 0) + Number(row.total_discount_amount ?? 0);
+                return <span className="font-mono text-sm">{fmt(orig)} <span className="text-t4">دج</span></span>;
+            }},
+        { key: "discount", label: "الخصم", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const dp = Number(row.discount_percentage ?? 0);
+                return dp > 0
+                    ? <span className="text-red text-sm">{dp}%</span>
+                    : <span className="text-t4">—</span>;
+            }},
+        { key: "price_after", label: "بعد الخصم HT", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => <span className="font-mono text-sm">{fmt(Number(row.total_ht ?? 0))} <span className="text-t4">دج</span></span> },
+        { key: "tva", label: "TVA %", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => <span className="text-t4 text-sm">{Number(row.tva_rate ?? 0)}%</span> },
+        { key: "total_ht", label: "إجمالي HT", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => <span className="font-mono text-sm">{fmt(Number(row.total_ht ?? 0))} <span className="text-t4">دج</span></span> },
+        { key: "total_ttc", label: "إجمالي TTC", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => <span className="font-mono font-extrabold text-em">{fmt(Number(row.total_ttc ?? 0))} <span className="text-t4">دج</span></span> },
+    ];
 
     return (
-        <div role="dialog" aria-modal="true" aria-label={`تفاصيل ${docType?.name ?? "المستند"}`}
-             style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,.45)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, direction: "rtl" }}
-             onClick={onClose}>
-            <div style={{ width: "100%", maxWidth: 920, maxHeight: "94vh", overflowY: "auto", overflowX: "hidden", background: "var(--bg1)", borderRadius: "var(--r3)", boxShadow: "0 24px 64px rgba(0,0,0,.22)", display: "flex", flexDirection: "column" }}
-                 onClick={e => e.stopPropagation()}>
-
-                {/* Header */}
-                <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--b1)", background: "var(--bg2)", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10, flexShrink: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <div style={{ width: 40, height: 40, borderRadius: 10, background: `color-mix(in srgb, ${isPurch ? "var(--purple)" : "var(--em)"} 12%, transparent)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                            <i className={`ti ${isPurch ? "ti-shopping-cart" : "ti-file-invoice"}`} style={{ fontSize: 18, color: isPurch ? "var(--purple)" : "var(--em)" }} aria-hidden="true" />
-                        </div>
-                        <div>
-                            <div style={{ fontWeight: 800, fontSize: 15, color: "var(--t1)" }}>
-                                {docType?.name}
-                                {d && <span style={{ marginRight: 8, color: isPurch ? "var(--purple)" : "var(--em)", fontFamily: "monospace" }}>{String(d.document_number ?? `#${d.id}`)}</span>}
-                            </div>
-                            {d && (
-                                <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
-                                    <StatusBadge status={status} />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                        {!isReadOnly && d && !(d as Record<string, unknown>).is_locked && (
-                            <button onClick={onEdit} style={{ height: 32, padding: "0 14px", borderRadius: 8, border: `1px solid color-mix(in srgb, var(--blue) 30%, transparent)`, background: "color-mix(in srgb, var(--blue) 8%, transparent)", color: "var(--blue)", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
-                                <i className="ti ti-pencil" style={{ fontSize: 13 }} aria-hidden="true" />
-                                تعديل
-                            </button>
+        <Modal
+            open={!!docId}
+            onClose={onClose}
+            size="xl"
+            title={`${docType?.name ?? ""} #${d.document_number ?? `#${docId}`}`}
+            subtitle={`${dtf(d.document_date as string)} • ${getPartyName(data)}`}
+            footer={
+                <>
+                    <div className="m-foot-l flex gap-6">
+                        {!isReadOnly && (
+                            <Button variant="danger" size="sm" icon={<i className="ti ti-trash" />} onClick={onDeleteDoc || onClose}>
+                                حذف
+                            </Button>
                         )}
-                        <button onClick={onClose} aria-label="إغلاق" style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--b1)", background: "var(--bg2)", color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <i className="ti ti-x" style={{ fontSize: 15 }} aria-hidden="true" />
-                        </button>
+                        <Button size="sm" icon={<i className="ti ti-corner-up-left" />} onClick={onClose}>
+                            مرتجع
+                        </Button>
+                    </div>
+                    {!isReadOnly && d && !d.is_locked && (
+                        <Button variant="primary" size="sm" icon={<i className="ti ti-pencil" />} onClick={onEdit}>
+                            تعديل
+                        </Button>
+                    )}
+                    <Button size="sm" variant="info" icon={<i className="ti ti-mail" />} onClick={onClose}>
+                        إرسال
+                    </Button>
+                    <Button size="sm" variant="primary" icon={<i className="ti ti-printer" />} onClick={onPrint || onClose}>
+                        طباعة
+                    </Button>
+                </>
+            }
+        >
+            {/* ── Colored header icon + status ── */}
+            <div className="flex items-center justify-between mb-10">
+                <div className="flex items-center gap-6">
+                    <div className="ic ic-md rounded-lg" style={{ background: isPurch ? 'var(--em3)' : 'var(--em)', color: '#fff' }}>
+                        <i className={isPurch ? 'ti ti-shopping-cart' : 'ti ti-receipt'} />
+                    </div>
+                    <div className="flex items-center gap-6">
+                        <StatusBadge status={status} />
+                        {d.is_locked && <span className="bx bp no-dot">مقفل</span>}
+                        {Number(d.remaining_amount ?? 0) > 0 && (
+                            <span className="text-red font-bold text-sm">متبقي: {fmt(Number(d.remaining_amount))} دج</span>
+                        )}
                     </div>
                 </div>
+                <div className="flex items-center gap-4 text-xs text-t4">
+                    <span>{getWarehouseName(data) || "—"}</span>
+                    <span>•</span>
+                    <span>{(d.fiscalYear as Record<string, unknown> | undefined)?.name as string ?? "—"}</span>
+                </div>
+            </div>
 
-                {/* Body */}
-                <div style={{ padding: "20px 24px", flex: 1 }}>
-                    {isLoading ? (
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 60, gap: 12, color: "var(--t4)" }}>
-                            <i className="ti ti-loader-2" style={{ animation: "cdp-spin .8s linear infinite", fontSize: 20 }} aria-hidden="true" />
-                            جارٍ تحميل التفاصيل…
-                        </div>
-                    ) : !d ? (
-                        <div style={{ textAlign: "center", padding: 60, color: "var(--t4)" }}>المستند غير موجود</div>
-                    ) : (
+            {/* ── Compact 4‑card info grid ── */}
+            <div className="g4 mb-12">
+                <div className="p-8 rounded-lg bg-3">
+                    <div className="text-xs text-t4 mb-4">{isPurch ? "المورد" : "الزبون"}</div>
+                    <div className="font-bold truncate">{getPartyName(data) || "عابر"}</div>
+                    {(() => {
+                        const pty = d.party as Record<string, unknown> | undefined;
+                        if (!pty) return null;
+                        return <>
+                            {pty.phone && <div className="text-xs text-t4 mt-2 ltr">{String(pty.phone)}</div>}
+                            {pty.nif && <div className="text-xs text-t4">NIF: {String(pty.nif)}</div>}
+                            {pty.rc && <div className="text-xs text-t4">RC: {String(pty.rc)}</div>}
+                        </>;
+                    })()}
+                </div>
+                <div className="p-8 rounded-lg bg-3">
+                    <div className="text-xs text-t4 mb-4">التواريخ</div>
+                    <div className="font-bold text-sm">{dtf(d.document_date as string)}</div>
+                    {d.due_date && <div className="text-xs text-t4 mt-2">استحقاق: {dtf(d.due_date as string)}</div>}
+                    {d.delivery_date && <div className="text-xs text-t4 mt-1">تسليم: {dtf(d.delivery_date as string)}</div>}
+                    {(d as Record<string, unknown>).currency && <div className="text-xs text-t4 mt-2">{(d.currency as Record<string, unknown>).name as string}</div>}
+                </div>
+                <div className="p-8 rounded-lg bg-3">
+                    <div className="text-xs text-t4 mb-4">الحالة</div>
+                    <StatusBadge status={status} />
+                    <div className="text-xs text-t4 mt-2">{(d.user as Record<string, unknown> | undefined)?.name as string ?? "—"}</div>
+                    {d.validatedBy && <div className="text-xs text-t4">اعتمد: {(d.validatedBy as Record<string, unknown>).name as string}</div>}
+                    {d.notes && <div className="text-xs text-t4 mt-1 truncate">{String(d.notes)}</div>}
+                </div>
+                <div className="p-8 rounded-lg bg-3">
+                    <div className="text-xs text-t4 mb-4">الرصيد</div>
+                    {bal ? (
                         <>
-                            {/* Meta Grid */}
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
-                                {[
-                                    { label: "التاريخ",     value: fmtDate(d.document_date as string) },
-                                    { label: "الاستحقاق",   value: fmtDate(d.due_date as string) },
-                                    { label: isPurch ? "المورد" : "الزبون", value: getPartyName(data as CommercialDocument) || "—" },
-                                    { label: "المستودع",    value: getWarehouseName(data as CommercialDocument) || "—" },
-                                ].map(f => (
-                                    <div key={f.label} style={{ background: "var(--bg2)", borderRadius: "var(--r2)", padding: "10px 14px" }}>
-                                        <div style={{ fontSize: 10, color: "var(--t4)", fontWeight: 700, marginBottom: 4 }}>{f.label}</div>
-                                        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--t1)" }}>{f.value}</div>
-                                    </div>
-                                ))}
+                            <div className="text-sm font-bold">
+                                {fmt(Number(bal.previous_balance ?? 0))} <span className="text-xs text-t4 font-normal">→</span> {fmt(Number(bal.new_balance ?? 0))} <span className="text-xs text-t4">دج</span>
                             </div>
-
-                            {/* Lines */}
-                            <ExpandedLines doc={data as CommercialDocument} />
-
-                            {/* Totals */}
-                            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
-                                <div style={{ width: 310, border: "1px solid var(--b1)", borderRadius: "var(--r2)", overflow: "hidden" }}>
-                                    {([
-                                        { label: "إجمالي HT",  value: d.total_ht,  dim: true },
-                                        { label: "TVA",         value: d.total_tva, dim: true },
-                                        parseFloat(String(d.total_discount ?? 0)) > 0 ? { label: "الخصم الإجمالي", value: d.total_discount, dim: false, red: true } : null,
-                                        parseFloat(String(d.total_stamp ?? 0)) > 0 ? { label: "الطابع الجبائي", value: d.total_stamp, dim: true } : null,
-                                    ] as ({ label: string; value: unknown; dim: boolean; red?: boolean } | null)[])
-                                        .filter(Boolean)
-                                        .map(row => {
-                                            const r = row!;
-                                            return (
-                                                <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 14px", borderBottom: "1px solid var(--b1)", fontSize: 12, color: r.dim ? "var(--t4)" : "var(--t2)" }}>
-                                                    <span>{r.label}</span>
-                                                    <span style={{ fontWeight: 600, direction: "ltr", color: r.red ? "var(--red)" : "inherit" }}>
-                                                        {fmtMoney(r.value as number)} دج
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
-                                    {/* Total TTC */}
-                                    <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 14px", background: "var(--bg2)", fontSize: 14, fontWeight: 800 }}>
-                                        <span style={{ color: "var(--t1)" }}>الإجمالي TTC</span>
-                                        <span style={{ direction: "ltr", color: "var(--em)" }}>{fmtMoney(d.total_ttc as number)} دج</span>
-                                    </div>
-                                </div>
-                            </div>
+                            {Number(d.remaining_amount ?? 0) > 0 && (
+                                <div className="text-xs text-red mt-2">متبقي: {fmt(Number(d.remaining_amount))} دج</div>
+                            )}
                         </>
+                    ) : (
+                        <div className="text-sm font-bold">{fmt(Number(d.total_ttc ?? 0))} <span className="text-xs text-t4">دج</span></div>
                     )}
                 </div>
             </div>
-        </div>
+
+            {/* Lines Section */}
+            <div className="mb-8">
+                <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-6">
+                        <span className="font-bold text-base">بنود المستند</span>
+                        <span className="text-xs text-t4 bg-3 px-8 py-2 rounded-md">{lines.length} بند</span>
+                    </div>
+                </div>
+                <SimpleTable
+                    columns={lineColumns}
+                    data={lines.map((line, i) => ({ ...line, _key: `l-${i}`, _idx: i + 1 })) as unknown as Record<string, unknown>[]}
+                    rowKey="_key"
+                    className="border border-b1 rounded-lg"
+                />
+            </div>
+
+            {/* Payments Section */}
+            {payments.length > 0 && (
+                <div className="mb-12">
+                    <div className="flex items-center gap-6 mb-8">
+                        <span className="font-bold text-base">المدفوعات</span>
+                        <span className="text-xs text-t4 bg-3 px-8 py-2 rounded-md">{payments.length} دفعة</span>
+                    </div>
+                    {payments.map((p, i) => {
+                        const pm = p.paymentMode as Record<string, unknown> | undefined;
+                        const iconMap: Record<string, string> = { cash: "ti-cash", bank: "ti-building-bank", ccp: "ti-mail", cib: "ti-credit-card", check: "ti-checks" };
+                        const icon = iconMap[pm?.code as string] ?? "ti-cash";
+                        return (
+                            <div key={p.id as number ?? i} className="flex items-center justify-between p-10 mb-4 rounded-md bg-3">
+                                <div className="flex items-center gap-8">
+                                    <div className="ic ic-sm text-t4"><i className={`ti ${icon}`} /></div>
+                                    <div>
+                                        <div className="font-bold text-sm">{pm?.name as string ?? "—"}</div>
+                                        <div className="text-xs text-t4">{p.reference ? String(p.reference) : ""} {p.payment_date ? `• ${dtf(p.payment_date as string)}` : ""}</div>
+                                    </div>
+                                </div>
+                                <div className="font-extrabold font-mono">{fmt(Number(p.amount ?? 0))} <span className="text-t4">دج</span></div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* Totals Section — 3‑card grid */}
+            <div className="g3 mb-4">
+                {/* Card 1: Discounts & Stamp */}
+                {(Number(d.total_discount ?? 0) > 0 || Number(d.total_stamp ?? 0) > 0) && (
+                    <div className="p-10 rounded-lg bg-3">
+                        <div className="text-xs text-t4 font-bold mb-6">التخفيضات</div>
+                        {Number(d.total_discount ?? 0) > 0 && (
+                            <div className="sr">
+                                <span className="sr-l">الخصم</span>
+                                <span className="sr-v text-red">-{fmt(Number(d.total_discount))} دج</span>
+                            </div>
+                        )}
+                        {Number(d.total_stamp ?? 0) > 0 && (
+                            <div className="sr">
+                                <span className="sr-l">الطابع الجبائي</span>
+                                <span className="sr-v">{fmt(Number(d.total_stamp))} دج</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Card 2: Totals */}
+                <div className="p-10 rounded-lg bg-3">
+                    <div className="text-xs text-t4 font-bold mb-6">الإجمالي</div>
+                    <div className="sr">
+                        <span className="sr-l">المجموع HT</span>
+                        <span className="sr-v">{fmt(Number(d.total_ht ?? 0))} دج</span>
+                    </div>
+                    <div className="sr">
+                        <span className="sr-l">TVA</span>
+                        <span className="sr-v">{fmt(Number(d.total_tva ?? 0))} دج</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-6 mt-6 border-t border-b3">
+                        <span className="font-black text-lg">TTC</span>
+                        <span className="font-black text-lg text-em">{fmt(Number(d.total_ttc ?? 0))} دج</span>
+                    </div>
+                </div>
+
+                {/* Card 3: Balance */}
+                <div className="p-10 rounded-lg bg-3">
+                    <div className="text-xs text-t4 font-bold mb-6">الرصيد</div>
+                    <div className="sr">
+                        <span className="sr-l">المدفوع</span>
+                        <span className="sr-v text-em">{fmt(Number(d.paid_amount ?? 0))} دج</span>
+                    </div>
+                    <div className="sr">
+                        <span className="sr-l">المتبقي</span>
+                        <span className="sr-v font-bold" style={Number(d.remaining_amount ?? 0) > 0 ? { color: 'var(--red)' } as React.CSSProperties : {}}>
+                            {fmt(Number(d.remaining_amount ?? 0))} دج
+                        </span>
+                    </div>
+                    {bal && (
+                        <div className="pt-6 mt-6 border-t border-b3">
+                            <div className="sr">
+                                <span className="sr-l">الرصيد السابق</span>
+                                <span className="sr-v">{fmt(Number(bal.previous_balance ?? 0))} دج</span>
+                            </div>
+                            <div className="sr">
+                                <span className="sr-l">الرصيد الجديد</span>
+                                <span className="sr-v font-bold">{fmt(Number(bal.new_balance ?? 0))} دج</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </Modal>
     );
 }
 
@@ -723,6 +906,11 @@ export default function CommercialDocumentsPage() {
             apiPost(`/documents/${id}/cancel`, { cancellation_reason: reason }),
         onSuccess: () => { notify.success("تم إلغاء المستند"); invalidateDocs(); },
         onError:   () => notify.error("فشل الإلغاء"),
+    });
+    const deleteMut = useMutation({
+        mutationFn: (id: number) => apiDelete(`/documents/${id}`),
+        onSuccess: () => { notify.success("تم حذف المستند"); invalidateDocs(); },
+        onError:   () => notify.error("فشل الحذف"),
     });
 
     // ── Edit modal ────────────────────────────────────────────────────────────
@@ -1870,7 +2058,15 @@ export default function CommercialDocumentsPage() {
                           else { closeModal(); openEditModal(doc); }
                         }
                     }}
+                    onCancel={() => { closeModal(); setCancelModal({ id: viewDocId, reason: '' }); }}
                     isReadOnly={!!isReadOnly}
+                    onDeleteDoc={async () => {
+                        closeModal();
+                        if (await confirm('هل أنت متأكد من حذف هذا المستند؟')) {
+                            deleteMut.mutate(viewDocId);
+                        }
+                    }}
+                    onPrint={() => { closeModal(); setPrintDocId(viewDocId); }}
                 />
             )}
 

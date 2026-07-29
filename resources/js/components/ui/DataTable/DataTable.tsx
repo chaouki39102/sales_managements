@@ -293,7 +293,7 @@ export function DataTable<T extends Record<string, unknown> = Record<string, unk
   const toggleCollapseAll = useCallback(() => {
     const next = allHidden
       ? new Set<string>()
-      : new Set(nonIndexCols.filter((c, i) => i > 0).map(c => c.key));
+      : new Set(nonIndexCols.filter((_c, i) => i > 0).map(c => c.key));
     updateHidden(next);
     setColMenuOpen(false);
   }, [allHidden, nonIndexCols, updateHidden]);
@@ -813,6 +813,19 @@ export function DataTable<T extends Record<string, unknown> = Record<string, unk
     setEditingCell(null);
   }, [editingCell, clearError]);
 
+  // ── Range Selection (v10.2) ───────────────────────────────────────────────
+  const { selectCell, isInRange } = useRangeSelection(
+    enableRangeSelection,
+    displayData.length,
+    visibleCols.length,
+  );
+
+  // effectiveVirtualDisplayData depends on visibleRange from useRangeSelection
+  const effectiveVirtualDisplayData = useMemo(() => {
+    if (!isVirtual) return effectiveDisplayData;
+    return effectiveDisplayData.slice(visibleRange.start, visibleRange.end + 1);
+  }, [isVirtual, effectiveDisplayData, visibleRange]);
+
   // ── Keyboard Navigation (v10) ─────────────────────────────────────────────
   const {
     activeCell,
@@ -834,7 +847,7 @@ export function DataTable<T extends Record<string, unknown> = Record<string, unk
   });
 
   // ── Copy/Paste from Excel 🆕 ──────────────────────────────────────────────
-  const tableWrapRef = useRef<HTMLDivElement>(null);
+  const tableWrapRef = useRef<HTMLDivElement | null>(null);
   // نمرر onCellEditRef.current عبر wrapper مستقر لتجنب stale closure
   const stableOnCellEdit = useCallback(
     (...args: Parameters<NonNullable<typeof onCellEdit>>) => onCellEditRef.current?.(...args),
@@ -891,19 +904,6 @@ export function DataTable<T extends Record<string, unknown> = Record<string, unk
     columnGroups,
     visibleColKeysForGroups,
   );
-
-  // ── Range Selection (v10.2) ───────────────────────────────────────────────
-  const { selectCell, isInRange } = useRangeSelection(
-    enableRangeSelection,
-    displayData.length,
-    visibleCols.length,
-  );
-
-  // effectiveVirtualDisplayData depends on visibleRange from useRangeSelection
-  const effectiveVirtualDisplayData = useMemo(() => {
-    if (!isVirtual) return effectiveDisplayData;
-    return effectiveDisplayData.slice(visibleRange.start, visibleRange.end + 1);
-  }, [isVirtual, effectiveDisplayData, visibleRange]);
 
   // Smart Filter (اللغة العربية) 🆕 ───────────────────────────────────────
   const { applySmartFilter } = useSmartFilter(allColDefs, (newFilters, newSorts) => {
@@ -1670,11 +1670,11 @@ export function DataTable<T extends Record<string, unknown> = Record<string, unk
                 ? ['csv', 'excel', 'json', 'print'] as ExportFormat[]
                 : ['csv', 'json', 'print'] as ExportFormat[]
             );
-            const ITEMS: { fmt: ExportFormat; icon: string; label: string; ext: string }[] = [
-              { fmt: 'csv',   icon: 'ti-file-text',        label: 'CSV',         ext: '.csv' },
-              { fmt: 'excel', icon: 'ti-file-spreadsheet', label: 'Excel',       ext: '.xlsx' },
-              { fmt: 'json',  icon: 'ti-file-code',        label: 'JSON',        ext: '.json' },
-              { fmt: 'print', icon: 'ti-printer',          label: 'طباعة / PDF', ext: '' },
+            const ITEMS = [
+              { fmt: 'csv' as const,   icon: 'ti-file-text',        label: 'CSV',         ext: '.csv' },
+              { fmt: 'excel' as const, icon: 'ti-file-spreadsheet', label: 'Excel',       ext: '.xlsx' },
+              { fmt: 'json' as const,  icon: 'ti-file-code',        label: 'JSON',        ext: '.json' },
+              { fmt: 'print' as const, icon: 'ti-printer',          label: 'طباعة / PDF', ext: '' },
             ].filter(i => formats.includes(i.fmt));
 
             return (
@@ -2286,7 +2286,7 @@ export function DataTable<T extends Record<string, unknown> = Record<string, unk
                               );
                             if (!agg || agg.value == null) return <td key={col.key} />;
                             const fmt = col.aggregateFormat
-                              ? col.aggregateFormat(agg.value, agg.type)
+                              ? col.aggregateFormat(agg.value as number, agg.type as AggregateType)
                               : Number(agg.value).toLocaleString('fr-DZ', {
                                   minimumFractionDigits: 2,
                                   maximumFractionDigits: 2,

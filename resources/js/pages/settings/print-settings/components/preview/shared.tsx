@@ -170,10 +170,10 @@ interface InfoRowProps {
 function InfoRowFn({ label, value }: InfoRowProps): JSX.Element {
   return (
     <tr>
-      <td style={{ color: '#555', padding: '2px 0', whiteSpace: 'nowrap', fontWeight: 600 }}>
+      <td style={{ color: '#555', padding: '2px 0', whiteSpace: 'nowrap', fontWeight: 600, verticalAlign: 'top' }}>
         {label}:
       </td>
-      <td style={{ padding: '2px 0', paddingRight: 12 }}>
+      <td style={{ padding: '2px 0', paddingRight: 12, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
         {value}
       </td>
     </tr>
@@ -184,12 +184,14 @@ export const InfoRow = React.memo(InfoRowFn);
 
 // ─── SectionWrap — applies highlight styling from rules ──────────────────────
 
-export function SectionWrap({ highlight, children }: {
+export function SectionWrap({ highlight, children, style }: {
   highlight: Record<string, string> | null;
   children: React.ReactNode;
+  style?: React.CSSProperties;
 }) {
-  if (!highlight) return <>{children}</>;
-  return <div style={highlight}>{children}</div>;
+  if (!highlight && !style) return <>{children}</>;
+  if (!highlight) return <div style={style}>{children}</div>;
+  return <div style={{ ...highlight, ...style }}>{children}</div>;
 }
 
 // ─── Box border helper (any side, color, width, radius) ───────────────────────
@@ -410,8 +412,15 @@ export function renderLayoutRows(
 
     // ── Legacy single-field mode → auto-convert to LayoutColumnCell ──
     if (r.field && r.field !== 'totals.tvaBreakdownGroup' && r.field !== 'literal') {
-      const labelSetting = COMPANY_FIELD_LABEL_SETTING[r.field] || CUSTOMER_FIELD_LABEL_SETTING[r.field];
       const def = printFieldRegistry.get(r.field);
+      const value = printFieldResolver.resolve(r.field, data, tpl);
+
+      // Hide empty text/date fields — show numeric/currency fields even when 0
+      const isEmpty = value === null || value === undefined || value === '';
+      const shouldHideWhenEmpty = def ? (def.type === 'string' || def.type === 'date') : true;
+      if (isEmpty && shouldHideWhenEmpty) continue;
+
+      const labelSetting = COMPANY_FIELD_LABEL_SETTING[r.field] || CUSTOMER_FIELD_LABEL_SETTING[r.field];
       const col: LayoutColumn = {
         id: `${r.id}_auto_col`,
         field: r.field,

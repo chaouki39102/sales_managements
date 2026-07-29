@@ -245,7 +245,7 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
           placeholder="مثال: السجل التجاري: 13/B.0123456" />
       </Field>}
 
-      <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
+      {sec('header_layout') && <><div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
       <div className="ps-field">
         <label className="ps-field-label">تخطيط الرأس</label>
         <div className="ps-paper-pills" style={{ marginTop: 2 }}>
@@ -256,7 +256,7 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
             </button>
           ))}
         </div>
-      </div>
+      </div></>}
 
       {isColumns && (
         <Section title="أعمدة الرأس" icon="ti-columns" defaultOpen>
@@ -385,20 +385,20 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
 
       <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
       <div className="ps-section-title" style={{ fontSize: 11, color: 'var(--t4)', marginBottom: 4 }}>تسميات الحقول</div>
-      <Field label="تسمية العنوان (address)"><Input value={tpl.label_address} onChange={v => syncLabel('label_address', v)} placeholder="العنوان" /></Field>
-      <Field label="تسمية الهاتف (phone)"><Input value={tpl.label_phone} onChange={v => syncLabel('label_phone', v)} placeholder="الهاتف" /></Field>
-      <Field label="تسمية المحمول (mobile)"><Input value={tpl.label_mobile} onChange={v => syncLabel('label_mobile', v)} placeholder="المحمول" /></Field>
-      <Field label="تسمية الفاكس (fax)"><Input value={tpl.label_fax} onChange={v => syncLabel('label_fax', v)} placeholder="الفاكس" /></Field>
-      <Field label="تسمية البريد الإلكتروني (email)"><Input value={tpl.label_email} onChange={v => syncLabel('label_email', v)} placeholder="البريد الإلكتروني" /></Field>
-      <Field label="تسمية الاسم التجاري (commercial_name)"><Input value={tpl.label_commercial_name} onChange={v => syncLabel('label_commercial_name', v)} placeholder="الاسم التجاري" /></Field>
-      <Field label="تسمية رقم الضريبة (nif)"><Input value={tpl.label_nif} onChange={v => syncLabel('label_nif', v)} placeholder="NIF" /></Field>
-      <Field label="تسمية السجل التجاري (rc)"><Input value={tpl.label_rc} onChange={v => syncLabel('label_rc', v)} placeholder="RC" /></Field>
-      <Field label="تسمية NIS (nis)"><Input value={tpl.label_nis} onChange={v => syncLabel('label_nis', v)} placeholder="NIS" /></Field>
-      <Field label="تسمية المادة الجبائية (ai)"><Input value={tpl.label_article} onChange={v => syncLabel('label_article', v)} placeholder="المادة الجبائية" /></Field>
-      <Field label="تسمية الرأس المال (capital_amount)"><Input value={tpl.label_capital} onChange={v => syncLabel('label_capital', v)} placeholder="الرأس المال" /></Field>
-      <Field label="تسمية اسم البنك (bank_name)"><Input value={tpl.label_bank_name} onChange={v => syncLabel('label_bank_name', v)} placeholder="اسم البنك" /></Field>
-      <Field label="تسمية الحساب البنكي (rib)"><Input value={tpl.label_rib} onChange={v => syncLabel('label_rib', v)} placeholder="RIB" /></Field>
-      <Field label="تسمية النشاط (activity)"><Input value={tpl.label_activity} onChange={v => syncLabel('label_activity', v)} placeholder="النشاط" /></Field>
+      {sec('label_address') && <Field label="تسمية العنوان (address)"><Input value={tpl.label_address} onChange={v => syncLabel('label_address', v)} placeholder="العنوان" /></Field>}
+      {sec('label_phone') && <Field label="تسمية الهاتف (phone)"><Input value={tpl.label_phone} onChange={v => syncLabel('label_phone', v)} placeholder="الهاتف" /></Field>}
+      {sec('label_mobile') && <Field label="تسمية المحمول (mobile)"><Input value={tpl.label_mobile} onChange={v => syncLabel('label_mobile', v)} placeholder="المحمول" /></Field>}
+      {sec('label_fax') && <Field label="تسمية الفاكس (fax)"><Input value={tpl.label_fax} onChange={v => syncLabel('label_fax', v)} placeholder="الفاكس" /></Field>}
+      {sec('label_email') && <Field label="تسمية البريد الإلكتروني (email)"><Input value={tpl.label_email} onChange={v => syncLabel('label_email', v)} placeholder="البريد الإلكتروني" /></Field>}
+      {sec('label_commercial_name') && <Field label="تسمية الاسم التجاري (commercial_name)"><Input value={tpl.label_commercial_name} onChange={v => syncLabel('label_commercial_name', v)} placeholder="الاسم التجاري" /></Field>}
+      {sec('label_nif') && <Field label="تسمية رقم الضريبة (nif)"><Input value={tpl.label_nif} onChange={v => syncLabel('label_nif', v)} placeholder="NIF" /></Field>}
+      {sec('label_rc') && <Field label="تسمية السجل التجاري (rc)"><Input value={tpl.label_rc} onChange={v => syncLabel('label_rc', v)} placeholder="RC" /></Field>}
+      {sec('label_nis') && <Field label="تسمية NIS (nis)"><Input value={tpl.label_nis} onChange={v => syncLabel('label_nis', v)} placeholder="NIS" /></Field>}
+      {sec('label_article') && <Field label="تسمية المادة الجبائية (ai)"><Input value={tpl.label_article} onChange={v => syncLabel('label_article', v)} placeholder="المادة الجبائية" /></Field>}
+      {sec('label_capital') && <Field label="تسمية الرأس المال (capital_amount)"><Input value={tpl.label_capital} onChange={v => syncLabel('label_capital', v)} placeholder="الرأس المال" /></Field>}
+      {sec('label_bank_name') && <Field label="تسمية اسم البنك (bank_name)"><Input value={tpl.label_bank_name} onChange={v => syncLabel('label_bank_name', v)} placeholder="اسم البنك" /></Field>}
+      {sec('label_rib') && <Field label="تسمية الحساب البنكي (rib)"><Input value={tpl.label_rib} onChange={v => syncLabel('label_rib', v)} placeholder="RIB" /></Field>}
+      {sec('label_activity') && <Field label="تسمية النشاط (activity)"><Input value={tpl.label_activity} onChange={v => syncLabel('label_activity', v)} placeholder="النشاط" /></Field>}
 
       <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0' }} />
       <div className="ps-section-title" style={{ fontSize: 12, marginBottom: 4 }}>

@@ -41,21 +41,16 @@ function renderThermalTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
 
 function renderPageTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
   const isA4 = tpl.paper_size === 'A4';
-  const blockWidth = isA4 ? 320 : 260;
-  const justify =
-    tpl.totals_align === 'left'  ? 'flex-start' :
-    tpl.totals_align === 'center' ? 'center' : 'flex-end';
 
   const bs = tpl.total_border_style;
   const hasBorder = bs && bs !== 'none';
 
   return (
     <div style={{
-      display: 'flex', justifyContent: justify,
       marginBottom: isA4 ? 24 : 12,
+      width: '100%',
     }}>
       <div style={{
-        width: blockWidth,
         fontSize: tpl.totals_font_size,
         fontWeight: tpl.totals_bold ? 700 : 400,
       }}>

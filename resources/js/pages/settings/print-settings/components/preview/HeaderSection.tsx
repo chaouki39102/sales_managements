@@ -111,7 +111,7 @@ function renderCompanyInfo(tpl: PrintTemplate, data: UniversalDocumentData, _isT
 function renderThermalHeader(tpl: PrintTemplate, data: UniversalDocumentData) {
   return (
     <div style={{ textAlign: align(tpl.company_info_align), marginBottom: 5 }}>
-      {tpl.show_logo && renderLogo(tpl, data)}
+        {/* logo removed from left column -- now rendered in logoAndTitle block above */}
       {tpl.show_company_name && (
         <div style={{
           textAlign: align(tpl.company_name_align),
@@ -137,20 +137,25 @@ function renderThermalHeader(tpl: PrintTemplate, data: UniversalDocumentData) {
 
 function renderPageHeader(tpl: PrintTemplate, data: UniversalDocumentData, paperWidth: number) {
   const isA4 = tpl.paper_size === 'A4';
+  const gap = (tpl.header_columns_gap ?? 30) as number;
+  const clientCardW = (tpl.client_card_width ?? 50) as number;
+  const docInfoW = 100 - clientCardW - (gap > 0 ? 1 : 0);
 
   const logoAndTitle = (
     <>
       {tpl.show_logo && renderLogo(tpl, data)}
       {tpl.title_text && (
-        <div style={{
-          fontSize: tpl.title_size + (isA4 ? 4 : 2),
-          fontWeight: tpl.title_bold ? 900 : 400,
-          color: tpl.title_color,
-          textAlign: align(tpl.title_align),
-          marginBottom: isA4 ? 12 : 8,
-        }}>
-          {tpl.title_text}
-        </div>
+      <div style={{
+        fontSize: tpl.title_size + (isA4 ? 4 : 2),
+        fontWeight: tpl.title_bold ? 900 : 400,
+        color: tpl.title_color,
+        textAlign: align(tpl.title_align),
+        marginBottom: isA4 ? 12 : 8,
+        wordBreak: 'break-word',
+        overflowWrap: 'break-word',
+      }}>
+        {tpl.title_text}
+      </div>
       )}
     </>
   );
@@ -169,15 +174,23 @@ function renderPageHeader(tpl: PrintTemplate, data: UniversalDocumentData, paper
 
   return (
     <div style={{ marginBottom: isA4 ? 30 : 16 }}>
+    {logoAndTitle}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
+        gap: gap,
         paddingBottom: isA4 ? 20 : 10,
         borderBottom: tpl.header_separator === 'none' ? 'none'
           : `2px ${tpl.header_separator === 'double' ? 'double' : tpl.header_separator === 'dashed' ? 'dashed' : 'solid'} #111`,
       }}>
-        <div style={{ textAlign: align(tpl.company_info_align) }}>
-        {tpl.show_logo && renderLogo(tpl, data)}
+        <div style={{
+          textAlign: align(tpl.company_info_align),
+          width: `${clientCardW}%`,
+          minWidth: 0,
+          wordBreak: 'break-word',
+          overflowWrap: 'break-word',
+        }}>
+
         {tpl.show_company_name && (
           <div style={{
             fontSize: tpl.company_name_size + (isA4 ? 4 : 2),
@@ -198,17 +211,14 @@ function renderPageHeader(tpl: PrintTemplate, data: UniversalDocumentData, paper
         )}
       </div>
 
-      <div style={{ textAlign: 'left', minWidth: isA4 ? 250 : 180 }}>
-        <div style={{
-          fontSize: tpl.title_size + (isA4 ? 4 : 2),
-          fontWeight: tpl.title_bold ? 900 : 400,
-          color: tpl.title_color,
-          marginBottom: isA4 ? 12 : 8,
-          textAlign: 'left',
-        }}>
-          {tpl.title_text}
-        </div>
-        <table style={{ fontSize: tpl.company_info_size, borderCollapse: 'collapse' }}>
+      <div style={{
+        textAlign: 'left',
+        width: `${docInfoW}%`,
+        minWidth: 0,
+        wordBreak: 'break-word',
+        overflowWrap: 'break-word',
+      }}>
+        <table style={{ fontSize: tpl.company_info_size, borderCollapse: 'collapse', width: '100%' }}>
           <tbody>
             {tpl.show_doc_number && <InfoRow label={isA4 ? 'رقم الفاتورة' : 'رقم'} value={r('document.number', data, tpl) as string} />}
             {tpl.show_date && <InfoRow label="التاريخ" value={formatDate(r('document.date', data, tpl) as string) + (tpl.show_time && r('document.time', data, tpl) ? ' ' + r('document.time', data, tpl) : '')} />}
@@ -217,7 +227,7 @@ function renderPageHeader(tpl: PrintTemplate, data: UniversalDocumentData, paper
               <InfoRow label="الكاشير" value={r('customer.cashierName', data, tpl) as string} />
             )}
             {tpl.show_session && r('session.code', data, tpl) && <InfoRow label="الجلسة" value={r('session.code', data, tpl) as string} />}
-            {tpl.show_payment_term && r('document.dueDate', data, tpl) && <InfoRow label="شروط الدفع" value={r('document.dueDate', data, tpl) as string} />}
+            {tpl.show_payment_term && r('document.paymentTerm', data, tpl) && <InfoRow label="شروط الدفع" value={r('document.paymentTerm', data, tpl) as string} />}
           </tbody>
         </table>
       </div>

@@ -13,6 +13,7 @@ use App\Models\Setting;
 use App\Models\NumberingSeries;
 use App\Models\Product;
 use App\Models\StockMovement;
+use App\Models\Payment;
 use App\Services\CompanyContextService;
 use App\Services\InventoryValuationService;
 use App\Services\Tax\FiscalStampCalculator;
@@ -75,7 +76,11 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             throw new BusinessRuleException('لم يتم تحديد الشركة الحالية.', 422);
         }
 
+        $savedLines = $data['lines'] ?? [];
         $data = parent::beforeCreate($data, $request);
+        if (!empty($savedLines)) {
+            $data['lines'] = $savedLines;
+        }
         $data['company_id'] = $companyId;
 
         if (empty($data['user_id'])) {
@@ -282,15 +287,36 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // HOOK: beforeDelete — حذف ممنوع تماماً
+    // OVERRIDE: delete — حذف فعلي مع تنظيف المخزون والمدفوعات
     // ═══════════════════════════════════════════════════════════════════════
 
-    protected function beforeDelete(Model $item): void
+    public function delete(Model $item, \Illuminate\Http\Request $request = null): bool
     {
-        throw new BusinessRuleException(
-            'لا يمكن حذف المستندات التجارية. استخدم الإلغاء بدلاً من الحذف.',
-            409
-        );
+        $document = $item instanceof CommercialDocument
+            ? $item
+            : CommercialDocument::findOrFail($item->getKey());
+
+        if ($document->is_locked) {
+            throw new BusinessRuleException('لا يمكن حذف وثيقة مقفلة.', 409);
+        }
+        if ($document->is_exported_to_accounting) {
+            throw new BusinessRuleException('لا يمكن حذف وثيقة مصدرة للمحاسبة.', 409);
+        }
+
+        DB::transaction(function () use ($document) {
+            // 1. Soft-delete stock movements (عكس تأثير المخزون)
+            $this->deleteStockMovementsForDocument($document);
+
+            // 2. Unlink payments (حذف rows الوسيطة)
+            $document->payments()->detach();
+
+            // 3. Hard-delete document (DB CASCADE يحذف lines و pivot rows)
+            $document->forceDelete();
+        });
+
+        $this->performPostCommitOperations($document, [], $request, 'delete');
+
+        return true;
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -453,18 +479,24 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 $document->company_id
             );
 
-            $inactiveIds = DB::table('products')
-                ->whereIn('id', $intIds)
-                ->where('company_id', $document->company_id)
-                ->where('active', false)
-                ->pluck('id')
-                ->toArray();
+            $document->loadMissing('documentType');
+            $docCode = $document->documentType?->code;
+            $isReturn = in_array($docCode, ['AV', 'AA'], true);
 
-            if (!empty($inactiveIds)) {
-                throw new BusinessRuleException(
-                    'المنتجات ذات المعرفات [' . implode(', ', $inactiveIds) . '] غير نشطة ولا يمكن بيعها.',
-                    422
-                );
+            if (!$isReturn) {
+                $inactiveIds = DB::table('products')
+                    ->whereIn('id', $intIds)
+                    ->where('company_id', $document->company_id)
+                    ->where('active', false)
+                    ->pluck('id')
+                    ->toArray();
+
+                if (!empty($inactiveIds)) {
+                    throw new BusinessRuleException(
+                        'المنتجات ذات المعرفات [' . implode(', ', $inactiveIds) . '] غير نشطة ولا يمكن بيعها.',
+                        422
+                    );
+                }
             }
         }
 

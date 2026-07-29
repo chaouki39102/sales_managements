@@ -399,7 +399,7 @@ export async function exportToExcelAdvanced<T extends Record<string, unknown>>(
       } else if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}/)) {
         cell.value = formatDateShort(val);
       } else {
-        cell.value = val;
+        cell.value = val as string | number | boolean | Date;
       }
 
       const align = col.align === 'center' ? 'center' : col.align === 'end' ? 'left' : 'right';

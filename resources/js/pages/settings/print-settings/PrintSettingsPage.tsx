@@ -26,10 +26,11 @@ import { useApiClient, useNotifier, useCompany, useSlug } from './providers/Prin
 import { validateTemplateIntegrity } from './services/SettingsSerializer';
 
 const PAPER_DIM: Record<string, { w: number; h: number }> = {
-  '80mm': { w: 80,  h: 0   },
-  '58mm': { w: 58,  h: 0   },
-  'A4':   { w: 210, h: 297 },
-  'A5':   { w: 148, h: 210 },
+  '80mm':      { w: 80,  h: 0   },
+  '58mm':      { w: 58,  h: 0   },
+  'A4':        { w: 210, h: 297 },
+  'A5':        { w: 148, h: 210 },
+  '400x200mm': { w: 400, h: 200 },
 };
 
 function paperLabel(size: string, mm: number): string {
@@ -43,6 +44,7 @@ const DOC_CATS = [
   { key: 'sales',    label: 'المبيعات',   icon: 'ti-receipt'        },
   { key: 'purchase', label: 'الشراء',     icon: 'ti-truck'          },
   { key: 'warehouse',label: 'المخزون',    icon: 'ti-box'            },
+  { key: 'product',  label: 'الملصقات',   icon: 'ti-tag'            },
 ] as const;
 
 export default function PrintSettingsPage() {
@@ -171,6 +173,12 @@ export default function PrintSettingsPage() {
       if (key === 'paper_size' && next) {
         if (val === '80mm') next.paper_width_mm = 80;
         else if (val === '58mm') next.paper_width_mm = 58;
+        else if (val === 'A4' || val === 'A5') {
+          next.paper_width_mm = 80; // Reset thermal width when switching to page paper
+          next.page_orientation = next.page_orientation || 'portrait';
+        } else if (val === '400x200mm') {
+          next.page_orientation = next.page_orientation || 'portrait';
+        }
       }
       return next;
     });
@@ -616,7 +624,10 @@ export default function PrintSettingsPage() {
                 )}
 
                 <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                  {(['80mm', '58mm', 'A4', 'A5'] as const).map(s => (
+                  {(activeDoc === 'STK'
+                    ? (['400x200mm'] as const)
+                    : (['80mm', '58mm', 'A4', 'A5'] as const)
+                  ).map(s => (
                     <button
                       key={s} type="button"
                       onClick={() => update('paper_size', s)}
@@ -765,6 +776,7 @@ export default function PrintSettingsPage() {
     </div>
 
       <TemplateLibraryModal
+        key={activeDoc}
         open={showLibrary}
         onClose={() => setShowLibrary(false)}
         onInstall={handleInstallLibrary}

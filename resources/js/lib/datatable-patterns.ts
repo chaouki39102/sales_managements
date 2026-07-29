@@ -9,7 +9,7 @@
 //   useSmartFilter(columns, onFilter, ERP_FILTER_PATTERNS)
 // ════════════════════════════════════════════════════════════════════════════
 
-import type { SmartFilterPattern } from '@components/ui/DataTable/DataTable';
+import type { SmartFilterPattern } from '@/components/ui/DataTable';
 
 export const ERP_FILTER_PATTERNS: SmartFilterPattern[] = [
   // ── فواتير متأخرة ──────────────────────────────────────────────────────

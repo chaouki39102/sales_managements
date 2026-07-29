@@ -5,6 +5,7 @@ import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
     useDocuments as useInvoices,
     useDocumentMutations,
+    useDocument,
 } from "@/lib/api/endpoints/documents";
 
 // ✅ استيراد الـ Hooks الصحيحة للزبائن والزبائن
@@ -19,20 +20,29 @@ import {
 import { useFiscalYear } from "@/context/FiscalYearContext";
 
 import { useModal } from "@/hooks/useModal";
+import { useConfirm } from "@/hooks/useConfirm";
 import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import KpiCard from "@/components/ui/KpiCard";
 import Avatar from "@/components/ui/Avatar";
 import EmptyState from "@/components/ui/EmptyState";
 import SimpleTable from "@/components/ui/SimpleTable";
+import type { SimpleColumn } from "@/components/ui/SimpleTable";
 import type {
     CommercialDocument,
     CommercialDocumentLine,
     Party,
 } from "@/types";
+import { useQuery } from "@tanstack/react-query";
+import { apiGet } from "@/lib/api/core/client";
+import { useActiveSlug, useActiveCompany } from "@/lib/store/appStore";
+import { usePrintTemplatesList, mapCompany } from '@/pages/settings/print-settings/runtime';
+const TemplatePrintModal = React.lazy(() => import('@/pages/settings/print-settings/components/shared/TemplatePrintModal'));
+import { ReturnDocumentModal } from '@/pages/documents/components/ReturnDocumentModal';
 
 // ── Status helpers ─────────────────────────────────
 const STATUS_BADGE: Record<
@@ -59,8 +69,8 @@ const _PAY_ICON: Record<string, string> = {
 export default function InvoicesPage() {
     const { selectedYear } = useFiscalYear();
   const [filters, setFilters] = useState<InvoiceFilters>({ page: 1, per_page: 20, fiscal_year_id: selectedYear?.id });
-  const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [viewing,  setViewing]  = useState<CommercialDocument | null>(null);
+  const [selected,  setSelected]  = useState<Set<number>>(new Set());
+  const [viewingId, setViewingId] = useState<number | null>(null);
 
   const detail   = useModal();
   const newInv   = useModal();
@@ -70,12 +80,26 @@ export default function InvoicesPage() {
     setFilters(prev => ({ ...prev, page: 1, fiscal_year_id: selectedYear?.id }));
   }, [selectedYear?.id]);
 
-  // تحويل fiscal_year_id إلى filter[fiscal_year_id] للباكند
+  const STATUS_MAP: Record<string, string> = {
+    paid:      'paid',
+    validated: 'validated',
+    partial:   'partially_paid',
+    cancelled: 'cancelled',
+  };
+
+  // تحويل الفلاتر إلى format الباكند
   const apiFilters = useMemo(() => {
     const params: Record<string, unknown> = { ...filters };
     if (params.fiscal_year_id) {
       params['filter[fiscal_year_id]'] = params.fiscal_year_id;
       delete params.fiscal_year_id;
+    }
+    if (params.status) {
+      params['filter[document_status.name]'] = STATUS_MAP[params.status as string] || params.status;
+      delete params.status;
+    } else {
+      // استبعاد المرتجعات من القائمة الافتراضية
+      params['filter[document_status.name]'] = 'draft,pending,validated,partially_paid,paid,overdue,cancelled';
     }
     return params;
   }, [filters]);
@@ -89,7 +113,33 @@ export default function InvoicesPage() {
   // ✅ استخراج ميثود الحفظ والإلغاء والاعتماد من الميوتيشن المركزي للمستندات
   const documentMutations = useDocumentMutations();
   const validateMut = { mutate: (id: number) => documentMutations.validate?.mutate(id) };
-  const cancelMut   = { mutate: (id: number) => documentMutations.cancel?.mutate(id) };
+  const cancelMut   = { mutate: (id: number) => documentMutations.cancel?.mutate({ id, reason: "حذف من قائمة الفواتير" }) };
+
+    const activeCompany = useActiveCompany();
+    const companyInfo = useMemo(() => mapCompany(activeCompany), [activeCompany]);
+    const { data: printTemplates = [] } = usePrintTemplatesList();
+
+    // ── Single-doc print preview ──────────────────────────────────
+    const [printDocId, setPrintDocId] = useState<number | null>(null);
+    const { data: printDoc } = useQuery({
+        queryKey: ['print-doc-inv', printDocId],
+        queryFn: () => apiGet<CommercialDocument>(`/documents/${printDocId}`, {
+            include: 'party,documentType,documentStatus,warehouse,lines,lines.product,lines.product_variant,payments,payments.payment_mode,totals',
+        }),
+        enabled: printDocId !== null,
+    });
+
+    const { confirm, confirmDialogProps } = useConfirm();
+
+    // ── Return (مرتجع) ─────────────────────────────────────────────
+    const [showReturnModal, setShowReturnModal] = useState(false);
+    const { data: returnDoc } = useQuery({
+        queryKey: ['return-doc-inv', viewingId],
+        queryFn: () => apiGet<CommercialDocument>(`/documents/${viewingId}`, {
+            include: 'party,documentType,documentStatus,warehouse,lines,lines.product,lines.product_variant,payments,payments.payment_mode,totals',
+        }),
+        enabled: showReturnModal && viewingId !== null,
+    });
 
     // ── Selection ──────────────────────────────────
     const toggleSelect = useCallback((id: number) => {
@@ -111,7 +161,7 @@ export default function InvoicesPage() {
 
     // ── Open detail ────────────────────────────────
     const openDetail = (inv: CommercialDocument) => {
-        setViewing(inv);
+        setViewingId(inv.id);
         detail.openModal();
     };
 
@@ -651,11 +701,31 @@ export default function InvoicesPage() {
             {/* Invoice Detail Modal */}
             <InvoiceDetailModal
                 open={detail.open}
-                invoice={viewing}
-                onClose={detail.closeModal}
-                onValidate={() => viewing && validateMut.mutate(viewing.id)}
-                onCancel={() => viewing && cancelMut.mutate(viewing.id)}
-            />
+                invoiceId={viewingId}
+                onClose={() => { detail.closeModal(); setViewingId(null); }}
+                onValidate={() => viewingId && validateMut.mutate(viewingId)}
+                onDelete={async () => {
+                    if (viewingId && await confirm('هل أنت متأكد من حذف هذه الفاتورة؟')) {
+                        documentMutations.remove.mutate(viewingId);
+                    }
+                }}
+                onPrint={() => viewingId && setPrintDocId(viewingId)}
+                onReturn={() => setShowReturnModal(true)}
+            />{/* end InvoiceDetailModal */}
+
+            {/* Single-doc print preview */}
+            {printDocId !== null && companyInfo && (
+                <TemplatePrintModal
+                    open={!!printDoc}
+                    onClose={() => { setPrintDocId(null); }}
+                    document={printDoc as any}
+                    company={companyInfo as any}
+                    templates={printTemplates}
+                    docTypeCode={printDoc?.document_type?.code ?? 'FV'}
+                    prevBalance={(printDoc as any)?.balance_data?.previous_balance}
+                    newBalance={(printDoc as any)?.balance_data?.new_balance}
+                />
+            )}
 
             {/* New Invoice Modal */}
             <NewInvoiceModal
@@ -663,6 +733,16 @@ export default function InvoicesPage() {
                 onClose={newInv.closeModal}
                 customers={customers?.data ?? []}
             />
+
+            {showReturnModal && returnDoc && (
+                <ReturnDocumentModal
+                    document={returnDoc as any}
+                    onCreated={() => { setShowReturnModal(false); setViewingId(null); detail.closeModal(); }}
+                    onClose={() => setShowReturnModal(false)}
+                />
+            )}
+
+            <ConfirmDialog {...confirmDialogProps} />
         </div>
     );
 }
@@ -670,309 +750,319 @@ export default function InvoicesPage() {
 // ── Invoice Detail Modal ───────────────────────────
 function InvoiceDetailModal({
     open,
-    invoice,
+    invoiceId,
     onClose,
-    onValidate: _onValidate,
-    onCancel,
+    onValidate,
+    onDelete,
+    onPrint,
+    onReturn,
 }: {
     open: boolean;
-    invoice: CommercialDocument | null;
+    invoiceId: number | null;
     onClose: () => void;
     onValidate: () => void;
-    onCancel: () => void;
+    onDelete?: () => void;
+    onPrint?: () => void;
+    onReturn?: () => void;
 }) {
-    if (!invoice) return null;
+    const { data: invoice, isLoading } = useDocument(invoiceId);
+
+    const fmt = (n: number) => n.toLocaleString("fr-DZ", { maximumFractionDigits: 2 });
+    const dtf = (d: string | null | undefined) =>
+        d ? new Date(d).toLocaleDateString("ar-DZ") : "—";
+
+    if (isLoading || !invoice) {
+        return (
+            <Modal open={open} onClose={onClose} size="xl" title="تفاصيل الفاتورة">
+                {isLoading && <div className="p-20 text-center text-t4">جار التحميل...</div>}
+            </Modal>
+        );
+    }
+
     const sb = STATUS_BADGE[invoice.status] ?? STATUS_BADGE.draft;
+    const lines = invoice.lines ?? [];
+    const payments = invoice.payments ?? [];
+    const bal = invoice.balance_data;
+    const inv = invoice as any;
+
+    const lineColumns: SimpleColumn[] = [
+        { key: "idx", label: "#", className: "m", align: "center",
+            render: (_v, row) => <span className="text-t4 text-sm">{(row._idx as number) + 1}</span> },
+        { key: "product", label: "المنتج",
+            render: (_v, row) => {
+                const l = row as unknown as CommercialDocumentLine;
+                const name = l.product_variant?.product?.name ?? l.product?.name ?? l.description ?? "—";
+                return <span className="truncate block font-bold" title={typeof name === 'string' ? name : ''}>{name}</span>;
+            }},
+        { key: "packaging", label: "التعبئة", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const l = row as unknown as CommercialDocumentLine;
+                return <span className="text-t4 text-sm">{l.packaging?.label ?? "—"}</span>;
+            }},
+        { key: "lot", label: "الحصة", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const l = row as Record<string, unknown>;
+                return <span className="text-t4 text-sm">{(l.stockLot as any)?.label ?? "—"}</span>;
+            }},
+        { key: "quantity", label: "الكمية", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const l = row as unknown as CommercialDocumentLine;
+                return <span className="text-t3">{l.quantity}</span>;
+            }},
+        { key: "total_qty", label: "الكمية الإجمالية", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const l = row as unknown as CommercialDocumentLine;
+                const tq = l.quantity * (l.packaging_units_snapshot ?? 1);
+                return <span className="text-t4 text-sm">{tq}</span>;
+            }},
+        { key: "unit", label: "الوحدة", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const l = row as unknown as CommercialDocumentLine;
+                const u = l.product_variant?.product?.unit?.abbreviation ?? l.product?.unit?.abbreviation;
+                return <span className="text-t4 text-sm">{u ?? "—"}</span>;
+            }},
+        { key: "unit_price", label: "سعر HT", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const l = row as unknown as CommercialDocumentLine;
+                return <span className="font-mono text-sm">{fmt(l.unit_price_ht)} <span className="text-t4">دج</span></span>;
+            }},
+        { key: "pack_price", label: "سعر التعبئة", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const l = row as unknown as CommercialDocumentLine;
+                const pp = l.unit_price_ht * (l.packaging_units_snapshot ?? 1);
+                return <span className="font-mono text-sm">{fmt(pp)} <span className="text-t4">دج</span></span>;
+            }},
+        { key: "orig_price", label: "السعر الأصلي", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const l = row as unknown as CommercialDocumentLine;
+                const orig = l.total_ht + (l.total_discount_amount ?? 0);
+                return <span className="font-mono text-sm">{fmt(orig)} <span className="text-t4">دج</span></span>;
+            }},
+        { key: "discount", label: "الخصم", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const l = row as unknown as CommercialDocumentLine;
+                return l.discount_percentage > 0
+                    ? <span className="text-red text-sm">{l.discount_percentage}%</span>
+                    : <span className="text-t4">—</span>;
+            }},
+        { key: "price_after", label: "بعد الخصم HT", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const l = row as unknown as CommercialDocumentLine;
+                return <span className="font-mono text-sm">{fmt(l.total_ht)} <span className="text-t4">دج</span></span>;
+            }},
+        { key: "tva", label: "TVA %", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const l = row as unknown as CommercialDocumentLine;
+                return <span className="text-t4 text-sm">{l.tva_rate}%</span>;
+            }},
+        { key: "total_ht", label: "إجمالي HT", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const l = row as unknown as CommercialDocumentLine;
+                return <span className="font-mono text-sm">{fmt(l.total_ht)} <span className="text-t4">دج</span></span>;
+            }},
+        { key: "total_ttc", label: "إجمالي TTC", align: "end", className: "whitespace-nowrap",
+            render: (_v, row) => {
+                const l = row as unknown as CommercialDocumentLine;
+                return <span className="font-mono font-extrabold text-em">{fmt(l.total_ttc)} <span className="text-t4">دج</span></span>;
+            }},
+    ];
 
     return (
         <Modal
             open={open}
             onClose={onClose}
-            size="lg"
+            size="xl"
             title={invoice.document_number}
-            subtitle={`${new Date(invoice.document_date).toLocaleDateString("ar-DZ")} • ${invoice.party?.name ?? "عابر"}`}
+            subtitle={`${dtf(invoice.document_date)} • ${invoice.party?.name ?? "عابر"}`}
             footer={
                 <>
-                    <div className="m-foot-l">
-                        {invoice.status !== "cancelled" && (
-                            <Button
-                                variant="danger"
-                                size="sm"
-                                icon={<i className="ti ti-ban" />}
-                                onClick={onCancel}
-                            >
-                                إلغاء
-                            </Button>
-                        )}
-                        <Button
-                            size="sm"
-                            icon={<i className="ti ti-corner-up-left" />}
-                        >
+                    <div className="m-foot-l flex gap-6">
+                        <Button variant="danger" size="sm" icon={<i className="ti ti-trash" />} onClick={onDelete || onClose}>
+                            حذف
+                        </Button>
+                        <Button size="sm" icon={<i className="ti ti-corner-up-left" />} onClick={onReturn || onClose}>
                             مرتجع
                         </Button>
                     </div>
-                    <Button
-                        size="sm"
-                        variant="info"
-                        icon={<i className="ti ti-mail" />}
-                    >
+                    {invoice.status === "draft" && (
+                        <Button variant="primary" size="sm" icon={<i className="ti ti-check" />} onClick={onValidate}>
+                            اعتماد
+                        </Button>
+                    )}
+                    <Button size="sm" variant="info" icon={<i className="ti ti-mail" />} onClick={onClose}>
                         إرسال
                     </Button>
-                    <Button
-                        size="sm"
-                        variant="primary"
-                        icon={<i className="ti ti-printer" />}
-                    >
+                    <Button size="sm" variant="primary" icon={<i className="ti ti-printer" />} onClick={onPrint || onClose}>
                         طباعة
                     </Button>
                 </>
             }
         >
-            {/* Seller / Buyer */}
-            <div className="g2" style={{ marginBottom: 14 }}>
-                {[
-                    {
-                        label: "البائع",
-                        name: "مؤسسة النور للتجارة",
-                        sub: [
-                            "NIF: 001234567890123",
-                            "RC: 29/00-0012345B05",
-                            "ورقلة — الجزائر",
-                        ],
-                    },
-                    {
-                        label: "المشتري",
-                        name: invoice.party?.name ?? "عابر",
-                        sub: [
-                            invoice.party?.phone ?? "",
-                            invoice.party?.nif
-                                ? `NIF: ${invoice.party.nif}`
-                                : "",
-                        ].filter(Boolean),
-                    },
-                ].map(({ label, name, sub }) => (
-                    <div
-                        key={label}
-                        style={{
-                            padding: 12,
-                            background: "var(--bg3)",
-                            borderRadius: "var(--r2)",
-                        }}
-                    >
-                        <div
-                            style={{
-                                fontSize: 10,
-                                color: "var(--t4)",
-                                textTransform: "uppercase",
-                                letterSpacing: 1,
-                                marginBottom: 7,
-                            }}
-                        >
-                            {label}
-                        </div>
-                        <div
-                            style={{
-                                fontWeight: 900,
-                                fontSize: 14,
-                                marginBottom: 3,
-                            }}
-                        >
-                            {name}
-                        </div>
-                        {sub.map((s, i) => (
-                            <div
-                                key={i}
-                                style={{
-                                    fontSize: "11.5px",
-                                    color: "var(--t4)",
-                                }}
-                            >
-                                {s}
-                            </div>
-                        ))}
+            {/* ── Colored header icon + status ── */}
+            <div className="flex items-center justify-between mb-10">
+                <div className="flex items-center gap-6">
+                    <div className="ic ic-md rounded-lg" style={{ background: 'var(--em)', color: '#fff' }}>
+                        <i className="ti ti-receipt" />
                     </div>
-                ))}
+                    <div className="flex items-center gap-6">
+                        <Badge variant={sb.variant}>{sb.label}</Badge>
+                        {invoice.is_locked && <Badge variant="purple">مقفل</Badge>}
+                        {invoice.remaining_amount > 0 && (
+                            <span className="text-red font-bold text-sm">متبقي: {fmt(invoice.remaining_amount)} دج</span>
+                        )}
+                    </div>
+                </div>
+                <div className="flex items-center gap-4 text-xs text-t4">
+                    <span>{invoice.warehouse?.name ?? "—"}</span>
+                    <span>•</span>
+                    <span>{invoice.fiscal_year?.name ?? "—"}</span>
+                </div>
             </div>
 
-            {/* Status badge */}
-            <div
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    marginBottom: 14,
-                }}
-            >
-                <Badge variant={sb.variant}>{sb.label}</Badge>
-                {invoice.remaining_amount > 0 && (
-                    <span
-                        style={{
-                            fontSize: 12,
-                            color: "var(--red)",
-                            fontWeight: 700,
-                        }}
-                    >
-                        متبقي:{" "}
-                        {invoice.remaining_amount.toLocaleString("fr-DZ")} دج
-                    </span>
-                )}
-            </div>
-
-            {/* Lines table */}
-            <SimpleTable
-                columns={[
-                    {
-                        key: "product",
-                        label: "المنتج",
-                        render: (_v, row) => {
-                            const line =
-                                row as unknown as CommercialDocumentLine;
-                            return (
-                                <span style={{ fontWeight: 700 }}>
-                                    {line.product_variant?.product?.name ??
-                                        line.description ??
-                                        "—"}
-                                </span>
-                            );
-                        },
-                    },
-                    {
-                        key: "quantity",
-                        label: "الكمية",
-                        render: (_v, row) => (
-                            <span style={{ color: "var(--t3)" }}>
-                                {
-                                    (row as unknown as CommercialDocumentLine)
-                                        .quantity
-                                }
-                            </span>
-                        ),
-                    },
-                    {
-                        key: "unit_price_ht",
-                        label: "سعر HT",
-                        render: (_v, row) => (
-                            <span style={{ fontFamily: "monospace" }}>
-                                {(
-                                    row as unknown as CommercialDocumentLine
-                                ).unit_price_ht.toFixed(2)}{" "}
-                                دج
-                            </span>
-                        ),
-                    },
-                    {
-                        key: "tva_rate",
-                        label: "TVA",
-                        render: (_v, row) => (
-                            <span
-                                style={{
-                                    fontSize: 12,
-                                    color: "var(--t4)",
-                                }}
-                            >
-                                {(row as unknown as CommercialDocumentLine)
-                                    .tva_rate}
-                                %
-                            </span>
-                        ),
-                    },
-                    {
-                        key: "discount_percentage",
-                        label: "خصم",
-                        render: (_v, row) => {
-                            const line =
-                                row as unknown as CommercialDocumentLine;
-                            return (
-                                <span
-                                    style={{
-                                        fontSize: 12,
-                                        color: "var(--red)",
-                                    }}
-                                >
-                                    {line.discount_percentage > 0
-                                        ? `${line.discount_percentage}%`
-                                        : "—"}
-                                </span>
-                            );
-                        },
-                    },
-                    {
-                        key: "total_ttc",
-                        label: "TTC",
-                        render: (_v, row) => (
-                            <span
-                                style={{
-                                    color: "var(--em)",
-                                    fontWeight: 800,
-                                    fontFamily: "monospace",
-                                }}
-                            >
-                                {(
-                                    row as unknown as CommercialDocumentLine
-                                ).total_ttc.toLocaleString("fr-DZ", {
-                                    maximumFractionDigits: 0,
-                                })}{" "}
-                                دج
-                            </span>
-                        ),
-                    },
-                ]}
-                data={
-                    (invoice.lines ?? []).map((line, i) => ({
-                        ...line,
-                        _key: `line-${i}`,
-                    })) as unknown as Record<string, unknown>[]
-                }
-                rowKey="_key"
-            />
-
-            {/* Totals */}
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                <div style={{ width: 280 }}>
-                    {[
-                        { label: "المجموع HT", val: invoice.total_ht },
-                        { label: "TVA", val: invoice.total_tva },
-                        { label: "الطابع الجبائي", val: invoice.fiscal_stamp },
-                    ].map(
-                        ({ label, val }) =>
-                            val > 0 && (
-                                <div
-                                    key={label}
-                                    style={{
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        padding: "6px 0",
-                                        fontSize: 13,
-                                        color: "var(--t4)",
-                                    }}
-                                >
-                                    <span>{label}</span>
-                                    <span>
-                                        {val.toLocaleString("fr-DZ", {
-                                            maximumFractionDigits: 0,
-                                        })}{" "}
-                                        دج
-                                    </span>
-                                </div>
-                            ),
+            {/* ── Compact 4‑card info grid ── */}
+            <div className="g4 mb-12">
+                <div className="p-8 rounded-lg bg-3">
+                    <div className="text-xs text-t4 mb-4">الزبون</div>
+                    <div className="font-bold truncate">{invoice.party?.name ?? "عابر"}</div>
+                    {invoice.party?.phone && <div className="text-xs text-t4 mt-2 ltr">{invoice.party.phone}</div>}
+                    {invoice.party?.nif && <div className="text-xs text-t4">NIF: {invoice.party.nif}</div>}
+                    {invoice.party?.rc && <div className="text-xs text-t4">RC: {invoice.party.rc}</div>}
+                </div>
+                <div className="p-8 rounded-lg bg-3">
+                    <div className="text-xs text-t4 mb-4">التواريخ</div>
+                    <div className="font-bold text-sm">{dtf(invoice.document_date)}</div>
+                    {invoice.due_date && <div className="text-xs text-t4 mt-2">استحقاق: {dtf(invoice.due_date)}</div>}
+                    {inv.delivery_date && <div className="text-xs text-t4 mt-1">تسليم: {dtf(inv.delivery_date)}</div>}
+                    {inv.currency && <div className="text-xs text-t4 mt-2">{inv.currency.name}</div>}
+                </div>
+                <div className="p-8 rounded-lg bg-3">
+                    <div className="text-xs text-t4 mb-4">الحالة</div>
+                    <Badge variant={sb.variant} noDot>{sb.label}</Badge>
+                    <div className="text-xs text-t4 mt-2">{invoice.user?.name ?? "—"}</div>
+                    {invoice.validatedBy && <div className="text-xs text-t4">اعتمد: {invoice.validatedBy.name}</div>}
+                    {invoice.notes && <div className="text-xs text-t4 mt-1 truncate">{invoice.notes}</div>}
+                </div>
+                <div className="p-8 rounded-lg bg-3">
+                    <div className="text-xs text-t4 mb-4">الرصيد</div>
+                    {bal ? (
+                        <>
+                            <div className="text-sm font-bold">
+                                {fmt(bal.previous_balance)} <span className="text-xs text-t4 font-normal">→</span> {fmt(bal.new_balance)} <span className="text-xs text-t4">دج</span>
+                            </div>
+                            {invoice.remaining_amount > 0 && (
+                                <div className="text-xs text-red mt-2">متبقي: {fmt(invoice.remaining_amount)} دج</div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="text-sm font-bold">{fmt(invoice.total_ttc)} <span className="text-xs text-t4">دج</span></div>
                     )}
-                    <div
-                        style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            padding: "8px 0",
-                            borderTop: "1px solid var(--b3)",
-                            fontSize: 17,
-                            fontWeight: 900,
-                        }}
-                    >
-                        <span>الإجمالي TTC</span>
-                        <span style={{ color: "var(--em)" }}>
-                            {invoice.total_ttc.toLocaleString("fr-DZ", {
-                                maximumFractionDigits: 0,
-                            })}{" "}
-                            دج
-                        </span>
+                </div>
+            </div>
+
+            {/* Lines Section */}
+            <div className="mb-8">
+                <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-6">
+                        <span className="font-bold text-base">بنود الفاتورة</span>
+                        <span className="text-xs text-t4 bg-3 px-8 py-2 rounded-md">{lines.length} بند</span>
+                    </div>
+                </div>
+                <SimpleTable
+                    columns={lineColumns}
+                    data={lines.map((line, i) => ({ ...line, _key: `l-${i}`, _idx: i })) as unknown as Record<string, unknown>[]}
+                    rowKey="_key"
+                    className="border border-b1 rounded-lg"
+                />
+            </div>
+
+            {/* Payments Section */}
+            {payments.length > 0 && (
+                <div className="mb-12">
+                    <div className="flex items-center gap-6 mb-8">
+                        <span className="font-bold text-base">المدفوعات</span>
+                        <span className="text-xs text-t4 bg-3 px-8 py-2 rounded-md">{payments.length} دفعة</span>
+                    </div>
+                    {payments.map((p, i) => {
+                        const pm = p as any;
+                        const iconMap: Record<string, string> = { cash: "ti-cash", bank: "ti-building-bank", ccp: "ti-mail", cib: "ti-credit-card", check: "ti-checks" };
+                        const icon = iconMap[pm.payment_mode?.code] ?? "ti-cash";
+                        return (
+                            <div key={p.id ?? i} className="flex items-center justify-between p-10 mb-4 rounded-md bg-3">
+                                <div className="flex items-center gap-8">
+                                    <div className="ic ic-sm text-t4">
+                                        <i className={`ti ${icon}`} />
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-sm">{pm.payment_mode?.name ?? "—"}</div>
+                                        <div className="text-xs text-t4">{p.reference ?? ""} {p.payment_date ? `• ${dtf(p.payment_date)}` : ""}</div>
+                                    </div>
+                                </div>
+                                <div className="font-extrabold font-mono">{fmt(p.amount)} <span className="text-t4">دج</span></div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* Totals Section — Total on the left, details on the right */}
+            <div className="flex items-stretch gap-6 mb-4">
+                <div className="flex gap-6 flex-1">
+                    {(invoice.total_discount > 0 || (invoice.fiscal_stamp ?? 0) > 0) && (
+                        <div className="flex-1 p-10 rounded-lg bg-3">
+                            <div className="text-xs text-t4 font-bold mb-6">التخفيضات</div>
+                            {invoice.total_discount > 0 && (
+                                <div className="sr">
+                                    <span className="sr-l">الخصم</span>
+                                    <span className="sr-v text-red">-{fmt(invoice.total_discount)} دج</span>
+                                </div>
+                            )}
+                            {(invoice.fiscal_stamp ?? 0) > 0 && (
+                                <div className="sr">
+                                    <span className="sr-l">الطابع الجبائي</span>
+                                    <span className="sr-v">{fmt(invoice.fiscal_stamp ?? 0)} دج</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <div className="flex-1 p-10 rounded-lg bg-3">
+                        <div className="text-xs text-t4 font-bold mb-6">الرصيد</div>
+                        <div className="sr">
+                            <span className="sr-l">المدفوع</span>
+                            <span className="sr-v text-em">{fmt(invoice.paid_amount)} دج</span>
+                        </div>
+                        <div className="sr">
+                            <span className="sr-l">المتبقي</span>
+                            <span className="sr-v font-bold" style={invoice.remaining_amount > 0 ? { color: 'var(--red)' } : {}}>
+                                {fmt(invoice.remaining_amount)} دج
+                            </span>
+                        </div>
+                        {bal && (
+                            <div className="pt-6 mt-6 border-t border-b3">
+                                <div className="sr">
+                                    <span className="sr-l">الرصيد السابق</span>
+                                    <span className="sr-v">{fmt(bal.previous_balance)} دج</span>
+                                </div>
+                                <div className="sr">
+                                    <span className="sr-l">الرصيد الجديد</span>
+                                    <span className="sr-v font-bold">{fmt(bal.new_balance)} دج</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                <div className="p-10 rounded-lg bg-3 flex flex-col items-center justify-center" style={{ minWidth: 200 }}>
+                    <div className="text-xs text-t4 font-bold mb-6">الإجمالي</div>
+                    <div className="text-3xl font-black text-em">{fmt(invoice.total_ttc)}</div>
+                    <div className="text-xs text-t4 mt-2">دينار جزائري</div>
+                    <div className="w-full mt-6 pt-6 border-t border-b3">
+                        <div className="flex items-center justify-between text-sm mb-2">
+                            <span className="text-t4">HT</span>
+                            <span className="font-bold">{fmt(invoice.total_ht)} دج</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                            <span className="text-t4">TVA</span>
+                            <span className="font-bold">{fmt(invoice.total_tva)} دج</span>
+                        </div>
                     </div>
                 </div>
             </div>

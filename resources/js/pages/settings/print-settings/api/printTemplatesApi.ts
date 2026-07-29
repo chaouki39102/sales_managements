@@ -66,6 +66,21 @@ export function createPrintTemplatesApi(api: ApiClient): PrintTemplatesApi {
       fd.append('logo', file);
       return api.upload<{ path: string; url: string }>('/print-templates/upload-logo', fd, onProgress);
     },
+
+    exportPdf: async (params) => {
+      const token = (api as any)?._token ?? (typeof window !== 'undefined' ? window.localStorage?.getItem('auth_token') : null);
+      const baseUrl = '/api/v1';
+      const res = await fetch(`${baseUrl}/pdf/export`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(params),
+      });
+      if (!res.ok) throw new Error('PDF export failed');
+      return res.blob();
+    },
   };
 }
 

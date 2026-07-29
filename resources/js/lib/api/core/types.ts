@@ -551,6 +551,7 @@ export interface CommercialDocument extends BaseModel {
   party_id?:          number | null;
   warehouse_id:       number;
   fiscal_year_id:     number;
+  pos_session_id?:    number | null;
   document_date:      string;
   due_date?:          string | null;
   status:             DocumentStatusCode;
@@ -566,14 +567,15 @@ export interface CommercialDocument extends BaseModel {
   is_locked:          boolean;
   company_id:         number;
   // Relations
-  document_type?: DocumentType;
-  party?:         Party;
-  warehouse?:     Warehouse;
-  fiscal_year?:   FiscalYear;
-  lines?:         CommercialDocumentLine[];
-  payments?:      Payment[];
-  validatedBy?:   User;
-  user?:          User;
+  document_type?:   DocumentType;
+  document_status?: { id: number; name: string };
+  party?:           Party;
+  warehouse?:       Warehouse;
+  fiscal_year?:     FiscalYear;
+  lines?:           CommercialDocumentLine[];
+  payments?:        Payment[];
+  validatedBy?:     User;
+  user?:            User;
   /** SSOT balance computed by backend */
   balance_data?: {
     previous_balance: number;

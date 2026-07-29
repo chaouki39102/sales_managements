@@ -1,4 +1,4 @@
-export type PaperSize       = '80mm' | '58mm' | 'A4' | 'A5' | 'none';
+export type PaperSize       = '80mm' | '58mm' | 'A4' | 'A5' | '400x200mm' | 'none';
 export type AlignOption     = 'right' | 'center' | 'left';
 export type BorderStyle     = 'solid' | 'dashed' | 'double' | 'none';
 export type PriceMode       = 'ht' | 'ttc';
@@ -106,6 +106,7 @@ export const DOC_TYPE_LIST = [
   { code: 'BT',  name: 'تحويل المخزون',   category: 'warehouse' },
   { code: 'POS', name: 'إيصال POS',        category: 'pos'       },
   { code: 'RPT', name: 'تقرير الجلسة',    category: 'pos'       },
+  { code: 'STK', name: 'ملصق المنتج',      category: 'product'   },
 ] as const;
 
 export type DocTypeCode = typeof DOC_TYPE_LIST[number]['code'];
@@ -121,7 +122,7 @@ export interface PrintTemplate {
   created_at?:  string;
   updated_at?:  string;
 
-  paper_width_mm:   58 | 80;
+  paper_width_mm:   number;
   page_orientation: PageOrientation;
   margin_top:       number;
   margin_bottom:    number;
@@ -352,7 +353,41 @@ export interface PrintTemplate {
   show_payments_section:  boolean;
   show_footer_section:    boolean;
 
+  section_header_width:   number;
+  section_header_align:   AlignOption;
+  section_doc_info_width: number;
+  section_doc_info_align: AlignOption;
+  section_items_width:    number;
+  section_items_align:    AlignOption;
+  section_totals_width:   number;
+  section_totals_align:   AlignOption;
+  section_footer_width:   number;
+  section_footer_align:   AlignOption;
+  header_columns_gap:     number;
+  client_card_width:      number;
+
   rules: ReportRule[];
+
+  // ── ملصق المنتج (STK) ──
+  show_label_barcode:      boolean;
+  label_barcode_height:    number;
+  show_label_product_name: boolean;
+  label_product_name_size: number;
+  label_product_name_bold: boolean;
+  label_product_name_color:string;
+  show_label_price:        boolean;
+  label_price_text:        string;
+  label_price_size:        number;
+  label_price_bold:        boolean;
+  label_price_color:       string;
+  label_price_prefix:      string;
+  show_label_ref:          boolean;
+  label_ref_size:          number;
+  label_ref_color:         string;
+  label_border_style:      BorderStyle;
+  label_border_width:      number;
+  label_border_color:      string;
+  label_border_radius:     number;
 
   show_report_header:        boolean;
   report_header_text:        string;
@@ -380,6 +415,11 @@ export type SectionMeta = {
   key: SectionTarget;
   visible: boolean;
   order: number;
+  width?: number;         // percentage of paper width (default 100)
+  align?: AlignOption;    // horizontal alignment
+  marginTop?: number;     // px
+  marginBottom?: number;  // px
+  minHeight?: number;     // px
 };
 
 export interface ColumnStyleConfig {

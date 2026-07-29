@@ -217,10 +217,10 @@ const STYLES = {
   },
 };
 
-export default function TemplateLibraryModal({ open, onClose, onInstall, _activeDoc }: Props) {
+export default function TemplateLibraryModal({ open, onClose, onInstall, activeDoc: _activeDoc }: Props) {
   // ── State ──────────────────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
-  const [filterDocType, setFilterDocType] = useState<string | null>(null);
+  const [filterDocType, setFilterDocType] = useState<string | null>(_activeDoc ?? null);
   const [filterPaperSize, setFilterPaperSize] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   const [favoritesOnly, setFavoritesOnly] = useState(false);

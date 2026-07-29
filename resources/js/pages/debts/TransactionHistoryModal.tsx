@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { usePartyBalanceHistory, usePartyProductRecap, usePartyDetailedHistory } from '@/lib/api/endpoints/partyBalances';
-import { type Column } from '@/components/ui/DataTable/DataTable';
+import { type Column } from '@/components/ui/DataTable';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';

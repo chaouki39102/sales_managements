@@ -116,7 +116,10 @@ export function FloatingTooltip({
     setPhase('visible');
   }, [phase, preferredPlacement]);
 
-  const childRef = (children as React.ReactElement<{ ref?: React.Ref<HTMLElement> }>).ref;
+  // Access child's ref in a type-safe way.
+  const childRef = React.isValidElement(children)
+    ? (children.ref as React.Ref<HTMLElement> | undefined)
+    : undefined;
 
   const childProps = {
     ref: mergeRefs(triggerRef, childRef),

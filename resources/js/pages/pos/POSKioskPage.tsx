@@ -205,6 +205,7 @@ export default function POSKioskPage() {
         fiscal_year_id:   fiscalYearId,
         document_date:    new Date().toISOString().slice(0, 10),
         notes:            null,
+        pos_session_id:   currentSession?.id ?? null,
         lines: pos.items.map(i => ({
           product_id:          i.product_id,
           quantity:            i.quantity,

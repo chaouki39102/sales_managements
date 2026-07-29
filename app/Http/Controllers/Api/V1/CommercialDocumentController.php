@@ -42,7 +42,7 @@ class CommercialDocumentController extends BaseApiController
 
             $f = $request->input('filter', []);
 
-            foreach (['document_type_id','fiscal_year_id','document_status_id','party_id','warehouse_id','user_id'] as $field) {
+            foreach (['document_type_id','fiscal_year_id','document_status_id','party_id','warehouse_id','user_id','pos_session_id'] as $field) {
                 if (isset($f[$field]) && $f[$field] !== '') {
                     $query->where($field, $f[$field]);
                 }

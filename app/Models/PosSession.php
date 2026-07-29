@@ -11,7 +11,7 @@ class PosSession extends Model
     protected $fillable = [
         'company_id', 'user_id', 'warehouse_id', 'fiscal_year_id',
         'opened_at', 'closed_at',
-        'opening_cash', 'opening_note',
+        'opening_cash', 'opening_note', 'device_name', 'device_ip', 'device_user_agent', 'device_browser_info',
         'invoices_count', 'returns_count',
         'gross_sales', 'returns_total', 'net_sales',
         'total_tva', 'total_fiscal_stamp', 'total_discount',
@@ -43,6 +43,7 @@ class PosSession extends Model
         'closing_cash_counted'   => 'decimal:2',
         'closing_cash_expected'  => 'decimal:2',
         'cash_difference'        => 'decimal:2',
+        'device_browser_info'    => 'array',
     ];
 
     public function company(): BelongsTo   { return $this->belongsTo(Company::class); }

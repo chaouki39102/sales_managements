@@ -55,6 +55,7 @@ export default function POSTopBar({
 
   const invoicesCount = session?.invoices_count ?? 0;
   const netSales      = session?.net_sales      ?? 0;
+  const deviceName    = session?.device_name    ?? null;
   const kb            = (action: string) => getEffectiveShortcut(slug, action) ?? '';
 
   const [showTarifDrop, setShowTarifDrop] = useState(false);
@@ -124,6 +125,18 @@ export default function POSTopBar({
             </div>
           </div>
         </FloatingTooltip>
+
+        {deviceName && (
+          <FloatingTooltip content={`اسم الجهاز: ${deviceName}`}>
+            <div className="pos-chip">
+              <i className="ti ti-device-desktop pic-ic" />
+              <div className="pos-chip-inner">
+                <span className="pos-chip-label">الجهاز</span>
+                <strong className="pos-chip-val">{deviceName}</strong>
+              </div>
+            </div>
+          </FloatingTooltip>
+        )}
 
         {heldCount > 0 && (
           <FloatingTooltip content={`الفواتير المعلقة — ${kb('heldCarts')}`}>

@@ -3,7 +3,7 @@
 // (لا تغييرات جوهرية – آلية المزامنة تعمل لأن المكون يُعاد تحميله)
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 
 interface BaseMultiSelectProps {
   value:    string;

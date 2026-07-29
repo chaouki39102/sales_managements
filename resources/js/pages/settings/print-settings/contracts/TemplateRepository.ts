@@ -11,6 +11,7 @@ export interface PrintTemplatesApi {
   library(): Promise<{ id: string; name: string; paper_size: string }[]>;
   installLibrary(templateId: string, docTypeCode?: string): Promise<PrintTemplate>;
   uploadLogo(file: File, onProgress?: (p: number) => void): Promise<{ path: string; url: string }>;
+  exportPdf(params: { html: string; paper_size?: string; orientation?: string; margin_top?: number; margin_bottom?: number; margin_sides?: number; filename?: string }): Promise<Blob>;
 }
 
 

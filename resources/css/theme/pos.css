@@ -3145,6 +3145,9 @@ body.dark .thermal-status.err { background: #7f1d1d; color: #fecaca; }
 .ret-line:hover { background: var(--bg4); }
 .ret-line-sel { background: var(--emb); }
 .ret-line-sel:hover { background: var(--emb); }
+.ret-line-disabled { opacity: .45; pointer-events: none; }
+.ret-line-disabled .ret-line-lbl { cursor: default; }
+.ret-line-done { display: block; font-size: 11px; color: var(--green); margin-top: 4px; padding-right: 12px; }
 .ret-line-lbl {
   display: flex;
   align-items: center;
@@ -3191,6 +3194,38 @@ body.dark .thermal-status.err { background: #7f1d1d; color: #fecaca; }
 .ret-line-qty-inp .inp:focus {
   border-color: var(--em);
   box-shadow: 0 0 0 2px var(--emb);
+}
+.ret-reason {
+  padding: 0 12px 8px;
+}
+.ret-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  margin: 8px 0 0;
+  border-radius: var(--r2);
+  background: var(--bg3);
+  border: 1px solid var(--b2);
+  font-size: 12px;
+  color: var(--t3);
+}
+.ret-summary-total {
+  font-weight: 700;
+  color: var(--purple);
+  font-size: 14px;
+  direction: ltr;
+}
+.ret-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+.ret-footer-total {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--t2);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -3330,6 +3365,7 @@ body.dark .thermal-status.err { background: #7f1d1d; color: #fecaca; }
 .si-badge-partial{background:#ea580c18;color:#ea580c;}
 .si-badge-unpaid{background:#dc262618;color:#dc2626;}
 .si-badge-cancelled{background:#6b728018;color:#6b7280;}
+.si-badge-returned{background:#dc262618;color:#dc2626;border:1px solid #dc262644;}
 .si-print-btn{background:none;border:none;cursor:pointer;color:var(--t3);padding:4px;border-radius:4px;transition:all .1s;display:inline-flex;align-items:center;justify-content:center;line-height:1;}
 .si-print-btn:hover{color:var(--em);background:var(--bg3);}
 .si-col-resize{position:absolute;top:0;inset-inline-end:0;width:6px;cursor:col-resize;height:100%;z-index:2;background:transparent;}

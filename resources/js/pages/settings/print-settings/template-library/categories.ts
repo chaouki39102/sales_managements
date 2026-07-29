@@ -35,6 +35,7 @@ export function categoryFromDocType(docType: string): string {
     BT:   'warehouse',
     POS:  'pos',
     RPT:  'pos',
+    STK:  'product',
   };
   return map[docType] ?? 'invoices';
 }

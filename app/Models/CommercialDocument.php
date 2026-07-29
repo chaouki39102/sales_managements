@@ -69,6 +69,7 @@ class CommercialDocument extends Model
         'is_exported_to_accounting',
         'exported_at',
         'fiscal_stamp_id',
+        'pos_session_id',
     ];
 
     protected $casts = [

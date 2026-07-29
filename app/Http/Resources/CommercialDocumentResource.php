@@ -19,6 +19,7 @@ class CommercialDocumentResource extends JsonResource
             'party_id'                     => $this->party_id,
             'warehouse_id'                 => $this->warehouse_id,
             'fiscal_year_id'               => $this->fiscal_year_id,
+            'pos_session_id'               => $this->pos_session_id,
             'currency_id'                  => $this->currency_id,
             'exchange_rate'                => $this->exchange_rate,
             'document_date'                => $this->document_date,

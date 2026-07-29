@@ -71,6 +71,13 @@ class PartyBalanceService
             2
         );
 
+        // ── Eliminate -0.00 from floating-point drift ─────────────────────────
+        // PHP's round() can return -0.0 for tiny negative values near zero,
+        // which JSON-encodes as -0.0 and the frontend displays as -0.00.
+        if (abs($currentBalance) < 0.005) {
+            $currentBalance = 0.0;
+        }
+
         // ── current_balance يُحافِظ على إشارته المالية ─────────────────────────
         // > 0 → الطرف مدين لنا (زبون لم يدفع)
         // < 0 → نحن مدينون للطرف (سلفة / رصيد دائن)

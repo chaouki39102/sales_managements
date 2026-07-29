@@ -16,6 +16,7 @@ import { rulesEngine } from '../../services/engines/RulesEngine';
 import { formulaEngine, type EvaluationContext, type ExpressionValue } from '../../services/engines/FormulaEngine';
 import { calculatedFieldService } from '../../services/CalculatedFieldService';
 import { PageFrame } from './PageFrame';
+import StickerLabel from './StickerLabel';
 
 export interface UniversalPreviewProps {
   tpl:      PrintTemplate;
@@ -45,26 +46,82 @@ function buildEvalContext(data: UniversalDocumentData): EvaluationContext {
   return { data, computed };
 }
 
-const SECTION_RENDERERS: Record<SectionTarget, (tpl: PrintTemplate, data: UniversalDocumentData, isThermal: boolean, paperWidth: number) => React.ReactNode> = {
-  'header':   (tpl, data, isThermal, pw) => renderHeader(tpl, data, isThermal, pw),
-  'doc-info': (tpl, data, isThermal)     => renderDocInfo(tpl, data, isThermal),
-  'items':    (tpl, data, isThermal)     => renderItems(tpl, data, isThermal),
-  'totals':   (tpl, data, isThermal)     => renderTotals(tpl, data, isThermal),
-  'payments': (tpl, data, isThermal)     => renderPayments(tpl, data, isThermal),
-  'footer':   (tpl, data, isThermal)     => renderFooter(tpl, data, isThermal),
+interface SectionRendererProps {
+  tpl: PrintTemplate;
+  data: UniversalDocumentData;
+  isThermal: boolean;
+  paperWidth: number;
+  widthPct: number;
+  align: AlignOption;
+}
+
+const SECTION_RENDERERS: Record<SectionTarget, (props: SectionRendererProps) => React.ReactNode> = {
+  'header':   (p) => wrapSection(p, renderHeader(p.tpl, p.data, p.isThermal, p.paperWidth)),
+  'doc-info': (p) => wrapSection(p, renderDocInfo(p.tpl, p.data, p.isThermal)),
+  'items':    (p) => wrapSection(p, renderItems(p.tpl, p.data, p.isThermal)),
+  'totals':   (p) => wrapSection(p, renderTotals(p.tpl, p.data, p.isThermal)),
+  'payments': (p) => wrapSection(p, renderPayments(p.tpl, p.data, p.isThermal)),
+  'footer':   (p) => wrapSection(p, renderFooter(p.tpl, p.data, p.isThermal)),
 };
+
+function wrapSection({ widthPct, align }: SectionRendererProps, content: React.ReactNode) {
+  const marginSide = align === 'center' ? 'auto' : align === 'left' ? '0 0 0 auto' : '0 auto 0 0';
+  return (
+    <div style={{
+      width: `${widthPct}%`,
+      margin: marginSide,
+      overflow: 'hidden',
+    }}>
+      {content}
+    </div>
+  );
+}
+
+const SECTION_DIM_SETTINGS: Record<SectionTarget, { w: keyof PrintTemplate; a: keyof PrintTemplate }> = {
+  'header':   { w: 'section_header_width',   a: 'section_header_align'   },
+  'doc-info': { w: 'section_doc_info_width', a: 'section_doc_info_align' },
+  'items':    { w: 'section_items_width',    a: 'section_items_align'    },
+  'totals':   { w: 'section_totals_width',   a: 'section_totals_align'   },
+  'payments': { w: 'section_header_width',   a: 'section_header_align'   },
+  'footer':   { w: 'section_footer_width',   a: 'section_footer_align'   },
+};
+
+const PRINT_CSS_ID = 'ps-print-styles';
 
 function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
   useEffect(() => { formulaEngine.clearCache(); }, [data]);
+  useEffect(() => {
+    let el = document.getElementById(PRINT_CSS_ID);
+    if (!el) {
+      el = document.createElement('style');
+      el.id = PRINT_CSS_ID;
+      el.setAttribute('media', 'print');
+      document.head.appendChild(el);
+    }
+    const sz = tpl.paper_size;
+    const landscape = !['80mm','58mm'].includes(sz) && tpl.page_orientation === 'landscape';
+    const w = sz === 'A4' ? (landscape ? '297mm' : '210mm') : sz === 'A5' ? (landscape ? '210mm' : '148mm') : sz === '400x200mm' ? '400mm' : sz === '80mm' ? '80mm' : '58mm';
+    const h = sz === 'A4' ? (landscape ? '210mm' : '297mm') : sz === 'A5' ? (landscape ? '148mm' : '210mm') : sz === '400x200mm' ? '200mm' : 'auto';
+    el.textContent = `
+      @page { size: ${w} ${h}; margin: ${tpl.margin_top ?? 5}mm ${tpl.margin_sides ?? 5}mm ${tpl.margin_bottom ?? 5}mm; }
+      body * { visibility: hidden !important; }
+      .ps-preview-wrapper { position: absolute !important; left: 0 !important; top: 0 !important; }
+      .ps-preview-wrapper, .ps-preview-wrapper * { visibility: visible !important; }
+      .ps-preview-inner { width: 100% !important; min-height: auto !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; }
+    `;
+    return () => { if (el?.parentNode) el.parentNode.removeChild(el); };
+  }, [tpl.paper_size, tpl.page_orientation, tpl.margin_top, tpl.margin_sides, tpl.margin_bottom]);
 
   const isThermal   = tpl.paper_size === '80mm' || tpl.paper_size === '58mm';
   const isA4        = tpl.paper_size === 'A4';
   const _isA5        = tpl.paper_size === 'A5';
+  const isLabel     = tpl.paper_size === '400x200mm';
   const isDeliveryA5 = tpl.doc_type_code === 'BL' && tpl.paper_size === 'A5';
+  const isSticker = tpl.doc_type_code === 'STK';
   const isLandscape = !isThermal && tpl.page_orientation === 'landscape';
 
-  const portraitW = isA4 ? 794 : 559;
-  const portraitH = isA4 ? 1123 : 794;
+  const portraitW = isA4 ? 794 : isLabel ? 1512 : 559;
+  const portraitH = isA4 ? 1123 : isLabel ? 756 : 794;
   const paperWidth   = isThermal ? tpl.paper_width_mm * 3.78 : (isLandscape ? portraitH : portraitW);
   const minHeight    = isThermal ? 'auto' : (isLandscape ? portraitW : portraitH);
 
@@ -110,7 +167,7 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
   const watermark = tpl.watermark;
 
   return (
-    <div style={{
+    <div className="ps-preview-wrapper" style={{
       width: paperWidth,
       direction: 'rtl',
       fontFamily: fontFamily(tpl.font_family),
@@ -127,15 +184,20 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
       <PageFrame config={frameConfig ?? { enabled: false }} tpl={tpl}>
         {isDeliveryA5 ? (
           <DeliveryReceiptA5 tpl={tpl} data={data} />
+        ) : isSticker ? (
+          <StickerLabel tpl={tpl} data={data} />
         ) : (
           <>
             {orderedSections.map(meta => {
               if (!showSection(meta.key)) return null;
               const renderer = SECTION_RENDERERS[meta.key];
               if (!renderer) return null;
+              const dims = SECTION_DIM_SETTINGS[meta.key];
+              const widthPct = dims ? Number((tpl as any)[dims.w]) || 100 : 100;
+              const align = dims ? ((tpl as any)[dims.a] as AlignOption) || 'right' : 'right';
               return (
-                <SectionWrap key={meta.key} highlight={sectionHighlight(meta.key)}>
-                  {renderer(tpl, data, isThermal, paperWidth)}
+                <SectionWrap key={meta.key} highlight={sectionHighlight(meta.key)} style={{ marginTop: meta.marginTop ?? 0, marginBottom: meta.marginBottom ?? 0 }}>
+                  {renderer({ tpl, data, isThermal, paperWidth, widthPct, align })}
                 </SectionWrap>
               );
             })}

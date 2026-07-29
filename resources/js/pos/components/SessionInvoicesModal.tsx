@@ -103,19 +103,13 @@ export default function SessionInvoicesModal({ session, onClose, onOpen, onPrint
     return COL_IDS.filter(id => id !== 'print');
   }, [onPrint]);
 
-  const openedDate = session.opened_at?.slice(0, 10);
-  const today      = new Date().toISOString().slice(0, 10);
-
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     documentsApi.list({
-      include: 'party',
       per_page: 200,
       sort: '-created_at',
-      'filter[created_at]': `${openedDate},${today}`,
-      'filter[warehouse_id]': session.warehouse?.id,
-      'filter[user_id]': session.user?.id,
+      'filter[pos_session_id]': session.id,
     }).then((res: any) => {
       if (cancelled) return;
       const list = Array.isArray(res) ? res : res?.data ?? [];
@@ -126,7 +120,7 @@ export default function SessionInvoicesModal({ session, onClose, onOpen, onPrint
       if (!cancelled) setLoading(false);
     });
     return () => { cancelled = true; };
-  }, [session.opened_at, session.warehouse?.id, session.user?.id, openedDate, today]);
+  }, [session.id]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return docs;
@@ -375,7 +369,14 @@ export default function SessionInvoicesModal({ session, onClose, onOpen, onPrint
                       <td><strong>{doc.document_number}</strong></td>
                       <td>{doc.party?.name ?? <span className="si-null">\u2014</span>}</td>
                       <td>{doc.document_date?.slice(0, 10) ?? '\u2014'}</td>
-                      <td><span className={`si-badge ${meta.cls}`}><i className={meta.icon} /> {meta.label}</span></td>
+                      <td>
+                        <span className={`si-badge ${meta.cls}`}><i className={meta.icon} /> {meta.label}</span>
+                        {doc.document_status?.name === 'returned' && (
+                          <span className="si-badge si-badge-returned" style={{marginRight: 4}}>
+                            <i className="ti ti-receipt-refund" /> مسترجع
+                          </span>
+                        )}
+                      </td>
                       <td className="si-ttc-cell">{formatDZD(doc.total_ttc)}</td>
                       <td className="si-paid-cell">{formatDZD(doc.paid_amount ?? 0)}</td>
                       <td className={`si-remain-cell ${Number(doc.remaining_amount ?? 0) > 0 ? 'si-remain-pos' : 'si-remain-neg'}`}>

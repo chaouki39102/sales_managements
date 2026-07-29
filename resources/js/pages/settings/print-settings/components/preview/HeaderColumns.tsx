@@ -2,8 +2,9 @@ import React from 'react';
 import { layoutEngine, type LayoutElement } from '../../engines/LayoutEngine';
 import type { PrintTemplate, HeaderLayout, LayoutBlock } from '../../types/domain';
 import type { UniversalDocumentData } from '../../types/data';
-import { renderLayoutRows, boxBorderCss } from './shared';
-import type { AlignOption } from '../../types/domain';
+import { renderLayoutRows, boxBorderCss, cellStyleCss } from './shared';
+import type { AlignOption, CellStyle } from '../../types/domain';
+import { printFieldResolver } from '../../services';
 
 function spacingCss(p?: LayoutBlock['padding']): string {
   if (!p) return '4px 8px';
@@ -12,6 +13,13 @@ function spacingCss(p?: LayoutBlock['padding']): string {
 
 function alignCss(a: LayoutBlock['align']): React.CSSProperties['textAlign'] {
   return a === 'start' ? 'right' : a === 'end' ? 'left' : 'center';
+}
+
+function renderBlockTitle(col: LayoutBlock, data: UniversalDocumentData, tpl: PrintTemplate) {
+  if (!col.titleField) return null;
+  const value = printFieldResolver.resolve(col.titleField, data, tpl);
+  if (!value) return null;
+  return <div style={{ marginBottom: 4, ...cellStyleCss(col.titleStyle as CellStyle) }}>{String(value)}</div>;
 }
 
 export function renderHeaderColumns(
@@ -57,6 +65,7 @@ export function renderHeaderColumns(
               ...boxBorderCss(col.border),
             }}
           >
+            {renderBlockTitle(col, data, tpl)}
             {renderLayoutRows(col.rows, data, tpl, { sectionAlign: (col.align === 'start' ? 'right' : col.align === 'end' ? 'left' : 'center') as AlignOption })}
           </div>
         );

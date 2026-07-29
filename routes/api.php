@@ -49,6 +49,7 @@ use App\Http\Controllers\Api\V1\SubsidizedSalesController;
 use App\Http\Controllers\Api\V1\G50DeclarationController;
 use App\Http\Controllers\Api\V1\IFUDeclarationController;
 use App\Http\Controllers\Api\V1\PrintTemplateController;
+use App\Http\Controllers\Api\V1\PdfExportController;
 
 
 // Tenant Lookup Controllers
@@ -583,6 +584,7 @@ Route::prefix('v1')->group(function () {
 
             // ── POS Sessions ──────────────────────────────────────
             Route::prefix('pos-sessions')->group(function () {
+                Route::get('device-name',            [PosSessionController::class, 'deviceName']);
                 Route::get('current',                [PosSessionController::class, 'current']);
                 Route::post('/',                     [PosSessionController::class, 'open']);
                 Route::post('{session}/increment',   [PosSessionController::class, 'increment']);
@@ -617,6 +619,9 @@ Route::prefix('v1')->group(function () {
             // مكتبة القوالب الجاهزة
             Route::get('print-templates/library',            [PrintTemplateController::class, 'library']);
             Route::post('print-templates/library/install',   [PrintTemplateController::class, 'installLibrary']);
+
+            // pdf-export: تصدير PDF من HTML معبأ
+            Route::post('pdf/export',                        [PdfExportController::class, 'export']);
             // جلب الملف الشخصي للمستخدم المسجل
             Route::get('/profile',          [UserController::class, 'profile']);
 

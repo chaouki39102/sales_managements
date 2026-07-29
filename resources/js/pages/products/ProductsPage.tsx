@@ -1,5 +1,5 @@
 // resources/js/pages/products/ProductsPage.tsx
-import React, { useState, useRef, useEffect, Suspense } from 'react';
+import React, { useState, useRef, useEffect, useMemo, Suspense } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useModal } from '@/hooks/useModal';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -15,9 +15,10 @@ import Switch from '@/components/ui/Switch';
 import ProgressBar from '@/components/ui/ProgressBar';
 const ProductModal = React.lazy(() => import('@/components/products/ProductModal'));
 const ImportWizardModal = React.lazy(() => import('@/pages/import/ImportWizardModal'));
+const TemplatePrintModal = React.lazy(() => import('@/pages/settings/print-settings/components/shared/TemplatePrintModal'));
 import { PRODUCT_IMPORT_CONFIG } from '@/pages/import/entityConfig';
 import { apiGet, apiPost } from '@/lib/api/core/client';
-import { useActiveSlug } from '@/lib/store/appStore';
+import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
 import { productsApi } from '@/lib/api/endpoints/products';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { useProductAggregatedLookups } from '@/lib/api/endpoints/lookups';
@@ -26,7 +27,11 @@ import { useNotification } from '@/hooks/useNotification';
 import { ConfirmDialog } from '@/components/ui';
 import type { Column } from '@/components/ui/DataTable';
 import type { Product, PaginatedResponse } from '@/lib/api/core/types';
+import type { PrintTemplate } from '@/pages/settings/print-settings/types';
 import CopyConfigModal from '@/components/products/CopyConfigModal';
+import { usePrintTemplatesList } from '@/pages/settings/print-settings/runtime';
+import { mapCompany } from '@/pages/settings/print-settings/runtime';
+import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -111,6 +116,43 @@ export default function ProductsPage() {
   const deleteConfirm = useConfirm();
   const notify = useNotification();
   const [copyModalOpen, setCopyModalOpen] = useState(false);
+
+  // ── Label / Sticker Print ──
+  const [labelPrintOpen, setLabelPrintOpen] = useState(false);
+  const activeCompany = useActiveCompany();
+  const companyInfo = useMemo(() => mapCompany(activeCompany as any), [activeCompany]);
+  const { data: stickerTemplates = [] } = usePrintTemplatesList('STK');
+
+  // Fallback template when no STK template exists in the database
+  const stickerTemplate = useMemo((): PrintTemplate | null => {
+    if (stickerTemplates.length > 0) return null; // use templates list selection
+    return {
+      id: null,
+      doc_type_code: 'STK',
+      paper_size: '400x200mm',
+      paper_width_mm: 400,
+      page_orientation: 'portrait',
+      name: 'ملصق المنتج',
+      is_default: false, is_active: true,
+      margin_top: 6, margin_bottom: 6, margin_sides: 8,
+      base_font_size: 12, font_family: 'tajawal', line_spacing: 1.2,
+      show_header_section: true, show_doc_info_section: false, show_items_section: false,
+      show_totals_section: false, show_payments_section: false, show_footer_section: false,
+      show_logo: true, logo_source: 'company', logo_size: 50, logo_align: 'center', logo_border_radius: 0,
+      show_company_name: true, company_name_text: '', company_name_size: 13, company_name_bold: true, company_name_color: '#1a1a2e', company_name_align: 'center',
+      header_separator: 'dashed',
+      show_label_barcode: true, label_barcode_height: 45,
+      show_label_product_name: true, label_product_name_size: 16, label_product_name_bold: true, label_product_name_color: '#111',
+      show_label_ref: true, label_ref_size: 9, label_ref_color: '#666',
+      show_label_price: true, label_price_size: 28, label_price_bold: true, label_price_color: '#c0392b', label_price_text: 'د.ج', label_price_prefix: '',
+      label_border_style: 'solid', label_border_width: 1, label_border_color: '#333', label_border_radius: 6,
+      show_payment_details: false, payment_font_size: 9, payments_align: 'right',
+      rules: [],
+      sections_order: [],
+      page_frame: { enabled: false },
+      watermark: { enabled: false },
+    } as unknown as PrintTemplate;
+  }, [stickerTemplates]);
 
   // ── Lookups — single aggregated request (7 HTTP → 1) ──
   const { data: productLookups } = useProductAggregatedLookups();
@@ -326,6 +368,32 @@ export default function ProductsPage() {
     setSelectedIds([]);
   };
 
+  // ── Label Print Data Builder ──
+  const labelPrintData = useMemo((): UniversalDocumentData | null => {
+    if (!companyInfo) return null;
+    const targets = selectedIds.length > 0 ? products.filter(p => selectedIds.includes(p.id)) : products;
+    if (targets.length === 0) return null;
+    return {
+      doc: { number: '—', date: new Date().toISOString().slice(0, 10), typeCode: 'STK', status: 'validated' },
+      company: companyInfo as any,
+      lines: targets.map((p, i) => ({
+        rowNumber: i + 1,
+        name: p.name,
+        ref: p.ref ?? null,
+        barcode: p.barcode ?? null,
+        quantity: 1,
+        unitPriceHt: p.prices?.find(pr => pr.active && pr.pricing_method === 'fixed')?.price ?? 0,
+        unitPriceTtc: p.prices?.find(pr => pr.active && pr.pricing_method === 'fixed')?.price ?? 0,
+        tvaRate: 0, tvaPct: 0, discountPct: 0, discountAmt: 0,
+        totalHt: 0, totalTva: 0, totalTtc: 0,
+        unit: null,
+        lot: null, notes: null,
+      })),
+      totals: { totalHt: 0, totalTva: 0, totalTtc: 0, fiscalStamp: 0, totalDiscount: 0, paid: 0, change: 0, remaining: 0, netToPay: 0 },
+      taxBreakdown: [], payments: [], computed: {},
+    };
+  }, [companyInfo, products, selectedIds]);
+
   // ── Render ──
   return (
     <div className="page on" id="p-products">
@@ -336,6 +404,11 @@ export default function ProductsPage() {
           <div style={{ display: 'flex', gap: 8 }}>
             <Button size="sm" icon={<i className="ti ti-table-import" />} onClick={importModal.openModal}>
               استيراد
+            </Button>
+            <Button size="sm" icon={<i className="ti ti-printer" />}
+              onClick={() => setLabelPrintOpen(true)}
+              disabled={products.length === 0}>
+              طباعة الليبل
             </Button>
             <Button size="sm" icon={<i className="ti ti-table-export" />}
               onClick={async () => { if (products.length) await exportData(products as any, getExportCols() as any); }}>
@@ -567,6 +640,21 @@ export default function ProductsPage() {
         bulkCount={selectedIds.length}
         onBulkApply={bulkCopyConfig}
       />
+
+      {/* Label Print Modal */}
+      {labelPrintData && companyInfo && (
+        <Suspense fallback={null}>
+          <TemplatePrintModal
+            open={labelPrintOpen}
+            onClose={() => setLabelPrintOpen(false)}
+            data={labelPrintData}
+            company={companyInfo as any}
+            templates={stickerTemplates}
+            template={stickerTemplate ?? undefined}
+            docTypeCode="STK"
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

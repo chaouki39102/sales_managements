@@ -77,8 +77,8 @@ function renderThermalDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
               </div>
             )
         }
-        {tpl.show_payment_term && r('document.dueDate', data, tpl) && (
-          <DocRow label="شروط الدفع:" value={r('document.dueDate', data, tpl) as string} />
+        {tpl.show_payment_term && r('document.paymentTerm', data, tpl) && (
+          <DocRow label="شروط الدفع:" value={r('document.paymentTerm', data, tpl) as string} />
         )}
       </div>
 

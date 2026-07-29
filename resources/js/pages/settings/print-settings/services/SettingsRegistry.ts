@@ -22,7 +22,9 @@ export interface SettingMeta {
   field?: string;
 }
 
-const ALL_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV', 'DDP', 'BT', 'POS', 'RPT'];
+const ALL_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV', 'DDP', 'BT', 'POS', 'RPT', 'STK'];
+const STICKER_DOCS: DocTypeCode[] = ['STK'];
+const STICKER_LABEL: PaperSize[] = ['400x200mm'];
 const COMMERCIAL_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV'];
 const POS_DOCS: DocTypeCode[] = ['POS', 'RPT'];
 const _WAREHOUSE_DOCS: DocTypeCode[] = ['DDP', 'BT'];
@@ -30,7 +32,7 @@ const REPORT_DOC: DocTypeCode[] = ['RPT'];
 const _NON_REPORT_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV', 'DDP', 'BT', 'POS'];
 const THERMAL: PaperSize[] = ['80mm', '58mm'];
 const PAGE: PaperSize[] = ['A4', 'A5'];
-const ALL_PAPERS: PaperSize[] = ['80mm', '58mm', 'A4', 'A5'];
+const ALL_PAPERS: PaperSize[] = ['80mm', '58mm', 'A4', 'A5', '400x200mm'];
 
 const ALIGN_OPTS = [
   { v: 'right' as const, l: 'يمين' },
@@ -64,6 +66,12 @@ export const SETTINGS_REGISTRY: Record<string, SettingMeta> = {
   base_font_size:   { key: 'base_font_size', label: 'Base Font Size', labelAr: 'حجم الخط الأساسي', category: 'formatting', component: 'slider', defaultValue: 10, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 6, max: 20, step: 0.5 },
   font_family:      { key: 'font_family', label: 'Font Family', labelAr: 'نوع الخط', category: 'formatting', component: 'select', defaultValue: 'tajawal' as FontFamily, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: [{ v: 'tajawal', l: 'Tajawal' }, { v: 'monospace', l: 'Monospace' }, { v: 'times', l: 'Times New Roman' }, { v: 'arial', l: 'Arial' }] },
 
+
+  // ── Layout Structure (complex objects managed by dedicated controls) ──
+  page_frame:       { key: 'page_frame', label: 'Page Frame', labelAr: 'إطار الصفحة', category: 'formatting', component: 'input', defaultValue: { enabled: false }, supportedPapers: PAGE, supportedDocs: ALL_DOCS },
+  sections_order:   { key: 'sections_order', label: 'Section Order', labelAr: 'ترتيب الأقسام', category: 'formatting', component: 'input', defaultValue: [] as unknown[], supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+  header_layout:    { key: 'header_layout', label: 'Header Layout', labelAr: 'تخطيط الرأس', category: 'header', component: 'input', defaultValue: { mode: 'simple', columns: [] }, supportedPapers: PAGE, supportedDocs: ALL_DOCS },
+  watermark:        { key: 'watermark', label: 'Watermark', labelAr: 'علامة مائية', category: 'formatting', component: 'input', defaultValue: { enabled: false }, supportedPapers: PAGE, supportedDocs: ALL_DOCS },
   // ── Header / Logo ──
   show_logo:          { key: 'show_logo', label: 'Show Logo', labelAr: 'إظهار الشعار', category: 'header', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'company.logo' },
   logo_source:        { key: 'logo_source', label: 'Logo Source', labelAr: 'مصدر الشعار', category: 'header', component: 'pills', defaultValue: 'company', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_logo', options: [{ v: 'company', l: 'الشركة' }, { v: 'custom', l: 'مخصص' }, { v: 'default', l: 'افتراضي' }] },
@@ -283,6 +291,41 @@ export const SETTINGS_REGISTRY: Record<string, SettingMeta> = {
   show_totals_section:    { key: 'show_totals_section', label: 'Totals Section', labelAr: 'قسم الإجماليات', category: 'section-visibility', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   show_payments_section:  { key: 'show_payments_section', label: 'Payments Section', labelAr: 'قسم الدفع', category: 'section-visibility', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   show_footer_section:    { key: 'show_footer_section', label: 'Footer Section', labelAr: 'قسم التذييل', category: 'section-visibility', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
+
+  // ── Label / Sticker (STK) ──
+  show_label_barcode:      { key: 'show_label_barcode', label: 'Show Barcode on Label', labelAr: 'إظهار الباركود في الملصق', category: 'label', component: 'toggle', defaultValue: true, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, field: 'item.barcode' },
+  label_barcode_height:    { key: 'label_barcode_height', label: 'Barcode Height', labelAr: 'ارتفاع الباركود', category: 'label', component: 'slider', defaultValue: 40, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, dependsOn: 'show_label_barcode', min: 20, max: 80, step: 5 },
+  show_label_product_name: { key: 'show_label_product_name', label: 'Show Product Name', labelAr: 'إظهار اسم المنتج', category: 'label', component: 'toggle', defaultValue: true, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, field: 'item.name' },
+  label_product_name_size: { key: 'label_product_name_size', label: 'Product Name Font Size', labelAr: 'حجم خط اسم المنتج', category: 'label', component: 'slider', defaultValue: 14, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, dependsOn: 'show_label_product_name', min: 8, max: 28, step: 1 },
+  label_product_name_bold: { key: 'label_product_name_bold', label: 'Bold Product Name', labelAr: 'تسميك اسم المنتج', category: 'label', component: 'toggle', defaultValue: true, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, dependsOn: 'show_label_product_name' },
+  label_product_name_color:{ key: 'label_product_name_color', label: 'Product Name Color', labelAr: 'لون اسم المنتج', category: 'label', component: 'color', defaultValue: '#111111', supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, dependsOn: 'show_label_product_name' },
+  show_label_price:        { key: 'show_label_price', label: 'Show Price', labelAr: 'إظهار السعر', category: 'label', component: 'toggle', defaultValue: true, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, field: 'item.unitPriceTtc' },
+  label_price_text:        { key: 'label_price_text', label: 'Price Label Text', labelAr: 'نص تسمية السعر', category: 'label', component: 'input', defaultValue: 'DA', supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, dependsOn: 'show_label_price' },
+  label_price_size:        { key: 'label_price_size', label: 'Price Font Size', labelAr: 'حجم خط السعر', category: 'label', component: 'slider', defaultValue: 22, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, dependsOn: 'show_label_price', min: 12, max: 48, step: 1 },
+  label_price_bold:        { key: 'label_price_bold', label: 'Bold Price', labelAr: 'تسميك السعر', category: 'label', component: 'toggle', defaultValue: true, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, dependsOn: 'show_label_price' },
+  label_price_color:       { key: 'label_price_color', label: 'Price Color', labelAr: 'لون السعر', category: 'label', component: 'color', defaultValue: '#c0392b', supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, dependsOn: 'show_label_price' },
+  label_price_prefix:      { key: 'label_price_prefix', label: 'Price Prefix', labelAr: 'بادئة السعر', category: 'label', component: 'input', defaultValue: '', supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, dependsOn: 'show_label_price' },
+  show_label_ref:          { key: 'show_label_ref', label: 'Show Reference', labelAr: 'إظهار المرجع', category: 'label', component: 'toggle', defaultValue: false, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, field: 'item.ref' },
+  label_ref_size:          { key: 'label_ref_size', label: 'Reference Font Size', labelAr: 'حجم خط المرجع', category: 'label', component: 'slider', defaultValue: 8, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, dependsOn: 'show_label_ref', min: 6, max: 14, step: 1 },
+  label_ref_color:         { key: 'label_ref_color', label: 'Reference Color', labelAr: 'لون المرجع', category: 'label', component: 'color', defaultValue: '#666666', supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, dependsOn: 'show_label_ref' },
+  label_border_style:      { key: 'label_border_style', label: 'Label Border Style', labelAr: 'نمط الحدود', category: 'label', component: 'pills', defaultValue: 'solid' as BorderStyle, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, options: BORDER_OPTS },
+  label_border_width:      { key: 'label_border_width', label: 'Label Border Width', labelAr: 'سُمك الحدود', category: 'label', component: 'slider', defaultValue: 1, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, min: 0, max: 5, step: 0.5 },
+  label_border_color:      { key: 'label_border_color', label: 'Label Border Color', labelAr: 'لون الحدود', category: 'label', component: 'color', defaultValue: '#333333', supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS },
+  label_border_radius:     { key: 'label_border_radius', label: 'Label Border Radius', labelAr: 'تدوير زوايا الملصق', category: 'label', component: 'slider', defaultValue: 4, supportedPapers: STICKER_LABEL, supportedDocs: STICKER_DOCS, min: 0, max: 20, step: 1 },
+
+  // ── Section Dimensions (page papers only) ──
+  section_header_width:    { key: 'section_header_width', label: 'Header Width %', labelAr: 'عرض الرأس %', category: 'formatting', component: 'slider', defaultValue: 100, supportedPapers: PAGE, supportedDocs: ALL_DOCS, min: 50, max: 100, step: 5 },
+  section_header_align:    { key: 'section_header_align', label: 'Header Align', labelAr: 'محاذاة الرأس', category: 'formatting', component: 'pills', defaultValue: 'right' as AlignOption, supportedPapers: PAGE, supportedDocs: ALL_DOCS, options: ALIGN_OPTS },
+  section_doc_info_width:  { key: 'section_doc_info_width', label: 'Doc Info Width %', labelAr: 'عرض معلومات المستند %', category: 'formatting', component: 'slider', defaultValue: 100, supportedPapers: PAGE, supportedDocs: ALL_DOCS, min: 50, max: 100, step: 5 },
+  section_doc_info_align:  { key: 'section_doc_info_align', label: 'Doc Info Align', labelAr: 'محاذاة معلومات المستند', category: 'formatting', component: 'pills', defaultValue: 'right' as AlignOption, supportedPapers: PAGE, supportedDocs: ALL_DOCS, options: ALIGN_OPTS },
+  section_items_width:     { key: 'section_items_width', label: 'Items Width %', labelAr: 'عرض الجدول %', category: 'formatting', component: 'slider', defaultValue: 100, supportedPapers: PAGE, supportedDocs: ALL_DOCS, min: 50, max: 100, step: 5 },
+  section_items_align:     { key: 'section_items_align', label: 'Items Align', labelAr: 'محاذاة الجدول', category: 'formatting', component: 'pills', defaultValue: 'right' as AlignOption, supportedPapers: PAGE, supportedDocs: ALL_DOCS, options: ALIGN_OPTS },
+  section_totals_width:    { key: 'section_totals_width', label: 'Totals Width %', labelAr: 'عرض الإجماليات %', category: 'formatting', component: 'slider', defaultValue: 60, supportedPapers: PAGE, supportedDocs: ALL_DOCS, min: 30, max: 100, step: 5 },
+  section_totals_align:    { key: 'section_totals_align', label: 'Totals Align', labelAr: 'محاذاة الإجماليات', category: 'formatting', component: 'pills', defaultValue: 'left' as AlignOption, supportedPapers: PAGE, supportedDocs: ALL_DOCS, options: ALIGN_OPTS },
+  section_footer_width:    { key: 'section_footer_width', label: 'Footer Width %', labelAr: 'عرض التذييل %', category: 'formatting', component: 'slider', defaultValue: 100, supportedPapers: PAGE, supportedDocs: ALL_DOCS, min: 50, max: 100, step: 5 },
+  section_footer_align:    { key: 'section_footer_align', label: 'Footer Align', labelAr: 'محاذاة التذييل', category: 'formatting', component: 'pills', defaultValue: 'center' as AlignOption, supportedPapers: PAGE, supportedDocs: ALL_DOCS, options: ALIGN_OPTS },
+  header_columns_gap:      { key: 'header_columns_gap', label: 'Header Columns Gap', labelAr: 'الفجوة بين أعمدة الرأس', category: 'formatting', component: 'slider', defaultValue: 30, supportedPapers: PAGE, supportedDocs: ALL_DOCS, min: 0, max: 60, step: 5 },
+  client_card_width:       { key: 'client_card_width', label: 'Client Card Width %', labelAr: 'عرض بطاقة العميل %', category: 'formatting', component: 'slider', defaultValue: 50, supportedPapers: PAGE, supportedDocs: ALL_DOCS, min: 30, max: 100, step: 5 },
 
   // ── Rules ──
   rules:                  { key: 'rules', label: 'Rules', labelAr: 'القواعد', category: 'rules', component: 'rules-editor', defaultValue: [] as any[], supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },

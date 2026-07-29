@@ -94,7 +94,10 @@ export function TemplateControls({ tpl, update, companyData }: {
       )}
 
       <Section id="s-format" title="تنسيق الطباعة — الهوامش والمسافات" icon="ti-settings" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
-        <FormattingSectionControls tpl={tpl} update={update} />
+        <FormattingSectionControls tpl={tpl} update={update}
+          rows={{ doc_info_rows: tpl.doc_info_rows ?? [], customer_info_rows: tpl.customer_info_rows ?? [], company_info_rows: tpl.company_info_rows ?? [] }}
+          onRowsChange={(key, rows) => update(key as keyof PrintTemplate, rows)}
+        />
       </Section>
 
       <Accordion id="s-rules" title="القواعد — الإظهار/الإخفاء الشرطي" icon="ti-adjustments" collapseVersion={collapseVersion} defaultOpen={!allCollapsed}>

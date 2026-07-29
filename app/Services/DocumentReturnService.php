@@ -10,10 +10,11 @@ use Illuminate\Support\Facades\DB;
 class DocumentReturnService
 {
     private const RETURN_MAP = [
-        'FV' => 'AV',
-        'FA' => 'AA',
-        'BL' => 'AV',
-        'BR' => 'AA',
+        'FV'  => 'AV',
+        'FA'  => 'AA',
+        'BL'  => 'AV',
+        'BR'  => 'AA',
+        'POS' => 'AV',
     ];
 
     public function __construct(

@@ -2206,10 +2206,47 @@
   .pss-live-banner { flex-wrap: wrap; }
   .pss-live-actions { width: 100%; }
   .pss-live-btn   { flex: 1; justify-content: center; }
-  .pss-table td:nth-child(3),
-  .pss-table th:nth-child(3),
   .pss-table td:nth-child(4),
   .pss-table th:nth-child(4),
-  .pss-table td:nth-child(6),
-  .pss-table th:nth-child(6) { display: none; }
+  .pss-table td:nth-child(5),
+  .pss-table th:nth-child(5),
+  .pss-table td:nth-child(7),
+  .pss-table th:nth-child(7) { display: none; }
+}
+
+/* ─── Device info grid ──────────────────────────────────────────────── */
+.ssm-device-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+.ssm-device-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--bg2);
+  border-radius: var(--r2);
+  border: 1px solid var(--b1);
+}
+.ssm-device-item--full { grid-column: 1 / -1; }
+.ssm-device-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+.ssm-device-value {
+  font-size: 13px;
+  color: var(--t1);
+  font-weight: 600;
+}
+.ssm-device-value--small {
+  font-size: 10px;
+  font-weight: 400;
+  word-break: break-all;
+  line-height: 1.4;
+  color: var(--t3);
 }

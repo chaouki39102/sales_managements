@@ -153,7 +153,7 @@ export interface PosAggregatedLookups {
   currencies:       Currency[];
   paymentModes:     PaymentMode[];
   treasuryAccounts: TreasuryAccount[];
-  fiscalYears:      { id: number; year: number; label: string; start_date: string; end_date: string; is_current: boolean; status: string }[];
+  fiscalYears:      { id: number; name: string; start_date: string; end_date: string; is_current: boolean; is_closed: boolean }[];
   customers:        { id: number; name: string; code: string; nif: string; commercial_name: string; party_type_id: number }[];
   settings:         { fiscal_stamp_enabled: unknown; allow_negative_stock: unknown; default_price_level_id: unknown };
 }

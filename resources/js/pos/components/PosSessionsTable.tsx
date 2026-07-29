@@ -27,6 +27,7 @@ export default function PosSessionsTable({
           <tr>
             <th>الحالة</th>
             <th>الكاشير</th>
+            <th>الجهاز</th>
             <th>المستودع</th>
             <th>الفتح</th>
             <th>الإغلاق</th>
@@ -55,6 +56,13 @@ export default function PosSessionsTable({
                     {(sess.user?.name ?? '?').charAt(0)}
                   </div>
                   <span className="pss-user-name">{sess.user?.name ?? '—'}</span>
+                </div>
+              </td>
+
+              <td>
+                <div className="pss-wh-cell">
+                  <i className="ti ti-device-desktop" />
+                  {sess.device_name ?? '—'}
                 </div>
               </td>
 

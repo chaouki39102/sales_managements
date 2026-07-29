@@ -1120,7 +1120,8 @@ const handleCompleteSale = useCallback(async (params: {
       }, 0);
       const effectiveTotalTtc = effectiveTotalHt + effectiveTotalTva + snapshot.totals.fiscal_stamp;
 
-      const commonPayload = {
+      const currentSessionId = currentSession?.id ?? null;
+      const commonPayload: Record<string, any> = {
         party_id:       currentClient?.id ?? null,
         warehouse_id:   defaultWarehouse.id,
         fiscal_year_id: fiscalYear.id,
@@ -1146,6 +1147,7 @@ const handleCompleteSale = useCallback(async (params: {
           document_type_id: invType.id,
           lines:            linesPayload,
           payments:         apiPayments,
+          pos_session_id:   currentSessionId,
         });
       }
 
@@ -1915,9 +1917,7 @@ const handleCompleteSale = useCallback(async (params: {
       {modal === 'returns' && (
         <Suspense fallback={null}>
           <ReturnsModal
-            documentTypes={documentTypes ?? []}
-            defaultWarehouseId={defaultWarehouse?.id ?? null}
-            fiscalYearId={fiscalYear?.id ?? undefined}
+            sessionId={currentSession?.id ?? null}
             onClose={() => setModal('none')}
             onDone={() => setModal('none')}
           />

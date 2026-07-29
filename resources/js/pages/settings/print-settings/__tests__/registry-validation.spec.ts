@@ -6,6 +6,7 @@ const VALID_CATEGORIES = [
   'global', 'paper', 'header', 'company', 'document', 'columns', 'items',
   'totals', 'payments', 'footer', 'barcode', 'qr', 'signature',
   'section-visibility', 'rules', 'report', 'charts', 'formatting',
+  'label',
 ] as const;
 
 const VALID_COMPONENTS = [
@@ -15,7 +16,7 @@ const VALID_COMPONENTS = [
 
 describe('SettingsRegistry — Structural Validation', () => {
   it('should have exactly 228 entries', () => {
-    expect(SETTING_COUNT).toBe(228);
+    expect(SETTING_COUNT).toBe(263);
   });
 
   it('every entry should have a matching key in the registry object', () => {

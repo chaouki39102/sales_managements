@@ -1,6 +1,7 @@
 // resources/js/pos/components/OpenSessionModal.tsx — v2 احترافي
 import { useState, useEffect } from 'react';
 import { formatDZD } from '@/pos/utils/calculations';
+import { useDeviceName } from '@/pos/hooks/useDeviceName';
 import type { Warehouse, FiscalYear } from '@/types';
 
 interface Props {
@@ -22,25 +23,41 @@ interface Props {
 // لوحة أرقام سريعة
 const QUICK_CASH = [0, 5000, 10000, 20000, 50000, 100000];
 
+function fiscalYearLabel(fy: FiscalYear): string {
+  return fy.name || String((fy as Record<string, unknown>).year || '');
+}
+
 export default function OpenSessionModal({
   warehouses, fiscalYears,
   defaultWarehouseId, defaultFiscalYearId,
   isLoading, error, onOpen, onClose,
 }: Props) {
-  const initWh = defaultWarehouseId
-    ?? warehouses.find(w => w.is_default)?.id
-    ?? warehouses[0]?.id ?? 0;
-  const initFy = defaultFiscalYearId
+  const initFyId = defaultFiscalYearId
     ?? fiscalYears.find(y => y.is_current && !y.is_closed)?.id
     ?? fiscalYears[0]?.id ?? 0;
 
   const [step,         setStep]         = useState<1 | 2>(1);
-  const [warehouseId,  setWarehouseId]  = useState<number>(initWh);
-  const [fiscalYearId, _setFiscalYearId] = useState<number>(initFy);
+  const [warehouseId,  setWarehouseId]  = useState<number>(
+    defaultWarehouseId
+      ?? warehouses.find(w => w.is_default)?.id
+      ?? warehouses[0]?.id ?? 0
+  );
+  const [fiscalYearId, setFiscalYearId] = useState<number>(initFyId);
   const [openingCash,  setOpeningCash]  = useState('');
   const [confirmCash,  setConfirmCash]  = useState('');
   const [note,         setNote]         = useState('');
   const [cashMode,     setCashMode]     = useState<'quick' | 'manual'>('quick');
+  const [deviceName,   setDeviceName]   = useDeviceName();
+
+  // مزامنة السنة المالية بعد تحميل البيانات غير المتزامنة
+  useEffect(() => {
+    const best = defaultFiscalYearId
+      ?? fiscalYears.find(y => y.is_current && !y.is_closed)?.id
+      ?? fiscalYears[0]?.id;
+    if (best && best !== fiscalYearId) {
+      setFiscalYearId(best);
+    }
+  }, [fiscalYears, defaultFiscalYearId, fiscalYearId]);
 
   const cashNum    = parseFloat(openingCash)  || 0;
   const confirmNum = parseFloat(confirmCash)  || 0;
@@ -79,11 +96,19 @@ export default function OpenSessionModal({
 
   const handleOpen = async () => {
     if (!canOpen) return;
+    const browserInfo = {
+      platform: navigator.platform,
+      language: navigator.language,
+      screen: `${screen.width}x${screen.height}`,
+      cores: navigator.hardwareConcurrency || 0,
+    };
     await onOpen({
-      warehouse_id:   warehouseId,
-      fiscal_year_id: fiscalYearId,
-      opening_cash:   cashNum,
-      opening_note:   note.trim() || undefined,
+      warehouse_id:       warehouseId,
+      fiscal_year_id:     fiscalYearId,
+      opening_cash:       cashNum,
+      opening_note:       note.trim() || undefined,
+      device_name:        deviceName,
+      device_browser_info: JSON.stringify(browserInfo),
     });
   };
 
@@ -165,7 +190,7 @@ export default function OpenSessionModal({
                 const currentFy = fiscalYears.find(y => y.id === fiscalYearId);
                 return currentFy ? (
                   <div className="osm-fy-badge">
-                    <span className="osm-fy-badge-name">{currentFy.name}</span>
+                    <span className="osm-fy-badge-name">{fiscalYearLabel(currentFy)}</span>
                     <span className="osm-fy-badge-dates">
                       {fmtDate(currentFy.start_date)} — {fmtDate(currentFy.end_date)}
                     </span>
@@ -175,18 +200,33 @@ export default function OpenSessionModal({
               })()}
             </div>
 
-            {/* ملاحظة وردية */}
+            {/* اسم الجهاز */}
+            <div className="osm-field">
+              <label className="osm-label">
+                <i className="ti ti-device-desktop" />
+                اسم الجهاز
+              </label>
+              <input
+                className="osm-inp"
+                type="text"
+                value={deviceName}
+                onChange={e => setDeviceName(e.target.value)}
+                placeholder="مثال: صندوق 1، كاشير أ..."
+              />
+            </div>
+
+            {/* ملاحظة الجلسة (اختياري) */}
             <div className="osm-field">
               <label className="osm-label">
                 <i className="ti ti-notes" />
-                ملاحظة الوردية (اختياري)
+                ملاحظة الجلسة (اختياري)
               </label>
               <input
                 className="osm-inp"
                 type="text"
                 value={note}
                 onChange={e => setNote(e.target.value)}
-                placeholder="مثال: وردية صباح، صندوق 1..."
+                placeholder="مثال: وردية صباح..."
               />
             </div>
 
@@ -196,7 +236,7 @@ export default function OpenSessionModal({
                 <span className="ic ic-xs"><i className="ti ti-check" /></span>
                 <strong>{selectedWh.name}</strong>
                 <span className="osm-summary-sep">·</span>
-                <strong>{selectedFy.name}</strong>
+                <strong>{fiscalYearLabel(selectedFy)}</strong>
               </div>
             )}
           </div>
@@ -295,7 +335,11 @@ export default function OpenSessionModal({
               </div>
               <div className="osm-preview-row">
                 <i className="ti ti-calendar" />
-                <span>{selectedFy?.name}</span>
+                <span>{fiscalYearLabel(selectedFy!)}</span>
+              </div>
+              <div className="osm-preview-row">
+                <i className="ti ti-device-desktop" />
+                <span>{deviceName}</span>
               </div>
               <div className="osm-preview-row">
                 <i className="ti ti-clock" />

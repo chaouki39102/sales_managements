@@ -147,7 +147,8 @@ function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
     tpl.footer_line1 || tpl.footer_line2 || tpl.footer_line3 ||
     tpl.show_thank_you || tpl.show_returns_policy || tpl.footer_legal_text ||
     tpl.show_barcode || tpl.show_qr ||
-    tpl.show_bank_details;
+    tpl.show_bank_details ||
+    tpl.show_cashier_signature || tpl.show_client_signature || tpl.show_stamp;
 
   if (!hasContent) return null;
 

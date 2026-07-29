@@ -33,6 +33,12 @@ export default function PosSessionsCards({
                 <i className="ti ti-building-warehouse" />
                 {sess.warehouse?.name ?? '—'}
               </div>
+              {sess.device_name && (
+                <div className="pss-card-wh">
+                  <i className="ti ti-device-desktop" />
+                  {sess.device_name}
+                </div>
+              )}
             </div>
             <Badge variant={STATUS_VARIANT[sess.status] ?? 'gray'}>{STATUS_LABEL[sess.status] ?? sess.status}</Badge>
           </div>

@@ -118,6 +118,9 @@ export default function CloseSessionModal({
                 <span><i className="ti ti-user" />{session.user?.name}</span>
                 <span>·</span>
                 <span><i className="ti ti-building-warehouse" />{session.warehouse?.name}</span>
+                {session.device_name && (
+                  <><span>·</span><span><i className="ti ti-device-desktop" />{session.device_name}</span></>
+                )}
                 <span>·</span>
                 <span><i className="ti ti-clock" />{session.duration}</span>
               </div>

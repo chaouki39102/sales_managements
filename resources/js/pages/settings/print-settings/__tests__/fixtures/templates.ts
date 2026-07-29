@@ -231,7 +231,41 @@ export function createMockTemplate(
     show_payments_section: true,
     show_footer_section: true,
 
+    section_header_width: 100,
+    section_header_align: 'right',
+    section_doc_info_width: 100,
+    section_doc_info_align: 'right',
+    section_items_width: 100,
+    section_items_align: 'right',
+    section_totals_width: 60,
+    section_totals_align: 'left',
+    section_footer_width: 100,
+    section_footer_align: 'center',
+    header_columns_gap: 30,
+    client_card_width: 50,
+
     rules: [],
+
+    // Label / Sticker
+    show_label_barcode: true,
+    label_barcode_height: 40,
+    show_label_product_name: true,
+    label_product_name_size: 14,
+    label_product_name_bold: true,
+    label_product_name_color: '#111111',
+    show_label_price: true,
+    label_price_text: 'DA',
+    label_price_size: 22,
+    label_price_bold: true,
+    label_price_color: '#c0392b',
+    label_price_prefix: '',
+    show_label_ref: false,
+    label_ref_size: 8,
+    label_ref_color: '#666666',
+    label_border_style: 'solid' as const,
+    label_border_width: 1,
+    label_border_color: '#333333',
+    label_border_radius: 4,
 
     show_report_header: true,
     report_header_text: '',
@@ -251,6 +285,19 @@ export function createMockTemplate(
 
     report_col_widths: { product: 50, quantity: 20, total: 30 } as any,
     report_col_headers: { product: 'Produit', quantity: 'Qté', total: 'Total' } as any,
+
+    // Layout structure (complex objects managed by dedicated controls)
+    page_frame:       { enabled: false },
+    sections_order:   [
+      { key: 'header',     visible: true, order: 0 },
+      { key: 'doc-info',   visible: true, order: 1 },
+      { key: 'items',      visible: true, order: 2 },
+      { key: 'totals',     visible: true, order: 3 },
+      { key: 'payments',   visible: true, order: 4 },
+      { key: 'footer',     visible: true, order: 5 },
+    ],
+    header_layout:    { mode: 'simple', columns: [] },
+    watermark:        { enabled: false },
 
     ...overrides,
   };

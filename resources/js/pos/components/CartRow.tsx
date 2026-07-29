@@ -546,13 +546,13 @@ export default function CartRow({
       {/* ── الإجمالي ── */}
       <div className="cr-total">
         <div className="cr-ttc" style={{ direction: 'ltr' }}>
-          {item.total_ttc.toLocaleString('fr-DZ', { maximumFractionDigits: 0 })}
+          {item.total_ttc.toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           <span className="cr-dzd"> دج</span>
         </div>
         {hasDisc && (
           <div className="cr-ht cr-ht--strike" style={{ direction: 'ltr' }}>
             {htToTtc(item.unit_price_ht * item.quantity, tvaRate)
-              .toLocaleString('fr-DZ', { maximumFractionDigits: 0 })}
+              .toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
         )}
       </div>

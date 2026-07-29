@@ -1,16 +1,20 @@
 import React from 'react';
 import type { FontFamily } from '../types';
-import type { PrintTemplate } from '../types';
+import type { PrintTemplate, LayoutRow } from '../types';
 import { SliderField } from './ToggleSwitch';
 import { Field, Select, Pills } from '../components/ui';
+import { Accordion } from '../components/Accordion';
 import { isSettingVisible } from '../services/SettingsRegistry';
+import { RowBuilder } from '../components/rows';
 
 interface Props {
   tpl: PrintTemplate;
   update: <K extends keyof PrintTemplate>(key: K, val: PrintTemplate[K]) => void;
+  rows?: Record<string, LayoutRow[]>;
+  onRowsChange?: (key: string, rows: LayoutRow[]) => void;
 }
 
-export default function FormattingSectionControls({ tpl, update }: Props) {
+export default function FormattingSectionControls({ tpl, update, rows, onRowsChange }: Props) {
   const sec = (k: string) => isSettingVisible(k, tpl.doc_type_code, tpl.paper_size, tpl);
   const isThermal = tpl.paper_size === '80mm' || tpl.paper_size === '58mm';
 
@@ -59,6 +63,27 @@ export default function FormattingSectionControls({ tpl, update }: Props) {
           <option value="times">Times New Roman</option>
         </Select>
       </Field>}
+
+      {rows && onRowsChange && (
+        <Accordion title="محرر الحقول (سحب وإفلات)" defaultOpen={false}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+            {['doc_info_rows', 'customer_info_rows', 'company_info_rows'].filter(k => rows[k]).map(k => (
+              <div key={k}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#666', display: 'block', marginBottom: 4 }}>
+                  {k === 'doc_info_rows' ? 'صفوف معلومات المستند' :
+                   k === 'customer_info_rows' ? 'صفوف معلومات العميل' :
+                   'صفوف معلومات الشركة'}
+                </label>
+                <RowBuilder
+                  rows={rows[k]}
+                  onChange={r => onRowsChange(k, r)}
+                  fieldGroup={k === 'doc_info_rows' ? 'document' : k === 'customer_info_rows' ? 'customer' : 'company'}
+                />
+              </div>
+            ))}
+          </div>
+        </Accordion>
+      )}
     </>
   );
 }

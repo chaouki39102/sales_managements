@@ -121,9 +121,12 @@ class DocumentComputeController extends BaseApiController
         }
     }
 
-    public function createReturn(Request $request, CommercialDocument $document): JsonResponse
+    public function createReturn(Request $request): JsonResponse
     {
         try {
+            $documentId = (int) $request->route('document');
+            $document   = CommercialDocument::with(['documentType'])->findOrFail($documentId);
+
             $this->authorizeAction('update', $document);
 
             $validated = $request->validate([

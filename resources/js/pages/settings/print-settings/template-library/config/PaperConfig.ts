@@ -11,7 +11,7 @@ export interface PaperConfig {
   marginTop: number;
   marginBottom: number;
   marginSides: number;
-  paperWidthMm: 58 | 80;
+  paperWidthMm: number;
 }
 
 export function paperConfig(size: PaperSize): PaperConfig {
@@ -33,6 +33,15 @@ export function paperConfig(size: PaperSize): PaperConfig {
         marginBottom: A5_MARGIN_BOTTOM,
         marginSides: A5_MARGIN_SIDES,
         paperWidthMm: 80,
+      };
+    case '400x200mm':
+      return {
+        paperSize: '400x200mm',
+        pageOrientation: 'portrait',
+        marginTop: 3,
+        marginBottom: 3,
+        marginSides: 6,
+        paperWidthMm: 400,
       };
     default:
       return {

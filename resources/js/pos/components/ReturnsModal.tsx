@@ -1,14 +1,15 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import Modal from '@/components/ui/Modal';
-import type { CommercialDocument, CommercialDocumentLine, DocumentType } from '@/types';
+import Button from '@/components/ui/Button';
+import type { CommercialDocument, CommercialDocumentLine } from '@/types';
 import { documentsApi } from '@/lib/api/endpoints/documents';
+import { posSessionApi } from '@/lib/api/endpoints/posSession';
+import { apiPost } from '@/lib/api/core/client';
 import { formatDZD } from '../utils/calculations';
 import { useNotification } from '@/hooks/useNotification';
 
 interface ReturnsModalProps {
-  documentTypes: DocumentType[];
-  defaultWarehouseId: number | null;
-  fiscalYearId: number | undefined;
+  sessionId: number | null;
   onClose: () => void;
   onDone: () => void;
 }
@@ -18,36 +19,56 @@ interface SelectedLine {
   qty: number;
 }
 
-export default function ReturnsModal({
-  documentTypes, defaultWarehouseId, fiscalYearId, onClose, onDone,
-}: ReturnsModalProps) {
+export default function ReturnsModal({ sessionId, onClose, onDone }: ReturnsModalProps) {
   const [search, setSearch] = useState('');
   const [searching, setSearching] = useState(false);
+  const [loadingDoc, setLoadingDoc] = useState(false);
   const [doc, setDoc] = useState<CommercialDocument | null>(null);
   const [selected, setSelected] = useState<SelectedLine[]>([]);
+  const [reason, setReason] = useState('');
   const [creating, setCreating] = useState(false);
   const notify = useNotification();
 
-  const avcType = documentTypes.find(t => t.code === 'AVC');
+  const allSelected = doc?.lines ? selected.length === doc.lines.length : false;
+
+  const totalReturn = useMemo(() => {
+    if (selected.length === 0) return 0;
+    return selected.reduce((acc, s) => {
+      const ht = s.qty * s.line.unit_price_ht;
+      const tva = ht * (s.line.tva_rate / 100);
+      return acc + ht + tva;
+    }, 0);
+  }, [selected]);
 
   const handleSearch = useCallback(async () => {
-    if (!search.trim()) return;
+    const q = search.trim();
+    if (!q) return;
     setSearching(true);
+    setDoc(null);
+    setSelected([]);
     try {
       const res = await documentsApi.list({
-        search: search.trim(),
-        include: 'lines,lines.product_variant,party',
+        'filter[search]': q,
         per_page: 5,
-        'filter[fiscal_year_id]': fiscalYearId,
       } as any);
       const found = Array.isArray(res) ? res : res.data ?? [];
       if (found.length === 0) {
         notify.error('لا توجد فاتورة بهذا الرقم');
         setDoc(null);
-      } else {
-        setDoc(found[0] as CommercialDocument);
-        setSelected([]);
+        return;
       }
+      const foundDoc = found[0] as CommercialDocument;
+      setLoadingDoc(true);
+      try {
+        const full = await documentsApi.show(foundDoc.id);
+        setDoc(full);
+        setSelected([]);
+        setReason('');
+      } catch {
+        notify.error('فشل تحميل تفاصيل الفاتورة');
+        setDoc(null);
+      }
+      setLoadingDoc(false);
     } catch {
       notify.error('فشل البحث عن الفاتورة');
     }
@@ -68,59 +89,72 @@ export default function ReturnsModal({
     ));
   }, []);
 
+  const selectAll = useCallback(() => {
+    if (!doc?.lines) return;
+    if (allSelected) {
+      setSelected([]);
+    } else {
+      setSelected(doc.lines.map(line => ({ line, qty: line.quantity })));
+    }
+  }, [doc, allSelected]);
+
   const handleCreateReturn = useCallback(async () => {
-    if (!avcType || !doc || !defaultWarehouseId || !fiscalYearId) {
-      notify.error('بيانات غير مكتملة لإنشاء المرتجع');
-      return;
-    }
-    if (selected.length === 0) {
-      notify.error('اختر أصنافاً للإرجاع');
-      return;
-    }
+    if (!doc) { notify.error('اختر فاتورة أولاً'); return; }
+    if (selected.length === 0) { notify.error('اختر أصنافاً للإرجاع'); return; }
+
     setCreating(true);
     try {
-      await documentsApi.create({
-        document_type_id: avcType.id,
-        warehouse_id: defaultWarehouseId,
-        fiscal_year_id: fiscalYearId,
-        document_date: new Date().toISOString().split('T')[0],
-        party_id: doc.party?.id ?? null,
-        notes: `مرتجع من الفاتورة رقم ${doc.document_number}`,
-        lines: selected.map(s => ({
-          product_id: s.line.product_id ?? 0,
-          description: s.line.description ?? undefined,
-          quantity: -Math.abs(s.qty),
-          unit_price_ht: s.line.unit_price_ht,
-          discount_percentage: s.line.discount_percentage,
-          tva_rate: s.line.tva_rate,
-          packaging_id: (s.line as any).packaging_id ?? null,
-        })),
+      await apiPost(`/documents/${doc.id}/return`, {
+        reason: reason || 'مرتجع من نقطة البيع',
+        lines: selected.map(s => ({ line_id: s.line.id, quantity: s.qty })),
       });
+
+      if (sessionId) {
+        const totalHt = selected.reduce((acc, s) => acc + s.qty * s.line.unit_price_ht, 0);
+        const totalTva = selected.reduce((acc, s) => {
+          const ht = s.qty * s.line.unit_price_ht;
+          return acc + ht * (s.line.tva_rate / 100);
+        }, 0);
+        try {
+          await posSessionApi.increment(sessionId, {
+            invoice_total: totalHt + totalTva,
+            total_ht: totalHt,
+            total_tva: totalTva,
+            total_fiscal_stamp: 0,
+            total_discount: 0,
+            is_return: true,
+          });
+        } catch {
+          console.warn('فشل تحديث جلسة البيع');
+        }
+      }
+
       notify.success('تم إنشاء المرتجع بنجاح');
       onDone();
     } catch {
       notify.error('فشل إنشاء المرتجع');
     }
     setCreating(false);
-  }, [avcType, doc, defaultWarehouseId, fiscalYearId, selected, onDone]);
+  }, [doc, reason, selected, sessionId, onDone]);
 
   return (
     <Modal
       open
       onClose={onClose}
       title={<><i className="ti ti-receipt-refund ml-2" /> مرتجع مبيعات</>}
-      size="md"
+      size="lg"
       footer={
-        <>
-          <button className="btn" onClick={onClose}>إلغاء</button>
-          <button
-            className="btn btn-p"
-            onClick={handleCreateReturn}
-            disabled={!doc || selected.length === 0 || creating || !avcType}
-          >
-            {creating ? 'جاري الإنشاء...' : 'إنشاء المرتجع'}
-          </button>
-        </>
+        <div className="ret-footer">
+          <span className="ret-footer-total">
+            {selected.length > 0 && `إجمالي المرتجع: ${formatDZD(totalReturn)} دج`}
+          </span>
+          <div className="flex gap-8">
+            <Button onClick={onClose}>إلغاء</Button>
+            <Button variant="primary" onClick={handleCreateReturn} disabled={!doc || selected.length === 0} loading={creating}>
+              تأكيد المرتجع
+            </Button>
+          </div>
+        </div>
       }
     >
       <div className="si-modal-body">
@@ -133,37 +167,63 @@ export default function ReturnsModal({
               onChange={e => setSearch(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
               placeholder="رقم الفاتورة..."
+              autoFocus
             />
-            <button className="btn btn-p" onClick={handleSearch} disabled={searching}>
-              {searching ? '...' : 'بحث'}
-            </button>
+            <Button onClick={handleSearch} disabled={searching} loading={searching}>
+              بحث
+            </Button>
           </div>
         </div>
 
-        {doc && (
+        {loadingDoc && (
+          <div className="ta-c py-8">
+            <span className="text-t3">جاري تحميل تفاصيل الفاتورة...</span>
+          </div>
+        )}
+
+        {doc && !loadingDoc && (
           <div className="ret-doc">
             <div className="ret-doc-hd">
-              <strong>الفاتورة: {doc.document_number}</strong>
-              <span className="ret-doc-meta">
-                {doc.party?.name} — {formatDZD(doc.total_ttc)}
-              </span>
+              <div>
+                <strong>الفاتورة: {doc.document_number}</strong>
+                <span className="ret-doc-meta">
+                  {doc.document_date} — {doc.party?.name} — {formatDZD(doc.total_ttc)} دج
+                </span>
+              </div>
+              <Button size="xs" onClick={selectAll}>
+                {allSelected ? 'إلغاء الكل' : 'إرجاع كامل'}
+              </Button>
             </div>
+
+            <div className="ret-reason">
+              <input
+                type="text"
+                className="inp w-full"
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                placeholder="سبب الإرجاع (اختياري)"
+              />
+            </div>
+
             <div className="ret-lines">
               {doc.lines?.map(line => {
                 const sel = selected.find(s => s.line.id === line.id);
+                const fullyReturned = line.returned_quantity >= line.quantity;
                 return (
-                  <div key={line.id} className={`ret-line ${sel ? 'ret-line-sel' : ''}`}>
+                  <div key={line.id} className={`ret-line ${sel ? 'ret-line-sel' : ''} ${fullyReturned ? 'ret-line-disabled' : ''}`}>
                     <label className="ret-line-lbl">
                       <input
                         type="checkbox"
                         checked={!!sel}
+                        disabled={fullyReturned}
                         onChange={() => toggleLine(line)}
                       />
-                      <span className="ret-line-name">{line.description ?? `صنف #${line.product_variant_id}`}</span>
+                      <span className="ret-line-name">{line.description || line.product?.name || line.product?.ref || `#${line.product_id}`}</span>
                       <span className="ret-line-qty">الكمية: {line.quantity}</span>
                       <span className="ret-line-amt">{formatDZD(line.total_ht)}</span>
                     </label>
-                    {sel && (
+                    {fullyReturned && <span className="ret-line-done">تم إرجاعه كاملاً</span>}
+                    {sel && !fullyReturned && (
                       <div className="ret-line-qty-inp">
                         <span>كمية الإرجاع:</span>
                         <input
@@ -181,6 +241,13 @@ export default function ReturnsModal({
                 );
               })}
             </div>
+
+            {selected.length > 0 && (
+              <div className="ret-summary">
+                <span>{selected.length} صنف</span>
+                <span className="ret-summary-total">{formatDZD(totalReturn)} دج</span>
+              </div>
+            )}
           </div>
         )}
       </div>

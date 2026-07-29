@@ -36,9 +36,9 @@ class PosLookupsController extends Controller
                 ->where('active', true)->orderBy('name')->get(),
             'treasuryAccounts' => TreasuryAccount::select('id', 'name', 'code', 'type', 'is_default', 'active')
                 ->where('active', true)->orderBy('name')->get(),
-            'fiscalYears'      => FiscalYear::select('id', 'year', 'label', 'start_date', 'end_date', 'is_current', 'status')
-                ->where('status', 'open')
-                ->orderBy('year', 'desc')->get(),
+            'fiscalYears'      => FiscalYear::select('id', 'name', 'start_date', 'end_date', 'is_current', 'is_closed')
+                ->where('is_closed', false)
+                ->orderBy('start_date', 'desc')->get(),
             'customers'        => DB::table('parties as p')
                 ->join('party_types as pt', 'p.party_type_id', '=', 'pt.id')
                 ->where('p.company_id', $companyId)

@@ -23,12 +23,17 @@ class PosSessionController extends Controller
 
     public function current(Request $request): JsonResponse
     {
-        $session = PosSession::forCompany($this->company($request)->id)
+        $q = PosSession::forCompany($this->company($request)->id)
             ->open()
             ->where('user_id', Auth::id())
-            ->with(['user:id,name', 'warehouse:id,name', 'payments.paymentMode', 'products'])
-            ->latest('opened_at')
-            ->first();
+            ->with(['user:id,name', 'warehouse:id,name', 'payments.paymentMode', 'products']);
+
+        $deviceName = $request->query('device_name');
+        if ($deviceName) {
+            $q->where('device_name', $deviceName);
+        }
+
+        $session = $q->latest('opened_at')->first();
 
         return response()->json([
             'data' => $session ? $this->formatSession($session) : null,
@@ -42,18 +47,23 @@ class PosSessionController extends Controller
             'fiscal_year_id' => 'required|integer|exists:fiscal_years,id',
             'opening_cash'   => 'required|numeric|min:0',
             'opening_note'   => 'nullable|string|max:255',
+            'device_name'    => 'nullable|string|max:100',
+            'device_browser_info' => 'nullable|json',
         ]);
+
+        $deviceName = $data['device_name'] ?? null;
 
         $existing = PosSession::forCompany($this->company($request)->id)
             ->open()
             ->where('user_id', Auth::id())
+            ->when($deviceName, fn($q) => $q->where('device_name', $deviceName))
             ->first();
 
         if ($existing) {
-            return response()->json([
-                'message' => 'لديك جلسة مفتوحة بالفعل',
-                'data'    => $existing,
-            ], 409);
+            $msg = $deviceName
+                ? "يوجد جلسة مفتوحة بالفعل على جهاز \"{$existing->device_name}\""
+                : 'لديك جلسة مفتوحة بالفعل';
+            return response()->json(['message' => $msg, 'data' => $existing], 409);
         }
 
         $session = PosSession::create([
@@ -64,7 +74,11 @@ class PosSessionController extends Controller
             'opened_at'      => now(),
             'opening_cash'   => $data['opening_cash'],
             'opening_note'   => $data['opening_note'] ?? null,
-            'status'         => 'open',
+            'device_name'       => $deviceName,
+            'device_ip'         => $request->ip(),
+            'device_user_agent'  => $request->userAgent(),
+            'device_browser_info'=> $data['device_browser_info'] ?? null,
+            'status'             => 'open',
         ]);
 
         return response()->json([
@@ -204,12 +218,19 @@ class PosSessionController extends Controller
         ]);
     }
 
+    public function deviceName(Request $request): JsonResponse
+    {
+        $hostname = gethostname();
+        return response()->json(['data' => $hostname ?: null]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $sessions = PosSession::forCompany($this->company($request)->id)
             ->with(['user:id,name', 'warehouse:id,name'])
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->user_id, fn($q) => $q->where('user_id', $request->user_id))
+            ->when($request->device_name, fn($q) => $q->where('device_name', $request->device_name))
             ->when($request->date_from, fn($q) => $q->whereDate('opened_at', '>=', $request->date_from))
             ->when($request->date_to,   fn($q) => $q->whereDate('opened_at', '<=', $request->date_to))
             ->orderByDesc('opened_at')
@@ -247,6 +268,10 @@ class PosSessionController extends Controller
             'warehouse'             => $s->warehouse,
             'opening_cash'          => $s->opening_cash,
             'opening_note'          => $s->opening_note,
+            'device_name'           => $s->device_name,
+            'device_ip'             => $s->device_ip,
+            'device_user_agent'     => $s->device_user_agent,
+            'device_browser_info'   => $s->device_browser_info,
             'invoices_count'        => $s->invoices_count,
             'returns_count'         => $s->returns_count,
             'gross_sales'           => $s->gross_sales,

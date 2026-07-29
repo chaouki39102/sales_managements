@@ -160,30 +160,37 @@ export function buildTemplate(
   const isInvoice = docTypeCode === 'FV';
   const isA5 = paperSize === 'A5';
   const isThermal = paperSize === '80mm' || paperSize === '58mm';
+  const isSticker = docTypeCode === 'STK';
 
-  const table = isThermal
-    ? POS_RECEIPT_80MM_COLUMNS
-    : isInvoice
-      ? INVOICE_COLUMNS
-      : isA5
-        ? DELIVERY_A5_COLUMNS
-        : DELIVERY_COLUMNS;
+  const table = isSticker
+    ? { columnOrder: [], columnShow: {}, columnWidths: {}, columnHeaders: {}, columnAligns: {}, itemsFontSize: 12, itemsFontFamily: 'tajawal', showColHeader: false, tableHeaderBold: false, tableHeaderBg: '', tableHeaderColor: '', tableHeaderRadius: 0, tableCellPadding: 6, tableBorderStyle: 'none', alternatingRows: false, alternatingColor: '', priceDisplay: 'ttc' }
+    : isThermal
+      ? POS_RECEIPT_80MM_COLUMNS
+      : isInvoice
+        ? INVOICE_COLUMNS
+        : isA5
+          ? DELIVERY_A5_COLUMNS
+          : DELIVERY_COLUMNS;
 
-  const totals = isThermal
-    ? POS_RECEIPT_80MM_TOTALS
-    : isInvoice
-      ? INVOICE_TOTALS
-      : isA5
-        ? DELIVERY_A5_TOTALS
-        : DELIVERY_TOTALS;
+  const totals = isSticker
+    ? { totalsFontSize: 12, totalsBold: true, totalsAlign: 'center', showTotalHt: false, showTotalTva: false, showTvaBreakdown: false, showDiscountTotal: false, showFiscalStamp: false, showTotalTtc: false, totalTtcFontSize: 16, totalTtcBold: true, totalTtcColor: '#c0392b', totalBorderStyle: 'solid', showAmountInWords: false, showPaidAmount: false, showChange: false, showRemaining: false, showPrevBalance: false, showNewBalance: false }
+    : isThermal
+      ? POS_RECEIPT_80MM_TOTALS
+      : isInvoice
+        ? INVOICE_TOTALS
+        : isA5
+          ? DELIVERY_A5_TOTALS
+          : DELIVERY_TOTALS;
 
-  const footer = isThermal
-    ? POS_RECEIPT_80MM_FOOTER
-    : isInvoice
-      ? INVOICE_FOOTER
-      : isA5
-        ? DELIVERY_A5_FOOTER
-        : DELIVERY_FOOTER;
+  const footer = isSticker
+    ? { footerLine1: '', footerLine2: '', footerLine3: '', footerSeparator: 'none', showThankYou: false, thankYouText: '', thankYouSize: 12, thankYouColor: '#333', showReturnsPolicy: false, returnsPolicyText: '', showBarcode: false, barcodeContent: '', barcodeCustomText: '', showQr: false, qrContent: '', showCashierSignature: false, showClientSignature: false, showStamp: false }
+    : isThermal
+      ? POS_RECEIPT_80MM_FOOTER
+      : isInvoice
+        ? INVOICE_FOOTER
+        : isA5
+          ? DELIVERY_A5_FOOTER
+          : DELIVERY_FOOTER;
 
   const base: PrintTemplate = {
     id: null,
@@ -195,9 +202,9 @@ export function buildTemplate(
     is_default: false,
     is_active: true,
 
-    margin_top: paper.marginTop,
-    margin_bottom: paper.marginBottom,
-    margin_sides: paper.marginSides,
+    margin_top: isSticker ? 3 : paper.marginTop,
+    margin_bottom: isSticker ? 3 : paper.marginBottom,
+    margin_sides: isSticker ? 6 : paper.marginSides,
     line_spacing: 1.2,
     base_font_size: typo.baseFontSize,
     font_family: typo.fontFamily,
@@ -405,11 +412,11 @@ export function buildTemplate(
     show_stamp: footer.showStamp,
 
     show_header_section: true,
-    show_doc_info_section: true,
-    show_items_section: true,
-    show_totals_section: true,
+    show_doc_info_section: !isSticker,
+    show_items_section: !isSticker,
+    show_totals_section: !isSticker,
     show_payments_section: false,
-    show_footer_section: true,
+    show_footer_section: !isSticker,
 
     rules: [],
 
@@ -676,6 +683,122 @@ export function registerBuiltinTemplates(): void {
       show_totals_section: true,
       show_payments_section: false,
       show_footer_section: true,
+      totals_grid: { enabled: false, columns: [] } as any,
+    }),
+  });
+
+  templateRegistry.register({
+    meta: createMeta({
+      id: 'dz-sticker-label',
+      name: 'Algerian Sticker Label 400x200mm',
+      nameAr: 'ملصق المنتج 400×200 مم',
+      description: 'Product sticker label in 400x200mm landscape format with logo, company name, product name, barcode, reference and price.',
+      descriptionAr: 'ملصق منتج بصيغة 400×200 مم مع الشعار واسم الشركة واسم المنتج والباركود والمرجع والسعر',
+      documentType: 'STK',
+      paperSize: '400x200mm',
+      tags: ['algeria', 'arabic', 'sticker', 'label', '400x200mm', 'barcode', 'price-tag'],
+    }),
+    createConfig: () => buildTemplate('ملصق المنتج 400×200 مم', 'STK', '400x200mm', {
+      show_logo: true,
+      logo_source: 'company',
+      logo_size: 40,
+      logo_align: 'center',
+      logo_border_radius: 0,
+      show_company_name: true,
+      company_name_size: 11,
+      company_name_bold: true,
+      company_name_align: 'center',
+      company_name_color: '#1a1a2e',
+      show_address: false,
+      show_phone: false,
+      show_tax_id: false,
+      show_rc: false,
+      show_nis: false,
+      show_article: false,
+      show_capital: false,
+      show_mobile: false,
+      show_commercial_name: false,
+      show_email: false,
+      show_fax: false,
+      show_bank_name: false,
+      show_rib: false,
+      show_activity: false,
+      company_info_align: 'center',
+      company_info_size: 7,
+      company_info_bold: false,
+      header_separator: 'dashed',
+      show_doc_number: false,
+      show_date: false,
+      show_time: false,
+      show_due_date: false,
+      show_cashier: false,
+      show_session: false,
+      show_client: false,
+      show_client_nif: false,
+      show_client_phone: false,
+      show_client_address: false,
+      show_delivery_address: false,
+      show_customer_commercial_name: false,
+      show_customer_rc: false,
+      show_customer_nis: false,
+      show_customer_ai: false,
+      show_customer_mobile: false,
+      show_customer_fax: false,
+      show_customer_email: false,
+      show_customer_activity: false,
+      show_customer_bank_name: false,
+      show_customer_rib: false,
+      title_text: '',
+      title_size: 0,
+      show_barcode: false,
+      barcode_content: '',
+      show_qr: false,
+      qr_content: '',
+      show_thank_you: false,
+      show_returns_policy: false,
+      show_stamp: false,
+      show_cashier_signature: false,
+      show_client_signature: false,
+      doc_separator: 'none',
+      show_payment_details: false,
+      payment_font_size: 9,
+      show_bank_details: false,
+      show_total_ht: false,
+      show_total_tva: false,
+      show_tva_breakdown: false,
+      show_discount_total: false,
+      show_fiscal_stamp: false,
+      show_total_ttc: false,
+      show_amount_in_words: false,
+      show_paid_amount: false,
+      show_change: false,
+      show_remaining: false,
+      show_prev_balance: false,
+      show_new_balance: false,
+      header_custom_text: '',
+      footer_legal_text: '',
+      // Sticker-specific defaults
+      show_label_barcode: true,
+      label_barcode_height: 35,
+      show_label_product_name: true,
+      label_product_name_size: 14,
+      label_product_name_bold: true,
+      label_product_name_color: '#111',
+      show_label_ref: true,
+      label_ref_size: 9,
+      label_ref_color: '#666',
+      show_label_price: true,
+      label_price_size: 22,
+      label_price_bold: true,
+      label_price_color: '#c0392b',
+      label_price_text: 'د.ج',
+      label_price_prefix: '',
+      label_border_style: 'solid',
+      label_border_width: 1,
+      label_border_color: '#333',
+      label_border_radius: 6,
+      base_font_size: 12,
+      font_family: 'tajawal',
       totals_grid: { enabled: false, columns: [] } as any,
     }),
   });

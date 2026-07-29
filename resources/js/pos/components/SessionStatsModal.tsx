@@ -110,6 +110,9 @@ export default function SessionStatsModal({ session, onClose, onEndSession }: Pr
               <div className="ssm-session-meta">
                 <i className="ti ti-building-warehouse" />
                 {session.warehouse?.name}
+                {session.device_name && (
+                  <><span>·</span><i className="ti ti-device-desktop" />{session.device_name}</>
+                )}
                 <span>·</span>
                 <i className="ti ti-clock" />
                 فُتحت {new Date(session.opened_at).toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' })}
@@ -199,6 +202,53 @@ export default function SessionStatsModal({ session, onClose, onEndSession }: Pr
                         <div className="ssm-qp-count">{p.count} عملية</div>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* معلومات الجهاز */}
+              {(session.device_name || session.device_ip || session.device_browser_info) && (
+                <div className="ssm-section" style={{ marginTop: 16 }}>
+                  <div className="ssm-section-title">
+                    <i className="ti ti-device-desktop" /> معلومات الجهاز
+                  </div>
+                  <div className="ssm-device-grid">
+                    {session.device_name && (
+                      <div className="ssm-device-item">
+                        <span className="ssm-device-label">الاسم</span>
+                        <span className="ssm-device-value">{session.device_name}</span>
+                      </div>
+                    )}
+                    {session.device_ip && (
+                      <div className="ssm-device-item">
+                        <span className="ssm-device-label">IP</span>
+                        <span className="ssm-device-value" style={{ direction: 'ltr' }}>{session.device_ip}</span>
+                      </div>
+                    )}
+                    {session.device_browser_info?.platform && (
+                      <div className="ssm-device-item">
+                        <span className="ssm-device-label">نظام التشغيل</span>
+                        <span className="ssm-device-value">{session.device_browser_info.platform}</span>
+                      </div>
+                    )}
+                    {session.device_browser_info?.screen && (
+                      <div className="ssm-device-item">
+                        <span className="ssm-device-label">الشاشة</span>
+                        <span className="ssm-device-value">{session.device_browser_info.screen}</span>
+                      </div>
+                    )}
+                    {session.device_browser_info?.language && (
+                      <div className="ssm-device-item">
+                        <span className="ssm-device-label">اللغة</span>
+                        <span className="ssm-device-value">{session.device_browser_info.language}</span>
+                      </div>
+                    )}
+                    {session.device_user_agent && (
+                      <div className="ssm-device-item ssm-device-item--full">
+                        <span className="ssm-device-label">المتصفح</span>
+                        <span className="ssm-device-value ssm-device-value--small">{session.device_user_agent}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

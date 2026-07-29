@@ -30,6 +30,10 @@ export interface PosSession {
   warehouse:              { id: number; name: string };
   opening_cash:           number;
   opening_note:           string | null;
+  device_name:            string | null;
+  device_ip:              string | null;
+  device_user_agent:      string | null;
+  device_browser_info:    { platform: string; language: string; screen: string; cores: number } | null;
   invoices_count:         number;
   returns_count:          number;
   gross_sales:            number;
@@ -54,10 +58,12 @@ export interface PosSession {
 }
 
 export interface OpenSessionInput {
-  warehouse_id:    number;
-  fiscal_year_id:  number;
-  opening_cash:    number;
-  opening_note?:   string;
+  warehouse_id:       number;
+  fiscal_year_id:     number;
+  opening_cash:       number;
+  opening_note?:      string;
+  device_name?:       string;
+  device_browser_info?: string;
 }
 
 export interface IncrementSessionInput {
@@ -90,7 +96,8 @@ const sessionKeys = {
 };
 
 export const posSessionApi = {
-  current: ()                        => apiGet<PosSession | null>('/pos-sessions/current'),
+  current:    (deviceName?: string)     => apiGet<PosSession | null>(`/pos-sessions/current${deviceName ? `?device_name=${encodeURIComponent(deviceName)}` : ''}`),
+  deviceName: ()                        => apiGet<string | null>('/pos-sessions/device-name'),
   open:    (data: OpenSessionInput)  => apiPost<PosSession>('/pos-sessions', data),
   increment: (id: number, data: IncrementSessionInput) =>
     apiPost<PosSession>(`/pos-sessions/${id}/increment`, data),
@@ -101,11 +108,15 @@ export const posSessionApi = {
   show:    (id: number) => apiGet<PosSession>(`/pos-sessions/${id}`),
 } as const;
 
+function getDeviceNameFromStorage(): string | undefined {
+  try { return localStorage.getItem('pos-device-name') ?? undefined; } catch { return undefined; }
+}
+
 export function useCurrentPosSession() {
   const slug = useActiveSlug();
   return useQuery({
     queryKey:            sessionKeys.current(slug ?? ''),
-    queryFn:             posSessionApi.current,
+    queryFn:             () => posSessionApi.current(getDeviceNameFromStorage()),
     enabled:             !!slug,
     staleTime:           0,
     refetchOnWindowFocus: true,
