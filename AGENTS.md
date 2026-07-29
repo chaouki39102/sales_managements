@@ -810,3 +810,52 @@ Report: `docs/reports/PRINT_RUNTIME_SEPARATION_REPORT.md`
 - `resources/js/pages/pos/POSPage.tsx` — `CartApiRef`→`ProfessionalCartHandle` import/usage
 
 **Verification**: `npm run build` — 0 errors, 1052 modules, 3.33s.
+
+---
+
+### Phase 28 — ESCPOSRenderer, ExcelJS Code-Split, PWA, Image Proxy, Playwright CI (July 28)
+
+**ESCPOSRenderer**: Extracted all ESC/POS byte construction from `printService.ts` (560 lines → 136) into a dedicated renderer implementing `IRenderer<Uint8Array>`:
+
+| New file | Purpose |
+|----------|---------|
+| `renderers/EscPosBuilder.ts` | Shared builder class — low-level ESC/POS commands (cut, feed, barcode, QR, text alignment, font weighting, table layout) |
+| `renderers/ESCPOSRenderer.ts` | Full renderer implementing `IRenderer<Uint8Array>` — reads ~50 template settings (title_text, col_order, show_client, show_barcode, show_payments_section, label overrides, logo, signatures, etc.) |
+| `renderers/IRenderer.ts` (modified) | Registered ESCPOSRenderer so runtime dispatcher routes thermal jobs to it |
+
+- `buildReceiptBytesFromTemplate()` now delegates to `escposRenderer.render()` asynchronously
+- `printThermalViaWebUSBFromTemplate()` awaits the result
+- 174 tests (up from 160) covering all template settings
+
+**ExcelJS dynamic import**: Changed `import ExcelJS from 'exceljs'` → `import type ExcelJS from 'exceljs'` (type-only) + `await import('exceljs')` inside `exportToExcelAdvanced()`. ExcelJS chunk (929 KB) now lazy-loaded only when export is triggered.
+
+**Image proxy controller**: Created `ImageProxyController.php` — GD-based resize + WebP conversion with 7-day cache. Route `GET /api/v1/image-proxy` registered in `routes/api.php`. Accepts `url`, `w`, `h` params.
+
+**POS optimization**: Removed unused `.priceLevel` nested include from POS API queries. Added `quantityDiscounts` to kiosk. Stock-at cache TTL 5→30s (`InventoryStockService.php:99`).
+
+**PWA**: Installed `vite-plugin-pwa` v1.3.0 from npm (184 packages). Configured in `vite.config.js` with `registerType: 'autoUpdate'`, Workbox pre-caching `**/*.{js,css,woff,woff2,ttf,png,svg,jpg,jpeg}` (max 5 MB), manifest with `theme_color: '#1F3864'`, RTL Arabic. Build generates `registerSW.js` (0.14 kB), `manifest.webmanifest` (0.43 kB), service worker with 173 precached entries (8928 KiB).
+
+**Playwright CI**: Created `.github/workflows/ci.yml` with 5 jobs (lint, types, unit, build, e2e). E2E job starts `php artisan serve`, installs Chromium, runs existing PW tests via `--config=resources/js/pages/settings/print-settings/__tests__/playwright.config.ts`. Added `test:e2e` and `test:ci` scripts to `package.json`.
+
+**Files created (8)**:
+- `renderers/EscPosBuilder.ts` — shared ESC/POS command builder
+- `renderers/ESCPOSRenderer.ts` — full thermal receipt renderer
+- `app/Http/Controllers/Api/V1/ImageProxyController.php` — GD image proxy
+- `.github/workflows/ci.yml` — CI pipeline
+- `public/build/registerSW.js` — PWA registration (build artifact)
+- `public/build/manifest.webmanifest` — PWA manifest (build artifact)
+- `public/build/sw.js` — service worker (build artifact)
+- `public/build/workbox-*.js` — Workbox runtime (build artifact)
+
+**Files modified (13)**:
+- `renderers/IRenderer.ts` — registered ESCPOSRenderer
+- `pos/utils/printService.ts` — delegates to ESCPOSRenderer, ~136 lines
+- `pos/utils/__tests__/thermal-print.baseline.spec.ts` — 174 tests, async, extended coverage
+- `components/ui/DataTable/excelExportAdvanced.ts` — `import ExcelJS`→`import type ExcelJS`, `await import(...)`
+- `pages/pos/POSPage.tsx` — removed `.priceLevel` include
+- `pages/pos/POSKioskPage.tsx` — removed `.priceLevel`, added `quantityDiscounts`
+- `app/Services/InventoryStockService.php` — stock-at cache TTL 5→30s
+- `routes/api.php` — image proxy route
+- `vite.config.js` — PWA plugin, tabler-font-display transform
+- `package.json` — `test:e2e`, `test:ci` scripts
+- `AGENTS.md` — Phase 28 summary

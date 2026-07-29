@@ -5,6 +5,12 @@ import { registerOfflineInterceptor } from '@/lib/offline/offlineAwareApi';
 import { registerAdvancedFunctions } from '@/pages/settings/print-settings/engines/AdvancedFunctions';
 import '@tabler/icons-webfont/dist/tabler-icons.min.css';
 
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js');
+  });
+}
+
 registerOfflineInterceptor();
 registerAdvancedFunctions();
 

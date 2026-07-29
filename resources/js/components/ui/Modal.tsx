@@ -12,6 +12,7 @@ interface ModalProps {
   children: React.ReactNode;
   resizable?: boolean;
   storageKey?: string;
+  closeOnBackdrop?: boolean;
 }
 
 const sizeMap = { sm: 'modal-sm', md: '', lg: 'modal-lg', xl: 'modal-xl' };
@@ -38,6 +39,7 @@ export default function Modal({
   open, onClose, title, subtitle,
   size = 'md', footer, footerLeft, children,
   resizable = true, storageKey,
+  closeOnBackdrop = true,
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
@@ -107,7 +109,7 @@ export default function Modal({
   return (
     <div
       className={`ov ${open ? 'on' : ''}${open ? '' : ' hidden'}`}
-      onClick={onClose}
+      onClick={closeOnBackdrop ? onClose : undefined}
     >
       <div
         ref={modalRef}

@@ -117,6 +117,8 @@ export const RendererRegistry = new RendererRegistryClass();
 
 import { csvRenderer } from './CsvRenderer';
 import { excelRenderer } from './ExcelRenderer';
+import { escposRenderer } from './ESCPOSRenderer';
 
 RendererRegistry.register(csvRenderer);
 RendererRegistry.register(excelRenderer);
+RendererRegistry.register(escposRenderer);

@@ -1,6 +1,5 @@
 import React from 'react';
 import ReactDOMServer from 'react-dom/server.browser';
-import UniversalPreview from '../components/preview/UniversalPreview';
 import { DocumentDataBuilder } from '../types/data';
 import type { UniversalDocumentData, CompanyInfo } from '../types/data';
 import type { PipelineSource } from './UniversalPrintPipeline';
@@ -17,14 +16,15 @@ function buildData(source: PipelineSource, company: CompanyInfo | null): Univers
   }
 }
 
-export function renderPreviewToHtml(input: {
+export async function renderPreviewToHtml(input: {
   template: PrintTemplate;
   company: CompanyData | null;
   source: PipelineSource;
-}): string {
+}): Promise<string> {
   const { template, company, source } = input;
 
   const data = buildData(source, company);
+  const UniversalPreview = (await import('../components/preview/UniversalPreview')).default;
 
   const element = React.createElement(UniversalPreview, {
     tpl: template,

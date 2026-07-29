@@ -29,6 +29,7 @@ import { useActiveSlug } from '@/lib/store/appStore';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import QuickAddLookupButton from '@/components/ui/QuickAddLookupButton';
 import { useConfirm } from '@/hooks/useConfirm';
+import { useNotification } from '@/hooks/useNotification';
 import CopyConfigModal from '@/components/products/CopyConfigModal';
 import { useProductBarcodes, useBarcodeMutations } from '@/lib/api/endpoints/barcodes';
 import type { BarcodeUpdateInput } from '@/lib/api/endpoints/barcodes';
@@ -409,6 +410,7 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
   const initDone  = useRef(false);
   const slugEdited = useRef(false); // لمنع auto-slug بعد التعديل اليدوي
   const { confirm, confirmDialogProps } = useConfirm();
+  const notify = useNotification();
 
   const [activeTab, setActiveTab] = useState<TabId>('basic');
   const [form,      setForm]      = useState<ProductForm>(() => emptyForm());
@@ -515,13 +517,27 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
   async function handleUploadImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !productId) return;
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      notify.error('الملف كبير جداً', 'الحد الأقصى 5 ميغابايت');
+      if (imgFileRef.current) imgFileRef.current.value = '';
+      return;
+    }
+    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      notify.error('صيغة غير مدعومة', 'JPG, PNG, GIF, WebP فقط');
+      if (imgFileRef.current) imgFileRef.current.value = '';
+      return;
+    }
     setImgUploadPct(0);
     try {
       const fd = new FormData();
       fd.append('image', file);
       const updated = await productsApi.uploadImage(productId, fd, p => setImgUploadPct(p));
       if (updated?.images) set('images', updated.images);
-    } catch { /* error handled by toast */ }
+    } catch (e) {
+      notify.error('فشل رفع الصورة', e instanceof Error ? e.message : undefined);
+    }
     setImgUploadPct(0);
     if (imgFileRef.current) imgFileRef.current.value = '';
   }
@@ -1928,13 +1944,21 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
           <div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
               {form.images.map((img, idx) => (
-                <div key={idx} style={{ position: 'relative', borderRadius: 'var(--r3)', overflow: 'hidden', border: '1px solid var(--b2)', background: 'var(--bg3)', aspectRatio: '1' }}>
+                <div key={idx} style={{
+                  position: 'relative', borderRadius: 'var(--r3)', overflow: 'hidden',
+                  border: '1px solid var(--b2)', background: 'var(--bg3)', aspectRatio: '1',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
                   <img
                     src={img}
                     alt={`صورة ${idx + 1}`}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    onError={e => { (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YwZjRmYSIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1zaXplPSIxMiIgZmlsbD0iIzhhYTRjMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+644KY7Zy6PC90ZXh0Pjwvc3ZnPg=='; }}
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
+                  <i className="ti ti-photo" style={{
+                    position: 'absolute', fontSize: 28, color: 'var(--t4)', opacity: 0.3,
+                    pointerEvents: 'none',
+                  }} />
                   {/* Overlay */}
                   <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.55)', opacity: 0, transition: 'opacity .2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
                     onMouseEnter={e => (e.currentTarget.style.opacity = '1')}

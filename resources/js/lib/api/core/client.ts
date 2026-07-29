@@ -138,7 +138,10 @@ client.interceptors.request.use(
       if (csrf) config.headers['X-CSRF-TOKEN'] = csrf;
     }
 
-    if (config.data instanceof FormData) config.timeout = 60_000;
+    if (config.data instanceof FormData) {
+      config.timeout = 60_000;
+      if (config.headers) config.headers['Content-Type'] = undefined;
+    }
 
     return config;
   },
@@ -298,7 +301,6 @@ export const apiDelete = (url: string, cfg?: AxiosRequestConfig): Promise<void> 
 
 export const apiUpload = <T>(url: string, fd: FormData, onProgress?: (p: number) => void): Promise<T> =>
   client.post<LaravelResponse<T>>(url, fd, {
-    headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 60_000,
     onUploadProgress: e => { if (onProgress && e.total) onProgress(Math.round(e.loaded / e.total * 100)); },
   }).then(r => extractData<T>(r));

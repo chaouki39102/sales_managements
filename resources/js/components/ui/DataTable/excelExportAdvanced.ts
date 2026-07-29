@@ -15,7 +15,7 @@
 //   await exportData(data, columns, documentInfo);
 // ════════════════════════════════════════════════════════════════════════════
 
-import ExcelJS from 'exceljs';
+import type ExcelJS from 'exceljs';
 import { useCallback, useEffect, useRef } from 'react';
 import type { Column, AggregateType, DocumentInfo, ExcelExportAdvancedOptions } from './types';
 
@@ -315,7 +315,8 @@ export async function exportToExcelAdvanced<T extends Record<string, unknown>>(
   }
 
   // ─── Workbook ─────────────────────────────────────────────────────────────
-  const wb = new ExcelJS.Workbook();
+  const ExcelJSModule = await import('exceljs');
+  const wb = new ExcelJSModule.Workbook();
   wb.creator  = documentInfo.preparedBy ?? 'ERP System';
   wb.created  = new Date();
   wb.modified = new Date();

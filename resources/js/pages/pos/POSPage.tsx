@@ -956,7 +956,7 @@ function POSPage() {
         return;
       }
 
-      const html = renderPreviewToHtml({
+      const html = await renderPreviewToHtml({
         template: posTemplate,
         company: companyData,
         source: { type: 'pos-snapshot', snapshot: snap },
@@ -986,6 +986,51 @@ function POSPage() {
       safeToast.error(`خطأ في تجهيز الطباعة: ${message}`);
     }
   }, [posTemplate, safeToast, companyData, settings.printMode, paperWidth, copies]);
+
+  const handlePrintDocument = useCallback(async (docId: number) => {
+    try {
+      const doc = await apiGet<CommercialDocument>(`/documents/${docId}`, {
+        include: 'party,documentType,lines,lines.product,lines.product_variant,payments,payments.payment_mode',
+      });
+      if (!doc) { safeToast.error('لم يتم العثور على الفاتورة'); return; }
+      const balance = doc.balance_data;
+      const snap: POSSaleSnapshot = {
+        docNumber: doc.document_number,
+        docDate: doc.document_date?.slice(0, 10) ?? '',
+        client: doc.party ? { name: doc.party.name, nif: doc.party.nif, phone: doc.party.phone, address: doc.party.address } : null,
+        items: (doc.lines ?? []).map(line => ({
+          name: line.description ?? line.product?.name ?? '',
+          ref: line.product?.ref,
+          qty: Number(line.quantity),
+          unit_price_ht: Number(line.unit_price_ht),
+          unit: line.product?.unit?.abbreviation ?? null,
+          tva_rate: Number(line.tva_rate),
+          discount_percentage: Number(line.discount_percentage),
+          total_ht: Number(line.total_ht),
+        })),
+        totals: {
+          total_ht: Number(doc.total_ht),
+          total_tva: Number(doc.total_tva),
+          total_ttc: Number(doc.total_ttc),
+          fiscal_stamp: Number((doc as any).total_stamp ?? doc.fiscal_stamp ?? 0),
+          total_discount: Number(doc.total_discount),
+          paid: Number(doc.paid_amount),
+          change: Math.max(0, Number(doc.paid_amount) - Number(doc.total_ttc)),
+          remaining: Number(doc.remaining_amount),
+        },
+        payments: (doc.payments ?? []).map(p => ({
+          mode: p.payment_mode?.name ?? '',
+          amount: Number(p.amount),
+        })),
+        cashierName: undefined,
+        prevBalance: balance?.previous_balance ?? null,
+        newBalance: balance?.new_balance ?? null,
+      };
+      await handlePrintDirect(snap);
+    } catch (e: unknown) {
+      safeToast.error('فشل طباعة الفاتورة');
+    }
+  }, [handlePrintDirect, safeToast]);
 
   // ── Complete Sale ──────────────────────────────────────────────────────────
 const handleCompleteSale = useCallback(async (params: {
@@ -1852,6 +1897,7 @@ const handleCompleteSale = useCallback(async (params: {
             session={currentSession}
             onClose={() => setShowSessionInvoices(false)}
             onOpen={handleOpenInvoice}
+            onPrint={handlePrintDocument}
           />
         </Suspense>
       )}

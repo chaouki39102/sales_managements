@@ -10,7 +10,10 @@ use App\Models\ProductPackaging;
 use App\Models\QuantityDiscount;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ProductController extends BaseApiController
 {
@@ -86,8 +89,11 @@ class ProductController extends BaseApiController
     }
 
     /**
-     * رفع صورة للمنتج من الجهاز — تُخزّن في storage/app/public/products/{id}/
-     * تُضيف URL الصورة إلى مصفوفة images الموجودة.
+     * رفع صورة للمنتج من الجهاز
+     *
+     * يُخزّن الملف في storage/app/public/products/{id}/
+     * يُضيف URL الصورة إلى مصفوفة images الموجودة.
+     * يمسح أي ملفات قديمة لم تعد مشاراً إليها في المصفوفة.
      */
     public function uploadImage(Request $request, $id = null): JsonResponse
     {
@@ -96,17 +102,33 @@ class ProductController extends BaseApiController
             $product = Product::findOrFail($id);
             $this->authorizeAction('update', $product);
 
-            $request->validate([
+            $validated = $request->validate([
                 'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
             ]);
 
-            $file = $request->file('image');
-            $path = $file->store("products/{$id}", 'public');
-            $url  = Storage::disk('public')->url($path);
-
+            $file = $validated['image'];
             $images = $product->images ?? [];
-            $images[] = $url;
-            $product->update(['images' => $images]);
+
+            $saved = DB::transaction(function () use ($file, $product, $images, $id) {
+                // 1. خزّن الملف باسم فريد: timestamp_random.extension
+                $ext  = $file->getClientOriginalExtension();
+                $name = time() . '_' . Str::random(8) . '.' . $ext;
+                $path = $file->storeAs("products/{$id}", $name, 'public');
+                if (!$path) {
+                    throw new \RuntimeException('فشل تخزين الملف على القرص');
+                }
+
+                $url = Storage::disk('public')->url($path);
+
+                // 2. أضف URL إلى صور المنتج
+                $images[] = $url;
+                $product->update(['images' => $images]);
+
+                return $url;
+            });
+
+            // 3. نظّف الملفات القديمة: احذف أي ملف مادي لم يعد موجوداً في images
+            $this->pruneOrphanedFiles($product->fresh()->images ?? [], $id);
 
             return $this->successResponse(
                 new ProductResource($product->fresh()),
@@ -114,6 +136,23 @@ class ProductController extends BaseApiController
             );
         } catch (\Throwable $e) {
             return $this->handleError($e, 'uploadImage');
+        }
+    }
+
+    /**
+     * يحذف من القرص أي ملفات صور لم تعد مشاراً إليها في مصفوفة images.
+     */
+    private function pruneOrphanedFiles(array $validUrls, int $productId): void
+    {
+        $disk = Storage::disk('public');
+        $prefix = "products/{$productId}/";
+        $allFiles = $disk->files($prefix);
+
+        foreach ($allFiles as $filePath) {
+            $fileUrl = $disk->url($filePath);
+            if (!in_array($fileUrl, $validUrls, true)) {
+                $disk->delete($filePath);
+            }
         }
     }
 

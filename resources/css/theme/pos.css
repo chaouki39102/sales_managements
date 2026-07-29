@@ -2835,18 +2835,28 @@ body.dark .pay-hero-amount { text-shadow: none; }
   .ctv2-debt { display: none; }
 
   /* Session invoices table: hide party column, shrink paid/remaining */
-  .si-modal-tbl .si-col-client { display: none; }
-  .si-modal-tbl th:nth-child(6),
-  .si-modal-tbl td:nth-child(6),
-  .si-modal-tbl th:nth-child(7),
-  .si-modal-tbl td:nth-child(7) { font-size: 12px; white-space: nowrap; }
+  .si-modal-tbl .si-th-client { display: none; }
+  .si-modal-tbl .si-th-amount { font-size: 12px; white-space: nowrap; }
 }
+/* ═══ SESSION INVOICES ENHANCED ═══ */
+.si-tbl-wrap{overflow-x:auto;max-height:55vh;border:1px solid var(--b3);border-radius:6px;}
+.si-tbl-wrap table{margin:0;min-width:780px;table-layout:fixed;}
+.si-tbl-wrap thead{position:sticky;top:0;z-index:2;}
+.si-tbl-wrap thead th{background:var(--bg2);white-space:nowrap;}
+.si-tbl-wrap tbody td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;}
+.si-tbl-wrap tfoot{position:sticky;bottom:0;z-index:2;}
+.si-tbl-wrap tfoot td{background:var(--bg2);}
+.si-th-num{width:36px;text-align:center;}
+.si-th-doc{width:130px;}
+.si-th-client{width:auto;min-width:80px;}
+.si-th-date{width:90px;text-align:center;}
+.si-th-status{width:95px;text-align:center;}
+.si-th-amount{width:95px;text-align:right;}
+.si-th-print{width:40px;text-align:center;vertical-align:middle;}
+.si-foot-label{font-weight:600;font-size:12px;color:var(--t3);}
 .si-row-sel { background: var(--emb); }
 .si-th-sort { cursor: pointer; user-select: none; white-space: nowrap; }
 .si-th-sort:hover { color: var(--em); }
-.si-modal-tbl td { white-space: nowrap; }
-.si-modal-tbl thead { position: sticky; top: 0; z-index: 1; }
-.si-modal-tbl thead th { background: var(--bg2); }
 @media (max-width: 480px) {
   .pos-topbar { padding: 4px 8px; gap: 3px; }
   .pos-chip-label { display: none; }
@@ -3285,24 +3295,17 @@ body.dark .thermal-status.err { background: #7f1d1d; color: #fecaca; }
 /* ══════════════════════════════════════════════════════════════════════════════
    19. SESSION INVOICE ROW
 ══════════════════════════════════════════════════════════════════════════════ */
-.si-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: var(--r1);
-  cursor: pointer;
-  transition: background .1s;
-}
-.si-row:hover { background: var(--bg3); }
-.si-modal-body{max-height:70vh;overflow:auto;}
+.si-row-sel{background:var(--bg3);}
+.si-row-sel td:first-child{border-right:3px solid var(--em);}
+.si-modal-body{padding-bottom:0;}
+.si-th-sort{cursor:pointer;user-select:none;}
+.si-th-sort:hover{color:var(--em);}
 .si-empty{text-align:center;padding:40px;color:var(--t4);}
 .si-empty i{margin-bottom:8px;}
 .si-empty-lg i{font-size:24px;}
 .si-empty-sm i{font-size:32px;}
 .si-sort-ic{font-size:11px;margin-left:3px;}
 .si-foot-hint{font-size:12px;color:var(--t4);}
-.si-date-cell{white-space:nowrap;font-size:13px;}
 .si-ttc-cell{font-weight:600;color:var(--purple);}
 .si-paid-cell{color:var(--gold);}
 .si-remain-cell{font-weight:600;}
@@ -3310,6 +3313,28 @@ body.dark .thermal-status.err { background: #7f1d1d; color: #fecaca; }
 .si-remain-neg{color:var(--t4);}
 .si-foot-row{font-weight:700;border-top:2px solid var(--b3);}
 .si-null{color:var(--t4);}
+
+/* ═══ SI ENHANCEMENTS ═══ */
+.si-info-bar{display:flex;flex-wrap:wrap;gap:8px 16px;padding:8px 12px;background:var(--bg2);border-radius:6px;margin-bottom:10px;font-size:13px;color:var(--t2);align-items:center;}
+.si-info-bar i{margin-left:4px;font-size:14px;}
+.si-info-total{font-weight:700;color:var(--purple);margin-right:auto;}
+.si-search{position:relative;margin-bottom:10px;}
+.si-search-input{width:100%;padding:8px 32px 8px 32px;border:1px solid var(--b3);border-radius:6px;background:var(--bg);color:var(--t1);font-size:13px;}
+.si-search-input:focus{outline:none;border-color:var(--em);}
+.si-search .ti-search{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--t4);font-size:14px;}
+.si-search-clear{position:absolute;left:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--t4);font-size:14px;}
+.si-search-clear:hover{color:var(--t1);}
+.si-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap;}
+.si-badge i{font-size:12px;}
+.si-badge-paid{background:#16a34a18;color:#16a34a;}
+.si-badge-partial{background:#ea580c18;color:#ea580c;}
+.si-badge-unpaid{background:#dc262618;color:#dc2626;}
+.si-badge-cancelled{background:#6b728018;color:#6b7280;}
+.si-print-btn{background:none;border:none;cursor:pointer;color:var(--t3);padding:4px;border-radius:4px;transition:all .1s;display:inline-flex;align-items:center;justify-content:center;line-height:1;}
+.si-print-btn:hover{color:var(--em);background:var(--bg3);}
+.si-col-resize{position:absolute;top:0;inset-inline-end:0;width:6px;cursor:col-resize;height:100%;z-index:2;background:transparent;}
+.si-col-resize:hover,.si-col-resize:active{background:var(--em);}
+.si-tbl-wrap th{position:relative;}
 
 /* ═══ QTY SET MODAL ═══ */
 .qsm-product{margin-bottom:16px;font-weight:600;font-size:15px;color:var(--t1);}

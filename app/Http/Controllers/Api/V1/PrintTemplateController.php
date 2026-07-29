@@ -169,7 +169,7 @@ class PrintTemplateController extends BaseApiController
             }
 
             $path = $request->file('logo')->store('print-logos', 'public');
-            $url  = Storage::disk('public')->url($path);
+            $url  = asset('storage/' . $path);
 
             return $this->successResponse(['path' => $path, 'url' => $url], 'تم رفع الشعار');
         } catch (\Throwable $e) {
