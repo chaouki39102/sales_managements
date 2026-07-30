@@ -187,7 +187,13 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
         ) : isSticker ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }}>
             {data.lines.map((line, idx) => (
-              <StickerLabel key={idx} tpl={tpl} data={{ ...data, lines: [line] }} />
+              <div key={idx}
+                style={{
+                  pageBreakAfter: idx < data.lines.length - 1 ? 'always' as any : undefined,
+                  breakAfter: idx < data.lines.length - 1 ? 'page' as any : undefined,
+                }}>
+                <StickerLabel tpl={tpl} data={{ ...data, lines: [line] }} />
+              </div>
             ))}
           </div>
         ) : (
