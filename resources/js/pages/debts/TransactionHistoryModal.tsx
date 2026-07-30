@@ -106,7 +106,7 @@ export function TransactionHistoryModal({
             return <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>{v as React.ReactNode}</span>;
         }},
         { key: 'date', label: 'التاريخ والوقت', render: (v, row) => {
-            if (row._rowType !== 'data') return v;
+            if (row._rowType !== 'data') return v as React.ReactNode;
             const tx = row._tx as any;
             return (
                 <div style={{ lineHeight: 1.3 }}>
@@ -127,21 +127,21 @@ export function TransactionHistoryModal({
                         <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--color-text-secondary)' }}>{tx.reference || '—'}</span>
                     )}
                     <Badge variant={tx.type === 'document' ? 'danger' : 'success'} style={{ fontSize: 11 }}>{tx.label}</Badge>
-                    {row._isOverdue && tx.remaining > 0 && (
-                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: row._agingBg as string, color: row._agingColor as string, fontWeight: 600 }}>{row._agingLabel as string}</span>
+                    {!!row._isOverdue && tx.remaining > 0 && (
+                        <span style={{ display: 'inline-block', fontSize: 10, marginLeft: 4, padding: '1px 6px', borderRadius: 8, background: row._agingBg as string, color: row._agingColor as string, fontWeight: 600, lineHeight: '16px' }}>{row._agingLabel as string}</span>
                     )}
                 </div>
             );
         }},
         { key: 'doc_amount', label: 'المستندات', align: 'center', render: (v, row) => {
-            if (row._rowType === 'opening' || row._rowType === 'summary') return v;
+            if (row._rowType === 'opening' || row._rowType === 'summary') return v as React.ReactNode;
             const amount = v as number;
             return amount !== 0 ? <span style={{ color: amount > 0 ? 'var(--em)' : 'var(--red)', fontWeight: amount > 0 ? 600 : undefined }}>{fmtNumber(amount)} دج</span> : '—';
         }},
         { key: 'cost', label: 'التكلفة', align: 'center', render: (v, row) => {
             if (row._rowType === 'opening' || row._rowType === 'summary') {
                 if (row._rowType === 'summary') return <span style={{ fontWeight: 700 }}>{fmtNumber(v as number)} دج</span>;
-                return v;
+                return v as React.ReactNode;
             }
             const cost = v as number;
             return cost > 0 ? <span style={{ color: 'var(--color-text-secondary)', fontSize: 12 }}>{fmtNumber(cost)} دج</span> : '—';
@@ -171,7 +171,7 @@ export function TransactionHistoryModal({
                     {tx.remaining > 0 && (
                         <div style={{ display: 'block', marginTop: 3 }}>
                             <span style={{ fontSize: 10, color: 'var(--red)' }}>متبقي {fmtNumber(tx.remaining)}</span>
-                            {row._isOverdue && (row._daysOld as number) > 0 && (
+                            {!!row._isOverdue && (row._daysOld as number) > 0 && (
                                 <span style={{ display: 'inline-block', fontSize: 10, marginLeft: 4, padding: '1px 6px', borderRadius: 8, background: row._agingBg as string, color: row._agingColor as string, fontWeight: 600, lineHeight: '16px' }}>{row._agingLabel as string}</span>
                             )}
                         </div>

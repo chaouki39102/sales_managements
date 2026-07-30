@@ -37,7 +37,7 @@ interface DocumentLinesSectionProps {
   productSuggestions: unknown;
   isLoadingSuggestions: boolean;
   setShowBulkImport: React.Dispatch<React.SetStateAction<boolean>>;
-  slug: string | undefined;
+  slug: string | null | undefined;
   affectsStock: boolean;
   stockDir: 1 | -1 | 0;
   warehouses: Array<{ id: number; name: string }>;

@@ -1,6 +1,6 @@
 import React, { useMemo, useEffect } from 'react';
 import type { UniversalDocumentData } from '../../types/data';
-import type { PrintTemplate, SectionTarget } from '../../types';
+import type { PrintTemplate, SectionTarget, AlignOption } from '../../types';
 import {
   mm, fontFamily, SectionWrap,
 } from './shared';

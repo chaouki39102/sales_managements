@@ -779,7 +779,7 @@ export function registerBuiltinTemplates(): void {
       footer_legal_text: '',
       // Sticker-specific defaults
       show_label_barcode: true,
-      label_barcode_height: 20,
+      label_barcode_height: 50, label_barcode_bar_width: 1.0,
       show_label_product_name: true,
       label_product_name_size: 9,
       label_product_name_bold: true,

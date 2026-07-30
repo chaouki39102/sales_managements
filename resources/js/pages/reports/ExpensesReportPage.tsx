@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
-import { FMT, MONEY, PCT, REPORT_DEFAULTS } from './helpers';
+import { FMT as _FMT, MONEY, PCT, REPORT_DEFAULTS } from './helpers';
 import { useExpensesReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
@@ -53,7 +53,7 @@ export default function ExpensesReportPage() {
           <Card title="حسب الفئة" titleIcon="ti-category" padding="sm" style={{ borderRadius: 12 }}>
             <SimpleTable
               rowKey={(row) => (row as any).__isSummary ? '__summary__' : String(row._idx ?? '')}
-              rowClassName={(row) => (row as any).__isSummary ? 'tw-sr' : undefined}
+              rowClassName={(row, _index) => (row as any).__isSummary ? 'tw-sr' : ''}
               columns={[
                 { key: '_idx', label: '#' },
                 { key: 'category_name', label: 'الفئة', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
@@ -85,14 +85,14 @@ export default function ExpensesReportPage() {
           <Card title="تفاصيل المصروفات" titleIcon="ti-list" padding="sm" style={{ borderRadius: 12 }}>
             <SimpleTable
               rowKey={(row) => (row as any).__isSummary ? '__summary__' : String(row.id ?? '')}
-              rowClassName={(row) => (row as any).__isSummary ? 'tw-sr' : undefined}
+              rowClassName={(row, _index) => (row as any).__isSummary ? 'tw-sr' : ''}
               columns={[
                 { key: '_idx', label: '#' },
                 { key: 'expense_number', label: 'رقم' },
                 { key: 'date', label: 'التاريخ' },
                 { key: 'amount', label: 'المبلغ', className: 'num', render: (v) => <span style={{ fontWeight: 700 }}>{MONEY(v as number)}</span> },
-                { key: 'category_name', label: 'الفئة', render: (v) => v ?? '—' },
-                { key: 'description', label: 'الوصف', render: (v) => <span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{v ?? '—'}</span> },
+                { key: 'category_name', label: 'الفئة', render: (v) => (v as string) ?? '—' },
+                { key: 'description', label: 'الوصف', render: (v) => <span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{(v as string) ?? '—'}</span> },
               ]}
               data={expensesData}
             />

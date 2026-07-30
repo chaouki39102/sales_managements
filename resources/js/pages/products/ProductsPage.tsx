@@ -142,7 +142,7 @@ export default function ProductsPage() {
       show_logo: true, logo_source: 'company', logo_size: 50, logo_align: 'center', logo_border_radius: 0,
       show_company_name: true, company_name_text: '', company_name_size: 9, company_name_bold: true, company_name_color: '#1a1a2e', company_name_align: 'center',
       header_separator: 'dashed',
-      show_label_barcode: true, label_barcode_height: 20, label_barcode_format: 'code39',
+      show_label_barcode: true, label_barcode_height: 50, label_barcode_format: 'code39',
       show_label_product_name: true, label_product_name_size: 9, label_product_name_bold: true, label_product_name_color: '#111111',
       show_label_product_image: false, label_product_image_size: 40,
       show_label_brand: false, label_brand_size: 7, label_brand_color: '#888888',
@@ -261,7 +261,7 @@ export default function ProductsPage() {
 
   const buildTableCols = (hidden: Set<string>): TableCol[] => [
     { key: 'checkbox', label: '', thStyle: { width: 40, textAlign: 'center' as const }, always: true,
-      render: (prod) => (
+      render: (prod: any) => (
         <input type="checkbox" checked={selectedIds.includes(prod.id)}
           onChange={() => setSelectedIds(prev =>
             selectedIds.includes(prod.id) ? prev.filter(id => id !== prod.id) : [...prev, prod.id]
@@ -269,7 +269,7 @@ export default function ProductsPage() {
           onClick={e => e.stopPropagation()} />
       )},
     { key: 'name', label: 'المنتج', thStyle: { cursor: 'pointer', minWidth: 180 }, tdStyle: { minWidth: 180 }, sortable: true,
-      render: (prod) => (
+      render: (prod: any) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0,
             background: prod.active ? 'var(--emb)' : 'var(--bg3)',
@@ -299,19 +299,19 @@ export default function ProductsPage() {
         </div>
       )},
     { key: 'family_brand', label: 'الفئة / العلامة',
-      render: (prod) => (
+      render: (prod: any) => (
         <div style={{ fontSize: 12 }}>{getFamilyName(prod.family_id)}</div>
       )},
     { key: 'purchase_price', label: 'سعر الشراء', thStyle: { textAlign: 'right' as const, cursor: 'pointer' }, tdStyle: { textAlign: 'right' as const }, sortable: true, sortField: 'purchase_price_ht',
-      render: (prod) => (
+      render: (prod: any) => (
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t2)' }}>
           {prod.purchase_price_ht > 0 ? formatDZD(prod.purchase_price_ht) : '—'}
         </div>
       )},
     { key: 'sell_price', label: 'سعر البيع', thStyle: { textAlign: 'right' as const }, tdStyle: { textAlign: 'right' as const },
-      render: (prod) => <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--em)' }}>{(getMinPrice(prod) > 0 ? formatDZD(getMinPrice(prod)) : '—')}</div> },
+      render: (prod: any) => <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--em)' }}>{(getMinPrice(prod) > 0 ? formatDZD(getMinPrice(prod)) : '—')}</div> },
     { key: 'stock', label: 'المخزون', thStyle: { textAlign: 'center' as const }, tdStyle: { textAlign: 'center' as const },
-      render: (prod) => {
+      render: (prod: any) => {
         const stockQty = prod.current_stock ?? 0;
         const minAlert = prod.min_stock_alert ?? 0;
         const stockPct = minAlert > 0 ? Math.min(100, (stockQty / (minAlert * 2)) * 100) : stockQty > 0 ? 100 : 0;
@@ -328,13 +328,13 @@ export default function ProductsPage() {
         );
       }},
     { key: 'active', label: 'الحالة', thStyle: { textAlign: 'center' as const }, tdStyle: { textAlign: 'center' as const },
-      render: (prod) => (
+      render: (prod: any) => (
         <span onClick={e => e.stopPropagation()}>
           <Switch checked={prod.active} onChange={val => toggleActiveMutation.mutate({ id: prod.id, active: val })} />
         </span>
       )},
     { key: 'actions', label: 'إجراءات', thStyle: { textAlign: 'center' as const, width: 100 }, tdStyle: { textAlign: 'center' as const }, always: true,
-      render: (prod) => (
+      render: (prod: any) => (
         <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
           <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={() => openEdit(prod)} title="تعديل" />
           <Button size="xs" variant="danger" icon={<i className="ti ti-trash" />} onClick={() => handleDelete(prod.id)} title="حذف" />

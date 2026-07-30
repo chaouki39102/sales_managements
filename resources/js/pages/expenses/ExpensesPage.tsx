@@ -1,5 +1,5 @@
 // resources/js/pages/expenses/ExpensesPage.tsx
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useModal } from "@/hooks/useModal";
 import { useFiscalYear } from "@/context/FiscalYearContext";
 import PageHeader from "@/components/ui/PageHeader";

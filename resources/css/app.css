@@ -51,3 +51,9 @@
     size: A4 landscape;
   }
 }
+
+/* Barcode fonts */
+@font-face {
+  font-family: 'Libre Barcode 128';
+  src: url('../fonts/LibreBarcode128-Regular.ttf') format('truetype');
+}

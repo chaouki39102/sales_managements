@@ -1,5 +1,4 @@
 // components/ui/Switch.tsx
-import React from 'react';
 
 interface SwitchProps {
   checked: boolean;

@@ -21,7 +21,8 @@ export default function G50DeclarationPage() {
   const currentMonth = new Date().getMonth();
   const [month, setMonth] = useState(currentMonth + 1);
 
-  const { data: declaration, isLoading } = useG50Declaration(fiscalYear?.id ?? null, month);
+  const { data: _declaration, isLoading } = useG50Declaration(fiscalYear?.id ?? null, month);
+  const declaration = _declaration as any;
   const { data: history } = useG50History(fiscalYear?.id ?? null);
   const mutations = useTaxManagementMutations();
   const submitModal = useModal();

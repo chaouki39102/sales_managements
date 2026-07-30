@@ -101,14 +101,14 @@ function ProductCardInner({
   }, [v.packagings, v.product]);
 
   const defaultPkg = useMemo(
-    () => packagings.find(p => p.is_default) ?? packagings[0] ?? null,
+    () => packagings.find((p: any) => p.is_default) ?? packagings[0] ?? null,
     [packagings],
   );
   const [selectedPkgId, setSelectedPkgId] = useState<number | null>(null);
 
   useEffect(() => { setSelectedPkgId(defaultPkg?.id ?? null); }, [defaultPkg?.id]);
 
-  const activePkg  = packagings.find(p => p.id === selectedPkgId) ?? defaultPkg;
+  const activePkg  = packagings.find((p: any) => p.id === selectedPkgId) ?? defaultPkg;
   const packQty    = activePkg ? Math.max(1, Number(activePkg.quantity) || 1) : 1;
   const showPkgSel = packagings.length > 1;
 
@@ -286,7 +286,7 @@ function ProductCardInner({
                 setSelectedPkgId(id);
               }}
             >
-              {packagings.map(p => (
+              {packagings.map((p: any) => (
                 <option key={p.id} value={p.id}>
                   {p.label}{p.quantity > 1 ? ` (${p.quantity})` : ''}
                 </option>

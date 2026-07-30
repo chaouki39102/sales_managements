@@ -1,4 +1,3 @@
-import React from 'react';
 import type { DocumentTotals } from '../types/document.types';
 import { fmtDZD } from '../utils/document.utils';
 

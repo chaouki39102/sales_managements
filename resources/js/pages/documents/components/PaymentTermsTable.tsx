@@ -1,4 +1,3 @@
-import React from 'react';
 import { inputStyle } from './DocumentUIPrimitives';
 import { fmtDZD } from '../utils/document.utils';
 import type { PaymentTerm } from '../types/document.types';

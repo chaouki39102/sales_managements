@@ -38,13 +38,17 @@ import type { FiscalYear }   from '@/lib/api/core/types';
 interface FiscalYearContextType {
   years:           FiscalYear[];
   selectedYear:    FiscalYear | null;
+  selected:        FiscalYear | null;
   currentYear:     FiscalYear | null;
   open:            FiscalYear[];
   closed:          FiscalYear[];
   setSelectedYear: (year: FiscalYear) => void;
+  selectYear:      (year: FiscalYear) => void;
   goToCurrentYear: () => void;
   isLoading:       boolean;
+  loading:         boolean;
   hasMultipleOpen: boolean;
+  isReadOnly:      boolean;
   refetch:         () => void;
 }
 
@@ -115,17 +119,23 @@ export function FiscalYearProvider({ children }: { children: React.ReactNode }) 
     if (current) setSelectedYearId(current.id);
   }, [current, setSelectedYearId]);
 
+  const isReadOnly = !!selectedYear?.is_closed;
+
   return (
     <FiscalYearContext.Provider value={{
       years,
       selectedYear,
+      selected:        selectedYear,
       currentYear:     current,
       open,
       closed,
       setSelectedYear,
+      selectYear:      setSelectedYear,
       goToCurrentYear,
       isLoading,
+      loading:         isLoading,
       hasMultipleOpen: open.length > 1,
+      isReadOnly,
       refetch,
     }}>
       {children}

@@ -2,7 +2,7 @@
 // resources/js/pages/fiscal/FiscalYearsPage.tsx
 // النسخة النهائية المُحسَّنة — تجمع أفضل الميزات
 // ════════════════════════════════════════════════════════════
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useModal } from '@/hooks/useModal';
 import { useTenantQuery, useTenantMutation } from '@/hooks/useTenantQuery';
 import { fiscalYearsApi } from '@/lib/api/endpoints/fiscalYears';

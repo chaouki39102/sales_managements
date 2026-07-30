@@ -2,7 +2,7 @@
 // components/ui/Button.tsx
 import React from 'react';
 
-type ButtonVariant = 'default' | 'primary' | 'danger' | 'warning' | 'info' | 'outline' | 'secondary' | 'success';
+type ButtonVariant = 'default' | 'primary' | 'danger' | 'warning' | 'info' | 'outline' | 'secondary' | 'success' | 'ghost' | 'gray';
 type ButtonSize    = 'xs' | 'sm' | 'md';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -23,6 +23,8 @@ const variantMap: Record<ButtonVariant, string> = {
   outline:  'btn-outline',
   secondary:'btn-secondary',
   success:  'btn-p',
+  ghost:    'btn-ghost',
+  gray:     'btn-gray',
 };
 
 const sizeMap: Record<ButtonSize, string> = {

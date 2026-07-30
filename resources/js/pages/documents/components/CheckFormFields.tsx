@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface CheckFormFieldsProps {
   checkNumber?: string;
   checkBank?:   string;

@@ -13,10 +13,12 @@ interface Props {
   error?:               string | null;
   onClose?:             () => void;
   onOpen: (data: {
-    warehouse_id:   number;
-    fiscal_year_id: number;
-    opening_cash:   number;
-    opening_note?:  string;
+    warehouse_id:        number;
+    fiscal_year_id:      number;
+    opening_cash:        number;
+    opening_note?:       string;
+    device_name?:        string;
+    device_browser_info?: string;
   }) => Promise<void>;
 }
 
@@ -24,7 +26,7 @@ interface Props {
 const QUICK_CASH = [0, 5000, 10000, 20000, 50000, 100000];
 
 function fiscalYearLabel(fy: FiscalYear): string {
-  return fy.name || String((fy as Record<string, unknown>).year || '');
+  return fy.name || '';
 }
 
 export default function OpenSessionModal({

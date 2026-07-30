@@ -1,4 +1,3 @@
-import React from 'react';
 import { fmtDZD } from '../utils/document.utils';
 import type { PartyBalanceInfo } from '../hooks/useDocumentForm';
 

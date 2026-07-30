@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
@@ -66,7 +66,7 @@ export default function AgingReportPage() {
                 { _isFooter: true, _idx: '', party_name: 'الإجمالي', total_due: data.summary.total_due, invoice_count: data.summary.total_count, max_days: '', bucket: '' },
               ]}
               rowKey={(row) => row._isFooter ? 'footer' : `row-${row._idx}`}
-              rowClassName={(row) => row._isFooter ? 'font-extrabold bg-2' : undefined}
+              rowClassName={(row, _index) => row._isFooter ? 'font-extrabold bg-2' : ''}
             />
           </Card>
         )}

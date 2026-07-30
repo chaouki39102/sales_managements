@@ -102,17 +102,22 @@ function useAutoSave(
     delay = 2000,
 ) {
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    // ✅ ref لـ onSave حتى لا نُعيد تشغيل الـ effect عند كل render
     const onSaveRef = useRef(onSave);
+    const mountedRef = useRef(true);
     useEffect(() => {
         onSaveRef.current = onSave;
     }, [onSave]);
 
     useEffect(() => {
-        // ✅ لا نُشغِّل شيئاً إذا لم يكن هناك تغييرات حقيقية من المستخدم
+        mountedRef.current = true;
+        return () => { mountedRef.current = false; };
+    }, []);
+
+    useEffect(() => {
         if (!enabled || !isDirty) return;
         if (timerRef.current) clearTimeout(timerRef.current);
         timerRef.current = setTimeout(async () => {
+            if (!mountedRef.current) return;
             try {
                 await onSaveRef.current();
             } catch {

@@ -20,6 +20,7 @@ import { documentsApi }       from '@/lib/api/endpoints/documents';
 import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
 import { useConfirm } from '@/hooks/useConfirm';
 import { ConfirmDialog } from '@/components/ui';
+const BarcodeScannerModal = React.lazy(() => import('@/components/BarcodeScannerModal'));
 
 import {
   calcFiscalStamp, htToTtc, ttcToHt, calcMargin, calcWeightedAverageMargin,
@@ -100,6 +101,8 @@ function POSPage() {
   const queryClient = useQueryClient();
   const slug        = useActiveSlug();
   const { settings, setSettings, resetSettings } = usePOSSettings(slug);
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
   // ── Aggregated lookups — single HTTP for all lookup tables + settings ──
   const { data: posLookups } = usePOSAggregatedLookups();
@@ -344,6 +347,7 @@ function POSPage() {
   const [barcodeBuffer, setBarcodeBuffer] = useState('');
   const [scannedId, setScannedId] = useState<number | null>(null);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
+  const [showScanner, setShowScanner] = useState(false);
 
   const searchRef    = useRef<HTMLInputElement>(null);
   const cartRef      = useRef<HTMLDivElement>(null);
@@ -371,7 +375,9 @@ function POSPage() {
   const prevModalRef = useRef(modal);
   useEffect(() => {
     if (prevModalRef.current !== 'none' && modal === 'none') {
-      setTimeout(() => searchRef.current?.focus(), 100);
+      const t = setTimeout(() => searchRef.current?.focus(), 100);
+      prevModalRef.current = modal;
+      return () => clearTimeout(t);
     }
     prevModalRef.current = modal;
   }, [modal]);
@@ -1221,9 +1227,9 @@ const handleCompleteSale = useCallback(async (params: {
         })),
         totals: {
           ...snapshot.totals,
-          total_ht:  res.total_ht  ?? effectiveTotalHt,
-          total_tva: res.total_tva ?? effectiveTotalTva,
-          total_ttc: res.total_ttc ?? effectiveTotalTtc,
+          total_ht:  res?.total_ht  ?? effectiveTotalHt,
+          total_tva: res?.total_tva ?? effectiveTotalTva,
+          total_ttc: res?.total_ttc ?? effectiveTotalTtc,
           paid:      backendPaidAmount,
           change:    invoiceChange,
           remaining: invoiceRemaining,
@@ -1249,36 +1255,29 @@ const handleCompleteSale = useCallback(async (params: {
       setSelectedCartItemId(null);
 
       // ── Print / Preview decision ─────────────────────────────────────────
+      const st = (fn: () => void, ms: number) => {
+        const t = setTimeout(() => { if (mountedRef.current) fn(); clearTimeout(t); }, ms);
+      };
+
       if (params.skipPreview) {
-        // Quick cash — use quickCashAction setting
         const action = settings.quickCashAction;
         if (action === 'preview') {
           setModal('receipt');
         } else if (action === 'print') {
-          setTimeout(() => {
-            const snap = receiptSnapshotRef.current;
-            if (snap) handlePrintDirect(snap);
-          }, 300);
+          st(() => { const snap = receiptSnapshotRef.current; if (snap) handlePrintDirect(snap); }, 300);
           setModal('none');
         } else if (action === 'silent') {
-          setTimeout(() => {
-            const snap = receiptSnapshotRef.current;
-            if (snap) handlePrintDirect(snap, { silent: true });
-          }, 300);
+          st(() => { const snap = receiptSnapshotRef.current; if (snap) handlePrintDirect(snap, { silent: true }); }, 300);
           setModal('none');
         } else {
           setModal('none');
         }
       } else {
-        // Normal sale — use afterSaleAction setting
         const action = settings.afterSaleAction;
         if (action === 'preview') {
           setModal('receipt');
         } else if (action === 'print' && isPrintEnabled && template) {
-          setTimeout(() => {
-            const snap = receiptSnapshotRef.current;
-            if (snap) handlePrintDirect(snap);
-          }, 300);
+          st(() => { const snap = receiptSnapshotRef.current; if (snap) handlePrintDirect(snap); }, 300);
           setModal('none');
         } else {
           setModal('none');
@@ -1288,18 +1287,14 @@ const handleCompleteSale = useCallback(async (params: {
       safeToast.success(`✅ تم حفظ الفاتورة ${res.document_number ?? ''}`);
       if (settings.playSoundOnSale) playSaleSound(settings.soundPreset as SoundPresetId, settings.soundVolume);
 
-      // Haptic feedback on successful sale
       try { navigator.vibrate?.(100); } catch {}
 
-      // Auto-open client modal after sale if setting is enabled
       if (settings.openClientOnNewSale) {
-        setTimeout(() => cartApiRef.current?.openCustomerModal(), 300);
+        st(() => cartApiRef.current?.openCustomerModal(), 300);
       }
 
-      // Auto-focus search after sale
-      setTimeout(() => searchRef.current?.focus(), 200);
+      st(() => searchRef.current?.focus(), 200);
 
-      // Auto-open cash drawer if payment includes cash and setting is enabled
       if (settings.openCashDrawer) {
         const hasCash = apiPayments.some(p => {
           const mode = (paymentModes ?? []).find(m => m.id === p.payment_mode_id);
@@ -1308,7 +1303,6 @@ const handleCompleteSale = useCallback(async (params: {
         if (hasCash) openCashDrawerViaWebUSB();
       }
 
-      // Auto-close only when no preview is shown (user sees nothing anyway)
       const willShowPreview = params.skipPreview
         ? settings.quickCashAction === 'preview'
         : settings.afterSaleAction === 'preview';
@@ -1316,7 +1310,7 @@ const handleCompleteSale = useCallback(async (params: {
         ? settings.quickCashAction !== 'none'
         : settings.afterSaleAction === 'print';
       if (settings.autoClosePayment && !willShowPreview && willPrint) {
-        setTimeout(() => setModal('none'), 1200);
+        st(() => setModal('none'), 1200);
       }
 
       return { ok: true, docNumber: res.document_number };
@@ -1469,8 +1463,42 @@ const handleCompleteSale = useCallback(async (params: {
       }
     };
     window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    return () => {
+      window.removeEventListener('keydown', handler);
+      clearTimeout(barcodeTimer.current);
+    };
   }, [allVariants, allowNegSetting, safeToast, handleAddItem]);
+
+  const handleCameraScan = useCallback((barcode: string) => {
+    if (!barcode || barcode.length < 4) return;
+    let variant = allVariants.find(v => v.barcode === barcode);
+    let packaging: ProductPackaging | null = null;
+    if (variant && !isVariantOutOfStock(variant, allowNegSetting)) {
+      setScannedId(variant.id);
+      handleAddItem(variant, 1, null);
+      return;
+    }
+    for (const v of allVariants) {
+      const pkgs = (v.packagings ?? (v.product as any)?.packagings) as ProductPackaging[] | undefined;
+      const match = pkgs?.find(p => p.barcode === barcode);
+      if (match) { variant = v; packaging = match; break; }
+    }
+    if (variant && !isVariantOutOfStock(variant, allowNegSetting)) {
+      setScannedId(variant.id);
+      handleAddItem(variant, 1, packaging);
+      return;
+    }
+    for (const v of allVariants) {
+      const bcList = v.barcodes;
+      if (bcList?.some((bc: Barcode) => bc.barcode === barcode)) {
+        variant = v; break;
+      }
+    }
+    if (variant && !isVariantOutOfStock(variant, allowNegSetting)) {
+      setScannedId(variant.id);
+      handleAddItem(variant, 1, null);
+    }
+  }, [allVariants, allowNegSetting, handleAddItem]);
 
   const handleQtyChange = useCallback((variantId: number, qty: number) => {
     const item = pos.items.find(i => i.variant_id === variantId);
@@ -1668,6 +1696,7 @@ const handleCompleteSale = useCallback(async (params: {
             slug={slug}
             clearSearchOnAdd={settings.clearSearchOnAdd}
             onToggleClearSearch={() => setSettings({ clearSearchOnAdd: !settings.clearSearchOnAdd })}
+            onBarcodeScan={() => setShowScanner(true)}
           />
           {showFilter && (
             <FilterPanel
@@ -1964,6 +1993,13 @@ const handleCompleteSale = useCallback(async (params: {
         </Suspense>
       )}
 
+      <Suspense fallback={null}>
+        <BarcodeScannerModal
+          open={showScanner}
+          onScan={handleCameraScan}
+          onClose={() => setShowScanner(false)}
+        />
+      </Suspense>
       <Toaster key={settings.toastPosition} position={settings.toastPosition} richColors closeButton
         duration={settings.toastDuration || undefined}
         toastOptions={{ style: { fontFamily: 'Tajawal, sans-serif', fontSize: 14 } }}

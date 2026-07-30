@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { PrintTemplate } from '../types';
 import type { CompanyData } from '../types';
 import { Toggle, Field, Input, Pills, SectionTitle } from './ui';
@@ -74,31 +74,31 @@ export function TemplateControls({ tpl, update, companyData }: {
         </Section>
       )}
 
-      {sec('show_doc_info_section') && (
+      {docType !== 'STK' && sec('show_doc_info_section') && (
         <Section id="s-doc" title="معلومات المستند" icon="ti-file-description" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
           <DocumentSectionControls tpl={tpl} update={update} />
         </Section>
       )}
 
-      {sec('show_items_section') && (
+      {docType !== 'STK' && sec('show_items_section') && (
         <Section id="s-items" title="جدول المنتجات — الأعمدة والتنسيق" icon="ti-table" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
           <ItemsSectionControls tpl={tpl} update={update} />
         </Section>
       )}
 
-      {sec('show_totals_section') && (
+      {docType !== 'STK' && sec('show_totals_section') && (
         <Section id="s-totals" title="الإجماليات — الحسابات" icon="ti-cash" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
           <TotalsSectionControls tpl={tpl} update={update} />
         </Section>
       )}
 
-      {sec('show_payments_section') && (
+      {docType !== 'STK' && sec('show_payments_section') && (
         <Section id="s-payments" title="تفاصيل الدفع" icon="ti-cash-banknote" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
           <PaymentsSectionControls tpl={tpl} update={update} />
         </Section>
       )}
 
-      {sec('show_footer_section') && (
+      {docType !== 'STK' && sec('show_footer_section') && (
         <Section id="s-footer" title="التذييل — النصوص والتواقيع" icon="ti-file-text" defaultOpen={!allCollapsed} collapseVersion={collapseVersion}>
           <FooterSectionControls tpl={tpl} update={update} />
         </Section>

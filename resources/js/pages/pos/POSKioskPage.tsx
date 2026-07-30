@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useNotification }             from '@/hooks/useNotification';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { usePOS }                     from '@/pos/hooks/usePOS';

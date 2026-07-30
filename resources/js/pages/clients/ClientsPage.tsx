@@ -235,9 +235,9 @@ export default function ClientsPage() {
   const buildTableCols = (hidden: Set<string>): TableCol[] => [
     // ── المجموعة 1: معلومات أساسية ──
     { key: '#', label: '#', thStyle: { width: 48, color: 'var(--t4)' }, tdStyle: { color: 'var(--t4)', fontSize: 12 },
-      render: (_, __, rowNum) => rowNum },
+      render: (_: any, __: any, rowNum: any) => rowNum },
     { key: 'name', label: 'الزبون', thStyle: { cursor: 'pointer' }, sortable: true,
-      render: (c, idx) => {
+      render: (c: any, idx: any) => {
         const avatarColor = AVATAR_COLORS[idx % AVATAR_COLORS.length] as 1|2|3|4|5|6|7;
         return (
           <div className="flex items-center gap-8">
@@ -252,47 +252,47 @@ export default function ClientsPage() {
         );
       }},
     { key: 'commercial_name', label: 'الاسم التجاري',
-      render: (c) => c.commercial_name || '—' },
+      render: (c: any) => c.commercial_name || '—' },
     { key: 'code', label: 'الرمز', tdStyle: { fontSize: 12, fontFamily: 'monospace' },
-      render: (c) => c.code || '—' },
+      render: (c: any) => c.code || '—' },
     { key: 'phone', label: 'الهاتف', tdStyle: { fontSize: 14 },
-      render: (c) => c.phone || '—' },
+      render: (c: any) => c.phone || '—' },
     { key: 'mobile', label: 'الجوال', tdStyle: { fontSize: 14 },
-      render: (c) => c.mobile || '—' },
+      render: (c: any) => c.mobile || '—' },
     { key: 'fax', label: 'الفاكس',
-      render: (c) => c.fax || '—' },
+      render: (c: any) => c.fax || '—' },
     { key: 'email', label: 'البريد',
-      render: (c) => c.email || '—' },
+      render: (c: any) => c.email || '—' },
 
     // ── المجموعة 2: الموقع ──
     { key: 'location', label: 'الولاية / البلدية', tdStyle: { fontSize: 13, color: 'var(--t4)' },
-      render: (c) => [c.wilaya?.name, c.commune?.name].filter(Boolean).join(' / ') || '—' },
+      render: (c: any) => [c.wilaya?.name, c.commune?.name].filter(Boolean).join(' / ') || '—' },
     { key: 'address', label: 'العنوان', tdStyle: { fontSize: 13, color: 'var(--t4)' },
-      render: (c) => c.address || '—' },
+      render: (c: any) => c.address || '—' },
 
     // ── المجموعة 3: وثائق قانونية ──
     { key: 'legal_form', label: 'الشكل القانوني',
-      render: (c) => c.legal_form?.name || '—' },
+      render: (c: any) => c.legal_form?.name || '—' },
     { key: 'activity', label: 'النشاط', tdStyle: { fontSize: 13, color: 'var(--t4)' },
-      render: (c) => c.activity || '—' },
+      render: (c: any) => c.activity || '—' },
     { key: 'nif', label: 'NIF', tdStyle: { fontSize: 12, fontFamily: 'monospace' },
-      render: (c) => c.nif || '—' },
+      render: (c: any) => c.nif || '—' },
     { key: 'nis', label: 'NIS', tdStyle: { fontSize: 12, fontFamily: 'monospace' },
-      render: (c) => c.nis || '—' },
+      render: (c: any) => c.nis || '—' },
     { key: 'rc', label: 'RC', tdStyle: { fontSize: 12, fontFamily: 'monospace' },
-      render: (c) => c.rc || '—' },
+      render: (c: any) => c.rc || '—' },
     { key: 'ai', label: 'AI', tdStyle: { fontSize: 12, fontFamily: 'monospace' },
-      render: (c) => c.ai || '—' },
+      render: (c: any) => c.ai || '—' },
     { key: 'capital_amount', label: 'رأس المال', thStyle: { textAlign: 'end' }, tdStyle: { textAlign: 'end' },
-      render: (c) => c.capital_amount ? (
+      render: (c: any) => c.capital_amount ? (
         <><span>{(+c.capital_amount).toLocaleString('fr-DZ', { maximumFractionDigits: 0 })}</span><span style={{ fontSize: 11, color: 'var(--t4)', marginRight: 3 }}>دج</span></>
       ) : <span style={{ color: 'var(--t4)' }}>—</span> },
     { key: 'rc_date', label: 'تاريخ السجل', tdStyle: { fontSize: 12 },
-      render: (c) => c.rc_date || '—' },
+      render: (c: any) => c.rc_date || '—' },
 
     // ── المجموعة 4: مالية ──
     { key: 'balance', label: 'الرصيد', thStyle: { textAlign: 'end' }, tdStyle: { textAlign: 'end' },
-      render: (c) => {
+      render: (c: any) => {
         const hasDebt = (c.balance ?? 0) > 0;
         return (
           <>
@@ -304,25 +304,25 @@ export default function ClientsPage() {
         );
       }},
     { key: 'credit_limit', label: 'الحد الائتماني', thStyle: { textAlign: 'end' }, tdStyle: { textAlign: 'end' },
-      render: (c) => c.credit_limit ? (
+      render: (c: any) => c.credit_limit ? (
         <><span>{(+c.credit_limit).toLocaleString('fr-DZ', { maximumFractionDigits: 0 })}</span><span style={{ fontSize: 11, color: 'var(--t4)', marginRight: 3 }}>دج</span></>
       ) : <span style={{ color: 'var(--t4)' }}>—</span> },
     { key: 'credit_days', label: 'أجل الدفع', thStyle: { textAlign: 'end' }, tdStyle: { textAlign: 'end' },
-      render: (c) => c.credit_days ? <>{c.credit_days} يوم</> : <span style={{ color: 'var(--t4)' }}>—</span> },
+      render: (c: any) => c.credit_days ? <>{c.credit_days} يوم</> : <span style={{ color: 'var(--t4)' }}>—</span> },
     { key: 'bank_name', label: 'البنك',
-      render: (c) => c.bank_name || '—' },
+      render: (c: any) => c.bank_name || '—' },
     { key: 'rib', label: 'RIB', tdStyle: { fontSize: 11, fontFamily: 'monospace', direction: 'ltr', textAlign: 'left' },
-      render: (c) => c.rib || '—' },
+      render: (c: any) => c.rib || '—' },
 
     // ── المجموعة 5: حالة ──
     { key: 'active', label: 'الحالة',
-      render: (c) => <Badge variant={c.active ? 'success' : 'danger'}>{c.active ? 'نشط' : 'موقوف'}</Badge> },
+      render: (c: any) => <Badge variant={c.active ? 'success' : 'danger'}>{c.active ? 'نشط' : 'موقوف'}</Badge> },
     { key: 'created_at', label: 'تاريخ الإضافة', tdStyle: { fontSize: 12, color: 'var(--t4)' },
-      render: (c) => c.created_at ? new Date(c.created_at).toLocaleDateString('ar-DZ') : '—' },
+      render: (c: any) => c.created_at ? new Date(c.created_at).toLocaleDateString('ar-DZ') : '—' },
 
     // ── الإجراءات ──
     { key: 'actions', label: '', thStyle: { width: 48 }, always: true,
-      render: (c) => <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={() => openEdit(c)} /> },
+      render: (c: any) => <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={() => openEdit(c)} /> },
   ].filter(col => col.always || !hidden.has(col.key));
 
   const [search, setSearch]             = useState('');

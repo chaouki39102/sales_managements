@@ -276,7 +276,7 @@ const reqKey   = (m: string, u: string, p?: unknown) => `${m}::${u}::${JSON.stri
 // ─── Typed API wrappers ───────────────────────────────────────────────────────
 export interface LaravelResponse<T> { data: T; meta?: unknown; links?: unknown; }
 
-export async function apiGet<T>(url: string, params?: Record<string, unknown>, cfg?: AxiosRequestConfig): Promise<T> {
+export async function apiGet<T>(url: string, params?: Record<string, unknown> | object, cfg?: AxiosRequestConfig): Promise<T> {
   const key = reqKey('GET', url, params);
   const hit = _pending.get(key);
   if (hit) return hit as Promise<T>;

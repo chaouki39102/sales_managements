@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense, useRef } from 'react';
 import { templateRegistry } from './registry';
 import { TEMPLATE_CATEGORIES } from './categories';
 import type { LibraryTemplateEntry, FavoriteEntry, InstallHistoryEntry } from './types';

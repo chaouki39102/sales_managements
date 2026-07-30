@@ -9,6 +9,7 @@ interface PageHeaderBadge {
 interface PageHeaderProps {
   title: string;
   description?: string;
+  subtitle?: string;
   breadcrumb?: BreadcrumbItem[];
   actions?: React.ReactNode;
   badge?: PageHeaderBadge;
@@ -34,12 +35,14 @@ const badgeText: Record<string, string> = {
 const PageHeader: React.FC<PageHeaderProps> = ({
   title,
   description,
+  subtitle,
   breadcrumb,
   actions,
   badge,
   tabs,
   className = '',
 }) => {
+  const desc = description ?? subtitle;
   const variant = badge?.variant ?? 'default';
 
   return (
@@ -68,7 +71,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
               </span>
             )}
           </div>
-          {description && <p className="ph-description">{description}</p>}
+          {desc && <p className="ph-description">{desc}</p>}
         </div>
 
         {actions && <div className="ph-actions">{actions}</div>}

@@ -1,13 +1,15 @@
 // components/ui/Badge.tsx
 import React from 'react';
 
-type BadgeVariant = 'success' | 'danger' | 'warning' | 'info' | 'purple' | 'teal' | 'orange' | 'gray' | 'indigo';
+type BadgeVariant = 'success' | 'danger' | 'warning' | 'info' | 'purple' | 'teal' | 'orange' | 'gray' | 'indigo' | 'default' | 'primary';
 
 interface BadgeProps {
   children: React.ReactNode;
   variant?: BadgeVariant;
   className?: string;
   noDot?: boolean;
+  style?: React.CSSProperties;
+  onClick?: React.MouseEventHandler<HTMLSpanElement>;
 }
 
 const variantMap: Record<BadgeVariant, string> = {
@@ -20,11 +22,13 @@ const variantMap: Record<BadgeVariant, string> = {
   orange:  'bo',
   gray:    'bz',
   indigo:  'bi',
+  default: 'bz',
+  primary: 'be',
 };
 
-export default function Badge({ children, variant = 'success', className = '', noDot = false }: BadgeProps) {
+export default function Badge({ children, variant = 'success', className = '', noDot = false, style, onClick }: BadgeProps) {
   return (
-    <span className={`bx ${variantMap[variant]} ${noDot ? 'no-dot' : ''} ${className}`}>
+    <span className={`bx ${variantMap[variant]} ${noDot ? 'no-dot' : ''} ${className}`} style={style} onClick={onClick}>
       {children}
     </span>
   );

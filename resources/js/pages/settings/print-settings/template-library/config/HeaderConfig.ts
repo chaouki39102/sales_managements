@@ -1,4 +1,4 @@
-import type { AlignOption, BorderStyle, PaperSize } from '../../../types';
+import type { AlignOption, BorderStyle, PaperSize } from '../../types';
 import { LOGO_SIZE_A4, LOGO_SIZE_A5, COLOR_PRIMARY } from '../constants';
 
 export interface HeaderConfig {

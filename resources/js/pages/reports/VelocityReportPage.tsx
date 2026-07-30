@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
-import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
+import { FMT, MONEY as _MONEY, REPORT_DEFAULTS } from './helpers';
 import { useVelocityReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';

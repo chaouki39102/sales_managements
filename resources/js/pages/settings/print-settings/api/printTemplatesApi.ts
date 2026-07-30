@@ -26,7 +26,7 @@ export function createPrintTemplatesApi(api: ApiClient): PrintTemplatesApi {
     list: (docTypeCode?: string) =>
       api.get<PrintTemplateApiResponse[]>('/print-templates', docTypeCode
         ? { doc_type_code: docTypeCode } : undefined)
-        .then(r => (Array.isArray(r) ? r : (r as Record<string, unknown>)?.data ?? [] as PrintTemplateApiResponse[]).map(deserializeResponse)),
+        .then((r: unknown) => (Array.isArray(r) ? r : ((r as Record<string, unknown>)?.data as PrintTemplateApiResponse[] ?? [])).map(deserializeResponse)),
 
     show: (id: number) =>
       api.get<PrintTemplateApiResponse>(`/print-templates/${id}`)
@@ -53,7 +53,7 @@ export function createPrintTemplatesApi(api: ApiClient): PrintTemplatesApi {
 
     library: () =>
       api.get<LibraryApiResponse[]>('/print-templates/library')
-        .then(r => (Array.isArray(r) ? r : (r as Record<string, unknown>)?.data ?? [] as LibraryApiResponse[])),
+        .then((r: unknown) => (Array.isArray(r) ? r : ((r as Record<string, unknown>)?.data as LibraryApiResponse[] ?? []))),
 
     installLibrary: (templateId: string, docTypeCode?: string) =>
       api.post<PrintTemplateApiResponse>('/print-templates/library/install', {

@@ -1,5 +1,5 @@
 // resources/js/pages/suppliers/SuppliersPage.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSuppliers, usePartyMutations } from '@/lib/api/endpoints/parties';
 import { useModal } from '@/hooks/useModal';
 import { useERPExport } from '@/components/ui/DataTable';

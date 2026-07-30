@@ -1,4 +1,4 @@
-import type { FontFamily, AlignOption, PaperSize } from '../../../types';
+import type { FontFamily, AlignOption, PaperSize } from '../../types';
 import {
   TITLE_SIZE_A4, TITLE_SIZE_A5,
   COMPANY_NAME_SIZE_A4, COMPANY_NAME_SIZE_A5,

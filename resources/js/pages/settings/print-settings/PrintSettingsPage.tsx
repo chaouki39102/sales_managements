@@ -363,9 +363,10 @@ export default function PrintSettingsPage() {
     await win.document.fonts.ready;
     await new Promise(r => requestAnimationFrame(r));
     await new Promise(r => setTimeout(r, 400));
+    if (win.closed) return;
     win.focus();
     win.print();
-    setTimeout(() => win.close(), 500);
+    setTimeout(() => { if (!win.closed) win.close(); }, 500);
   }, [localTpl, companyCtx, previewData, useRealData]);
 
   const refs = useRef({ handleSave, handleUndo, handleRedo, isDirty, isSaving });

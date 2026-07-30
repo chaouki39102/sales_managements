@@ -15,7 +15,8 @@ export default function IFUDeclarationPage() {
   const fiscalYear = useSelectedFiscalYear();
   const [formType, setFormType] = useState<'g12' | 'g12bis'>('g12');
 
-  const { data: declaration, isLoading } = useIFUDeclaration(fiscalYear?.id ?? null);
+  const { data: _declaration, isLoading } = useIFUDeclaration(fiscalYear?.id ?? null);
+  const declaration = _declaration as any;
   const { data: history } = useIFUHistory(fiscalYear?.id ?? null);
   const mutations = useTaxManagementMutations();
   const submitModal = useModal();
@@ -213,7 +214,7 @@ export default function IFUDeclarationPage() {
         <Card title="سابق التصريحات" subtitle={`IFU للأعوام السابقة`}>
           <SimpleTable
             columns={[
-              { key: 'year', label: 'السنة', render: (v) => v ?? '—' },
+              { key: 'year', label: 'السنة', render: (v) => (v as string) ?? '—' },
               { key: 'form_type', label: 'النموذج', render: (v) => (v as string)?.toUpperCase() },
               { key: 'amount_due', label: 'المبلغ', className: 'm', render: (v) => `${(v as number)?.toLocaleString('fr-DZ')} دج` },
               { key: 'status', label: 'الحالة', render: (v) => (

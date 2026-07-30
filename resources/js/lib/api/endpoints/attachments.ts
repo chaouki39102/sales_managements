@@ -71,7 +71,7 @@ export function useAttachments(params?: Record<string, unknown>) {
 export function useAttachmentsByAttachable(type: string | null, id: number | null) {
   const slug = useActiveSlug();
   return useQuery({
-    queryKey:  tenantKeys.lookups.attachments(slug ?? ''),
+    queryKey:  [...tenantKeys.lookups.attachments(slug ?? ''), 'by-attachable', type, id],
     queryFn:   () => attachmentsApi.listByAttachable(type!, id!),
     enabled:   !!slug && !!type && id != null,
     staleTime: 2 * 60_000,

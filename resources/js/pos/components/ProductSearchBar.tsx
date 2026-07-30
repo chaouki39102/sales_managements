@@ -39,13 +39,14 @@ interface ProductSearchBarProps {
   slug?: string | null;
   clearSearchOnAdd?: boolean;
   onToggleClearSearch?: () => void;
+  onBarcodeScan?: () => void;
 }
 
 export default function ProductSearchBar({
   query, onQuery, view, gridSize, onView, onGridSize,
   onFilter, filterActive, inputRef, sortBy, onSort, resultsCount, onEnterFirst,
   highlightedIndex, onArrowUp, onArrowDown, onEscape, keyboardNavEnabled, slug,
-  clearSearchOnAdd, onToggleClearSearch,
+  clearSearchOnAdd, onToggleClearSearch, onBarcodeScan,
 }: ProductSearchBarProps) {
   const [sortOpen, setSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
@@ -140,6 +141,13 @@ export default function ProductSearchBar({
         >
           <i className="ti ti-adjustments-horizontal" />
           {filterActive && <span className="filter-dot" />}
+        </button>
+      </FloatingTooltip>
+
+      <FloatingTooltip content="مسح الباركود بالكاميرا">
+        <button className="pos-tool-icon" onClick={onBarcodeScan}
+          style={{ width: 34, height: 34 }}>
+          <i className="ti ti-camera" />
         </button>
       </FloatingTooltip>
 

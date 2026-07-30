@@ -79,7 +79,7 @@ function renderCompanyInfo(tpl: PrintTemplate, data: UniversalDocumentData, _isT
     if (!str.trim()) return null;
     return <div><span style={{ fontWeight: 600 }}>{label}: </span>{str}</div>;
   };
-  const SimpleField = ({ _label, val }: { _label: string; val: unknown }) => {
+  const SimpleField = ({ label: _label, val }: { label: string; val: unknown }) => {
     if (!val) return null;
     const str = String(val);
     if (!str.trim()) return null;

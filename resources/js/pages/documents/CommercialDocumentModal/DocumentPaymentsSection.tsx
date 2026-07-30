@@ -1,4 +1,3 @@
-import React from 'react';
 import { Section, Label, AlertBanner } from '../components/DocumentUIPrimitives';
 import { CheckFormFields } from '../components/CheckFormFields';
 import { AdvancePaymentsPanel } from '../components/AdvancePaymentsPanel';

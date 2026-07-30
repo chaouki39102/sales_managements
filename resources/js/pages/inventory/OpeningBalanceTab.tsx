@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // pages/inventory/OpeningBalanceTab.tsx — تاب "الرصيد الافتتاحي"
 // ════════════════════════════════════════════════════════════════════════════
-import React, { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { flushSync } from 'react-dom';
 import {
   useQuery,

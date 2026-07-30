@@ -1,7 +1,6 @@
 import type { PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
-import { renderLayoutRows, align, borderStyle, type FieldStyleOverride } from './shared';
-import type { AlignOption } from '../../types';
+import { renderLayoutRows, borderStyle, type FieldStyleOverride } from './shared';
 import { TotalsGrid } from './TotalsGrid';
 
 const TOTALS_FIELD_OVERRIDES: (tpl: PrintTemplate) => Record<string, FieldStyleOverride> = (tpl) => ({

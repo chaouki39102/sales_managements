@@ -9,7 +9,7 @@
 //    وحساب الإحداثيات بـ getBoundingClientRect().
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { getProductStock } from '../utils/document.utils';
 import { cellStyle } from './DocumentUIPrimitives';

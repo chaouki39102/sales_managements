@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type UseMutationResult } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { apiPost } from '@/lib/api/core/client';
@@ -53,7 +53,7 @@ interface QuickAddLookupButtonProps {
  */
 export default function QuickAddLookupButton({
   title,
-  buttonLabel = '+',
+  _buttonLabel = '+',
   fields,
   resourcePath,
   onCreated,

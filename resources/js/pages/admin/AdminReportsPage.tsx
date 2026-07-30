@@ -157,7 +157,7 @@ export default function AdminReportsPage() {
                 </span>
               )},
             ]}
-            data={stats!.recent_companies}
+            data={stats?.recent_companies ?? []}
             rowKey="id"
           />
         </Card>

@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { adminApi } from '@/lib/admin';
 import { useConfirm } from '@/hooks/useConfirm';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Button from '@/components/ui/Button';
-import Badge from '@/components/ui/Badge';
 import PageHeader from '@/components/ui/PageHeader';
 import type { Paginated } from '@/types/admin';
 
@@ -15,13 +13,11 @@ interface PendingUser {
 
 export default function AdminApprovalsPage() {
   const qc = useQueryClient();
-  const navigate = useNavigate();
-  const confirm = useConfirm();
+  const { confirm } = useConfirm();
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [rejectTarget, setRejectTarget] = useState<number | null>(null);
-  const [bulkRejectOpen, setBulkRejectOpen] = useState(false);
+  const [, setBulkRejectOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'users', 'pending-approval', search, page],

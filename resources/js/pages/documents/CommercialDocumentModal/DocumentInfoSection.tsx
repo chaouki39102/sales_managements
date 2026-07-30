@@ -1,9 +1,12 @@
 import React from 'react';
+import type { QueryClient } from '@tanstack/react-query';
 import { Section, Label, FieldError, ComboBox, AlertBanner } from '../components/DocumentUIPrimitives';
 import PartyBalanceBadge from './PartyBalanceBadge';
 import { CreditCheckBar } from '../components/CreditCheckBar';
 import { CustomerInsightPanel } from '../components/CustomerInsightPanel';
 import type { PartyBalanceInfo } from '../hooks/useDocumentForm';
+import type { CreditCheckResult } from '../hooks/useCreditCheck';
+import type { CustomerInsightsData } from '../hooks/useCustomerInsights';
 
 interface DocumentInfoSectionProps {
   form: Record<string, unknown>;
@@ -32,13 +35,13 @@ interface DocumentInfoSectionProps {
   partyBalance: PartyBalanceInfo | null;
   isLoadingBalance: boolean;
   selectedParty?: { name?: string } | null;
-  creditCheck: Record<string, unknown> | null;
+  creditCheck: CreditCheckResult | null | undefined;
   isLoadingCredit: boolean;
-  customerInsights: Record<string, unknown> | null;
+  customerInsights: CustomerInsightsData | null | undefined;
   isLoadingInsights: boolean;
   balanceWarning: string | null;
-  qc: { invalidateQueries: (opts: { queryKey: unknown }) => void };
-  slug: string | undefined;
+  qc: QueryClient;
+  slug: string | null | undefined;
   warehouseIdNum: number | null;
 }
 

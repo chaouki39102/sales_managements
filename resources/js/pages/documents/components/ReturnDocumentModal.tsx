@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { fmtDZD } from '../utils/document.utils';
 import { useCreateReturn } from '../hooks/useDocumentChain';
 

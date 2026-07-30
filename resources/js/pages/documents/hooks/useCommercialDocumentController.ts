@@ -188,7 +188,7 @@ export function useCommercialDocumentController({
     stockData:          {},
     isPurchase,
     open: active,
-    priceLevels:        lookups.priceLevels,
+    priceLevels:        lookups.priceLevels as Array<{ id: number; name: string }>,
   });
 
   // ─── حالة المستند ─────────────────────────────────────────────────────────
@@ -680,11 +680,11 @@ export function useCommercialDocumentController({
     docTypes,
 
     // Credit check
-    creditCheck: creditCheck as Record<string, unknown> | undefined,
+    creditCheck,
     isLoadingCredit,
 
     // Customer insights
-    customerInsights: customerInsights as Record<string, unknown> | undefined,
+    customerInsights,
     isLoadingInsights,
 
     // Product suggestions

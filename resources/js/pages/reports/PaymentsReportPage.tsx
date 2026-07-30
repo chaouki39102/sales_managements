@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
@@ -47,10 +47,10 @@ export default function PaymentsReportPage() {
           <Card noHeader style={{ padding: 0, marginTop: 16 }}>
             <SimpleTable
               rowKey={(row) => (row as any).__isSummary ? '__summary__' : String(row._idx ?? '')}
-              rowClassName={(row) => (row as any).__isSummary ? 'tw-sr' : undefined}
+              rowClassName={(row, _index) => (row as any).__isSummary ? 'tw-sr' : ''}
               columns={[
                 { key: '_idx', label: '#' },
-                { key: 'mode', label: 'طريقة الدفع', render: (v) => <span style={{ fontWeight: 700 }}>{v ?? 'غير محدد'}</span> },
+                { key: 'mode', label: 'طريقة الدفع', render: (v) => <span style={{ fontWeight: 700 }}>{(v as string) ?? 'غير محدد'}</span> },
                 { key: 'total', label: 'الإجمالي', render: (v) => FMT(v as number) },
                 { key: 'count', label: 'العدد' },
               ]}
@@ -66,11 +66,11 @@ export default function PaymentsReportPage() {
                 { key: '_idx', label: '#' },
                 { key: 'payment_date', label: 'التاريخ' },
                 { key: 'amount', label: 'المبلغ', render: (v) => <span style={{ fontWeight: 700 }}>{FMT(v as number)}</span> },
-                { key: 'payment_mode', label: 'طريقة الدفع', render: (v) => v ?? '—' },
-                { key: 'party_name', label: 'العميل/المورد', render: (v) => v ?? '—' },
-                { key: 'document_number', label: 'الوثيقة', render: (v) => v ?? '—' },
-                { key: 'reference', label: 'المرجع', render: (v) => <span style={{ color: 'var(--t4)' }}>{v ?? '—'}</span> },
-                { key: 'status', label: 'الحالة', render: (v) => <Badge variant={v === 'confirmed' ? 'success' : v === 'pending' ? 'warning' : 'danger'} noDot>{v as string}</Badge> },
+                { key: 'payment_mode', label: 'طريقة الدفع', render: (v) => (v as string) ?? '—' },
+                { key: 'party_name', label: 'العميل/المورد', render: (v) => (v as string) ?? '—' },
+                { key: 'document_number', label: 'الوثيقة', render: (v) => (v as string) ?? '—' },
+                { key: 'reference', label: 'المرجع', render: (v) => <span style={{ color: 'var(--t4)' }}>{(v as string) ?? '—'}</span> },
+                { key: 'status', label: 'الحالة', render: (v) => <Badge variant={(v as string) === 'confirmed' ? 'success' : (v as string) === 'pending' ? 'warning' : 'danger'} noDot>{(v as string)}</Badge> },
               ]}
               data={data.payments.map((p, i) => ({ ...p, _idx: i + 1 }))}
             />

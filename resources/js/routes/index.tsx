@@ -92,7 +92,7 @@ const SettingsPage       = lazy(() => import('@/pages/settings/SettingsPage'));
 const DocumentTypesPage  = lazy(() => import('@/pages/settings/DocumentTypesPage'));
 const PrintSettingsPage  = lazy(() => import('@/pages/settings/print-settings-adapter'));
 const ReportDesignerPage = lazy(() => import('@/pages/settings/report-designer/ReportDesignerPage'));
-const StickerDesignerPage = lazy(() => import('@/pages/settings/sticker-designer/StickerDesignerPage'));
+const StickerDesignerPage = lazy(() => import('@/pages/settings/sticker-designer/StickerDesignerAdapter'));
 
 // â”€â”€ Tenant Lookups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const FamiliesPage          = lazy(() => import('@/pages/lookups/FamiliesPage'));

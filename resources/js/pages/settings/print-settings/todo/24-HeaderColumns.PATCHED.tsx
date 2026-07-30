@@ -39,11 +39,11 @@ export function renderHeaderColumns(
 ): JSX.Element | null {
   if (layout.mode !== 'columns' || layout.columns.length === 0) return null;
 
-  const cols = layout.columns.filter(c => c.visible).sort((a, b) => a.order - b.order);
+  const cols = layout.columns.filter((c: any) => c.visible).sort((a: any, b: any) => a.order - b.order);
   if (cols.length === 0) return null;
 
   const evenWidth = 100 / cols.length;
-  const elements: LayoutElement[] = cols.map(col => ({
+  const elements: LayoutElement[] = cols.map((col: any) => ({
     id: col.id,
     type: 'text',
     mode: 'flex',
@@ -64,7 +64,7 @@ export function renderHeaderColumns(
       paddingBottom: isA4 ? 16 : 10,
       borderBottom: tpl.header_separator === 'none' ? 'none' : (isA4 ? '2px solid #111' : '1.5px solid #111'),
     }}>
-      {cols.map(col => {
+      {cols.map((col: any) => {
         const c = computed.elements.get(col.id);
         return (
           <div

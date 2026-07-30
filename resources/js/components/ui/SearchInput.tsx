@@ -12,6 +12,7 @@ interface SearchInputProps {
   width?: string | number;
   autoFocus?: boolean;
   disabled?: boolean;
+  style?: React.CSSProperties;
 }
 
 /* Minimal inline SVG icons to avoid Tabler dependency issues */

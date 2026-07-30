@@ -1,4 +1,4 @@
-import type { AlignOption, BorderStyle } from '../../../types';
+import type { AlignOption, BorderStyle } from '../../types';
 import { COLOR_PRIMARY, TOTAL_TTC_FONT_SIZE } from '../constants';
 
 export interface TotalsConfig {

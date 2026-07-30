@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
@@ -49,7 +49,7 @@ export default function ProductMovementPage() {
             <Card title={`حركة المنتجات (${d.items.length})`} titleIcon="ti-arrows-exchange" padding="sm" style={{ borderRadius: 12 }}>
               <SimpleTable
                 columns={[
-                  { key: 'product_ref', label: 'المرجع', render: (v) => <span style={{ fontWeight: 600 }}>{v}</span> },
+                  { key: 'product_ref', label: 'المرجع', render: (v) => <span style={{ fontWeight: 600 }}>{v as React.ReactNode}</span> },
                   { key: 'product_name', label: 'المنتج' },
                   { key: 'sales_qty', label: 'كمية المبيعات', className: 'num', render: (v) => FMT(v as number) },
                   { key: 'sales_ht', label: 'قيمة المبيعات HT', className: 'num', render: (v) => FMT(v as number) },
@@ -60,7 +60,7 @@ export default function ProductMovementPage() {
                     return <span style={{ fontWeight: 700, color: n > 0 ? 'var(--em)' : n < 0 ? 'var(--red)' : undefined }}>{n > 0 ? '+' : ''}{FMT(n)}</span>;
                   }},
                 ]}
-                data={d.items}
+                data={d.items as unknown as Record<string, unknown>[]}
                 rowKey="product_id"
               />
             </Card>

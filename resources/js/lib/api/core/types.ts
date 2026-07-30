@@ -79,6 +79,10 @@ export interface ActiveCompany {
   rib?:             string | null;
   activity?:        string | null;
   avatar?:          string | null;
+  max_users?:       number;
+  max_warehouses?:  number;
+  max_products?:    number;
+  trial_ends_at?:   string | null;
 }
 
 // ─── Company ──────────────────────────────────────────────────────────────────
@@ -110,6 +114,7 @@ export interface Company extends BaseModel {
 // ─── Fiscal Year ──────────────────────────────────────────────────────────────
 export interface FiscalYear extends BaseModel {
   name:       string;
+  label?:     string;
   start_date: string;
   end_date:   string;
   is_current: boolean;
@@ -173,13 +178,18 @@ export interface DocumentStatus extends BaseModel {
   name: string; code: string; color?: string | null; is_final: boolean;
 }
 export interface DocumentType extends BaseModel {
-  name:                    string;
-  code:                    string;
-  base_operation_id:       number;
-  affects_stock_direction: -1 | 0 | 1;
-  requires_party:          boolean;
-  affects_accounting:      boolean;
-  active:                  boolean;
+  name:                      string;
+  name_latin?:               string;
+  code:                      string;
+  description?:              string | null;
+  base_operation_id:         number;
+  document_base_operation_id?: number;
+  affects_stock_direction:   -1 | 0 | 1;
+  requires_party:            boolean;
+  affects_accounting:        boolean;
+  is_printable?:             boolean;
+  display_order?:            number;
+  active:                    boolean;
 }
 export interface DocumentBaseOperation extends BaseModel {
   name: string; code: string;
@@ -337,6 +347,8 @@ export interface Party extends BaseModel {
   default_price_level?:   PriceLevel;
   // Computed
   balance?:               number;
+  total_purchases?:       number;
+  total_sales?:           number;
 }
 
 // ─── Products ─────────────────────────────────────────────────────────────────

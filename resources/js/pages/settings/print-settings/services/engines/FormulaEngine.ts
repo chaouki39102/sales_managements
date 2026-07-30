@@ -21,7 +21,7 @@ import type { UniversalDocumentData } from '../../types/data/UniversalDocumentDa
 
 // â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-export type ExpressionValue = number | string | boolean | null;
+export type ExpressionValue = number | string | boolean | null | ExpressionValue[];
 
 export interface EvaluationContext {
   data: UniversalDocumentData;
@@ -534,14 +534,14 @@ export class FormulaEngine {
   private evaluateMember(node: { kind: 'member'; object: ASTNode; property: string }, ctx: EvaluationContext): ExpressionValue {
     const obj = this.evaluateNode(node.object, ctx);
     if (obj == null || typeof obj !== 'object') return null;
-    return (obj as Record<string, unknown>)[node.property] as ExpressionValue ?? null;
+    return (obj as unknown as Record<string, unknown>)[node.property] as ExpressionValue ?? null;
   }
 
   private evaluateWildcard(node: { kind: 'wildcard'; prefix: string; field: string }, ctx: EvaluationContext): ExpressionValue {
     // Currently only supports lines.*.field
     if (node.prefix !== 'lines') return null;
     return ctx.data.lines.map(line => {
-      const val = (line as Record<string, unknown>)[node.field];
+      const val = (line as unknown as Record<string, unknown>)[node.field];
       return typeof val === 'number' ? val : 0;
     });
   }
@@ -554,7 +554,7 @@ export class FormulaEngine {
     );
 
     this.functions.set('SUM', (args: ExpressionValue[]) =>
-      args.reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0),
+      args.reduce<number>((s, v) => s + (typeof v === 'number' ? v : 0), 0),
     );
 
     this.functions.set('AVG', (args: ExpressionValue[]) => {

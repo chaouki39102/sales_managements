@@ -25,7 +25,7 @@ export interface DocumentInfo {
   /** ISO date string or null */
   dueDate?:     string | null;
   /** localised time string e.g. "14:35" — computed by DocumentDataBuilder */
-  time?:        string;
+  time?:        string | null;
   /** DocTypeCode: "FV", "BL", "FA", "POS", … */
   typeCode?:    string;
   /** Localised document type name e.g. "فاتورة المبيعات" */
@@ -159,7 +159,7 @@ export interface DocumentTotals {
   /** Amount still owed */
   remaining:     number;
   /** = total_ttc + fiscal_stamp — matches backend net_to_pay used in attachBalanceData() */
-  netToPay:      number;
+  netToPay?:     number;
 }
 
 export interface Payment {

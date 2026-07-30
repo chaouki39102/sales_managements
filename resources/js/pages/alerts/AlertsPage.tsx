@@ -3,7 +3,7 @@
 // صفحة التنبيهات — عرض جميع التنبيهات
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost } from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
@@ -52,7 +52,7 @@ const fmtDate = (d: string) => new Date(d).toLocaleDateString('ar-DZ', {
 export default function AlertsPage() {
   const slug   = useActiveSlug();
   const qc     = useQueryClient();
-  const { notify } = useNotification();
+  const notify = useNotification();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
   const { data: alerts = [], isLoading } = useQuery<Alert[]>({

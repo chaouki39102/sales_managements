@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { LayoutRow, LayoutColumn, AlignOption, LogicalSide } from '../types/domain';
+import type { LayoutRow, LayoutColumn, AlignOption } from '../types/domain';
 
 export interface FieldOption {
   value: string;
@@ -32,17 +32,8 @@ function nextColId(rowId: string, cols: LayoutColumn[]): string {
   return `${rowId}_col_${cols.length}`;
 }
 
-function _createDefaultColumn(field: string, label: string): LayoutColumn {
-  return {
-    id: '',
-    field,
-    label,
-    width: 1,
-    alignment: 'right',
-    labelSide: 'start',
-    valueSide: 'end',
-  };
-}
+/**/
+
 
 interface Props {
   rows: LayoutRow[];
@@ -155,9 +146,6 @@ export function RowManager({ rows, onChange, fields, addLabel = '+ إضافة س
       fontSize: row.fontSize,
     }];
   };
-
-  const _fieldLabel = (fieldVal: string) =>
-    fields?.find(f => f.value === fieldVal)?.label ?? fieldVal;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

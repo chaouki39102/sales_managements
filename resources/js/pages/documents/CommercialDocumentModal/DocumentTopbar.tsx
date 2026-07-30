@@ -121,7 +121,7 @@ export default function DocumentTopbar({
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--t1)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           {isEdit ? `تعديل ${documentType?.name}` : `مستند جديد: ${documentType?.name}`}
-          {isEdit && existingDocument?.document_number && (
+          {isEdit && !!existingDocument?.document_number && (
             <span style={{
               padding: '2px 8px', borderRadius: 'var(--r1)',
               background: 'var(--bg1)', border: '1px solid var(--b2)',

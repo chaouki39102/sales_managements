@@ -216,7 +216,7 @@ export function LineCard({
         {line._packQty > 1 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ color: 'var(--t4)', fontSize: 10, width: 56 }}>الكمية الإجمالية:</span>
-            <TotalQtyCardInput baseQty={baseQty} packQty={line._packQty} disabled={disabled} onUpdate={(v) => {
+            <TotalQtyCardInput baseQty={baseQty} packQty={line._packQty} disabled={disabled} onUpdate={(v: any) => {
               const newQty = line._packQty > 1 ? v / line._packQty : v;
               onUpdate(idx, { quantity: newQty });
             }} />

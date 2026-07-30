@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
@@ -41,12 +41,12 @@ export default function SuppliersReportPage() {
         <Card noHeader style={{ padding: 0, marginTop: 16 }}>
           <SimpleTable
             columns={[
-              { key: '_idx', label: '#', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v}</span> },
-              { key: 'name', label: 'الاسم', render: (v, row) => row.id === '__summary' ? <span style={{ fontWeight: 800 }}>{v}</span> : <span style={{ fontWeight: 700 }}>{v}</span> },
-              { key: 'code', label: 'الكود', render: (v) => <span style={{ color: 'var(--t4)' }}>{v ?? '—'}</span> },
-              { key: 'nif', label: 'NIF', render: (v) => v ?? '—' },
-              { key: 'phone', label: 'الهاتف', render: (v) => v ?? '—' },
-              { key: 'wilaya', label: 'الولاية', render: (v) => v ?? '—' },
+              { key: '_idx', label: '#', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v as React.ReactNode}</span> },
+              { key: 'name', label: 'الاسم', render: (v, row) => row.id === '__summary' ? <span style={{ fontWeight: 800 }}>{v as React.ReactNode}</span> : <span style={{ fontWeight: 700 }}>{v as React.ReactNode}</span> },
+              { key: 'code', label: 'الكود', render: (v) => <span style={{ color: 'var(--t4)' }}>{(v as string) ?? '—'}</span> },
+              { key: 'nif', label: 'NIF', render: (v) => (v as string) ?? '—' },
+              { key: 'phone', label: 'الهاتف', render: (v) => (v as string) ?? '—' },
+              { key: 'wilaya', label: 'الولاية', render: (v) => (v as string) ?? '—' },
               { key: 'doc_count', label: 'عدد الوثائق', className: 'num' },
               { key: 'total_ht', label: 'المشتريات HT', className: 'num', render: (v, row) => row.id === '__summary' ? <span style={{ fontWeight: 800 }}>{FMT(v as number)}</span> : FMT(v as number) },
               { key: 'total_paid', label: 'المدفوع', className: 'num', render: (v, row) => row.id === '__summary' ? <span style={{ fontWeight: 800, color: 'var(--em)' }}>{FMT(v as number)}</span> : <span style={{ color: 'var(--em)' }}>{FMT(v as number)}</span> },

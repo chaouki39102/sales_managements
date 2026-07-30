@@ -289,17 +289,17 @@ export default function CommercialDocumentModal({
             priceLevelOptions={priceLevelOptions}
             handlePriceLevelChange={handlePriceLevelChange}
             lookups={{
-              warehouses: lookups.warehouses,
-              fiscalYears: lookups.fiscalYears,
-              currencies: lookups.currencies,
-              priceLevels: lookups.priceLevels,
+              warehouses: lookups.warehouses as Array<{ id: number; name: string; is_default?: boolean }>,
+              fiscalYears: lookups.fiscalYears as Array<{ id: number; name: string; is_current?: boolean; is_closed?: boolean }>,
+              currencies: lookups.currencies as Array<{ id: number; code: string; name: string; is_base_currency?: boolean }>,
+              priceLevels: lookups.priceLevels as Array<{ id: number; name: string }>,
             }}
             partyBalance={partyBalance}
             isLoadingBalance={isLoadingBalance}
             selectedParty={selectedParty}
-            creditCheck={creditCheck as Record<string, unknown> | null}
+            creditCheck={creditCheck ?? null}
             isLoadingCredit={isLoadingCredit}
-            customerInsights={customerInsights as Record<string, unknown> | null}
+            customerInsights={customerInsights ?? null}
             isLoadingInsights={isLoadingInsights}
             balanceWarning={balanceWarning}
             qc={qc}
@@ -333,10 +333,10 @@ export default function CommercialDocumentModal({
                       priceLevelOptions={priceLevelOptions}
                       handlePriceLevelChange={handlePriceLevelChange}
                       lookups={{
-                        warehouses: lookups.warehouses,
-                        fiscalYears: lookups.fiscalYears,
-                        currencies: lookups.currencies,
-                        priceLevels: lookups.priceLevels,
+                        warehouses: lookups.warehouses as Array<{ id: number; name: string; is_default?: boolean }>,
+                        fiscalYears: lookups.fiscalYears as Array<{ id: number; name: string; is_current?: boolean; is_closed?: boolean }>,
+                        currencies: lookups.currencies as Array<{ id: number; code: string; name: string; is_base_currency?: boolean }>,
+                        priceLevels: lookups.priceLevels as Array<{ id: number; name: string }>,
                       }}
                       qc={qc}
                       slug={slug}
@@ -397,7 +397,7 @@ export default function CommercialDocumentModal({
             slug={slug}
             affectsStock={affectsStock}
             stockDir={stockDir}
-            warehouses={lookups.warehouses}
+            warehouses={lookups.warehouses as Array<{ id: number; name: string }>}
           />
 
           {/* ═══ SECTION 3: الدفعات ═══ */}

@@ -1,4 +1,4 @@
-import type { BorderStyle } from '../../../types';
+import type { BorderStyle } from '../../types';
 
 export interface FooterConfig {
   footerLine1: string;

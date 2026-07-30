@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
@@ -23,7 +23,7 @@ export default function StockMovementsReportPage() {
     await exportToExcel([{
       name: 'حركات المخزون',
       headers: ['#', 'التاريخ', 'المنتج', 'المستودع', 'النوع', 'الاتجاه', 'الكمية', 'القيمة'],
-      rows: d.movements.map((m, i) => [i + 1, m.movement_date, m.product_name, m.warehouse_name ?? '—', m.type_label ?? '—', m.direction === 1 ? 'وارد' : m.direction === -1 ? 'صادر' : 'تسوية', m.quantity, m.total_price]),
+      rows: d.movements.map((m, i) => [i + 1, m.movement_date, m.product_name, m.warehouse_name ?? '—', m.type_label ?? '—', m.direction === 1 ? 'وارد' : m.direction === -1 ? 'صادر' : 'تسوية', m.quantity, m.total_price] as (string | number)[]),
     }], `حركات المخزون ${fromDate}-${toDate}`);
   };
 
@@ -45,11 +45,11 @@ export default function StockMovementsReportPage() {
             <Card noHeader style={{ padding: 0, marginTop: 16 }}>
               <SimpleTable
                 columns={[
-                  { key: '_idx', label: '#', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v}</span> },
+                  { key: '_idx', label: '#', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v as React.ReactNode}</span> },
                   { key: 'movement_date', label: 'التاريخ' },
-                  { key: 'product_name', label: 'المنتج', render: (v) => <span style={{ fontWeight: 700 }}>{v}</span> },
-                  { key: 'warehouse_name', label: 'المستودع', render: (v) => v ?? '—' },
-                  { key: 'type_label', label: 'النوع', render: (v) => v ?? '—' },
+                  { key: 'product_name', label: 'المنتج', render: (v) => <span style={{ fontWeight: 700 }}>{v as React.ReactNode}</span> },
+                  { key: 'warehouse_name', label: 'المستودع', render: (v) => (v as string) ?? '—' },
+                  { key: 'type_label', label: 'النوع', render: (v) => (v as string) ?? '—' },
                   { key: '_direction', label: 'الاتجاه', render: (_v, row) => (
                     <Badge variant={row.direction === 1 ? 'success' : row.direction === -1 ? 'danger' : 'warning'} noDot>
                       {row.direction === 1 ? 'وارد' : row.direction === -1 ? 'صادر' : 'تسوية'}

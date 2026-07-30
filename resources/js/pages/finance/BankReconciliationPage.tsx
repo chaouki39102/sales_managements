@@ -3,7 +3,7 @@
 // المطابقة البنكية — صفحة مستقلة
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useReconciliationQueries, useReconciliationMutations } from '@/lib/api/endpoints/reconciliation';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';

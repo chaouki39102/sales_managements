@@ -5,7 +5,7 @@
 //   - كل عنصر مكتمل يبقى مرئياً ويتراكم
 //   - auto-scroll للعنصر النشط
 // ════════════════════════════════════════════════════════════════════
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { seedsApi } from '@/lib/api/endpoints/seeds';
 import type { SeedKey } from '@/lib/api/core/types';
 import Modal from '@/components/ui/Modal';

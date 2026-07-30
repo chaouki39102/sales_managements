@@ -19,13 +19,13 @@ interface Permission {
     name: string;
     display_name?: string;
     group?: string;
-    description?: string;
+    description?: string | null;
 }
 interface Role {
     id: number;
     name: string;
     display_name?: string;
-    description?: string;
+    description?: string | null;
     permissions?: Permission[];
     relations?: {
         permissions?: { id: number; name: string; display_name?: string }[];
@@ -499,7 +499,7 @@ function UserDetailModal({
                             />
                         }
                         loading={toggleActive.isPending}
-                        onClick={() => toggleActive.mutate()}
+                        onClick={() => toggleActive.mutate(undefined)}
                     >
                         {user.active ? "إيقاف" : "تفعيل"}
                     </Btn>
@@ -1282,7 +1282,7 @@ function RoleFormModal({
                             />
                         }
                         loading={mutation.isPending}
-                        onClick={() => mutation.mutate()}
+                        onClick={() => mutation.mutate(undefined)}
                     >
                         {isEdit ? "حفظ التغييرات" : "إنشاء الدور"}
                     </Btn>
@@ -1489,7 +1489,7 @@ function RoleDetailModal({
                                 `حذف دور "${role.display_name ?? role.name}"؟`,
                             )
                         )
-                            deleteRole.mutate();
+                            deleteRole.mutate(undefined);
                     }}
                 >
                     حذف
@@ -2435,7 +2435,7 @@ export default function UsersPage() {
                                                         icon={
                                                             <i className="ti ti-pencil" />
                                                         }
-                                                        onClick={(e) => {
+                                                        onClick={(e: any) => {
                                                             e.stopPropagation();
                                                             setEditRole(role);
                                                         }}

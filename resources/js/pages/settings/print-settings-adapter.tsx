@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { useNotification } from '@/hooks/useNotification';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete, apiUpload } from '@/lib/api/core/client';
 import { useActiveCompany, useActiveSlug } from '@/lib/store/appStore';

@@ -8,7 +8,7 @@ interface Props {
   children: React.ReactNode;
 }
 
-function PageFrameFn({ config, _tpl, children }: Props): JSX.Element {
+function PageFrameFn({ config, tpl: _tpl, children }: Props): JSX.Element {
   if (!config.enabled) return <>{children}</>;
 
   const bs = config.borderStyle ?? 'solid';

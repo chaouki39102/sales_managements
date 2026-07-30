@@ -1,4 +1,3 @@
-import React from 'react';
 import { inputStyle, labelStyle } from './DocumentUIPrimitives';
 import type { ShippingInfo } from '../types/document.types';
 

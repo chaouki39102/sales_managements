@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import type { LayoutRow, AlignOption, LogicalSide } from '../../types';
+import type { LayoutRow } from '../../types';
 import type { PrintFieldGroup } from '../../services/PrintFieldRegistry';
 import FieldPickerModal from './FieldPickerModal';
 
@@ -87,7 +87,7 @@ export default function RowBuilder({ rows, onChange, label, fieldGroup }: Props)
             لا توجد حقول — اضف حقول من الأسفل
           </div>
         )}
-        {ordered.map((r, i) => {
+        {ordered.map((r, _i) => {
           const realIdx = rows.indexOf(r);
           return (
             <div key={r.id}
@@ -175,7 +175,7 @@ export default function RowBuilder({ rows, onChange, label, fieldGroup }: Props)
                       <input type="number" value={r.fontSize ?? ''}
                         onChange={e => updateField(realIdx, { fontSize: Number(e.target.value) || undefined })}
                         style={{ width: 55, padding: '3px 6px', borderRadius: 4, border: '1px solid #ccc', fontSize: 12 }}
-                        placeholder={9} />
+                        placeholder={'9'} />
                     </div>
                     <button onClick={() => setEditIdx(null)}
                       style={{ padding: '3px 10px', background: '#e9ecef', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11, marginRight: 'auto' }}>

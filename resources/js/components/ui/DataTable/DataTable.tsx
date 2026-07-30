@@ -119,7 +119,7 @@ const VirtualRow = memo(function VirtualRow({ rowNode, renderFn }: VirtualRowPro
 // MAIN COMPONENT
 // ════════════════════════════════════════════════════════════════════════════
 
-export function DataTable<T extends Record<string, unknown> = Record<string, unknown>>({
+export function DataTable<T = Record<string, unknown>>({
   // بيانات أساسية
   data,
   columns,

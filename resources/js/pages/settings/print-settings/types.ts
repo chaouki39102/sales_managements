@@ -1,6 +1,9 @@
 export type {
   PaperSize, AlignOption, BorderStyle, PriceMode, PageOrientation, FontFamily,
   ColumnKey, DocTypeCode, PrintTemplate, SectionTarget, ReportRule,
+  LayoutRow, LayoutColumn, LayoutBlock, LogicalSide, LogicalAlign, CellStyle, BoxBorder, BoxSpacing,
+  HeaderLayout, PageFrameConfig, TotalsGridConfig, TotalsGridColumn,
+  ColumnStyleConfig, SectionMeta, WatermarkConfig,
 } from './types/domain';
 
 export {

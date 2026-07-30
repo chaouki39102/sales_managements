@@ -1,4 +1,3 @@
-import React from 'react';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
@@ -44,8 +43,6 @@ export const REPORT_CARDS: ReportCardMeta[] = [
   { id: 'sales-trend', title: 'اتجاهات المبيعات', description: 'مقارنة يومية/أسبوعية/شهرية', icon: 'ti-chart-line', color: 'var(--blue)', href: '/reports/sales-trend' },
   { id: 'stock-movements', title: 'حركات المخزون', description: 'تفاصيل الوارد والصادر والتسويات', icon: 'ti-arrows-exchange', color: 'var(--teal)', href: '/reports/stock-movements' },
 ];
-
-type ReportId = typeof REPORT_CARDS[number]['id'];
 
 export function QuickReportCard({ report, onSelect }: { report: ReportCardMeta; onSelect: () => void }) {
   return (

@@ -133,7 +133,7 @@ export interface UseDocumentFormReturn {
   lineErr:                string;
   apiErr:                 string;
   setApiErr:              (msg: string) => void;
-  set:                    (k: keyof DocumentFormState, v: unknown) => void;
+  set:                    (k: string, v: unknown) => void;
   handlePartyChange:      (id: string) => PartyChangeResult;
   handlePriceLevelChange: (priceLevelIdStr: string) => void;
   priceLevelId:           number | null;
@@ -624,7 +624,7 @@ export function useDocumentForm({
 
   // ── set ───────────────────────────────────────────────────────────────────
 
-  const set = useCallback((k: keyof DocumentFormState, v: unknown) => {
+  const set = useCallback((k: string, v: unknown) => {
     if (k === 'apply_stamp' && stampEnabled === false) return;
     setForm((f) => ({ ...f, [k]: v }));
     setErrors((prev) => { const n = { ...prev }; delete n[k as string]; return n; });

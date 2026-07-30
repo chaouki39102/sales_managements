@@ -16,7 +16,7 @@
  */
 
 import React, {
-  useState, useEffect, useRef, useCallback, useMemo,
+  useState, useEffect, useRef, useCallback, useMemo, Suspense,
 } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiPost, apiPut } from '@/lib/api/core/client';
@@ -31,6 +31,7 @@ import QuickAddLookupButton from '@/components/ui/QuickAddLookupButton';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useNotification } from '@/hooks/useNotification';
 import CopyConfigModal from '@/components/products/CopyConfigModal';
+const BarcodeScannerModal = React.lazy(() => import('@/components/BarcodeScannerModal'));
 import { useProductBarcodes, useBarcodeMutations } from '@/lib/api/endpoints/barcodes';
 import type { BarcodeUpdateInput } from '@/lib/api/endpoints/barcodes';
 import type { Product, Family, Brand, ProductType, PriceLevel, Barcode } from '@/lib/api/core/types';
@@ -429,6 +430,7 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
   // ── Barcodes ──
   const [barcodeInput, setBarcodeInput] = useState('');
   const [showAddBarcode, setShowAddBarcode] = useState(false);
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
 
   // ── اقتراح صورة من الإنترنت ──
   const [showImgSuggest, setShowImgSuggest] = useState(false);
@@ -943,6 +945,11 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
                 onChange={e => set('barcode', e.target.value)}
                 placeholder="6121234567890"
               />
+              <button type="button" onClick={() => setShowBarcodeScanner(true)}
+                style={{ padding: '7px 10px', borderRadius: 'var(--r2)', border: '1px solid var(--b3)', background: 'var(--bg3)', cursor: 'pointer', fontSize: 12 }}
+                title="مسح الباركود بالكاميرا">
+                <i className="ti ti-camera" style={{ fontSize: 13 }} />
+              </button>
               {form.barcode && (
                 <button
                   type="button"
@@ -2504,6 +2511,13 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
         onApply={handleCopyConfig}
         mode="inline"
       />
+      <Suspense fallback={null}>
+        <BarcodeScannerModal
+          open={showBarcodeScanner}
+          onScan={code => { set('barcode', code); setShowBarcodeScanner(false); }}
+          onClose={() => setShowBarcodeScanner(false)}
+        />
+      </Suspense>
     </div>
   );
 }

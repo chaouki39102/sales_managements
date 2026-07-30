@@ -1,6 +1,6 @@
 import type { PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
-import { Separator, borderStyle, align, fontFamily } from './shared';
+import { Separator, borderStyle, align, fontFamily as _fontFamily } from './shared';
 
 function barcodeText(tpl: PrintTemplate, data: UniversalDocumentData): string {
   if (tpl.barcode_content === 'custom') return tpl.barcode_custom_text;

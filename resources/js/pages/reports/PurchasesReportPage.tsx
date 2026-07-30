@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
@@ -76,12 +76,12 @@ export default function PurchasesReportPage() {
           <Card noHeader style={{ padding: 0 }}>
             <SimpleTable
               rowKey={(row) => (row as any).__isSummary ? '__summary__' : String(row.id ?? '')}
-              rowClassName={(row) => (row as any).__isSummary ? 'tw-sr' : undefined}
+              rowClassName={(row, _index) => (row as any).__isSummary ? 'tw-sr' : ''}
               columns={[
                 { key: '_idx', label: '#' },
                 { key: 'document_number', label: 'الوثيقة', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
                 { key: 'date', label: 'التاريخ' },
-                { key: 'party_name', label: 'المورد', render: (v) => v ?? '—' },
+                { key: 'party_name', label: 'المورد', render: (v) => (v as string) ?? '—' },
                 { key: 'total_ht', label: 'HT', render: (v) => FMT(v as number) },
                 { key: 'total_tva', label: 'TVA', render: (v) => FMT(v as number) },
                 { key: 'total_discount', label: 'الخصم', render: (v) => (v as number) > 0 ? <span style={{ color: 'var(--orange)' }}>{FMT(v as number)}</span> : '—' },
@@ -101,7 +101,7 @@ export default function PurchasesReportPage() {
           <Card noHeader style={{ padding: 0 }}>
             <SimpleTable
               rowKey={(row) => (row as any).__isSummary ? '__summary__' : String(row.product_id ?? '')}
-              rowClassName={(row) => (row as any).__isSummary ? 'tw-sr' : undefined}
+              rowClassName={(row, _index) => (row as any).__isSummary ? 'tw-sr' : ''}
               columns={[
                 { key: '_idx', label: '#' },
                 { key: 'product_name', label: 'المنتج', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },

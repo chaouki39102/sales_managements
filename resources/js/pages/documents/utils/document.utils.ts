@@ -220,7 +220,7 @@ export function resolveQuantityDiscount(
   priceLevelId: number | null,
 ): { percentage: number; fixed: number } {
   // baseQty = الكميات الأساسية (بعد ضرب عدد العبوات)
-  const matches = (product.quantityDiscounts ?? []).filter((d) => {
+  const matches = (product.quantityDiscounts ?? []).filter((d: any) => {
     if (!d.active)                                              return false;
     if (priceLevelId && d.price_level_id !== priceLevelId)     return false;
     if (baseQty < d.min_qty)                                    return false;

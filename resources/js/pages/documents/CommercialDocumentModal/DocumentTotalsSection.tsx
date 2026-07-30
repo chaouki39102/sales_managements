@@ -1,4 +1,3 @@
-import React from 'react';
 import { Section, TotalCard, Toggle } from '../components/DocumentUIPrimitives';
 import type { DocumentTotals, DocumentFormState } from '../types/document.types';
 import type { PartyBalanceInfo } from '../hooks/useDocumentForm';
@@ -28,12 +27,12 @@ export default function DocumentTotalsSection({
   const futureBalance = partyBalance && form.party_id && totals.netToPay > 0
     ? (() => {
         const existingNetToPay = isEdit
-          ? toNum((existingDocument as Record<string, unknown> | undefined)?.total_ttc ?? 0)
-            + toNum((existingDocument as Record<string, unknown> | undefined)?.total_stamp ?? 0)
+          ? toNum(((existingDocument?.total_ttc as number) ?? 0) as number)
+            + toNum(((existingDocument?.total_stamp as number) ?? 0) as number)
           : 0;
         const existingPaymentsSum = isEdit
-          ? ((existingDocument as Record<string, unknown> | undefined)?.payments as unknown[] ?? [])
-              .reduce((s: number, p: unknown) => s + toNum((p as Record<string, unknown>).amount ?? 0), 0)
+          ? ((existingDocument?.payments as unknown[]) ?? [])
+              .reduce((s: number, p: unknown) => s + toNum(((p as Record<string, unknown>).amount as number) ?? 0), 0)
           : 0;
         const deltaDoc = totals.netToPay - existingNetToPay;
         const deltaPmt = totals.totalPaid - existingPaymentsSum;

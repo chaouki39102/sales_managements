@@ -254,7 +254,7 @@ export default function CommercialDocumentPage() {
         }}>
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-            {isEdit && existingDoc && (
+            {isEdit && !!existingDoc && (
               <DocumentChainPanel
                 chain={chain}
                 isLoading={isLoadingChain}
@@ -294,10 +294,10 @@ export default function CommercialDocumentPage() {
               priceLevelOptions={priceLevelOptions}
               handlePriceLevelChange={handlePriceLevelChange}
               lookups={{
-                warehouses: lookups.warehouses,
-                fiscalYears: lookups.fiscalYears,
-                currencies: lookups.currencies,
-                priceLevels: lookups.priceLevels,
+                warehouses: lookups.warehouses as Array<{ id: number; name: string; is_default?: boolean }>,
+                fiscalYears: lookups.fiscalYears as Array<{ id: number; name: string; is_current?: boolean; is_closed?: boolean }>,
+                currencies: lookups.currencies as Array<{ id: number; code: string; name: string; is_base_currency?: boolean }>,
+                priceLevels: lookups.priceLevels as Array<{ id: number; name: string }>,
               }}
               partyBalance={partyBalance}
               isLoadingBalance={isLoadingBalance}
@@ -324,10 +324,10 @@ export default function CommercialDocumentPage() {
                   priceLevelOptions={priceLevelOptions}
                   handlePriceLevelChange={handlePriceLevelChange}
                   lookups={{
-                    warehouses: lookups.warehouses,
-                    fiscalYears: lookups.fiscalYears,
-                    currencies: lookups.currencies,
-                    priceLevels: lookups.priceLevels,
+                    warehouses: lookups.warehouses as Array<{ id: number; name: string; is_default?: boolean }>,
+                    fiscalYears: lookups.fiscalYears as Array<{ id: number; name: string; is_current?: boolean; is_closed?: boolean }>,
+                    currencies: lookups.currencies as Array<{ id: number; code: string; name: string; is_base_currency?: boolean }>,
+                    priceLevels: lookups.priceLevels as Array<{ id: number; name: string }>,
                   }}
                   qc={qc}
                   slug={slug}
@@ -422,7 +422,7 @@ export default function CommercialDocumentPage() {
             slug={slug}
             affectsStock={affectsStock}
             stockDir={stockDir}
-            warehouses={lookups.warehouses}
+            warehouses={lookups.warehouses as Array<{ id: number; name: string }>}
           />
         </div>
       </div>
@@ -434,7 +434,7 @@ export default function CommercialDocumentPage() {
         onImport={(importedLines) => { bulkAddLines(importedLines); }}
       />
 
-      {showReturnModal && existingDoc && (
+      {showReturnModal && !!existingDoc && (
         <ReturnDocumentModal
           document={existingDoc as Record<string, unknown>}
           onCreated={(returnDoc) => {
@@ -448,7 +448,7 @@ export default function CommercialDocumentPage() {
         />
       )}
 
-      {printModalOpen && existingDoc && companyInfo && (
+      {printModalOpen && !!existingDoc && !!companyInfo && (
         <Suspense fallback={null}>
           <TemplatePrintModal
             open={printModalOpen}

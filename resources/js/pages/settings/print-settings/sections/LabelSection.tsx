@@ -1,4 +1,3 @@
-import React from 'react';
 import type { PrintTemplate, BorderStyle } from '../types';
 import { Toggle, SliderField } from './ToggleSwitch';
 import { Field, ColorField, Input, Pills } from '../components/ui';
@@ -85,8 +84,10 @@ export default function LabelSectionControls({ tpl, update }: Props) {
                 onChange={v => update('label_barcode_format', v as 'code39' | 'ean13' | 'code128')} />
             </Field>
           )}
-          <SliderField label="الارتفاع" value={tpl.label_barcode_height} min={20} max={80} step={5} unit="px"
+          <SliderField label="الارتفاع" value={tpl.label_barcode_height ?? 50} min={20} max={120} step={5} unit="px"
             onChange={v => update('label_barcode_height', v)} />
+          <SliderField label="العرض" value={tpl.label_barcode_bar_width ?? 1.0} min={0.5} max={3.0} step={0.25} unit="×"
+            onChange={v => update('label_barcode_bar_width', v)} />
         </>
       )}
 

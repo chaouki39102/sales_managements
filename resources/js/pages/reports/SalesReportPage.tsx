@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
@@ -90,10 +90,10 @@ export default function SalesReportPage() {
                 { key: '_idx', label: '#' },
                 { key: 'document_number', label: 'الوثيقة', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
                 { key: 'date', label: 'التاريخ' },
-                { key: 'party_name', label: 'الزبون', render: (v) => v ?? '—' },
+                { key: 'party_name', label: 'الزبون', render: (v) => (v as string) ?? '—' },
                 { key: 'total_ht', label: 'HT', render: (v) => FMT(v as number) },
                 { key: 'total_tva', label: 'TVA', render: (v) => FMT(v as number) },
-                { key: 'total_discount', label: 'الخصم', render: (v, row) => (v as number) > 0 ? <span style={{ color: 'var(--orange)' }}>{FMT(v as number)}</span> : '—' },
+                { key: 'total_discount', label: 'الخصم', render: (v, _row) => (v as number) > 0 ? <span style={{ color: 'var(--orange)' }}>{FMT(v as number)}</span> : '—' },
                 { key: 'doc_cost_ht', label: 'التكلفة', render: (v) => FMT(v as number) },
                 { key: 'margin_value', label: 'الهامش', render: (v) => <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(v as number)}</span> },
                 { key: 'total_ttc', label: 'TTC', render: (v) => FMT(v as number) },
@@ -124,7 +124,7 @@ export default function SalesReportPage() {
                 { key: 'total_cost', label: 'التكلفة', render: (v) => FMT(v as number) },
                 { key: 'margin_value', label: 'الهامش', render: (v) => <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(v as number)}</span> },
                 { key: 'total_ttc', label: 'TTC', render: (v) => FMT(v as number) },
-                { key: 'margin_pct', label: '%', render: (v) => <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)' }}>{v}%</span> },
+                { key: 'margin_pct', label: '%', render: (v) => <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)' }}>{v as React.ReactNode}%</span> },
               ]}
               data={productsData}
             />

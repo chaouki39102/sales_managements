@@ -7,14 +7,11 @@ import { useQuery }                          from '@tanstack/react-query';
 import { apiGet }                            from '../core/client';
 import { tenantKeys }                        from '../core/queryKeys';
 import { useActiveSlug, useSelectedYearId }  from '../../store/appStore';
-import type {
-  Party, Product, ProductVariant,
-  CommercialDocument,
-} from '../core/types';
+
 
 // ─── Report Params ────────────────────────────────────────────────────────────
 
-export interface ReportBaseParams {
+export interface ReportBaseParams extends Record<string, unknown> {
   year_id?:   number;
   from_date?: string;   // YYYY-MM-DD
   to_date?:   string;

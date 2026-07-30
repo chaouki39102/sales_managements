@@ -983,7 +983,7 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
                         placeholder="— اختر منتجاً —"
                         disabled={isPending}
                         error={!line.product_id}
-                        inputRef={el => (productInputRefs.current[idx] = el)}
+                        inputRef={(el: any) => (productInputRefs.current[idx] = el)}
                         onEnter={() => {
                           // عند الضغط Enter في حقل البحث بعد اختيار منتج (أو بدون اختيار)
                           // ننتقل إلى حقل الكمية

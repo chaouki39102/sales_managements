@@ -43,7 +43,7 @@ export function Label({ className, children, required, ...props }: React.LabelHT
   )
 }
 
-export function FormField({ className, children, span, ...props }: React.HTMLAttributes<HTMLDivElement> & { span?: 2 | 3 }) {
+export function FormField({ className, children, span, label, required, ...props }: React.HTMLAttributes<HTMLDivElement> & { span?: 2 | 3; label?: string; required?: boolean }) {
   return (
     <div
       className={cn(
@@ -54,6 +54,12 @@ export function FormField({ className, children, span, ...props }: React.HTMLAtt
       )}
       {...props}
     >
+      {label && (
+        <label className="text-[12px] font-bold text-[var(--t3)] tracking-[.3px]">
+          {label}
+          {required && <span className="text-[var(--red)] ms-0.5">*</span>}
+        </label>
+      )}
       {children}
     </div>
   )

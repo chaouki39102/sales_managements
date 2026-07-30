@@ -367,7 +367,7 @@ export function useG50Declaration(fiscalYearId: number | null, month: number | n
     queryFn: () => taxManagementApi.getG50Declaration(fiscalYearId!, month!),
     enabled: !!slug && !!fiscalYearId && !!month,
     staleTime: 5 * 60_000,
-    select: (data: Record<string, unknown>) => ({
+    select: (data: Record<string, unknown>): any => ({
       ...data,
       amount_due: data.total_due,
       timbre_fiscal: data.timbre_total,
@@ -399,7 +399,13 @@ export function useIFUDeclaration(fiscalYearId: number | null, month?: number) {
       ifu_total:      data.summary?.ifu_total,
       ifu_minimum:    data.summary?.ifu_minimum,
       amount_due:     data.summary?.ifu_due,
-    }),
+    }) as IFUDeclaration & {
+      ifu_subsidized: number | undefined;
+      ifu_other: number | undefined;
+      ifu_total: number | undefined;
+      ifu_minimum: number | undefined;
+      amount_due: number | undefined;
+    },
   });
 }
 

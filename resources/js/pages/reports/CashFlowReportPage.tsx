@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
-import { FMT, MONEY, PCT, REPORT_DEFAULTS } from './helpers';
+import { FMT as _FMT, MONEY, PCT, REPORT_DEFAULTS } from './helpers';
 import { useCashFlowReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
@@ -47,7 +47,7 @@ export default function CashFlowReportPage() {
           <Card title="التحصيل اليومي" titleIcon="ti-calendar-day" padding="sm" style={{ borderRadius: 12 }}>
             <SimpleTable
               rowKey={(row) => (row as any).__isSummary ? '__summary__' : String(row.date ?? '')}
-              rowClassName={(row) => (row as any).__isSummary ? 'tw-sr' : undefined}
+              rowClassName={(row, _index) => (row as any).__isSummary ? 'tw-sr' : ''}
               columns={[
                 { key: 'date', label: 'التاريخ', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
                 { key: 'count', label: 'العدد', className: 'num' },
@@ -73,7 +73,7 @@ export default function CashFlowReportPage() {
         {data.by_mode.length > 0 && (
           <Card title="حسب طريقة الدفع" titleIcon="ti-wallet" padding="sm" style={{ borderRadius: 12 }}>
             <SimpleTable
-              rowKey={(row, i) => String(i)}
+              rowKey={(_row: any) => String((_row as any).mode ?? Math.random())}
               columns={[
                 { key: 'mode', label: 'الطريقة', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
                 { key: 'count', label: 'العدد', className: 'num' },

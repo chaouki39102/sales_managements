@@ -103,7 +103,7 @@ export function useRoles() {
 
     return useQuery({
         queryKey: roleKeys.list(slug),
-        queryFn: () => rolesApi.list().then(r => r?.data ?? r ?? []),
+        queryFn: () => rolesApi.list(),
         enabled: !!slug,
         staleTime: 5 * 60_000,
         select: (data) => {

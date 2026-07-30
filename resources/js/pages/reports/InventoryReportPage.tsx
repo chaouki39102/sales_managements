@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
@@ -66,8 +66,11 @@ export default function InventoryReportPage() {
               ...data.products.map((row, i) => ({ ...row, _idx: i + 1, family: row.family ?? '—' })),
               { _isFooter: true, _idx: '', name: `الإجمالي (${data.products.length} منتج)`, ref: '', family: '', stock_quantity: data.products.reduce((s, r) => s + r.stock_quantity, 0), purchase_price_ht: '', current_cost_price: '', stock_value: data.summary.total_value, status: '' },
             ]}
-            rowKey={(row) => row._isFooter ? 'footer' : (row as Record<string, unknown>).id ?? `row-${row._idx}`}
-            rowClassName={(row) => row._isFooter ? 'font-extrabold bg-2' : undefined}
+            rowKey={(row: Record<string, unknown>) => {
+              const r = row as Record<string, unknown>;
+              return (r as any)._isFooter ? 'footer' : String((r as any).id ?? (r as any)._idx ?? '');
+            }}
+            rowClassName={(row, _index) => row._isFooter ? 'font-extrabold bg-2' : ''}
           />
         </Card>
       </>

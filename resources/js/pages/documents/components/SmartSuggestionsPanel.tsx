@@ -1,4 +1,3 @@
-import React from 'react';
 import { InfoPanel } from './DocumentUIPrimitives';
 import { fmtDZD } from '../utils/document.utils';
 import type { ProductSuggestion } from '../hooks/useProductSuggestions';

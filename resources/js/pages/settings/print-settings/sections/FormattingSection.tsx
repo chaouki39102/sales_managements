@@ -1,4 +1,3 @@
-import React from 'react';
 import type { FontFamily } from '../types';
 import type { PrintTemplate, LayoutRow } from '../types';
 import { SliderField } from './ToggleSwitch';

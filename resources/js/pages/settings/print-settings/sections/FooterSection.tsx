@@ -1,4 +1,3 @@
-import React from 'react';
 import type { BorderStyle } from '../types';
 import type { PrintTemplate } from '../types';
 import { Toggle, SliderField, Section } from './ToggleSwitch';

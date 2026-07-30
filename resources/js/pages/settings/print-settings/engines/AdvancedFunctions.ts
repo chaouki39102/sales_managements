@@ -220,9 +220,6 @@ const EDATE: ExpressionFunction = ([date, months]) => {
 const FILTER: ExpressionFunction = ([arr, cond]) => {
   if (!isArray(arr)) return [];
   const condVal = (cond as ExpressionValue);
-  if (typeof condVal === 'function') {
-    return (arr as ExpressionValue[]).filter((item: ExpressionValue) => condVal(item));
-  }
   return (arr as ExpressionValue[]).filter(() => isTruthy(condVal));
 };
 
@@ -453,9 +450,11 @@ const MATCH: ExpressionFunction = ([lookup, arr, matchType]) => {
   const items = arr as ExpressionValue[];
   const mt = matchType != null ? Math.floor(toNum(matchType)) : 0;
   for (let i = 0; i < items.length; i++) {
-    if (mt === 0 && items[i] === lookup) return i + 1;
-    if (mt === 1 && typeof items[i] === 'number' && typeof lookup === 'number' && items[i] <= lookup) return i + 1;
-    if (mt === -1 && typeof items[i] === 'number' && typeof lookup === 'number' && items[i] >= lookup) return i + 1;
+    const item = items[i];
+    if (item === null || item === undefined) continue;
+    if (mt === 0 && item === lookup) return i + 1;
+    if (mt === 1 && typeof item === 'number' && typeof lookup === 'number' && item <= lookup) return i + 1;
+    if (mt === -1 && typeof item === 'number' && typeof lookup === 'number' && item >= lookup) return i + 1;
   }
   return null;
 };

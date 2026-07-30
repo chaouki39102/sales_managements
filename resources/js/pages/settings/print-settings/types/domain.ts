@@ -371,6 +371,7 @@ export interface PrintTemplate {
   // ── ملصق المنتج (STK) ──
   show_label_barcode:      boolean;
   label_barcode_height:    number;
+  label_barcode_bar_width: number;
   show_label_product_name: boolean;
   label_product_name_size: number;
   label_product_name_bold: boolean;
@@ -396,6 +397,7 @@ export interface PrintTemplate {
   label_layout:             'stacked' | 'side-by-side';
   label_hide_currency:      boolean;
   label_barcode_format:     'code39' | 'ean13' | 'code128';
+  label_positions:          Record<string, {x: number; y: number}>;
 
   show_report_header:        boolean;
   report_header_text:        string;

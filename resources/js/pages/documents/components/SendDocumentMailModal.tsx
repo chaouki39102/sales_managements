@@ -3,7 +3,7 @@
 // مودال إرسال المستند بالبريد الإلكتروني
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { apiPost } from '@/lib/api/core/client';
 import { useNotification } from '@/hooks/useNotification';
 
@@ -16,7 +16,7 @@ interface SendDocumentMailModalProps {
 }
 
 export function SendDocumentMailModal({ documentId, documentNumber, partyName, partyEmail, onClose }: SendDocumentMailModalProps) {
-  const { notify } = useNotification();
+  const notify = useNotification();
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
 

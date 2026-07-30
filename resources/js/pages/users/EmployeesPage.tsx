@@ -1,5 +1,5 @@
 // resources/js/pages/users/EmployeesPage.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useModal } from '@/hooks/useModal';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
@@ -151,7 +151,7 @@ export default function EmployeesPage() {
                                 },
                             },
                         ]}
-                        data={employees}
+                        data={employees as unknown as Record<string, unknown>[]}
                         rowKey="id"
                     />
                 </Card>

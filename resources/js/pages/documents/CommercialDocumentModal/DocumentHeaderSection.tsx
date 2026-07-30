@@ -1,4 +1,3 @@
-import React from 'react';
 import type { DocumentType } from '@/lib/api/core/types';
 
 interface DocumentHeaderSectionProps {
@@ -55,7 +54,7 @@ export default function DocumentHeaderSection({
           }}>
             {isEdit ? `تعديل ${documentType?.name}` : `مستند جديد: ${documentType?.name}`}
 
-            {isEdit && existingDocument?.document_number && (
+            {isEdit && !!existingDocument?.document_number && (
               <span style={{
                 padding: '2px 8px', borderRadius: 'var(--r1)',
                 background: 'var(--bg1)', border: '1px solid var(--b2)',

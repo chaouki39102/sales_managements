@@ -239,7 +239,7 @@ export interface DocumentTotals {
   ttc:         number;
   discount:    number;
   stamp:       number;
-  netToPay:    number;
+  netToPay?:   number;
   totalPaid:   number;
   remaining:   number;
 }

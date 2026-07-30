@@ -7,6 +7,8 @@ interface AlertBarProps {
   variant?: AlertVariant;
   children: React.ReactNode;
   dismissible?: boolean;
+  style?: React.CSSProperties;
+  onDismiss?: () => void;
 }
 
 const variantMap: Record<AlertVariant, string> = {
@@ -23,14 +25,14 @@ const iconMap: Record<AlertVariant, string> = {
   blue:  'ti-info-circle',
 };
 
-export default function AlertBar({ variant = 'green', children, dismissible = true }: AlertBarProps) {
+export default function AlertBar({ variant = 'green', children, dismissible = true, style, onDismiss }: AlertBarProps) {
   const [visible, setVisible] = useState(true);
   if (!visible) return null;
 
   return (
     <div
       className={`al ${variantMap[variant]}`}
-      style={{ borderRadius: 'var(--r3)', marginBottom: 18 }}
+      style={{ borderRadius: 'var(--r3)', marginBottom: 18, ...style }}
     >
       <span className="ic ic-sm" style={{ flexShrink: 0, marginTop: 1 }}>
         <i className={`ti ${iconMap[variant]}`} />
@@ -38,7 +40,7 @@ export default function AlertBar({ variant = 'green', children, dismissible = tr
       <div style={{ flex: 1 }}>{children}</div>
       {dismissible && (
         <button
-          onClick={() => setVisible(false)}
+          onClick={() => { setVisible(false); onDismiss?.(); }}
           style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, flexShrink: 0, padding: 0, color: 'inherit' }}
         >
           <i className="ti ti-x" />

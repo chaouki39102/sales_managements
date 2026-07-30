@@ -30,6 +30,28 @@ class CommercialDocumentController extends BaseApiController
         parent::__construct();
     }
 
+    public function checkNumber(Request $request): JsonResponse
+    {
+        $number = $request->input('document_number');
+        $typeId = $request->input('document_type_id');
+        $excludeId = $request->input('exclude_id');
+
+        if (!$number || !$typeId) {
+            return response()->json(['exists' => false]);
+        }
+
+        $query = CommercialDocument::where('document_number', $number)
+            ->where('document_type_id', $typeId);
+
+        if ($excludeId) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        $exists = $query->exists();
+
+        return response()->json(['exists' => $exists]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         try {

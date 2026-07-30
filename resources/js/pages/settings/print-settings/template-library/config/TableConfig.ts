@@ -1,4 +1,4 @@
-import type { ColumnKey, AlignOption, BorderStyle, FontFamily } from '../../../types';
+import type { ColumnKey, AlignOption, BorderStyle, FontFamily } from '../../types';
 import {
   TABLE_ROW_ALT,
   COLUMN_REF_WIDTH, COLUMN_NAME_WIDTH, COLUMN_QTY_WIDTH,

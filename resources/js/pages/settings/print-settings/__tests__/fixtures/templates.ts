@@ -248,7 +248,7 @@ export function createMockTemplate(
 
     // Label / Sticker
     show_label_barcode: true,
-    label_barcode_height: 40,
+    label_barcode_height: 50, label_barcode_bar_width: 1.0,
     show_label_product_name: true,
     label_product_name_size: 14,
     label_product_name_bold: true,

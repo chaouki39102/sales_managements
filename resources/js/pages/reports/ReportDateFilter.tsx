@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface ReportDateFilterProps {
   fromDate: string;
   toDate: string;
@@ -34,7 +32,7 @@ function startOfMonth(): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
-function endOfMonth(d: Date): Date {
+function _endOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0);
 }
 
@@ -62,7 +60,7 @@ const PRESETS = [
 ] as const;
 
 export default function ReportDateFilter({ fromDate, toDate, onChangeFrom, onChangeTo }: ReportDateFilterProps) {
-  const applyPreset = (getRange: () => readonly [string, string]) => {
+  const applyPreset = (getRange: () => string[]) => {
     const [from, to] = getRange();
     onChangeFrom(from);
     onChangeTo(to);

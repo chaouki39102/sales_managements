@@ -496,7 +496,7 @@ function DocumentViewModal({
                     </div>
                     <div className="flex items-center gap-6">
                         <StatusBadge status={status} />
-                        {d.is_locked && <span className="bx bp no-dot">مقفل</span>}
+                        {!!d.is_locked && <span className="bx bp no-dot">مقفل</span>}
                         {Number(d.remaining_amount ?? 0) > 0 && (
                             <span className="text-red font-bold text-sm">متبقي: {fmt(Number(d.remaining_amount))} دج</span>
                         )}
@@ -527,16 +527,16 @@ function DocumentViewModal({
                 <div className="p-8 rounded-lg bg-3">
                     <div className="text-xs text-t4 mb-4">التواريخ</div>
                     <div className="font-bold text-sm">{dtf(d.document_date as string)}</div>
-                    {d.due_date && <div className="text-xs text-t4 mt-2">استحقاق: {dtf(d.due_date as string)}</div>}
-                    {d.delivery_date && <div className="text-xs text-t4 mt-1">تسليم: {dtf(d.delivery_date as string)}</div>}
-                    {(d as Record<string, unknown>).currency && <div className="text-xs text-t4 mt-2">{(d.currency as Record<string, unknown>).name as string}</div>}
+                    {!!d.due_date && <div className="text-xs text-t4 mt-2">استحقاق: {dtf(d.due_date as string)}</div>}
+                    {!!d.delivery_date && <div className="text-xs text-t4 mt-1">تسليم: {dtf(d.delivery_date as string)}</div>}
+                    {!!(d as Record<string, unknown>).currency && <div className="text-xs text-t4 mt-2">{(d.currency as Record<string, unknown>).name as string}</div>}
                 </div>
                 <div className="p-8 rounded-lg bg-3">
                     <div className="text-xs text-t4 mb-4">الحالة</div>
                     <StatusBadge status={status} />
                     <div className="text-xs text-t4 mt-2">{(d.user as Record<string, unknown> | undefined)?.name as string ?? "—"}</div>
-                    {d.validatedBy && <div className="text-xs text-t4">اعتمد: {(d.validatedBy as Record<string, unknown>).name as string}</div>}
-                    {d.notes && <div className="text-xs text-t4 mt-1 truncate">{String(d.notes)}</div>}
+                    {!!d.validatedBy && <div className="text-xs text-t4">اعتمد: {(d.validatedBy as Record<string, unknown>).name as string}</div>}
+                    {!!d.notes && <div className="text-xs text-t4 mt-1 truncate">{String(d.notes)}</div>}
                 </div>
                 <div className="p-8 rounded-lg bg-3">
                     <div className="text-xs text-t4 mb-4">الرصيد</div>

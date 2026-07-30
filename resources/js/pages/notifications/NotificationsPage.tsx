@@ -269,7 +269,7 @@ export default function NotificationsPage() {
               },
               {
                 key: 'content', label: 'المحتوى',
-                render: (_v, row) => {
+                render: (_v: any, row: any) => {
                   const n = row as any;
                   return (
                     <>

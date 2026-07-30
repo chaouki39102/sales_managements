@@ -1,35 +1,33 @@
-import type { IRenderer, RenderContext, RenderResult } from './IRenderer';
+﻿import type { IRenderer, RenderContext, RenderResult } from './IRenderer';
 import type { ColumnKey, PrintTemplate } from '../types';
-import type { UniversalDocumentData, DocumentLine } from '../types/data';
+import type { UniversalDocumentData } from '../types/data';
 import { printFieldResolver } from '../services/PrintFieldResolver';
 import { COLUMN_DEFAULTS } from '../services/SettingsRegistry';
 import { EscPosBuilder, fmt, lineRow, mapFontSizeToEscPos, mapInfoFontSizeToEscPos, mapAlignToEscPos } from './EscPosBuilder';
 
-type EscPosAlign = 0 | 1 | 2;
+type _Tpl = PrintTemplate & Record<string, unknown>;
+type _Data = UniversalDocumentData & Record<string, unknown>;
 
-function getVisibleCols(tpl: PrintTemplate): ColumnKey[] {
+function lbl(tpl: _Tpl, k: string, fallback: string): string {
+  return ((tpl as Record<string, unknown>)[k] as string) || fallback;
+}
+
+function getVisibleCols(tpl: _Tpl): ColumnKey[] {
   return tpl.col_order.filter(k => tpl.col_show[k] !== false);
 }
 
-function colWidth(tpl: PrintTemplate, col: ColumnKey): number {
-  return tpl.col_widths[col] ?? COLUMN_DEFAULTS[col]?.width ?? 20;
-}
 
-function colAlignEscPos(tpl: PrintTemplate, col: ColumnKey): EscPosAlign {
-  const a = tpl.col_aligns[col] ?? COLUMN_DEFAULTS[col]?.align ?? 'right';
-  return mapAlignToEscPos(a);
-}
 
-function resolveField(fieldId: string, fallback: string, data: UniversalDocumentData, template: PrintTemplate): string {
+function resolveField(fieldId: string, fallback: string, data: _Data, template: _Tpl): string {
   return String(printFieldResolver.resolve(fieldId, data, template) ?? fallback);
 }
 
-function buildThermalHeader(b: EscPosBuilder, data: UniversalDocumentData, template: PrintTemplate): void {
+function buildThermalHeader(b: EscPosBuilder, data: _Data, template: _Tpl): void {
   if (!template.show_header_section) return;
 
   const co = data.company ?? {};
 
-  const companyName    = resolveField('company.name', co.name ?? 'نظام المبيعات', data, template);
+  const companyName    = resolveField('company.name', co.name ?? 'ظ†ط¸ط§ظ… ط§ظ„ظ…ط¨ظٹط¹ط§طھ', data, template);
   const companyAddress = resolveField('company.address', co.address ?? '', data, template);
   const companyPhone   = resolveField('company.phone', co.phone ?? '', data, template);
   const companyNIF     = resolveField('company.nif', co.nif ?? '', data, template);
@@ -73,8 +71,8 @@ function buildThermalHeader(b: EscPosBuilder, data: UniversalDocumentData, templ
   }
 }
 
-function buildThermalTitle(b: EscPosBuilder, template: PrintTemplate): void {
-  const title = template.title_text || 'فاتورة';
+function buildThermalTitle(b: EscPosBuilder, template: _Tpl): void {
+  const title = template.title_text || 'ظپط§طھظˆط±ط©';
   const titleAlign = mapAlignToEscPos(template.title_align);
   const titleBold  = template.title_bold !== false;
   const [tw, th]   = mapFontSizeToEscPos(template.title_size ?? 13);
@@ -86,7 +84,7 @@ function buildThermalTitle(b: EscPosBuilder, template: PrintTemplate): void {
   b.resetFontSize();
 }
 
-function buildThermalDocInfo(b: EscPosBuilder, data: UniversalDocumentData, template: PrintTemplate): void {
+function buildThermalDocInfo(b: EscPosBuilder, data: _Data, template: _Tpl): void {
   if (!template.show_doc_info_section) return;
 
   buildThermalTitle(b, template);
@@ -98,52 +96,52 @@ function buildThermalDocInfo(b: EscPosBuilder, data: UniversalDocumentData, temp
   const party = data.party;
 
   if (template.show_doc_number !== false && doc.number) {
-    b.setBold(true).text(template.label_doc_number || 'رقم الفاتورة: ').ascii(doc.number).lineFeed().setBold(false);
+    b.setBold(true).text(lbl(template, 'label_doc_number', 'رقم الفاتورة: ')).ascii(doc.number).lineFeed().setBold(false);
   }
 
   if (template.show_date !== false && doc.date) {
-    b.text(template.label_date || 'التاريخ: ').ascii(doc.date.slice(0, 10)).lineFeed();
+    b.text(lbl(template, 'label_date', 'التاريخ: ')).ascii(doc.date.slice(0, 10)).lineFeed();
   }
 
   if (template.show_time !== false) {
-    b.text(template.label_time || 'الوقت: ').ascii(doc.time || now.toLocaleTimeString('fr-DZ')).lineFeed();
+    b.text(lbl(template, 'label_time', 'الوقت: ')).ascii(doc.time || now.toLocaleTimeString('fr-DZ')).lineFeed();
   }
 
   if (template.show_due_date !== false && doc.dueDate) {
-    b.text(template.label_due_date || 'تاريخ الاستحقاق: ').ascii(doc.dueDate.slice(0, 10)).lineFeed();
+    b.text(lbl(template, 'label_due_date', 'تاريخ الاستحقاق: ')).ascii(doc.dueDate.slice(0, 10)).lineFeed();
   }
 
   if (party) {
     if (template.show_client !== false) {
-      b.text(template.label_client || 'الزبون: ').text(party.name).lineFeed();
+      b.text(lbl(template, 'label_client', 'الزبون: ')).text(party.name).lineFeed();
     }
     if (template.show_client_phone && party.phone) {
-      b.text(template.label_client_phone || 'الهاتف: ').ascii(party.phone).lineFeed();
+      b.text(lbl(template, 'label_client_phone', 'الهاتف: ')).ascii(party.phone).lineFeed();
     }
     if (template.show_client_nif && party.nif) {
-      b.text(template.label_client_nif || 'NIF: ').ascii(party.nif).lineFeed();
+      b.text(lbl(template, 'label_client_nif', 'NIF: ')).ascii(party.nif).lineFeed();
     }
     if (template.show_client_address && party.address) {
-      b.text(template.label_client_address || 'العنوان: ').ascii(party.address).lineFeed();
+      b.text(lbl(template, 'label_client_address', 'العنوان: ')).ascii(party.address).lineFeed();
     }
   }
 
-  if (template.show_cashier !== false && data.cashier) {
-    b.text(template.label_cashier || 'الكاشير: ').text(data.cashier).lineFeed();
+  if (template.show_cashier !== false && ((data as Record<string, unknown>).cashier as string)) {
+    b.text(lbl(template, 'label_cashier', 'الكاشير: ')).text(((data as Record<string, unknown>).cashier as string)).lineFeed();
   }
 
-  if (template.show_session && data.sessionLabel) {
-    b.text(template.label_session || 'الجلسة: ').text(data.sessionLabel).lineFeed();
+  if (template.show_session && ((data as Record<string, unknown>).sessionLabel as string)) {
+    b.text(lbl(template, 'label_session', 'الجلسة: ')).text(((data as Record<string, unknown>).sessionLabel as string)).lineFeed();
   }
 
-  if (template.show_payment_term && data.paymentTerm) {
-    b.text(template.label_payment_term || 'شروط الدفع: ').text(data.paymentTerm).lineFeed();
+  if (template.show_payment_term && ((data as Record<string, unknown>).paymentTerm as string)) {
+    b.text(lbl(template, 'label_payment_term', 'شروط الدفع: ')).text(((data as Record<string, unknown>).paymentTerm as string)).lineFeed();
   }
 
   b.divider('-', 42);
 }
 
-function buildThermalItems(b: EscPosBuilder, data: UniversalDocumentData, template: PrintTemplate): void {
+function buildThermalItems(b: EscPosBuilder, data: _Data, template: _Tpl): void {
   if (!template.show_items_section) return;
   const lines = data.lines ?? [];
   if (lines.length === 0) return;
@@ -166,7 +164,7 @@ function buildThermalItems(b: EscPosBuilder, data: UniversalDocumentData, templa
       b.text(name).lineFeed();
       const detail = `  ${fmt(line.quantity)} x ${fmt(line.unitPriceHt)}` +
         (line.discountPct > 0 ? ` (-${line.discountPct.toFixed(0)}%)` : '');
-      const totalStr = `${fmt(line.totalTtc)} دج`;
+      const totalStr = `${fmt(line.totalTtc)} ط¯ط¬`;
       b.setAlign(0).ascii(detail);
       b.setAlign(2).ascii(totalStr).lineFeed();
     } else {
@@ -196,7 +194,7 @@ function buildThermalItems(b: EscPosBuilder, data: UniversalDocumentData, templa
   b.divider('-', printWidth);
 }
 
-function buildThermalTotals(b: EscPosBuilder, data: UniversalDocumentData, template: PrintTemplate): void {
+function buildThermalTotals(b: EscPosBuilder, data: _Data, template: _Tpl): void {
   if (!template.show_totals_section) return;
   const t = data.totals;
   if (!t) return;
@@ -205,46 +203,46 @@ function buildThermalTotals(b: EscPosBuilder, data: UniversalDocumentData, templ
 
   b.setAlign(0);
   if (template.show_total_ht !== false) {
-    b.ascii(lineRow(template.label_total_ht || 'المجموع HT:', `${fmt(t.totalHt)} دج`, printWidth)).lineFeed();
+    b.ascii(lineRow(lbl(template, 'label_total_ht', 'المجموع HT:'), `${fmt(t.totalHt)} ط¯ط¬`, printWidth)).lineFeed();
   }
   if (template.show_discount_total !== false && t.totalDiscount > 0) {
-    b.ascii(lineRow(template.label_discount_total || 'الخصم:', `-${fmt(t.totalDiscount)} دج`, printWidth)).lineFeed();
+    b.ascii(lineRow(lbl(template, 'label_discount_total', 'الخصم:'), `-${fmt(t.totalDiscount)} ط¯ط¬`, printWidth)).lineFeed();
   }
   if (template.show_total_tva !== false) {
-    b.ascii(lineRow(template.label_total_tva || 'TVA:', `${fmt(t.totalTva)} دج`, printWidth)).lineFeed();
+    b.ascii(lineRow(lbl(template, 'label_total_tva', 'TVA:'), `${fmt(t.totalTva)} ط¯ط¬`, printWidth)).lineFeed();
   }
   if (template.show_tva_breakdown && data.taxBreakdown && data.taxBreakdown.length > 0) {
     for (const br of data.taxBreakdown) {
-      b.ascii(lineRow(`  TVA ${(br.rate * 100).toFixed(0)}%:`, `${fmt(br.tva)} دج`, printWidth)).lineFeed();
+      b.ascii(lineRow(`  TVA ${(br.rate * 100).toFixed(0)}%:`, `${fmt(br.tva)} ط¯ط¬`, printWidth)).lineFeed();
     }
   }
   if (template.show_fiscal_stamp !== false && t.fiscalStamp > 0) {
-    b.ascii(lineRow(template.label_fiscal_stamp || 'الطابع المالي:', `${fmt(t.fiscalStamp)} دج`, printWidth)).lineFeed();
+    b.ascii(lineRow(lbl(template, 'label_fiscal_stamp', 'الطابع المالي:'), `${fmt(t.fiscalStamp)} ط¯ط¬`, printWidth)).lineFeed();
   }
   b.divider('=', printWidth);
 
   const totalTtcFinal = t.totalTtc + t.fiscalStamp;
-  b.setFontSize(2, 2).setBold(true).setAlign(2).ascii(`${fmt(totalTtcFinal)} دج`).lineFeed()
+  b.setFontSize(2, 2).setBold(true).setAlign(2).ascii(`${fmt(totalTtcFinal)} ط¯ط¬`).lineFeed()
    .setBold(false).resetFontSize();
 
-  const totalLabel = template.label_total_ttc || 'الإجمالي شامل الضريبة';
+  const totalLabel = lbl(template, 'label_total_ttc', 'الإجمالي شامل الضريبة');
   b.setAlign(1).text(totalLabel).lineFeed();
   b.divider('=', printWidth);
 
   if (template.show_paid_amount !== false) {
-    b.setAlign(0).ascii(lineRow(template.label_paid_amount || 'المدفوع:', `${fmt(t.paid)} دج`, printWidth)).lineFeed();
+    b.setAlign(0).ascii(lineRow(lbl(template, 'label_paid_amount', 'المدفوع:'), `${fmt(t.paid)} ط¯ط¬`, printWidth)).lineFeed();
   }
   if (template.show_change !== false && t.change > 0) {
-    b.ascii(lineRow(template.label_change || 'الباقي:', `${fmt(t.change)} دج`, printWidth)).lineFeed();
+    b.ascii(lineRow(lbl(template, 'label_change', 'الباقي:'), `${fmt(t.change)} ط¯ط¬`, printWidth)).lineFeed();
   }
   if (template.show_remaining !== false && t.remaining > 0) {
     b.setBold(true);
-    b.ascii(lineRow(template.label_remaining || 'المتبقي:', `${fmt(t.remaining)} دج`, printWidth)).lineFeed();
+    b.ascii(lineRow(lbl(template, 'label_remaining', 'المتبقي:'), `${fmt(t.remaining)} ط¯ط¬`, printWidth)).lineFeed();
     b.setBold(false);
   }
 }
 
-function buildThermalPayments(b: EscPosBuilder, data: UniversalDocumentData, template: PrintTemplate): void {
+function buildThermalPayments(b: EscPosBuilder, data: _Data, template: _Tpl): void {
   if (!template.show_payments_section) return;
   const payments = data.payments ?? [];
   if (payments.length === 0) return;
@@ -253,31 +251,31 @@ function buildThermalPayments(b: EscPosBuilder, data: UniversalDocumentData, tem
   b.setAlign(payAlign);
 
   for (const p of payments) {
-    const method = p.method || '';
+    const method = p.mode || '';
     const amount = p.amount || 0;
-    b.text(`${method}: `).ascii(`${fmt(amount)} دج`).lineFeed();
+    b.text(`${method}: `).ascii(`${fmt(amount)} ط¯ط¬`).lineFeed();
   }
 
   b.divider('-', 42);
 }
 
-function buildThermalBalance(b: EscPosBuilder, data: UniversalDocumentData, template: PrintTemplate): void {
+function buildThermalBalance(b: EscPosBuilder, data: _Data, template: _Tpl): void {
   if (!data.balance) return;
   if (!template.show_prev_balance && !template.show_new_balance) return;
   const printWidth = template.paper_width_mm === 58 ? 32 : 42;
 
   b.divider('-', printWidth);
   if (template.show_prev_balance) {
-    b.setAlign(0).ascii(lineRow(template.label_prev_balance || 'الرصيد السابق:', `${fmt(data.balance.previous)} دج`, printWidth)).lineFeed();
+    b.setAlign(0).ascii(lineRow(lbl(template, 'label_prev_balance', 'الرصيد السابق:'), `${fmt(data.balance.previous)} ط¯ط¬`, printWidth)).lineFeed();
   }
   if (template.show_new_balance) {
     b.setBold(true).setAlign(0)
-     .ascii(lineRow(template.label_new_balance || 'الرصيد الجديد:', `${fmt(data.balance.current)} دج`, printWidth))
+     .ascii(lineRow(lbl(template, 'label_new_balance', 'الرصيد الجديد:'), `${fmt(data.balance.current)} ط¯ط¬`, printWidth))
      .lineFeed().setBold(false);
   }
 }
 
-function buildThermalFooter(b: EscPosBuilder, data: UniversalDocumentData, template: PrintTemplate): void {
+function buildThermalFooter(b: EscPosBuilder, _data: _Data, template: _Tpl): void {
   if (!template.show_footer_section) return;
   const now = new Date();
   const footerAlign = mapAlignToEscPos(template.footer_align);
@@ -303,10 +301,10 @@ function buildThermalFooter(b: EscPosBuilder, data: UniversalDocumentData, templ
     b.text(template.footer_legal_text).lineFeed();
   }
 
-  b.center(`نظام ERP الجزائر — ${now.getFullYear()}`);
+  b.center(`ظ†ط¸ط§ظ… ERP ط§ظ„ط¬ط²ط§ط¦ط± â€” ${now.getFullYear()}`);
 }
 
-function buildThermalBarcode(b: EscPosBuilder, data: UniversalDocumentData, template: PrintTemplate): void {
+function buildThermalBarcode(b: EscPosBuilder, data: _Data, template: _Tpl): void {
   if (!template.show_barcode) return;
   const docNumber = data.doc?.number;
   if (!docNumber) return;
@@ -314,20 +312,20 @@ function buildThermalBarcode(b: EscPosBuilder, data: UniversalDocumentData, temp
   b.center(docNumber);
 }
 
-function buildThermalSignatures(b: EscPosBuilder, template: PrintTemplate): void {
+function buildThermalSignatures(b: EscPosBuilder, template: _Tpl): void {
   if (!template.show_cashier_signature && !template.show_client_signature && !template.show_stamp) return;
 
   b.lineFeed(2);
   if (template.show_cashier_signature) {
     b.setAlign(0).text('___________________').lineFeed();
-    b.text(template.label_cashier_signature || 'توقيع الكاشير').lineFeed(2);
+    b.text(lbl(template, 'label_cashier_signature', 'توقيع الكاشير')).lineFeed(2);
   }
   if (template.show_client_signature) {
     b.setAlign(2).text('___________________').lineFeed();
-    b.setAlign(2).text(template.label_client_signature || 'توقيع الزبون').lineFeed(2);
+    b.setAlign(2).text(lbl(template, 'label_client_signature', 'توقيع الزبون')).lineFeed(2);
   }
   if (template.show_stamp) {
-    b.setAlign(1).text('[ ختم ]').lineFeed();
+    b.setAlign(1).text('[ ط®طھظ… ]').lineFeed();
   }
 }
 
@@ -339,7 +337,8 @@ export const escposRenderer: IRenderer<Uint8Array> = {
   },
 
   async render(ctx: RenderContext): Promise<RenderResult<Uint8Array>> {
-    const { data, template } = ctx;
+    const data = ctx.data as _Data;
+    const template = ctx.template as _Tpl;
     const docNumber = data.doc?.number;
 
     const b = new EscPosBuilder().init();
@@ -370,3 +369,9 @@ export const escposRenderer: IRenderer<Uint8Array> = {
     };
   },
 };
+
+
+
+
+
+

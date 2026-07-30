@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
@@ -51,10 +51,10 @@ export default function ReturnsReportPage() {
                 { key: 'document_number', label: 'رقم الوثيقة', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
                 { key: 'document_type', label: 'النوع', render: (v) => <Badge>{v as string}</Badge> },
                 { key: 'date', label: 'التاريخ' },
-                { key: 'party_name', label: 'العميل/المورد', render: (v) => v ?? '—' },
+                { key: 'party_name', label: 'العميل/المورد', render: (v) => (v as string) ?? '—' },
                 { key: 'total_ht', label: 'HT', render: (v) => FMT(v as number) },
                 { key: 'total_ttc', label: 'TTC', render: (v) => FMT(v as number) },
-                { key: 'reason', label: 'السبب', render: (v) => <span style={{ color: 'var(--t4)' }}>{v ?? '—'}</span> },
+                { key: 'reason', label: 'السبب', render: (v) => <span style={{ color: 'var(--t4)' }}>{(v as string) ?? '—'}</span> },
               ]}
               data={data.documents.map((doc, i) => ({ ...doc, _idx: i + 1 }))}
             />

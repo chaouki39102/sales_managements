@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { fmtDZD, fmtDate } from '../utils/document.utils';
 import { STATUS_CONFIG } from '../types/document.types';
 import type { DocumentChain, ChainNode } from '../hooks/useDocumentChain';

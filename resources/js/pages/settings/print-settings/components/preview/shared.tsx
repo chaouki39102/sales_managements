@@ -375,8 +375,8 @@ export function renderLayoutRows(
 ): JSX.Element[] {
   const options: RenderLayoutRowsOptions =
     fieldStyleOverridesOrOptions && 'sectionAlign' in fieldStyleOverridesOrOptions
-      ? fieldStyleOverridesOrOptions
-      : { fieldStyleOverrides: fieldStyleOverridesOrOptions };
+      ? fieldStyleOverridesOrOptions as RenderLayoutRowsOptions
+      : { fieldStyleOverrides: fieldStyleOverridesOrOptions as Record<string, FieldStyleOverride> | undefined };
   const fieldStyleOverrides = options.fieldStyleOverrides;
   const sectionAlign = options.sectionAlign;
   if (!rows || rows.length === 0) return [];
@@ -388,7 +388,7 @@ export function renderLayoutRows(
     // ── Multi-column mode: row has columns[] ──
     if (r.columns && r.columns.length > 0) {
       const cells = r.columns
-        .map(col => <LayoutColumnCell key={col.id} column={col} data={data} tpl={tpl} />)
+        .map((col: any) => <LayoutColumnCell key={col.id} column={col} data={data} tpl={tpl} />)
         .filter(Boolean);
       if (cells.length === 0) continue;
       out.push(

@@ -5,6 +5,7 @@
 
 import { QueryClient, MutationCache, QueryCache } from '@tanstack/react-query';
 import { ApiError } from './client';
+import { companyKeys } from './queryKeys';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

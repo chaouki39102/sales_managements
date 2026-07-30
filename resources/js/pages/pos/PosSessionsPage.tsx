@@ -27,7 +27,7 @@ export default function PosSessionsPage() {
     showOpenModal, setShowOpenModal,
     showCloseModal, setShowCloseModal,
     showStatsModal, setShowStatsModal,
-    openError, closeError,
+    openError, closeError, setCloseError,
 
     isLoading, isFetching,
     currentSession, sessionLoading,

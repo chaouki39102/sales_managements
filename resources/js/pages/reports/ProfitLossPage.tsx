@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
@@ -69,7 +69,7 @@ export default function ProfitLossPage() {
             {d.expenses.by_category.length > 0 && (
               <SimpleTable
                 columns={[
-                  { key: 'category_name', label: 'الفئة', render: (v) => v ?? 'غير مصنف' },
+                  { key: 'category_name', label: 'الفئة', render: (v) => (v as string) ?? 'غير مصنف' },
                   { key: 'total', label: 'المبلغ', className: 'num', render: (v) => FMT(v as number) },
                 ]}
                 data={d.expenses.by_category}

@@ -14,7 +14,7 @@
 //     "آخر نوع مُستخدم".
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { apiGet } from '@/lib/api/core/client';
@@ -24,11 +24,11 @@ import { useDocumentQuickCreate } from '@/lib/store/documentQuickCreateStore';
 
 const LAST_TYPE_STORAGE_KEY = 'doc_quickcreate_last_type_code';
 
-function loadLastTypeCode(slug: string | undefined): string | null {
+function loadLastTypeCode(slug: string | null | undefined): string | null {
   try { return localStorage.getItem(`${LAST_TYPE_STORAGE_KEY}_${slug ?? 'default'}`); }
   catch { return null; }
 }
-function saveLastTypeCode(slug: string | undefined, code: string) {
+function saveLastTypeCode(slug: string | null | undefined, code: string) {
   try { localStorage.setItem(`${LAST_TYPE_STORAGE_KEY}_${slug ?? 'default'}`, code); }
   catch { /* تجاهل — التخزين المحلي غير إلزامي لعمل الزر */ }
 }

@@ -10,8 +10,8 @@ export async function dbSaveDocConfigs(api: ApiClient, configs: Record<string, u
 /** Fetch document configs */
 export async function dbFetchDocConfigs(api: ApiClient): Promise<Record<string, unknown>[]> {
   try {
-    const res = await api.get<{ value: string | object }>(`/settings/${DB_KEY_DOC_CONFIGS}`);
-    const raw = (res as Record<string, unknown>)?.value ?? (res as Record<string, unknown>)?.data?.value ?? null;
+    const res = await api.get<Record<string, unknown>>(`/settings/${DB_KEY_DOC_CONFIGS}`);
+    const raw = (res as Record<string, unknown>)?.value ?? ((res as Record<string, unknown>)?.data as Record<string, unknown>)?.value ?? null;
     if (!raw) return [];
     return typeof raw === 'string' ? JSON.parse(raw) : raw;
   } catch {

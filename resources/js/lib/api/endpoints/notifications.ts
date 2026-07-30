@@ -43,19 +43,19 @@ export interface NotificationsFilters {
 }
 
 export const getUnreadNotifications = () =>
-  apiGet<NotificationsResponse>('/notifications/unread');
+  apiGet<NotificationsResponse>('/alerts/unread');
 
 export const markNotificationAsRead = (id: string) =>
-  apiPost<{ message: string }>(`/notifications/${id}/read`);
+  apiPost<{ message: string }>(`/alerts/${id}/read`);
 
 export const markAllNotificationsAsRead = () =>
-  apiPost<{ message: string }>('/notifications/read-all');
+  apiPost<{ message: string }>('/alerts/mark-all-read');
 
 export const getNotifications = (filters: NotificationsFilters = {}) =>
-  apiGet<PaginatedNotificationsResponse>('/notifications', filters);
+  apiGet<PaginatedNotificationsResponse>('/alerts/all', filters);
 
 export const deleteNotification = (id: string) =>
-  apiDelete(`/notifications/${id}`);
+  apiDelete(`/alerts/${id}`);
 
 export const deleteMultipleNotifications = (ids: string[]) =>
-  apiPost<{ deleted_count: number }>('/notifications/delete-multiple', { ids });
+  apiPost<{ deleted_count: number }>('/alerts/delete-multiple', { ids });

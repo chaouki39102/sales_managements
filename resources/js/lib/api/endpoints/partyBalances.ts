@@ -6,8 +6,8 @@ import { useActiveSlug, useSelectedYearId } from '@/lib/store/appStore';
 import type { PartyBalance, PartyBalanceHistory, PartyTransaction, ProductRecapResponse, DetailedBalanceHistory, DetailedTransaction } from '../core/types';
 
 export const partyBalancesApi = {
-    getAll: (params?: { date?: string; party_type_id?: number; search?: string }) =>
-        apiGet<PartyBalance[]>('/party-balances', params as Record<string, unknown>),
+    getAll: (params?: Record<string, unknown>) =>
+        apiGet<PartyBalance[]>('/party-balances', params),
 
     getOne: (partyId: number, date?: string) =>
         apiGet<PartyBalance>(`/party-balances/${partyId}`, date ? { date } : undefined),

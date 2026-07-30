@@ -1,4 +1,3 @@
-import React from 'react';
 import { useOnlineStatus, usePendingOpsCount, useSync } from '@/lib/offline/useOffline';
 
 export default function OfflineIndicator() {

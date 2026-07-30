@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
@@ -41,16 +41,16 @@ export default function ProductsReportPage() {
         <Card noHeader style={{ padding: 0, marginTop: 16 }}>
           <SimpleTable
             columns={[
-              { key: '_idx', label: '#', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v}</span> },
-              { key: 'name', label: 'المنتج', render: (v, row) => row.id === '__summary' ? <span style={{ fontWeight: 800 }}>{v}</span> : <span style={{ fontWeight: 700 }}>{v}</span> },
-              { key: 'ref', label: 'المرجع', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v}</span> },
+              { key: '_idx', label: '#', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v as React.ReactNode}</span> },
+              { key: 'name', label: 'المنتج', render: (v, row) => row.id === '__summary' ? <span style={{ fontWeight: 800 }}>{v as React.ReactNode}</span> : <span style={{ fontWeight: 700 }}>{v as React.ReactNode}</span> },
+              { key: 'ref', label: 'المرجع', render: (v) => <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v as React.ReactNode}</span> },
               { key: 'family', label: 'العائلة' },
               { key: 'stock_quantity', label: 'المخزون', className: 'num' },
               { key: 'sales_cost', label: 'التكلفة', className: 'num', render: (v, row) => row.id === '__summary' ? <span style={{ fontWeight: 800 }}>{FMT(v as number)}</span> : FMT(v as number) },
-              { key: 'total_sold', label: 'المباع', className: 'num', render: (v, row) => row.id === '__summary' ? <span style={{ fontWeight: 800 }}>{v}</span> : v },
+              { key: 'total_sold', label: 'المباع', className: 'num', render: (v, row) => row.id === '__summary' ? <span style={{ fontWeight: 800 }}>{v as React.ReactNode}</span> : v as React.ReactNode },
               { key: 'sales_ht', label: 'المبيعات HT', className: 'num', render: (v, row) => row.id === '__summary' ? <span style={{ fontWeight: 800 }}>{FMT(v as number)}</span> : FMT(v as number) },
               { key: 'margin_value', label: 'الهامش', className: 'num', render: (v, row) => row.id === '__summary' ? <span style={{ fontWeight: 800 }}>{FMT(v as number)}</span> : <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(v as number)}</span> },
-              { key: 'margin_pct', label: '%', render: (v, row) => row.id === '__summary' ? null : <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)' }}>{v}%</span> },
+              { key: 'margin_pct', label: '%', render: (v, row) => row.id === '__summary' ? null : <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)' }}>{v as React.ReactNode}%</span> },
             ]}
             data={[
               ...data.products.map((r, i) => ({ ...r, _idx: i + 1 })),

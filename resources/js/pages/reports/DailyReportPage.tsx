@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ReportShell from './ReportShell';
 import { FMT, MONEY } from './helpers';
 import { useDailyReport } from '@/lib/api/endpoints/reports';
@@ -57,7 +57,7 @@ export default function DailyReportPage() {
                   { key: 'total_ttc', label: 'TTC', className: 'num', render: (v) => FMT(v as number) },
                   { key: 'payment_status', label: 'الحالة', render: (v) => <Badge variant={v === 'paid' ? 'success' : 'warning'} noDot>{v === 'paid' ? 'مدفوع' : 'غير مدفوع'}</Badge> },
                 ]}
-                data={d.documents}
+                data={d.documents as unknown as Record<string, unknown>[]}
                 rowKey="id"
               />
             </Card>

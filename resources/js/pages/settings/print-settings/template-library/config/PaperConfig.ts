@@ -1,4 +1,4 @@
-import type { PaperSize, PageOrientation } from '../../../types';
+import type { PaperSize, PageOrientation } from '../../types';
 import {
   A4_MARGIN_TOP, A4_MARGIN_BOTTOM, A4_MARGIN_SIDES,
   A5_MARGIN_TOP, A5_MARGIN_BOTTOM, A5_MARGIN_SIDES,

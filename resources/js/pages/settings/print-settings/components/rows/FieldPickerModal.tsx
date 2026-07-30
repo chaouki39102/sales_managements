@@ -1,6 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { printFieldRegistry, type PrintFieldGroup } from '../../services/PrintFieldRegistry';
-import type { LayoutRow } from '../../types';
 
 interface Props {
   open: boolean;

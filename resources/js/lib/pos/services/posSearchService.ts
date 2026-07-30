@@ -204,7 +204,7 @@ function scoreVariantEnhanced(
   // ─── البحث الدقيق والجزئي ──────────────────────────────────────────────────
 
   const fields: Array<{
-    name: keyof typeof SearchResult['matchType'];
+    name: string;
     value: string | null | undefined;
     scoreExact: number;
     scorePartial: number;

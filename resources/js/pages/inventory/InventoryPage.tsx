@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // pages/inventory/InventoryPage.tsx
 // ════════════════════════════════════════════════════════════════════════════
-import React, { useState } from 'react';
+import { useState } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import StockTab          from './StockTab';
 import OpeningBalanceTab from './OpeningBalanceTab';

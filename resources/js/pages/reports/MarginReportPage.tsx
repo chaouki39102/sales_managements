@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
@@ -61,7 +61,7 @@ export default function MarginReportPage() {
               { _isFooter: true, _idx: '', product_name: `الإجمالي (${data.items.length} منتج)`, product_ref: '', total_qty: data.items.reduce((s, r) => s + r.total_qty, 0), total_ht: data.summary.total_ht, cost_total: data.summary.total_cost, margin_amount: data.summary.total_margin, margin_pct: data.summary.margin_pct },
             ]}
             rowKey={(row) => row._isFooter ? 'footer' : `row-${row._idx}`}
-            rowClassName={(row) => row._isFooter ? 'font-extrabold bg-2' : undefined}
+              rowClassName={(row, _index) => row._isFooter ? 'font-extrabold bg-2' : ''}
           />
         </Card>
       </>

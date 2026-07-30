@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface DeliveryProgressBarProps {
   quantity:           number;
   deliveredQuantity:  number;

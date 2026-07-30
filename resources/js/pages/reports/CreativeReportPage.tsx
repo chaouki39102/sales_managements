@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
@@ -60,7 +60,7 @@ export default function CreativeReportPage() {
         {data.top_products.length > 0 && (
           <Card title={<><span className="ic ic-sm" style={{ color: 'var(--em)' }}><i className="ti ti-trophy"/></span> أفضل 10 منتجات حسب الهامش</>}>
             <SimpleTable
-              rowKey={(row, i) => String(i)}
+              rowKey={(_row: any) => String((_row as any).product_name ?? Math.random())}
               columns={[
                 { key: '_idx', label: '#' },
                 { key: 'product_name', label: 'المنتج', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
@@ -69,7 +69,7 @@ export default function CreativeReportPage() {
                 { key: 'total_ht', label: 'HT', render: (v) => FMT(v as number) },
                 { key: 'total_cost', label: 'التكلفة', render: (v) => FMT(v as number) },
                 { key: 'margin_value', label: 'الهامش', render: (v) => <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(v as number)}</span> },
-                { key: 'margin_pct', label: '%', render: (v) => <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)' }}>{v}%</span> },
+                { key: 'margin_pct', label: '%', render: (v) => <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)' }}>{v as React.ReactNode}%</span> },
               ]}
               data={data.top_products.map((p, i) => ({ ...p, _idx: i + 1 }))}
             />
@@ -78,7 +78,7 @@ export default function CreativeReportPage() {
         {data.top_customers.length > 0 && (
           <Card title={<><span className="ic ic-sm" style={{ color: 'var(--purple)' }}><i className="ti ti-crown"/></span> أفضل 10 زبائن حسب المشتريات</>}>
             <SimpleTable
-              rowKey={(row, i) => String(i)}
+              rowKey={(_row: any) => String((_row as any).party_name ?? Math.random())}
               columns={[
                 { key: '_idx', label: '#' },
                 { key: 'party_name', label: 'الزبون', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },

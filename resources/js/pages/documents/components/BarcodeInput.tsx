@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { inputStyle } from './DocumentUIPrimitives';
 
 interface BarcodeInputProps {

@@ -1,5 +1,5 @@
 // pages/invoices/InvoicesPage.tsx
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo, useEffect, Suspense } from "react";
 
 // ✅ استيراد الـ Hooks الصحيحة للمستندات والفواتير
 import {
@@ -77,7 +77,7 @@ export default function InvoicesPage() {
 
   // تزامن السنة المالية المحددة مع الفلاتر
   useEffect(() => {
-    setFilters(prev => ({ ...prev, page: 1, fiscal_year_id: selectedYear?.id }));
+    setFilters((prev: any) => ({ ...prev, page: 1, fiscal_year_id: selectedYear?.id }));
   }, [selectedYear?.id]);
 
   const STATUS_MAP: Record<string, string> = {
@@ -248,7 +248,7 @@ export default function InvoicesPage() {
                         placeholder="ابحث برقم الفاتورة، اسم الزبون..."
                         style={{ width: "100%" }}
                         onChange={(e) =>
-                            setFilters((f) => ({
+                            setFilters((f: any) => ({
                                 ...f,
                                 search: e.target.value || undefined,
                                 page: 1,
@@ -259,7 +259,7 @@ export default function InvoicesPage() {
                 <select
                     style={{ width: 150 }}
                     onChange={(e) =>
-                        setFilters((f) => ({
+                        setFilters((f: any) => ({
                             ...f,
                             status: e.target.value || undefined,
                             page: 1,
@@ -275,7 +275,7 @@ export default function InvoicesPage() {
                 <select
                     style={{ width: 150 }}
                     onChange={(e) =>
-                        setFilters((f) => ({
+                        setFilters((f: any) => ({
                             ...f,
                             party_id: e.target.value
                                 ? Number(e.target.value)
@@ -302,7 +302,7 @@ export default function InvoicesPage() {
                         fontSize: 12,
                     }}
                     onChange={(e) =>
-                        setFilters((f) => ({
+                        setFilters((f: any) => ({
                             ...f,
                             date_from: e.target.value || undefined,
                             page: 1,
@@ -659,7 +659,7 @@ export default function InvoicesPage() {
                                 size="xs"
                                 disabled={(filters.page ?? 1) <= 1}
                                 onClick={() =>
-                                    setFilters((f) => ({
+                                    setFilters((f: any) => ({
                                         ...f,
                                         page: (f.page ?? 1) - 1,
                                     }))
@@ -675,7 +675,7 @@ export default function InvoicesPage() {
                                     key={p}
                                     className={`btn btn-xs ${(filters.page ?? 1) === p ? "btn-p" : ""}`}
                                     onClick={() =>
-                                        setFilters((f) => ({ ...f, page: p }))
+                                        setFilters((f: any) => ({ ...f, page: p }))
                                     }
                                 >
                                     {p}
@@ -685,7 +685,7 @@ export default function InvoicesPage() {
                                 size="xs"
                                 disabled={(filters.page ?? 1) >= meta.last_page}
                                 onClick={() =>
-                                    setFilters((f) => ({
+                                    setFilters((f: any) => ({
                                         ...f,
                                         page: (f.page ?? 1) + 1,
                                     }))
@@ -715,16 +715,18 @@ export default function InvoicesPage() {
 
             {/* Single-doc print preview */}
             {printDocId !== null && companyInfo && (
-                <TemplatePrintModal
-                    open={!!printDoc}
-                    onClose={() => { setPrintDocId(null); }}
-                    document={printDoc as any}
-                    company={companyInfo as any}
-                    templates={printTemplates}
-                    docTypeCode={printDoc?.document_type?.code ?? 'FV'}
-                    prevBalance={(printDoc as any)?.balance_data?.previous_balance}
-                    newBalance={(printDoc as any)?.balance_data?.new_balance}
-                />
+                <Suspense fallback={null}>
+                    <TemplatePrintModal
+                        open={!!printDoc}
+                        onClose={() => { setPrintDocId(null); }}
+                        document={printDoc as any}
+                        company={companyInfo as any}
+                        templates={printTemplates}
+                        docTypeCode={printDoc?.document_type?.code ?? 'FV'}
+                        prevBalance={(printDoc as any)?.balance_data?.previous_balance}
+                        newBalance={(printDoc as any)?.balance_data?.new_balance}
+                    />
+                </Suspense>
             )}
 
             {/* New Invoice Modal */}

@@ -2,7 +2,7 @@
 // pages/parties/PartiesPage.tsx
 // صفحة الأطراف الموحدة — زبائن + موردون + مختلط
 // ════════════════════════════════════════════════════════════════════════════
-import React, {
+import {
   useState, useMemo, useCallback, useRef, useEffect,
 } from 'react';
 import {
@@ -412,7 +412,7 @@ export default function PartiesPage() {
       <PartyStatsModal
         open={statsModal.open} party={viewParty}
         onClose={statsModal.closeModal}
-        onEdit={p => { statsModal.closeModal(); openEdit(p); }}
+        onEdit={(p: any) => { statsModal.closeModal(); openEdit(p); }}
       />
 
       <ImportWizardModal

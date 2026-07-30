@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
@@ -79,13 +79,13 @@ export default function CustomersReportPage() {
           <Card noHeader style={{ padding: 0 }}>
             <SimpleTable
               rowKey={(row) => (row as any).__isSummary ? '__summary__' : String(row.id ?? '')}
-              rowClassName={(row) => (row as any).__isSummary ? 'tw-sr' : undefined}
+              rowClassName={(row, _index) => (row as any).__isSummary ? 'tw-sr' : ''}
               columns={[
                 { key: '_idx', label: '#' },
                 { key: 'name', label: 'الاسم', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },
-                { key: 'code', label: 'الكود', render: (v) => <span style={{ color: 'var(--t4)' }}>{v ?? '—'}</span> },
-                { key: 'phone', label: 'الهاتف', render: (v) => v ?? '—' },
-                { key: 'wilaya', label: 'الولاية', render: (v) => v ?? '—' },
+                { key: 'code', label: 'الكود', render: (v) => <span style={{ color: 'var(--t4)' }}>{(v as string) ?? '—'}</span> },
+                { key: 'phone', label: 'الهاتف', render: (v) => (v as string) ?? '—' },
+                { key: 'wilaya', label: 'الولاية', render: (v) => (v as string) ?? '—' },
                 { key: 'doc_count', label: 'عدد الوثائق' },
                 { key: 'total_ht', label: 'المبيعات HT', render: (v) => FMT(v as number) },
                 { key: 'total_paid', label: 'المدفوع', render: (v) => <span style={{ color: 'var(--em)' }}>{FMT(v as number)}</span> },
@@ -103,7 +103,7 @@ export default function CustomersReportPage() {
           <Card noHeader style={{ padding: 0 }}>
             <SimpleTable
               rowKey={(row) => (row as any).__isSummary ? '__summary__' : String(row.product_id ?? '')}
-              rowClassName={(row) => (row as any).__isSummary ? 'tw-sr' : undefined}
+              rowClassName={(row, _index) => (row as any).__isSummary ? 'tw-sr' : ''}
               columns={[
                 { key: '_idx', label: '#' },
                 { key: 'product_name', label: 'المنتج', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },

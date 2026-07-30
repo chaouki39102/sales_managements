@@ -13,6 +13,7 @@ interface KpiCardProps {
   trend?: string;
   trendDir?: TrendDir;
   sub?: React.ReactNode;
+  suffix?: string;
   onClick?: () => void;
 }
 

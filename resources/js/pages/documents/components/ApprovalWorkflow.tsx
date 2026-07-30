@@ -3,7 +3,7 @@
 // مكون سير عمل الموافقة على المستندات
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useApprovalCheck, useApprovalMutations } from '@/lib/api/endpoints/approvals';
 import { useNotification } from '@/hooks/useNotification';
 import type { ApprovalCheck } from '@/lib/api/endpoints/approvals';
@@ -75,7 +75,7 @@ interface ApprovalActionsProps {
 }
 
 export function ApprovalActions({ documentId, statusSlug, netToPay: _netToPay, approvalCheck }: ApprovalActionsProps & { netToPay?: number }) {
-  const { notify } = useNotification();
+  const notify = useNotification();
   const { data: hookCheck } = useApprovalCheck(approvalCheck === undefined ? documentId : null);
   const check = approvalCheck ?? hookCheck;
   const { submit, approve, reject } = useApprovalMutations();

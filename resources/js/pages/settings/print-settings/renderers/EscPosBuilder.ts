@@ -1,4 +1,4 @@
-import type { AlignOption } from '../types';
+import type { AlignOption as _AlignOption } from '../types';
 
 const ESC = 0x1B;
 const GS  = 0x1D;
