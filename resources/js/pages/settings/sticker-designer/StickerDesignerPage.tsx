@@ -79,7 +79,7 @@ export default function StickerDesignerPage() {
   const { data: templates = [], isLoading } = usePrintTemplatesList('STK');
   const mutations = useStickerMutations();
 
-  const [localTpl, setLocalTpl] = useState<PrintTemplate>(DEFAULT_TEMPLATE);
+  const [localTpl, setLocalTpl] = useState<PrintTemplate>(createDefaultTpl('ملصق المنتج'));
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
