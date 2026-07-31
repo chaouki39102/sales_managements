@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import type { PrintTemplate, BorderStyle } from '@/pages/settings/print-settings/types/domain';
+import type { PrintTemplate, BorderStyle, FontFamily } from '@/pages/settings/print-settings/types/domain';
+import { FONT_OPTIONS } from '@/pages/settings/print-settings/services/SettingsRegistry';
 
 interface Props {
   tpl: PrintTemplate;
@@ -190,6 +191,20 @@ export default function StickerControls({ tpl, update, selectedElement, onSelect
               </div>
             );
           })}
+        </div>
+      </Section>
+
+      {/* ── Font ── */}
+      <Section icon="ti-letter-case" title="الخط" defaultOpen>
+        <div style={row}>
+          <span style={label}>نوع الخط</span>
+          <select
+            value={tpl.font_family}
+            onChange={e => update('font_family', e.target.value as FontFamily)}
+            style={textInput}
+          >
+            {FONT_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+          </select>
         </div>
       </Section>
 
