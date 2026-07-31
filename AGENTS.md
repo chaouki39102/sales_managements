@@ -897,3 +897,25 @@ Report: `docs/reports/PRINT_RUNTIME_SEPARATION_REPORT.md`
 **Verification**: `npm run build` — 0 errors (StickerDesignerAdapter chunk 261 kB gzip 83 kB). `npm test` — 174/174 pass. `tsc --noEmit` clean. ESLint — only pre-existing `any` warnings. Pushed as `8f9069f`.
 
 **Remaining (non-blocking)**: keyboard nudge (Moveable `nudgeable`), snap grid via `gridSnap`, content-outline resize handles, per-element delete/reset control.
+
+### Phase 30 — Sticker Drag Regression Fix: One-Gesture Manual Drag + Opt-In Snap (July 31)
+
+**Bug**: After the Phase 29 Moveable rewrite, dragging elements "jumped" and was uncontrollable ("WHEN DRAG DROP THE ELEMENT JUMP AND DONT ALLOW TO CONTROL IT").
+
+**Root causes (2 regressions vs. the old single-gesture manual drag)**:
+1. Moveable `draggable` only starts on an already-`selected` target — the first press-drag gesture merely selected the element, so the element seemed unresponsive then jumped on the next gesture.
+2. Always-on snapping fought the user: `snapHorizontal=[0,H/2,H]` + `snapVertical=[0,W/2,W]` (center lines at y=80/x=160) and `elementGuidelines` pulled elements toward center/edges.
+
+**Fix** in `StickerCanvas.tsx`:
+- **Restored the original single-gesture manual drag** via pointer events on the element itself (`onPointerDown/Move/Up` with `setPointerCapture`), now **zoom-aware** (`dx = (clientDelta)/zoom`) and **clamped** to canvas bounds using the element's measured `offsetWidth/offsetHeight` at drag start (`maxX = max(0, W - elW)`).
+- **Removed Moveable `draggable`/`onDrag`/`onDragEnd`** — Moveable is now handles-only (resize + rotate). No dual-write fight between Moveable and React-controlled `left/top`.
+- **Snapping is now opt-in** via a magnet toggle button in the zoom toolbar (Tabler `ti-magnet` / `ti-magnet-off`), default **off**. When off: `snappable={false}` and `snapHorizontal`/`snapVertical`/`elementGuidelines` pass `undefined`. Still applies to resize when enabled.
+- Hint text under canvas updated (`زر المغناطيس لتفعيل التصاق الحواف والمركز`).
+
+**Files modified**:
+- `resources/js/pages/settings/sticker-designer/StickerCanvas.tsx` — manual pointer drag, removed Moveable drag, snap toggle
+- `resources/js/pages/settings/sticker-designer/StickerDesignerPage.tsx` — hint text
+
+**Verification**: `tsc --noEmit` clean (0 errors). `npm run build` — 0 errors. `npm test` — 174/174 pass. ESLint — 0 errors, only 12 pre-existing `any` warnings.
+
+**Architectural rule**: Moveable is for handle-based transforms (resize/rotate) only; primary positioning uses element-level pointer drag with pointer capture so a single gesture both selects and moves. Never wire two drag sources to the same axis.

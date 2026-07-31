@@ -1,9 +1,8 @@
 import {
   useRef, useCallback, useEffect, useMemo, useState,
-  type MouseEvent as ReactMouseEvent, type CSSProperties,
+  type PointerEvent as ReactPointerEvent, type CSSProperties,
 } from 'react';
 import Moveable, {
-  type OnDrag, type OnDragEnd,
   type OnResize, type OnResizeEnd,
   type OnRotate, type OnRotateEnd,
 } from 'react-moveable';
@@ -232,8 +231,12 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
   const elementRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const resizeStartRef = useRef<{ startW: number; startH: number; startScale: number } | null>(null);
   const suppressResizeRef = useRef(false);
+  const dragRef = useRef<{ id: string; startX: number; startY: number; elX: number; elY: number; elW: number; elH: number } | null>(null);
+  const moveableRef = useRef<React.ElementRef<typeof Moveable>>(null);
+  const moveableGestureRef = useRef(false);
 
   const [zoom, setZoom] = useState(1);
+  const [snapEnabled, setSnapEnabled] = useState(false);
   const [livePos, setLivePos] = useState<Record<string, StickerElementGeometry>>({});
   const livePosRef = useRef<Record<string, StickerElementGeometry>>({});
 
@@ -243,6 +246,11 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
     livePosRef.current = {};
     setLivePos({});
   }, [tpl.label_positions]);
+
+  useEffect(() => {
+    if (!selected || moveableGestureRef.current) return;
+    moveableRef.current?.updateRect();
+  }, [livePos, selected]);
 
   const getPos = useCallback((id: string): StickerElementGeometry =>
     livePos[id] ?? savedPos[id] ?? { x: 0, y: 0 }, [livePos, savedPos]);
@@ -261,22 +269,50 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
     onTransformChange(id, { ...p });
   }, [onTransformChange]);
 
-  // ── Drag ──────────────────────────────────────────────────────────────────
-  const handleDrag = useCallback((e: OnDrag) => {
-    const id = selected;
-    if (!id) return;
-    applyLive(id, { x: Math.round(e.beforeTranslate[0]), y: Math.round(e.beforeTranslate[1]) });
-  }, [selected, applyLive]);
+  // ── Drag (manual pointer drag — single gesture, zoom-aware, no jumping) ──
+  const onElementPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>, id: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onSelect(id);
+    const p = getPos(id);
+    dragRef.current = {
+      id,
+      startX: e.clientX,
+      startY: e.clientY,
+      elX: p.x ?? 0,
+      elY: p.y ?? 0,
+      elW: e.currentTarget.offsetWidth,
+      elH: e.currentTarget.offsetHeight,
+    };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
+  }, [onSelect, getPos]);
 
-  const handleDragEnd = useCallback((e: OnDragEnd) => {
-    const id = selected;
-    if (id && e.isDrag) commitLive(id);
-  }, [selected, commitLive]);
+  const onElementPointerMove = useCallback((e: ReactPointerEvent<HTMLDivElement>, id: string) => {
+    const d = dragRef.current;
+    if (!d || d.id !== id) return;
+    const dx = (e.clientX - d.startX) / zoom;
+    const dy = (e.clientY - d.startY) / zoom;
+    const maxX = Math.max(0, W - d.elW);
+    const maxY = Math.max(0, H - d.elH);
+    applyLive(id, {
+      x: Math.round(Math.max(0, Math.min(maxX, d.elX + dx))),
+      y: Math.round(Math.max(0, Math.min(maxY, d.elY + dy))),
+    });
+  }, [zoom, applyLive]);
+
+  const onElementPointerUp = useCallback((e: ReactPointerEvent<HTMLDivElement>, id: string) => {
+    const d = dragRef.current;
+    if (!d || d.id !== id) return;
+    dragRef.current = null;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
+    commitLive(id);
+  }, [commitLive]);
 
   // ── Resize ────────────────────────────────────────────────────────────────
   const handleResizeStart = useCallback(() => {
     const id = selected;
     if (!id || suppressResizeRef.current) return;
+    moveableGestureRef.current = true;
     const cur = getPos(id);
     const el = elementRefs.current[id];
     resizeStartRef.current = {
@@ -306,6 +342,7 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
   }, [selected, applyLive]);
 
   const handleResizeEnd = useCallback((e: OnResizeEnd) => {
+    moveableGestureRef.current = false;
     const id = selected;
     if (id && e.isDrag) commitLive(id);
     resizeStartRef.current = null;
@@ -314,6 +351,7 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
   // ── Rotate ────────────────────────────────────────────────────────────────
   const handleRotateStart = useCallback(() => {
     suppressResizeRef.current = true;
+    moveableGestureRef.current = true;
   }, []);
 
   const handleRotate = useCallback((e: OnRotate) => {
@@ -324,14 +362,10 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
 
   const handleRotateEnd = useCallback((e: OnRotateEnd) => {
     suppressResizeRef.current = false;
+    moveableGestureRef.current = false;
     const id = selected;
     if (id && e.isDrag) commitLive(id);
   }, [selected, commitLive]);
-
-  const onElementMouseDown = useCallback((e: ReactMouseEvent, id: string) => {
-    e.stopPropagation();
-    onSelect(id);
-  }, [onSelect]);
 
   const visible = ELEMENTS.filter(el => el.visible(tpl, data));
   const targetEl = selected ? (elementRefs.current[selected] ?? null) : null;
@@ -365,6 +399,15 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
           onClick={() => setZoom(1)}
           style={zoomBtn}>
           <i className="ti ti-frame" />
+        </button>
+        <button type="button" title={snapEnabled ? 'التصاق: مفعّل' : 'التصاق: معطّل'}
+          onClick={() => setSnapEnabled(s => !s)}
+          style={{
+            ...zoomBtn,
+            color: snapEnabled ? 'var(--em)' : 'var(--t3)',
+            boxShadow: snapEnabled ? 'var(--emglow)' : 'none',
+          }}>
+          <i className={snapEnabled ? 'ti-magnet' : 'ti-magnet-off'} />
         </button>
       </div>
 
@@ -414,7 +457,9 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
                     if (node) elementRefs.current[el.id] = node;
                     else delete elementRefs.current[el.id];
                   }}
-                  onMouseDown={(e) => onElementMouseDown(e, el.id)}
+                  onPointerDown={(e) => onElementPointerDown(e, el.id)}
+                  onPointerMove={(e) => onElementPointerMove(e, el.id)}
+                  onPointerUp={(e) => onElementPointerUp(e, el.id)}
                   onClick={(e) => { e.stopPropagation(); onSelect(el.id); }}
                   style={style}
                 >
@@ -431,13 +476,11 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
 
           {targetEl && (
             <Moveable
+              ref={moveableRef}
               container={stageRef.current ?? undefined}
               target={targetEl}
               zoom={zoom}
               origin={false}
-              draggable
-              onDrag={handleDrag}
-              onDragEnd={handleDragEnd}
               resizable
               keepRatio={false}
               onResizeStart={handleResizeStart}
@@ -448,11 +491,11 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
               onRotateStart={handleRotateStart}
               onRotate={handleRotate}
               onRotateEnd={handleRotateEnd}
-              snappable
+              snappable={snapEnabled}
               snapThreshold={5}
-              snapHorizontal={[0, H / 2, H]}
-              snapVertical={[0, W / 2, W]}
-              elementGuidelines={otherEls}
+              snapHorizontal={snapEnabled ? [0, H / 2, H] : undefined}
+              snapVertical={snapEnabled ? [0, W / 2, W] : undefined}
+              elementGuidelines={snapEnabled ? otherEls : undefined}
               bounds={{ left: 0, top: 0, right: W, bottom: H }}
               snapContainer={canvasRef.current ?? undefined}
             />

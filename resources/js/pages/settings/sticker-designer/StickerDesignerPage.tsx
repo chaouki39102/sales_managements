@@ -31,6 +31,7 @@ function createDefaultTpl(name: string): PrintTemplate {
     show_company_name: true, company_name_text: '', company_name_size: 9, company_name_bold: true, company_name_color: '#1a1a2e', company_name_align: 'center',
     header_separator: 'dashed',
     show_label_barcode: true, label_barcode_height: 50, label_barcode_format: 'code39',
+    label_barcode_show_text: true, label_barcode_bar_width: 1.0,
     show_label_product_name: true, label_product_name_size: 9, label_product_name_bold: true, label_product_name_color: '#111111',
     show_label_product_image: false, label_product_image_size: 40,
     show_label_brand: false, label_brand_size: 7, label_brand_color: '#888888',
@@ -344,7 +345,7 @@ export default function StickerDesignerPage() {
                   onTransformChange={handleTransformChange}
                 />
                 <div style={{ fontSize: 10, color: 'var(--t4)', textAlign: 'center' }}>
-                  اسحب للتحريك — مقابض لتغيير الحجم والتدوير — التصاق تلقائي بالمركز والحواف
+                  اسحب للتحريك — مقابض لتغيير الحجم والتدوير — زر المغناطيس لتفعيل التصاق الحواف والمركز
                 </div>
               </>
             ) : (

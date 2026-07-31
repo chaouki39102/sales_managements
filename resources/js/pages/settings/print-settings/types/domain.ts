@@ -415,6 +415,7 @@ export interface PrintTemplate {
   label_layout:             'stacked' | 'side-by-side';
   label_hide_currency:      boolean;
   label_barcode_format:     'code39' | 'ean13' | 'code128';
+  label_barcode_show_text:  boolean;
   label_positions:          Record<string, StickerElementGeometry>;
 
   show_report_header:        boolean;
