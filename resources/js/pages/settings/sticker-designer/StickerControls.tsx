@@ -1,10 +1,33 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { PrintTemplate, BorderStyle } from '@/pages/settings/print-settings/types/domain';
 
 interface Props {
   tpl: PrintTemplate;
   update: <K extends keyof PrintTemplate>(key: K, val: PrintTemplate[K]) => void;
+  selectedElement: string | null;
+  onSelectElement: (id: string | null) => void;
 }
+
+type ShowField =
+  | 'show_logo'
+  | 'show_company_name'
+  | 'show_label_brand'
+  | 'show_label_product_name'
+  | 'show_label_ref'
+  | 'show_label_price'
+  | 'show_label_barcode'
+  | 'show_label_product_image';
+
+const ELEMENT_DEFS: { id: string; label: string; icon: string; field: ShowField }[] = [
+  { id: 'logo', label: 'الشعار', icon: 'ti-photo', field: 'show_logo' },
+  { id: 'company', label: 'اسم الشركة', icon: 'ti-building', field: 'show_company_name' },
+  { id: 'brand', label: 'الماركة', icon: 'ti-trademark', field: 'show_label_brand' },
+  { id: 'product_name', label: 'اسم المنتج', icon: 'ti-abc', field: 'show_label_product_name' },
+  { id: 'ref', label: 'المرجع', icon: 'ti-hash', field: 'show_label_ref' },
+  { id: 'price', label: 'السعر', icon: 'ti-coin', field: 'show_label_price' },
+  { id: 'barcode', label: 'الباركود', icon: 'ti-barcode', field: 'show_label_barcode' },
+  { id: 'image', label: 'الصورة', icon: 'ti-photo', field: 'show_label_product_image' },
+];
 
 const sect: React.CSSProperties = {
   padding: '8px 10px', marginBottom: 6,
@@ -51,9 +74,9 @@ const toggleKnob: React.CSSProperties = {
   boxShadow: '0 1px 3px rgba(0,0,0,.25)', transition: 'left .16s',
 };
 
-function Toggle({ value, onChange, label: lbl }: { value: boolean; onChange: (v: boolean) => void; label: string }) {
+function Toggle({ value, onChange, label: lbl, muted }: { value: boolean; onChange: (v: boolean) => void; label: string; muted?: boolean }) {
   return (
-    <div onClick={() => onChange(!value)} style={toggleStyle}>
+    <div onClick={() => onChange(!value)} style={{ ...toggleStyle, opacity: muted ? 0.75 : 1 }}>
       <div style={{ ...toggleTrack, background: value ? 'var(--em)' : 'var(--bg5)', border: `1px solid ${value ? 'var(--embo)' : 'var(--b3)'}` }}>
         <div style={{ ...toggleKnob, left: value ? 14 : 2 }} />
       </div>
@@ -100,15 +123,78 @@ function Pills<T extends string>({ options, value, onChange }: {
   );
 }
 
-export default function StickerControls({ tpl, update }: Props) {
-  const [showExtra, setShowExtra] = useState(false);
+function Section({ icon, title, defaultOpen = true, children }: {
+  icon: string; title: string; defaultOpen?: boolean; children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={sect}>
+      <div
+        onClick={() => setOpen(o => !o)}
+        style={{ ...sectTitle, cursor: 'pointer', marginBottom: 0, userSelect: 'none' }}
+        title={open ? 'طي القسم' : 'فتح القسم'}
+      >
+        <i className={icon} style={{ fontSize: 13, color: 'var(--em)' }} />
+        <span style={{ flex: 1 }}>{title}</span>
+        <i className={`ti ti-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 11, color: 'var(--t4)', transition: 'transform .15s' }} />
+      </div>
+      {open && <div style={{ marginTop: 5 }}>{children}</div>}
+    </div>
+  );
+}
 
+export default function StickerControls({ tpl, update, selectedElement, onSelectElement }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
 
+      {/* ── Elements Manager ── */}
+      <Section icon="ti-layout-grid" title="العناصر" defaultOpen>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {ELEMENT_DEFS.map(def => {
+            const isOn = !!tpl[def.field];
+            const isSel = selectedElement === def.id;
+            return (
+              <div
+                key={def.id}
+                onClick={() => onSelectElement(isSel ? null : def.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '3px 6px',
+                  borderRadius: 'var(--r1)', cursor: 'pointer',
+                  border: `1px solid ${isSel ? 'var(--em)' : 'transparent'}`,
+                  background: isSel ? 'var(--emb)' : isOn ? 'var(--bg2)' : 'transparent',
+                  opacity: isOn ? 1 : 0.55,
+                }}
+                title={isOn ? `${def.label} — انقر للتحريك` : `${def.label} مخفي — انقر للتحريك`}
+              >
+                <i className={def.icon} style={{ fontSize: 13, color: isSel ? 'var(--em)' : 'var(--t3)', width: 16, textAlign: 'center' }} />
+                <span style={{ flex: 1, fontSize: 11.5, fontWeight: isSel ? 800 : 600, color: isSel ? 'var(--em)' : 'var(--t2)' }}>
+                  {def.label}
+                </span>
+                {isOn && (
+                  <button type="button" title="تحديد في اللوحة"
+                    onClick={(e) => { e.stopPropagation(); onSelectElement(def.id); }}
+                    style={{
+                      padding: '2px 5px', border: '1px solid var(--b2)', borderRadius: 4,
+                      background: 'var(--bg3)', color: 'var(--em)', cursor: 'pointer', fontSize: 10,
+                      lineHeight: 1, display: 'flex', alignItems: 'center',
+                    }}>
+                    <i className="ti ti-crosshair" />
+                  </button>
+                )}
+                <div
+                  onClick={(e) => { e.stopPropagation(); update(def.field, !tpl[def.field]); }}
+                  style={{ ...toggleTrack, background: isOn ? 'var(--em)' : 'var(--bg5)', border: `1px solid ${isOn ? 'var(--embo)' : 'var(--b3)'}`, width: 26, height: 14, borderRadius: 7 }}
+                >
+                  <div style={{ ...toggleKnob, top: 1.5, width: 10, height: 10, left: isOn ? 13 : 2 }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+
       {/* ── Company Name ── */}
-      <div style={sect}>
-        <div style={sectTitle}><i className="ti ti-building" style={{ fontSize: 13 }} />اسم الشركة</div>
+      <Section icon="ti-building" title="اسم الشركة" defaultOpen>
         <Toggle value={tpl.show_company_name} onChange={v => update('show_company_name', v)} label="عرض اسم الشركة" />
         {tpl.show_company_name && (
           <>
@@ -125,11 +211,10 @@ export default function StickerControls({ tpl, update }: Props) {
             </div>
           </>
         )}
-      </div>
+      </Section>
 
       {/* ── Product Name ── */}
-      <div style={sect}>
-        <div style={sectTitle}><i className="ti ti-abc" style={{ fontSize: 13 }} />اسم المنتج</div>
+      <Section icon="ti-abc" title="اسم المنتج" defaultOpen>
         <Toggle value={tpl.show_label_product_name} onChange={v => update('show_label_product_name', v)} label="عرض اسم المنتج" />
         {tpl.show_label_product_name && (
           <>
@@ -138,11 +223,10 @@ export default function StickerControls({ tpl, update }: Props) {
             <ColorPicker label="اللون" value={tpl.label_product_name_color} onChange={v => update('label_product_name_color', v)} />
           </>
         )}
-      </div>
+      </Section>
 
       {/* ── Price ── */}
-      <div style={sect}>
-        <div style={sectTitle}><i className="ti ti-coin" style={{ fontSize: 13 }} />السعر</div>
+      <Section icon="ti-coin" title="السعر" defaultOpen>
         <Toggle value={tpl.show_label_price} onChange={v => update('show_label_price', v)} label="عرض السعر" />
         {tpl.show_label_price && (
           <>
@@ -160,11 +244,10 @@ export default function StickerControls({ tpl, update }: Props) {
             <Toggle value={tpl.label_hide_currency} onChange={v => update('label_hide_currency', v)} label="إخفاء نص العملة" />
           </>
         )}
-      </div>
+      </Section>
 
       {/* ── Barcode ── */}
-      <div style={sect}>
-        <div style={sectTitle}><i className="ti ti-barcode" style={{ fontSize: 13 }} />الباركود</div>
+      <Section icon="ti-barcode" title="الباركود" defaultOpen>
         <Toggle value={tpl.show_label_barcode} onChange={v => update('show_label_barcode', v)} label="عرض الباركود" />
         {tpl.show_label_barcode && (
           <>
@@ -174,24 +257,21 @@ export default function StickerControls({ tpl, update }: Props) {
             </div>
             <Slider label="الارتفاع" value={tpl.label_barcode_height ?? 50} min={20} max={120} step={5} unit="px" onChange={v => update('label_barcode_height', v)} />
             <Slider label="العرض" value={tpl.label_barcode_bar_width ?? 1.0} min={0.5} max={3.0} step={0.25} unit="×" onChange={v => update('label_barcode_bar_width', v)} />
+            <div style={{ marginTop: 2 }}>
+              <Toggle
+                value={tpl.label_barcode_show_text !== false}
+                onChange={v => update('label_barcode_show_text', v)}
+                label="إظهار الرقم أسفل الباركود"
+              />
+            </div>
           </>
         )}
-      </div>
+      </Section>
 
       {/* ── Extra Options ── */}
-      <button onClick={() => setShowExtra(e => !e)} type="button"
-        style={{
-          padding: '6px 10px', marginBottom: 6, borderRadius: 'var(--r2)',
-          border: '1px solid var(--b2)', background: showExtra ? 'var(--emb)' : 'var(--bg3)',
-          cursor: 'pointer', fontSize: 11, fontWeight: 700, color: showExtra ? 'var(--em)' : 'var(--t3)',
-          fontFamily: 'Tajawal, sans-serif', display: 'flex', alignItems: 'center', gap: 5,
-        }}>
-        <i className={`ti ti-chevron-${showExtra ? 'up' : 'down'}`} style={{ fontSize: 12 }} />
-        {showExtra ? 'إخفاء الخيارات الإضافية' : 'خيارات إضافية'}
-      </button>
+      <Section icon="ti-adjustments-horizontal" title="خيارات إضافية" defaultOpen={false}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
 
-      {showExtra && (
-        <>
           {/* ── Brand ── */}
           <div style={sect}>
             <div style={sectTitle}><i className="ti ti-trademark" style={{ fontSize: 13 }} />الماركة</div>
@@ -250,8 +330,8 @@ export default function StickerControls({ tpl, update }: Props) {
             <Slider label="التدوير" value={tpl.label_border_radius ?? 4} min={0} max={20} unit="px" onChange={v => update('label_border_radius', v)} />
             <ColorPicker label="اللون" value={tpl.label_border_color || '#333333'} onChange={v => update('label_border_color', v)} />
           </div>
-        </>
-      )}
+        </div>
+      </Section>
     </div>
   );
 }

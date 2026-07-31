@@ -25,8 +25,8 @@ function StickerLabel({ tpl, data }: { tpl: PrintTemplate; data: UniversalDocume
   const imageUrl = (product.imageUrl || '') as string;
   const pricePrefix = tpl.label_price_prefix || '';
   const priceText = tpl.label_price_text || 'DA';
-  const isNumber = typeof price === 'number' && Number.isFinite(price);
-  const displayPrice = isNumber ? price.toFixed(2) : String(price ?? '0.00');
+  const priceNum = Number(price);
+  const displayPrice = Number.isFinite(priceNum) ? priceNum.toFixed(2) : '0.00';
   const barcodeFormat = tpl.label_barcode_format || 'code39';
   const bcHeight = tpl.label_barcode_height ?? 50;
   const bcBarWidth = tpl.label_barcode_bar_width ?? 1.0;
@@ -72,10 +72,12 @@ function StickerLabel({ tpl, data }: { tpl: PrintTemplate; data: UniversalDocume
       fontWeight: tpl.label_product_name_bold ? 700 : 400,
       color: tpl.label_product_name_color || '#111',
       lineHeight: 1.25,
-      padding: '0 10px',
+      textAlign: 'center',
+      padding: '0 4px',
       maxHeight: Math.max(20, innerH * 0.2),
       overflow: 'hidden',
       textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
     }}>
       {productName}
     </div>
@@ -129,6 +131,8 @@ function StickerLabel({ tpl, data }: { tpl: PrintTemplate; data: UniversalDocume
       fontWeight: tpl.company_name_bold ? 700 : 400,
       color: tpl.company_name_color || '#111',
       lineHeight: 1.2,
+      textAlign: tpl.company_name_align || 'center',
+      whiteSpace: 'nowrap',
     }}>
       {companyName}
     </div>
@@ -187,15 +191,23 @@ function StickerLabel({ tpl, data }: { tpl: PrintTemplate; data: UniversalDocume
 
   if (hasCustomPos) {
     const absBox = (p: StickerElementGeometry): CSSProperties => {
+      const offX = p.align === 'center' ? -50 : p.align === 'right' ? -100 : 0;
+      const offY = p.valign === 'middle' ? -50 : p.valign === 'bottom' ? -100 : 0;
       const s: CSSProperties = {
         position: 'absolute',
         left: p.x, top: p.y,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        textAlign: 'center', boxSizing: 'border-box',
+        display: 'flex',
+        justifyContent: offX === 0 ? 'flex-start' : offX === -50 ? 'center' : 'flex-end',
+        alignItems: offY === 0 ? 'flex-start' : offY === -50 ? 'center' : 'flex-end',
+        textAlign: p.align === 'right' ? 'right' : p.align === 'left' ? 'left' : 'center',
+        boxSizing: 'border-box',
       };
       if (p.width !== undefined) s.width = p.width;
       if (p.height !== undefined) s.height = p.height;
-      if (p.rotate) s.transform = `rotate(${p.rotate}deg)`;
+      const transforms: string[] = [];
+      if (offX !== 0 || offY !== 0) transforms.push(`translate(${offX}%, ${offY}%)`);
+      if (p.rotate) transforms.push(`rotate(${p.rotate}deg)`);
+      if (transforms.length > 0) s.transform = transforms.join(' ');
       return s;
     };
     const scaled = (scale: number | undefined, node: React.ReactNode) => (

@@ -124,8 +124,8 @@ const ELEMENTS: ElementDef[] = [
     render: (tpl, data) => {
       if (!tpl.show_label_price) return null;
       const price = (data.lines[0] as any)?.unitPriceTtc ?? (data.lines[0] as any)?.unitPriceHt ?? 0;
-      const isNumber = typeof price === 'number' && Number.isFinite(price);
-      const displayPrice = isNumber ? price.toFixed(2) : String(price ?? '0.00');
+      const priceNum = Number(price);
+      const displayPrice = Number.isFinite(priceNum) ? priceNum.toFixed(2) : '0.00';
       const prefix = tpl.label_price_prefix || '';
       const text = tpl.label_price_text || 'DA';
       const hideCurrency = !!tpl.label_hide_currency;
@@ -232,28 +232,46 @@ export const ELEMENT_META: Record<string, { label: string; icon: string }> = {
 
 export type SelectedElement = string | null;
 
+export interface ElementRefs {
+  current: Record<string, HTMLDivElement | null>;
+}
+
 interface Props {
   tpl: PrintTemplate;
   data: UniversalDocumentData;
   selected: SelectedElement;
   onSelect: (id: SelectedElement) => void;
   onTransformChange: (id: string, pos: StickerElementGeometry) => void;
+  elementRefs: ElementRefs;
 }
 
-export default function StickerCanvas({ tpl, data, selected, onSelect, onTransformChange }: Props) {
+export default function StickerCanvas({ tpl, data, selected, onSelect, onTransformChange, elementRefs }: Props) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
-  const elementRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const wheelAreaRef = useRef<HTMLDivElement>(null);
   const resizeStartRef = useRef<{ startW: number; startH: number; startScale: number } | null>(null);
   const suppressResizeRef = useRef(false);
-  const dragRef = useRef<{ id: string; startX: number; startY: number; elX: number; elY: number; elW: number; elH: number } | null>(null);
+  const dragRef = useRef<{ id: string; startX: number; startY: number; elX: number; elY: number; elW: number; elH: number; align: 'left' | 'center' | 'right'; valign: 'top' | 'middle' | 'bottom' } | null>(null);
   const moveableRef = useRef<React.ElementRef<typeof Moveable>>(null);
   const moveableGestureRef = useRef(false);
 
   const [zoom, setZoom] = useState(1);
   const [snapEnabled, setSnapEnabled] = useState(false);
+  const [guidesEnabled, setGuidesEnabled] = useState(true);
   const [livePos, setLivePos] = useState<Record<string, StickerElementGeometry>>({});
   const livePosRef = useRef<Record<string, StickerElementGeometry>>({});
+
+  useEffect(() => {
+    const area = wheelAreaRef.current;
+    if (!area) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey || !e.metaKey) return;
+      e.preventDefault();
+      setZoom(z => Math.round(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP))) * 100) / 100);
+    };
+    area.addEventListener('wheel', onWheel, { passive: false });
+    return () => area.removeEventListener('wheel', onWheel);
+  }, []);
 
   const savedPos = useMemo(() => tpl.label_positions ?? {}, [tpl.label_positions]);
 
@@ -298,6 +316,8 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
       elY: p.y ?? 0,
       elW: e.currentTarget.offsetWidth,
       elH: e.currentTarget.offsetHeight,
+      align: p.align ?? 'left',
+      valign: p.valign ?? 'top',
     };
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
   }, [onSelect, getPos]);
@@ -307,11 +327,15 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
     if (!d || d.id !== id) return;
     const dx = (e.clientX - d.startX) / zoom;
     const dy = (e.clientY - d.startY) / zoom;
-    const maxX = Math.max(0, W - d.elW);
-    const maxY = Math.max(0, H - d.elH);
+    const offX = d.align === 'center' ? 0.5 : d.align === 'right' ? 1 : 0;
+    const offY = d.valign === 'middle' ? 0.5 : d.valign === 'bottom' ? 1 : 0;
+    const minX = offX * d.elW;
+    const maxX = Math.max(minX, W - (1 - offX) * d.elW);
+    const minY = offY * d.elH;
+    const maxY = Math.max(minY, H - (1 - offY) * d.elH);
     applyLive(id, {
-      x: Math.round(Math.max(0, Math.min(maxX, d.elX + dx))),
-      y: Math.round(Math.max(0, Math.min(maxY, d.elY + dy))),
+      x: Math.round(Math.max(minX, Math.min(maxX, d.elX + dx))),
+      y: Math.round(Math.max(minY, Math.min(maxY, d.elY + dy))),
     });
   }, [zoom, applyLive]);
 
@@ -335,7 +359,7 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
       startH: cur.height ?? el?.offsetHeight ?? 16,
       startScale: cur.scale ?? 1,
     };
-  }, [selected, getPos]);
+  }, [selected, getPos, elementRefs]);
 
   const handleResize = useCallback((e: OnResize) => {
     const id = selected;
@@ -347,14 +371,19 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
       ? e.height / info.startH
       : (info.startW > 0 ? e.width / info.startW : 1);
     const scale = Math.max(0.1, Math.min(10, info.startScale * ratio));
+    const cur = getPos(id);
+    const offX = cur.align === 'center' ? 0.5 : cur.align === 'right' ? 1 : 0;
+    const offY = cur.valign === 'middle' ? 0.5 : cur.valign === 'bottom' ? 1 : 0;
+    const newW = Math.max(4, Math.round(e.width));
+    const newH = Math.max(4, Math.round(e.height));
     applyLive(id, {
-      x: Math.round(e.drag.beforeTranslate[0]),
-      y: Math.round(e.drag.beforeTranslate[1]),
-      width: Math.max(4, Math.round(e.width)),
-      height: Math.max(4, Math.round(e.height)),
+      x: Math.round(e.drag.beforeTranslate[0] + offX * newW),
+      y: Math.round(e.drag.beforeTranslate[1] + offY * newH),
+      width: newW,
+      height: newH,
       scale: round1(scale),
     });
-  }, [selected, applyLive]);
+  }, [selected, applyLive, getPos]);
 
   const handleResizeEnd = useCallback((e: OnResizeEnd) => {
     moveableGestureRef.current = false;
@@ -389,15 +418,33 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
     .map(el => elementRefs.current[el.id])
     .filter((el): el is HTMLDivElement => !!el);
 
-  const zoomBtn: CSSProperties = { ...toolBtnStyle, padding: '3px 9px', fontSize: 12, lineHeight: 1 };
+  const zoomBtn: CSSProperties = { ...toolBtnStyle, padding: '3px 8px', fontSize: 12, lineHeight: 1 };
+  const divider: CSSProperties = { width: 1, height: 20, background: 'var(--b2)', margin: '0 2px', flexShrink: 0 };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+    <div ref={wheelAreaRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 4,
+        padding: '4px 6px', borderRadius: 'var(--r2)',
+        background: 'var(--bg3)', border: '1px solid var(--b2)',
+      }}>
         <button type="button" title="تصغير"
           onClick={() => setZoom(z => Math.max(ZOOM_MIN, z - ZOOM_STEP))}
           style={zoomBtn}>
           <i className="ti ti-zoom-out" />
+        </button>
+        <input
+          type="range" min={Math.round(ZOOM_MIN * 100)} max={Math.round(ZOOM_MAX * 100)}
+          step={Math.round(ZOOM_STEP * 100)}
+          value={Math.round(zoom * 100)}
+          onChange={e => setZoom(Number(e.target.value) / 100)}
+          title="مستوى التكبير"
+          style={{ width: 90, height: 3, accentColor: 'var(--em)', cursor: 'pointer' }}
+        />
+        <button type="button" title="تكبير"
+          onClick={() => setZoom(z => Math.min(ZOOM_MAX, z + ZOOM_STEP))}
+          style={zoomBtn}>
+          <i className="ti ti-zoom-in" />
         </button>
         <span style={{
           fontSize: 11, minWidth: 44, textAlign: 'center', color: 'var(--t3)',
@@ -405,15 +452,17 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
         }}>
           {Math.round(zoom * 100)}%
         </span>
-        <button type="button" title="تكبير"
-          onClick={() => setZoom(z => Math.min(ZOOM_MAX, z + ZOOM_STEP))}
-          style={zoomBtn}>
-          <i className="ti ti-zoom-in" />
-        </button>
+        <div style={divider} />
+
         <button type="button" title="إعادة الضبط 100%"
           onClick={() => setZoom(1)}
           style={zoomBtn}>
           <i className="ti ti-frame" />
+        </button>
+        <button type="button" title={guidesEnabled ? 'إظهار الأدلة' : 'إخفاء الأدلة'}
+          onClick={() => setGuidesEnabled(g => !g)}
+          style={{ ...zoomBtn, color: guidesEnabled ? 'var(--em)' : 'var(--t3)' }}>
+          <i className="ti ti-grip-horizontal" />
         </button>
         <button type="button" title={snapEnabled ? 'التصاق: مفعّل' : 'التصاق: معطّل'}
           onClick={() => setSnapEnabled(s => !s)}
@@ -424,6 +473,19 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
           }}>
           <i className={snapEnabled ? 'ti-magnet' : 'ti-magnet-off'} />
         </button>
+        <div style={divider} />
+
+        {selected ? (
+          <button type="button" title="إلغاء التحديد (Esc)"
+            onClick={() => onSelect(null)}
+            style={{ ...zoomBtn, color: 'var(--em)' }}>
+            <i className="ti ti-click" />
+          </button>
+        ) : (
+          <span style={{ fontSize: 10, color: 'var(--t4)', padding: '0 4px' }}>
+            انقر عنصراً للتحديد
+          </span>
+        )}
       </div>
 
       <div style={{ width: W * zoom, height: H * zoom, position: 'relative' }}>
@@ -448,17 +510,31 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
             }}
             onClick={(e) => { if (e.target === e.currentTarget) onSelect(null); }}
           >
+            {guidesEnabled && (
+              <>
+                <div style={{ position: 'absolute', left: 0, right: 0, top: H / 2, height: 1, background: 'rgba(10,138,92,.25)', pointerEvents: 'none', zIndex: 1 }} />
+                <div style={{ position: 'absolute', top: 0, bottom: 0, left: W / 2, width: 1, background: 'rgba(10,138,92,.25)', pointerEvents: 'none', zIndex: 1 }} />
+              </>
+            )}
             {visible.map(el => {
               const p = getPos(el.id);
               const isSelected = selected === el.id;
+              const node = elementRefs.current[el.id];
+              const effW = p.width ?? (node?.offsetWidth ?? 0);
+              const effH = p.height ?? (node?.offsetHeight ?? 0);
+              const offX = p.align === 'center' ? 0.5 : p.align === 'right' ? 1 : 0;
+              const offY = p.valign === 'middle' ? 0.5 : p.valign === 'bottom' ? 1 : 0;
               const style: CSSProperties = {
                 position: 'absolute',
-                left: p.x,
-                top: p.y,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                left: p.x - offX * effW,
+                top: p.y - offY * effH,
+                display: 'flex',
+                justifyContent: offX === 0 ? 'flex-start' : offX === 1 ? 'flex-end' : 'center',
+                alignItems: offY === 0 ? 'flex-start' : offY === 1 ? 'flex-end' : 'center',
+                textAlign: p.align === 'right' ? 'right' : p.align === 'left' ? 'left' : 'center',
                 boxSizing: 'border-box', cursor: 'grab', touchAction: 'none',
                 outline: isSelected ? '2px dashed var(--em)' : '2px solid transparent',
-                outlineOffset: 1, borderRadius: 2, padding: '1px 2px',
+                outlineOffset: 1, borderRadius: 2,
                 background: isSelected ? 'rgba(59,130,246,0.06)' : 'transparent',
                 minWidth: 4, minHeight: 4,
               };

@@ -19,6 +19,20 @@ export interface StickerElementGeometry {
   rotate?: number;
   /** Uniform content scale (natural-size → box) applied at design time. */
   scale?: number;
+  /**
+   * Horizontal alignment anchor. `(x, y)` is the anchor point of the element
+   * box: 'left' → left edge at x, 'center' → center at x, 'right' → right edge at x.
+   * Content inside an explicitly-sized box is aligned to the same value.
+   * Undefined = 'left'.
+   */
+  align?: 'left' | 'center' | 'right';
+  /**
+   * Vertical alignment anchor. `(x, y)` is the anchor point of the element
+   * box: 'top' → top edge at y, 'middle' → center at y, 'bottom' → bottom edge at y.
+   * Content inside an explicitly-sized box is aligned to the same value.
+   * Undefined = 'top'.
+   */
+  valign?: 'top' | 'middle' | 'bottom';
 }
 
 export type StickerElementPosition = StickerElementGeometry;

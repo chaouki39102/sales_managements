@@ -110,6 +110,7 @@ export default function StickerDesignerPage() {
   const historyRef = useRef<PrintTemplate[]>([]);
   const historyPos = useRef(-1);
   const controlsRef = useRef<HTMLDivElement>(null);
+  const elementRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
     if (templateId && templates.length > 0) {
@@ -173,6 +174,30 @@ export default function StickerDesignerPage() {
     setIsDirty(true);
   }, []);
 
+  const handleNudge = useCallback((id: string, dx: number, dy: number) => {
+    setLocalTpl(prev => {
+      if (!prev) return prev;
+      const current = prev.label_positions?.[id] ?? { x: 0, y: 0 };
+      const el = elementRefs.current[id];
+      const effW = current.width ?? el?.offsetWidth ?? 0;
+      const effH = current.height ?? el?.offsetHeight ?? 0;
+      const offX = current.align === 'center' ? 0.5 : current.align === 'right' ? 1 : 0;
+      const offY = current.valign === 'middle' ? 0.5 : current.valign === 'bottom' ? 1 : 0;
+      const minX = offX * effW;
+      const maxX = Math.max(minX, 320 - (1 - offX) * effW);
+      const minY = offY * effH;
+      const maxY = Math.max(minY, 160 - (1 - offY) * effH);
+      const next = {
+        ...current,
+        x: Math.round(Math.max(minX, Math.min(maxX, (current.x ?? 0) + dx))),
+        y: Math.round(Math.max(minY, Math.min(maxY, (current.y ?? 0) + dy))),
+      };
+      const positions = { ...(prev.label_positions ?? {}), [id]: next };
+      return { ...prev, label_positions: positions };
+    });
+    setIsDirty(true);
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (!localTpl || isSaving) return;
     setIsSaving(true);
@@ -219,8 +244,10 @@ export default function StickerDesignerPage() {
     }
   }, [mutations, navigate, templateId, deleteConfirm, notify]);
 
-  const refs = useRef({ handleSave, handleUndo, handleRedo, isDirty, isSaving });
-  useEffect(() => { refs.current = { handleSave, handleUndo, handleRedo, isDirty, isSaving }; });
+  const refs = useRef({ handleSave, handleUndo, handleRedo, isDirty, isSaving, handleNudge, selectedElement, deselect: () => setSelectedElement(null) });
+  useEffect(() => {
+    refs.current = { handleSave, handleUndo, handleRedo, isDirty, isSaving, handleNudge, selectedElement, deselect: () => setSelectedElement(null) };
+  });
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -228,6 +255,28 @@ export default function StickerDesignerPage() {
       if (ctrl && e.key === 's') { e.preventDefault(); if (refs.current.isDirty && !refs.current.isSaving) refs.current.handleSave(); }
       if (ctrl && e.key === 'z' && !e.shiftKey) { e.preventDefault(); refs.current.handleUndo(); }
       if (ctrl && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); refs.current.handleRedo(); }
+
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+      if (e.key === 'Escape' && !typing && refs.current.selectedElement) {
+        refs.current.deselect();
+        return;
+      }
+
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        if (typing) return;
+        const id = refs.current.selectedElement;
+        if (!id) return;
+        e.preventDefault();
+        const step = e.shiftKey ? 10 : 1;
+        const delta: Record<string, [number, number]> = {
+          ArrowUp: [0, -step], ArrowDown: [0, step],
+          ArrowLeft: [-step, 0], ArrowRight: [step, 0],
+        };
+        const [dx, dy] = delta[e.key];
+        refs.current.handleNudge(id, dx, dy);
+      }
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
@@ -344,9 +393,10 @@ export default function StickerDesignerPage() {
                   selected={selectedElement}
                   onSelect={setSelectedElement}
                   onTransformChange={handleTransformChange}
+                  elementRefs={elementRefs}
                 />
                 <div style={{ fontSize: 10, color: 'var(--t4)', textAlign: 'center' }}>
-                  اسحب للتحريك — مقابض لتغيير الحجم والتدوير — زر المغناطيس لتفعيل التصاق الحواف والمركز
+                  اسحب للتحريك — مقابض لتغيير الحجم والتدوير — مفاتيح الأسهم للتحريك الدقيق (Shift=10px) — Ctrl+عجلة الفأرة للتكبير
                 </div>
               </>
             ) : (
@@ -465,7 +515,7 @@ export default function StickerDesignerPage() {
                 />
               )}
 
-              <StickerControls tpl={localTpl} update={update} />
+              <StickerControls tpl={localTpl} update={update} selectedElement={selectedElement} onSelectElement={setSelectedElement} />
             </div>
           ) : (
             <div style={{

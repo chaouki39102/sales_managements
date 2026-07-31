@@ -62,6 +62,8 @@
 
 **Price 2 decimals**: `Number(price)` + `Number.isFinite` → `toFixed(2)`, else `'0.00'` — applied in BOTH `StickerCanvas.tsx` and `StickerLabel.tsx` (handles string prices from API; design == print).
 
+**Print nowrap parity (bug)**: printed product name wrapped to 2 lines while the design canvas showed 1 line — canvas forces `whiteSpace:'nowrap'` (+`textOverflow:'ellipsis'`) on `product_name` and `company`, but the print renderer didn't. Fixed `StickerLabel.tsx` `renderProductName`/`renderCompany` to mirror the canvas exactly (`whiteSpace:'nowrap'`, `textAlign` from `p.align`/`company_name_align`), so design and print always match line count.
+
 **Key architectural rule**: The anchor model (`x,y` + align/valign) is the SSOT shared by canvas and print renderer. Canvas CSS `left/top` and print `translate%` are two implementations of the same formula `x - offX*w`, `y - offY*h` (offX/offY in {0, 0.5, 1}) — never introduce a third.
 
 **Files modified**:
