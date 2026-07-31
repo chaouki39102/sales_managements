@@ -151,12 +151,14 @@ function StickerLabel({ tpl, data }: { tpl: PrintTemplate; data: UniversalDocume
       }}>
         {barcodeValue}
       </div>
-      <div style={{
-        fontFamily: "'Courier New', monospace",
-        fontSize: 8, letterSpacing: 1, color: '#666', direction: 'ltr',
-      }}>
-        {eanText || barcodeValue}
-      </div>
+      {tpl.label_barcode_show_text !== false && (
+        <div style={{
+          fontFamily: "'Courier New', monospace",
+          fontSize: 8, letterSpacing: 1, color: '#666', direction: 'ltr',
+        }}>
+          {eanText || barcodeValue}
+        </div>
+      )}
     </div>
   ) : showBarcode && bcData ? (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, margin: '1px 0' }}>
@@ -167,12 +169,14 @@ function StickerLabel({ tpl, data }: { tpl: PrintTemplate; data: UniversalDocume
           <rect key={i} x={bar.x} y={0} width={bar.width} height={bcHeight} fill="#111" />
         ))}
       </svg>
-      <div style={{
-        fontFamily: "'Courier New', monospace",
-        fontSize: 8, letterSpacing: 1, color: '#666', direction: 'ltr',
-      }}>
-        {eanText || barcodeValue}
-      </div>
+      {tpl.label_barcode_show_text !== false && (
+        <div style={{
+          fontFamily: "'Courier New', monospace",
+          fontSize: 8, letterSpacing: 1, color: '#666', direction: 'ltr',
+        }}>
+          {eanText || barcodeValue}
+        </div>
+      )}
     </div>
   ) : null;
 

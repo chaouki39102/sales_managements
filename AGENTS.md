@@ -919,3 +919,27 @@ Report: `docs/reports/PRINT_RUNTIME_SEPARATION_REPORT.md`
 **Verification**: `tsc --noEmit` clean (0 errors). `npm run build` — 0 errors. `npm test` — 174/174 pass. ESLint — 0 errors, only 12 pre-existing `any` warnings.
 
 **Architectural rule**: Moveable is for handle-based transforms (resize/rotate) only; primary positioning uses element-level pointer drag with pointer capture so a single gesture both selects and moves. Never wire two drag sources to the same axis.
+
+### Phase 31 — Element Properties Inspector + Moveable Handles Follow + Barcode Text Toggle (July 31)
+
+**Feature**: Per-element control panel in the sticker designer's right column. Appears whenever an element is selected (`selectedElement`). No new sticker fields were added — the panel exposes **properties of the existing elements** (logo, company name, product name, price, barcode, ref, brand, image).
+
+**What the panel provides** (`ElementProperties.tsx`, new file):
+- **X / Y** numeric inputs — precise positioning of the selected element (canvas is 320×160).
+- **Rotation** numeric input with hint `0 = القيمة الافتراضية` and a reset button (`ti-rotate-360`) that writes `rotate: 0` (falsy `rotate` = no transform in both canvas and print renderer, so 0 restores default orientation).
+- **Barcode-only toggle** `إظهار الرقم أسفل الباركود` — persists as new template setting `label_barcode_show_text: boolean` (default `true`). When `false`, only the barcode lines render — the human-readable number below the SVG/font barcode is suppressed. Respected in BOTH the design canvas (`StickerCanvas.tsx`) and the print renderer (`StickerLabel.tsx`) for design/print consistency.
+
+**Bug fixed — Moveable control frame not following the element**: after the manual-drag fix (Phase 30), the resize/rotate handles "stayed in the last place" while the element moved. Moveable does NOT observe `left`/`top` position changes (only size via ResizeObserver). Fix:
+- Added `moveableRef` and a `useEffect` that calls `moveableRef.current.updateRect()` whenever `livePos` changes, so handles re-anchor to the element after every drag frame.
+- `moveableGestureRef` guards it: `updateRect()` is skipped during Moveable's own resize/rotate gestures (when it would fight Moveable's internal frame) — set in `onResizeStart`/`onRotateStart`, cleared in `onResizeEnd`/`onRotateEnd`.
+
+**Prop-name fix**: react-moveable 0.56 uses `horizontalGuidelines`/`verticalGuidelines`, NOT `snapHorizontal`/`snapVertical` (the latter don't exist in `MoveableProps`). The Phase 29/30 code passed `snapHorizontal`/`snapVertical`; corrected. `elementGuidelines` now passes `[]` when snap is off instead of `undefined`.
+
+**Files modified**:
+- `resources/js/pages/settings/sticker-designer/ElementProperties.tsx` — NEW properties inspector
+- `resources/js/pages/settings/sticker-designer/StickerCanvas.tsx` — `ELEMENT_META` export, `moveableRef` + `updateRect` effect, `moveableGestureRef`, correct snap prop names, barcode text gating
+- `resources/js/pages/settings/sticker-designer/StickerDesignerPage.tsx` — renders `ElementProperties` when an element is selected
+- `resources/js/pages/settings/print-settings/types/domain.ts` — `label_barcode_show_text: boolean`
+- `resources/js/pages/settings/print-settings/components/preview/StickerLabel.tsx` — barcode number gated by `label_barcode_show_text`
+
+**Verification**: `tsc --noEmit` clean (0 errors). `npm run build` — 0 errors. `npm test` — 174/174 pass. ESLint — 0 errors, only 12 pre-existing `any` warnings.

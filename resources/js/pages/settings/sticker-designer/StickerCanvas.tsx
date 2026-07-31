@@ -172,11 +172,13 @@ const ELEMENTS: ElementDef[] = [
             }}>
               {barcodeValue}
             </div>
-            <div style={{ fontFamily: "'Courier New', monospace", fontSize: 8, letterSpacing: 1, color: '#666', direction: 'ltr' }}>
-              {(format as string) === 'ean13'
-                ? `${barcodeValue[0]} ${barcodeValue.slice(1, 7)} ${barcodeValue.slice(7)}`
-                : barcodeValue}
-            </div>
+            {tpl.label_barcode_show_text !== false && (
+              <div style={{ fontFamily: "'Courier New', monospace", fontSize: 8, letterSpacing: 1, color: '#666', direction: 'ltr' }}>
+                {(format as string) === 'ean13'
+                  ? `${barcodeValue[0]} ${barcodeValue.slice(1, 7)} ${barcodeValue.slice(7)}`
+                  : barcodeValue}
+              </div>
+            )}
           </div>
         );
       }
@@ -191,9 +193,11 @@ const ELEMENTS: ElementDef[] = [
               <rect key={i} x={bar.x} y={0} width={bar.width} height={height} fill="#111" />
             ))}
           </svg>
-          <div style={{ fontFamily: "'Courier New', monospace", fontSize: 8, letterSpacing: 1, color: '#666', direction: 'ltr' }}>
-            {barcodeValue}
-          </div>
+          {tpl.label_barcode_show_text !== false && (
+            <div style={{ fontFamily: "'Courier New', monospace", fontSize: 8, letterSpacing: 1, color: '#666', direction: 'ltr' }}>
+              {barcodeValue}
+            </div>
+          )}
         </div>
       );
     },
@@ -214,6 +218,17 @@ const ELEMENTS: ElementDef[] = [
 ];
 
 const round1 = (v: number) => Math.round(v * 10) / 10;
+
+export const ELEMENT_META: Record<string, { label: string; icon: string }> = {
+  logo: { label: 'الشعار', icon: 'ti-photo' },
+  company: { label: 'اسم الشركة', icon: 'ti-building' },
+  brand: { label: 'الماركة', icon: 'ti-trademark' },
+  product_name: { label: 'اسم المنتج', icon: 'ti-abc' },
+  ref: { label: 'المرجع', icon: 'ti-hash' },
+  price: { label: 'السعر', icon: 'ti-coin' },
+  barcode: { label: 'الباركود', icon: 'ti-barcode' },
+  image: { label: 'الصورة', icon: 'ti-photo' },
+};
 
 export type SelectedElement = string | null;
 
@@ -493,9 +508,9 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
               onRotateEnd={handleRotateEnd}
               snappable={snapEnabled}
               snapThreshold={5}
-              snapHorizontal={snapEnabled ? [0, H / 2, H] : undefined}
-              snapVertical={snapEnabled ? [0, W / 2, W] : undefined}
-              elementGuidelines={snapEnabled ? otherEls : undefined}
+              horizontalGuidelines={[0, H / 2, H]}
+              verticalGuidelines={[0, W / 2, W]}
+              elementGuidelines={snapEnabled ? otherEls : []}
               bounds={{ left: 0, top: 0, right: W, bottom: H }}
               snapContainer={canvasRef.current ?? undefined}
             />

@@ -7,6 +7,7 @@ import { usePrintTemplatesList } from '@/pages/settings/print-settings/runtime';
 import { useStickerMutations } from './stickerMutations';
 import StickerControls from './StickerControls';
 import StickerCanvas from './StickerCanvas';
+import ElementProperties from './ElementProperties';
 import { Input } from '@/pages/settings/print-settings/components/ui';
 import { toolBtnStyle } from '@/pages/settings/print-settings/components/TinyBtn';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -452,6 +453,17 @@ export default function StickerDesignerPage() {
                   ))}
                 </div>
               </div>
+
+              {selectedElement && (
+                <ElementProperties
+                  elementId={selectedElement}
+                  geometry={localTpl.label_positions?.[selectedElement] ?? { x: 0, y: 0 }}
+                  tpl={localTpl}
+                  onGeometryChange={handleTransformChange}
+                  onTemplateChange={update}
+                  onDeselect={() => setSelectedElement(null)}
+                />
+              )}
 
               <StickerControls tpl={localTpl} update={update} />
             </div>
