@@ -24,6 +24,7 @@ const CommercialDocumentPage  = lazy(() => import('@/pages/documents/CommercialD
 const InvoicesPage            = lazy(() => import('@/pages/invoices/InvoicesPage'));
 const POSPage                 = lazy(() => import('@/pages/pos/POSPage'));
 const POSKioskPage            = lazy(() => import('@/pages/pos/POSKioskPage'));const PosSessionsPage         = lazy(() => import('@/pages/pos/PosSessionsPage'));
+const POSProPage              = lazy(() => import('@/pos-pro/POSProPage'));
 
 // â”€â”€ Products / Inventory â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ProductsPage   = lazy(() => import('@/pages/products/ProductsPage'));
@@ -223,6 +224,7 @@ export function AppRoutes() {
           <Route path="pos"         element={<POSPage />} />
           <Route path="pos/kiosk"   element={<POSKioskPage />} />
           <Route path="pos/sessions" element={<PosSessionsPage />} />
+          <Route path="pos/pro"     element={<POSProPage />} />
           <Route path="invoices" element={<InvoicesPage />} />
 
           {/* Documents */}

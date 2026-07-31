@@ -19,6 +19,7 @@ const NAV_GROUPS = [
       { name: 'لوحة التحكم', href: 'dashboard', icon: 'ti-layout-dashboard' },
       { name: 'نقطة البيع',  href: 'pos',         icon: 'ti-shopping-cart'   },
       { name: 'جلسات POS',   href: 'pos/sessions', icon: 'ti-chart-bar'      },
+      { name: 'POS PRO',     href: 'pos/pro',      icon: 'ti-cash-register'  },
     ],
   },
   {
@@ -913,6 +914,7 @@ const meta = useTopbarTitle();
           <div className="mdb-grid">
             {[
               { href:'pos',          icon:'ti-shopping-cart', label:'بيع'    },
+              { href:'pos/pro',      icon:'ti-cash-register', label:'POS PRO' },
               { href:'inventory',    icon:'ti-package',       label:'مخزون'  },
               { href:'finance',      icon:'ti-building-bank', label:'خزينة'  },
               { href:'clients',      icon:'ti-users',         label:'زبائن'  },
