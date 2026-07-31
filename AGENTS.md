@@ -859,3 +859,41 @@ Report: `docs/reports/PRINT_RUNTIME_SEPARATION_REPORT.md`
 - `vite.config.js` — PWA plugin, tabler-font-display transform
 - `package.json` — `test:e2e`, `test:ci` scripts
 - `AGENTS.md` — Phase 28 summary
+
+### Phase 29 — Moveable Sticker Designer: Drag/Resize/Rotate/Snap/Zoom (July 31)
+
+**Mission**: Upgrade the product sticker designer from mouse-drag-only to a professional live-design editor using `@moveable` (`moveable@0.53.0` + `react-moveable@0.56.0`, MIT), keeping the existing DOM-based rendering (barcode SVG, logo, Arabic text — no canvas migration).
+
+**Architecture**:
+
+1. **`StickerElementGeometry` type** (`types/domain.ts:400`) — `label_positions` upgraded from `{x, y}` to `{x, y, width?, height?, rotate?, scale?}`. Backward compatible: old x/y-only entries still render. Exported through `types.ts` barrel.
+
+2. **`StickerCanvas.tsx` rewritten with Moveable**:
+   - **Drag** (`onDrag`/`onDragEnd`) — `e.beforeTranslate` → x/y
+   - **Resize** (`onResizeStart/onResize/onResizeEnd`) — box `width/height` + **uniform content scale** (ratio of the dominant changed axis × startScale; content rendered in a nested div with `transform: scale()` so text/images/barcode scale proportionally, no distortion)
+   - **Rotate** (`onRotate`/`onRotateEnd`) — `e.rotate` stored; **`suppressResizeRef`** blocks Moveable's rotate-driven `resize` events (rotate causes resize in Moveable — without the flag the bounding-box resize would corrupt geometry)
+   - **Snap**: `snapHorizontal=[0,H/2,H]`, `snapVertical=[0,W/2,W]` (edges + center), `elementGuidelines` (sibling alignment), `bounds={0..W, 0..H}`, `snapThreshold=5`
+   - **Zoom**: 50–300% toolbar; stage wrapped in `transform: scale(zoom)` with `Moveable zoom={zoom}` prop, and a `W*zoom × H*zoom` wrapper so the scroll container reserves scaled space
+   - **Performance**: live geometry kept in an internal `livePos` state + `livePosRef` mirror (only `StickerCanvas` re-renders per frame); `onTransformChange` commits **only on gesture end** (`e.isDrag`) — no page re-render storm, no history spam
+
+3. **`StickerDesignerPage.tsx`** — `handlePositionChange(id,x,y)` → `handleTransformChange(id, StickerElementGeometry)` merging into existing entry.
+
+4. **`StickerLabel.tsx` print renderer** — now respects saved positions: when `Object.keys(label_positions).length > 0` it renders **absolutely positioned elements** (same coordinate space 320×160 as the canvas, incl. `rotate` + content `scale`); otherwise falls back to the legacy flex layout. Element builders refactored into shared per-element render fns so both layouts reuse the same markup.
+
+**Key architectural rules**:
+- Moveable handles are placed inside the scaled stage (`container=stageRef`) — the `zoom` prop compensates pointer deltas; never set zoom outside Moveable without it.
+- Resize stores BOTH box dims AND `scale` (stored at design time) so the print renderer reproduces content sizing without measuring natural sizes.
+- Rotation must suppress Moveable's interleaved `resize` events (`suppressResizeRef`) to avoid bounding-box corruption.
+- Commit-on-end (`isDrag`) keeps undo history free of per-frame noise; live preview is ref-mirrored for stale-closure safety.
+
+**Files modified**:
+- `resources/js/pages/settings/sticker-designer/StickerCanvas.tsx` — Moveable integration (rewrite)
+- `resources/js/pages/settings/sticker-designer/StickerDesignerPage.tsx` — transform-change handler
+- `resources/js/pages/settings/print-settings/types/domain.ts` — `StickerElementGeometry`
+- `resources/js/pages/settings/print-settings/types.ts` — barrel export
+- `resources/js/pages/settings/print-settings/components/preview/StickerLabel.tsx` — absolute layout + shared element builders
+- `package.json` / `package-lock.json` — `moveable@^0.53.0`, `react-moveable@^0.56.0`
+
+**Verification**: `npm run build` — 0 errors (StickerDesignerAdapter chunk 261 kB gzip 83 kB). `npm test` — 174/174 pass. `tsc --noEmit` clean. ESLint — only pre-existing `any` warnings. Pushed as `8f9069f`.
+
+**Remaining (non-blocking)**: keyboard nudge (Moveable `nudgeable`), snap grid via `gridSnap`, content-outline resize handles, per-element delete/reset control.
