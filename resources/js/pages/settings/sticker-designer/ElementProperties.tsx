@@ -124,7 +124,7 @@ export default function ElementProperties({
         fontSize: 11, fontWeight: 800, color: 'var(--em)', marginBottom: 5,
         display: 'flex', alignItems: 'center', gap: 5,
       }}>
-        <i className={meta.icon} style={{ fontSize: 13 }} />
+        <i className={`ti ${meta.icon}`} style={{ fontSize: 13 }} />
         <span style={{ flex: 1 }}>{meta.label}</span>
         <span style={{ fontSize: 9, color: 'var(--t4)', fontWeight: 600, fontFamily: 'monospace' }}>
           {x}, {y}
@@ -157,7 +157,7 @@ export default function ElementProperties({
               <button key={a.v} type="button" title={a.title}
                 onClick={() => onGeometryChange(elementId, { ...geometry, align: a.v })}
                 style={alignBtn(currentAlign === a.v)}>
-                <i className={a.icon} />
+                <i className={`ti ${a.icon}`} />
               </button>
             ))}
           </div>
@@ -169,7 +169,7 @@ export default function ElementProperties({
               <button key={a.v} type="button" title={a.title}
                 onClick={() => onGeometryChange(elementId, { ...geometry, valign: a.v })}
                 style={alignBtn(currentValign === a.v)}>
-                <i className={a.icon} />
+                <i className={`ti ${a.icon}`} />
               </button>
             ))}
           </div>

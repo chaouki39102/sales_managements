@@ -9,7 +9,7 @@ import Moveable, {
 import type { PrintTemplate, StickerElementGeometry } from '@/pages/settings/print-settings/types/domain';
 import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data';
 import { printFieldResolver } from '@/pages/settings/print-settings/services';
-import { fontFamily } from '@/pages/settings/print-settings/components/preview/shared';
+import { fontFamily, borderStyle } from '@/pages/settings/print-settings/components/preview/shared';
 import { renderLogo } from '@/pages/settings/print-settings/components/preview/LogoRenderer';
 import { buildBarcode } from '@/lib/barcodeRenderer';
 import { toolBtnStyle } from '@/pages/settings/print-settings/components/TinyBtn';
@@ -163,6 +163,14 @@ const ELEMENTS: ElementDef[] = [
       const format = tpl.label_barcode_format || 'code39';
       const height = tpl.label_barcode_height ?? 50;
       const barWidth = tpl.label_barcode_bar_width ?? 1.0;
+      const maxWidth = W - 2 * (tpl.margin_sides ?? 8);
+      const barcodeText = (v: string) => {
+        if (format !== 'ean13') return v;
+        const d = v.replace(/\D/g, '');
+        if (d.length === 13) return `${d[0]} ${d.slice(1, 7)} ${d.slice(7, 13)}`;
+        if (d.length === 8) return `${d.slice(0, 4)} ${d.slice(4)}`;
+        return v;
+      };
       if (format === 'code128') {
         return (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
@@ -174,15 +182,13 @@ const ELEMENTS: ElementDef[] = [
             </div>
             {tpl.label_barcode_show_text !== false && (
               <div style={{ fontFamily: "'Courier New', monospace", fontSize: 8, letterSpacing: 1, color: '#666', direction: 'ltr' }}>
-                {(format as string) === 'ean13'
-                  ? `${barcodeValue[0]} ${barcodeValue.slice(1, 7)} ${barcodeValue.slice(7)}`
-                  : barcodeValue}
+                {barcodeText(barcodeValue)}
               </div>
             )}
           </div>
         );
       }
-      const bc = buildBarcode(barcodeValue, format, barWidth);
+      const bc = buildBarcode(barcodeValue, format, barWidth, maxWidth);
       if (!bc) return null;
       return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
@@ -195,7 +201,7 @@ const ELEMENTS: ElementDef[] = [
           </svg>
           {tpl.label_barcode_show_text !== false && (
             <div style={{ fontFamily: "'Courier New', monospace", fontSize: 8, letterSpacing: 1, color: '#666', direction: 'ltr' }}>
-              {barcodeValue}
+              {barcodeText(barcodeValue)}
             </div>
           )}
         </div>
@@ -471,7 +477,7 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
             color: snapEnabled ? 'var(--em)' : 'var(--t3)',
             boxShadow: snapEnabled ? 'var(--emglow)' : 'none',
           }}>
-          <i className={snapEnabled ? 'ti-magnet' : 'ti-magnet-off'} />
+          <i className={snapEnabled ? 'ti ti-magnet' : 'ti ti-magnet-off'} />
         </button>
         <div style={divider} />
 
@@ -503,8 +509,11 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
               fontFamily: fontFamily(tpl.font_family),
               fontSize: tpl.base_font_size ?? 12,
               background: '#fff',
-              borderRadius: 2, overflow: 'hidden',
-              border: '1px solid var(--b3)',
+              borderRadius: tpl.label_border_radius ?? 4,
+              overflow: 'hidden',
+              border: (tpl.label_border_width ?? 1) > 0
+                ? `${tpl.label_border_width ?? 1}px ${borderStyle(tpl.label_border_style || 'solid')} ${tpl.label_border_color || '#333'}`
+                : 'none',
               position: 'relative',
               userSelect: 'none',
             }}

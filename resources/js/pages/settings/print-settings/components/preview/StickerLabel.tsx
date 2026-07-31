@@ -30,11 +30,15 @@ function StickerLabel({ tpl, data }: { tpl: PrintTemplate; data: UniversalDocume
   const barcodeFormat = tpl.label_barcode_format || 'code39';
   const bcHeight = tpl.label_barcode_height ?? 50;
   const bcBarWidth = tpl.label_barcode_bar_width ?? 1.0;
-  const bcData = barcodeFormat !== 'code128' ? buildBarcode(barcodeValue, barcodeFormat, bcBarWidth) : null;
+  const bcMaxWidth = LABEL_PX - 2 * (tpl.margin_sides ?? 8);
+  const bcData = barcodeFormat !== 'code128' ? buildBarcode(barcodeValue, barcodeFormat, bcBarWidth, bcMaxWidth) : null;
   const showBarcode = tpl.show_label_barcode && barcodeValue;
-  const eanText = barcodeFormat === 'ean13' && barcodeValue.length >= 13
-    ? `${barcodeValue[0]} ${barcodeValue.slice(1, 7)} ${barcodeValue.slice(7, 13)}`
-    : null;
+  const eanDigits = barcodeValue.replace(/\D/g, '');
+  const eanText = barcodeFormat === 'ean13' && eanDigits.length === 13
+    ? `${eanDigits[0]} ${eanDigits.slice(1, 7)} ${eanDigits.slice(7, 13)}`
+    : barcodeFormat === 'ean13' && eanDigits.length === 8
+      ? `${eanDigits.slice(0, 4)} ${eanDigits.slice(4)}`
+      : null;
   const isSideBySide = tpl.label_layout === 'side-by-side';
   const hideCurrency = !!tpl.label_hide_currency;
 

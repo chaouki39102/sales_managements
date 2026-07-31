@@ -134,7 +134,7 @@ function Section({ icon, title, defaultOpen = true, children }: {
         style={{ ...sectTitle, cursor: 'pointer', marginBottom: 0, userSelect: 'none' }}
         title={open ? 'طي القسم' : 'فتح القسم'}
       >
-        <i className={icon} style={{ fontSize: 13, color: 'var(--em)' }} />
+        <i className={`ti ${icon}`} style={{ fontSize: 13, color: 'var(--em)' }} />
         <span style={{ flex: 1 }}>{title}</span>
         <i className={`ti ti-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 11, color: 'var(--t4)', transition: 'transform .15s' }} />
       </div>
@@ -166,7 +166,7 @@ export default function StickerControls({ tpl, update, selectedElement, onSelect
                 }}
                 title={isOn ? `${def.label} — انقر للتحريك` : `${def.label} مخفي — انقر للتحريك`}
               >
-                <i className={def.icon} style={{ fontSize: 13, color: isSel ? 'var(--em)' : 'var(--t3)', width: 16, textAlign: 'center' }} />
+                <i className={`ti ${def.icon}`} style={{ fontSize: 13, color: isSel ? 'var(--em)' : 'var(--t3)', width: 16, textAlign: 'center' }} />
                 <span style={{ flex: 1, fontSize: 11.5, fontWeight: isSel ? 800 : 600, color: isSel ? 'var(--em)' : 'var(--t2)' }}>
                   {def.label}
                 </span>

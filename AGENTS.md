@@ -7,6 +7,35 @@
 ## Date
 2026-07-31
 
+### Phase 34 — `php artisan test` Fixed: Pest + PHPUnit Test Infrastructure (July 31)
+
+**Problem**: `php artisan test` crashed instantly with `Class "PHPUnit\Framework\TestCase" not found` — the project had NO test framework installed (no `phpunit/phpunit`, no `pestphp/pest` in `composer.json` require-dev) AND no `phpunit.xml`, `tests/TestCase.php`, or `tests/Pest.php`. The one existing test (`tests/Feature/ApiResponseShapeTest.php`) was written in Pest syntax and calls two undefined global helpers: `actingAsAuthenticatedTenantUser()` and `testCompanySlug()`.
+
+**Fix (5 parts)**:
+
+1. **Installed dev packages** — `composer require --dev phpunit/phpunit pestphp/pest pestphp/pest-plugin-laravel mockery/mockery` (Pest v4.7.5, PHPUnit v12.5.30, plugin v4.1.0). Had to `composer config allow-plugins.pestphp/pest-plugin true` first (Composer plugin block). Mockery is required by Laravel's test framework.
+
+2. **`phpunit.xml` created** — standard Laravel test config: `APP_ENV=testing`, `DB_CONNECTION=sqlite`, `DB_DATABASE=:memory:`, `CACHE_STORE=array`, `SESSION_DRIVER=array`, `QUEUE_CONNECTION=sync`, `MAIL_MAILER=array`, `BCRYPT_ROUNDS=4`. Tests run on an **in-memory sqlite** DB via `RefreshDatabase` — never touch the dev `database/database.sqlite`.
+
+3. **`autoload-dev` added to `composer.json`** — `"Tests\\": "tests/"` (was missing entirely; `Tests\TestCase` couldn't be autoloaded).
+
+4. **`tests/TestCase.php` + `tests/Pest.php` created** — `tests/Pest.php` binds `Tests\TestCase` + `RefreshDatabase` to all Feature tests via `uses(...)->in('Feature')` and defines the two helpers the test calls:
+   - `testCompanySlug()` — firstOrCreate a `companies` row with slug `test-company`.
+   - `actingAsAuthenticatedTenantUser()` — creates a tenant user + `company_user` pivot membership, calls `Sanctum::actingAs($user)`, returns `test()` (Pest's `HigherOrderTapProxy`; do NOT type-hint the return as TestCase — Pest returns a proxy).
+   - Membership route: the `company` middleware (`SetCompanyContext`) checks `company_user.active` for non-super-admin users, so the pivot row MUST exist.
+
+5. **`?simple=1` support added to `ApiListService::executeQuery`** (`app/Core/Services/ApiListService.php`) — `($config['simple_paginate'] ?? false) || $request->boolean('simple')` → `simplePaginate()`. This was needed so the contract test's 2nd scenario (`simplePaginate()` envelope without `total`/`last_page`) actually runs. `ApiResponders::successResponse` already handled non-LengthAware `Paginator` objects.
+
+**Also committed (pending work from prior session)**: EAN-8 barcode encoder + barcode max-width fitting in `buildBarcode()` (`lib/barcodeRenderer.ts`), sticker border/radius settings applied to canvas + print renderer, `ti` icon class fixes in sticker designer components, deleted the three EMPTY sidebar placeholder files (`Sidebar.tsx`/`SidebarSection.tsx`/`SidebarItem.tsx` — dead code, no imports), regenerated `public/sw.js`.
+
+**Key architectural rules**:
+- Tests run against **in-memory sqlite** (`:memory:`) — never the dev DB. `RefreshDatabase` runs all ~150 migrations per test class (~2s).
+- The `company` middleware requires a real `company_user` pivot row (or `ROLE_SUPER_ADMIN`); use `Sanctum::actingAs()` for API auth (no token records needed).
+- `?simple=1` is now a global opt-in for `simplePaginate()` on ANY `ApiListService`-driven endpoint — consumers explicitly requesting it get a lighter `meta` (no `total`/`last_page`).
+- Test helper global functions live in `tests/Pest.php`; Pest's `test()` returns a tap proxy (no return type hint).
+
+**Verification**: `php artisan test` — 3 passed (35 assertions). `php -l` clean on edited PHP. `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors.
+
 ### Phase 32 — Sidebar UX: Collapsible Groups + Search + A11y + Ctrl+B (July 31)
 
 **Request**: Sidebar must always be fixed and auto-scroll to the current page (e.g. entering Settings should keep the sidebar scrolled at the Settings section). Then a full UX upgrade was requested based on research (shadcn/fragments/AdminLTE 2026 best practices).

@@ -68,6 +68,22 @@ function encodeEAN13(raw: string): string | null {
   return pattern;
 }
 
+function encodeEAN8(raw: string): string | null {
+  let digits = String(raw ?? '').replace(/\D/g, '');
+  if (digits.length < 7 || digits.length > 8) return null;
+  if (digits.length === 7) {
+    let sum = 0;
+    for (let i = 0; i < 7; i++) sum += parseInt(digits[i]) * (i % 2 === 0 ? 3 : 1);
+    digits += (10 - (sum % 10)) % 10;
+  }
+  let pattern = '101';
+  for (let i = 0; i < 4; i++) pattern += EAN13_A[digits[i]];
+  pattern += '01010';
+  for (let i = 4; i < 8; i++) pattern += EAN13_C[digits[i]];
+  pattern += '101';
+  return pattern;
+}
+
 function patternToBars(pattern: string, barWidth = 1.0): { bars: BarcodeBar[]; totalWidth: number } {
   const bars: BarcodeBar[] = [];
   let x = 0;
@@ -83,18 +99,25 @@ function patternToBars(pattern: string, barWidth = 1.0): { bars: BarcodeBar[]; t
   return { bars, totalWidth: x };
 }
 
-export function buildBarcode(value: string, format: string, barWidth = 1.0): { bars: BarcodeBar[]; totalWidth: number } | null {
+export function buildBarcode(value: string, format: string, barWidth = 1.0, maxWidth?: number): { bars: BarcodeBar[]; totalWidth: number } | null {
   if (!value) return null;
   let pattern = '';
   if (format === 'code39') pattern = encodeCode39(value);
-  else if (format === 'ean13') pattern = encodeEAN13(value) ?? '';
+  else if (format === 'ean13') {
+    const digits = String(value).replace(/\D/g, '');
+    pattern = digits.length <= 8 ? (encodeEAN8(digits) ?? '') : (encodeEAN13(digits) ?? '');
+  }
   else return null;
   if (!pattern) return null;
-  return patternToBars(pattern, barWidth);
+  const fitted = patternToBars(pattern, barWidth);
+  if (maxWidth && maxWidth > 0 && fitted.totalWidth > maxWidth) {
+    return patternToBars(pattern, barWidth * (maxWidth / fitted.totalWidth));
+  }
+  return fitted;
 }
 
 export function renderBarcodeSvg(bc: { bars: BarcodeBar[]; totalWidth: number }, height: number) {
   return { bars: bc.bars, totalWidth: bc.totalWidth, height };
 }
 
-export { encodeCode39, encodeEAN13 };
+export { encodeCode39, encodeEAN13, encodeEAN8 };

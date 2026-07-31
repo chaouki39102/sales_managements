@@ -77,7 +77,8 @@ class ApiListService
 
             // ✅ simplePaginate إذا لم يطلب المستخدم total count صراحةً
             // يتجنب COUNT(*) الثقيل على الجداول الكبيرة
-            if ($config['simple_paginate'] ?? false) {
+            // يدعم التفعيل عبر إعداد الموديل (simple_paginate) أو طلب صريح ?simple=1
+            if (($config['simple_paginate'] ?? false) || $request->boolean('simple')) {
                 return $qb->simplePaginate($perPage);
             }
 
