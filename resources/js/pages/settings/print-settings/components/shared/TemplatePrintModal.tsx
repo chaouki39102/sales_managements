@@ -5,6 +5,7 @@ import type { UniversalDocumentData } from '@/pages/settings/print-settings/type
 import type { PrintTemplate } from '@/pages/settings/print-settings/types';
 import type { CompanyData } from '@/pages/settings/print-settings/components/preview/shared';
 import { resolveTemplate } from '@/pages/settings/print-settings/runtime/TemplateResolver';
+import { stickerDims } from '@/pages/settings/print-settings/components/preview/stickerDims';
 import UniversalPrintPipeline, { renderPipelineToPopup } from '@/pages/settings/print-settings/runtime/UniversalPrintPipeline';
 import StickerLabel from '@/pages/settings/print-settings/components/preview/StickerLabel';
 
@@ -153,8 +154,17 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
                   {c.paper_size}{c.paper_width_mm ? ` · ${c.paper_width_mm}mm` : ''}
                 </div>
                 {docTypeCode === 'STK' && overrideData ? (
-                  <div className="tpl-card-mini">
-                    <div style={{ transform: `scale(${STK_SCALE})`, transformOrigin: 'top left', width: 320, height: 160 }}>
+                  <div
+                    className="tpl-card-mini"
+                    style={{
+                      width: Math.round(stickerDims(c.paper_size).w * STK_SCALE),
+                      height: Math.round(stickerDims(c.paper_size).h * STK_SCALE),
+                    }}
+                  >
+                    <div style={{
+                      transform: `scale(${STK_SCALE})`, transformOrigin: 'top left',
+                      width: stickerDims(c.paper_size).w, height: stickerDims(c.paper_size).h,
+                    }}>
                       <StickerLabel tpl={c} data={overrideData} />
                     </div>
                   </div>

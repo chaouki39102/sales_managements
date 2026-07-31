@@ -24,13 +24,13 @@ export interface SettingMeta {
 
 const ALL_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV', 'DDP', 'BT', 'POS', 'RPT', 'STK'];
 const STICKER_DOCS: DocTypeCode[] = ['STK'];
-const STICKER_LABEL: PaperSize[] = ['40x20mm'];
+const STICKER_LABEL: PaperSize[] = ['40x20mm', '30x20mm', '60x40mm', '80x50mm', '100x50mm'];
 const COMMERCIAL_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV'];
 const POS_DOCS: DocTypeCode[] = ['POS', 'RPT'];
 const REPORT_DOC: DocTypeCode[] = ['RPT'];
 const THERMAL: PaperSize[] = ['80mm', '58mm'];
 const PAGE: PaperSize[] = ['A4', 'A5'];
-const ALL_PAPERS: PaperSize[] = ['80mm', '58mm', 'A4', 'A5', '40x20mm'];
+const ALL_PAPERS: PaperSize[] = ['80mm', '58mm', 'A4', 'A5', '40x20mm', '30x20mm', '60x40mm', '80x50mm', '100x50mm'];
 
 const ALIGN_OPTS = [
   { v: 'right' as const, l: 'يمين' },

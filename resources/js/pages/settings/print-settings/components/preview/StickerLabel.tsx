@@ -4,17 +4,14 @@ import type { PrintTemplate, StickerElementGeometry } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
 import { printFieldResolver } from '../../services';
 import { fontFamily, borderStyle } from './shared';
+import { stickerDims } from './stickerDims';
 import { renderLogo } from './LogoRenderer';
 import { buildBarcode } from '@/lib/barcodeRenderer';
-
-// ─── Dimensions ─────────────────────────────────────────────────────────────
-
-const LABEL_PX = 320;
-const LABEL_PX_H = 160;
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 function StickerLabel({ tpl, data }: { tpl: PrintTemplate; data: UniversalDocumentData }) {
+  const { w: LABEL_PX, h: LABEL_PX_H } = stickerDims(tpl.paper_size);
   const product = data.lines[0] || {};
   const companyName = tpl.company_name_text || (printFieldResolver.resolve('company.name', data, tpl) as string) || '';
   const productName = (product.name || '') as string;

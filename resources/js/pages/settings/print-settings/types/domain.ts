@@ -1,4 +1,4 @@
-export type PaperSize       = '80mm' | '58mm' | 'A4' | 'A5' | '40x20mm' | 'none';
+export type PaperSize       = '80mm' | '58mm' | 'A4' | 'A5' | '40x20mm' | '30x20mm' | '60x40mm' | '80x50mm' | '100x50mm' | 'none';
 export type AlignOption     = 'right' | 'center' | 'left';
 export type BorderStyle     = 'solid' | 'dashed' | 'double' | 'none';
 export type PriceMode       = 'ht' | 'ttc';

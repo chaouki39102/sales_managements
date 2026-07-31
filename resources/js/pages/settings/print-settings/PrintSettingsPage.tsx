@@ -20,6 +20,7 @@ import { DocumentDataBuilder } from './types/data/DocumentDataBuilder';
 import { resolveTemplate } from './runtime';
 import type { UniversalDocumentData } from './types/data';
 import { TemplateLibraryModal } from './template-library';
+import { isStickerPaper, stickerDims, STICKER_SIZE_OPTIONS } from './components/preview/stickerDims';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useApiClient, useNotifier, useCompany, useSlug } from './providers/PrintSettingsContext';
@@ -34,6 +35,10 @@ const PAPER_DIM: Record<string, { w: number; h: number }> = {
 };
 
 function paperLabel(size: string, mm: number): string {
+  if (isStickerPaper(size)) {
+    const d = stickerDims(size);
+    return `${Math.round(d.w / 8)}×${Math.round(d.h / 8)}mm`;
+  }
   const d = PAPER_DIM[size];
   if (!d) return `${mm}mm × تلقائي`;
   return d.h > 0 ? `${d.w}×${d.h}mm` : `${d.w}mm × تلقائي`;
@@ -176,7 +181,7 @@ export default function PrintSettingsPage() {
         else if (val === 'A4' || val === 'A5') {
           next.paper_width_mm = 80; // Reset thermal width when switching to page paper
           next.page_orientation = next.page_orientation || 'portrait';
-        }         else if (val === '40x20mm') {
+        } else if (typeof val === 'string' && isStickerPaper(val)) {
           next.page_orientation = next.page_orientation || 'portrait';
         }
       }
@@ -624,20 +629,20 @@ export default function PrintSettingsPage() {
                   </div>
                 )}
 
-                <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
                   {(activeDoc === 'STK'
-                    ? (['40x20mm'] as const)
+                    ? STICKER_SIZE_OPTIONS.map(s => s.v)
                     : (['80mm', '58mm', 'A4', 'A5'] as const)
                   ).map(s => (
                     <button
                       key={s} type="button"
                       onClick={() => update('paper_size', s)}
                       style={{
-                        flex: 1, padding: '3px 0', fontSize: 11, borderRadius: 'var(--r1)',
+                        flex: 1, padding: '3px 4px', fontSize: 10.5, borderRadius: 'var(--r1)',
                         border: `1px solid ${localTpl.paper_size === s ? 'var(--em)' : 'var(--b2)'}`,
                         background: localTpl.paper_size === s ? 'var(--emb)' : 'var(--bg3)',
                         color: localTpl.paper_size === s ? 'var(--em)' : 'var(--t3)',
-                        cursor: 'pointer', fontWeight: 700,
+                        cursor: 'pointer', fontWeight: 700, whiteSpace: 'nowrap',
                       }}
                     >{s}</button>
                   ))}

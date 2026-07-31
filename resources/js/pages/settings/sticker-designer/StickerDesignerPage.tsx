@@ -5,6 +5,8 @@ import type { UniversalDocumentData } from '@/pages/settings/print-settings/type
 import type { CompanyData } from '@/pages/settings/print-settings/types/live-data';
 import { usePrintTemplatesList } from '@/pages/settings/print-settings/runtime';
 import { useStickerMutations } from './stickerMutations';
+import { renderPipelineToPopup } from '@/pages/settings/print-settings/runtime/UniversalPrintPipeline';
+import { STICKER_SIZE_OPTIONS, stickerDims } from '@/pages/settings/print-settings/components/preview/stickerDims';
 import StickerControls from './StickerControls';
 import StickerCanvas from './StickerCanvas';
 import ElementProperties from './ElementProperties';
@@ -188,6 +190,7 @@ export default function StickerDesignerPage() {
   const handleNudge = useCallback((id: string, dx: number, dy: number) => {
     setLocalTpl(prev => {
       if (!prev) return prev;
+      const { w, h } = stickerDims(prev.paper_size);
       const current = prev.label_positions?.[id] ?? { x: 0, y: 0 };
       const el = elementRefs.current[id];
       const effW = current.width ?? el?.offsetWidth ?? 0;
@@ -195,9 +198,9 @@ export default function StickerDesignerPage() {
       const offX = current.align === 'center' ? 0.5 : current.align === 'right' ? 1 : 0;
       const offY = current.valign === 'middle' ? 0.5 : current.valign === 'bottom' ? 1 : 0;
       const minX = offX * effW;
-      const maxX = Math.max(minX, 320 - (1 - offX) * effW);
+      const maxX = Math.max(minX, w - (1 - offX) * effW);
       const minY = offY * effH;
-      const maxY = Math.max(minY, 160 - (1 - offY) * effH);
+      const maxY = Math.max(minY, h - (1 - offY) * effH);
       const next = {
         ...current,
         x: Math.round(Math.max(minX, Math.min(maxX, (current.x ?? 0) + dx))),
@@ -254,6 +257,11 @@ export default function StickerDesignerPage() {
       notify.error('فشل الحذف');
     }
   }, [mutations, navigate, templateId, deleteConfirm, notify]);
+
+  const handleTestPrint = useCallback(() => {
+    if (!localTpl) return;
+    renderPipelineToPopup({ type: 'prebuilt', data: MOCK_DOC_DATA }, localTpl, null);
+  }, [localTpl]);
 
   const refs = useRef({ handleSave, handleUndo, handleRedo, isDirty, isSaving, handleNudge, selectedElement, deselect: () => setSelectedElement(null) });
   useEffect(() => {
@@ -337,6 +345,20 @@ export default function StickerDesignerPage() {
             <i className={`ti ${isDirty ? 'ti-point-filled' : 'ti-check'}`} style={{ fontSize: 10 }} />
             {isDirty ? 'تغييرات غير محفوظة' : 'محفوظ'}
           </div>
+        )}
+
+        {localTpl && (
+          <button onClick={handleTestPrint} type="button"
+            title="طباعة تجريبية بالمعاينة الحالية"
+            style={{
+              padding: '6px 12px', borderRadius: 'var(--r2)', fontSize: 12, fontWeight: 700,
+              border: '1px solid var(--b3)', fontFamily: 'Tajawal, sans-serif',
+              background: 'var(--bg3)', color: 'var(--t2)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 5, transition: 'all .15s',
+            }}>
+            <i className="ti ti-printer" />
+            طباعة تجريبية
+          </button>
         )}
 
         {localTpl && (
@@ -498,18 +520,18 @@ export default function StickerDesignerPage() {
                   </div>
                 )}
 
-                <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                  {(['40x20mm'] as const).map(s => (
-                    <button key={s} type="button"
-                      onClick={() => update('paper_size', s)}
+                <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
+                  {STICKER_SIZE_OPTIONS.map(s => (
+                    <button key={s.v} type="button"
+                      onClick={() => update('paper_size', s.v)}
                       style={{
-                        flex: 1, padding: '3px 0', fontSize: 11, borderRadius: 'var(--r1)',
-                        border: `1px solid ${localTpl.paper_size === s ? 'var(--em)' : 'var(--b2)'}`,
-                        background: localTpl.paper_size === s ? 'var(--emb)' : 'var(--bg3)',
-                        color: localTpl.paper_size === s ? 'var(--em)' : 'var(--t3)',
-                        cursor: 'pointer', fontWeight: 700,
+                        flex: 1, minWidth: 62, padding: '3px 4px', fontSize: 10.5, borderRadius: 'var(--r1)',
+                        border: `1px solid ${localTpl.paper_size === s.v ? 'var(--em)' : 'var(--b2)'}`,
+                        background: localTpl.paper_size === s.v ? 'var(--emb)' : 'var(--bg3)',
+                        color: localTpl.paper_size === s.v ? 'var(--em)' : 'var(--t3)',
+                        cursor: 'pointer', fontWeight: 700, whiteSpace: 'nowrap',
                       }}>
-                      {s}
+                      {s.l}
                     </button>
                   ))}
                 </div>

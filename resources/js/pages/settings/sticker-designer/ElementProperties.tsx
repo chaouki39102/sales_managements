@@ -1,9 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { PrintTemplate, StickerElementGeometry } from '@/pages/settings/print-settings/types/domain';
+import { stickerDims } from '@/pages/settings/print-settings/components/preview/stickerDims';
 import { ELEMENT_META } from './StickerCanvas';
-
-const CANVAS_W = 320;
-const CANVAS_H = 160;
 
 interface Props {
   elementId: string;
@@ -92,6 +90,7 @@ const toggleKnob: CSSProperties = {
 export default function ElementProperties({
   elementId, geometry, tpl, hasCustomPosition, onGeometryChange, onRemovePosition, onTemplateChange, onDeselect,
 }: Props) {
+  const { w: CANVAS_W, h: CANVAS_H } = stickerDims(tpl.paper_size);
   const meta = ELEMENT_META[elementId] ?? { label: elementId, icon: 'ti-box' };
   const x = geometry.x ?? 0;
   const y = geometry.y ?? 0;

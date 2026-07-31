@@ -340,8 +340,9 @@ body.dark .al-p{background:var(--purb);border-color:var(--purbo);color:var(--pur
 .tpl-card.on .tpl-card-name{color:var(--em);}
 .tpl-card-meta{font-size:10px;color:var(--t4);margin-bottom:6px;font-family:monospace;}
 .tpl-card-mini{
-  width:121px;height:60px;overflow:hidden;border-radius:4px;
+  overflow:hidden;border-radius:4px;
   border:1px solid var(--b2);background:#fff;margin:0 auto;direction:rtl;
+  max-width:170px;
 }
 .tpl-preview{
   display:flex;justify-content:center;align-items:flex-start;

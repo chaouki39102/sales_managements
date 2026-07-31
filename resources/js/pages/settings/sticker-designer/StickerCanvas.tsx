@@ -10,12 +10,10 @@ import type { PrintTemplate, StickerElementGeometry } from '@/pages/settings/pri
 import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data';
 import { printFieldResolver } from '@/pages/settings/print-settings/services';
 import { fontFamily, borderStyle } from '@/pages/settings/print-settings/components/preview/shared';
+import { stickerDims } from '@/pages/settings/print-settings/components/preview/stickerDims';
 import { renderLogo } from '@/pages/settings/print-settings/components/preview/LogoRenderer';
 import { buildBarcode } from '@/lib/barcodeRenderer';
 import { toolBtnStyle } from '@/pages/settings/print-settings/components/TinyBtn';
-
-const W = 320;
-const H = 160;
 
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 3;
@@ -164,7 +162,7 @@ const ELEMENTS: ElementDef[] = [
       const format = tpl.label_barcode_format || 'code39';
       const height = tpl.label_barcode_height ?? 50;
       const barWidth = tpl.label_barcode_bar_width ?? 1.0;
-      const maxWidth = W - 2 * (tpl.margin_sides ?? 8);
+      const maxWidth = stickerDims(tpl.paper_size).w - 2 * (tpl.margin_sides ?? 8);
       const barcodeText = (v: string) => {
         if (format !== 'ean13') return v;
         const d = v.replace(/\D/g, '');
@@ -253,6 +251,7 @@ interface Props {
 }
 
 export default function StickerCanvas({ tpl, data, selected, onSelect, onTransformChange, elementRefs }: Props) {
+  const { w: W, h: H } = stickerDims(tpl.paper_size);
   const canvasRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const wheelAreaRef = useRef<HTMLDivElement>(null);
@@ -345,7 +344,7 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
       x: round(Math.max(minX, Math.min(maxX, d.elX + dx))),
       y: round(Math.max(minY, Math.min(maxY, d.elY + dy))),
     });
-  }, [zoom, applyLive, snapEnabled]);
+  }, [zoom, applyLive, snapEnabled, W, H]);
 
   const onElementPointerUp = useCallback((e: ReactPointerEvent<HTMLDivElement>, id: string) => {
     const d = dragRef.current;

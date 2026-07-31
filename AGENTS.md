@@ -7,6 +7,27 @@
 ## Date
 2026-07-31
 
+### Phase 38 — Sticker Designer: Multiple Paper Sizes + Test Print (July 31)
+
+**Request**: sticker designer features — more paper sizes (40×20 was the only option), a real test-print from the designer, copy/paste. Implemented paper sizes + test print; copy/paste left out (elements are a fixed set, not duplicable — geometry copy between elements was deemed low-value).
+
+**New SSOT**: `components/preview/stickerDims.ts` — `STICKER_PAPERS` (paper_size → design-space px at 8px/mm: 40x20→320×160, 30x20→240×160, 60x40→480×320, 80x50→640×400, 100x50→800×400), `STICKER_SIZE_OPTIONS` (picker labels), `isStickerPaper()`, `stickerDims()`. The design space is NO LONGER hardcoded 320×160.
+
+**Changes**:
+- `types/domain.ts` — `PaperSize` union extended with `30x20mm | 60x40mm | 80x50mm | 100x50mm`.
+- `services/SettingsRegistry.ts` — `STICKER_LABEL` + `ALL_PAPERS` extended with the 4 new sizes.
+- `StickerCanvas.tsx` — W/H derived from `stickerDims(tpl.paper_size)` (was module constants); all clamps/guides/bounds/mini-box/zoom use the derived values; barcode max-width uses `stickerDims(...)`.
+- `StickerLabel.tsx` — `LABEL_PX`/`LABEL_PX_H` derived from `stickerDims(tpl.paper_size)` (was module constants).
+- `UniversalPreview.tsx` — `isLabel = isStickerPaper(...)`; portraitW/H use the label dims; `@page` print CSS maps each sticker paper to its physical mm (`Math.round(px/8)`).
+- `TemplatePrintModal.tsx` — STK mini preview box width/height computed per template (`dims × STK_SCALE`), `.tpl-card-mini` no longer fixed 121×60.
+- `StickerDesignerPage.tsx` — paper-size buttons now render `STICKER_SIZE_OPTIONS` (flex-wrap); `handleNudge` clamps use `stickerDims(prev.paper_size)`; new **طباعة تجريبية** button in the topbar calls `renderPipelineToPopup({type:'prebuilt', data:MOCK_DOC_DATA}, tpl, null)`.
+- `ElementProperties.tsx` — `CANVAS_W`/`CANVAS_H` derived from `tpl.paper_size` (center actions + input max bounds).
+- `PrintSettingsPage.tsx` — STK paper pills use `STICKER_SIZE_OPTIONS`; `paperLabel()` uses `stickerDims` for sticker papers; `isStickerPaper(val)` guard on paper_size change.
+
+**Key architectural rule**: sticker paper dimensions are SSOT'd in `stickerDims.ts` — the canvas, print renderer, print CSS, mini preview, and clamps all consume the same map. Never hardcode 320×160 (or a paper's mm) in two places.
+
+**Verification**: `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors.
+
 ### Phase 37 — Print Modal Uses Shared Modal Component + Sticker Designer Cleanup (July 31)
 
 **Request**: "SET THE PAGE NOT SCROLL WHEN THE MODAL OPENED" + "ENHANCE THE MODAL USE MY COMPONENTS AND MY STYLE" — the print/template modal (`TemplatePrintModal`) was a bespoke inline-styled overlay (own `overlayStyle`/`modalStyle`/`btnPrimary`…), duplicated the Escape handler, and did NOT lock body scroll. Then "COMMIT AND COMPLETE" for all pending work.
