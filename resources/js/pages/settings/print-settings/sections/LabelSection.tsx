@@ -1,7 +1,7 @@
-import type { PrintTemplate, BorderStyle } from '../types';
+import type { PrintTemplate, BorderStyle, FontFamily } from '../types';
 import { Toggle, SliderField } from './ToggleSwitch';
 import { Field, ColorField, Input, Pills } from '../components/ui';
-import { isSettingVisible } from '../services/SettingsRegistry';
+import { isSettingVisible, FONT_OPTIONS } from '../services/SettingsRegistry';
 import { BorderSelect } from './HeaderSection';
 
 interface Props {
@@ -125,6 +125,18 @@ export default function LabelSectionControls({ tpl, update }: Props) {
           <Pills options={LABEL_LAYOUT_OPTS} value={tpl.label_layout}
             onChange={v => update('label_layout', v as 'stacked' | 'side-by-side')} />
         </Field>
+      )}
+
+      <div className="ps-section-title" style={{ fontSize: 12, marginTop: 8, marginBottom: 4 }}>الخط</div>
+
+      {sec('font_family') && (
+        <div className="ps-field">
+          <label className="ps-field-label">نوع الخط</label>
+          <select className="ps-select" value={tpl.font_family}
+            onChange={e => update('font_family', e.target.value as FontFamily)}>
+            {FONT_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+          </select>
+        </div>
       )}
 
       <div className="ps-section-title" style={{ fontSize: 12, marginTop: 8, marginBottom: 4 }}>الحدود</div>

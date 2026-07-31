@@ -27,6 +27,12 @@
 
 **Verification**: `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors, 181 precache entries.
 
+**Bug fixed — sticker templates had NO font picker**: `TemplateControls.tsx` rendered the Formatting section (base `font_family`, margins, line spacing, base font size) only for `docType !== 'STK'`, and `LabelSection.tsx` had no font control — so sticker fonts were impossible to change. Fixes:
+- `components/TemplateControls.tsx` — the "تنسيق الطباعة" section now renders for **all** doc types including STK (`rows`/`onRowsChange` passed as `undefined` for STK so the field-drag editor is skipped).
+- `sections/LabelSection.tsx` — new "الخط" group with the `font_family` picker (uses `FONT_OPTIONS`), right inside the primary sticker settings section.
+
+**Verification**: `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors, 181 precache entries.
+
 ### Phase 35 — Template Chooser in Print Modal (July 31)
 
 **Request**: "I create 2 models of stickers. How to select? I suggest to show in the modal the name of the modal with preview to select before print" — when multiple templates exist for a doc type, the print modal must let the user pick which one to print, showing each template's **name + live preview** before confirming.
