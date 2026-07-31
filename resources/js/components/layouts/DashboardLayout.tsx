@@ -525,6 +525,13 @@ export default function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try { return localStorage.getItem('sidebar_collapsed') === 'true'; } catch { return false; }
   });
+  // ✅ مجموعات طواها المستخدم يدوياً حتى وهي مجموعة الصفحة الحالية
+  const [closedGroups, setClosedGroups] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem('sidebar_closed_groups');
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch { return new Set(); }
+  });
   // ✅ يحفظ آخر اختيار يدوي للمستخدم (طي/توسيع) بمعزل عن الطي التلقائي لصفحات التحرير
   const manualSidebarPref = useRef(sidebarCollapsed);
   const toggleSidebar = useCallback(() => {
@@ -537,8 +544,18 @@ export default function DashboardLayout() {
   }, []);
 
   // ✅ توسيع/طيّ مجموعة يدوياً مع الحفظ في localStorage
-  //    (الافتراضي: المجموعات مطويّة — مجموعة الصفحة الحالية تفتح تلقائياً)
-  const toggleGroup = useCallback((label: string) => {
+  //    (الافتراضي: المجموعات مطويّة — مجموعة الصفحة الحالية تفتح تلقائياً،
+  //     ويُسمح للمستخدم بضغطها يدوياً أيضاً عبر closedGroups)
+  const toggleGroup = useCallback((label: string, isActive: boolean) => {
+    if (isActive) {
+      setClosedGroups(prev => {
+        const next = new Set(prev);
+        if (next.has(label)) next.delete(label); else next.add(label);
+        try { localStorage.setItem('sidebar_closed_groups', JSON.stringify([...next])); } catch { /* ignore */ }
+        return next;
+      });
+      return;
+    }
     setOpenGroups(prev => {
       const next = new Set(prev);
       if (next.has(label)) next.delete(label); else next.add(label);
@@ -672,7 +689,7 @@ const meta = useTopbarTitle();
           const hasActiveItem = group.items.some(isItemActive);
           const items: any[] = group.items.filter(matchesQuery);
           if (q && items.length === 0) return null;
-          const open = q ? true : (hasActiveItem ? true : openGroups.has(group.label));
+          const open = q ? true : (hasActiveItem ? !closedGroups.has(group.label) : openGroups.has(group.label));
           return (
             <div className="sb-sec" key={group.label}>
               <button
@@ -681,7 +698,7 @@ const meta = useTopbarTitle();
                 style={{ color: LABEL_COLORS[idx] }}
                 aria-expanded={open}
                 aria-controls={`sb-group-${idx}`}
-                onClick={() => toggleGroup(group.label)}
+                onClick={() => toggleGroup(group.label, hasActiveItem)}
                 title={open ? 'طيّ المجموعة' : 'توسيع المجموعة'}
               >
                 <span className="sb-lbl-txt">{group.label}</span>
