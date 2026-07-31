@@ -229,7 +229,7 @@ class UserService extends \App\Core\Services\BaseService
         }
         $path = $file->store('avatars', 'public');
         $user->update(['avatar' => $path]);
-        return Storage::disk('public')->url($path);
+        return asset('storage/' . $path);
     }
 
     public function updateLastLogin(User $user): void

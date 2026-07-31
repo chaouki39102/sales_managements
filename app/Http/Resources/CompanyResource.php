@@ -4,7 +4,6 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
 
 class CompanyResource extends JsonResource
 {
@@ -30,7 +29,7 @@ class CompanyResource extends JsonResource
             'mobile'              => $this->mobile,
             'fax'                 => $this->fax,
             'email'               => $this->email,
-            'avatar'              => $this->avatar ? '/storage/' . $this->avatar : null,
+            'avatar'              => $this->avatar ? asset('storage/' . $this->avatar) : null,
             'bank_name'           => $this->bank_name,
             'rib'                 => $this->rib,
             'owner_id'            => $this->owner_id,
@@ -53,7 +52,7 @@ class CompanyResource extends JsonResource
             'deleted_at'          => $this->deleted_at,
 
             // Computed
-            'avatar_url'          => $this->avatar ? Storage::url($this->avatar) : null,
+            'avatar_url'          => $this->avatar ? asset('storage/' . $this->avatar) : null,
             'is_suspended'        => !is_null($this->suspended_at),
             'is_verified'         => !is_null($this->verified_at),
             'is_operational'      => $this->active && is_null($this->suspended_at),

@@ -75,7 +75,7 @@ class ProcessExportJob implements ShouldQueue
         );
 
         // 4. Notify the user with the download link
-        $downloadUrl = Storage::disk('public')->url($fileName);
+        $downloadUrl = asset('storage/' . $fileName);
         $this->user->notify(new ExportReadyNotification($downloadUrl, $resourceName));
     }
 

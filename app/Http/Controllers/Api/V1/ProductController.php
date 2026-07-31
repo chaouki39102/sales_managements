@@ -118,7 +118,7 @@ class ProductController extends BaseApiController
                     throw new \RuntimeException('فشل تخزين الملف على القرص');
                 }
 
-                $url = Storage::disk('public')->url($path);
+                $url = asset('storage/' . $path);
 
                 // 2. أضف URL إلى صور المنتج
                 $images[] = $url;
@@ -140,17 +140,73 @@ class ProductController extends BaseApiController
     }
 
     /**
+     * حذف صورة منتج: يزيل الـ URL من مصفوفة images ثم يمسح الملف من القرص.
+     * DELETE /products/{product}/image  { "image": "https://…/storage/products/1/x.png" }
+     */
+    public function deleteImage(Request $request, $id = null): JsonResponse
+    {
+        try {
+            $id = $this->extractId($id);
+            $product = Product::findOrFail($id);
+            $this->authorizeAction('update', $product);
+
+            $validated = $request->validate([
+                'image' => 'required|string',
+            ]);
+
+            $target = $validated['image'];
+            $images = array_values(array_filter(
+                $product->images ?? [],
+                fn ($url) => $url !== $target
+            ));
+
+            if (count($images) === count($product->images ?? [])) {
+                throw new \RuntimeException('الصورة غير موجودة في قائمة صور المنتج');
+            }
+
+            $product->update(['images' => $images]);
+
+            // احذف الملف المادي المرتبط بالـ URL المحذوف
+            $disk = Storage::disk('public');
+            $pos = strpos($target, '/storage/');
+            if ($pos !== false) {
+                $relative = substr($target, $pos + strlen('/storage/'));
+                if ($relative) {
+                    $disk->delete($relative);
+                }
+            }
+
+            return $this->successResponse(
+                new ProductResource($product->fresh()),
+                'تم حذف الصورة بنجاح'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'deleteImage');
+        }
+    }
+
+    /**
      * يحذف من القرص أي ملفات صور لم تعد مشاراً إليها في مصفوفة images.
+     *
+     * المقارنة تتم على المسار النسبي (بعد /storage/) وليس على الـ URL الكامل،
+     * لأن URL الصورة قد يُولَّد من asset() (يتضمن مجلد النشر) أو من أي مصدر آخر.
      */
     private function pruneOrphanedFiles(array $validUrls, int $productId): void
     {
         $disk = Storage::disk('public');
-        $prefix = "products/{$productId}/";
-        $allFiles = $disk->files($prefix);
+        $allFiles = $disk->files("products/{$productId}");
+
+        $validPaths = [];
+        foreach ($validUrls as $url) {
+            if (!is_string($url)) continue;
+            $pos = strpos($url, '/storage/');
+            if ($pos !== false) {
+                $validPaths[] = substr($url, $pos + strlen('/storage/'));
+            }
+        }
 
         foreach ($allFiles as $filePath) {
-            $fileUrl = $disk->url($filePath);
-            if (!in_array($fileUrl, $validUrls, true)) {
+            if (!in_array($filePath, $validPaths, true)) {
                 $disk->delete($filePath);
             }
         }
@@ -246,6 +302,30 @@ class ProductController extends BaseApiController
     }
 
     // ========== تجاوز الإعدادات الخاصة بالقائمة ==========
+
+    /**
+     * update — نفس منطق BaseApiController، مع تنظيف ملفات الصور المتروكة
+     * بعد أي تحديث يغيّر مصفوفة images (حذف محلي ثم حفظ، اقتراح صورة خارجي…).
+     */
+    public function update(Request $request, $id): JsonResponse
+    {
+        try {
+            $resolvedId = $this->extractId($id);
+            $item       = $this->getService()->findById($resolvedId);
+            $this->authorizeAction('update', $item);
+            $data = $this->getValidatedData($request, $resolvedId);
+            $item = $this->getService()->update($item, $data, $request);
+
+            $this->pruneOrphanedFiles($item->fresh()->images ?? [], $resolvedId);
+
+            return $this->successResponse(
+                $this->transformItem($item),
+                "تم تحديث {$this->resourceName} بنجاح"
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'update');
+        }
+    }
 
     protected function getListConfig(): array
     {

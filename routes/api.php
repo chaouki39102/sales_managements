@@ -281,6 +281,7 @@ Route::prefix('v1')->group(function () {
             Route::get('products/by-brand/{brand}',   [ProductController::class, 'byBrand']);
             Route::get('products/{product}',          [ProductController::class, 'show']);
             Route::post('products/{product}/image',   [ProductController::class, 'uploadImage']);
+            Route::delete('products/{product}/image', [ProductController::class, 'deleteImage']);
 
             Route::get('product-variants',                  [ProductVariantController::class, 'index']);
             Route::get('product-variants/barcode-search',  [ProductVariantController::class, 'barcodeSearch']);

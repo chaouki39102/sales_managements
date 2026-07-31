@@ -99,6 +99,9 @@ export const productsApi = {
   uploadImage: (id: number, fd: FormData, onProgress?: (p: number) => void) =>
     apiUpload<Product>(`/products/${id}/image`, fd, onProgress),
 
+  deleteImage: (id: number, imageUrl: string) =>
+    apiDelete(`/products/${id}/image`, { data: { image: imageUrl } }),
+
   /**
    * بحث اقتراح صور المنتج — يدمج Google CSE (مقيّد بمواقع جزائرية) + متاجر
    * جزائرية عبر WooCommerce Store API + Open Food Facts (باركود + نص) +
@@ -319,6 +322,12 @@ export function useProductMutations() {
         onProgress?: (p: number) => void;
       }) => productsApi.uploadImage(id, formData, onProgress),
       onSuccess: invalidateOne,
+    }),
+
+    deleteImage: useMutation({
+      mutationFn: ({ id, imageUrl }: { id: number; imageUrl: string }) =>
+        productsApi.deleteImage(id, imageUrl),
+      onSuccess: invalidateAll,
     }),
   };
 }

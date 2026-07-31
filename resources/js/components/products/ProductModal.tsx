@@ -542,6 +542,17 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
     if (imgFileRef.current) imgFileRef.current.value = '';
   }
 
+  async function handleDeleteImage(url: string, idx: number) {
+    set('images', form.images.filter((_, i) => i !== idx));
+    if (productId && url.includes('/storage/')) {
+      try {
+        await productsApi.deleteImage(productId, url);
+      } catch (e) {
+        notify.error('فشل حذف الصورة', e instanceof Error ? e.message : undefined);
+      }
+    }
+  }
+
   function toggleImgSuggest() {
     setShowImgSuggest(v => {
       const next = !v;
@@ -1969,7 +1980,7 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
                       <i className="ti ti-external-link" />
                     </a>
                     <button
-                      onClick={() => set('images', form.images.filter((_, i) => i !== idx))}
+                      onClick={() => handleDeleteImage(img, idx)}
                       style={{ padding: '5px 8px', borderRadius: 8, background: 'rgba(212,43,43,.8)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 13 }}
                     ><i className="ti ti-trash" /></button>
                   </div>
