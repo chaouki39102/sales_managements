@@ -11,7 +11,7 @@
   display:flex;flex-direction:column;
   z-index:200;overflow-y:auto;
   box-shadow:var(--shadow2);
-  transition:width .22s cubic-bezier(.4,0,.2,1),transform .3s cubic-bezier(.4,0,.2,1);
+  transition:width .16s cubic-bezier(.4,0,.2,1);
 }
 body.dark #sidebar{background:var(--bg2);}
 #sidebar.collapsed{width:58px;}
@@ -33,27 +33,6 @@ body.dark #sidebar{background:var(--bg2);}
 #sidebar.collapsed .sb-foot button{width:36px;padding:8px;justify-content:center;}
 #sidebar.collapsed .sb-foot button span{display:none;}
 
-/* ── Hover expand for collapsed sidebar ── */
-#sidebar.collapsed:hover{width:var(--sb);overflow-y:auto;}
-#sidebar.collapsed:hover .sbi{justify-content:normal;padding:8px 10px;}
-#sidebar.collapsed:hover .sb-logo{justify-content:normal;padding:16px 14px 12px;}
-#sidebar.collapsed:hover .sb-sec{padding:4px 10px;}
-#sidebar.collapsed:hover .sbi.on{border-right:2px solid var(--em);border-left:none;}
-#sidebar.collapsed:hover .sb-name,
-#sidebar.collapsed:hover .sb-sub,
-#sidebar.collapsed:hover .sb-lbl,
-#sidebar.collapsed:hover .sbi-name,
-#sidebar.collapsed:hover .sbi-badge,
-#sidebar.collapsed:hover .cs-text,
-#sidebar.collapsed:hover .cs-text+.ti{display:block;}
-#sidebar.collapsed:hover .sbi-ic{font-size:16px;width:22px;}
-#sidebar.collapsed:hover .sb-lbl{display:flex;}
-#sidebar.collapsed:hover .sb-foot>div{display:flex;flex-direction:column;}
-#sidebar.collapsed:hover .sb-foot a>div{justify-content:normal;padding:10px 12px;gap:10px;}
-#sidebar.collapsed:hover .sb-foot a>div>div:nth-child(2){display:block;}
-#sidebar.collapsed:hover .sb-foot button{width:100%;padding:8px 10px;justify-content:normal;}
-#sidebar.collapsed:hover .sb-foot button span{display:inline;}
-
 /* ── شريط تمرير رفيع للقائمة الجانبية ── */
 #sidebar{scrollbar-width:thin;scrollbar-color:var(--b3) transparent;}
 #sidebar::-webkit-scrollbar{width:5px;}
@@ -67,7 +46,8 @@ body.dark #sidebar{background:var(--bg2);}
   #sidebar .sbi,
   #sidebar .sb-lbl,
   #sidebar .sb-caret,
-  #sidebar .sb-group-content{transition:none !important;}
+  #sidebar .sb-group-content,
+  .sb-toggle{transition:none !important;}
   .sbi-badge{animation:none !important;}
 }
 
@@ -140,7 +120,7 @@ body.dark #sidebar{background:var(--bg2);}
 /* ── مجموعات قابلة للطي/التوسيع ── */
 .sb-group-content{
   display:grid;grid-template-rows:0fr;
-  transition:grid-template-rows .25s ease;
+  transition:grid-template-rows .18s ease;
 }
 .sb-group-content.open{grid-template-rows:1fr;}
 .sb-group-inner{overflow:hidden;min-height:0;}
@@ -244,9 +224,45 @@ body.dark #sidebar{background:var(--bg2);}
   min-height:100vh;
   display:flex;flex-direction:column;
   background:var(--bg1);
-  transition:margin-right .22s cubic-bezier(.4,0,.2,1);
+  transition:margin-right .16s cubic-bezier(.4,0,.2,1);
 }
 #sidebar.collapsed ~ #main{margin-right:58px;}
+
+/* ═══ SIDEBAR COLLAPSE TOGGLE — زر دائري على الحافة العلوية للقائمة (نصفه خارجها) ═══ */
+.sb-toggle{
+  position:fixed;
+  top:0;
+  right:calc(var(--sb) - 20px); /* منتصفه على خط حافة القائمة */
+  z-index:300;
+  width:40px;height:40px;
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--bg2);
+  border:1px solid var(--b2);
+  color:var(--t3);
+  font-size:17px;
+  cursor:pointer;
+  box-shadow:var(--shadow2);
+  transition:
+    right .16s cubic-bezier(.4,0,.2,1),
+    background .15s,border-color .15s,color .15s,
+    box-shadow .15s,transform .15s;
+}
+/* عند الطي: يتراجع الزر نحو الخارج (بروز خفيف ~8px) حتى لا يغطي شعار/أيقونة الشركة
+   المتمركزة داخل الشريط الضيق (58px) — الشعار يبقى ظاهراً بالكامل */
+#sidebar.collapsed ~ .sb-toggle{right:calc(58px - 8px);}
+.sb-toggle:hover{
+  background:var(--emb);
+  border-color:var(--em);
+  color:var(--em);
+  box-shadow:var(--emglow);
+}
+.sb-toggle:active{transform:scale(.9);}
+.sb-toggle:focus-visible{
+  outline:none;
+  border-color:var(--em);
+  box-shadow:0 0 0 3px var(--embo);
+}
 
 /* ═══ TOPBAR ═══ */
 #topbar{
@@ -358,6 +374,7 @@ body.dark #topbar{
   }
 
   #sidebar{display:none !important;}
+  .sb-toggle{display:none !important;}
   #mob-nav{
     display:flex;
     position:fixed;bottom:0;

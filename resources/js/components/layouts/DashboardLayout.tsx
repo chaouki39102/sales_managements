@@ -798,6 +798,18 @@ const meta = useTopbarTitle();
         </div>
       </nav>
 
+      {/* ═══ زر طي/توسيع القائمة — دائري على الحافة العلوية للشريط الجانبي (نصفه خارج القائمة) ═══ */}
+      <button
+        type="button"
+        className="sb-toggle"
+        onClick={toggleSidebar}
+        title={sidebarCollapsed ? 'توسيع القائمة (Ctrl+B)' : 'طي القائمة (Ctrl+B)'}
+        aria-label={sidebarCollapsed ? 'توسيع القائمة الجانبية' : 'طي القائمة الجانبية'}
+        aria-pressed={sidebarCollapsed}
+      >
+        <i className={`ti ${sidebarCollapsed ? 'ti-chevrons-left' : 'ti-chevrons-right'}`} />
+      </button>
+
       {/* ════════ MAIN ════════ */}
       <main id="main">
         {/* Topbar */}
@@ -808,9 +820,6 @@ const meta = useTopbarTitle();
             <div className="tb-path">{meta.path}</div>
           </div>
           <div className="tb-actions">
-            <button className="ib" onClick={toggleSidebar} title={sidebarCollapsed ? 'توسيع القائمة' : 'طي القائمة'}>
-              <span className="ic ic-sm"><i className={`ti ${sidebarCollapsed ? 'ti-layout-sidebar-right-expand' : 'ti-layout-sidebar-right-collapse'}`} /></span>
-            </button>
             <FiscalYearSelector />
             <span className="tb-sep" aria-hidden="true" />
             <div className="srch">
