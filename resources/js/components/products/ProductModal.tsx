@@ -117,6 +117,7 @@ interface ProductForm {
   meta_keywords:    string[];
   // ── الصور ──
   images:  string[];
+  default_image: string | null;
   // ── الوزن ──
   is_sold_by_weight:       boolean;
   // ── الدعم (المواد المدعمة) ──
@@ -202,7 +203,7 @@ function emptyForm(priceLevels: PriceLevel[] = [], defaultTvaId: number | null =
     min_stock_alert: '', max_stock_alert: '',
     manages_quantity_discounts: false, valuation_method_id: null,
     weight: '', volume: '', length: '', width: '', height: '',
-    specifications: {}, images: [],
+    specifications: {}, images: [], default_image: null,
     meta_title: '', meta_description: '', meta_keywords: [],
     is_sold_by_weight: false, is_subsidized: false, regulated_product_config_id: null,
     active: true,
@@ -231,6 +232,7 @@ function productToForm(p: any, priceLevels: PriceLevel[]): ProductForm {
     length: p.length ?? '', width: p.width ?? '', height: p.height ?? '',
     specifications: p.specifications ?? {},
     images: p.images ?? [],
+    default_image: p.default_image ?? null,
     meta_title: p.meta_title ?? '', meta_description: p.meta_description ?? '',
     meta_keywords: Array.isArray(p.meta_keywords) ? p.meta_keywords : (p.meta_keywords ? String(p.meta_keywords).split(',').map((k: string) => k.trim()).filter(Boolean) : []),
     is_sold_by_weight: p.is_sold_by_weight ?? false, is_subsidized: p.is_subsidized ?? false,
@@ -285,6 +287,7 @@ function buildPayload(form: ProductForm) {
     height: form.height !== '' ? form.height : null,
     specifications: Object.keys(form.specifications).length ? form.specifications : null,
     images: form.images,
+    default_image: form.default_image || null,
     meta_title: form.meta_title.trim() || null,
     meta_description: form.meta_description.trim() || null,
     meta_keywords: form.meta_keywords.length ? form.meta_keywords : null,
@@ -543,7 +546,11 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
   }
 
   async function handleDeleteImage(url: string, idx: number) {
-    set('images', form.images.filter((_, i) => i !== idx));
+    const remaining = form.images.filter((_, i) => i !== idx);
+    set('images', remaining);
+    if (form.default_image === url) {
+      setForm(f => ({ ...f, default_image: remaining[0] ?? null }));
+    }
     if (productId && url.includes('/storage/')) {
       try {
         await productsApi.deleteImage(productId, url);
@@ -551,6 +558,10 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
         notify.error('فشل حذف الصورة', e instanceof Error ? e.message : undefined);
       }
     }
+  }
+
+  function setDefaultImage(url: string) {
+    setForm(f => ({ ...f, default_image: f.default_image === url ? null : url }));
   }
 
   function toggleImgSuggest() {
@@ -853,6 +864,18 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
     });
   }
 
+  // ── Generate barcode (with confirm) ──
+  async function handleGenerateBarcode() {
+    if (!await confirm('تأكيد توليد باركود جديد؟ سيتم استبدال الباركود الحالي بباركود فريد غير مستعمل.')) return;
+    try {
+      const res = await productsApi.generateBarcode();
+      set('barcode', res?.barcode ?? '');
+      notify.success('تم توليد باركود فريد', res?.barcode ?? undefined);
+    } catch (e) {
+      notify.error('فشل توليد الباركود', e instanceof Error ? e.message : undefined);
+    }
+  }
+
   // ── Completeness % ──
   const completeness = useMemo(() => {
     let score = 0; const total = 10;
@@ -950,6 +973,11 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
                 onChange={e => set('barcode', e.target.value)}
                 placeholder="6121234567890"
               />
+              <button type="button" onClick={handleGenerateBarcode}
+                style={{ padding: '7px 10px', borderRadius: 'var(--r2)', border: '1px solid var(--b3)', background: 'var(--bg3)', cursor: 'pointer', fontSize: 12 }}
+                title="توليد باركود فريد جديد">
+                <i className="ti ti-dice" style={{ fontSize: 13 }} />
+              </button>
               <button type="button" onClick={() => setShowBarcodeScanner(true)}
                 style={{ padding: '7px 10px', borderRadius: 'var(--r2)', border: '1px solid var(--b3)', background: 'var(--bg3)', cursor: 'pointer', fontSize: 12 }}
                 title="مسح الباركود بالكاميرا">
@@ -1958,7 +1986,8 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
               {form.images.map((img, idx) => (
                 <div key={idx} style={{
                   position: 'relative', borderRadius: 'var(--r3)', overflow: 'hidden',
-                  border: '1px solid var(--b2)', background: 'var(--bg3)', aspectRatio: '1',
+                  border: form.default_image === img ? '2px solid #f5a623' : '1px solid var(--b2)',
+                  background: 'var(--bg3)', aspectRatio: '1',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   <img
@@ -1976,6 +2005,11 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
                     onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
                     onMouseLeave={e => (e.currentTarget.style.opacity = '0')}
                   >
+                    <button
+                      onClick={() => setDefaultImage(img)}
+                      title={form.default_image === img ? 'إلغاء الصورة الرئيسية' : 'تعيين كصورة رئيسية (تظهر في نقاط البيع)'}
+                      style={{ padding: '5px 8px', borderRadius: 8, background: form.default_image === img ? 'rgba(245,166,35,.9)' : 'rgba(255,255,255,.15)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 13 }}
+                    ><i className={form.default_image === img ? 'ti ti-star-filled' : 'ti ti-star'} /></button>
                     <a href={img} target="_blank" rel="noopener noreferrer" style={{ padding: '5px 8px', borderRadius: 8, background: 'rgba(255,255,255,.15)', color: '#fff', textDecoration: 'none', fontSize: 13 }}>
                       <i className="ti ti-external-link" />
                     </a>
@@ -1988,13 +2022,19 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
                   <div style={{ position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: '50%', background: 'rgba(0,0,0,.6)', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {idx + 1}
                   </div>
+                  {/* شارة الصورة الرئيسية */}
+                  {form.default_image === img && (
+                    <div style={{ position: 'absolute', bottom: 6, left: 6, background: 'rgba(245,166,35,.95)', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 999 }}>
+                      <i className="ti ti-star" style={{ fontSize: 11, marginInlineEnd: 3 }} />الرئيسية
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
             <div style={{ marginTop: 10, fontSize: 11, color: 'var(--t4)', display: 'flex', alignItems: 'center', gap: 6 }}>
               <i className="ti ti-info-circle" style={{ fontSize: 13 }} />
-              {form.images.length} صورة — الصورة الأولى هي الصورة الرئيسية.
-              مرر الماوس على الصورة لحذفها أو فتحها.
+              {form.images.length} صورة — الصورة ذات النجمة تظهر في نقاط البيع.
+              مرر الماوس على الصورة لتعيينها رئيسية أو حذفها أو فتحها.
             </div>
           </div>
         )}

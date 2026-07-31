@@ -89,6 +89,23 @@ class ProductController extends BaseApiController
     }
 
     /**
+     * يُنشئ باركود EAN-13 فريداً غير مستعمل، لاستخدامه في حقل الباركود.
+     * POST /products/generate-barcode → { barcode }
+     */
+    public function generateBarcode(Request $request): JsonResponse
+    {
+        try {
+            $this->authorizeAction('create', Product::class);
+            return $this->successResponse(
+                ['barcode' => Product::generateUniqueBarcode()],
+                'تم توليد باركود جديد'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'generateBarcode');
+        }
+    }
+
+    /**
      * رفع صورة للمنتج من الجهاز
      *
      * يُخزّن الملف في storage/app/public/products/{id}/

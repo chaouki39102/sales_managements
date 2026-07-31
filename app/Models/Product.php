@@ -60,6 +60,7 @@ class Product extends Model
         'height',
         'specifications',
         'images',
+        'default_image',
         'meta_title',
         'meta_description',
         'meta_keywords',
@@ -341,5 +342,32 @@ class Product extends Model
             }
         }
         return $totalQuantity > 0 ? round($totalValue / $totalQuantity, 4) : 0;
+    }
+
+    /**
+     * يُنشئ باركود EAN-13 فريداً غير مستعمل لأي منتج آخر.
+     * البادئة "613" (الجزائر) + 9 أرقام عشوائية + خانة تحقق.
+     */
+    public static function generateUniqueBarcode(): string
+    {
+        do {
+            $base = '613' . str_pad((string) random_int(0, 999999999), 9, '0', STR_PAD_LEFT);
+            $candidate = self::ean13CheckDigit($base);
+        } while (static::where('barcode', $candidate)->exists());
+
+        return $candidate;
+    }
+
+    /**
+     * حساب خانة التحقق EAN-13: 12 خانة ← 13 خانة.
+     */
+    public static function ean13CheckDigit(string $twelveDigits): string
+    {
+        $sum = 0;
+        for ($i = 0; $i < 12; $i++) {
+            $sum += (int) $twelveDigits[$i] * ($i % 2 === 0 ? 1 : 3);
+        }
+        $check = (10 - ($sum % 10)) % 10;
+        return $twelveDigits . $check;
     }
 }

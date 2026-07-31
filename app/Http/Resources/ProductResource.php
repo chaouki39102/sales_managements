@@ -43,6 +43,7 @@ class ProductResource extends JsonResource
             'valuation_method_id'       => $this->valuation_method_id,
             'specifications'            => $this->specifications,
             'images'                    => $this->images,
+            'default_image'             => $this->default_image,
             'meta_title'                => $this->meta_title,
             'meta_description'          => $this->meta_description,
             'meta_keywords'             => $this->meta_keywords,

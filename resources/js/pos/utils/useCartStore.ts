@@ -115,7 +115,7 @@ export const useCartStore = create<CartState>()(
             variant_name:        variant.variant_name ?? null,
             barcode:             variant.barcode ?? null,
             unit_symbol:         resolvedPkg?.label ?? getUnitSymbol(variant),
-            image_url:           (variant as any).image_url ?? variant.product?.images?.[0] ?? null,
+            image_url:           (variant as any).image_url ?? variant.product?.default_image ?? variant.product?.images?.[0] ?? null,
             quantity:            safeQty,
             unit_price_ht:       priceHt,
             selling_price_ttc:   priceHt * (1 + tvaRate / 100),

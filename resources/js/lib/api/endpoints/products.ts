@@ -102,6 +102,9 @@ export const productsApi = {
   deleteImage: (id: number, imageUrl: string) =>
     apiDelete(`/products/${id}/image`, { data: { image: imageUrl } }),
 
+  generateBarcode: () =>
+    apiPost<{ barcode: string }>('/products/generate-barcode'),
+
   /**
    * بحث اقتراح صور المنتج — يدمج Google CSE (مقيّد بمواقع جزائرية) + متاجر
    * جزائرية عبر WooCommerce Store API + Open Food Facts (باركود + نص) +
@@ -328,6 +331,10 @@ export function useProductMutations() {
       mutationFn: ({ id, imageUrl }: { id: number; imageUrl: string }) =>
         productsApi.deleteImage(id, imageUrl),
       onSuccess: invalidateAll,
+    }),
+
+    generateBarcode: useMutation({
+      mutationFn: () => productsApi.generateBarcode(),
     }),
   };
 }

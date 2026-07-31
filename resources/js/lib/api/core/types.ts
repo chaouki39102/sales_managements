@@ -477,6 +477,7 @@ export interface Product extends BaseModel {
   valuation_method_id?:      number | null;
   specifications?:           Record<string, string> | null;
   images?:                   string[] | null;
+  default_image?:            string | null;
   meta_title?:               string | null;
   meta_description?:         string | null;
   meta_keywords?:            string[] | null;

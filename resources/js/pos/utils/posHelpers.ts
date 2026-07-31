@@ -90,7 +90,7 @@ export function productToVariant(p: Product): ProductVariant {
 
     // relations
     product:           p,
-    image_url:         p.images?.[0] ?? null,
+    image_url:         p.default_image ?? p.images?.[0] ?? null,
     unit:              p.unit,
     tva:               p.tva,
     current_stock:     pr.current_stock,

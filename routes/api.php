@@ -279,6 +279,7 @@ Route::prefix('v1')->group(function () {
             Route::get('products/image-search',       [ProductController::class, 'imageSearch']);
             Route::get('products/by-family/{family}', [ProductController::class, 'byFamily']);
             Route::get('products/by-brand/{brand}',   [ProductController::class, 'byBrand']);
+            Route::post('products/generate-barcode',  [ProductController::class, 'generateBarcode']);
             Route::get('products/{product}',          [ProductController::class, 'show']);
             Route::post('products/{product}/image',   [ProductController::class, 'uploadImage']);
             Route::delete('products/{product}/image', [ProductController::class, 'deleteImage']);
