@@ -17,7 +17,7 @@
 
 1. **Fixed + scroll-to-active** — added `sidebarRef` + `useEffect` that centers the `.sbi.on` item in the sidebar viewport on every route change (`scrollTop` math from `getBoundingClientRect`, instant). Also re-runs on search change.
 
-2. **Collapsible groups (accordion)** — group labels are now `<button className="sb-lbl">` with `ti-chevron-down` caret (rotates 180° when open, `.sb-caret`). Content wrapped in `.sb-group-content` (grid `0fr→1fr` animation, `.sb-group-inner` inner div with `overflow:hidden;min-height:0`). Open state is **derived**: `open = searching ? true : (groupHasActive ? true : !closedGroups.has(label))`. Active group auto-expands on navigation; manual collapse persisted in `localStorage` key `sidebar_closed_groups` (Set of labels).
+2. **Collapsible groups (accordion)** — group labels are now `<button className="sb-lbl">` with `ti-chevron-down` caret (rotates 180° when open, `.sb-caret`). Content wrapped in `.sb-group-content` (grid `0fr→1fr` animation, `.sb-group-inner` inner div with `overflow:hidden;min-height:0`). Open state is **derived**: `open = searching ? true : (groupHasActive ? true : openGroups.has(label))`. Groups are **collapsed by default** (compact sidebar); only the active group auto-expands on navigation; manually-opened groups persisted in `localStorage` key `sidebar_open_groups` (Set of labels).
 
 3. **Sidebar search** — `.sb-search` input under the company switcher; live-filters items by name/href (`matchesQuery`); groups with no matches are hidden; all matching groups force-open; `sb-search-clear` × button resets.
 
@@ -27,12 +27,12 @@
 
 **Key architectural rules**:
 - `LABEL_COLORS` inline style is now the SSOT for group label colors (all 8 groups). The CSS `nth-child` color rules were REMOVED from both `layout.css` and `theme.css` — they'd break because the new `.sb-search` div shifts the `nth-child` index of every `.sb-sec`.
-- Path matching uses `normHref(h) = h.replace(/^\//,'')` — **fixed a latent bug**: items with absolute-style hrefs (`/settings/print`, `/settings/print/designer`, `/onboarding`) never matched `currentPath` and could never highlight as active.
+- Path matching (`isItemActive`) is **segment-aware so only ONE item highlights**: exact match wins; a prefix match is allowed only when the NEXT path segment is not itself another nav item's href (`navHrefSet`). This prevents siblings like `pos`/`pos/sessions` and `settings`/`settings/print` from both lighting up, while still highlighting true sub-pages (e.g. `documents/DEV/new` → `documents/DEV`). `normHref(h) = h.replace(/^\//,'')` also fixed a latent bug where absolute-style hrefs (`/settings/print`, `/settings/print/designer`, `/onboarding`) never matched `currentPath`.
 - Group open state is derived from `currentPath` (not an effect) so the scroll-to-active effect always runs after the active group is already expanded (no effect-ordering race).
 - CSS files: `theme.css` (loaded first) still contains duplicate `.sb-lbl`/`.sb-sec`/`.sbi` rules; `layout.css` (loaded later) wins the cascade — all new sidebar CSS goes in `layout.css`.
 
 **Files modified**:
-- `resources/js/components/layouts/DashboardLayout.tsx` — `normHref`, extended `LABEL_COLORS`, `closedGroups` + `sidebarQuery` state, `toggleGroup`, Ctrl+B handler, scroll effect deps, search box, collapsible group render, a11y attrs
+- `resources/js/components/layouts/DashboardLayout.tsx` — `normHref`, `navHrefSet`, segment-aware `isItemActive`, extended `LABEL_COLORS`, `openGroups` + `sidebarQuery` state, `toggleGroup`, Ctrl+B handler, scroll effect deps, search box, collapsible group render, a11y attrs
 - `resources/css/theme/layout.css` — button-ized `.sb-lbl` (+`.sb-caret`, `.sb-lbl.open`), `.sb-group-content`/`.sb-group-inner` animation, `.sb-search` styles, thin scrollbar, reduced-motion block, `#sidebar.collapsed:hover .sb-lbl{display:flex}`, removed nth-child color rules
 - `resources/css/theme/theme.css` — removed duplicate nth-child color rules
 

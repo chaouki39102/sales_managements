@@ -3,7 +3,7 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useFiscalYear, FiscalYearSelector } from '@/context/FiscalYearContext';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTheme } from '@/hooks/useTheme';
 import { apiGet, apiPost } from '@/lib/api/core/client';
 import { useTopbarTitle } from '@/hooks/useTopbarTitle';
@@ -516,9 +516,9 @@ export default function DashboardLayout() {
   const [drawerOpen, setDrawerOpen]     = useState(false);
   const sidebarRef                      = useRef<HTMLElement | null>(null);
   const [sidebarQuery, setSidebarQuery] = useState('');
-  const [closedGroups, setClosedGroups] = useState<Set<string>>(() => {
+  const [openGroups, setOpenGroups]     = useState<Set<string>>(() => {
     try {
-      const raw = localStorage.getItem('sidebar_closed_groups');
+      const raw = localStorage.getItem('sidebar_open_groups');
       return raw ? new Set(JSON.parse(raw)) : new Set();
     } catch { return new Set(); }
   });
@@ -536,12 +536,13 @@ export default function DashboardLayout() {
     });
   }, []);
 
-  // ✅ طيّ/توسيع مجموعة يدوياً مع الحفظ في localStorage
+  // ✅ توسيع/طيّ مجموعة يدوياً مع الحفظ في localStorage
+  //    (الافتراضي: المجموعات مطويّة — مجموعة الصفحة الحالية تفتح تلقائياً)
   const toggleGroup = useCallback((label: string) => {
-    setClosedGroups(prev => {
+    setOpenGroups(prev => {
       const next = new Set(prev);
       if (next.has(label)) next.delete(label); else next.add(label);
-      try { localStorage.setItem('sidebar_closed_groups', JSON.stringify([...next])); } catch { /* ignore */ }
+      try { localStorage.setItem('sidebar_open_groups', JSON.stringify([...next])); } catch { /* ignore */ }
       return next;
     });
   }, []);
@@ -574,6 +575,30 @@ export default function DashboardLayout() {
   };
 
   const currentPath = location.pathname.replace(/^\//, '') || 'dashboard';
+
+  // ✅ كل روابط القائمة (لتمييز الصفحات الشقيقة عن الصفحات الفرعية)
+  const navHrefSet = useMemo(() => {
+    const s = new Set<string>();
+    NAV_GROUPS
+      .filter(g => !(g as any).superAdminOnly || isSuperAdmin)
+      .forEach(g => (g.items as any[]).forEach(it => s.add(normHref(it.href))));
+    return s;
+  }, [isSuperAdmin]);
+
+  // ✅ عنصر واحد فقط يظهر نشطاً:
+  //    - تطابق تام، أو
+  //    - صفحة فرعية حقيقية (مثل documents/DEV/new) بشرط ألا يكون المقطع التالي
+  //      رابطاً لقائمة جانبية أخرى (فلا يتعارض pos مع pos/sessions مثلاً)
+  const isItemActive = useCallback((item: any) => {
+    const h = normHref(item.href);
+    if (currentPath === h) return true;
+    if (currentPath.startsWith(h + '/')) {
+      const nextSeg = currentPath.slice(h.length + 1).split('/')[0];
+      return !navHrefSet.has(`${h}/${nextSeg}`);
+    }
+    return false;
+  }, [currentPath, navHrefSet]);
+
 const meta = useTopbarTitle();
   const userInitial = user?.name?.[0] ?? 'م';
 
@@ -644,11 +669,10 @@ const meta = useTopbarTitle();
         {NAV_GROUPS.filter(g => !(g as any).superAdminOnly || isSuperAdmin).map((group, idx) => {
           const q = sidebarQuery.trim().toLowerCase();
           const matchesQuery = (item: any) => !q || item.name.toLowerCase().includes(q) || normHref(item.href).includes(q);
-          const isItemActive  = (item: any) => currentPath === normHref(item.href) || currentPath.startsWith(normHref(item.href) + '/');
           const hasActiveItem = group.items.some(isItemActive);
-          const items = group.items.filter(matchesQuery);
+          const items: any[] = group.items.filter(matchesQuery);
           if (q && items.length === 0) return null;
-          const open = q ? true : (hasActiveItem ? true : !closedGroups.has(group.label));
+          const open = q ? true : (hasActiveItem ? true : openGroups.has(group.label));
           return (
             <div className="sb-sec" key={group.label}>
               <button
