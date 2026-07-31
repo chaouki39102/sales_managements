@@ -107,7 +107,10 @@ const NAV_GROUPS = [
   },
 ];
 
-const LABEL_COLORS = ['var(--em)','var(--blue)','var(--purple)','var(--gold)','var(--orange)','var(--teal)'];
+const LABEL_COLORS = ['var(--em)','var(--blue)','var(--purple)','var(--gold)','var(--orange)','var(--teal)','var(--red)','var(--purple)'];
+
+// يوحّد مقارنة الروابط مع المسار الحالي (بعض الروابط تبدأ بـ '/')
+const normHref = (h: string) => h.replace(/^\//, '');
 
 
 
@@ -511,6 +514,14 @@ export default function DashboardLayout() {
   const navigate                        = useNavigate();
   const { dark, toggle: toggleTheme }   = useTheme();
   const [drawerOpen, setDrawerOpen]     = useState(false);
+  const sidebarRef                      = useRef<HTMLElement | null>(null);
+  const [sidebarQuery, setSidebarQuery] = useState('');
+  const [closedGroups, setClosedGroups] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem('sidebar_closed_groups');
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch { return new Set(); }
+  });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try { return localStorage.getItem('sidebar_collapsed') === 'true'; } catch { return false; }
   });
@@ -524,6 +535,28 @@ export default function DashboardLayout() {
       return next;
     });
   }, []);
+
+  // ✅ طيّ/توسيع مجموعة يدوياً مع الحفظ في localStorage
+  const toggleGroup = useCallback((label: string) => {
+    setClosedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label); else next.add(label);
+      try { localStorage.setItem('sidebar_closed_groups', JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+
+  // ✅ اختصار لوحة المفاتيح: Ctrl/Cmd + B لطي/توسيع القائمة الجانبية
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        toggleSidebar();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [toggleSidebar]);
 
   // ✅ نستخدم FiscalYearContext مباشرة — بدون useParams
   const { years, selectedYear, isLoading: fiscalLoading, refetch } = useFiscalYear();
@@ -546,6 +579,19 @@ const meta = useTopbarTitle();
 
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
 
+  // ✅ القائمة الجانبية مثبّتة دائماً (position:fixed) — عند تغيير الصفحة
+  //    نمرّر الشريط تلقائياً حتى يظهر عنصر الصفحة الحالية في منتصف الظاهر
+  useEffect(() => {
+    const sb = sidebarRef.current;
+    if (!sb) return;
+    const el = sb.querySelector<HTMLElement>('.sbi.on');
+    if (!el) return;
+    const sbRect = sb.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const target = sb.scrollTop + (elRect.top - sbRect.top) - (sb.clientHeight - elRect.height) / 2;
+    sb.scrollTop = Math.max(0, Math.round(target));
+  }, [currentPath, sidebarQuery]);
+
   // Auto-collapse sidebar on document editor pages (new/edit)
   // ✅ عند الدخول لصفحة تحرير: نطوي القائمة تلقائياً.
   //    عند الخروج: نعيد آخر اختيار يدوي للمستخدم بدل إجباره دائماً على "موسّعة"
@@ -565,7 +611,7 @@ const meta = useTopbarTitle();
   return (
     <>
       {/* ════════ SIDEBAR ════════ */}
-      <nav id="sidebar" className={sidebarCollapsed ? 'collapsed' : ''}>
+      <nav id="sidebar" ref={sidebarRef} aria-label="القائمة الرئيسية" className={sidebarCollapsed ? 'collapsed' : ''}>
         <div className="sb-logo">
           <div className="sb-mark">ب</div>
           <div>
@@ -579,28 +625,75 @@ const meta = useTopbarTitle();
           <CompanySwitcher />
         </div>
 
-        {NAV_GROUPS.filter(g => !(g as any).superAdminOnly || isSuperAdmin).map((group, idx) => (
-          <div className="sb-sec" key={group.label}>
-            <div className="sb-lbl" style={{ color: LABEL_COLORS[idx] }}>{group.label}</div>
-            {group.items.map(item => {
-              const isActive = currentPath === item.href || currentPath.startsWith(item.href + '/');
-              return (
-                <Link key={item.href} to={item.href} className={`sbi${isActive ? ' on' : ''}`}>
-                  <span className="sbi-ic ic"><i className={`ti ${item.icon}`} /></span>
-                  <span className="sbi-name">{item.name}</span>
-                  {'badge' in item && item.badge && <span className="sbi-badge">{item.badge}</span>}
-                  {'badgeWarn' in item && item.badgeWarn && (
-                    <span className="sbi-badge w ic-badge">
-                      <svg viewBox="0 0 24 24" fill="none" strokeWidth="2.5">
-                        <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                      </svg>
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        ))}
+        {/* ─── بحث في القائمة ─── */}
+        <div className="sb-search">
+          <i className="ti ti-search sb-search-ic" />
+          <input
+            value={sidebarQuery}
+            onChange={e => setSidebarQuery(e.target.value)}
+            placeholder="بحث في القائمة…"
+            aria-label="بحث في القائمة"
+          />
+          {sidebarQuery && (
+            <button type="button" className="sb-search-clear" onClick={() => setSidebarQuery('')} aria-label="مسح البحث">
+              <i className="ti ti-x" />
+            </button>
+          )}
+        </div>
+
+        {NAV_GROUPS.filter(g => !(g as any).superAdminOnly || isSuperAdmin).map((group, idx) => {
+          const q = sidebarQuery.trim().toLowerCase();
+          const matchesQuery = (item: any) => !q || item.name.toLowerCase().includes(q) || normHref(item.href).includes(q);
+          const isItemActive  = (item: any) => currentPath === normHref(item.href) || currentPath.startsWith(normHref(item.href) + '/');
+          const hasActiveItem = group.items.some(isItemActive);
+          const items = group.items.filter(matchesQuery);
+          if (q && items.length === 0) return null;
+          const open = q ? true : (hasActiveItem ? true : !closedGroups.has(group.label));
+          return (
+            <div className="sb-sec" key={group.label}>
+              <button
+                type="button"
+                className={`sb-lbl${open ? ' open' : ''}`}
+                style={{ color: LABEL_COLORS[idx] }}
+                aria-expanded={open}
+                aria-controls={`sb-group-${idx}`}
+                onClick={() => toggleGroup(group.label)}
+                title={open ? 'طيّ المجموعة' : 'توسيع المجموعة'}
+              >
+                <span className="sb-lbl-txt">{group.label}</span>
+                <i className={`ti ti-chevron-down sb-caret${open ? ' open' : ''}`} />
+              </button>
+              <div id={`sb-group-${idx}`} className={`sb-group-content${open ? ' open' : ''}`}>
+                <div className="sb-group-inner">
+                  {items.map(item => {
+                    const isActive = isItemActive(item);
+                    return (
+                      <Link
+                        key={item.href}
+                        to={item.href}
+                        className={`sbi${isActive ? ' on' : ''}`}
+                        title={item.name}
+                        aria-label={item.name}
+                        aria-current={isActive ? 'page' : undefined}
+                      >
+                        <span className="sbi-ic ic"><i className={`ti ${item.icon}`} /></span>
+                        <span className="sbi-name">{item.name}</span>
+                        {'badge' in item && item.badge && <span className="sbi-badge">{item.badge}</span>}
+                        {'badgeWarn' in item && item.badgeWarn && (
+                          <span className="sbi-badge w ic-badge">
+                            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2.5">
+                              <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                            </svg>
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        })}
 
         <div className="sb-foot">
           {/* ─── بطاقة المستخدم (قابلة للضغط → profile) ─── */}

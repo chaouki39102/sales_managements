@@ -5,6 +5,79 @@
 - **When reading how API data is returned**, ALWAYS check `extractData()` in `resources/js/lib/api/core/client.ts` — it is the single standard bridge between backend and frontend. Never assume the raw HTTP response shape reaches consumers directly.
 
 ## Date
+2026-07-31
+
+### Phase 32 — Sidebar UX: Collapsible Groups + Search + A11y + Ctrl+B (July 31)
+
+**Request**: Sidebar must always be fixed and auto-scroll to the current page (e.g. entering Settings should keep the sidebar scrolled at the Settings section). Then a full UX upgrade was requested based on research (shadcn/fragments/AdminLTE 2026 best practices).
+
+**Architecture before**: `#sidebar` was already `position:fixed; overflow-y:auto` (`layout.css:6`). Nav was FLAT — all 8 groups always expanded (~40 items) → long scroll. `Sidebar.tsx`/`SidebarSection.tsx`/`SidebarItem.tsx` are empty placeholders; the real nav is inline in `DashboardLayout.tsx`.
+
+**5 improvements implemented**:
+
+1. **Fixed + scroll-to-active** — added `sidebarRef` + `useEffect` that centers the `.sbi.on` item in the sidebar viewport on every route change (`scrollTop` math from `getBoundingClientRect`, instant). Also re-runs on search change.
+
+2. **Collapsible groups (accordion)** — group labels are now `<button className="sb-lbl">` with `ti-chevron-down` caret (rotates 180° when open, `.sb-caret`). Content wrapped in `.sb-group-content` (grid `0fr→1fr` animation, `.sb-group-inner` inner div with `overflow:hidden;min-height:0`). Open state is **derived**: `open = searching ? true : (groupHasActive ? true : !closedGroups.has(label))`. Active group auto-expands on navigation; manual collapse persisted in `localStorage` key `sidebar_closed_groups` (Set of labels).
+
+3. **Sidebar search** — `.sb-search` input under the company switcher; live-filters items by name/href (`matchesQuery`); groups with no matches are hidden; all matching groups force-open; `sb-search-clear` × button resets.
+
+4. **Rail-mode tooltips + a11y** — every `Link` gets `title`/`aria-label` + `aria-current={isActive?'page':undefined}` (collapsed icon rail previously had NO tooltips). Group toggles get `aria-expanded` + `aria-controls`. `<nav>` gets `aria-label="القائمة الرئيسية"`.
+
+5. **Ctrl+B shortcut + polish** — `(e.ctrlKey||e.metaKey) && e.key==='b'` toggles collapse (same handler as topbar button). Thin scrollbar (`scrollbar-width:thin` + webkit 5px). `prefers-reduced-motion` disables sidebar/group transitions. `LABEL_COLORS` extended to 8 entries (was 6 — groups 7/8 previously fell back to CSS `nth-child` color rules).
+
+**Key architectural rules**:
+- `LABEL_COLORS` inline style is now the SSOT for group label colors (all 8 groups). The CSS `nth-child` color rules were REMOVED from both `layout.css` and `theme.css` — they'd break because the new `.sb-search` div shifts the `nth-child` index of every `.sb-sec`.
+- Path matching uses `normHref(h) = h.replace(/^\//,'')` — **fixed a latent bug**: items with absolute-style hrefs (`/settings/print`, `/settings/print/designer`, `/onboarding`) never matched `currentPath` and could never highlight as active.
+- Group open state is derived from `currentPath` (not an effect) so the scroll-to-active effect always runs after the active group is already expanded (no effect-ordering race).
+- CSS files: `theme.css` (loaded first) still contains duplicate `.sb-lbl`/`.sb-sec`/`.sbi` rules; `layout.css` (loaded later) wins the cascade — all new sidebar CSS goes in `layout.css`.
+
+**Files modified**:
+- `resources/js/components/layouts/DashboardLayout.tsx` — `normHref`, extended `LABEL_COLORS`, `closedGroups` + `sidebarQuery` state, `toggleGroup`, Ctrl+B handler, scroll effect deps, search box, collapsible group render, a11y attrs
+- `resources/css/theme/layout.css` — button-ized `.sb-lbl` (+`.sb-caret`, `.sb-lbl.open`), `.sb-group-content`/`.sb-group-inner` animation, `.sb-search` styles, thin scrollbar, reduced-motion block, `#sidebar.collapsed:hover .sb-lbl{display:flex}`, removed nth-child color rules
+- `resources/css/theme/theme.css` — removed duplicate nth-child color rules
+
+**Verification**: `tsc --noEmit` clean, `npm run build` 0 errors, `npm test` 174/174 pass.
+
+**Remaining (non-blocking)**: `Sidebar.tsx`/`SidebarSection.tsx`/`SidebarItem.tsx` still empty placeholders (dead code) — could be wired up or deleted; keyboard first-letter nav; group item-count badges when collapsed.
+
+### Phase 33 — Sticker Designer Full Alignment Control (align/valign) + Price 2 Decimals (July 31)
+
+**Request**: "النحاذاة لا توجد في اغلب العناصر... الباركود متعدد خاصة في الطول عندما لا يكون في المنتصف... تجده في جهة اليسار... اسماء المنتجات تختلف في الطول اريد التحكم التام في المحاداة ويجب على العنصر ان يلتزم بها" — alignment was missing on most elements; barcode/name widths vary so full per-element alignment control is required and every element MUST strictly respect it in BOTH the design canvas and the printed sticker. Then: price must show with 2 decimals. Finally: commit + push.
+
+**Design concept** (backward compatible — old x/y-only entries still render):
+- `(x, y)` is now the **anchor point** of the element box (not always top-left).
+- `align: 'left' | 'center' | 'right'` (default `'left'`) → element's left edge / horizontal center / right edge sits at `x`.
+- `valign: 'top' | 'middle' | 'bottom'` (default `'top'`) → element's top / vertical center / bottom sits at `y`.
+- `StickerElementGeometry` gained `align?` + `valign?` (`types/domain.ts`).
+
+**Canvas render** (`StickerCanvas.tsx`): `left: p.x - offX*effW`, `top: p.y - offY*effH` (offsets 0 / 0.5 / 1); content box uses flex `justifyContent`/`alignItems` + `textAlign` mirroring `align` so content inside an explicitly sized box aligns to the same value. Explicit `width` (`p.width`) is preferred; falls back to measured `offsetWidth`.
+
+**Drag/clamp**: clamp uses `minX = offX*elW`, `maxX = max(minX, W-(1-offX)*elW)` (same for Y), so dragging keeps the anchored edge/center inside the canvas. Manual pointer-drag stores `align`/`valign` in the `dragRef` snapshot so the anchor can't change mid-gesture.
+
+**Resize anchor recovery** (`handleResize`): after a Moveable resize, `x = e.drag.beforeTranslate[0] + offX*newW`, `y = e.drag.beforeTranslate[1] + offY*newH` (beforeTranslate is the CSS top-left). `elementRefs`/`naturalSize()` removed from `ElementProperties.tsx` (no longer needed).
+
+**Print renderer** (`StickerLabel.tsx`): `absBox` uses `translate(-50%)` / `translate(-100%)` + optional `rotate` joined in ONE transform string; inner flex + `textAlign` mirror the canvas so design and print are pixel-consistent.
+
+**UI controls** (`ElementProperties.tsx`): new "أفقي" row (right/center/left) + "عمودي" row (top/middle/bottom), 3-button segments, active state = `var(--em)` + glow; `currentAlign = geometry.align ?? 'left'`. Center actions set anchor: `centerX` → `{x:160, align:'center'}`, `centerY` → `{y:80, valign:'middle'}`; `resetAll` clears `align`/`valign` too. `handleNudge` in `StickerDesignerPage.tsx` is alignment-aware.
+
+**Price 2 decimals**: `Number(price)` + `Number.isFinite` → `toFixed(2)`, else `'0.00'` — applied in BOTH `StickerCanvas.tsx` and `StickerLabel.tsx` (handles string prices from API; design == print).
+
+**Key architectural rule**: The anchor model (`x,y` + align/valign) is the SSOT shared by canvas and print renderer. Canvas CSS `left/top` and print `translate%` are two implementations of the same formula `x - offX*w`, `y - offY*h` (offX/offY in {0, 0.5, 1}) — never introduce a third.
+
+**Files modified**:
+- `resources/js/pages/settings/print-settings/types/domain.ts` — `align`/`valign` on `StickerElementGeometry`
+- `resources/js/pages/settings/sticker-designer/StickerCanvas.tsx` — anchor render, flex alignment, alignment-aware clamp/drag/resize
+- `resources/js/pages/settings/sticker-designer/ElementProperties.tsx` — أفقي/عمودي alignment buttons, center/reset anchor semantics, removed `elementRefs`
+- `resources/js/pages/settings/sticker-designer/StickerDesignerPage.tsx` — alignment-aware `handleNudge`, no `elementRefs` prop
+- `resources/js/pages/settings/print-settings/components/preview/StickerLabel.tsx` — `absBox` translate% + flex alignment + price `toFixed(2)`
+
+**Verification**: `tsc --noEmit` clean for all touched files (the only remaining errors are pre-existing `DashboardLayout.tsx` TS2322 in uncommitted Phase 32 sidebar work — excluded from this commit). `npm run build` — 0 errors. `npm test` — 174/174 pass.
+
+---
+
+## Previous Sessions
+
+### Date
 2026-07-28
 
 ### Phase 27 — extractData: The Single Standard Bridge (July 28)

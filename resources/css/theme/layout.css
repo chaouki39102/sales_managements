@@ -47,11 +47,29 @@ body.dark #sidebar{background:var(--bg2);}
 #sidebar.collapsed:hover .cs-text,
 #sidebar.collapsed:hover .cs-text+.ti{display:block;}
 #sidebar.collapsed:hover .sbi-ic{font-size:16px;width:22px;}
+#sidebar.collapsed:hover .sb-lbl{display:flex;}
 #sidebar.collapsed:hover .sb-foot>div{display:flex;flex-direction:column;}
 #sidebar.collapsed:hover .sb-foot a>div{justify-content:normal;padding:10px 12px;gap:10px;}
 #sidebar.collapsed:hover .sb-foot a>div>div:nth-child(2){display:block;}
 #sidebar.collapsed:hover .sb-foot button{width:100%;padding:8px 10px;justify-content:normal;}
 #sidebar.collapsed:hover .sb-foot button span{display:inline;}
+
+/* ── شريط تمرير رفيع للقائمة الجانبية ── */
+#sidebar{scrollbar-width:thin;scrollbar-color:var(--b3) transparent;}
+#sidebar::-webkit-scrollbar{width:5px;}
+#sidebar::-webkit-scrollbar-track{background:transparent;}
+#sidebar::-webkit-scrollbar-thumb{background:var(--b3);border-radius:3px;}
+#sidebar::-webkit-scrollbar-thumb:hover{background:var(--t4);}
+
+/* ── احترام تفضيل تقليل الحركة ── */
+@media (prefers-reduced-motion: reduce){
+  #sidebar,
+  #sidebar .sbi,
+  #sidebar .sb-lbl,
+  #sidebar .sb-caret,
+  #sidebar .sb-group-content{transition:none !important;}
+  .sbi-badge{animation:none !important;}
+}
 
 
 /* ═══ SIDEBAR LOGO ═══ */
@@ -102,19 +120,55 @@ body.dark #sidebar{background:var(--bg2);}
   color:var(--t4);letter-spacing:1.4px;
   padding:6px 15px 4px;text-transform:uppercase;
   display:flex;align-items:center;gap:6px;
+  background:none;border:none;width:100%;
+  font-family:'Tajawal',sans-serif;text-align:right;
+  cursor:pointer;user-select:none;
+  transition:color .16s;
 }
+.sb-lbl:hover{color:var(--t2);}
 .sb-lbl::before{
   content:'';width:12px;height:1px;
   background:currentColor;opacity:.4;flex-shrink:0;
 }
-.sb-sec:nth-child(3) .sb-lbl{color:var(--em);}
-.sb-sec:nth-child(4) .sb-lbl{color:var(--blue);}
-.sb-sec:nth-child(5) .sb-lbl{color:var(--purple);}
-.sb-sec:nth-child(6) .sb-lbl{color:var(--gold);}
-.sb-sec:nth-child(7) .sb-lbl{color:var(--orange);}
-.sb-sec:nth-child(8) .sb-lbl{color:var(--red);}
-.sb-sec:nth-child(9) .sb-lbl{color:var(--teal);}
-.sb-sec:nth-child(10) .sb-lbl{color:var(--purple);}
+.sb-lbl .sb-caret{
+  font-size:11px;margin-left:auto;flex-shrink:0;
+  color:inherit;opacity:.55;
+  transition:transform .22s ease;
+}
+.sb-lbl.open .sb-caret{transform:rotate(180deg);}
+
+/* ── مجموعات قابلة للطي/التوسيع ── */
+.sb-group-content{
+  display:grid;grid-template-rows:0fr;
+  transition:grid-template-rows .25s ease;
+}
+.sb-group-content.open{grid-template-rows:1fr;}
+.sb-group-inner{overflow:hidden;min-height:0;}
+
+/* ── بحث في القائمة ── */
+.sb-search{
+  display:flex;align-items:center;gap:7px;
+  margin:8px 10px;padding:7px 10px;
+  background:var(--bg3);border:1px solid var(--b2);
+  border-radius:var(--r2);transition:.15s;flex-shrink:0;
+}
+.sb-search:focus-within{
+  border-color:var(--em);background:var(--bg2);
+  box-shadow:0 0 0 3px var(--emb);
+}
+.sb-search input{
+  flex:1;min-width:0;background:transparent;border:none;outline:none;
+  color:var(--t1);font-size:12.5px;font-family:'Tajawal',sans-serif;
+}
+.sb-search input::placeholder{color:var(--t4);}
+.sb-search-ic{color:var(--t4);font-size:13px;flex-shrink:0;}
+.sb-search-clear{
+  background:none;border:none;color:var(--t4);
+  cursor:pointer;padding:0;display:flex;flex-shrink:0;
+  font-size:12px;line-height:1;
+}
+.sb-search-clear:hover{color:var(--t1);}
+#sidebar.collapsed .sb-search{display:none;}
 
 /* ═══ SIDEBAR ITEMS ═══ */
 .sbi{
