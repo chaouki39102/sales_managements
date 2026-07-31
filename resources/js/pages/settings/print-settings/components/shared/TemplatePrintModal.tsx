@@ -1,10 +1,11 @@
-import React, { useMemo, useEffect, useRef, useCallback } from 'react';
+import React, { useMemo, useEffect, useRef, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data/UniversalDocumentData';
 import type { PrintTemplate } from '@/pages/settings/print-settings/types';
 import type { CompanyData } from '@/pages/settings/print-settings/components/preview/shared';
 import { resolveTemplate } from '@/pages/settings/print-settings/runtime/TemplateResolver';
 import UniversalPrintPipeline, { renderPipelineToPopup } from '@/pages/settings/print-settings/runtime/UniversalPrintPipeline';
+import StickerLabel from '@/pages/settings/print-settings/components/preview/StickerLabel';
 
 // ─── ApiDocument ────────────────────────────────────────────────────────────
 // Minimal shape expected by DocumentDataBuilder.fromApiDocument().
@@ -127,6 +128,19 @@ const btnSecondary: React.CSSProperties = {
   cursor: 'pointer',
 };
 
+const STK_SCALE = 0.38;
+
+const templateCard: React.CSSProperties = {
+  minWidth: 150,
+  maxWidth: 170,
+  padding: 8,
+  borderRadius: 8,
+  cursor: 'pointer',
+  textAlign: 'center',
+  fontFamily: 'Tajawal, sans-serif',
+  transition: 'border-color .15s, box-shadow .15s',
+};
+
 // ─── Component ──────────────────────────────────────────────────────────────
 
 function TemplatePrintModal({ open, onClose, document, company, template, templates, docTypeCode, data: overrideData, prevBalance, newBalance }: TemplatePrintModalProps) {
@@ -134,11 +148,29 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
+  const candidates = useMemo(() => {
+    const list = templates ?? [];
+    return list.filter(t => t.doc_type_code === docTypeCode && t.is_active);
+  }, [templates, docTypeCode]);
+
+  const defaultTpl = useMemo((): PrintTemplate | null => {
+    if (template) return template;
+    return resolveTemplate(candidates, docTypeCode) ?? null;
+  }, [template, candidates, docTypeCode]);
+
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const id = defaultTpl?.id ?? null;
+    setSelectedId(id != null && candidates.some(c => c.id === id) ? id : null);
+  }, [open, defaultTpl, candidates]);
+
   const tpl: PrintTemplate | null = useMemo(() => {
     if (template) return template;
-    const found = resolveTemplate(templates ?? [], docTypeCode);
-    return found ?? null;
-  }, [template, templates, docTypeCode]);
+    if (selectedId != null) return candidates.find(c => c.id === selectedId) ?? defaultTpl;
+    return defaultTpl;
+  }, [template, selectedId, candidates, defaultTpl]);
 
   const source = useMemo(() => {
     if (overrideData) return { type: 'prebuilt' as const, data: overrideData };
@@ -175,6 +207,54 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
             ✕
           </button>
         </div>
+
+        {candidates.length > 1 && (
+          <div style={{
+            display: 'flex', gap: 10, padding: '10px 16px',
+            borderBottom: '1px solid var(--b2)', background: 'var(--bg2)',
+            overflowX: 'auto', flexShrink: 0,
+          }}>
+            {candidates.map(c => {
+              const isSel = c.id != null && c.id === selectedId;
+              return (
+                <button
+                  key={c.id ?? c.name}
+                  type="button"
+                  title={c.name}
+                  onClick={() => setSelectedId(c.id)}
+                  style={{
+                    ...templateCard,
+                    border: isSel ? '2px solid var(--em)' : '1px solid var(--b2)',
+                    background: isSel ? 'var(--emb)' : 'var(--bg1)',
+                    boxShadow: isSel ? 'var(--emglow)' : 'none',
+                  }}
+                >
+                  <div style={{ fontWeight: 800, fontSize: 12, color: isSel ? 'var(--em)' : 'var(--t1)', marginBottom: 2 }}>
+                    {c.is_default ? '★ ' : ''}{c.name}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--t4)', marginBottom: 6, fontFamily: 'monospace' }}>
+                    {c.paper_size}{c.paper_width_mm ? ` · ${c.paper_width_mm}mm` : ''}
+                  </div>
+                  {docTypeCode === 'STK' && overrideData ? (
+                    <div style={{
+                      width: STK_SCALE * 320, height: STK_SCALE * 160,
+                      overflow: 'hidden', borderRadius: 4, border: '1px solid var(--b2)',
+                      background: '#fff', margin: '0 auto', direction: 'rtl',
+                    }}>
+                      <div style={{ transform: `scale(${STK_SCALE})`, transformOrigin: 'top left', width: 320, height: 160 }}>
+                        <StickerLabel tpl={c} data={overrideData} />
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 10, color: 'var(--t4)', padding: '18px 0' }}>
+                      اختر القالب لعرض المعاينة
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div style={previewAreaStyle}>
           {source && tpl ? (

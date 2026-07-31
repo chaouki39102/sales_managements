@@ -7,6 +7,30 @@
 ## Date
 2026-07-31
 
+### Phase 35 — Template Chooser in Print Modal (July 31)
+
+**Request**: "I create 2 models of stickers. How to select? I suggest to show in the modal the name of the modal with preview to select before print" — when multiple templates exist for a doc type, the print modal must let the user pick which one to print, showing each template's **name + live preview** before confirming.
+
+**Architecture**: `TemplatePrintModal` previously resolved a template silently via `resolveTemplate()` (default → first match) with no way to switch. Added a selection state machine:
+
+1. **`candidates`** (`TemplatePrintModal.tsx`) — templates filtered to `doc_type_code === docTypeCode && is_active` (same filter as `resolveTemplate`).
+2. **`defaultTpl`** — caller-passed `template` prop wins (fallback object when no DB templates); otherwise `resolveTemplate(candidates, docTypeCode)`.
+3. **`selectedId`** — state initialized to the resolved template's `id` (or `null` when the fallback has no id); reset on every open via an effect keyed on `[open, defaultTpl, candidates]`. **The caller-provided `template` prop always wins** over any selection, so callers passing an intentionally-resolved template (e.g. invoice flow) keep their pick unless the user explicitly clicks another card.
+4. **Effective `tpl`** — `template` prop > `candidates[selectedId]` > `defaultTpl`. The main preview AND the print button both consume this `tpl`, so switching the card instantly re-renders the preview and changes what prints.
+
+**Chooser UI**: rendered only when `candidates.length > 1`. A horizontal strip under the modal header: one card per template showing **name** (+ ★ when `is_default`), paper size / width, and — for `STK` — a **scaled mini preview** via `StickerLabel` (`transform: scale(0.38)` with `transformOrigin: 'top left'`, container `0.38×320 × 0.38×160`; `StickerLabel` renders at its fixed 320×160 design space so the scale is exact). Non-STK cards show a "choose to preview" hint; the main preview area serves as their preview.
+
+**Key architectural rules**:
+- `StickerLabel` is the shared preview primitive — the mini card preview and the full main preview are the same component, guaranteeing the picker shows exactly what will print.
+- The mini preview is clipped via an outer `overflow:hidden` box sized `STK_SCALE×W/H`; the inner div scales with `transformOrigin: 'top left'` — never size the container by the scaled content or the box collapses.
+- Selection is a purely local state; no URL params, no persistence — each modal open re-defaults to the resolved template.
+- The modal stays generic: the chooser works for every doc type, but only `STK` gets the scaled mini preview (only sticker has a fixed-size renderer).
+
+**Files modified**:
+- `resources/js/pages/settings/print-settings/components/shared/TemplatePrintModal.tsx` — candidates/defaultTpl/selectedId state, effective `tpl`, chooser strip + `StickerLabel` mini previews
+
+**Verification**: `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors, 181 precache entries.
+
 ### Phase 34 — `php artisan test` Fixed: Pest + PHPUnit Test Infrastructure (July 31)
 
 **Problem**: `php artisan test` crashed instantly with `Class "PHPUnit\Framework\TestCase" not found` — the project had NO test framework installed (no `phpunit/phpunit`, no `pestphp/pest` in `composer.json` require-dev) AND no `phpunit.xml`, `tests/TestCase.php`, or `tests/Pest.php`. The one existing test (`tests/Feature/ApiResponseShapeTest.php`) was written in Pest syntax and calls two undefined global helpers: `actingAsAuthenticatedTenantUser()` and `testCompanySlug()`.
