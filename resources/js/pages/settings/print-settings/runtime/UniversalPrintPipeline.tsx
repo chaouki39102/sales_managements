@@ -96,7 +96,7 @@ export function openPrintPopup(
     @media print { body { padding: 0; } }
     ${extraStyles ?? ''}
   </style>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;900&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Mono:wght@400;500&family=Cairo:wght@300;400;500;600;700;800;900&family=Almarai:wght@300;400;700;800&family=Noto+Kufi+Arabic:wght@400;500;600;700;800&family=El+Messiri:wght@400;500;600;700&family=Amiri:wght@400;700&family=Zain:wght@300;400;700;800;900&display=swap" rel="stylesheet"/>
 </head>
 <body><div id="print-root"></div>
 <script>

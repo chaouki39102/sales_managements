@@ -3,7 +3,7 @@ import type { PrintTemplate } from '../types';
 import { Toggle, SliderField } from './ToggleSwitch';
 import { AlignButtons, BorderSelect } from './HeaderSection';
 import { Field, ColorField, Textarea, Input } from '../components/ui';
-import { isSettingVisible } from '../services/SettingsRegistry';
+import { isSettingVisible, FONT_OPTIONS } from '../services/SettingsRegistry';
 import { RowManager, type FieldOption } from '../components/RowManager';
 
 const CUSTOMER_FIELD_OPTIONS: FieldOption[] = [
@@ -65,13 +65,6 @@ const CUST_LABEL_MAP: Record<string, string> = {
   label_customer_bank_name:           'cust_bank_name',
   label_customer_rib:                 'cust_rib',
 };
-
-const FONT_OPTIONS: { value: FontFamily; label: string }[] = [
-  { value: 'tajawal', label: 'Tajawal' },
-  { value: 'monospace', label: 'Monospace' },
-  { value: 'times', label: 'Times New Roman' },
-  { value: 'arial', label: 'Arial' },
-];
 
 export default function DocumentSectionControls({ tpl, update }: Props) {
   const sec = (k: string) => isSettingVisible(k, tpl.doc_type_code, tpl.paper_size, tpl);
@@ -154,7 +147,7 @@ export default function DocumentSectionControls({ tpl, update }: Props) {
             onChange={e => update('customer_info_font_family', e.target.value as FontFamily)}
             style={{ width: '100%', padding: '4px 8px', borderRadius: 4, border: '1px solid var(--b2)' }}
           >
-            {FONT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            {FONT_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
           </select>
         </Field>
       )}

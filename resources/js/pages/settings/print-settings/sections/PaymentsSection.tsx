@@ -1,7 +1,7 @@
 import type { FontFamily, PrintTemplate } from '../types';
 import { Toggle, SliderField } from './ToggleSwitch';
 import { AlignButtons } from './HeaderSection';
-import { isSettingVisible } from '../services/SettingsRegistry';
+import { isSettingVisible, FONT_OPTIONS } from '../services/SettingsRegistry';
 
 interface Props {
   tpl: PrintTemplate;
@@ -24,10 +24,7 @@ export default function PaymentsSectionControls({ tpl, update }: Props) {
             <label className="ps-field-label">نوع خط الدفعات</label>
             <select className="ps-select" value={tpl.payments_font_family}
               onChange={e => update('payments_font_family', e.target.value as FontFamily)}>
-              <option value="tajawal">Tajawal</option>
-              <option value="monospace">Courier</option>
-              <option value="times">Times New Roman</option>
-              <option value="arial">Arial</option>
+              {FONT_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
             </select>
           </div>}
         </>

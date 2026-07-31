@@ -30,13 +30,22 @@ export function align(a: AlignOption): React.CSSProperties['textAlign'] {
   return a === 'right' ? 'right' : a === 'left' ? 'left' : 'center';
 }
 
+/** SSOT: FontFamily value → CSS font stack. Keep in sync with the Google Fonts families loaded in app.blade.php + print popup. */
+export const FONT_STACK: Record<FontFamily, string> = {
+  tajawal:    "'Tajawal', sans-serif",
+  monospace:  "'Courier New', monospace",
+  times:      "'Times New Roman', serif",
+  arial:      "Arial, sans-serif",
+  cairo:      "'Cairo', sans-serif",
+  almarai:    "'Almarai', sans-serif",
+  noto_kufi:  "'Noto Kufi Arabic', sans-serif",
+  el_messiri: "'El Messiri', sans-serif",
+  amiri:      "'Amiri', serif",
+  zain:       "'Zain', sans-serif",
+};
+
 export function fontFamily(f: FontFamily): string {
-  switch (f) {
-    case 'monospace': return "'Courier New', monospace";
-    case 'times':     return "'Times New Roman', serif";
-    case 'arial':     return "Arial, sans-serif";
-    default:          return "'Tajawal', sans-serif";
-  }
+  return FONT_STACK[f] ?? FONT_STACK.tajawal;
 }
 
 import { COLUMN_DEFAULTS } from '../../services/SettingsRegistry';

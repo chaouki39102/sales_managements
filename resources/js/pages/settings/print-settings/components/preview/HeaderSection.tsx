@@ -1,7 +1,7 @@
 import type { PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
 import { renderLogo } from './LogoRenderer';
-import { align, formatDate, Separator, InfoRow, renderLayoutRows } from './shared';
+import { align, formatDate, Separator, InfoRow, renderLayoutRows, fontFamily } from './shared';
 import { printFieldResolver } from '../../services';
 import { renderHeaderColumns } from './HeaderColumns';
 
@@ -10,16 +10,9 @@ function r(fieldId: string, data: UniversalDocumentData, tpl: PrintTemplate) {
 }
 
 function companyInfoStyle(tpl: PrintTemplate) {
-  const ff = tpl.company_info_font_family === 'monospace'
-    ? "'Courier New', monospace"
-    : tpl.company_info_font_family === 'times'
-      ? "'Times New Roman', serif"
-      : tpl.company_info_font_family === 'arial'
-        ? "'Arial', sans-serif"
-        : "'Tajawal', sans-serif";
   return {
     fontSize: tpl.company_info_size,
-    fontFamily: ff,
+    fontFamily: fontFamily(tpl.company_info_font_family),
     fontWeight: tpl.company_info_bold ? 700 : 400,
     fontStyle: tpl.company_info_italic ? 'italic' : 'normal' as const,
   };

@@ -3,7 +3,7 @@ import type { PrintTemplate, LayoutRow } from '../types';
 import { SliderField } from './ToggleSwitch';
 import { Field, Select, Pills } from '../components/ui';
 import { Accordion } from '../components/Accordion';
-import { isSettingVisible } from '../services/SettingsRegistry';
+import { isSettingVisible, FONT_OPTIONS } from '../services/SettingsRegistry';
 import { RowBuilder } from '../components/rows';
 
 interface Props {
@@ -56,10 +56,7 @@ export default function FormattingSectionControls({ tpl, update, rows, onRowsCha
 
       {sec('font_family') && <Field label="نوع الخط الأساسي">
         <Select value={tpl.font_family} onChange={v => update('font_family', v as FontFamily)}>
-          <option value="tajawal">Tajawal — عربي</option>
-          <option value="monospace">Courier — أحادي</option>
-          <option value="arial">Arial — لاتيني</option>
-          <option value="times">Times New Roman</option>
+          {FONT_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
         </Select>
       </Field>}
 

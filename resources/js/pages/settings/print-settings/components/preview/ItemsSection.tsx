@@ -1,6 +1,6 @@
 import type { PrintTemplate, ColumnKey } from '../../types';
 import type { UniversalDocumentData, DocumentLine } from '../../types/data';
-import { getVisibleCols, colWidth, colAlign, colDefaultHeader, borderStyle, align } from './shared';
+import { getVisibleCols, colWidth, colAlign, colDefaultHeader, borderStyle, align, fontFamily } from './shared';
 import { COLUMN_DEFAULTS } from '../../services/SettingsRegistry';
 import { printFieldResolver } from '../../services';
 
@@ -57,9 +57,7 @@ function renderThermalItems(tpl: PrintTemplate, data: UniversalDocumentData) {
   const visibleCols = getVisibleCols(tpl);
   if (visibleCols.length === 0 || data.lines.length === 0) return null;
 
-  const ff = tpl.items_font_family === 'monospace'
-    ? "'Courier New', monospace"
-    : "'Tajawal', sans-serif";
+  const ff = fontFamily(tpl.items_font_family);
 
   const bs = borderStyle(tpl.table_border_style);
   const border = tpl.table_border_style === 'none' ? 'none' : `1px ${bs} #999`;
@@ -121,9 +119,7 @@ function renderPageItems(tpl: PrintTemplate, data: UniversalDocumentData) {
   const cellPad = `${cp}px ${Math.round(cp * 1.2)}px`;
   const totalPct = visibleCols.reduce((s, c) => s + colWidth(tpl, c, COL_WIDTH_DEFAULTS), 0);
   const scale = totalPct > 0 ? 100 / totalPct : 1;
-  const ff = tpl.items_font_family === 'monospace'
-    ? "'Courier New', monospace"
-    : "'Tajawal', sans-serif";
+  const ff = fontFamily(tpl.items_font_family);
 
   const thR = tpl.table_header_radius || 0;
 

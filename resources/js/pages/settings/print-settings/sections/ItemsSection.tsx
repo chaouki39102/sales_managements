@@ -4,7 +4,7 @@ import type { PrintTemplate } from '../types';
 import { Toggle, SliderField, Section } from './ToggleSwitch';
 import { ColorField } from '../components/ui';
 import { BorderSelect } from './HeaderSection';
-import { isSettingVisible } from '../services/SettingsRegistry';
+import { isSettingVisible, FONT_OPTIONS } from '../services/SettingsRegistry';
 
 const COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: 'rowNumber', label: 'رقم السطر' },
@@ -174,8 +174,7 @@ export default function ItemsSectionControls({ tpl, update }: Props) {
           <label className="ps-field-label">نوع الخط</label>
           <select className="ps-select" value={tpl.items_font_family}
             onChange={e => update('items_font_family', e.target.value as FontFamily)}>
-            <option value="tajawal">Tajawal (واضح)</option>
-            <option value="monospace">Courier (أحادي)</option>
+            {FONT_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
           </select>
         </div>}
 

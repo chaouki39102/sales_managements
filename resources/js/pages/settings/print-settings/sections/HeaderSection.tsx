@@ -1,11 +1,11 @@
 import React, { useRef, useState } from 'react';
-import type { AlignOption, BorderStyle, LayoutBlock } from '../types';
+import type { AlignOption, BorderStyle, LayoutBlock, FontFamily } from '../types';
 import type { PrintTemplate } from '../types';
 import type { CompanyData } from '../types';
 import { Toggle, SliderField, Section } from './ToggleSwitch';
 import { Field, ColorField, Input } from '../components/ui';
 import { usePrintTemplatesApi } from '../providers/PrintSettingsContext';
-import { isSettingVisible } from '../services/SettingsRegistry';
+import { isSettingVisible, FONT_OPTIONS } from '../services/SettingsRegistry';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import { RowManager, type FieldOption } from '../components/RowManager';
 
@@ -371,11 +371,8 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
       {sec('company_info_font_family') && <div className="ps-field">
         <label className="ps-field-label">نوع الخط</label>
         <select className="ps-select" value={tpl.company_info_font_family}
-          onChange={e => update('company_info_font_family', e.target.value as any)}>
-          <option value="tajawal">Tajawal (واضح)</option>
-          <option value="monospace">Courier (أحادي)</option>
-          <option value="times">Times (كلاسيكي)</option>
-          <option value="arial">Arial (حديث)</option>
+          onChange={e => update('company_info_font_family', e.target.value as FontFamily)}>
+          {FONT_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
         </select>
       </div>}
       {sec('company_info_bold') && <Toggle value={tpl.company_info_bold} onChange={v => update('company_info_bold', v)} label="خط عريض" />}

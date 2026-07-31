@@ -7,6 +7,26 @@
 ## Date
 2026-07-31
 
+### Phase 36 — More Google Fonts for Print Templates (July 31)
+
+**Request**: "ADD MORE FONT TYPE IMPORT GOOGLE FONTS" — the print-template font pickers offered only Tajawal / Monospace / Times New Roman / Arial. Added 6 more Arabic-supported Google Font families.
+
+**New families**: Cairo, Almarai, Noto Kufi Arabic, El Messiri, Zain, Amiri (kept Tajawal default + Monospace/Times/Arial).
+
+**Changes**:
+- `types/domain.ts` — `FontFamily` union extended with `cairo | almarai | noto_kufi | el_messiri | amiri | zain`.
+- `services/SettingsRegistry.ts` — new exported `FONT_OPTIONS` (SSOT list of `{v,l}` pairs, 10 entries); all 5 font fields (`font_family`, `company_info_font_family`, `customer_info_font_family`, `items_font_family`, `payments_font_family`) now use it.
+- `components/preview/shared.tsx` — `FONT_STACK` record + `fontFamily()` now the single map from `FontFamily` → CSS stack (defaults to Tajawal on unknown).
+- Section selects (`sections/HeaderSection.tsx`, `sections/ItemsSection.tsx`, `sections/DocumentSection.tsx`, `sections/PaymentsSection.tsx`, `sections/FormattingSection.tsx`) — replaced hardcoded `<option>` lists (some had only 2–4 entries, e.g. Items/Payments had no Times/Arial) with `FONT_OPTIONS.map(...)`; `companyInfoStyle`/`renderThermalItems`/`renderPageItems` inline ternaries replaced with `fontFamily()`.
+- Google Fonts loaded in **3 places** with the same full URL: `resources/views/app.blade.php` (non-blocking `media=print onload` + noscript), `runtime/UniversalPrintPipeline.tsx` print popup, `PrintSettingsPage.tsx` preview popup.
+
+**Key architectural rules**:
+- `FONT_STACK` (shared.tsx) and `FONT_OPTIONS` (SettingsRegistry.ts) are the two SSOTs; never hardcode per-file option lists or ternary stacks (the pre-fix sections each had a different subset, so some fonts were selectable in one section but not another).
+- Fonts must be loaded in the print popup (UniversalPrintPipeline) too — the popup is a fresh document that does not inherit `app.blade.php`'s `<head>`.
+- Stickers benefit automatically: `StickerCanvas.tsx`/`StickerLabel.tsx` already call `fontFamily(tpl.font_family)`.
+
+**Verification**: `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors, 181 precache entries.
+
 ### Phase 35 — Template Chooser in Print Modal (July 31)
 
 **Request**: "I create 2 models of stickers. How to select? I suggest to show in the modal the name of the modal with preview to select before print" — when multiple templates exist for a doc type, the print modal must let the user pick which one to print, showing each template's **name + live preview** before confirming.

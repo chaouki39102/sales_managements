@@ -3,7 +3,7 @@ export type AlignOption     = 'right' | 'center' | 'left';
 export type BorderStyle     = 'solid' | 'dashed' | 'double' | 'none';
 export type PriceMode       = 'ht' | 'ttc';
 export type PageOrientation = 'portrait' | 'landscape';
-export type FontFamily      = 'tajawal' | 'monospace' | 'times' | 'arial';
+export type FontFamily      = 'tajawal' | 'monospace' | 'times' | 'arial' | 'cairo' | 'almarai' | 'noto_kufi' | 'el_messiri' | 'amiri' | 'zain';
 
 // ─── Sticker Label Designer Geometry ─────────────────────────────────────────
 

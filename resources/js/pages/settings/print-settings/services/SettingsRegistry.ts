@@ -45,6 +45,20 @@ const BORDER_OPTS = [
   { v: 'none' as const, l: 'بدون' },
 ];
 
+/** Single source of truth for selectable fonts (Google Fonts families are loaded in app.blade.php / print popup). */
+export const FONT_OPTIONS: readonly { v: FontFamily; l: string }[] = [
+  { v: 'tajawal',    l: 'Tajawal' },
+  { v: 'cairo',      l: 'Cairo' },
+  { v: 'almarai',    l: 'Almarai' },
+  { v: 'noto_kufi',  l: 'Noto Kufi Arabic' },
+  { v: 'el_messiri', l: 'El Messiri' },
+  { v: 'zain',       l: 'Zain' },
+  { v: 'amiri',      l: 'Amiri' },
+  { v: 'monospace',  l: 'Monospace' },
+  { v: 'times',      l: 'Times New Roman' },
+  { v: 'arial',      l: 'Arial' },
+];
+
 export const SETTINGS_REGISTRY: Record<string, SettingMeta> = {
   // ── Global ──
   id:             { key: 'id', label: 'ID', labelAr: 'المعرف', category: 'global', component: 'input', defaultValue: null, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
@@ -62,7 +76,7 @@ export const SETTINGS_REGISTRY: Record<string, SettingMeta> = {
   margin_sides:     { key: 'margin_sides', label: 'Side Margin (mm)', labelAr: 'الهامش الجانبي (ملم)', category: 'formatting', component: 'slider', defaultValue: 3, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 0, max: 20, step: 0.5 },
   line_spacing:     { key: 'line_spacing', label: 'Line Spacing', labelAr: 'تباعد الأسطر', category: 'formatting', component: 'slider', defaultValue: 1.3, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 0.8, max: 3, step: 0.1 },
   base_font_size:   { key: 'base_font_size', label: 'Base Font Size', labelAr: 'حجم الخط الأساسي', category: 'formatting', component: 'slider', defaultValue: 10, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 6, max: 20, step: 0.5 },
-  font_family:      { key: 'font_family', label: 'Font Family', labelAr: 'نوع الخط', category: 'formatting', component: 'select', defaultValue: 'tajawal' as FontFamily, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: [{ v: 'tajawal', l: 'Tajawal' }, { v: 'monospace', l: 'Monospace' }, { v: 'times', l: 'Times New Roman' }, { v: 'arial', l: 'Arial' }] },
+  font_family:      { key: 'font_family', label: 'Font Family', labelAr: 'نوع الخط', category: 'formatting', component: 'select', defaultValue: 'tajawal' as FontFamily, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: FONT_OPTIONS },
 
 
   // ── Layout Structure (complex objects managed by dedicated controls) ──
@@ -105,7 +119,7 @@ export const SETTINGS_REGISTRY: Record<string, SettingMeta> = {
   company_info_size:  { key: 'company_info_size', label: 'Info Font Size', labelAr: 'حجم خط المعلومات', category: 'company', component: 'slider', defaultValue: 9, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 6, max: 16, step: 0.5 },
   company_info_bold:  { key: 'company_info_bold', label: 'Bold Info', labelAr: 'تسميك معلومات الشركة', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   company_info_italic:{ key: 'company_info_italic', label: 'Italic Info', labelAr: 'مائل معلومات الشركة', category: 'company', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
-  company_info_font_family: { key: 'company_info_font_family', label: 'Info Font Family', labelAr: 'نوع خط المعلومات', category: 'company', component: 'select', defaultValue: 'tajawal' as FontFamily, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: [{ v: 'tajawal', l: 'Tajawal' }, { v: 'monospace', l: 'Monospace' }, { v: 'times', l: 'Times' }, { v: 'arial', l: 'Arial' }] },
+  company_info_font_family: { key: 'company_info_font_family', label: 'Info Font Family', labelAr: 'نوع خط المعلومات', category: 'company', component: 'select', defaultValue: 'tajawal' as FontFamily, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: FONT_OPTIONS },
   label_address:      { key: 'label_address', label: 'Label: Address', labelAr: 'تسمية العنوان', category: 'company', component: 'input', defaultValue: 'العنوان', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_address' },
   label_phone:        { key: 'label_phone', label: 'Label: Phone', labelAr: 'تسمية الهاتف', category: 'company', component: 'input', defaultValue: 'الهاتف', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_phone' },
   label_nif:          { key: 'label_nif', label: 'Label: NIF', labelAr: 'تسمية رقم الضريبة', category: 'company', component: 'input', defaultValue: 'NIF', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_tax_id' },
@@ -194,7 +208,7 @@ export const SETTINGS_REGISTRY: Record<string, SettingMeta> = {
   override_customer_activity: { key: 'override_customer_activity', label: 'Override Customer Activity', labelAr: 'تجاوز نشاط العميل', category: 'document', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   override_customer_bank_name: { key: 'override_customer_bank_name', label: 'Override Customer Bank', labelAr: 'تجاوز اسم البنك للعميل', category: 'document', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   override_customer_rib: { key: 'override_customer_rib', label: 'Override Customer RIB', labelAr: 'تجاوز الحساب البنكي للعميل', category: 'document', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
-  customer_info_font_family: { key: 'customer_info_font_family', label: 'Customer Info Font', labelAr: 'نوع خط معلومات العميل', category: 'document', component: 'select', defaultValue: 'tajawal' as FontFamily, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: [{ v: 'tajawal', l: 'Tajawal' }, { v: 'monospace', l: 'Monospace' }, { v: 'times', l: 'Times' }, { v: 'arial', l: 'Arial' }] },
+  customer_info_font_family: { key: 'customer_info_font_family', label: 'Customer Info Font', labelAr: 'نوع خط معلومات العميل', category: 'document', component: 'select', defaultValue: 'tajawal' as FontFamily, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: FONT_OPTIONS },
   customer_info_size: { key: 'customer_info_size', label: 'Customer Info Size', labelAr: 'حجم خط معلومات العميل', category: 'document', component: 'slider', defaultValue: 9, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 6, max: 16, step: 0.5 },
   customer_info_bold: { key: 'customer_info_bold', label: 'Customer Info Bold', labelAr: 'تسميك معلومات العميل', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   customer_info_italic: { key: 'customer_info_italic', label: 'Customer Info Italic', labelAr: 'مائل معلومات العميل', category: 'document', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
@@ -215,7 +229,7 @@ export const SETTINGS_REGISTRY: Record<string, SettingMeta> = {
 
   // ── Items Table ──
   items_font_size:      { key: 'items_font_size', label: 'Items Font Size', labelAr: 'حجم خط الجدول', category: 'items', component: 'slider', defaultValue: 10, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 6, max: 18, step: 0.5 },
-  items_font_family:    { key: 'items_font_family', label: 'Items Font Family', labelAr: 'نوع خط الجدول', category: 'items', component: 'select', defaultValue: 'tajawal' as FontFamily, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: [{ v: 'tajawal', l: 'Tajawal' }, { v: 'monospace', l: 'Monospace' }, { v: 'times', l: 'Times' }, { v: 'arial', l: 'Arial' }] },
+  items_font_family:    { key: 'items_font_family', label: 'Items Font Family', labelAr: 'نوع خط الجدول', category: 'items', component: 'select', defaultValue: 'tajawal' as FontFamily, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: FONT_OPTIONS },
   show_col_header:      { key: 'show_col_header', label: 'Show Column Headers', labelAr: 'إظهار رؤوس الأعمدة', category: 'items', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
   table_header_bold:    { key: 'table_header_bold', label: 'Bold Table Header', labelAr: 'تسميك رأس الجدول', category: 'items', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_col_header' },
   table_header_bg:      { key: 'table_header_bg', label: 'Table Header Background', labelAr: 'لون خلفية رأس الجدول', category: 'items', component: 'color', defaultValue: '#f5f5f5', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_col_header' },
@@ -253,7 +267,7 @@ export const SETTINGS_REGISTRY: Record<string, SettingMeta> = {
   show_payment_details: { key: 'show_payment_details', label: 'Show Payment Details', labelAr: 'إظهار تفاصيل الدفع', category: 'payments', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'payment.method' },
   payment_font_size:    { key: 'payment_font_size', label: 'Payment Font Size', labelAr: 'حجم خط الدفع', category: 'payments', component: 'slider', defaultValue: 9, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, min: 6, max: 16, step: 0.5 },
   payments_align:       { key: 'payments_align', label: 'Payments Alignment', labelAr: 'محاذاة الدفع', category: 'payments', component: 'pills', defaultValue: 'right' as AlignOption, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: ALIGN_OPTS },
-  payments_font_family: { key: 'payments_font_family', label: 'Payments Font Family', labelAr: 'نوع خط الدفع', category: 'payments', component: 'select', defaultValue: 'tajawal' as FontFamily, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: [{ v: 'tajawal', l: 'Tajawal' }, { v: 'monospace', l: 'Monospace' }, { v: 'times', l: 'Times' }, { v: 'arial', l: 'Arial' }] },
+  payments_font_family: { key: 'payments_font_family', label: 'Payments Font Family', labelAr: 'نوع خط الدفع', category: 'payments', component: 'select', defaultValue: 'tajawal' as FontFamily, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, options: FONT_OPTIONS },
 
   // ── Footer ──
   footer_line1:         { key: 'footer_line1', label: 'Footer Line 1', labelAr: 'سطر التذييل 1', category: 'footer', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS },
