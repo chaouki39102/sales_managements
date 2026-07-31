@@ -5,6 +5,24 @@ export type PriceMode       = 'ht' | 'ttc';
 export type PageOrientation = 'portrait' | 'landscape';
 export type FontFamily      = 'tajawal' | 'monospace' | 'times' | 'arial';
 
+// ─── Sticker Label Designer Geometry ─────────────────────────────────────────
+
+/** Per-element geometry persisted by the sticker label designer (Moveable). */
+export interface StickerElementGeometry {
+  x: number;
+  y: number;
+  /** Explicit box width in canvas px — set once the element has been resized. */
+  width?: number;
+  /** Explicit box height in canvas px — set once the element has been resized. */
+  height?: number;
+  /** Rotation in degrees (Moveable `onRotate`). */
+  rotate?: number;
+  /** Uniform content scale (natural-size → box) applied at design time. */
+  scale?: number;
+}
+
+export type StickerElementPosition = StickerElementGeometry;
+
 // ─── CellStyle (v2) ────────────────────────────────────────────────────────────
 
 export interface CellStyle {
@@ -397,7 +415,7 @@ export interface PrintTemplate {
   label_layout:             'stacked' | 'side-by-side';
   label_hide_currency:      boolean;
   label_barcode_format:     'code39' | 'ean13' | 'code128';
-  label_positions:          Record<string, {x: number; y: number}>;
+  label_positions:          Record<string, StickerElementGeometry>;
 
   show_report_header:        boolean;
   report_header_text:        string;

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import type { PrintTemplate } from '@/pages/settings/print-settings/types/domain';
+import type { PrintTemplate, StickerElementGeometry } from '@/pages/settings/print-settings/types/domain';
 import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data';
 import type { CompanyData } from '@/pages/settings/print-settings/types/live-data';
 import { usePrintTemplatesList } from '@/pages/settings/print-settings/runtime';
@@ -151,10 +151,11 @@ export default function StickerDesignerPage() {
     setIsDirty(true);
   }, []);
 
-  const handlePositionChange = useCallback((id: string, x: number, y: number) => {
+  const handleTransformChange = useCallback((id: string, pos: StickerElementGeometry) => {
     setLocalTpl(prev => {
       if (!prev) return prev;
-      const positions = { ...(prev.label_positions ?? {}), [id]: { x, y } };
+      const current = prev.label_positions?.[id] ?? { x: 0, y: 0 };
+      const positions = { ...(prev.label_positions ?? {}), [id]: { ...current, ...pos } };
       return { ...prev, label_positions: positions };
     });
     setIsDirty(true);
@@ -340,10 +341,10 @@ export default function StickerDesignerPage() {
                   data={MOCK_DOC_DATA}
                   selected={selectedElement}
                   onSelect={setSelectedElement}
-                  onPositionChange={handlePositionChange}
+                  onTransformChange={handleTransformChange}
                 />
                 <div style={{ fontSize: 10, color: 'var(--t4)', textAlign: 'center' }}>
-                  اسحب العناصر لتغيير موقعها — انقر لتحديد عنصر
+                  اسحب للتحريك — مقابض لتغيير الحجم والتدوير — التصاق تلقائي بالمركز والحواف
                 </div>
               </>
             ) : (
