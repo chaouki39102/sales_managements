@@ -30,6 +30,7 @@
 **Bug fixed — sticker templates had NO font picker**: `TemplateControls.tsx` rendered the Formatting section (base `font_family`, margins, line spacing, base font size) only for `docType !== 'STK'`, and `LabelSection.tsx` had no font control — so sticker fonts were impossible to change. Fixes:
 - `components/TemplateControls.tsx` — the "تنسيق الطباعة" section now renders for **all** doc types including STK (`rows`/`onRowsChange` passed as `undefined` for STK so the field-drag editor is skipped).
 - `sections/LabelSection.tsx` — new "الخط" group with the `font_family` picker (uses `FONT_OPTIONS`), right inside the primary sticker settings section.
+- **Sticker designer font picker (2nd round)**: the user couldn't find the font list because the sticker designer page (`sticker-designer/StickerControls.tsx`) had NO font control. Added a top-level "الخط" section (icon `ti-letter-case`) right under the elements manager with the `font_family` select (uses `FONT_OPTIONS`, 10 entries). The sticker designer's `update('font_family', …)` already persisted to the STK template, so no other wiring was needed.
 
 **Verification**: `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors, 181 precache entries.
 
