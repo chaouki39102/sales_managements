@@ -164,6 +164,17 @@ export default function StickerDesignerPage() {
     setIsDirty(true);
   }, []);
 
+  const handleRemovePosition = useCallback((id: string) => {
+    setLocalTpl(prev => {
+      if (!prev?.label_positions?.[id]) return prev;
+      pushHistory(prev);
+      const positions = { ...prev.label_positions };
+      delete positions[id];
+      return { ...prev, label_positions: positions };
+    });
+    setIsDirty(true);
+  }, [pushHistory]);
+
   const handleRedo = useCallback(() => {
     if (historyPos.current >= historyRef.current.length - 1) return;
     const next = historyRef.current[historyPos.current + 1];
@@ -509,7 +520,9 @@ export default function StickerDesignerPage() {
                   elementId={selectedElement}
                   geometry={localTpl.label_positions?.[selectedElement] ?? { x: 0, y: 0 }}
                   tpl={localTpl}
+                  hasCustomPosition={!!localTpl.label_positions?.[selectedElement]}
                   onGeometryChange={handleTransformChange}
+                  onRemovePosition={handleRemovePosition}
                   onTemplateChange={update}
                   onDeselect={() => setSelectedElement(null)}
                 />

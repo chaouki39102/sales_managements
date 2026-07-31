@@ -9,7 +9,9 @@ interface Props {
   elementId: string;
   geometry: StickerElementGeometry;
   tpl: PrintTemplate;
+  hasCustomPosition: boolean;
   onGeometryChange: (id: string, pos: StickerElementGeometry) => void;
+  onRemovePosition: (id: string) => void;
   onTemplateChange: <K extends keyof PrintTemplate>(key: K, val: PrintTemplate[K]) => void;
   onDeselect: () => void;
 }
@@ -45,6 +47,10 @@ const actionBtn: CSSProperties = {
   background: 'var(--bg2)', color: 'var(--em)', cursor: 'pointer',
   fontSize: 10.5, fontWeight: 700, fontFamily: 'Tajawal, sans-serif',
   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+};
+const dangerBtn: CSSProperties = {
+  ...actionBtn,
+  borderColor: 'var(--redbo)', color: 'var(--red)', background: 'var(--redb)',
 };
 const alignBtn = (on: boolean): CSSProperties => ({
   flex: 1, padding: '4px 0', borderRadius: 'var(--r1)', cursor: 'pointer',
@@ -84,7 +90,7 @@ const toggleKnob: CSSProperties = {
 };
 
 export default function ElementProperties({
-  elementId, geometry, tpl, onGeometryChange, onTemplateChange, onDeselect,
+  elementId, geometry, tpl, hasCustomPosition, onGeometryChange, onRemovePosition, onTemplateChange, onDeselect,
 }: Props) {
   const meta = ELEMENT_META[elementId] ?? { label: elementId, icon: 'ti-box' };
   const x = geometry.x ?? 0;
@@ -186,6 +192,11 @@ export default function ElementProperties({
         <button type="button" title="إعادة الضبط (الزاوية العلوية)" onClick={resetAll} style={actionBtn}>
           <i className="ti ti-corner-up-left" style={{ fontSize: 11 }} />
         </button>
+        {hasCustomPosition && (
+          <button type="button" title="حذف التخصيص والعودة إلى التخطيط الافتراضي" onClick={() => onRemovePosition(elementId)} style={dangerBtn}>
+            <i className="ti ti-trash" style={{ fontSize: 11 }} />
+          </button>
+        )}
       </div>
 
       <div style={groupTitle}>

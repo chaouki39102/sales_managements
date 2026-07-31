@@ -20,6 +20,7 @@ const H = 160;
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 3;
 const ZOOM_STEP = 0.25;
+const SNAP_GRID = 4;
 
 interface ElementDef {
   id: string;
@@ -339,11 +340,12 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
     const maxX = Math.max(minX, W - (1 - offX) * d.elW);
     const minY = offY * d.elH;
     const maxY = Math.max(minY, H - (1 - offY) * d.elH);
+    const round = snapEnabled ? (v: number) => Math.round(v / SNAP_GRID) * SNAP_GRID : Math.round;
     applyLive(id, {
-      x: Math.round(Math.max(minX, Math.min(maxX, d.elX + dx))),
-      y: Math.round(Math.max(minY, Math.min(maxY, d.elY + dy))),
+      x: round(Math.max(minX, Math.min(maxX, d.elX + dx))),
+      y: round(Math.max(minY, Math.min(maxY, d.elY + dy))),
     });
-  }, [zoom, applyLive]);
+  }, [zoom, applyLive, snapEnabled]);
 
   const onElementPointerUp = useCallback((e: ReactPointerEvent<HTMLDivElement>, id: string) => {
     const d = dragRef.current;
@@ -593,6 +595,8 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
               onRotateEnd={handleRotateEnd}
               snappable={snapEnabled}
               snapThreshold={5}
+              snapGridWidth={snapEnabled ? SNAP_GRID : 0}
+              snapGridHeight={snapEnabled ? SNAP_GRID : 0}
               horizontalGuidelines={[0, H / 2, H]}
               verticalGuidelines={[0, W / 2, W]}
               elementGuidelines={snapEnabled ? otherEls : []}

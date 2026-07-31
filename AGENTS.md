@@ -7,6 +7,28 @@
 ## Date
 2026-07-31
 
+### Phase 37 — Print Modal Uses Shared Modal Component + Sticker Designer Cleanup (July 31)
+
+**Request**: "SET THE PAGE NOT SCROLL WHEN THE MODAL OPENED" + "ENHANCE THE MODAL USE MY COMPONENTS AND MY STYLE" — the print/template modal (`TemplatePrintModal`) was a bespoke inline-styled overlay (own `overlayStyle`/`modalStyle`/`btnPrimary`…), duplicated the Escape handler, and did NOT lock body scroll. Then "COMMIT AND COMPLETE" for all pending work.
+
+**Modal refactor**:
+- `components/shared/TemplatePrintModal.tsx` — rewrote to use the shared `Modal` component (`components/ui/Modal.tsx`, `size="xl"`, `resizable={false}`). Gets for free: body scroll-lock (`document.body.style.overflow` effect), `.ov` fade + `.modal` scale-in animation, `.m-hd/.m-title/.m-x` header, `.m-foot` footer, Escape-to-close. Footer buttons now use project classes `.btn`/`.btn-p`/`.btn-secondary`/`.btn-b` (with `ti-printer`/`ti-pencil` icons); sticker count moved to `footerLeft`.
+- `components.css` — new `.tpl-chooser` (full-bleed via negative margin inside `.m-body`), `.tpl-card`/`.tpl-card-name`/`.tpl-card-meta`/`.tpl-card-mini` (template picker cards), `.tpl-preview`, `.tpl-empty`. The STK mini preview keeps `StickerLabel` at fixed 320×160 with `scale(0.38)` (`transformOrigin:'top left'`, 121×60 box).
+- Architectural rule: ALL modals go through the shared `Modal` component — never hand-roll an overlay (custom overlays skip the scroll-lock + animation + Escape logic).
+
+**Sticker designer additions** (in `sticker-designer/`):
+- `ElementProperties.tsx` — new "حذف التخصيص" danger button (trash icon, shown only when the element HAS a custom entry in `label_positions`) + new `hasCustomPosition`/`onRemovePosition` props.
+- `StickerDesignerPage.tsx` — new `handleRemovePosition(id)` deletes the element's entry from `label_positions` (pushHistory first) so the print renderer falls back to the default stacked layout; keyboard nudge (arrows, Shift=10) was already present.
+- `StickerCanvas.tsx` — snap grid when the magnet toggle is on: `snapGridWidth={snapEnabled ? 4 : 0}` + `snapGridHeight` (note: THIS react-moveable version uses `snapGridWidth`/`snapGridHeight`, NOT `gridSnap` — `gridSnap` does not exist in `MoveableProps` here), AND the manual pointer drag snaps to the same 4px grid via `round = snapEnabled ? v => Math.round(v/SNAP_GRID)*SNAP_GRID : Math.round`.
+
+**Also committed** (leftover pending work): `DashboardLayout.tsx` `closedGroups` — user can now manually collapse even the ACTIVE sidebar group (toggle persisted in `localStorage` key `sidebar_closed_groups`); the open-state formula became `open = q ? true : (hasActiveItem ? !closedGroups.has(label) : openGroups.has(label))` with `toggleGroup(label, isActive)`.
+
+**Already done (verified, no work needed)**: ESCPOS thermal template parity (Phase 28 ESCPOSRenderer reads `show_client`/`show_total_ht`/`show_barcode`/`show_payments_section`/signatures), keyboard nudge, per-element reset.
+
+**Non-goal**: the 1256 project-wide ESLint warnings are all `@typescript-eslint/no-explicit-any` (mostly test files / deliberate typing) — 0 errors; blanket cleanup rejected as noise-with-risk.
+
+**Verification**: `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors.
+
 ### Phase 36 — More Google Fonts for Print Templates (July 31)
 
 **Request**: "ADD MORE FONT TYPE IMPORT GOOGLE FONTS" — the print-template font pickers offered only Tajawal / Monospace / Times New Roman / Arial. Added 6 more Arabic-supported Google Font families.
