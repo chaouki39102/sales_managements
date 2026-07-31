@@ -308,5 +308,5 @@ export function createMockTemplate(
     watermark:        { enabled: false },
 
     ...overrides,
-  };
+  } as unknown as PrintTemplate;
 }

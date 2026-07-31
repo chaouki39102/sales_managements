@@ -62,7 +62,6 @@ export default function DocumentLinesSection({
   setShowBulkImport, slug,
   affectsStock, stockDir,
   warehouses,
-  fill = false,
 }: DocumentLinesSectionProps) {
   const [stockAlertOpen, setStockAlertOpen] = useState(true);
 
@@ -117,7 +116,6 @@ export default function DocumentLinesSection({
     <Section
       title="أسطر المستند"
       icon="ti-list-details"
-      fill={fill}
       badge={
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {lines.length > 0 && (
@@ -401,7 +399,7 @@ export default function DocumentLinesSection({
 
         {!isLinesReadOnly && needsParty && (
           <SmartSuggestionsPanel
-            suggestions={productSuggestions}
+            suggestions={productSuggestions as any}
             isLoading={isLoadingSuggestions}
             onAddProduct={(productId, suggestedPrice, suggestedTva) => {
               addLineWithProduct(String(productId), suggestedPrice ?? undefined, suggestedTva ?? undefined);

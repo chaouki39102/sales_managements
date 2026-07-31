@@ -118,7 +118,7 @@ export function FloatingTooltip({
 
   // Access child's ref in a type-safe way.
   const childRef = React.isValidElement(children)
-    ? (children.ref as React.Ref<HTMLElement> | undefined)
+    ? ((children as unknown as Record<string, unknown>).ref as React.Ref<HTMLElement> | undefined)
     : undefined;
 
   const childProps = {

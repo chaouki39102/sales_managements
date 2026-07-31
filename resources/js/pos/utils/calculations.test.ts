@@ -84,6 +84,7 @@ describe('calcTotals', () => {
     quantity: 1, unit_price_ht: 1000, selling_price_ttc: 1190,
     tva_rate: 19, tva_id: null, discount_percentage: 0, discount_amount: 0,
     total_ht: 1000, total_ttc: 1190, max_stock: null, manages_stock: false,
+    is_sold_by_weight: false,
     ...overrides,
   });
 
@@ -170,6 +171,7 @@ describe('checkStock', () => {
     quantity: 1, unit_price_ht: 1000, selling_price_ttc: 1190,
     tva_rate: 19, tva_id: null, discount_percentage: 0, discount_amount: 0,
     total_ht: 1000, total_ttc: 1190, max_stock: max, manages_stock: true,
+    is_sold_by_weight: false,
   });
 
   it('returns ok when stock is unlimited', () => {

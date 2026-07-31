@@ -6,7 +6,7 @@
 // للبيانات المتغيرة بكثرة مثل pos.items).
 // ════════════════════════════════════════════════════════════════════════════
 
-import { useEffect, type RefObject } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { matchOverrideFrom } from './useKeyboardMap';
 import { useCartStore } from '../utils/useCartStore';
@@ -27,11 +27,11 @@ export interface POSApi {
 }
 
 export interface KeyboardShortcutsRefs {
-  posRef:         RefObject<POSApi>;
-  overridesRef:   RefObject<Record<string, string[]>>;
-  searchRef:      RefObject<HTMLInputElement | null>;
-  cartRef:        RefObject<HTMLDivElement | null>;
-  cartApiRef:     RefObject<{ scrollToItemId: (id: string) => void; openCustomerModal: () => void } | null>;
+  posRef:         { readonly current: POSApi | null };
+  overridesRef:   { readonly current: Record<string, string[]> | null };
+  searchRef:      { readonly current: HTMLInputElement | null };
+  cartRef:        { readonly current: HTMLDivElement | null };
+  cartApiRef:     { readonly current: { scrollToItemId: (id: string) => void; openCustomerModal: () => void } | null };
 }
 
 export interface KeyboardShortcutsState {

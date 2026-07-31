@@ -115,6 +115,7 @@ export interface Party {
   is_tva_exempt?:          boolean;
   is_final_consumer?:      boolean;
   is_vat_registered?:      boolean;
+  allow_credit_sale?:      boolean;
 }
 
 // ─── Shipping Info ──────────────────────────────────────────────────────────────

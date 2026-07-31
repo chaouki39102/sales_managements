@@ -110,7 +110,7 @@ export default function PartiesPage() {
   const [statusFilter, setStatusFilter] = useState<StatusKey>('all');
   const [page,         setPage]         = useState(1);
   const [editing,      setEditing]      = useState<Party | null>(null);
-  const [initType,     setInitType]     = useState(PT.CUSTOMER);
+  const [initType,     setInitType]     = useState<number>(PT.CUSTOMER);
   const [viewParty,    setViewParty]    = useState<Party | null>(null);
   const formModal  = useModal();
   const statsModal = useModal();
@@ -160,7 +160,7 @@ export default function PartiesPage() {
     else         await createMut.mutateAsync(formData);
   }, [editing, createMut, updateMut]);
 
-  const openCreate = (type = PT.CUSTOMER) => { setEditing(null); setInitType(type); formModal.openModal(); };
+  const openCreate = (type: number = PT.CUSTOMER) => { setEditing(null); setInitType(type); formModal.openModal(); };
   const openEdit   = (p: Party) => { setEditing(p); setInitType(p.party_type_id); formModal.openModal(); };
   const openStats  = (p: Party) => { setViewParty(p); statsModal.openModal(); };
 

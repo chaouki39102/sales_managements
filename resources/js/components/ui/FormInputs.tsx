@@ -10,7 +10,15 @@ const inputBase = [
   'dark:bg-[var(--bg3)]',
 ].join(' ')
 
-export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
+export function Input({ className, suffix, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { suffix?: string }) {
+  if (suffix) {
+    return (
+      <div className="flex items-stretch border border-[var(--b3)] rounded-[var(--r2)] overflow-hidden bg-[var(--bg2)] transition-[border-color_.15s,box-shadow_.15s] focus-within:border-[var(--em)] focus-within:shadow-[0_0_0_3px_var(--emb)]">
+        <input className={cn(inputBase, 'border-0 focus:shadow-none', className)} {...props} />
+        <span className="flex items-center px-3 text-[12px] font-bold text-[var(--t4)] bg-[var(--bg3)] border-r border-[var(--b3)] flex-shrink-0">{suffix}</span>
+      </div>
+    )
+  }
   return <input className={cn(inputBase, className)} {...props} />
 }
 

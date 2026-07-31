@@ -95,7 +95,6 @@ export default function CommercialDocumentPage() {
     printModalOpen, setPrintModalOpen, handlePrint,
     visibleCols, lineMode, handleColsChange, setLineMode,
     deleteConfirm,
-    deleteMut,
     handleSave, handleDelete, handleExport, handlePartyChangeWithWarning,
     isPending,
     isPartyExempt, partyOptions, priceLevelOptions,
@@ -121,7 +120,7 @@ export default function CommercialDocumentPage() {
   }, [errors.warehouse_id, errors.fiscal_year_id, errors.currency_id]);
 
   const [alertsOpen, setAlertsOpen] = useState(true);
-  const _canDismiss = !isPending && !successMsg;
+  
 
   if (!lookupsReady) {
     return (
@@ -302,9 +301,9 @@ export default function CommercialDocumentPage() {
               partyBalance={partyBalance}
               isLoadingBalance={isLoadingBalance}
               selectedParty={selectedParty}
-              creditCheck={creditCheck as Record<string, unknown> | null}
+              creditCheck={creditCheck as any}
               isLoadingCredit={isLoadingCredit}
-              customerInsights={customerInsights as Record<string, unknown> | null}
+              customerInsights={customerInsights as any}
               isLoadingInsights={isLoadingInsights}
               balanceWarning={balanceWarning}
               qc={qc}
@@ -331,7 +330,7 @@ export default function CommercialDocumentPage() {
                   }}
                   qc={qc}
                   slug={slug}
-                  warehouseIdNum={warehouseIdNum}
+              warehouseIdNum={warehouseIdNum!}
                 />
               )}
               {extraTab === 'shipping' && (
@@ -346,7 +345,7 @@ export default function CommercialDocumentPage() {
               {extraTab === 'payment-terms' && (
                 <PaymentTermsTable
                   terms={form.payment_terms}
-                  netToPay={totals.netToPay}
+                  netToPay={totals.netToPay!}
                   disabled={isReadOnly}
                   onChange={(terms) => set('payment_terms', terms)}
                 />
@@ -380,7 +379,7 @@ export default function CommercialDocumentPage() {
               payments={payments}
               partyBalance={partyBalance}
               form={form}
-              selectedParty={selectedParty}
+              selectedParty={selectedParty!}
               isPurchase={isPurchase}
               isEdit={isEdit}
               isReadOnly={isReadOnly}
@@ -409,7 +408,7 @@ export default function CommercialDocumentPage() {
             addLineWithProduct={addLineWithProduct}
             removeLine={removeLine}
             duplicateLine={duplicateLine}
-            updateLine={updateLine}
+            updateLine={updateLine as any}
             lineErr={lineErr}
             savedDraft={savedDraft}
             draftKey={draftKey}

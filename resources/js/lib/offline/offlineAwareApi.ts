@@ -52,14 +52,14 @@ export function registerOfflineInterceptor(): void {
             status: 200,
             statusText: 'OK (cached offline)',
             _offline: true,
-          } as AxiosResponse);
+          } as unknown as AxiosResponse);
         }
         return Promise.resolve({
           data: [],
           status: 200,
           statusText: 'OK (empty offline)',
           _offline: true,
-        } as AxiosResponse);
+        } as unknown as AxiosResponse);
       }
 
       throw error;

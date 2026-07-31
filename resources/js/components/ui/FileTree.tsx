@@ -112,8 +112,8 @@ const EXT_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
 
 function resolveFileIcon(
   name: string,
-  custom?: React.ComponentType<{ className?: string }>,
-): React.ComponentType<{ className?: string }> {
+  custom?: React.ComponentType<{ className?: string; strokeWidth?: number }>,
+): React.ComponentType<{ className?: string; strokeWidth?: number }> {
   if (custom) return custom;
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
   return EXT_ICONS[ext] ?? File;

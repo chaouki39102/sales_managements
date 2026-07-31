@@ -107,6 +107,7 @@ export interface DocumentCreateInput {
   notes?:            string | null;
   lines:             DocumentLineInput[];
   payments?:         DocumentPaymentInput[];
+  pos_session_id?:   number | null;
   // ✅ price_level_id و apply_fiscal_stamp مُزالَان — الباكاند لا يستخدمهما
 }
 

@@ -140,6 +140,7 @@ function PageLoader() {
 function RequireNoCompany({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, isSuperAdmin } = useAuth();
   const _activeCompany = useActiveCompany();
+  void _activeCompany;
   if (isLoading) return <PageLoader />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   // ط§ظ„ط³ظˆط¨ط± ط£ط¯ظ…ظ† ظ„ط§ ظٹظ…ط± ظ…ظ† ظ‡ظ†ط§ ط£ط¨ط¯ط§ظ‹ â€” ظ„ظ‡ ط¯ط§ط´ط¨ظˆط±ط¯ظ‡ ط§ظ„ط®ط§طµ

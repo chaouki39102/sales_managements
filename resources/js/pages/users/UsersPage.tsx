@@ -833,7 +833,7 @@ function UserFormModal({
                 // user.role_permissions = صلاحيات الدور (يرجعها UserResource)
                 permission_ids: [
                     ...(user.permissions?.map((p: any) => p.id) ?? []),
-                    ...(user.role_permissions?.map((p: any) => p.id) ?? []),
+                    ...((user as any).role_permissions?.map((p: any) => p.id) ?? []),
                 ],
                 active: user.active ?? true,
             });
@@ -921,12 +921,9 @@ function UserFormModal({
                         onClick={() => setTab(t.key)}
                         style={{
                             padding: "10px 16px",
-                            borderBottom: `2px solid ${tab === t.key ? "var(--em)" : "transparent"}`,
                             color: tab === t.key ? "var(--em)" : "var(--t4)",
                             background: "none",
-                            borderTop: 0,
-                            borderLeft: 0,
-                            borderRight: 0,
+                            border: 0,
                             borderBottom: `2px solid ${tab === t.key ? "var(--em)" : "transparent"}`,
                             fontSize: 13,
                             fontWeight: 700,
@@ -2349,7 +2346,7 @@ export default function UsersPage() {
                                 {roles.map((role, i) => {
                                     const perms =
                                         role.permissions ??
-                                        role.relations?.permissions ??
+                                        (role as any).relations?.permissions ??
                                         [];
                                     const groups = [
                                         ...new Set(
@@ -2435,8 +2432,7 @@ export default function UsersPage() {
                                                         icon={
                                                             <i className="ti ti-pencil" />
                                                         }
-                                                        onClick={(e: any) => {
-                                                            e.stopPropagation();
+                                                        onClick={() => {
                                                             setEditRole(role);
                                                         }}
                                                     />

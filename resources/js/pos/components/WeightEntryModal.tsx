@@ -213,7 +213,7 @@ export default function WeightEntryModal({
                 .filter(d => d.active && !d.is_blocked)
                 .sort((a, b) => a.min_qty - b.min_qty)
                 .map(d => {
-                  const isActive = activeTier?.id === d.id;
+                  const isActive = activeTier?.quantity_discount_id === d.id;
                   const tierPct = d.discount_percentage != null && Number(d.discount_percentage) > 0
                     ? Number(d.discount_percentage)
                     : Number(d.discount_amount) > 0 && unitPrice > 0

@@ -21,7 +21,7 @@ export default function FormField({ label, required = false, children, hint }: F
   );
 }
 
-interface FormInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface FormInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
   size?: 'sm' | 'md' | 'lg';
 }
 

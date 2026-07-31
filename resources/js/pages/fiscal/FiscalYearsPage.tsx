@@ -830,7 +830,7 @@ function ImportModal({ open, year, years, onClose }: {
                 <>
                     <Button onClick={onClose}>إلغاء</Button>
                     <Button variant="primary" icon={<i className="ti ti-import"/>}
-                        onClick={() => importMut.mutate()}
+                        onClick={() => importMut.mutate(undefined as any)}
                         disabled={!sourceYearId || importMut.isPending}>
                         {importMut.isPending ? 'جاري الاستيراد...' : 'استيراد'}
                     </Button>

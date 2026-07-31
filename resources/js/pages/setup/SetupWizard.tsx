@@ -234,7 +234,7 @@ function Step2({ form, onChange }: { form: TaxForm; onChange: (k: keyof TaxForm,
 }
 
 // ════ STEP 3 — الشعار ════════════════════════════
-function Step3({ _logo, onLogo, companyName }: { _logo: File | null; onLogo: (f: File | null) => void; companyName: string }) {
+function Step3({ _logo, onLogo, companyName }: { _logo: File | null; onLogo: (f: File | null) => void; companyName: string }) { void _logo;
   const [preview, setPreview] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -477,7 +477,7 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
           <div style={{ minHeight:360 }}>
             {step === 1 && <Step1 form={company} onChange={setC} />}
             {step === 2 && <Step2 form={tax}     onChange={setT} />}
-            {step === 3 && <Step3 logo={logo} onLogo={setLogo} companyName={company.name} />}
+            {step === 3 && <Step3 _logo={logo} onLogo={setLogo} companyName={company.name} />}
             {step === 4 && <Step4 form={fiscal}  onChange={setF} />}
           </div>
 

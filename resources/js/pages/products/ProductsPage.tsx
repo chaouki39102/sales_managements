@@ -245,8 +245,8 @@ export default function ProductsPage() {
     { key: 'name',              header: 'المنتج',            exportHeader: 'المنتج',             accessor: (r) => r.name },
     { key: 'ref',               header: 'المرجع',            exportHeader: 'المرجع',             accessor: (r) => r.ref },
     { key: 'barcode',           header: 'الباركود',          exportHeader: 'الباركود',           accessor: (r) => r.barcode },
-    { key: 'family',            header: 'الفئة',             exportHeader: 'الفئة',              accessor: (r) => getFamilyName(r.family_id) },
-    { key: 'brand',             header: 'العلامة',            exportHeader: 'العلامة التجارية',    accessor: (r) => getBrandName(r.brand_id) },
+    { key: 'family',            header: 'الفئة',             exportHeader: 'الفئة',              accessor: (r) => getFamilyName(r.family_id ?? null) },
+    { key: 'brand',             header: 'العلامة',            exportHeader: 'العلامة التجارية',    accessor: (r) => getBrandName(r.brand_id ?? null) },
     { key: 'purchase_price',    header: 'سعر الشراء',         exportHeader: 'سعر الشراء (دج)',     accessor: (r) => r.purchase_price_ht,  aggregate: 'sum' as const },
     { key: 'sell_price',        header: 'سعر البيع',          exportHeader: 'سعر البيع (دج)',      accessor: (r) => getMinPrice(r),       aggregate: 'avg' as const },
     { key: 'current_stock',     header: 'المخزون',            exportHeader: 'المخزون الحالي',      accessor: (r) => r.current_stock ?? 0, aggregate: 'sum' as const },
@@ -476,7 +476,7 @@ export default function ProductsPage() {
         <KpiCard variant="orange" icon="ti-alert-triangle" label="مخزون منخفض"      value={stats.lowStock} />
         <KpiCard variant="teal"   icon="ti-box"            label="مخزون (بالصفحة)"  value={stats.totalStock} suffix=" وحدة" />
         <KpiCard variant="purple" icon="ti-tag"            label="لها أسعار"         value={stats.withPrices} />
-        <KpiCard variant="indigo" icon="ti-trending-up"    label="أعلى سعر"         value={formatDZD(stats.highestPrice)} />
+        <KpiCard variant="purple" icon="ti-trending-up"    label="أعلى سعر"         value={formatDZD(stats.highestPrice)} />
       </div>
 
       {/* Bulk Actions */}

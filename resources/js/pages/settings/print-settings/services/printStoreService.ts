@@ -13,7 +13,7 @@ export async function dbFetchDocConfigs(api: ApiClient): Promise<Record<string, 
     const res = await api.get<Record<string, unknown>>(`/settings/${DB_KEY_DOC_CONFIGS}`);
     const raw = (res as Record<string, unknown>)?.value ?? ((res as Record<string, unknown>)?.data as Record<string, unknown>)?.value ?? null;
     if (!raw) return [];
-    return typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return typeof raw === 'string' ? JSON.parse(raw) as Record<string, unknown>[] : raw as Record<string, unknown>[];
   } catch {
     return [];
   }

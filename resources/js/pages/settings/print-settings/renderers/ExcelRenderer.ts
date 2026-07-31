@@ -45,7 +45,7 @@ function stylesXml(): string {
 }
 
 function buildSheet(data: UniversalDocumentData): string {
-  const _cur = data.currency?.symbol ?? 'د.ج';
+  const _cur = data.currency?.symbol ?? 'د.ج'; void _cur;
   const rows: string[] = [];
 
   // Company header

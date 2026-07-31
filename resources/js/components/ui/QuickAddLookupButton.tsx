@@ -53,7 +53,6 @@ interface QuickAddLookupButtonProps {
  */
 export default function QuickAddLookupButton({
   title,
-  _buttonLabel = '+',
   fields,
   resourcePath,
   onCreated,

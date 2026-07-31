@@ -47,12 +47,12 @@ function createDefaultTpl(name: string): PrintTemplate {
   } as unknown as PrintTemplate;
 }
 
-const MOCK_COMPANY_DATA: CompanyData = {
+const _MOCK_COMPANY_DATA: CompanyData = {
   name: 'شركتي', commercialName: '', address: 'العنوان', phone: '0555000000',
   mobile: '', fax: '', email: '', nif: '123456789', rc: '', nis: '',
   article: '', capital: '', bankName: '', rib: '', activity: '',
   logoUrl: null,
-};
+}; void _MOCK_COMPANY_DATA;
 
 const MOCK_DOC_DATA: UniversalDocumentData = {
   doc: {

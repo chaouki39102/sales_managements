@@ -10,7 +10,6 @@ import { useCartStore }       from '@/pos/utils/useCartStore';
 import { useCashClient }  from '@/lib/api/endpoints/parties';
 import {
   usePOSAggregatedLookups,
-  useFamilies,
 } from '@/lib/api/endpoints/lookups';
 import { productsApi }        from '@/lib/api/endpoints/products';
 import { settingsApi }        from '@/lib/api/endpoints/settings';
@@ -23,7 +22,7 @@ import { ConfirmDialog } from '@/components/ui';
 const BarcodeScannerModal = React.lazy(() => import('@/components/BarcodeScannerModal'));
 
 import {
-  calcFiscalStamp, htToTtc, ttcToHt, calcMargin, calcWeightedAverageMargin,
+  calcFiscalStamp, htToTtc, ttcToHt, calcWeightedAverageMargin,
 } from '@/pos/utils/calculations';
 import {
   productToVariant, makeFakeVariant,
@@ -33,8 +32,8 @@ import type { ActiveModal, QuickItem, ViewMode, GridSize, SortMode } from '@/pos
 import type { PaginatedResponse } from '@/lib/api/core/types';
 import { nanoid }   from 'nanoid';
 import type {
-  Product, ProductVariant, ProductPackaging, CartItem,
-  PriceLevel, Party, PaymentMode, DocumentType, Barcode,
+  Product, ProductVariant, ProductPackaging, CartItem, CartTotals,
+  Party, Barcode,
   CommercialDocument,
 } from '@/types';
 
@@ -269,15 +268,15 @@ function POSPage() {
   const [receiptSnapshot, setReceiptSnapshot] = useState<POSSaleSnapshot | null>(null);
   const receiptSnapshotRef = useRef<POSSaleSnapshot | null>(null);
   const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
-  const [editingDocStatus, setEditingDocStatus] = useState<string | null>(null);
+  const [, setEditingDocStatus] = useState<string | null>(null);
   const [editingDocumentDate, setEditingDocumentDate] = useState<string | null>(null);
   const [editingDocumentNumber, setEditingDocumentNumber] = useState<string | null>(null);
-  const editingPrevBalanceRef = useRef<number | undefined>(undefined);
+  const editingPrevBalanceRef = useRef<number | undefined>(undefined) as React.MutableRefObject<number | undefined>;
   const editingDocMetaRef = useRef<{
     dueDate?:   string | null;
     typeCode?:  string | null;
     currencyId?: number | null;
-  }>(null);
+  }>(null) as React.MutableRefObject<{ dueDate?: string | null; typeCode?: string | null; currencyId?: number | null; } | null>;
 
   const clearEditingState = useCallback(() => {
     setEditingDocumentId(null);
@@ -352,7 +351,7 @@ function POSPage() {
   const searchRef    = useRef<HTMLInputElement>(null);
   const cartRef      = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const cartApiRef   = useRef<ProfessionalCartHandle>(null);
+  const cartApiRef   = useRef<ProfessionalCartHandle>(null) as React.RefObject<ProfessionalCartHandle | null>;
   const barcodeTimer = useRef<ReturnType<typeof setTimeout>>();
   const weightModalVariant = useRef<ProductVariant | null>(null);
   const weightEditItemId   = useRef<string | null>(null);
@@ -448,7 +447,6 @@ function POSPage() {
   const currencies       = posLookups?.currencies ?? [];
   const treasuryAccounts = posLookups?.treasuryAccounts ?? [];
   const fiscalYears      = posLookups?.fiscalYears ?? [];
-  const customers        = posLookups?.customers ?? [];
   const paymentModes     = posLookups?.paymentModes ?? [];
 
   // ── Client balance ──────────────────────────────────────────────────────────
@@ -782,7 +780,7 @@ function POSPage() {
       editingPrevBalanceRef.current = doc.balance_data?.previous_balance;
       editingDocMetaRef.current = {
         dueDate:   doc.due_date ?? null,
-        typeCode:  doc.documentType?.code ?? null,
+        typeCode:  doc.document_type?.code ?? null,
         currencyId: doc.currency_id ?? null,
       };
       setCartNote(doc.notes ?? '');
@@ -868,7 +866,7 @@ function POSPage() {
   // ── Keyboard Shortcuts ─────────────────────────────────────────────────────
   const handleQuickCashRef = useRef<() => void>(() => {});
   useKeyboardShortcuts(
-    { posRef, overridesRef: kbOverridesRef, searchRef, cartRef, cartApiRef },
+    { posRef: posRef as { readonly current: any }, overridesRef: kbOverridesRef, searchRef, cartRef, cartApiRef },
     { isEmpty, modal, showFilter, showSessionInvoices, showSettings, showCloseSession, pinModal, selectedCartItemId, families, openClientOnNewSale: settings.openClientOnNewSale },
     { setModal, setFilter: setShowFilter, setShowSessionInvoices, setShowSettings, setShowCloseSession, setPinModal, setSelectedCartItemId, setView, setGridSize, setReceiptSnapshot },
     { toggleFullscreen, handleClearCart, handleOpenDrawer, handleUndoClear, handleToggleQuickbar, handleSearchEscape, deleteConfirm, handleQuickCash: () => handleQuickCashRef.current() },
@@ -1065,13 +1063,13 @@ const handleCompleteSale = useCallback(async (params: {
     const currentInvDisc = posRef.current.invoiceDiscountPct;
 
     try {
-      const snapshot = { items: [...currentItems], totals: { ...currentTotals } };
+      const snapshot = { items: [...currentItems], totals: { ...currentTotals } as CartTotals };
 
       const existingPaymentsMap = new Map(
         (pos.payments ?? []).map(p => [p.id, p.payment_date])
       );
       const today = new Date().toISOString().slice(0, 10);
-      const apiPayments = (params.payments ?? [])
+      const apiPayments: import('@/lib/api/endpoints/documents').DocumentPaymentInput[] = (params.payments ?? [])
         .filter(p => p.amount > 0)
         .map(p => {
           const existingPaymentDate = p.id ? existingPaymentsMap.get(p.id) : undefined;
@@ -1083,7 +1081,7 @@ const handleCompleteSale = useCallback(async (params: {
             treasury_account_id: p.treasuryAccountId ?? defaultTreasury?.id ?? null,
             reference:           p.reference?.trim() || null,
             notes:               params.note?.trim() || null,
-          };
+          } as import('@/lib/api/endpoints/documents').DocumentPaymentInput;
         });
 
       // ✅ TVA-exempt parties: frontend must match backend override
@@ -1107,7 +1105,7 @@ const handleCompleteSale = useCallback(async (params: {
         };
       });
 
-      const effectiveTotalHt = linesPayload.reduce((s, l) => {
+      const effectiveTotalHt = linesPayload.reduce((s: number, l: Record<string, any>) => {
         const gross = l.quantity * l.unit_price_ht;
         const bq = l.quantity * l.pack_qty;
         const disc = l.discount_amount_per_unit
@@ -1115,7 +1113,7 @@ const handleCompleteSale = useCallback(async (params: {
           : gross * (l.discount_percentage / 100);
         return s + gross - disc;
       }, 0);
-      const effectiveTotalTva = linesPayload.reduce((s, l) => {
+      const effectiveTotalTva = linesPayload.reduce((s: number, l: Record<string, any>) => {
         const gross = l.quantity * l.unit_price_ht;
         const bq = l.quantity * l.pack_qty;
         const disc = l.discount_amount_per_unit
@@ -1124,18 +1122,9 @@ const handleCompleteSale = useCallback(async (params: {
         const lineHt = gross - disc;
         return s + lineHt * l.tva_rate / 100;
       }, 0);
-      const effectiveTotalTtc = effectiveTotalHt + effectiveTotalTva + snapshot.totals.fiscal_stamp;
+      const effectiveTotalTtc = effectiveTotalHt + effectiveTotalTva + (snapshot.totals.fiscal_stamp ?? 0);
 
       const currentSessionId = currentSession?.id ?? null;
-      const commonPayload: Record<string, any> = {
-        party_id:       currentClient?.id ?? null,
-        warehouse_id:   defaultWarehouse.id,
-        fiscal_year_id: fiscalYear.id,
-        currency_id:    params.currencyId ?? defaultCurrency?.id ?? undefined,
-        document_date:  editingDocumentDate ?? new Date().toISOString().slice(0, 10),
-        due_date:       params.dueDate ?? null,
-        notes:          params.note ?? cartNote ?? null,
-      };
 
       // ✅ نحدّد نوع العملية قبل الإرسال لاستعمالها لاحقاً في شرط incrementMut
       const isEditingExistingDocument = !!editingDocumentId;
@@ -1143,13 +1132,25 @@ const handleCompleteSale = useCallback(async (params: {
       let res;
       if (editingDocumentId) {
         res = await documentsApi.update(editingDocumentId, {
-          ...commonPayload,
-          lines:    linesPayload,
-          payments: apiPayments,
+          party_id:       currentClient?.id ?? null,
+          warehouse_id:   defaultWarehouse.id,
+          fiscal_year_id: fiscalYear.id,
+          currency_id:    params.currencyId ?? defaultCurrency?.id ?? undefined,
+          document_date:  editingDocumentDate ?? new Date().toISOString().slice(0, 10),
+          due_date:       params.dueDate ?? null,
+          notes:          params.note ?? cartNote ?? null,
+          lines:          linesPayload,
+          payments:       apiPayments,
         });
       } else {
         res = await documentsApi.create({
-          ...commonPayload,
+          party_id:       currentClient?.id ?? null,
+          warehouse_id:   defaultWarehouse.id,
+          fiscal_year_id: fiscalYear.id,
+          currency_id:    params.currencyId ?? defaultCurrency?.id ?? undefined,
+          document_date:  editingDocumentDate ?? new Date().toISOString().slice(0, 10),
+          due_date:       params.dueDate ?? null,
+          notes:          params.note ?? cartNote ?? null,
           document_type_id: invType.id,
           lines:            linesPayload,
           payments:         apiPayments,
@@ -1168,8 +1169,8 @@ const handleCompleteSale = useCallback(async (params: {
             items:            currentItems,
             totalHt:          effectiveTotalHt,
             totalTva:         effectiveTotalTva,
-            totalFiscalStamp: snapshot.totals.fiscal_stamp,
-            totalDiscount:    snapshot.totals.total_discount + invoiceDiscountAmount,
+            totalFiscalStamp: snapshot.totals.fiscal_stamp ?? 0,
+            totalDiscount:    (snapshot.totals.total_discount ?? 0) + invoiceDiscountAmount,
             grandTotal:       effectiveTotalTtc,
             payments:         apiPayments.map(p => ({
               payment_mode_id: p.payment_mode_id,
@@ -1325,7 +1326,7 @@ const handleCompleteSale = useCallback(async (params: {
 
   // ── Quick Cash (no modal) ────────────────────────────────────────────────
   const handleQuickCash = useCallback(async () => {
-    if (pos.isEmpty) return;
+    if (pos.items.length === 0) return;
     const cashMode = paymentModes?.find(m =>
       new RegExp(settings.defaultPaymentCode, 'i').test(m.name),
     ) ?? paymentModes?.find(m => m.is_default) ?? paymentModes?.[0];
@@ -1337,7 +1338,7 @@ const handleCompleteSale = useCallback(async (params: {
       docTypeCode: settings.defaultDocTypeCode,
       skipPreview: true,
     });
-  }, [pos.isEmpty, pos.totals.total_ttc, paymentModes, settings.defaultPaymentCode, settings.defaultDocTypeCode, handleCompleteSale, safeToast]);
+  }, [pos.items.length, pos.totals.total_ttc, paymentModes, settings.defaultPaymentCode, settings.defaultDocTypeCode, handleCompleteSale, safeToast]);
   useEffect(() => { handleQuickCashRef.current = handleQuickCash; }, [handleQuickCash]);
 
   // ── Quick Items ────────────────────────────────────────────────────────────
@@ -1524,7 +1525,7 @@ const handleCompleteSale = useCallback(async (params: {
         const qty = parseInt(qtyMatch[1], 10);
         if (qty > 0) {
           posRef.current.updateQty(selectedCartItemId, qty);
-          const itemName = posRef.current.items.find(i => i.id === selectedCartItemId)?.product_name ?? '';
+          const itemName = posRef.current.items.find((i: any) => i.id === selectedCartItemId)?.product_name ?? '';
           safeToast.success(`${itemName} — الكمية ${qty}`, { id: 'pos-qty-cmd', duration: 1200 });
           skipNextSearchResetRef.current = true;
           posRef.current.setSearch(prevSearchRef.current);
@@ -1565,7 +1566,7 @@ const handleCompleteSale = useCallback(async (params: {
         <Suspense fallback={null}>
           <OpenSessionModal
             warehouses={warehouses ?? []}
-            fiscalYears={fiscalYears ?? []}
+            fiscalYears={fiscalYears as any}
             defaultWarehouseId={defaultWarehouse?.id}
             defaultFiscalYearId={fiscalYear?.id}
             isLoading={openSessionMut.isPending}
@@ -1732,7 +1733,7 @@ const handleCompleteSale = useCallback(async (params: {
 
         {/* ✅ ProfessionalCart مع onDiscountAmount */}
         <ProfessionalCart
-          ref={cartApiRef}
+          ref={cartApiRef as any}
           items={pos.items} totals={pos.totals} client={pos.client}
           note={cartNote} selectedItemId={selectedCartItemId}
           onSelectItem={setSelectedCartItemId}

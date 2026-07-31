@@ -39,7 +39,7 @@ interface UseCommercialDocumentControllerOptions {
 export function useCommercialDocumentController({
   documentType,
   existingDocument,
-  onClose,
+  onClose: _onClose,
   onSaved,
   active,
 }: UseCommercialDocumentControllerOptions) {
@@ -296,7 +296,7 @@ export function useCommercialDocumentController({
   // ─── Credit check ─────────────────────────────────────────────────────────
   const { data: creditCheck, isLoading: isLoadingCredit } = useCreditCheck({
     partyId:    form.party_id ? parseInt(form.party_id) : null,
-    amount:     totals.netToPay,
+    amount:     totals.netToPay!,
     date:       form.document_date,
     isPurchase,
     enabled:    active && needsParty && !isPurchase,
@@ -339,7 +339,7 @@ export function useCommercialDocumentController({
 
   const companyInfo = mapCompany(useActiveCompany());
 
-  const { data: printTemplates = [] } = usePrintTemplatesList(docCode);
+  const { data: printTemplates = [] } = usePrintTemplatesList(docCode as any);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const selectedTemplate = useMemo(() => {
     if (selectedTemplateId) return resolveTemplateById(printTemplates, selectedTemplateId);
@@ -469,8 +469,8 @@ export function useCommercialDocumentController({
     if (docNumberErr) { setApiErr('رجاء التحقق من رقم المستند'); return; }
     if (selectedParty && selectedParty.allow_credit_sale === false) {
       const totalPaid = payments.reduce((acc, p) => acc + toNum(p.amount), 0);
-      if (totalPaid + 0.01 < totals.netToPay) {
-        setApiErr(`التعامل «${selectedParty.name}» لا يُسمح له بالبيع بالدين — يجب دفع المبلغ كاملاً (${fmtDZD(totals.netToPay)} دج)`);
+      if (totalPaid + 0.01 < (totals.netToPay ?? 0)) {
+        setApiErr(`التعامل «${selectedParty.name}» لا يُسمح له بالبيع بالدين — يجب دفع المبلغ كاملاً (${fmtDZD(totals.netToPay ?? 0)} دج)`);
         return;
       }
     }
@@ -570,8 +570,8 @@ export function useCommercialDocumentController({
     lookups.parties.map((p) => ({
       id:    p.id,
       label: p.name,
-      sub:   [(p as Record<string, unknown>).code, (p as Record<string, unknown>).phone].filter(Boolean).join(' · '),
-      badge: (p as Record<string, unknown>).is_tva_exempt ? 'معفى' : (p as Record<string, unknown>).price_level?.name,
+      sub:   [(p as unknown as Record<string, unknown>).code, (p as unknown as Record<string, unknown>).phone].filter(Boolean).join(' · '),
+      badge: (p as unknown as Record<string, unknown>).is_tva_exempt ? 'معفى' : ((p as unknown as Record<string, unknown>).price_level as Record<string, unknown>)?.name as string,
     })),
     [lookups.parties],
   );
@@ -613,8 +613,8 @@ export function useCommercialDocumentController({
 
   const paymentsExceedWarning = useMemo(() => {
     const allPaid = payments.reduce((acc, p) => acc + toNum(p.amount), 0);
-    if (allPaid > totals.netToPay + 0.01 && totals.netToPay > 0) {
-      return `مجموع الدفعات (${fmtDZD(allPaid)} دج) يتجاوز المبلغ المستحق (${fmtDZD(totals.netToPay)} دج)`;
+    if (allPaid > (totals.netToPay ?? 0) + 0.01 && (totals.netToPay ?? 0) > 0) {
+      return `مجموع الدفعات (${fmtDZD(allPaid)} دج) يتجاوز المبلغ المستحق (${fmtDZD(totals.netToPay ?? 0)} دج)`;
     }
     return null;
   }, [payments, totals.netToPay]);
@@ -622,8 +622,8 @@ export function useCommercialDocumentController({
   const balanceWarning = useMemo(() => {
     if (!partyBalance || partyBalance.current_balance <= 0) return null;
     if (partyBalance.balance_type !== 'debit') return null;
-    if (totals.netToPay <= 0) return null;
-    if (partyBalance.current_balance > totals.netToPay * 2) {
+    if ((totals.netToPay ?? 0) <= 0) return null;
+    if (partyBalance.current_balance > (totals.netToPay ?? 0) * 2) {
       return `رصيد ${selectedParty?.name ?? 'المتعامل'} المتراكم (${fmtDZD(partyBalance.current_balance)} دج) كبير — تأكد من تسوية الحسابات`;
     }
     return null;

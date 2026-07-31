@@ -142,7 +142,7 @@ export default function RowBuilder({ rows, onChange, label, fieldGroup }: Props)
                     <div style={{ flex: 1 }}>
                       <label style={{ fontSize: 11, color: '#666' }}>محاذاة التسمية</label>
                       <select value={r.labelSide ?? 'start'}
-                        onChange={e => updateField(realIdx, { labelSide: e.target.value as LogicalSide })}
+                        onChange={e => updateField(realIdx, { labelSide: e.target.value as any })}
                         style={{ width: '100%', padding: '3px 6px', borderRadius: 4, border: '1px solid #ccc', fontSize: 12 }}>
                         <option value="start">اليمين (بداية)</option>
                         <option value="end">اليسار (نهاية)</option>
@@ -151,7 +151,7 @@ export default function RowBuilder({ rows, onChange, label, fieldGroup }: Props)
                     <div style={{ flex: 1 }}>
                       <label style={{ fontSize: 11, color: '#666' }}>محاذاة القيمة</label>
                       <select value={r.valueSide ?? 'end'}
-                        onChange={e => updateField(realIdx, { valueSide: e.target.value as LogicalSide })}
+                        onChange={e => updateField(realIdx, { valueSide: e.target.value as any })}
                         style={{ width: '100%', padding: '3px 6px', borderRadius: 4, border: '1px solid #ccc', fontSize: 12 }}>
                         <option value="end">اليمين (نهاية)</option>
                         <option value="start">اليسار (بداية)</option>

@@ -2,7 +2,7 @@ import type { PrintTemplate, BorderStyle } from '../types';
 import { Toggle, SliderField } from './ToggleSwitch';
 import { Field, ColorField, Input, Pills } from '../components/ui';
 import { isSettingVisible } from '../services/SettingsRegistry';
-import { AlignButtons, BorderSelect } from './HeaderSection';
+import { BorderSelect } from './HeaderSection';
 
 interface Props {
   tpl: PrintTemplate;

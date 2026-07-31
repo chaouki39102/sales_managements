@@ -114,7 +114,7 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
 
   const isThermal   = tpl.paper_size === '80mm' || tpl.paper_size === '58mm';
   const isA4        = tpl.paper_size === 'A4';
-  const _isA5        = tpl.paper_size === 'A5';
+  const _isA5        = tpl.paper_size === 'A5'; void _isA5;
   const isLabel     = tpl.paper_size === '40x20mm';
   const isDeliveryA5 = tpl.doc_type_code === 'BL' && tpl.paper_size === 'A5';
   const isSticker = tpl.doc_type_code === 'STK';

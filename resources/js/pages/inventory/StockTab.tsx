@@ -99,7 +99,7 @@ function LotsSubRow({
                     </div>
                   );
                 }},
-                { key: 'expiration_date', label: "\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0627\u0646\u062a\u0647\u0627\u0621", render: (v, row) => {
+                { key: 'expiration_date', label: "\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0627\u0646\u062a\u0647\u0627\u0621", render: (_v, row) => {
                   const lt = row as ProductLot;
                   const remaining = Number(lt.remaining_quantity ?? 0);
                   const depleted = remaining <= 0;

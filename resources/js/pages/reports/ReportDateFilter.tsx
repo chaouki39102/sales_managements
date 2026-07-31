@@ -34,7 +34,7 @@ function startOfMonth(): Date {
 
 function _endOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0);
-}
+} void _endOfMonth;
 
 function startOfYear(): Date {
   return new Date(new Date().getFullYear(), 0, 1);

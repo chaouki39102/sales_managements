@@ -1,7 +1,8 @@
-import type { DocTypeCode, PaperSize, PrintTemplate, SettingMeta } from '../types';
+import type { DocTypeCode, PaperSize, PrintTemplate } from '../types';
 import { isSettingVisible, getVisibleSettings } from './SettingsRegistry';
+import type { SettingMeta } from './SettingsRegistry';
 
-export type { SettingMeta, PropertyCategory } from './SettingsRegistry';
+export type { SettingMeta } from './SettingsRegistry';
 
 const THERMAL_SIZES: PaperSize[] = ['80mm', '58mm'];
 const PAGE_SIZES: PaperSize[] = ['A4', 'A5'];

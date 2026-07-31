@@ -9,7 +9,7 @@ import Skeleton           from '@/components/ui/Skeleton';
 import Pagination         from '@/components/ui/Pagination';
 import { useConfirm } from '@/hooks/useConfirm';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import { useModal } from '@/hooks/useModal';
+
 import {
   useNotificationsQuery,
   useMarkAsReadMutation,
@@ -18,7 +18,7 @@ import {
   useDeleteMultipleNotificationsMutation,
 } from '@/hooks/useNotificationsQuery';
 import { useNotification } from '@/hooks/useNotification';
-import type { RemoteNotificationType } from '@/lib/api/endpoints/notifications';
+import type { RemoteNotificationType, RemoteNotification } from '@/lib/api/endpoints/notifications';
 import {
   NOTIFICATION_TYPE_ICON,
   NOTIFICATION_TYPE_COLOR,
@@ -64,14 +64,14 @@ export default function NotificationsPage() {
     per_page: PER_PAGE,
   };
 
-  const { data, isLoading, isFetching } = useNotificationsQuery(filters);
+  const { data, isLoading } = useNotificationsQuery(filters);
   const markOneMutation   = useMarkAsReadMutation();
   const markAllMutation   = useMarkAllAsReadMutation();
   const deleteOneMutation = useDeleteNotificationMutation();
   const deleteManyMutation = useDeleteMultipleNotificationsMutation();
 
-  const notifications = data?.data ?? [];
-  const meta          = data?.meta;
+  const notifications = (data as any)?.data ?? [];
+  const meta          = (data as any)?.meta;
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -118,9 +118,9 @@ export default function NotificationsPage() {
   };
 
   const handleMarkSelectedAsRead = async () => {
-    const unreadSelected = notifications.filter((n) => selectedIds.has(n.id) && !n.is_read);
+    const unreadSelected = notifications.filter((n: RemoteNotification) => selectedIds.has(n.id) && !n.is_read);
     try {
-      await Promise.all(unreadSelected.map((n) => markOneMutation.mutateAsync(n.id)));
+      await Promise.all(unreadSelected.map((n: RemoteNotification) => markOneMutation.mutateAsync(n.id)));
       notify.success('تم', `تم تحديد ${unreadSelected.length} إشعار كمقروء`);
       clearSelection();
     } catch {
@@ -150,7 +150,7 @@ export default function NotificationsPage() {
     }
   };
 
-  const isDeleting = deleteOneMutation.isPending || deleteManyMutation.isPending;
+  const _isDeleting = deleteOneMutation.isPending || deleteManyMutation.isPending; void _isDeleting;
 
   return (
     <div>
@@ -277,8 +277,8 @@ export default function NotificationsPage() {
                         <span style={{ fontWeight: 700, color: 'var(--t1)', fontSize: 12.5 }}>
                           {n.title}
                         </span>
-                        <Badge variant={NOTIFICATION_TYPE_BADGE_VARIANT[n.type]} noDot>
-                          {NOTIFICATION_TYPE_LABEL[n.type]}
+                        <Badge variant={NOTIFICATION_TYPE_BADGE_VARIANT[n.type as RemoteNotificationType]} noDot>
+                          {NOTIFICATION_TYPE_LABEL[n.type as RemoteNotificationType]}
                         </Badge>
                         {!n.is_read && (
                           <span style={{
@@ -351,7 +351,7 @@ export default function NotificationsPage() {
         )}
 
         {meta && meta.last_page > 1 && (
-          <Pagination meta={meta} onPageChange={handlePageChange} showPageSize={false} />
+          <Pagination meta={meta as any} onPageChange={handlePageChange} showPageSize={false} />
         )}
       </Card>
 

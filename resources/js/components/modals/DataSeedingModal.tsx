@@ -303,8 +303,6 @@ const handleApply = async () => {
   // ─────────────────────────────────────────────────────────
   const renderApplying = () => {
     const currentLog = logs.find(l => l.status === 'running');
-    const _doneLogs  = logs.filter(l => l.status === 'done' || l.status === 'error');
-    const _idleLogs  = logs.filter(l => l.status === 'idle');
 
     return (
       <div style={{ direction: 'rtl' }}>

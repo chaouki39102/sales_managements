@@ -13,24 +13,24 @@ export interface SimpleColumn {
   /** Right-align numeric columns */
   align?: 'start' | 'center' | 'end';
   /** Custom render function — receives cell value, entire row, and column key */
-  render?: (value: unknown, row: Record<string, unknown>, columnKey: string) => React.ReactNode;
+  render?: (value: unknown, row: any, columnKey: string) => React.ReactNode;
   /** Click handler on the column header */
   onHeaderClick?: () => void;
 }
 
 interface SimpleTableProps {
   columns: SimpleColumn[];
-  data: Record<string, unknown>[];
+  data: any[];
   /** Unique row key — defaults to row.id */
-  rowKey?: string | ((row: Record<string, unknown>) => string | number);
+  rowKey?: string | ((row: any) => string | number);
   /** Empty state message */
   emptyText?: string;
   /** Extra class on <table> */
   className?: string;
   /** Row click handler */
-  onRowClick?: (row: Record<string, unknown>, index: number) => void;
+  onRowClick?: (row: any, index: number) => void;
   /** Custom row className */
-  rowClassName?: (row: Record<string, unknown>, index: number) => string;
+  rowClassName?: (row: any, index: number) => string;
   /** Show loading skeleton */
   isLoading?: boolean;
   /** Number of skeleton rows when loading */

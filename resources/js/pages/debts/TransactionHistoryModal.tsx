@@ -257,7 +257,7 @@ export function TransactionHistoryModal({
                 fileName: `كشف_حساب_${partyName}_${date}`,
                 title: `كشف حساب – ${partyName}`,
                 sheetName: 'كشف حساب',
-                documentInfo: { party: partyName, date },
+                documentInfo: { party: partyName, date } as any,
                 showAggregates: false,
             },
         );
@@ -400,7 +400,7 @@ export function TransactionHistoryModal({
                 fileName: `ملخص_المنتجات_${partyName}_${date}`,
                 title: `ملخص المنتجات – ${partyName}`,
                 sheetName: 'ملخص المنتجات',
-                documentInfo: { party: partyName, date },
+                documentInfo: { party: partyName, date } as any,
                 showAggregates: false,
             },
         );
@@ -534,7 +534,7 @@ export function TransactionHistoryModal({
                 fileName: `كشف_تفصيلي_${partyName}_${date}`,
                 title: `كشف حساب تفصيلي – ${partyName}`,
                 sheetName: 'الحركات التفصيلية',
-                documentInfo: { party: partyName, date },
+                documentInfo: { party: partyName, date } as any,
                 showAggregates: false,
             },
         );

@@ -16,7 +16,7 @@ function makeVariant(overrides: Partial<ProductVariant> = {}): ProductVariant {
     min_stock_alert: 0, max_stock_alert: null, manages_quantity_discounts: false,
     active: true, company_id: 1, created_at: now, updated_at: now,
     ...overrides,
-  };
+  } as any;
 }
 
 function makeProduct(overrides: Partial<Product> = {}): Product {
@@ -33,7 +33,7 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
     specifications: null, images: null, meta_title: null, meta_description: null,
     active: true, company_id: 1, created_at: now, updated_at: now,
     ...overrides,
-  };
+  } as any;
 }
 
 describe('getVariantPrice', () => {
@@ -44,11 +44,11 @@ describe('getVariantPrice', () => {
 
   it('returns matching price level price when found', () => {
     const prices: ProductVariantPrice[] = [
-      { price_level_id: 2, price: 1200, active: true },
+      { price_level_id: 2, price: 1200, active: true } as any,
     ];
     const v = makeVariant({ default_selling_price_ht: 1500, prices });
     const levels: PriceLevel[] = [
-      { id: 2, name: 'Wholesale', discount_percent: null, company_id: 1, is_default: false, created_at: '', updated_at: '' },
+      { id: 2, name: 'Wholesale', discount_percent: 0, company_id: 1, is_default: false, active: true, created_at: '', updated_at: '' },
     ];
     expect(getVariantPrice(v, 2, levels)).toBe(1200);
   });
@@ -57,7 +57,7 @@ describe('getVariantPrice', () => {
     const prices: ProductVariantPrice[] = [];
     const v = makeVariant({ default_selling_price_ht: 1000, prices });
     const levels: PriceLevel[] = [
-      { id: 3, name: 'VIP', discount_percent: 10, company_id: 1, is_default: false, created_at: '', updated_at: '' },
+      { id: 3, name: 'VIP', discount_percent: 10, company_id: 1, is_default: false, active: true, created_at: '', updated_at: '' },
     ];
     expect(getVariantPrice(v, 3, levels)).toBe(900);
   });
@@ -65,7 +65,7 @@ describe('getVariantPrice', () => {
   it('returns default price when both price entry and discount percent are missing', () => {
     const v = makeVariant({ default_selling_price_ht: 2000 });
     const levels: PriceLevel[] = [
-      { id: 4, name: 'Regular', discount_percent: null, company_id: 1, is_default: false, created_at: '', updated_at: '' },
+      { id: 4, name: 'Regular', discount_percent: 0, company_id: 1, is_default: false, active: true, created_at: '', updated_at: '' },
     ];
     expect(getVariantPrice(v, 4, levels)).toBe(2000);
   });
@@ -83,13 +83,13 @@ describe('productToVariant', () => {
   });
 
   it('uses default selling price from product when available', () => {
-    const p = makeProduct({ default_selling_price_ht: 1200 });
+    const p = makeProduct({ default_selling_price_ht: 1200 } as any);
     const v = productToVariant(p);
     expect(v.default_selling_price_ht).toBe(1200);
   });
 
   it('calculates fallback selling price from purchase price * 1.3', () => {
-    const p = makeProduct({ default_selling_price_ht: undefined as unknown as number, purchase_price_ht: 1000 });
+    const p = makeProduct({ default_selling_price_ht: undefined as unknown as number, purchase_price_ht: 1000 } as any);
     const v = productToVariant(p);
     expect(v.default_selling_price_ht).toBe(1300);
   });
@@ -97,7 +97,7 @@ describe('productToVariant', () => {
   it('passes through current_stock and prices from API response', () => {
     const p = makeProduct() as Product & { current_stock?: number; prices?: ProductVariantPrice[] };
     p.current_stock = 42;
-    p.prices = [{ price_level_id: 1, price: 900, active: true }];
+    p.prices = [{ price_level_id: 1, price: 900, active: true }] as any;
     const v = productToVariant(p);
     expect(v.current_stock).toBe(42);
     expect(v.prices).toEqual(p.prices);
@@ -123,7 +123,7 @@ describe('makeFakeVariant', () => {
     const v = makeFakeVariant('Custom Item', 2000, 19);
     expect(v.variant_name).toBeNull();
     expect(v.default_selling_price_ht).toBe(2000);
-    expect(v.product.name).toBe('Custom Item');
+    expect(v.product!.name).toBe('Custom Item');
     expect(v.tva!.rate).toBe(19);
     expect(v.tva!.name).toContain('19');
     expect(v.product_id).toBe(0);

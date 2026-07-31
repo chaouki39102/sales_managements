@@ -371,7 +371,7 @@ export default function TaxSettingsPage() {
 
   const { data: config, isLoading } = useTaxConfig(regime);
   const { data: history } = useTaxConfigHistory(regime);
-  const mutations = useTaxManagementMutations();
+  
 
   if (isLoading) return <Skeleton variant="card" rows={6} />;
 

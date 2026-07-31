@@ -57,7 +57,7 @@ export default function SubsidizedProductsPage() {
         <KpiCard variant="red" icon="ti-calculator" label="IFU المستحق"
           value={summary?.totals?.total_ifu?.toLocaleString('fr-DZ', { maximumFractionDigits: 0 }) ?? '0'} unit="دج" />
         <KpiCard variant="orange" icon="ti-alert-triangle" label="مخالفات"
-          value={summary?.totals?.total_violations?.toString() ?? '0'} sub="مواد تتجاوز السعر الأقصى" />
+          value={(summary?.totals as any)?.total_violations?.toString() ?? (summary?.totals?.violations_count?.toString() ?? '0')} sub="مواد تتجاوز السعر الأقصى" />
       </div>
 
       {/* Violations */}
@@ -156,12 +156,12 @@ function EditSubsidizedForm({
   const handleSave = () => {
     onSave({
       qty_sold: qtySold,
-      purchase_price_avg: purchasePriceAvg,
+      pmp: purchasePriceAvg,
       actual_sell_price: actualSellPrice,
       total_margin: totalMargin,
       ifu_amount: ifuAmount,
       price_violation: priceViolation,
-    });
+    } as any);
   };
 
   return (

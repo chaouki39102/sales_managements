@@ -157,7 +157,7 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
 
   const handlePrint = useCallback(() => {
     if (!tpl || !source) return;
-    renderPipelineToPopup(source, tpl, company);
+    renderPipelineToPopup(source as any, tpl, company);
   }, [tpl, source, company]);
 
   if (!open) return null;
@@ -178,7 +178,7 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
 
         <div style={previewAreaStyle}>
           {source && tpl ? (
-            <UniversalPrintPipeline source={source} template={tpl} company={company} />
+            <UniversalPrintPipeline source={source as any} template={tpl} company={company} />
           ) : (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--t3)' }}>
               {!tpl ? 'لا يوجد قالب لهذا المستند' : 'لا توجد بيانات للمعاينة'}

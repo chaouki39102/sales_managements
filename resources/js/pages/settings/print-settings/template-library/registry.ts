@@ -192,7 +192,7 @@ export function buildTemplate(
           ? DELIVERY_A5_FOOTER
           : DELIVERY_FOOTER;
 
-  const base: PrintTemplate = {
+  const base: Record<string, any> = {
     id: null,
     name,
     doc_type_code: docTypeCode,
@@ -458,7 +458,7 @@ export function buildTemplate(
     watermark: { enabled: false },
   };
 
-  return overrides ? { ...base, ...overrides } : base;
+  return (overrides ? { ...base, ...overrides } : base) as unknown as PrintTemplate;
 }
 
 // ─── Register all built-in templates ───────────────────────────────────────────
@@ -508,7 +508,7 @@ export function registerBuiltinTemplates(): void {
             titleField: 'company.name',
             titleStyle: { bold: true, fontSize: 18 },
             rows: [
-              { id: 'cname',  field: 'company.commercialName', label: 'الاسم التجاري', visible: true, order: 0, labelSide: 'start', valueSide: 'start', label: '' },
+              { id: 'cname',  field: 'company.commercialName', label: 'الاسم التجاري', visible: true, order: 0, labelSide: 'start', valueSide: 'start' },
               { id: 'addr',   field: 'company.address',        visible: true, order: 1, labelSide: 'start', valueSide: 'start', label: '' },
               { id: 'capital', field: 'company.capital',       label: 'رأس المال',     visible: true, order: 2, labelSide: 'start', valueSide: 'end' },
             ],
@@ -751,9 +751,9 @@ export function registerBuiltinTemplates(): void {
       title_text: '',
       title_size: 0,
       show_barcode: false,
-      barcode_content: '',
+      barcode_content: undefined,
       show_qr: false,
-      qr_content: '',
+      qr_content: undefined,
       show_thank_you: false,
       show_returns_policy: false,
       show_stamp: false,

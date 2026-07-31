@@ -19,7 +19,7 @@ import { useActiveSlug }   from '@/lib/store/appStore';
 import { useCashClient }   from '@/lib/api/endpoints/parties';
 import { formatCurrency }  from '@/lib/utils';
 import Modal from '@/components/ui/Modal';
-import { PinnedList, type PinnedListItem } from '@/components/ui/PinnedList';
+import { PinnedList } from '@/components/ui/PinnedList';
 import type { Party }      from '@/types';
 import type { PaginatedResponse, PartyBalance } from '@/lib/api/core/types';
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { KB_DEFAULTS, normalizeEventKey, type KbOverrides } from '@/pos/hooks/useKeyboardMap';
-import { readOverrides, saveOverrides, addShortcut, removeShortcut, clearShortcuts } from '@/pos/hooks/useKeyboardMap';
+import { readOverrides, saveOverrides, addShortcut, removeShortcut } from '@/pos/hooks/useKeyboardMap';
 import Modal from '@/components/ui/Modal';
 
 interface KeyboardHelpModalProps {
@@ -18,16 +18,16 @@ interface ShortcutGroup {
   items: ShortcutItem[];
 }
 
-function keyLabel(key: string): string {
-  const map: Record<string, string> = {
-    NumpadAdd: 'Num+',
-    NumpadSubtract: 'Num-',
-    ArrowUp: '↑',
-    ArrowDown: '↓',
-    Escape: 'Esc',
-  };
-  return map[key] ?? key;
-}
+// function _keyLabel(key: string): string {
+//   const map: Record<string, string> = {
+//     NumpadAdd: 'Num+',
+//     NumpadSubtract: 'Num-',
+//     ArrowUp: '↑',
+//     ArrowDown: '↓',
+//     Escape: 'Esc',
+//   };
+//   return map[key] ?? key;
+// }
 
 /* Build display string from combo: "Ctrl+Alt+K" → ["Ctrl","Alt","K"] → "Ctrl+Alt+K" (no change needed) */
 function comboDisplay(combo: string): string {
@@ -116,18 +116,18 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
   /* ─── Helpers ──────────────────────────────────────────────────────────── */
 
   /** Get all currently assigned shortcuts across ALL actions */
-  function allAssignedShortcuts(): Map<string, string> {
-    const map = new Map<string, string>();
-    for (const g of groups) {
-      for (const item of g.items) {
-        const combos = overrides[item.action] ?? [];
-        for (const c of combos) {
-          map.set(c, item.desc);
-        }
-      }
-    }
-    return map;
-  }
+  // function _allAssignedShortcuts(): Map<string, string> {
+  //   const map = new Map<string, string>();
+  //   for (const g of groups) {
+  //     for (const item of g.items) {
+  //       const combos = overrides[item.action] ?? [];
+  //       for (const c of combos) {
+  //         map.set(c, item.desc);
+  //       }
+  //     }
+  //   }
+  //   return map;
+  // }
 
   /** Get the effective shortcuts for an action (overrides first, then default) */
   function getShortcuts(action: string): string[] {
@@ -222,7 +222,7 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
   return (
     <Modal open onClose={onClose} title="تخصيص الاختصارات" size="lg"
       footer={<button className="btn" onClick={onClose} type="button">إغلاق</button>}>
-      <div onKeyDown={handleKeyCapture} tabIndex={-1} ref={el => { if (el) captureRef.current = el; }}>
+      <div onKeyDown={handleKeyCapture} tabIndex={-1} ref={el => { if (el) (captureRef as any).current = el; }}>
         {/* Recording banner */}
         {listening && editingAction && (
           <div className="al al-i" style={{ marginBottom: 12 }}>
@@ -255,7 +255,7 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
                 {g.items.map(item => {
                   const combos = getShortcuts(item.action);
                   const isEditing = editingAction === item.action;
-                  const isDefault = overrides[item.action]?.length === 0 || !overrides[item.action];
+                  const _isDefault = overrides[item.action]?.length === 0 || !overrides[item.action]; void _isDefault;
                   return (
                     <div key={item.action} className={`kb-help-row ${isEditing ? 'kb-edit-on' : ''}`}>
                       <span className="kb-desc">{item.desc}</span>

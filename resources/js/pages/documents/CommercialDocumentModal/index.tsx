@@ -58,17 +58,17 @@ export default function CommercialDocumentModal({
   const {
     slug, qc, navigate, docCode, isPurchase, isEdit,
     lookups, lookupsReady, settingsApplyStamp,
-    form, errors, lineErr, apiErr, _setApiErr,
+    form, errors, lineErr, apiErr,
     set, handlePriceLevelChange,
     addLine, addLineWithProduct, removeLine, duplicateLine, updateLine,
     pmMode, payments,
     bulkAddLines, addPayment, addPaymentWithValues, removePayment, updatePayment,
     partyBalance, isLoadingBalance,
-    totals, _validate, _buildPayload,
+    totals,
     needsParty, affectsStock, stockDir,
     isReadOnly, isLinesReadOnly,
     lineWarnings,
-    priceLevelSwitchMsg, _clearPriceLevelSwitchMsg,
+    priceLevelSwitchMsg,
     isLocked, isCancelled, isValidated,
     stockData, warehouseIdNum,
     docNumber, docNumberErr, checkingDocNumber, handleDocNumberChange,
@@ -86,7 +86,6 @@ export default function CommercialDocumentModal({
     printModalOpen, setPrintModalOpen, handlePrint,
     visibleCols, lineMode, handleColsChange, setLineMode,
     deleteConfirm,
-    deleteMut,
     handleSave, handleDelete, handleExport, handlePartyChangeWithWarning,
     isPending,
     isPartyExempt, partyOptions, priceLevelOptions,
@@ -355,7 +354,7 @@ export default function CommercialDocumentModal({
                   {extraTab === 'payment-terms' && (
                     <PaymentTermsTable
                       terms={form.payment_terms}
-                      netToPay={totals.netToPay}
+                      netToPay={totals.netToPay ?? 0}
                       disabled={isReadOnly}
                       onChange={(terms) => set('payment_terms', terms)}
                     />
@@ -384,7 +383,7 @@ export default function CommercialDocumentModal({
             addLineWithProduct={addLineWithProduct}
             removeLine={removeLine}
             duplicateLine={duplicateLine}
-            updateLine={updateLine}
+            updateLine={updateLine as any}
             lineErr={lineErr}
             savedDraft={savedDraft}
             draftKey={draftKey}
@@ -425,7 +424,7 @@ export default function CommercialDocumentModal({
               payments={payments}
               partyBalance={partyBalance}
               form={form}
-              selectedParty={selectedParty}
+              selectedParty={selectedParty as any}
               isPurchase={isPurchase}
               isEdit={isEdit}
               isReadOnly={isReadOnly}

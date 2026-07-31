@@ -5,9 +5,10 @@ import { createMockTemplate } from '@/pages/settings/print-settings/__tests__/fi
 import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data';
 import type { PrintTemplate } from '@/pages/settings/print-settings/types';
 
-function _toHex(bytes: Uint8Array): string {
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+function _toHex(_bytes: Uint8Array): string {
+  return '';
 }
+void _toHex;
 
 function containsBytes(haystack: Uint8Array, needle: number[]): boolean {
   for (let i = 0; i <= haystack.length - needle.length; i++) {
@@ -452,7 +453,7 @@ describe('ThermalPrintPath — totals settings', () => {
     const data = makeData({
       doc: { number: 'FV-001', date: '2026-07-01', dueDate: null, time: '14:30', typeCode: 'FV', typeName: 'فاتورة', status: 'validated' },
       totals: { totalHt: 1000, totalTva: 190, totalTtc: 1190, fiscalStamp: 0, totalDiscount: 0, paid: 1190, change: 0, remaining: 0 },
-      taxBreakdown: [{ rate: 0.19, base: 1000, tva: 190 }],
+      taxBreakdown: [{ rate: 19, baseHt: 1000, tva: 190, ttc: 1190 }],
     });
     const bytes = await buildReceiptBytesFromTemplate(makeTemplate({ show_tva_breakdown: true }), data, 'FV-001');
     expect(containsAscii(bytes, '19')).toBe(true);
@@ -463,7 +464,7 @@ describe('ThermalPrintPath — balance section', () => {
 
   it('shows previous balance when show_prev_balance is ON, shorter when OFF', async () => {
     const data = makeData({
-      balance: { previous: 500, current: 619 },
+      balance: { previous: 500, movement: 119, current: 619 },
       totals: { totalHt: 100, totalTva: 19, totalTtc: 119, fiscalStamp: 0, totalDiscount: 0, paid: 119, change: 0, remaining: 0 },
     });
     const on  = await buildReceiptBytesFromTemplate(makeTemplate({ show_prev_balance: true, show_new_balance: true }), data);
@@ -473,7 +474,7 @@ describe('ThermalPrintPath — balance section', () => {
 
   it('shows new balance when show_new_balance is ON, shorter when OFF', async () => {
     const data = makeData({
-      balance: { previous: 500, current: 619 },
+      balance: { previous: 500, movement: 119, current: 619 },
       totals: { totalHt: 100, totalTva: 19, totalTtc: 119, fiscalStamp: 0, totalDiscount: 0, paid: 119, change: 0, remaining: 0 },
     });
     const on  = await buildReceiptBytesFromTemplate(makeTemplate({ show_new_balance: true, show_prev_balance: true }), data);
@@ -486,7 +487,7 @@ describe('ThermalPrintPath — payments section', () => {
 
   it('shows payments when show_payments_section is ON and payments exist', async () => {
     const data = makeData({
-      payments: [{ method: 'Cash', amount: 500, reference: null }],
+      payments: [{ mode: 'Cash', amount: 500, reference: null }],
       totals: { totalHt: 400, totalTva: 76, totalTtc: 476, fiscalStamp: 0, totalDiscount: 0, paid: 500, change: 24, remaining: 0 },
     });
     const bytes = await buildReceiptBytesFromTemplate(makeTemplate({ show_payments_section: true }), data);

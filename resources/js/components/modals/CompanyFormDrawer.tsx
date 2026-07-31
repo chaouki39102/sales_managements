@@ -294,7 +294,7 @@ export default function CompanyFormDrawer({ open, company, onClose, onSaved }: P
           {/* Tabs */}
           <div style={{ display: 'flex', borderBottom: '1px solid var(--b2)', padding: '0 20px', flexShrink: 0 }}>
             {tabs.map(t => (
-              <button key={t.key} onClick={() => setTab(t.key)} style={{
+              <button key={t.key} onClick={() => setTab(t.key as any)} style={{
                 padding: '10px 16px', background: 'none', border: 'none',
                 borderBottom: `2px solid ${tab === t.key ? 'var(--em)' : 'transparent'}`,
                 color: tab === t.key ? 'var(--em)' : 'var(--t4)',

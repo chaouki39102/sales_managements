@@ -561,13 +561,13 @@ function AdminModal({
   };
 
   // ✅ PATCH /admin/companies/{slug}/plan
-  const _handleChangePlan = async (co: Company, plan: typeof PLANS[number]) => {
+  const _handleChangePlan = async (_co: Company, _plan: typeof PLANS[number]) => {
     try {
-      await apiPatch(`/admin/companies/${co.slug}/plan`, { plan });
+      await apiPatch(`/admin/companies/${_co.slug}/plan`, { plan: _plan });
       setCompanies(prev => prev.map(c =>
-        c.id === co.id ? { ...c, plan } : c
+        c.id === _co.id ? { ...c, plan: _plan } : c
       ));
-      notify.success(`تم تغيير خطة ${co.name} إلى ${PLAN_LABELS[plan]}`);
+      notify.success(`تم تغيير خطة ${_co.name} إلى ${PLAN_LABELS[_plan]}`);
     } catch {
       notify.error('فشل تغيير الخطة');
     }
@@ -588,7 +588,7 @@ function AdminModal({
     } finally {
       setSaving(false);
     }
-  };
+  }; void _handleSaveNotes; void _handleChangePlan;
 
   const filtered = companies.filter(c =>
     !search || c.name.toLowerCase().includes(search.toLowerCase())

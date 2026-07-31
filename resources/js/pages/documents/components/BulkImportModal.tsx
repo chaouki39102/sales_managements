@@ -130,7 +130,7 @@ export function BulkImportModal({ open, onClose, onImport, products }: BulkImpor
   }, [onClose]);
 
   return (
-    <Modal isOpen={open} onClose={handleClose} title="استيراد من Excel" style={{ maxWidth: 700 }}>
+    <Modal open={open} onClose={handleClose} title="استيراد من Excel">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ fontSize: 13, color: 'var(--t3)' }}>
           ارفع ملف Excel يحتوي على أعمدة: المنتج / المرجع، الكمية، السعر (اختياري)

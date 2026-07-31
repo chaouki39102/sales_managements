@@ -113,17 +113,18 @@ export interface Company extends BaseModel {
 
 // ─── Fiscal Year ──────────────────────────────────────────────────────────────
 export interface FiscalYear extends BaseModel {
-  name:       string;
-  label?:     string;
-  start_date: string;
-  end_date:   string;
-  is_current: boolean;
-  is_closed:  boolean;
-  closed_at?: string | null;
-  closed_by?: number | null;
-  notes?:     string | null;
-  company_id: number;
-  closedBy?:  Pick<User, 'id' | 'name'>;
+  name:          string;
+  label?:        string;
+  start_date:    string;
+  end_date:      string;
+  is_current:    boolean;
+  is_closed:     boolean;
+  closed_at?:    string | null;
+  closed_by?:    number | null;
+  closing_notes?: string | null;
+  notes?:        string | null;
+  company_id:    number;
+  closedBy?:     Pick<User, 'id' | 'name'>;
 }
 
 // ─── Roles & Permissions ──────────────────────────────────────────────────────
@@ -242,6 +243,11 @@ export interface PaymentMode extends BaseModel {
   active:     boolean;
   company_id: number;
   treasury_account_id?: number | null;
+  is_cash?: boolean;
+  requires_reference?: boolean;
+  description?: string;
+  display_order?: number;
+  relations?: Record<string, unknown>;
 }
 export interface NumberingSeries extends BaseModel {
   name:               string;
@@ -537,6 +543,7 @@ export interface CommercialDocumentLine extends BaseModel {
   commercial_document_id: number;
   product_id?:            number | null;
   product_variant_id?:    number | null;
+  packaging_id?:          number | null;
   description?:           string | null;
   quantity:               number;
   unit_price_ht:          number;
@@ -576,9 +583,12 @@ export interface CommercialDocument extends BaseModel {
   total_tva:          number;
   total_ttc:          number;
   total_discount:     number;
+  total_stamp?:       number;
+  net_to_pay?:        number;
   fiscal_stamp:       number;
   paid_amount:        number;
   remaining_amount:   number;
+  currency_id?:       number | null;
   is_locked:          boolean;
   company_id:         number;
   // Relations

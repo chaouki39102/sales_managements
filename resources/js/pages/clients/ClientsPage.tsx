@@ -224,14 +224,8 @@ export default function ClientsPage() {
     return next;
   });
 
-  const [sortField, setSortField] = useState('name');
-  const [sortDir, setSortDir]     = useState<'asc' | 'desc'>('asc');
-  const handleSort = (field: string) => {
-    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortField(field); setSortDir('asc'); }
-    setCurrentPage(1);
-  };
-
+  const [_sortField, _setSortField] = useState('name');
+  const [_sortDir, _setSortDir]     = useState<'asc' | 'desc'>('asc');
   const buildTableCols = (hidden: Set<string>): TableCol[] => [
     // ── المجموعة 1: معلومات أساسية ──
     { key: '#', label: '#', thStyle: { width: 48, color: 'var(--t4)' }, tdStyle: { color: 'var(--t4)', fontSize: 12 },
@@ -283,7 +277,7 @@ export default function ClientsPage() {
       render: (c: any) => c.rc || '—' },
     { key: 'ai', label: 'AI', tdStyle: { fontSize: 12, fontFamily: 'monospace' },
       render: (c: any) => c.ai || '—' },
-    { key: 'capital_amount', label: 'رأس المال', thStyle: { textAlign: 'end' }, tdStyle: { textAlign: 'end' },
+    { key: 'capital_amount', label: 'رأس المال', thStyle: { textAlign: 'end' as const }, tdStyle: { textAlign: 'end' as const },
       render: (c: any) => c.capital_amount ? (
         <><span>{(+c.capital_amount).toLocaleString('fr-DZ', { maximumFractionDigits: 0 })}</span><span style={{ fontSize: 11, color: 'var(--t4)', marginRight: 3 }}>دج</span></>
       ) : <span style={{ color: 'var(--t4)' }}>—</span> },
@@ -291,7 +285,7 @@ export default function ClientsPage() {
       render: (c: any) => c.rc_date || '—' },
 
     // ── المجموعة 4: مالية ──
-    { key: 'balance', label: 'الرصيد', thStyle: { textAlign: 'end' }, tdStyle: { textAlign: 'end' },
+    { key: 'balance', label: 'الرصيد', thStyle: { textAlign: 'end' as const }, tdStyle: { textAlign: 'end' as const },
       render: (c: any) => {
         const hasDebt = (c.balance ?? 0) > 0;
         return (
@@ -303,15 +297,15 @@ export default function ClientsPage() {
           </>
         );
       }},
-    { key: 'credit_limit', label: 'الحد الائتماني', thStyle: { textAlign: 'end' }, tdStyle: { textAlign: 'end' },
+    { key: 'credit_limit', label: 'الحد الائتماني', thStyle: { textAlign: 'end' as const }, tdStyle: { textAlign: 'end' as const },
       render: (c: any) => c.credit_limit ? (
         <><span>{(+c.credit_limit).toLocaleString('fr-DZ', { maximumFractionDigits: 0 })}</span><span style={{ fontSize: 11, color: 'var(--t4)', marginRight: 3 }}>دج</span></>
       ) : <span style={{ color: 'var(--t4)' }}>—</span> },
-    { key: 'credit_days', label: 'أجل الدفع', thStyle: { textAlign: 'end' }, tdStyle: { textAlign: 'end' },
+    { key: 'credit_days', label: 'أجل الدفع', thStyle: { textAlign: 'end' as const }, tdStyle: { textAlign: 'end' as const },
       render: (c: any) => c.credit_days ? <>{c.credit_days} يوم</> : <span style={{ color: 'var(--t4)' }}>—</span> },
     { key: 'bank_name', label: 'البنك',
       render: (c: any) => c.bank_name || '—' },
-    { key: 'rib', label: 'RIB', tdStyle: { fontSize: 11, fontFamily: 'monospace', direction: 'ltr', textAlign: 'left' },
+    { key: 'rib', label: 'RIB', tdStyle: { fontSize: 11, fontFamily: 'monospace', direction: 'ltr' as const, textAlign: 'left' as const },
       render: (c: any) => c.rib || '—' },
 
     // ── المجموعة 5: حالة ──
@@ -346,10 +340,10 @@ export default function ClientsPage() {
     isFetching,
     refetch,
   } = useQuery<ClientsApiResponse>({
-    queryKey: ['clients', slug, search, activeParam, currentPage, perPage, sortField, sortDir],
+    queryKey: ['clients', slug, search, activeParam, currentPage, perPage, _sortField, _sortDir],
     // ✅ الإصلاح الثالث: params تُبنى داخل queryFn — تضمن دائماً استخدام
     //    القيم الحالية وقت التنفيذ لا وقت بناء الـ object خارجها
-    queryFn: () => fetchClients({ search, activeParam, page: currentPage, perPage, sortField, sortDir }),
+    queryFn: () => fetchClients({ search, activeParam, page: currentPage, perPage, sortField: _sortField, sortDir: _sortDir }),
     placeholderData: keepPreviousData,
     staleTime: 2 * 60_000,
     enabled: !!slug,
@@ -552,7 +546,7 @@ export default function ClientsPage() {
           <SimpleTable
             columns={buildTableCols(hiddenCols).map(col => ({
               key: col.key,
-              label: col.label + (col.sortable && sortField === (col.sortField ?? col.key) ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''),
+              label: col.label + (col.sortable && _sortField === (col.sortField ?? col.key) ? (_sortDir === 'asc' ? ' ↑' : ' ↓') : ''),
               render: (_v: unknown, row: Record<string, unknown>) => {
                 const c = row as unknown as Party;
                 const idx = clients.indexOf(c);

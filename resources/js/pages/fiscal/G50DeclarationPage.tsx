@@ -33,7 +33,7 @@ export default function G50DeclarationPage() {
 
   const latestPeriod = history?.find(h => h.month === month);
   const currentStatus = latestPeriod?.status ?? 'draft';
-  const _statusVariant = currentStatus === 'paid' ? 'success' : currentStatus === 'submitted' ? 'info' : 'warning';
+
 
   const handleSubmit = async () => {
     setSaving(true);

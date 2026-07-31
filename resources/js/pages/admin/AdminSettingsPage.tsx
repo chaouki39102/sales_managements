@@ -99,18 +99,7 @@ export default function AdminSettingsPage() {
   });
 
   useEffect(() => {
-    if (_settings && !form) setForm({
-      allow_registration:   false,
-      allow_new_companies:  false,
-      debug_mode:           false,
-      public_api:           false,
-      maintenance_mode:     false,
-      maintenance_message:  '',
-      free_trial_days:      0,
-      free_max_users:       0,
-      starter_max_products: 0,
-      ..._settings,
-    } as SystemSettings);
+    if (_settings && !form) setForm({ ..._settings } as SystemSettings);
   }, [_settings]);
 
   const { data: maintenance } = useQuery({
@@ -371,7 +360,7 @@ export default function AdminSettingsPage() {
           <button
             disabled={bootPermMut.isPending}
             onClick={() => {
-              import('@/lib/admin').then(({ adminApi }) => {
+              import('@/lib/admin').then(() => {
                 apiPost('/admin/system/boot')
                   .then((d: any) => notify.success(d.message || 'تم تثبيت الخطط ✓'));
               });

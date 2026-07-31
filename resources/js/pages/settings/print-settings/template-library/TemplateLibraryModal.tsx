@@ -326,7 +326,7 @@ export default function TemplateLibraryModal({ open, onClose, onInstall, activeD
   const hasActiveFilters = search || filterDocType || filterPaperSize || filterCategory || favoritesOnly;
 
   return (
-    <div style={STYLES.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div style={STYLES.overlay as React.CSSProperties} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={STYLES.modal}>
         {/* Header */}
         <div style={STYLES.header}>
@@ -453,11 +453,10 @@ export default function TemplateLibraryModal({ open, onClose, onInstall, activeD
                   <div style={STYLES.cardPreviewWrapper}>
                     <div style={STYLES.cardPreviewContent}>
                       <Suspense fallback={<PreviewFallback />}>
-                        <UniversalPreview
-                          tpl={entry.createConfig()}
-                          data={mockDataRef.current!}
-                          company={null}
-                        />
+                          <UniversalPreview
+                            tpl={entry.createConfig()}
+                            data={mockDataRef.current!}
+                          />
                       </Suspense>
                     </div>
                     {/* Favorite toggle */}

@@ -102,7 +102,7 @@ export default function ExpensesPage() {
         { enabled: !!selectedYear?.id },
     );
 
-    const expenses: Expense[] = paginated?.data ?? [];
+    const expenses: Expense[] = (paginated?.data ?? []) as any;
     const meta = paginated?.meta;
 
     // قوائم الاختيار – سنستخدمها لعرض الأسماء
@@ -620,8 +620,8 @@ function ExpenseModal({
                 fiscal_year_id: fiscalYearId ?? null,
             };
             return isEdit
-                ? expensesApi.update(record!.id, payload)
-                : expensesApi.create(payload);
+                ? expensesApi.update(record!.id, payload as any)
+                : expensesApi.create(payload as any);
         },
         (slug) => tenantKeys.expenses.all(slug),
         {

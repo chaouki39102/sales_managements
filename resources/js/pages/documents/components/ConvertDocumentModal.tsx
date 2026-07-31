@@ -11,7 +11,7 @@ interface ConvertDocumentModalProps {
   onClose:   () => void;
   onDone:    () => void;
   documentId: number;
-  sourceCode: string;
+  sourceCode: string | null;
   sourceDate: string;
 }
 
@@ -32,8 +32,8 @@ export default function ConvertDocumentModal({
   const cancelRef  = useRef<HTMLButtonElement>(null);
 
   const { data: allowedTypes = [] } = useQuery({
-    queryKey: tenantKeys.conversions.allowedTargets(slug, sourceCode),
-    queryFn:  () => apiGet<{ code: string; name: string }[]>(`/document-type-conversions/${sourceCode}/allowed-targets`),
+    queryKey: tenantKeys.conversions.allowedTargets(slug ?? '', sourceCode ?? ''),
+    queryFn:  () => apiGet<{ code: string; name: string }[]>(`/document-type-conversions/${sourceCode ?? ''}/allowed-targets`),
     staleTime: 10 * 60_000,
     enabled: !!sourceCode,
   });

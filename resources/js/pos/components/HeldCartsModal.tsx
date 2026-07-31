@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Modal from '@/components/ui/Modal';
 import { PinnedList } from '@/components/ui/PinnedList';
 import { FloatingTooltip } from '@/components/ui/FloatingTooltip';
@@ -14,7 +14,7 @@ interface HeldCartsModalProps {
 }
 
 export default function HeldCartsModal({
-  carts, onClose, onRestore, onDelete, onRestoreAndPay,
+  carts, onClose, onRestore, onDelete,
 }: HeldCartsModalProps) {
   const [search, setSearch] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);

@@ -15,9 +15,10 @@ describe('SettingsSerializer — toApiPayload', () => {
     expect(payload.is_active).toBe(true);
     expect(payload.template_version).toBe(TEMPLATE_VERSION);
 
-    expect(payload.config.show_logo).toBe(true);
-    expect(payload.config.title_text).toBe('FACTURE');
-    expect(payload.config.margin_top).toBe(3);
+    const cfg = payload.config as Record<string, unknown>;
+    expect(cfg.show_logo).toBe(true);
+    expect(cfg.title_text).toBe('FACTURE');
+    expect(cfg.margin_top).toBe(3);
   });
 
   it('should not include id, created_at, updated_at in config', () => {

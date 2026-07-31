@@ -64,7 +64,7 @@ export default function FormattingSectionControls({ tpl, update, rows, onRowsCha
       </Field>}
 
       {rows && onRowsChange && (
-        <Accordion title="محرر الحقول (سحب وإفلات)" defaultOpen={false}>
+        <Accordion title="محرر الحقول (سحب وإفلات)" icon="ti ti-edit" defaultOpen={false}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
             {['doc_info_rows', 'customer_info_rows', 'company_info_rows'].filter(k => rows[k]).map(k => (
               <div key={k}>

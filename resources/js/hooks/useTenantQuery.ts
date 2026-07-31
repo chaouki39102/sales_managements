@@ -108,9 +108,9 @@ export function useTenantMutation<TData, TVariables>(
 
   return useMutation({
     mutationFn,
-    onSuccess: (data, variables, context) => {
+    onSuccess: (data, variables, onMutateResult, mutationContext) => {
       if (slug) qc.invalidateQueries({ queryKey: invalidateKeyFn(slug) });
-      options?.onSuccess?.(data, variables, context);
+      options?.onSuccess?.(data, variables, onMutateResult, mutationContext);
     },
     onError: options?.onError,
     onMutate: options?.onMutate,

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { SETTINGS_REGISTRY, getSettingMeta } from '../services/SettingsRegistry';
+import { SETTINGS_REGISTRY } from '../services/SettingsRegistry';
+const getSettingMeta = (k: string) => SETTINGS_REGISTRY[k];
 import { getExpandedRegistry, ALL_DOC_TYPES, SETTING_COUNT } from './fixtures/expanded-registry';
 
 const VALID_CATEGORIES = [
@@ -48,10 +49,10 @@ describe('SettingsRegistry — Structural Validation', () => {
 
 describe('SettingsRegistry — dependsOn Validation', () => {
   it('every dependsOn target should exist in the registry', () => {
-    for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
+    for (const [_key, meta] of Object.entries(SETTINGS_REGISTRY)) {
       if (!meta.dependsOn) continue;
       const target = getSettingMeta(meta.dependsOn as string);
-      expect(target).toBeDefined(`${key} depends on ${meta.dependsOn} which does not exist`);
+      expect(target).toBeDefined();
     }
   });
 
@@ -112,7 +113,7 @@ describe('SettingsRegistry — Visibility Scope Validation', () => {
   });
 
   it('paper_width_mm should only be for thermal papers', () => {
-    const _meta = getSettingMeta('paper_width_mm')!;
+    const _meta = getSettingMeta('paper_width_mm')!; void _meta;
     const expandedPapers = expanded.find(s => s.key === 'paper_width_mm')!.expandedPapers;
     expect(expandedPapers).toContain('80mm');
     expect(expandedPapers).toContain('58mm');

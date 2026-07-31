@@ -24,7 +24,7 @@ export default function DocumentTotalsSection({
   stampEnabled = true,
   existingDocument,
 }: DocumentTotalsSectionProps) {
-  const futureBalance = partyBalance && form.party_id && totals.netToPay > 0
+  const futureBalance = partyBalance && form.party_id && (totals.netToPay ?? 0) > 0
     ? (() => {
         const existingNetToPay = isEdit
           ? toNum(((existingDocument?.total_ttc as number) ?? 0) as number)
@@ -34,7 +34,7 @@ export default function DocumentTotalsSection({
           ? ((existingDocument?.payments as unknown[]) ?? [])
               .reduce((s: number, p: unknown) => s + toNum(((p as Record<string, unknown>).amount as number) ?? 0), 0)
           : 0;
-        const deltaDoc = totals.netToPay - existingNetToPay;
+        const deltaDoc = (totals.netToPay ?? 0) - existingNetToPay;
         const deltaPmt = totals.totalPaid - existingPaymentsSum;
         return isPurchase
           ? partyBalance!.signed_balance - deltaDoc + deltaPmt
@@ -79,7 +79,7 @@ export default function DocumentTotalsSection({
         )}
       </div>
 
-      {partyBalance && form.party_id && totals.netToPay > 0 && (
+      {partyBalance && form.party_id && (totals.netToPay ?? 0) > 0 && (
         <div style={{
           padding: '8px 12px', borderRadius: 'var(--r2)',
           background: 'var(--bg3)', border: '1px solid var(--b2)',

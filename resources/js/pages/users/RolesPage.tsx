@@ -72,12 +72,12 @@ function MyPermissionsSection() {
   // تجميع الصلاحيات حسب prefix (الجزء قبل أول _)
   const _grouped = permissions.reduce<Record<string, string[]>>((acc, p) => {
     const parts = p.split('_');
-    // الجزء الأخير هو الفعل (view, create...) والأول هو المجال
     const group = parts.slice(1).join('_') || 'أخرى';
     if (!acc[group]) acc[group] = [];
     acc[group].push(p);
     return acc;
   }, {});
+  void _grouped;;
 
   return (
     <Card style={{ marginBottom: 24 }}>

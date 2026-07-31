@@ -78,7 +78,7 @@ export default function POSKioskPage() {
     const snap = receiptSnapshot;
     const totalTtc = snap.totals.total_ttc + snap.totals.fiscal_stamp;
     return {
-      docNumber: snap.docNum ?? lastDocNum,
+      docNumber: snap.docNum ?? lastDocNum ?? '',
       docDate:   new Date().toISOString().slice(0, 10),
       client: null,
       items: snap.items.map(i => ({
@@ -306,6 +306,7 @@ export default function POSKioskPage() {
             onQuery={setSearchQuery}
             view={view}
             gridSize={gridSize}
+            inputRef={undefined as any}
             onView={setView}
             onGridSize={setGridSize}
             onFilter={() => {}}
@@ -330,8 +331,6 @@ export default function POSKioskPage() {
             view={view}
             gridSize={gridSize}
             loading={false}
-            hasMore={false}
-            onLoadMore={() => {}}
             onAdd={v => pos.addItem(v)}
             onAddManual={() => {}}
             onPin={() => {}}
@@ -380,7 +379,6 @@ export default function POSKioskPage() {
       {modal === 'payment' && (
         <ProfessionalPaymentModal
           totals={pos.totals}
-          items={pos.items}
           client={null}
           paymentModes={paymentModes ?? []}
           documentTypes={documentTypes ?? []}
@@ -388,7 +386,8 @@ export default function POSKioskPage() {
           treasuryAccounts={treasuryAccounts ?? []}
           totalTtcFinal={totalTtcFinal}
           onClose={() => setModal('none')}
-          onConfirm={handleCompleteSale}
+          onConfirm={handleCompleteSale as any}
+          existingPayments={[]}
         />
       )}
 

@@ -259,7 +259,7 @@ function resolvePackQty(
  *   discount_amount_fixed = خصم العبوة الواحدة = db.discount_amount × packQty
  */
 function buildLineFromApi(
-  l:              Record<string, unknown>,
+  l:              any,
   defaultTvaRate: number,
   products?:      Product[],
 ): LineItem {
@@ -305,7 +305,7 @@ function buildLineFromApi(
   // TVA: 0 = معفى (قيمة صحيحة — لا تُستبدَل)
   let tvaRate = l.tva_rate != null ? toNum(l.tva_rate) : NaN;
   if (isNaN(tvaRate) && productRel) {
-    tvaRate = toNum((productRel.tva as Record<string, unknown> | null)?.rate ?? NaN);
+    tvaRate = toNum(((productRel as any)?.tva?.rate) ?? NaN);
   }
   if (isNaN(tvaRate)) tvaRate = defaultTvaRate;
 
@@ -335,7 +335,7 @@ function buildLineFromApi(
     expiration_date:       l.expiration_date ?? l.line_attributes?.expiration_date ?? undefined,
     supplier_lot_number:   l.supplier_lot_number ?? l.line_attributes?.supplier_lot_number ?? undefined,
     line_note:             String(l.notes ?? l.line_note ?? ''),
-    _product:              productRel as Product | undefined,
+    _product:              productRel as any as Product | undefined,
     _packQty:              packQty,
   };
 }
@@ -402,7 +402,7 @@ function buildDefaultForm(
       currency_id:    String(doc.currency_id    ?? ''),
       exchange_rate:  String(doc.exchange_rate  ?? '1'),
       apply_stamp:    stampEnabled !== false
-        ? (toNum(doc.total_stamp ?? doc.fiscal_stamp ?? 0) > 0)
+        ? (toNum((doc as any).total_stamp ?? (doc as any).fiscal_stamp ?? 0) > 0)
         : false,
       price_level_id: String(doc.price_level_id ?? ''),
       lines,
@@ -664,7 +664,7 @@ export function useDocumentForm({
 
     const curForm       = formRef.current!;
     const party         = partiesRef.current.find((p) => String(p.id) === id);
-    const newPriceLevel = party?.default_price_level_id ?? party?.default_price_level?.id ?? party?.price_level?.id ?? (defaultPriceLevelId ? parseInt(defaultPriceLevelId) : null);
+    const newPriceLevel = (party as any)?.default_price_level_id ?? (party as any)?.default_price_level?.id ?? (party as any)?.price_level?.id ?? (defaultPriceLevelId ? parseInt(defaultPriceLevelId) : null);
     const curPriceLvl   = curForm.price_level_id ? parseInt(curForm.price_level_id) : null;
 
     const hasPayments = payments.some((p) => p.payment_mode_id && parseFloat(p.amount) > 0);

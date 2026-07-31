@@ -33,14 +33,12 @@ import { useNotification } from '@/hooks/useNotification';
 import CopyConfigModal from '@/components/products/CopyConfigModal';
 const BarcodeScannerModal = React.lazy(() => import('@/components/BarcodeScannerModal'));
 import { useProductBarcodes, useBarcodeMutations } from '@/lib/api/endpoints/barcodes';
-import type { BarcodeUpdateInput } from '@/lib/api/endpoints/barcodes';
 import type { Product, Family, Brand, ProductType, PriceLevel, Barcode } from '@/lib/api/core/types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════════
 
-interface Unit            { id: number; name: string; symbol: string; }
 interface TvaRate         { id: number; rate: number; is_default?: boolean; }
 interface ValuationMethod { id: number; name: string; method?: string; }
 
@@ -698,10 +696,6 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
     setShowAddBarcode(false);
   }
 
-  function updateBarcodeItem(id: number, data: BarcodeUpdateInput) {
-    barcodeMutations.update.mutate({ id, data });
-  }
-
   function removeBarcodeItem(id: number) {
     barcodeMutations.remove.mutate(id);
   }
@@ -1086,7 +1080,7 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
             <div style={{ display: 'flex', gap: 4, alignItems: 'stretch' }}>
               <select style={{ ...s.sel(), flex: 1 }} value={form.unit_id ?? ''} onChange={e => set('unit_id', e.target.value ? Number(e.target.value) : null)}>
                 <option value="">— اختر —</option>
-                {(units as Unit[]).map(u => <option key={u.id} value={u.id}>{u.name} ({u.symbol})</option>)}
+                {(units as any[]).map((u: any) => <option key={u.id} value={u.id}>{u.name} ({u.symbol})</option>)}
               </select>
               <QuickAddLookupButton
                 title="إضافة وحدة قياس جديدة"
@@ -1142,7 +1136,7 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
         </div>
 
         {/* تكلفة صافية (read-only في حالة التعديل) */}
-        {isEdit && product?.current_cost_price > 0 && (
+        {isEdit && (product?.current_cost_price ?? 0) > 0 && (
           <div style={{ ...s.card, display: 'flex', alignItems: 'center', gap: 12 }}>
             <i className="ti ti-coin" style={{ fontSize: 20, color: 'var(--gold)' }} />
             <div>
@@ -1533,7 +1527,7 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
                 <div style={{ fontSize: 20, fontWeight: 800, color: product.is_low_stock ? 'var(--red)' : 'var(--t1)' }}>
                   {Number(product.current_stock).toFixed(2)}
                   <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--t4)', marginRight: 4 }}>
-                    {(units as Unit[]).find(u => u.id === form.unit_id)?.symbol ?? 'وحدة'}
+                    {(units as any[]).find((u: any) => u.id === form.unit_id)?.symbol ?? 'وحدة'}
                   </span>
                 </div>
                 {product.is_low_stock && (

@@ -47,7 +47,7 @@ export interface CellValidationRule {
   };
 }
 
-export interface Column<T = Record<string, unknown>> {
+export interface Column<T = any> {
   key: string;
   header: ReactNode;
   exportHeader?: string;
@@ -156,7 +156,7 @@ export interface URLStateConfig {
   search?: boolean;
 }
 
-export interface ConditionalFormat<T = Record<string, unknown>> {
+export interface ConditionalFormat<T = any> {
   colKey: string | '*';
   condition: (value: unknown, row: T) => boolean;
   style?: React.CSSProperties;
@@ -314,7 +314,7 @@ export interface ContextMenuState {
 // DataTable Props (موسعة)
 // ════════════════════════════════════════════════════════════════════════════
 
-export interface DataTableProps<T = Record<string, unknown>> {
+export interface DataTableProps<T = any> {
   data: T[];
   columns: Column<T>[];
   rowKey: (row: T, index: number) => string | number;

@@ -432,8 +432,8 @@ function TreasuryAccountModal({
         swift_bic:      isBankType ? (data.swift_bic      || null) : null,
       };
       return isEdit
-        ? treasuryAccountsApi.update(account!.id, payload)
-        : treasuryAccountsApi.create(payload);
+            ? treasuryAccountsApi.update(account!.id, payload as any)
+            : treasuryAccountsApi.create(payload as any);
     },
     (slug) => tenantKeys.lookups.treasuryAccounts(slug),
     {

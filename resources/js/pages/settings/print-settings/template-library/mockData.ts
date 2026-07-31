@@ -31,7 +31,7 @@ export function getMockDocumentData(): UniversalDocumentData {
     party: {
       id:              1,
       name:            'شركة نموذجية',
-      type:            'client',
+      type:            'customer',
       nif:             '09991234567895',
       rc:              '',
       nis:             '',
@@ -119,6 +119,7 @@ export function getMockDocumentData(): UniversalDocumentData {
     payments: [
       { mode: 'cash', amount: 23055, reference: '', date: '28/06/2025' },
     ],
+    computed: {},
   };
   _mockCache = data;
   return data;

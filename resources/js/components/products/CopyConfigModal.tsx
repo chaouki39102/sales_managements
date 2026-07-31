@@ -169,7 +169,7 @@ export default function CopyConfigModal({
       replace_packaging: replacePackaging,
       replace_discounts: replaceDiscounts,
       packagings: copyPackaging ? (selected.packagings ?? []).map(pkg => ({
-        ...pkg, id: undefined,
+        ...pkg, id: undefined as unknown as number,
       })) : [],
       quantity_discounts: copyDiscounts ? (selected.quantity_discounts ?? []).map(d => ({
         price_level_id:      d.price_level_id,

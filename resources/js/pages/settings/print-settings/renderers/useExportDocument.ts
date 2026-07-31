@@ -31,7 +31,7 @@ export function useExportDocument() {
     if (!renderer) throw new Error('CSV renderer not registered');
     const result = await renderer.render({
       data,
-      template: { paper_size: 'A4' } as const,
+      template: { paper_size: 'A4' } as any,
     });
     download(result.payload as string, result.filename ?? 'export.csv', result.mimeType ?? 'text/csv');
   }, []);
@@ -41,7 +41,7 @@ export function useExportDocument() {
     if (!renderer) throw new Error('Excel renderer not registered');
     const result = await renderer.render({
       data,
-      template: { paper_size: 'A4' } as const,
+      template: { paper_size: 'A4' } as any,
     });
     download(result.payload as string, result.filename ?? 'export.xlsx', result.mimeType ?? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   }, []);
@@ -57,7 +57,7 @@ export async function exportDocumentCsv(data: UniversalDocumentData): Promise<vo
   if (!renderer) throw new Error('CSV renderer not registered');
   const result = await renderer.render({
     data,
-    template: { paper_size: 'A4' } as const,
+    template: { paper_size: 'A4' } as any,
   });
   download(result.payload as string, result.filename ?? 'export.csv', result.mimeType ?? 'text/csv');
 }
@@ -67,7 +67,7 @@ export async function exportDocumentXlsx(data: UniversalDocumentData): Promise<v
   if (!renderer) throw new Error('Excel renderer not registered');
   const result = await renderer.render({
     data,
-    template: { paper_size: 'A4' } as const,
+    template: { paper_size: 'A4' } as any,
   });
   download(result.payload as string, result.filename ?? 'export.xlsx', result.mimeType ?? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 }

@@ -100,7 +100,7 @@ export default function NumberingSeriesPage() {
     }),
   );
 
-  const items: NumberingSeriesRecord[] = paginated?.data ?? [];
+  const items: NumberingSeriesRecord[] = (paginated?.data ?? []) as any;
   const meta = paginated?.meta;
 
   const { data: documentTypes } = useTenantQuery<DocumentTypeOption[]>(
@@ -439,8 +439,8 @@ function NumberingSeriesModal({
         ...(isEdit ? {} : { last_number: data.start_number - 1 }),
       };
       return isEdit
-        ? numberingSeriesApi.update(record!.id, payload)
-        : numberingSeriesApi.create(payload);
+        ? numberingSeriesApi.update(record!.id, payload as any)
+        : numberingSeriesApi.create(payload as any);
     },
     (slug) => tenantKeys.lookups.numberingSeries(slug),
     {

@@ -8,8 +8,8 @@ type PaperSize = '80mm' | '58mm' | 'A4' | 'A5';
 const ALL_DOCS: DocType[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV', 'DDP', 'BT', 'POS', 'RPT'];
 const ALL_PAPERS: PaperSize[] = ['80mm', '58mm', 'A4', 'A5'];
 
-function makeTpl(doc: DocType, paper: PaperSize, overrides: Record<string, any> = {}) {
-  const base = Object.fromEntries(
+function makeTpl(doc: DocType, paper: PaperSize, overrides: Record<string, any> = {}): Record<string, any> {
+  const base: Record<string, any> = Object.fromEntries(
     Object.entries(SETTINGS_REGISTRY).map(([k, m]) => [k, m.defaultValue])
   );
 

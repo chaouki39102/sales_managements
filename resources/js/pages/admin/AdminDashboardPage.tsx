@@ -17,7 +17,7 @@ export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const { data: systemStatus, isLoading: statusLoading } = useSystemSettings();
   const [bootDismissed, setBootDismissed] = useState(false);
-  const showBootModal = !statusLoading && systemStatus?.is_ready === false && !bootDismissed;
+  const showBootModal = !statusLoading && (systemStatus as any)?.is_ready === false && !bootDismissed;
 
   const { data: approvalsData } = useQuery({
     queryKey: ['admin', 'users', 'pending-approval'],
@@ -43,13 +43,13 @@ export default function AdminDashboardPage() {
 
   if (!stats) return null;
 
-  const { companies, users, recent_companies, recent_users, recent_activity, growth_7d, at_risk_companies, system_health } = stats;
+  const { companies, users, recent_companies, recent_activity, growth_7d, at_risk_companies, system_health } = stats;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {showBootModal && <AdminBootModal onComplete={() => setBootDismissed(true)} />}
 
-      {!statusLoading && systemStatus?.is_ready === false && bootDismissed && (
+      {!statusLoading && (systemStatus as any)?.is_ready === false && bootDismissed && (
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '10px 16px', borderRadius: 10,

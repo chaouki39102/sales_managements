@@ -120,7 +120,7 @@ export default function DocumentTypesPage() {
                             { key: 'name', label: 'الاسم (عربي)', className: 's' },
                             { key: 'name_latin', label: 'الاسم (لاتيني)', render: (v) => <span style={{ color: 'var(--t3)' }}>{v as string}</span> },
                             { key: 'code', label: 'الكود', className: 'm' },
-                            { key: 'document_base_operation_id', label: 'العملية الأساسية', render: (v, row) => {
+                            { key: 'document_base_operation_id', label: 'العملية الأساسية', render: (_v, row) => {
                                 const item = row as any;
                                 const opName = operationMap[item.document_base_operation_id] || '-';
                                 const opCode = operationsArray.find((o: any) => o.id === item.document_base_operation_id)?.name || '';
@@ -166,7 +166,7 @@ export default function DocumentTypesPage() {
             <DocumentTypeModal
                 open={modal.open}
                 docType={editing}
-                slug={slug}
+                _slug={slug ?? ''}
                 onClose={modal.closeModal}
             />
             <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
@@ -192,9 +192,9 @@ export default function DocumentTypesPage() {
 // ===============================================
 // MODAL: Add / Edit Document Type (مع حماية البيانات التاريخية)
 // ===============================================
-function DocumentTypeModal({ open, docType, _slug, onClose }: {
+function DocumentTypeModal({ open, docType, _slug: _slugProp, onClose }: {
     open: boolean; docType: DocumentType | null; _slug: string; onClose: () => void;
-}) {
+}) { void _slugProp;
     const isEdit = !!docType;
 
     // ---------- العمليات الأساسية ----------
@@ -307,8 +307,8 @@ function DocumentTypeModal({ open, docType, _slug, onClose }: {
                 display_order: parseInt(String(data.display_order)) || 0,
             };
             return isEdit
-                ? documentTypesApi.update(docType!.id, payload)
-                : documentTypesApi.create(payload);
+                ? documentTypesApi.update(docType!.id, payload as any)
+                : documentTypesApi.create(payload as any);
         },
         (slug) => tenantKeys.lookups.documentTypes(slug),
         {

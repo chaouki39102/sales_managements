@@ -14,7 +14,7 @@ const QRZ_CONFIG = { fps: 15, qrbox: { width: 280, height: 140 }, formatsToSuppo
 const Q = 'html5-qrcode-scanner';
 
 function beep() {
-  try { new AudioContext().resume().then(ctx => { const o = ctx.createOscillator(); const g = ctx.createGain(); o.connect(g); g.connect(ctx.destination); g.gain.value = 0.15; o.frequency.value = 1200; o.start(); o.stop(ctx.currentTime + 0.1); }); } catch { }
+  try { new AudioContext().resume().then(() => { const ctx = new AudioContext(); const o = ctx.createOscillator(); const g = ctx.createGain(); o.connect(g); g.connect(ctx.destination); g.gain.value = 0.15; o.frequency.value = 1200; o.start(); o.stop(ctx.currentTime + 0.1); }); } catch { }
 }
 
 export default function BarcodeScannerModal({ open, onScan, onClose }: Props) {
@@ -48,7 +48,7 @@ export default function BarcodeScannerModal({ open, onScan, onClose }: Props) {
       ref.current = null;
       startedRef.current = false;
       setTimeout(() => onClose(), 400);
-    }).then(() => {
+    }, () => {}).then(() => {
       startedRef.current = true;
     }).catch((err) => {
       const msg = String(err);

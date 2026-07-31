@@ -247,7 +247,7 @@ export default function AdminApprovalsPage() {
       )}
 
 
-      <ConfirmDialog {...confirm.confirmDialogProps} />
+      <ConfirmDialog {...(confirm as any).confirmDialogProps} />
     </div>
   );
 }

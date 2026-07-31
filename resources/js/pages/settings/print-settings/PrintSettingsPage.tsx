@@ -196,7 +196,7 @@ export default function PrintSettingsPage() {
           savedTpl = await mutations.update.mutateAsync({ id: localTpl.id, data: localTpl });
         } catch (e: any) {
           if (e?.response?.status === 404) {
-            savedTpl = await mutations.create.mutateAsync({
+            savedTpl = await (mutations.create.mutateAsync as any)({
               ...localTpl, id: undefined,
               doc_type_code: activeDoc,
               is_default: templates.length === 0,
@@ -356,7 +356,7 @@ export default function PrintSettingsPage() {
     const reactRoot = createRoot(root);
     reactRoot.render(
       React.createElement(PreviewSelector, {
-        tpl: localTpl, company: companyCtx,
+        tpl: localTpl,
         data: useRealData ? previewData : null,
       }),
     );
@@ -762,7 +762,7 @@ export default function PrintSettingsPage() {
                 display: 'inline-block',
               }}>
                 <ErrorBoundary>
-                  <PreviewSelector tpl={localTpl} company={companyCtx} data={useRealData ? previewData : null} />
+                  <PreviewSelector tpl={localTpl} data={useRealData ? previewData : null} />
                 </ErrorBoundary>
               </div>
             ) : (

@@ -75,8 +75,8 @@ export const useCartStore = create<CartState>()(
           if (existing) {
             const newQty   = existing.quantity + safeQty;
             const existPackQty = existing.pack_qty ?? 1;
-            const hasTiers = (variant.quantity_discounts ?? existing.quantity_discounts)?.length > 0;
             const tierSource = variant.quantity_discounts ?? existing.quantity_discounts ?? [];
+            const hasTiers = tierSource.length > 0;
 
             let discPatch: Partial<Pick<CartItem, 'discount_percentage' | 'discount_amount' | 'discount_mode'>>;
 
@@ -154,7 +154,7 @@ export const useCartStore = create<CartState>()(
           const safeQty = Math.max(isWeight ? 0.001 : 1, rounded);
 
           const packQty = item.pack_qty ?? 1;
-          const hasTiers = item.quantity_discounts?.length > 0;
+          const hasTiers = (item.quantity_discounts ?? []).length > 0;
 
           let discPatch: Partial<Pick<CartItem, 'discount_percentage' | 'discount_amount' | 'discount_mode'>>;
 

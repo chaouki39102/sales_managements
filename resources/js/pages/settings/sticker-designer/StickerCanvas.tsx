@@ -1,8 +1,8 @@
-import { useState, useRef, useCallback, type MouseEvent } from 'react';
+import { useRef, useCallback, type MouseEvent } from 'react';
 import type { PrintTemplate } from '@/pages/settings/print-settings/types/domain';
 import type { UniversalDocumentData } from '@/pages/settings/print-settings/types/data';
 import { printFieldResolver } from '@/pages/settings/print-settings/services';
-import { fontFamily, borderStyle } from '@/pages/settings/print-settings/components/preview/shared';
+import { fontFamily } from '@/pages/settings/print-settings/components/preview/shared';
 import { renderLogo } from '@/pages/settings/print-settings/components/preview/LogoRenderer';
 import { buildBarcode } from '@/lib/barcodeRenderer';
 
@@ -161,7 +161,7 @@ const ELEMENTS: ElementDef[] = [
               {barcodeValue}
             </div>
             <div style={{ fontFamily: "'Courier New', monospace", fontSize: 8, letterSpacing: 1, color: '#666', direction: 'ltr' }}>
-              {format === 'ean13'
+              {(format as string) === 'ean13'
                 ? `${barcodeValue[0]} ${barcodeValue.slice(1, 7)} ${barcodeValue.slice(7)}`
                 : barcodeValue}
             </div>
@@ -201,7 +201,7 @@ const ELEMENTS: ElementDef[] = [
   },
 ];
 
-const SEP = { id: 'separator', label: 'فاصل' };
+const _SEP = { id: 'separator', label: 'فاصل' }; void _SEP;
 
 export type SelectedElement = string | null;
 

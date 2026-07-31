@@ -54,7 +54,6 @@ import { companyKeys, globalKeys, tenantKeys } from "@/lib/api/core/queryKeys";
 import { useActiveSlug, useAppStore } from "@/lib/store/appStore";
 import { useFiscalYear } from "@/context/FiscalYearContext";
 import { useAuth } from "@/context/AuthContext";
-import { useModal } from "@/hooks/useModal";
 import { useConfirm } from "@/hooks/useConfirm";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import SimpleTable from "@/components/ui/SimpleTable";
@@ -1392,6 +1391,7 @@ function CompanyTab({
     const navigate = useNavigate();
     const deleteConfirm = useConfirm();
     const _qc = useQueryClient();
+    void _qc;
     const { isDirty, markDirty, markClean } = useDirtyState();
 
     const [form, setForm] = useState({
@@ -5286,7 +5286,7 @@ function PlanTab() {
 
 // ─── PrintersTab ─────────────────────────────────────────────────────────────
 
-function PrintersTab({ onDirty, onClean }: { onDirty?: () => void; onClean?: () => void }) {
+function PrintersTab({ onDirty: _onDirty, onClean: _onClean }: { onDirty?: () => void; onClean?: () => void }) {
     const slug = useActiveSlug() ?? "";
     const { isDirty, markDirty, markClean } = useDirtyState();
     const [printers, setPrinters] = useState<DetectedPrinter[]>(() => deviceGetPrinters(slug));

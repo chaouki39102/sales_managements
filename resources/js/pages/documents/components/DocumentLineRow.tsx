@@ -55,10 +55,10 @@ function CellInput({
 }
 
 function TotalQtyInput({
-  baseQty, packQty, disabled, onUpdate,
+  baseQty, disabled, onUpdate,
 }: {
   baseQty:  number;
-  packQty:  number;
+  _packQty:  number;
   disabled: boolean;
   onUpdate: (totalQty: number) => void;
 }) {
@@ -112,14 +112,14 @@ export const DocumentLineRow = memo(function DocumentLineRow({
   if (!isPurchase && prod) {
     const cp = toNum(prod.current_cost_price) || toNum(prod.purchase_price_ht);
     if (cp > 0 && line.unit_price_ht > 0) {
-      const threshold = prod.min_margin_percentage ?? 5;
+      const threshold = (prod as any).min_margin_percentage ?? 5;
       lowMarginRow = ((line.unit_price_ht - cp) / line.unit_price_ht) * 100 < threshold;
     }
   }
   const rowBg = lowMarginRow
     ? `color-mix(in srgb, var(--red) 15%, transparent)`
     : hasStockWarning || activeComputeWarnings.length > 0
-      ? `color-mix(in srgb, ${stockValidation.blocking ? 'var(--red)' : 'var(--orange)'} 5%, transparent)`
+      ? `color-mix(in srgb, ${(stockValidation as any).blocking ? 'var(--red)' : 'var(--orange)'} 5%, transparent)`
       : undefined;
 
   const col = (key: ColKey) => visibleCols.has(key);
@@ -178,7 +178,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
         {col('lot') && (
           <td style={{ padding: '3px 4px' }}>
             {isPurchase ? (
-              <LotCell line={line} idx={idx} prod={prod} disabled={disabled} onUpdate={onUpdate} />
+              <LotCell line={line} idx={idx} disabled={disabled} onUpdate={onUpdate as (idx: number, patch: Partial<LineItem>) => void} />
             ) : (
               prod?.has_lots ? (
                 <select
@@ -233,7 +233,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
 
         {col('total_qty') && (
           <td style={{ padding: '3px 4px' }}>
-            <TotalQtyInput baseQty={baseQty} packQty={line._packQty} disabled={disabled} onUpdate={(v) => {
+            <TotalQtyInput baseQty={baseQty} _packQty={line._packQty} disabled={disabled} onUpdate={(v) => {
               const newQty = line._packQty > 1 ? v / line._packQty : v;
               onUpdate(idx, { quantity: newQty });
             }} />
@@ -274,7 +274,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
         {col('orig_price') && (
           <td style={{ padding: '3px 6px', textAlign: 'left', direction: 'ltr',
             fontSize: 11, color: 'var(--t4)' }}>
-            {fmtDZD(gross)}
+            {fmtDZD((line as any).orig_price ?? 0)}
           </td>
         )}
 
@@ -378,7 +378,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
               const unitMargin = line.unit_price_ht - costPrice;
               const marginPct = (unitMargin / line.unit_price_ht) * 100;
               const totalMargin = unitMargin * baseQty;
-              const marginThreshold = prod?.min_margin_percentage ?? 5;
+              const marginThreshold = (prod as any)?.min_margin_percentage ?? 5;
               const color  = marginPct < marginThreshold ? 'var(--red)' : marginPct < 10 ? 'var(--orange)' : 'var(--green)';
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>

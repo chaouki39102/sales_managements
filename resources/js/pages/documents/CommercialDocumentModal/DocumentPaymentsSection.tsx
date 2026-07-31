@@ -40,15 +40,15 @@ export default function DocumentPaymentsSection({
     <Section title="الدفعات" icon="ti-wallet" collapsible>
 
       <AdvancePaymentsPanel
-        advances={advancePayments}
+        advances={advancePayments as any[]}
         isLoading={isLoadingAdvances}
         onApply={(adv) => {
           if (pmMode === 'locked') return;
           addPaymentWithValues({
-            payment_mode_id: String((adv as Record<string, unknown>).payment_mode_id),
-            amount: String((adv as Record<string, unknown>).unapplied_amount),
-            reference: (adv as Record<string, unknown>).reference as string ?? '',
-            payment_date: (adv as Record<string, unknown>).payment_date as string,
+            payment_mode_id: String((adv as unknown as Record<string, unknown>).payment_mode_id),
+            amount: String((adv as unknown as Record<string, unknown>).unapplied_amount),
+            reference: (adv as unknown as Record<string, unknown>).reference as string ?? '',
+            payment_date: (adv as unknown as Record<string, unknown>).payment_date as string,
           });
         }}
         disabled={pmMode === 'locked'}

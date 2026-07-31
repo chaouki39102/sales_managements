@@ -1,7 +1,7 @@
 // ── UI Components (New) ──────────────────────────────────────────────────────
 export { default as Tooltip }      from './ui/Tooltip';
 export { default as Dropdown }     from './ui/Dropdown';
-export { default as Drawer }       from './ui/Drawer';
+
 export { default as Skeleton }     from './ui/Skeleton';
 export { default as Breadcrumb }   from './ui/Breadcrumb';
 export { default as Stepper }      from './ui/Stepper';

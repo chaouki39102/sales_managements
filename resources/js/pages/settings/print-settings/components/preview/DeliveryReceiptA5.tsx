@@ -127,7 +127,7 @@ function DeliveryReceiptA5({ tpl, data }: { tpl: PrintTemplate; data: UniversalD
   // ✅ totalAmount - paid: works for ALL doc types (accounting + non-accounting).
   // For non-accounting docs (BL, DEV, BCC), data.balance?.current = previousBalance
   // (unchanged), but the receipt must show the running total debt.
-  const totalAmount = data.totals.netToPay + prevBalance;
+  const totalAmount = (data.totals.netToPay ?? 0) + prevBalance;
   const newBalance  = totalAmount - (data.totals.paid ?? 0);
 
   // ── Barcode (pre-computed) ──
@@ -421,7 +421,7 @@ function DeliveryReceiptA5({ tpl, data }: { tpl: PrintTemplate; data: UniversalD
                   <span style={VALUE_STYLE}>{fmt(r('customer.commercialName', data, tpl))}</span>
                 </>
               )}
-              {tpl.show_customer_nif && r('customer.nif', data, tpl) && (
+              {tpl.show_client_nif && r('customer.nif', data, tpl) && (
                 <>
                   <br />
                   <span style={LABEL_STYLE}>{tpl.label_client_nif || 'NIF العميل'}:</span>{' '}

@@ -22,7 +22,6 @@ import React, {
     useState,
     useCallback,
     useMemo,
-    useEffect,
 } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -359,8 +358,8 @@ function getRowPermissions(row: CommercialDocument, isReadOnly: boolean) {
 // ════════════════════════════════════════════════════════════════════════════
 
 function DocumentViewModal({
-    docId, docType, onClose, onEdit, onCancel, isReadOnly, onDeleteDoc, onPrint,
-}: { docId: number; docType: DocumentType | null; onClose: () => void; onEdit: () => void; onCancel?: () => void; isReadOnly: boolean; onDeleteDoc?: () => void; onPrint?: () => void }) {
+    docId, docType, onClose, onEdit, isReadOnly, onDeleteDoc, onPrint, onCancel: _onCancel,
+}: { docId: number; docType: DocumentType | null; onClose: () => void; onEdit: () => void; isReadOnly: boolean; onDeleteDoc?: () => void; onPrint?: () => void; onCancel?: () => void }) { void _onCancel;
     const slug    = useActiveSlug();
     const isPurch = PURCHASE_CODES.has(docType?.code ?? "");
 
@@ -768,7 +767,7 @@ export default function CommercialDocumentsPage() {
 
             if (rangeFields.has(key) && val.includes("|")) {
                 // "min|max" → "min,max"
-                const rangeVal = val.replaceAll("|", ",");
+                const rangeVal = val.replace(/\|/g, ",");
                 if (rangeVal !== "," && rangeVal !== "") {
                     converted[key] = rangeVal;
                 }
@@ -1657,7 +1656,7 @@ export default function CommercialDocumentsPage() {
         }
 
         // ─── جدول — قفل/فتح جماعي + إرسال جماعي للموافقة ──────────────────
-        if (ctx.type === "table" && !isReadOnly) {
+        if ((ctx as any).type === "table" && !isReadOnly) {
             const lockable   = items.filter(r => getRowPermissions(r, false).canLock);
             const unlockable = items.filter(r => getRowPermissions(r, false).canUnlock);
 
@@ -1943,7 +1942,7 @@ export default function CommercialDocumentsPage() {
                             setServerFilters(prev => { const n = { ...prev }; if (q) n.search = q; else delete n.search; return n; });
                             setPage(1);
                         }}
-                        allData={items as unknown as Record<string, unknown>[]}
+                        allData={items}
 
                         // ── Selection + Batch Print ──────────────────────
                         selectable
@@ -2024,7 +2023,7 @@ export default function CommercialDocumentsPage() {
                 <CommercialDocumentModal
                     open
                     documentType={docType ?? null}
-                    existingDocument={modal === "edit" ? (editDocFull ?? undefined) : undefined}
+                    existingDocument={modal === "edit" ? (editDocFull as unknown as Record<string, unknown> ?? undefined) : undefined}
                     onClose={closeModal}
                     onSaved={() => {
                         closeModal();
@@ -2038,10 +2037,10 @@ export default function CommercialDocumentsPage() {
                 <QuickSaleModal
                     open
                     onClose={closeModal}
-                    onSaved={(state: Record<string, unknown>) => {
+                    onSaved={(doc) => {
                         closeModal();
                         invalidateDocs();
-                        notify.success(`تم إنشاء ${String(state.document_number ?? "المستند")} بنجاح`);
+                        notify.success(`تم إنشاء ${String((doc as any).document_number ?? "المستند")} بنجاح`);
                     }}
                 />
             )}

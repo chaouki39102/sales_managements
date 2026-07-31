@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import AlertBar from '@/components/ui/AlertBar';
-import Switch from '@/components/ui/Switch';
 import { useWilayas, useCommunes, useLegalForms, usePriceLevels } from '@/lib/api/endpoints/lookups';
 import type { Party, Wilaya, LegalForm, PriceLevel } from '@/types';
 

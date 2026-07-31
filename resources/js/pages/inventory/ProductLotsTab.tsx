@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { useProductLots, useInventoryMutations } from '@/lib/api/endpoints/inventory';
@@ -67,8 +67,8 @@ const sectionTitleCls: React.CSSProperties = {
 
 export default function ProductLotsTab() {
   const slug = useActiveSlug();
-  const _qc = useQueryClient();
-  const { notify } = useNotification();
+  const notify = useNotification();
+
   const deleteConfirm = useConfirm();
   const createModal = useModal();
   const editModal = useModal();

@@ -56,7 +56,7 @@ export default function DebtsPage() {
 
     const balances = useMemo(() => {
         if (filterType === null) return rawBalances;
-        return rawBalances.filter(b => b.party?.party_type_id === filterType);
+        return rawBalances.filter(b => (b.party as any)?.party_type_id === filterType);
     }, [rawBalances, filterType]);
 
     const totalDebit = useMemo(() =>
@@ -266,10 +266,10 @@ export default function DebtsPage() {
             <DataTable
                 columns={columns}
                 data={balances}
-                isLoading={isLoading}
+                loading={isLoading}
                 emptyText="لا توجد أرصدة"
                 rowKey={(item: PartyBalance) => item.party_id}
-                rowClick={openDetail}
+                onRowClick={openDetail}
             />
 
             <BalanceDetailModal open={detailModal.open} balance={selectedBalance} onClose={detailModal.closeModal} />

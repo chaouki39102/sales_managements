@@ -307,8 +307,8 @@ export default function HeaderSectionControls({ tpl, update, company }: Props) {
                     <div style={{ padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <SliderField label="العرض" value={col.width ?? 30} min={10} max={60} unit="%"
                         onChange={v => updateColumn(col.id, { width: v })} />
-                      <AlignButtons label="المحاذاة" value={col.align}
-                        onChange={v => updateColumn(col.id, { align: v })} />
+                      <AlignButtons label="المحاذاة" value={col.align as any}
+                        onChange={v => updateColumn(col.id, { align: v as any })} />
                       <BorderSelect label="الإطار" value={col.border?.style ?? 'none'}
                         onChange={v => updateColumn(col.id, {
                           border: { ...(col.border ?? { style: 'none', width: 1, color: '#333' }), style: v },
@@ -454,7 +454,7 @@ export function BorderSelect({ label, value, onChange }: {
   return (
     <div className="ps-field">
       <label className="ps-field-label">{label}</label>
-      <select className="ps-select" value={value} onChange={e => onChange(e.target.value)}>
+      <select className="ps-select" value={value} onChange={e => onChange(e.target.value as BorderStyle)}>
         <option value="solid">خط متصل</option>
         <option value="dashed">خط متقطع</option>
         <option value="double">خط مزدوج</option>

@@ -17,7 +17,7 @@ import { useTenantQueryPaginated, useTenantMutation } from '@/hooks/useTenantQue
 import { paymentMethodsApi } from '@/lib/api/endpoints/paymentMethods';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { useTreasuryAccountsList } from '@/lib/api/endpoints/treasuryAccounts';
-import type { PaymentMethod } from '@/lib/api/core/types';
+import type { PaymentMode as PaymentMethod } from '@/lib/api/core/types';
 
 // --------------- Types ---------------
 interface TreasuryAccount {
@@ -142,7 +142,8 @@ export default function PaymentMethodsPage() {
               { key: 'code', label: 'الكود', render: (v) => <code style={{ fontSize: 12, background: 'var(--bg3)', padding: '2px 6px', borderRadius: 4 }}>{v as string}</code> },
               { key: '_treasury', label: 'الحساب المالي', render: (_, row) => {
                 const item = row as PaymentMethod;
-                return <span style={{ fontSize: 12, color: 'var(--t3)' }}>{item.relations?.treasuryAccount?.name ?? '—'}</span>;
+                const ta = item.relations?.treasuryAccount as { name?: string } | undefined;
+                return <span style={{ fontSize: 12, color: 'var(--t3)' }}>{ta?.name ?? '—'}</span>;
               }},
               { key: 'is_cash', label: 'نقدي', render: (v) => <Badge variant={v ? 'success' : 'gray'}>{v ? 'نعم' : 'لا'}</Badge> },
               { key: 'requires_reference', label: 'يتطلب مرجع', render: (v) => v ? (
@@ -188,7 +189,7 @@ export default function PaymentMethodsPage() {
         open={modal.open}
         record={editing}
         treasuryAccounts={treasuryAccounts ?? []}
-        slug={slug}
+        _slug={slug ?? ''}
         onClose={modal.closeModal}
       />
 
@@ -201,10 +202,10 @@ export default function PaymentMethodsPage() {
 
 // =============== Add/Edit Modal ===============
 function PaymentMethodModal({
-  open, record, treasuryAccounts, _slug, onClose,
+  open, record, treasuryAccounts, _slug: _slugProp, onClose,
 }: {
   open: boolean; record: PaymentMethod | null; treasuryAccounts: TreasuryAccount[]; _slug: string; onClose: () => void;
-}) {
+}) { void _slugProp;
   const isEdit = !!record;
 
   const emptyForm = {

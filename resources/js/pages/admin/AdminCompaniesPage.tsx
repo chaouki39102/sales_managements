@@ -23,7 +23,7 @@ import { useDebounce }       from '@/hooks/useDebounce';
 import CompanyDrawer         from '@/components/admin/CompanyDrawer';
 import { plansApi } from '@/lib/api/admin';
 import {
-  Avatar, StatusBadge, EmptyState, Spinner, fmtDate,
+  Avatar, StatusBadge, fmtDate,
 } from '@/components/admin/shared';
 import PageHeader  from '@/components/ui/PageHeader';
 import Card        from '@/components/ui/Card';
@@ -42,8 +42,8 @@ export default function AdminCompaniesPage() {
   const search = useDebounce(rawSearch, 350);
   const [status,  setStatus]  = useState<AdminCompaniesFilter['status']>('');
   const [plan,    setPlan]    = useState('');
-  const [sortBy,  setSortBy]  = useState<'name' | 'created_at' | 'users_count'>('created_at');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [_sortBy,  _setSortBy]  = useState<'name' | 'created_at' | 'users_count'>('created_at');
+  const [_sortDir, _setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page,    setPage]    = useState(1);
   const [selected, setSelected] = useState<AdminCompany | null>(null);
 
@@ -58,24 +58,20 @@ export default function AdminCompaniesPage() {
     search:   search || undefined,
     status:   status || undefined,
     plan:     plan   || undefined,
-    sort_by:  sortBy,
-    sort_dir: sortDir,
+    sort_by:  _sortBy,
+    sort_dir: _sortDir,
     page,
     per_page: 20,
-  }), [search, status, plan, sortBy, sortDir, page]);
+  }), [search, status, plan, _sortBy, _sortDir, page]);
 
-  const { data, isLoading, isError, error, refetch } = useAdminCompanies(filter);
+  const { data, isLoading, isError, error, refetch } = useAdminCompanies(filter as any);
 
   // ✅ apiGetPaginated يُعيد { data:[...], meta:{...} } مباشرة — طبقة واحدة
   const paginated = data as Paginated<AdminCompany> | undefined;
   const companies = paginated?.data ?? [];
   const meta      = paginated?.meta;
 
-  const toggleSort = (col: typeof sortBy) => {
-    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortBy(col); setSortDir('desc'); }
-    setPage(1);
-  };
+  
 
   const FILTERS = [
     { val: '' as const,            label: 'الكل' },
@@ -157,7 +153,7 @@ export default function AdminCompaniesPage() {
           isLoading={isLoading}
           className="plt-tbl"
           columns={[
-            { key: 'name', label: sortBy === 'name' ? `الشركة ${sortDir === 'asc' ? '▲' : '▼'}` : 'الشركة', render: (_v, row) => {
+            { key: 'name', label: _sortBy === 'name' ? `الشركة ${_sortDir === 'asc' ? '▲' : '▼'}` : 'الشركة', render: (_v, row) => {
               const co = row as unknown as AdminCompany;
               return (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -204,7 +200,7 @@ export default function AdminCompaniesPage() {
                 </>
               );
             }},
-            { key: 'created_at', label: sortBy === 'created_at' ? `الإنشاء ${sortDir === 'asc' ? '▲' : '▼'}` : 'الإنشاء', render: (v) => (
+            { key: 'created_at', label: _sortBy === 'created_at' ? `الإنشاء ${_sortDir === 'asc' ? '▲' : '▼'}` : 'الإنشاء', render: (v) => (
               <span style={{ fontSize: 11, color: 'var(--t4)' }}>{fmtDate(v as string)}</span>
             )},
             { key: 'chevron', label: '', render: () => (

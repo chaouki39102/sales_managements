@@ -494,7 +494,7 @@ export function DataTable<T = Record<string, unknown>>({
     expandAll: expandAllGroups,
     collapseAll: collapseAllGroups,
     groupSubTotals,
-  } = useRowGrouping(processedData, groupBy, orderedColumns as Column<Record<string, unknown>>[]);
+  } = useRowGrouping(processedData, groupBy, orderedColumns as Column<any>[]);
 
   // ── Virtual Scrolling (v9) — must come before quick filter & pagination ───
   const isVirtual = !!virtual;

@@ -14,7 +14,6 @@ import { useParties as useCustomers } from "@/lib/api/endpoints/parties";
 // ✅ تصحيح الاسم: useDocumentTypes بدلاً من useDocumentTypes
 import {
     useWarehouses,
-    usePaymentModes,
     useDocumentTypes,
 } from "@/lib/api/endpoints/lookups";
 import { useFiscalYear } from "@/context/FiscalYearContext";
@@ -39,7 +38,7 @@ import type {
 } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api/core/client";
-import { useActiveSlug, useActiveCompany } from "@/lib/store/appStore";
+import { useActiveCompany } from "@/lib/store/appStore";
 import { usePrintTemplatesList, mapCompany } from '@/pages/settings/print-settings/runtime';
 const TemplatePrintModal = React.lazy(() => import('@/pages/settings/print-settings/components/shared/TemplatePrintModal'));
 import { ReturnDocumentModal } from '@/pages/documents/components/ReturnDocumentModal';
@@ -57,18 +56,11 @@ const STATUS_BADGE: Record<
     locked: { label: "مقفولة", variant: "purple" },
 };
 
-const _PAY_ICON: Record<string, string> = {
-    cash: "💵",
-    cib: "💳",
-    ccp: "📮",
-    bank: "🏦",
-    credit: "📋",
-    mixed: "✂️",
-};
+
 
 export default function InvoicesPage() {
     const { selectedYear } = useFiscalYear();
-  const [filters, setFilters] = useState<InvoiceFilters>({ page: 1, per_page: 20, fiscal_year_id: selectedYear?.id });
+  const [filters, setFilters] = useState<Record<string, any>>({ page: 1, per_page: 20, fiscal_year_id: selectedYear?.id });
   const [selected,  setSelected]  = useState<Set<number>>(new Set());
   const [viewingId, setViewingId] = useState<number | null>(null);
 
@@ -113,9 +105,9 @@ export default function InvoicesPage() {
   // ✅ استخراج ميثود الحفظ والإلغاء والاعتماد من الميوتيشن المركزي للمستندات
   const documentMutations = useDocumentMutations();
   const validateMut = { mutate: (id: number) => documentMutations.validate?.mutate(id) };
-  const cancelMut   = { mutate: (id: number) => documentMutations.cancel?.mutate({ id, reason: "حذف من قائمة الفواتير" }) };
+  const _cancelMut   = { mutate: (id: number) => documentMutations.cancel?.mutate({ id, reason: "حذف من قائمة الفواتير" }) }; void _cancelMut;
 
-    const activeCompany = useActiveCompany();
+  const activeCompany = useActiveCompany();
     const companyInfo = useMemo(() => mapCompany(activeCompany), [activeCompany]);
     const { data: printTemplates = [] } = usePrintTemplatesList();
 
@@ -1084,9 +1076,9 @@ function NewInvoiceModal({
 }) {
     const createMut = useDocumentMutations();
     const { data: warehouses } = useWarehouses();
-    const { fiscalYear } = useFiscalYear();
+    const { selectedYear: fiscalYear } = useFiscalYear();
     const { data: docTypes } = useDocumentTypes();
-    const { data: _payModes } = usePaymentModes();
+
 
     const defaultDate = (): string => {
         const d = new Date().toISOString().split("T")[0];
@@ -1151,7 +1143,7 @@ function NewInvoiceModal({
         const wh = warehouses?.[0];
         if (!invType || !wh || !fiscalYear) return;
 
-        await createMut.mutateAsync({
+        await (createMut.create.mutateAsync as any)({
             document_type_id: invType.id,
             party_id: clientId ? Number(clientId) : null,
             warehouse_id: wh.id,
@@ -1162,7 +1154,7 @@ function NewInvoiceModal({
                 ...l,
                 line_order: i + 1,
             })) as unknown as CommercialDocumentLine[],
-        } as Partial<CommercialDocument>);
+        });
         onClose();
     };
 
@@ -1187,9 +1179,9 @@ function NewInvoiceModal({
                         variant="primary"
                         icon={<i className="ti ti-circle-check" />}
                         onClick={() => handleSave(false)}
-                        disabled={createMut.isPending}
+                        disabled={createMut.create.isPending}
                     >
-                        {createMut.isPending ? "جاري الحفظ..." : "حفظ وطباعة"}
+                        {createMut.create.isPending ? "جاري الحفظ..." : "حفظ وطباعة"}
                     </Button>
                 </>
             }

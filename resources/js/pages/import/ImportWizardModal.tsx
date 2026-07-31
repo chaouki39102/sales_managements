@@ -57,8 +57,8 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
 
   // State
   const [step, setStep] = useState<Step>('upload');
-  const [fileName, setFileName] = useState('');
-  const [columns, setColumns] = useState<ParsedColumn[]>([]);
+  const [_fileName, _setFileName] = useState('');
+  const [_columns, _setColumns] = useState<ParsedColumn[]>([]);
   const [rawRows, setRawRows] = useState<Record<string, unknown>[]>([]);
   const [mappings, setMappings] = useState<MappingDef[]>([]);
   const [previewResult, setPreviewResult] = useState<PreviewResponse | null>(null);
@@ -67,8 +67,8 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
   // Reset when modal opens
   const handleClose = useCallback(() => {
     setStep('upload');
-    setFileName('');
-    setColumns([]);
+    _setFileName('');
+    _setColumns([]);
     setRawRows([]);
     setMappings([]);
     setPreviewResult(null);
@@ -82,7 +82,7 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
 
   const handleFile = useCallback((file: File | null) => {
     if (!file) return;
-    setFileName(file.name);
+    _setFileName(file.name);
 
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -98,7 +98,7 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
         header: h,
       }));
 
-      setColumns(cols);
+      _setColumns(cols);
       setRawRows(json);
 
       // Auto-guess mapping
@@ -210,6 +210,7 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
     if (previewResult) return previewResult.validated.length + previewResult.errors.length;
     return rawRows.length;
   }, [previewResult, rawRows]);
+  void _totalRows;
 
   // ═══════════════════════════════════════════════════════════════
   // RENDER

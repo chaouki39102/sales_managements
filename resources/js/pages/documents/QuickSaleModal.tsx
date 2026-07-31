@@ -104,7 +104,7 @@ interface SearchSelectProps<T extends Record<string, unknown>> {
   placeholder: string;
   disabled?: boolean;
   error?: boolean;
-  inputRef?: React.RefObject<HTMLInputElement>;
+  inputRef?: React.Ref<HTMLInputElement>;
   onEnter?: () => void;
 }
 
@@ -151,8 +151,8 @@ function SearchSelect<T extends Record<string, unknown>>({
     setQuery('');
     // بعد اختيار المنتج، ننتقل إلى حقل الكمية (يتم التعامل معه من خلال المكون الأب)
     setTimeout(() => {
-      if (finalInputRef.current) {
-        const quantityInput = finalInputRef.current.closest('tr')?.querySelector('input[type="number"]') as HTMLInputElement;
+      if ((finalInputRef as any).current) {
+        const quantityInput = (finalInputRef as any).current.closest('tr')?.querySelector('input[type="number"]') as HTMLInputElement;
         quantityInput?.focus();
       }
     }, 50);
@@ -430,18 +430,28 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
   // State
   const [partyId, setPartyId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
-  const [docDate, setDocDate] = useState(defaultDocDate(selectedYear));
+  const [docDate, setDocDate] = useState(defaultDocDate(selectedYear as any));
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<QuickLine[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [apiErr, setApiErr] = useState('');
   const [success, setSuccess] = useState<SuccessState | null>(null);
 
+  // Payment state — synced with defaults when queries resolve
+  const [paymentLocal, setPaymentLocal] = useState({
+    enabled: true,
+    payment_mode_id: defaultPaymentModeId,
+    treasury_account_id: defaultTreasuryId,
+    amount: 0,
+    reference: '',
+    payment_date: defaultDocDate(selectedYear as any),
+  });
+
   // Effects for reset
   useEffect(() => {
     if (open) {
       setPartyId('');
-      setDocDate(defaultDocDate(selectedYear));
+      setDocDate(defaultDocDate(selectedYear as any));
       setNotes('');
       setLines([{ product_id: '', quantity: 1, price: 0, tva_rate: 19 }]);
       setErrors({});
@@ -453,7 +463,7 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
         payment_mode_id: defaultPaymentModeId,
         treasury_account_id: defaultTreasuryId,
         amount: 0,
-        payment_date: defaultDocDate(selectedYear),
+        payment_date: defaultDocDate(selectedYear as any),
       }));
     }
     return () => {
@@ -553,7 +563,7 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }, [warehouseId, lines, products, paymentLocal.treasury_account_id]);
+  }, [warehouseId, lines, products, paymentLocal?.treasury_account_id]);
 
   // Getters for SearchSelect
   const getProductLabel = useCallback(
@@ -584,16 +594,6 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
   const fillFullAmount = useCallback(() => {
     setPaymentLocal(prev => ({ ...prev, amount: totals.netPay }));
   }, [totals.netPay]);
-
-  // Payment state — synced with defaults when queries resolve
-  const [paymentLocal, setPaymentLocal] = useState({
-    enabled: true,
-    payment_mode_id: defaultPaymentModeId,
-    treasury_account_id: defaultTreasuryId,
-    amount: 0,
-    reference: '',
-    payment_date: defaultDocDate(selectedYear),
-  });
 
   // Sync paymentLocal with defaults after queries resolve
   useEffect(() => {

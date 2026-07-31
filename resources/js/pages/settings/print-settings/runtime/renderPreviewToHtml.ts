@@ -1,5 +1,5 @@
 import React from 'react';
-import ReactDOMServer from 'react-dom/server.browser';
+import ReactDOMServer from 'react-dom/server';
 import { DocumentDataBuilder } from '../types/data';
 import type { UniversalDocumentData, CompanyInfo } from '../types/data';
 import type { PipelineSource } from './UniversalPrintPipeline';

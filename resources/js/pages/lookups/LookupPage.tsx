@@ -181,7 +181,6 @@ function RemoteSelect({ field, value, onChange, parentValue, inputRef }: {
   }, [parentValue]);
 
   const isDisabled = loading || (!!field.cascadeParent && !parentValue);
-  const _selected = options.find(o => String(o.value) === String(value));
 
   return (
     <div style={{ position: 'relative' }}>
@@ -539,8 +538,8 @@ export default function LookupPage({
   const [formErr,   setFormErr]   = useState<string | null>(null);
   const [fieldErrs, setFieldErrs] = useState<Record<string, string>>({});
   const [delItem,   setDelItem]   = useState<any | null>(null);
-  const [sortKey,   setSortKey]   = useState<string | null>(null);
-  const [sortAsc,   setSortAsc]   = useState(true);
+  const [sortKey,   _setSortKey]   = useState<string | null>(null);
+  const [sortAsc,   _setSortAsc]   = useState(true); void _setSortKey; void _setSortAsc;
 
   // refs للحقول — للـ Enter navigation
   const fieldRefs = useRef<Array<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null>>([]);
@@ -621,10 +620,10 @@ export default function LookupPage({
     setFormErr(null);
   }
 
-  function _handleFieldBlur(f: FieldDef, v: any) {
-    const err = validateField(f, v);
-    if (err) setFieldErrs(prev => ({ ...prev, [f.key]: err }));
-  }
+  // function _handleFieldBlur(f: FieldDef, _v: any) {
+  //   const err = validateField(f, _v);
+  //   if (err) setFieldErrs(prev => ({ ...prev, [f.key]: err }));
+  // }
 
   // حفظ أساسي
   async function performSubmit(closeAfterSave: boolean) {
@@ -738,10 +737,10 @@ export default function LookupPage({
     return arr;
   }, [items, search, sortKey, sortAsc, nameField]);
 
-  function handleSort(key: string) {
-    if (sortKey === key) setSortAsc(a => !a);
-    else { setSortKey(key); setSortAsc(true); }
-  }
+  // function _handleSort(key: string) {
+  //   if (sortKey === key) setSortAsc(a => !a);
+  //   else { setSortKey(key); setSortAsc(true); }
+  // }
 
   // ── render cell ──
   function renderCellValue(f: FieldDef, item: any) {
@@ -884,7 +883,7 @@ export default function LookupPage({
                 ...tableFields.map(f => ({
                   key: f.key,
                   label: f.label,
-                  render: (value: unknown, row: Record<string, unknown>) => renderCellValue(f, row),
+                  render: (_value: unknown, row: Record<string, unknown>) => renderCellValue(f, row),
                 })),
                 { key: '_actions', label: 'إجراءات', render: (_v, row) => (
                   <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>

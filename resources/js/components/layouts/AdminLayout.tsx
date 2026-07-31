@@ -3,7 +3,7 @@
 // Layout مستقل للسوبر أدمن — sidebar + topbar متطور
 // ════════════════════════════════════════════════
 import { useState, useEffect, useRef } from 'react';
-import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useAdminDashboard } from '@/hooks/useAdmin';
 import { useTheme } from '@/hooks/useTheme';
@@ -56,7 +56,6 @@ const PAGE_META: Record<string, { title: string; sub: string }> = {
 
 export default function AdminLayout() {
   const { user, logout }   = useAuth();
-  const _navigate           = useNavigate();
   const location            = useLocation();
   const { data: stats }     = useAdminDashboard();
   const { dark, toggle: toggleTheme } = useTheme();

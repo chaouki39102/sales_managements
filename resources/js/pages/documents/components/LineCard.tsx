@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+
 import { fmtDZD, calcLineTotal, getProductStock, toNum } from '../utils/document.utils';
 import { ProductSearch } from './ProductSearch';
 import type { LineItem, Product } from '../types/document.types';
@@ -55,7 +55,7 @@ export function LineCard({
   let totalMargin = 0;
   let marginColor = 'var(--t4)';
   let costPrice = 0;
-  const lowMarginThreshold = prod?.min_margin_percentage ?? 5;
+  const lowMarginThreshold = (prod as any)?.min_margin_percentage ?? 5;
   if (!isPurchase && prod) {
     costPrice = toNum(prod.current_cost_price) || toNum(prod.purchase_price_ht);
     if (costPrice > 0 && line.unit_price_ht > 0) {
@@ -216,10 +216,13 @@ export function LineCard({
         {line._packQty > 1 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ color: 'var(--t4)', fontSize: 10, width: 56 }}>الكمية الإجمالية:</span>
-            <TotalQtyCardInput baseQty={baseQty} packQty={line._packQty} disabled={disabled} onUpdate={(v: any) => {
-              const newQty = line._packQty > 1 ? v / line._packQty : v;
-              onUpdate(idx, { quantity: newQty });
-            }} />
+            <input type="number" defaultValue={baseQty * line._packQty} disabled={disabled}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                const newQty = line._packQty > 1 ? v / line._packQty : v;
+                onUpdate(idx, { quantity: newQty });
+              }}
+              style={{ width: 70, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--b2)', fontSize: 12 }} />
           </div>
         )}
 
