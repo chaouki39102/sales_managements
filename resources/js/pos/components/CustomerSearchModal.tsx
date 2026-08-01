@@ -219,8 +219,12 @@ export default function CustomerSearchModal({
     mutationFn: (data: Partial<Party>) =>
       apiPost<Party>('/parties', data),
     onSuccess: (newParty) => {
-      // invalidate قائمة الزبائن
-      if (slug) qc.invalidateQueries({ queryKey: [slug, 'parties'] });
+      // إبطال قوائم الزبائن والأرصدة حتى يُفحص رصيد الزبون الجديد فوراً
+      if (slug) {
+        qc.invalidateQueries({ queryKey: [slug, 'parties'] });
+        qc.invalidateQueries({ queryKey: [slug, 'party-balance'] });
+        if (newParty?.id) qc.invalidateQueries({ queryKey: [slug, 'party-balance', newParty.id] });
+      }
       onSelect(newParty);
     },
     onError: (err: any) => {

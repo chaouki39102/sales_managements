@@ -197,6 +197,11 @@ export const documentsApi = {
   }) =>
     apiGet<{ exists: boolean }>('/documents/check-number', params),
 
+  nextNumber: (documentTypeId: number) =>
+    apiGet<{ next_number: string; document_type_id: number }>('/documents/next-number', {
+      document_type_id: documentTypeId,
+    }),
+
   // ── Actions ────────────────────────────────────────────────────────────────
 
   validate: (id: number) =>

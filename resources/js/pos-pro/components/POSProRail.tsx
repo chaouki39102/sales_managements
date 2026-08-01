@@ -4,6 +4,7 @@
 // شريط الإجراءات الرأسي — يمين صفحة POS PRO (الأول في ترتيب DOM فيقف يمين
 // RTL). يضم الإجراءات الأساسية للكاشير:
 //   • منتجات      — فتح منتقي المنتجات (زر رئيسي كبير).
+//   • جديد        — بيع جديد: يعلّق السلة الحالية (إن لم تكن فارغة) ويفتح سلة فارغة.
 //   • الدفع (Pay) — فتح مودال الدفع مع الزبون.
 //   • دفع سريع    — زر ذهبي: بيع نقدي بضغطة واحدة بدون مودال.
 //   • فتح السلة   — تمرير إلى السلة (اختصار تمرير عند السلات الطويلة).
@@ -24,6 +25,7 @@ import Switch from '@/components/ui/Switch';
 interface Props {
   canSell:      boolean;
   isBusy:       boolean;
+  onNewSale:    () => void;
   onOpenProducts: () => void;
   onPay:        () => void;
   onQuickPay:   () => void;
@@ -43,7 +45,7 @@ interface Props {
 }
 
 type RailAction =
-  | 'products' | 'pay' | 'quickPay' | 'manual' | 'hold' | 'held'
+  | 'products' | 'newSale' | 'pay' | 'quickPay' | 'manual' | 'hold' | 'held'
   | 'returns' | 'session' | 'sessionInvoices' | 'cart'
   | 'drawer' | 'fullscreen' | 'settings' | 'help';
 
@@ -51,16 +53,17 @@ const STORAGE_KEY     = 'pos-pro-rail-order-';
 const STORAGE_KEY_HIDDEN = 'pos-pro-rail-hidden-';
 const DRAG_THRESHOLD  = 6;
 
-/** مواضع الفواصل (بعد الفهارس التالية في القائمة المُرتبة) */
-const SEP_AFTER = new Set<number>([2, 6, 9]);
+/** مواضع الفواصل (بعد الفهارس التالية في القائمة المرتّبة) */
+const SEP_AFTER = new Set<number>([3, 7, 10]);
 
 const DEFAULT_ORDER: RailAction[] = [
-  'products', 'pay', 'quickPay', 'manual', 'hold', 'held', 'returns',
+  'products', 'newSale', 'pay', 'quickPay', 'manual', 'hold', 'held', 'returns',
   'session', 'sessionInvoices', 'cart', 'drawer', 'fullscreen', 'settings', 'help',
 ];
 
 const BUTTON_META: Record<RailAction, { label: string; icon: string; className: string; baseTitle: string }> = {
   products:        { label: 'المنتجات',      icon: 'ti-package',            className: 'pp-rail-btn pp-rail-btn--primary', baseTitle: 'فتح منتقي المنتجات' },
+  newSale:         { label: 'جديد',          icon: 'ti-file-plus',          className: 'pp-rail-btn pp-rail-btn--new',     baseTitle: 'بيع جديد (تعليق السلة الحالية)' },
   pay:             { label: 'الدفع',         icon: 'ti-cash-register',      className: 'pp-rail-btn pp-rail-btn--pay',     baseTitle: 'فتح نافذة الدفع' },
   quickPay:        { label: 'دفع سريع',      icon: 'ti-bolt',               className: 'pp-rail-btn pp-rail-btn--gold',    baseTitle: 'بيع نقدي بضغطة واحدة' },
   manual:          { label: 'يدوي',          icon: 'ti-square-plus',        className: 'pp-rail-btn pp-rail-btn--ghost',  baseTitle: 'إضافة صنف يدوي بدون منتج' },
@@ -105,7 +108,7 @@ function loadHidden(slug: string | null): Set<RailAction> {
 }
 
 export default function POSProRail({
-  canSell, isBusy, onOpenProducts, onPay, onQuickPay, onSession, sessionAvailable,
+  canSell, isBusy, onNewSale, onOpenProducts, onPay, onQuickPay, onSession, sessionAvailable,
   onHold, onHeld, heldCount, onReturns, onHelp, onScrollToCart,
   onManual, onSessionInvoices, onFullscreen, onOpenDrawer, onSettings,
 }: Props) {
@@ -265,6 +268,7 @@ export default function POSProRail({
       case 'sessionInvoices':
         return { disabled: !sessionAvailable, title: meta.baseTitle, onClick: onSessionInvoices, badge: null };
       case 'products': return { disabled: false, title: meta.baseTitle, onClick: onOpenProducts, badge: null };
+      case 'newSale':  return { disabled: false, title: meta.baseTitle, onClick: onNewSale, badge: null };
       case 'manual':   return { disabled: false, title: meta.baseTitle, onClick: onManual, badge: null };
       case 'returns':  return { disabled: false, title: meta.baseTitle, onClick: onReturns, badge: null };
       case 'cart':     return { disabled: false, title: meta.baseTitle, onClick: onScrollToCart, badge: null };
@@ -273,7 +277,7 @@ export default function POSProRail({
       case 'settings': return { disabled: false, title: meta.baseTitle, onClick: onSettings, badge: null };
       case 'help':     return { disabled: false, title: meta.baseTitle, onClick: onHelp, badge: null };
     }
-  }, [canSell, isBusy, sessionAvailable, heldCount, onPay, onQuickPay, onHold, onHeld, onSession, onSessionInvoices, onOpenProducts, onManual, onReturns, onScrollToCart, onOpenDrawer, onFullscreen, onSettings, onHelp]);
+  }, [canSell, isBusy, sessionAvailable, heldCount, onNewSale, onPay, onQuickPay, onHold, onHeld, onSession, onSessionInvoices, onOpenProducts, onManual, onReturns, onScrollToCart, onOpenDrawer, onFullscreen, onSettings, onHelp]);
 
   const dragging  = dragId !== null;
 

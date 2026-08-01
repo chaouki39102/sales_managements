@@ -58,6 +58,29 @@ export function usePartyBalances(params?: { date?: string; party_type_id?: numbe
     });
 }
 
+export function usePartyBalance(partyId: number | null | undefined, date?: string) {
+    const slug = useActiveSlug();
+
+    return useQuery({
+        queryKey: tenantKeys.partyBalances.detail(slug ?? '', partyId ?? 0, date),
+        queryFn:  () => partyBalancesApi.getOne(partyId!, date),
+        enabled:  !!slug && !!partyId,
+        staleTime: 30_000,
+        refetchOnMount: 'always',
+        select: (data: unknown): PartyBalance | null => {
+            if (!data || typeof data !== 'object') return null;
+            const d = data as Record<string, unknown>;
+            return {
+                ...(d as unknown as PartyBalance),
+                opening_balance:   Number(d.opening_balance   ?? 0),
+                documents_balance: Number(d.documents_balance ?? 0),
+                payments_total:    Number(d.payments_total    ?? 0),
+                current_balance:   Number(d.current_balance   ?? 0),
+            } as PartyBalance;
+        },
+    });
+}
+
 export function usePartyBalanceHistory(partyId: number | null, date?: string) {
     const slug = useActiveSlug();
 

@@ -898,6 +898,31 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             ]);
     }
 
+    /**
+     * معاينة الرقم التالي للوثيقة — بدون استهلاك ولا قفل صف.
+     * نفس منطق generateDocumentNumber() بالضبط (نفس الصيغة) لكنه للعرض فقط
+     * (مثل رقم "مسودة" يُطبع قبل إتمام البيع). لا تُنشئ مستنداً ولا تزيد العداد.
+     */
+    public function previewNextDocumentNumber(DocumentType $documentType, int $companyId): string
+    {
+        $prefix = $documentType->code;
+        $year   = date('Y');
+
+        $last = CommercialDocument::withTrashed()
+            ->where('company_id', $companyId)
+            ->where('document_number', 'like', "{$prefix}-{$year}-%")
+            ->orderByDesc('document_number')
+            ->first();
+
+        $seq = 1;
+        if ($last) {
+            $parts = explode('-', $last->document_number);
+            $seq   = (int) end($parts) + 1;
+        }
+
+        return sprintf('%s-%s-%06d', $prefix, $year, $seq);
+    }
+
     private function generateDocumentNumber(DocumentType $documentType, int $companyId): string
     {
         return DB::transaction(function () use ($documentType, $companyId) {

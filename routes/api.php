@@ -455,6 +455,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('documents/unpaid',       [CommercialDocumentController::class, 'unpaid']);
                 Route::get('documents/overdue',      [CommercialDocumentController::class, 'overdue']);
                 Route::get('documents/check-number', [CommercialDocumentController::class, 'checkNumber']);
+                Route::get('documents/next-number',  [CommercialDocumentController::class, 'nextNumber']);
                 Route::post('documents/compute-line',   [DocumentComputeController::class, 'computeLine']);
                 Route::post('documents/compute-totals', [DocumentComputeController::class, 'computeTotals']);
 

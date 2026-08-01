@@ -7,6 +7,111 @@
 ## Date
 2026-08-01
 
+### Phase 45 — POS Pro Parity: Weight Modal, Classic Discounts, Single-Line Cart, New-Sale Rail (Aug 1)
+
+**Request (continuing the parity drive)**: (1) a "جديد" new-sale button in the POS Pro right rail, (2) the weight modal must behave like the classic `WeightEntryModal`, (3) classic-style discount handling — per-item `%`/دج popover + invoice discount bar with `%`/دج toggle, (4) a simpler single-line cart row. Plus the customer-card balance must re-check when the client is created or changed.
+
+**1. Rail new-sale button** (`POSProRail.tsx` + `pos-pro.css`): new `newSale` rail action — label 'جديد', `ti-file-plus`, variant `.pp-rail-btn--new` (soft emerald fill, `--em` border/text), inserted after `products` in `DEFAULT_ORDER` (bumped `SEP_AFTER` to `[3,7,10]`), wired via `withActionFor`. `POSProPage` passes `onNewSale={handleNewSale}`.
+
+**2. Weight modal rework** (`POSProWeightModal.tsx` rewritten): now mirrors the classic `WeightEntryModal` 1:1 — reuses the global `.wem-*` CSS from `pos.css` (~line 3396) and the same calc utils (`resolveQuantityTier`, `calcWeightTotal`, `calcWeightDiscounted`, `calcWeightFromPrice`). Features: dual weight/price inputs with `lastEdited`, gram quick buttons 50غ–5000غ, ±100غ/±10غ and ±100دج/±10دج adjusters, quantity-tier badges + active discount banner with savings, total summary with strikethrough old price, submit footer with weight + total, Tab/Enter/Esc hints. Props changed: dropped `tvaRate`; added `unitSymbol?` + `quantityDiscounts?` (`QuantityDiscount[]`). `POSProPage` now passes `unitSymbol={variant.unit?.abbreviation ?? 'كغ'}` / `item.unit_symbol` and `quantityDiscounts={variant.quantity_discounts}` / `item.quantity_discounts`. Add and edit modes unchanged (`pos.addItem(variant, kg)` / `pos.updateQty(item.id, kg)`).
+
+**3. Classic discounts** (`POSProCart.tsx` + `pos-pro.css`):
+- **Per-item popover**: `PPRow` sub-component owns a `disc` popover rendered via `createPortal` at the button's rect (mirrors classic `CartRow` `cr-popup--disc`). Modes `%`/دج toggle, savings preview, إزالة/إلغاء/تطبيق actions. `onDiscount` (percentage) + `onDiscountAmount` (fixed) both wired — page now passes `onDiscountAmount={pos.updateDiscountAmount}` (store already had it).
+- **Invoice discount bar**: replaced the old `.pp-disc-toggle` (hard % toggle) with `.pp-inv-disc` — a compact inline bar with `%`/دج mode buttons + number input + live `-amount` readout (gold when active). Store persists only `invoiceDiscountPct`; the amount mode reverse-engineers the pct from `totals` exactly like classic `handleInvDiscAmount`: `origHt = totals.total_ht + totals.invoice_discount_amount; pct = min(100, n/origHt*100)`. `POSProCart` gains a `totals?: CartTotals` prop (`pos.totals` from page).
+
+**4. Single-line cart row**: `.pp-row` is now a thin positioning wrapper (`padding:5px 10px`); all layout lives in `.pp-row-body` (`display:flex; align-items:center; gap:8px`). Row = 34px image → name+inline meta (ref/unit/TVA/stock badge/pack select in a nowrap `.pp-row-sub`) → qty stepper (26px buttons) → inline price (click-to-edit) → discount button → line total (96px) → remove. `estimateSize` 72→48. Dead `.pp-row-sub2` CSS removed; the 720px media query now wraps `.pp-row-body`.
+
+**Balance re-check** (already pending, completed this session): `CustomerSearchModal` create `onSuccess` invalidates `[slug,'parties']`, `[slug,'party-balance']`, and the new party's detail key; page `onSelect` invalidates `tenantKeys.partyBalances.detail` + `parties.detail`; `usePartyBalance` has `refetchOnMount:'always'`; `POSProTopCards` balance reads strictly `balanceData?.current_balance` (never `party?.balance` — `PartyResource` doesn't serialize it).
+
+**Also fixed**: `lookups.ts` `normalizePosLookups` had an orphaned leftover return-block from the `uniqueById` refactor (TS1005 syntax errors) — removed.
+
+**Key architectural rules**:
+- The POS Pro weight modal is the classic `WeightEntryModal` with different prop names — never re-implement the dual-input `lastEdited` logic or the gram quick-set; reuse the shared calc utils and `.wem-*` CSS (they are global).
+- Amount-mode invoice discount must convert to the store's pct via `origHt = total_ht + invoice_discount_amount` (the amount is always derived at HT level) — do NOT add a second persisted amount field.
+- A per-item discount popover must be owned by the row component (portal to body) so virtualization can't reset it on every scroll; stopPropagation on the trigger so the row-select click doesn't fire.
+- `PartyResource` never sends `balance`; any balance shown on a POS card must come from `/party-balances/{id}` and be re-fetched when the client changes.
+
+**Verification**: `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors, 185 precache entries, `root sw == build sw: True` (SW MATCH).
+
+### Phase 44 — POS Pro Top Cards: Draggable Swap (Aug 1)
+
+**Request**: "set this two draggable — I can change the position one with other right to left" — the two top cards in POS Pro (`CustomerCard` + `TotalCard`, rendered in `.pos-pro-top` at `POSProPage.tsx`) must be swappable by drag to exchange their left/right positions in the RTL layout.
+
+**Approach**: NO drag library installed (verified `package.json` has no dnd/draggable/sortable dep) — a lightweight pointer-based swap built on Pointer Events + `setPointerCapture`.
+
+- **New file** `resources/js/pos-pro/components/ReorderableTopCards.tsx` — renders `.pos-pro-top` (the grid stays `340px minmax(0,1fr)`, so whichever card is first owns the 340px column) and maps `order` → two `.pp-top-slot` wrappers.
+- **Drag model**: the whole card is the drag source (grip `ti-grip-vertical` is a decorative `pointer-events:none` hint that fades in on hover). `onPointerDown` ignores `button, a, input, select, textarea` targets so the existing "تغيير الزبون" button still clicks normally; capture is set on the slot wrapper. A 6px movement threshold activates the drag (`dragRef.active`) so a plain click never dims or swaps.
+- **Swap**: on `pointermove` the drop target is whichever card the pointer is over (`getBoundingClientRect` check on the OTHER slot); `onPointerUp`/`onPointerCancel` commits the swap only when `target === other(id)`, writing `['customer','total'] | ['total','customer']` to `localStorage` key `pos-pro-top-order` (read back on mount; wraps in try/catch — never throws on storage-denied).
+- **UX feedback**: source slot gets `.is-dragging-source` (55% opacity), target slot gets `.is-drop-target` (dashed `--em` outline + `outline-offset`) and a `.pp-top-drop-hint` overlay "أفلت هنا للتبديل" (`pointer-events:none`).
+- **CSS** (`pos-pro.css`, right after `.pos-pro-top`): `.pp-top-slot` (`position:relative; min-width:0; touch-action:none`), `.pp-top-grip`, `.is-dragging-source`, `.is-drop-target`, `.pp-top-drop-hint`. No `.pos-pro-top` media-query changes — the existing `@media (max-width:1100px)` single-column stack still works (swap becomes vertical order).
+
+**Key architectural rules**:
+- With only two slots, "swap" is `order = [other(id), id]` + `setOrder`; there is no index math or re-insertion. The `.pos-pro-top` grid template never changes — order controls which card occupies the fixed 340px column.
+- Interactive elements inside a draggable card must be excluded via `e.target.closest('button, a, input, select, textarea')` or drag steals their clicks.
+- Pointer capture belongs on the slot wrapper (`e.currentTarget`), NOT on the element under the pointer at `pointerdown` — the wrapper keeps receiving `pointermove` even when the pointer travels over the sibling card.
+- A movement threshold (6px) separates "click" from "drag"; committing only on pointerup over the target means a drag that ends elsewhere is a no-op (no accidental swap).
+- local-storage persistence is a best-effort UI preference — wrap reads/writes in try/catch; the default order (`customer` first) applies on first load.
+
+**Files modified**:
+- `resources/js/pos-pro/components/ReorderableTopCards.tsx` — NEW
+- `resources/js/pos-pro/POSProPage.tsx` — import + replace static `.pos-pro-top` block with `<ReorderableTopCards customer={<CustomerCard…/>} total={<TotalCard…/>}/>`
+- `resources/css/theme/pos-pro.css` — `.pp-top-slot` / `.pp-top-grip` / drag + drop-target + hint styles
+
+**Verification**: `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors, 185 precache entries, `root sw == build sw: True` (SW MATCH).
+
+**Follow-up — swapped cards keep their own dimensions**: the first implementation kept the grid `340px minmax(0,1fr)`, so whichever card was FIRST owned the 340px column — swapping made the total card 340px and the customer card full-width (ugly). `.pos-pro-top` is now `display:flex` with **identity-based** widths: `.pp-top-slot--customer { width:340px; flex:0 0 340px }`, `.pp-top-slot--total { flex:1 1 auto; min-width:0 }`. Whichever side the customer card sits on, it stays 340px and the total card always fills the rest; the `@media (max-width:1100px)` block now switches `.pos-pro-top` to `flex-direction:column` and resets both slots to `width:auto; flex:none`.
+
+**Follow-up — `*N` qty command only worked on an already-selected row**: in classic POS, adding an item auto-selects it ("Auto-select + scroll to added item so user can immediately set qty via *<digits> Enter", POSPage.tsx:1372) — POS Pro never did that, so `*168` right after scanning/adding hit the "حدد صنفاً في السلة أولاً" toast. Fixes:
+- `usePosProCart.addItem` now **returns the resulting item id** (`string | null`) — refactored to compute from `get()` and `set({...})` instead of `set(state => ...)` so it can return the merged/existing id. Call sites auto-select: `handleAddItem`, the weight-confirm `onConfirm` (add mode), and the ManualProductModal `onAdd` all do `const addedId = pos.addItem(...); if (addedId) setSelectedItemId(addedId)`.
+- `handleQtyCommand` falls back to the **last cart row** when nothing is selected (`targetId = selectedItemId ?? items[last]?.id ?? null`) and only errors when the cart is empty — mirrors classic POS behavior.
+
+**Key architectural rule**: a merge-based `addItem` must return the resulting row's id (or null) so callers can target it for selection — never re-derive it by variant_id, because the store resolves default packaging internally and a caller cannot know the merge key (`variant_id + packaging_id`) without duplicating store logic.
+
+### Phase 43 — POS Pro Pre-Sale Print: Draft Document Number (Aug 1)
+
+**Request**: the pre-sale print button (طباعة — prints the current cart as a receipt WITHOUT completing the sale) set `docNumber: ''`, so `handlePrintDirect`'s guard `if (!resolvedDocNum)` skipped the WebUSB thermal path — thermal (80mm/58mm) pre-sale receipts always fell back to browser print. The chosen fix: **generate a draft document number** so the thermal printer can print before the sale is confirmed.
+
+**Design** — a read-only "next number" preview that mirrors the REAL generation logic:
+- **Backend** `app/Services/CommercialDocumentService.php` — new **public** `previewNextDocumentNumber(DocumentType $documentType, int $companyId): string`. It is a copy of the private `generateDocumentNumber()` logic (same `{CODE}-{YEAR}-%06d` format, same `orderByDesc` max-search) but WITHOUT the `DB::transaction` + `lockForUpdate` — it does not consume the sequence and creates no document. When the sale later completes, `beforeCreate()` calls `generateDocumentNumber()` which (in the single-terminal case) returns the SAME number, so the printed draft matches the saved invoice.
+- **Controller** `CommercialDocumentController::nextNumber(Request)` — validates `document_type_id`, scopes the `DocumentType` by `CompanyContextService::get()`, returns `{ document_type_id, next_number }` via `successResponse`. Uses `errorResponse('...', 422/404)` for missing id / doc type.
+- **Route** `routes/api.php` — `GET documents/next-number` added in the `can:create_sales_document` group, MUST sit BEFORE `apiResource('documents', ...)` (same rule as `check-number`/`unpaid`/`overdue`) or Laravel intercepts it as `{commercialDocument}`.
+- **Frontend** `documentsApi.nextNumber(documentTypeId)` → `apiGet<{ next_number: string; document_type_id: number }>('/documents/next-number', { document_type_id })`.
+- **POSProPage** `handlePrintCart` is now async: resolves the invoice doc type (same fallback chain as `handleCompleteSale`), fetches the draft number, and puts it in `snap.docNumber`. On any error it silently falls back to `''` (browser print), never blocks the print. The full `handlePrintDirect` logic (thermal vs browser) is untouched.
+
+**Key architectural rules**:
+- A pre-sale draft number is a **preview of the real next number**, not a separate counter. It must reuse `generateDocumentNumber()`'s exact format so draft == final in the normal single-terminal flow. Do NOT invent a "DRAFT-…" prefix or a client-side random number — the printed receipt would never match the saved invoice.
+- Any "generate next doc number" preview endpoint must replicate the backend's ACTUAL generation (`CommercialDocumentService`), not `NumberingSeries::getNextNumber()` — the two use different formats (`POS-2026-000297` vs `POS/26/000297`) and different counters. `NumberingSeries` is only stored as `numbering_series_id` metadata; the real `document_number` always comes from `generateDocumentNumber()`.
+- Read-only preview (no transaction, no `lockForUpdate`) is correct here: the draft is informational for printing. The consuming/atomic generation stays only in `generateDocumentNumber()` at create time.
+
+**Files modified**:
+- `app/Services/CommercialDocumentService.php` — `previewNextDocumentNumber()`
+- `app/Http/Controllers/Api/V1/CommercialDocumentController.php` — `nextNumber()` + `use App\Models\DocumentType`
+- `routes/api.php` — `documents/next-number` GET route
+- `resources/js/lib/api/endpoints/documents.ts` — `documentsApi.nextNumber()`
+- `resources/js/pos-pro/POSProPage.tsx` — async `handlePrintCart` with draft number
+
+**Verification**: `php -l` clean ×3. Tinker smoke: `previewNextDocumentNumber(POS, company)` → `POS-2026-000297`. `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors, 185 precache entries, `root sw == build sw: True` (SW MATCH).
+
+### Phase 42 — POS Pro Customer Card Enhancement (Aug 1)
+
+**Request**: "enhance client card" — the POS Pro `CustomerCard` was sparse and showed FAKE data: its two stats (الرصيد / إجمالي المبيعات) read `party?.balance`/`party?.total_sales`, but `PartyResource` never serializes those fields (verified: `PartyResource.php` has no `balance`/`total_sales`; the Party model has no accessors), so the card always showed `0.00` for both.
+
+**Fix** (`POSProTopCards.tsx`):
+- **Real balance** via new `usePartyBalance(partyId)` hook (`partyBalances.ts`) hitting `/party-balances/{id}` — the same endpoint the payment modal uses (SSOT). It uses `tenantKeys.partyBalances.detail(slug, partyId)`, which `POSProPage.tsx:702` already invalidates after every completed sale, so the card auto-refreshes.
+- **Contact row** (dashed divider): clickable `tel:` phone (mobile preferred), `mailto:` email, address chip — each with a Tabler icon, only shown when present.
+- **Credit limit stat** (replaces the fake "إجمالي المبيعات"): `credit_limit` shown directly; when `credit_limit > 0`, a progress bar (balance ÷ limit) + "مستعمل/متبقّي" line, red `over` state when balance ≥ limit.
+- **Badges**: `الصندوق` pill for the cash client (`slug === 'client-cash'`), `معفى من TVA` green chip when `is_tva_exempt`, plus existing price level + NIF.
+- **Visual**: gradient avatar with em ring (red ring when debtor), cash-client card variant with em-tinted gradient background.
+
+**CSS** (`pos-pro.css`): `.pp-cust-card--cash`, `.pp-cust-badge`, `.pp-cust-name-txt`, `.pp-cust-contact`, `.pp-cust-credit{,-bar,-meta}`, `.pp-cust-meta .exempt`; avatar ring/gradient uses `color-mix` (already used project-wide).
+
+**Key rules**:
+- Balance on any POS card must come from `/party-balances/{id}` (the balance SSOT), never from a party object — `PartyResource` does not include computed balances/totals.
+- Do not show stats fed by fields the backend never sends (`party.total_sales` was always 0).
+- Reuse `tenantKeys.partyBalances.detail` so the existing post-sale invalidation (`POSProPage.tsx:702`) refreshes the card automatically.
+
+**Verification**: `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors, 185 precache entries, `root sw == build sw: True`.
+
 ### Phase 41 — POS Pro Default Client Shows Real "Client Cash", Not "زبون نقدي" (Aug 1)
 
 **Bug**: POS Pro's customer card could show the hardcoded Arabic placeholder "زبون نقدي" even though no such party exists — the user's cash client party is named **"Client Cash"** (slug `client-cash`, e.g. party id 771 for company 1). Root cause: `CustomerCard` received `pos.client` from the store; after completing a sale or restoring a document without a party, the store sets `client: null` (POSProPage lines ~959/1002). The default-client effect (`if (cashClient && !posRef.current.client)`) never re-runs because `useCashClient` is cached with `staleTime: Infinity`, so the card stayed on the placeholder.

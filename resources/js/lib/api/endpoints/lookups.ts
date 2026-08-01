@@ -167,15 +167,24 @@ function normalizePosLookups(raw: unknown): PosAggregatedLookups {
   if (!raw || typeof raw !== 'object') return EMPTY_POS_LOOKUPS;
   const obj = raw as Record<string, unknown>;
   const pick = (k: string) => Array.isArray(obj[k]) ? obj[k] as never[] : [];
+  const uniqueById = (rows: never[]): never[] => {
+    const seen = new Set<number>();
+    return rows.filter((r) => {
+      const id = (r as { id?: number } | null)?.id ?? -1;
+      if (id === -1 || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  };
   return {
-    warehouses:       pick('warehouses'),
-    documentTypes:    pick('documentTypes'),
-    priceLevels:      pick('priceLevels'),
-    currencies:       pick('currencies'),
-    paymentModes:     pick('paymentModes'),
-    treasuryAccounts: pick('treasuryAccounts'),
-    fiscalYears:      pick('fiscalYears'),
-    customers:        pick('customers'),
+    warehouses:       uniqueById(pick('warehouses')),
+    documentTypes:    uniqueById(pick('documentTypes')),
+    priceLevels:      uniqueById(pick('priceLevels')),
+    currencies:       uniqueById(pick('currencies')),
+    paymentModes:     uniqueById(pick('paymentModes')),
+    treasuryAccounts: uniqueById(pick('treasuryAccounts')),
+    fiscalYears:      uniqueById(pick('fiscalYears')),
+    customers:        uniqueById(pick('customers')),
     settings:         (obj.settings && typeof obj.settings === 'object') ? obj.settings as PosAggregatedLookups['settings'] : EMPTY_POS_LOOKUPS.settings,
   };
 }

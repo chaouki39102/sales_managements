@@ -1,110 +1,419 @@
 // ════════════════════════════════════════════════════════════════════════════
 // pos-pro/components/POSProWeightModal.tsx
 //
-// مودال الوزن للمنتجات المباعة بالوزن (is_sold_by_weight):
-// يدخل الكاشير الكمية بالكيلوغرام (إدخال عشري + أزرار سريعة)، ونعرض له
-// السعر المحسوب (HT/TTC) فورياً قبل التأكيد. يُستخدَم للإضافة من المودال/
-// المسح، ولتعديل كمية صنف موجود في السلة.
+// مودال الوزن للمنتجات المباعة بالوزن (is_sold_by_weight) — نسخة POS Pro من
+// WeightEntryModal الكلاسيكي: نفس السلوك (إدخال مزدوج وزن/سعر مع lastEdited،
+// أزرار الجرامات السريعة 50غ–5000غ، شارات التخفيض حسب الكمية + بانر الخصم،
+// تعديل ±100غ/±10غ و ±100دج/±10دج، ملخص الإجمالي). يعتمد على نفس دوال
+// calculations.ts و نفس كلاسات `.wem-*` الموجودة في pos.css (عامة).
 // ════════════════════════════════════════════════════════════════════════════
-import { useState, useEffect, useRef } from 'react';
-import Modal from '@/components/ui/Modal';
-import { formatDZD } from '@/pos/utils/calculations';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import type { QuantityDiscount } from '@/types/product';
+import { FloatingTooltip } from '@/components/ui/FloatingTooltip';
+import {
+  resolveQuantityTier,
+  calcWeightTotal,
+  calcWeightDiscounted,
+  calcWeightFromPrice,
+} from '@/pos/utils/calculations';
 
 interface Props {
-  open:          boolean;
-  name:          string;
-  priceHtPerKg:  number;
-  tvaRate:       number;
-  initialKg?:    number;
+  open: boolean;
+  name: string;
+  unitSymbol?: string | null;
+  priceHtPerKg: number;
+  quantityDiscounts?: QuantityDiscount[];
+  initialKg?: number;
   confirmLabel?: string;
-  onConfirm:     (kg: number) => void;
-  onClose:       () => void;
+  onConfirm: (kg: number) => void;
+  onClose: () => void;
 }
 
-const QUICK_KGS = [0.5, 1, 2, 5, 10];
+const QUICK_WEIGHTS = [
+  { g: 50,   label: '50',  sub: 'غ' },
+  { g: 100,  label: '100', sub: 'غ' },
+  { g: 250,  label: '250', sub: 'غ' },
+  { g: 500,  label: '500', sub: 'غ' },
+  { g: 750,  label: '750', sub: 'غ' },
+  { g: 1000, label: '1',   sub: 'كغ' },
+  { g: 2000, label: '2',   sub: 'كغ' },
+  { g: 3000, label: '3',   sub: 'كغ' },
+  { g: 5000, label: '5',   sub: 'كغ' },
+];
+
+const fmt = (n: number) => n.toLocaleString('ar-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function POSProWeightModal({
-  open, name, priceHtPerKg, tvaRate, initialKg, confirmLabel, onConfirm, onClose,
+  open,
+  name,
+  unitSymbol = 'كغ',
+  priceHtPerKg,
+  quantityDiscounts,
+  initialKg,
+  confirmLabel = 'تأكيد الإضافة',
+  onConfirm,
+  onClose,
 }: Props) {
-  const [kgText, setKgText] = useState(initialKg ? String(initialKg) : '1');
-  const inputRef            = useRef<HTMLInputElement>(null);
+  const [weightStr, setWeightStr] = useState(
+    () => (initialKg && initialKg > 0 ? Number(initialKg).toFixed(3) : ''),
+  );
+  const [priceStr, setPriceStr] = useState(() => {
+    if (initialKg && initialKg > 0 && priceHtPerKg > 0)
+      return String(Math.round(initialKg * priceHtPerKg));
+    return '';
+  });
+  const [lastEdited, setLastEdited] = useState<'weight' | 'price' | null>(null);
+  const [gramNotice, setGramNotice] = useState('');
+  const [submitPulse, setSubmitPulse] = useState(false);
+
+  const weightRef = useRef<HTMLInputElement>(null);
+  const priceRef  = useRef<HTMLInputElement>(null);
+  const exactWeightRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (open) {
-      setKgText(initialKg ? String(initialKg) : '1');
-      const t = setTimeout(() => inputRef.current?.select(), 60);
+      setWeightStr(initialKg && initialKg > 0 ? Number(initialKg).toFixed(3) : '');
+      setPriceStr(initialKg && initialKg > 0 && priceHtPerKg > 0 ? String(Math.round(initialKg * priceHtPerKg)) : '');
+      setLastEdited(null);
+      setGramNotice('');
+      const t = setTimeout(() => weightRef.current?.focus(), 60);
       return () => clearTimeout(t);
     }
-  }, [open, initialKg]);
+  }, [open, initialKg, priceHtPerKg]);
 
-  const kg = parseFloat(kgText);
+  const weight = useMemo(() => {
+    const v = parseFloat(weightStr);
+    return isNaN(v) || v < 0 ? 0 : v;
+  }, [weightStr]);
 
-  const commit = () => {
-    if (!Number.isFinite(kg) || kg <= 0) return;
-    onConfirm(kg);
-    onClose();
+  const price = useMemo(() => {
+    const v = parseFloat(priceStr);
+    return isNaN(v) || v < 0 ? 0 : v;
+  }, [priceStr]);
+
+  const activeTier = useMemo(
+    () => resolveQuantityTier(quantityDiscounts, weight, 1),
+    [quantityDiscounts, weight],
+  );
+
+  const originalTotal = useMemo(() => {
+    if (lastEdited === 'price' && price > 0) return price;
+    return calcWeightTotal(weight, priceHtPerKg);
+  }, [lastEdited, price, weight, priceHtPerKg]);
+
+  const discountedTotal = useMemo(
+    () => calcWeightDiscounted(originalTotal, activeTier, weight),
+    [activeTier, originalTotal, weight],
+  );
+
+  const savings = useMemo(
+    () => (discountedTotal != null ? originalTotal - discountedTotal : 0),
+    [discountedTotal, originalTotal],
+  );
+
+  const handleWeightChange = useCallback((raw: string) => {
+    setLastEdited('weight');
+    exactWeightRef.current = null;
+    const v = parseFloat(raw);
+    if (isNaN(v) || v < 0 || raw === '') {
+      setWeightStr(raw);
+      setPriceStr('');
+      setGramNotice('');
+      return;
+    }
+    setWeightStr(raw);
+    setPriceStr(priceHtPerKg > 0 ? String(calcWeightTotal(v, priceHtPerKg)) : '');
+    setGramNotice('');
+  }, [priceHtPerKg]);
+
+  const handlePriceChange = useCallback((raw: string) => {
+    setLastEdited('price');
+    const p = parseFloat(raw);
+    if (isNaN(p) || p < 0 || raw === '') {
+      setPriceStr(raw);
+      setWeightStr('');
+      setGramNotice('');
+      exactWeightRef.current = null;
+      return;
+    }
+    const w = calcWeightFromPrice(p, priceHtPerKg);
+    exactWeightRef.current = w;
+    setWeightStr(w > 0 ? w.toFixed(6) : '');
+    setPriceStr(raw);
+    setGramNotice('');
+  }, [priceHtPerKg]);
+
+  const quickSet = useCallback((kg: number) => {
+    setWeightStr(kg.toFixed(3));
+    setLastEdited('weight');
+    if (priceHtPerKg > 0) setPriceStr(String(calcWeightTotal(kg, priceHtPerKg)));
+    setGramNotice('');
+    weightRef.current?.focus();
+  }, [priceHtPerKg]);
+
+  const adjust = useCallback((delta: number) => {
+    setWeightStr(prev => {
+      const cur = parseFloat(prev) || 0;
+      const next = Math.max(0.001, Math.round((cur + delta) * 1000) / 1000);
+      if (priceHtPerKg > 0) setPriceStr(String(calcWeightTotal(next, priceHtPerKg)));
+      setLastEdited('weight');
+      return next.toFixed(3);
+    });
+  }, [priceHtPerKg]);
+
+  const handleOk = useCallback(() => {
+    if (weight > 0) {
+      setSubmitPulse(true);
+      setTimeout(() => {
+        onConfirm(exactWeightRef.current ?? weight);
+        onClose();
+      }, 120);
+    }
+  }, [weight, onConfirm, onClose]);
+
+  const finalTotal = discountedTotal ?? originalTotal;
+  const hasDiscount = discountedTotal != null && savings > 0;
+
+  const effectiveDiscountPct = activeTier
+    ? activeTier.discount_percentage > 0
+      ? activeTier.discount_percentage
+      : activeTier.discount_amount > 0 && originalTotal > 0
+        ? Math.round((activeTier.discount_amount / originalTotal) * 1000) / 10
+        : 0
+    : 0;
+
+  const fmtQty = (v: number | string) => {
+    const n = Number(v);
+    return Number.isInteger(n) ? String(n) : parseFloat(n.toFixed(3)).toString();
   };
 
-  const ttcPerKg = priceHtPerKg * (1 + tvaRate / 100);
-
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="تحديد الوزن"
-      subtitle={name}
-      size="sm"
-      resizable={false}
-      footer={
-        <button
-          type="button"
-          className="btn btn-p"
-          onClick={commit}
-          disabled={!Number.isFinite(kg) || kg <= 0}
-        >
-          <i className="ti ti-scale" />
-          {confirmLabel ?? 'إضافة بالسلة'}
-        </button>
-      }
-    >
-      <div className="pp-weight">
-        <div className="pp-weight-input">
-          <input
-            ref={inputRef}
-            value={kgText}
-            onChange={(e) => setKgText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') commit(); }}
-            inputMode="decimal"
-          />
-          <span>كغ</span>
-        </div>
-
-        <div className="pp-weight-chips">
-          {QUICK_KGS.map(k => (
-            <button
-              key={k}
-              type="button"
-              className={`pp-weight-chip${kg === k ? ' on' : ''}`}
-              onClick={() => setKgText(String(k))}
-            >
-              {k} كغ
-            </button>
-          ))}
-        </div>
-
-        {Number.isFinite(kg) && kg > 0 && (
-          <div className="pp-weight-preview">
-            <div>
-              <span>السعر (HT)</span>
-              <strong dir="ltr">{formatDZD(kg * priceHtPerKg)}</strong>
-            </div>
-            <div>
-              <span>السعر (TTC)</span>
-              <strong dir="ltr">{formatDZD(kg * ttcPerKg)}</strong>
+    <div className="wem-overlay" onClick={onClose}>
+      <div className="wem-card" onClick={e => e.stopPropagation()}>
+        {/* ── Header ── */}
+        <div className="wem-header">
+          <button className="wem-close" onClick={onClose} type="button" aria-label="إغلاق">
+            <i className="ti ti-x" />
+          </button>
+          <div className="wem-header-content">
+            <h2 className="wem-header-title">{name}</h2>
+            <div className="wem-header-meta">
+              <span className="wem-tag">{unitSymbol}</span>
+              {priceHtPerKg > 0 && (
+                <span className="wem-tag wem-tag--price">{fmt(priceHtPerKg)} دج/{unitSymbol}</span>
+              )}
             </div>
           </div>
-        )}
+        </div>
+
+        <div className="wem-body">
+          {/* ── Discount tier badges ── */}
+          {quantityDiscounts?.filter(d => d.active && !d.is_blocked).length ? (
+            <div className="wem-tiers">
+              {quantityDiscounts
+                .filter(d => d.active && !d.is_blocked)
+                .sort((a, b) => a.min_qty - b.min_qty)
+                .map(d => {
+                  const isActive = activeTier?.quantity_discount_id === d.id;
+                  const tierPct = d.discount_percentage != null && Number(d.discount_percentage) > 0
+                    ? Number(d.discount_percentage)
+                    : Number(d.discount_amount) > 0 && priceHtPerKg > 0
+                      ? (Number(d.discount_amount) / priceHtPerKg) * 100
+                      : 0;
+                  const displayPct = Math.round(tierPct * 10) / 10;
+                  const label = d.max_qty
+                    ? `${fmtQty(d.min_qty)}–${fmtQty(d.max_qty)}`
+                    : `${fmtQty(d.min_qty)}+`;
+                  return (
+                    <div key={d.id} className={`wem-tier-badge ${isActive ? 'active' : ''}`}>
+                      <span className="wem-tier-qty">{label}</span>
+                      <span className="wem-tier-pct">-{displayPct}%</span>
+                    </div>
+                  );
+                })}
+            </div>
+          ) : null}
+
+          {/* ── Active discount banner ── */}
+          {hasDiscount && (
+            <div className="wem-discount-banner">
+              <div className="wem-discount-icon"><i className="ti ti-discount" /></div>
+              <div className="wem-discount-text">
+                <span className="wem-discount-title">
+                  خصم {effectiveDiscountPct > 0
+                    ? `${effectiveDiscountPct}%`
+                    : `${Number(activeTier?.discount_amount).toFixed(2)} دج/${unitSymbol}`}
+                </span>
+                <span className="wem-discount-detail">توفير {fmt(savings)} دج</span>
+              </div>
+              <div className="wem-discount-amount">-{fmt(savings)}</div>
+            </div>
+          )}
+
+          {/* ── Gram notice ── */}
+          {gramNotice && (
+            <div className="wem-gram-notice">
+              <i className="ti ti-info-circle" /> {gramNotice}
+            </div>
+          )}
+
+          {/* ── Weight Input (Hero) ── */}
+          <div className="wem-hero">
+            <label className="wem-field-label">
+              <i className="ti ti-scale-outline" /> الوزن
+            </label>
+            <div className={`wem-hero-input ${lastEdited === 'weight' ? 'focused' : ''}`}>
+              <FloatingTooltip content="-100 غ">
+                <button className="wem-adj wem-adj--lg" onClick={() => adjust(-0.100)} type="button">
+                  <i className="ti ti-minus" /><span>100</span>
+                </button>
+              </FloatingTooltip>
+              <FloatingTooltip content="-10 غ">
+                <button className="wem-adj" onClick={() => adjust(-0.010)} type="button">
+                  <i className="ti ti-minus" /><span>10</span>
+                </button>
+              </FloatingTooltip>
+              <div className="wem-hero-field">
+                <input
+                  ref={weightRef}
+                  type="number" inputMode="decimal" step="0.001" min="0"
+                  className="wem-inp"
+                  value={weightStr}
+                  onChange={e => handleWeightChange(e.target.value)}
+                  placeholder="0.000"
+                  onFocus={e => e.target.select()}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleOk();
+                    if (e.key === 'Escape') onClose();
+                    if (e.key === 'Tab') { e.preventDefault(); priceRef.current?.focus(); }
+                  }}
+                />
+                <span className="wem-hero-unit">{unitSymbol}</span>
+              </div>
+              <FloatingTooltip content="+10 غ">
+                <button className="wem-adj" onClick={() => adjust(0.010)} type="button">
+                  <span>10</span><i className="ti ti-plus" />
+                </button>
+              </FloatingTooltip>
+              <FloatingTooltip content="+100 غ">
+                <button className="wem-adj wem-adj--lg" onClick={() => adjust(0.100)} type="button">
+                  <span>100</span><i className="ti ti-plus" />
+                </button>
+              </FloatingTooltip>
+            </div>
+          </div>
+
+          {/* ── Quick weights ── */}
+          <div className="wem-quick">
+            {QUICK_WEIGHTS.map(({ g, label, sub }) => {
+              const kg = g / 1000;
+              const isActive = Math.abs(weight - kg) < 0.0001;
+              return (
+                <button
+                  key={g}
+                  className={`wem-quick-btn ${isActive ? 'active' : ''}`}
+                  onClick={() => quickSet(kg)}
+                  type="button"
+                >
+                  <span className="wem-quick-val">{label}</span>
+                  <span className="wem-quick-sub">{sub}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── Price Input ── */}
+          {priceHtPerKg > 0 && (
+            <div className="wem-price-section">
+              <label className="wem-field-label wem-field-label--price">
+                <i className="ti ti-coins" /> السعر الإجمالي
+              </label>
+              <div className={`wem-hero-input wem-hero-input--price ${lastEdited === 'price' ? 'focused' : ''}`}>
+                <FloatingTooltip content="-100 دج">
+                  <button className="wem-adj wem-adj--lg" onClick={() => handlePriceChange(String(Math.max(0, price - 100)))} type="button">
+                    <i className="ti ti-minus" /><span>100</span>
+                  </button>
+                </FloatingTooltip>
+                <FloatingTooltip content="-10 دج">
+                  <button className="wem-adj" onClick={() => handlePriceChange(String(Math.max(0, price - 10)))} type="button">
+                    <i className="ti ti-minus" /><span>10</span>
+                  </button>
+                </FloatingTooltip>
+                <div className="wem-hero-field">
+                  <input
+                    ref={priceRef}
+                    type="number" inputMode="decimal" step="1" min="0"
+                    className="wem-inp wem-inp--price-hero"
+                    value={priceStr}
+                    onChange={e => handlePriceChange(e.target.value)}
+                    placeholder="0"
+                    onFocus={e => e.target.select()}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleOk();
+                      if (e.key === 'Escape') onClose();
+                      if (e.key === 'Tab') { e.preventDefault(); weightRef.current?.focus(); }
+                    }}
+                  />
+                  <span className="wem-hero-unit wem-hero-unit--price">دج</span>
+                </div>
+                <FloatingTooltip content="+10 دج">
+                  <button className="wem-adj" onClick={() => handlePriceChange(String(price + 10))} type="button">
+                    <span>10</span><i className="ti ti-plus" />
+                  </button>
+                </FloatingTooltip>
+                <FloatingTooltip content="+100 دج">
+                  <button className="wem-adj wem-adj--lg" onClick={() => handlePriceChange(String(price + 100))} type="button">
+                    <span>100</span><i className="ti ti-plus" />
+                  </button>
+                </FloatingTooltip>
+              </div>
+            </div>
+          )}
+
+          {/* ── Total summary ── */}
+          {weight > 0 && priceHtPerKg > 0 && (
+            <div className={`wem-total ${hasDiscount ? 'wem-total--discount' : ''}`}>
+              <div className="wem-total-line">
+                <span className="wem-total-label">الإجمالي</span>
+                <span className="wem-total-value">
+                  {hasDiscount && <span className="wem-total-old">{fmt(originalTotal)}</span>}
+                  <span className="wem-total-final">{fmt(finalTotal)} دج</span>
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Footer ── */}
+        <div className="wem-footer">
+          <button
+            className={`wem-submit ${submitPulse ? 'pulse' : ''} ${weight <= 0 ? '' : 'wem-submit--ready'}`}
+            onClick={handleOk}
+            disabled={weight <= 0}
+            type="button"
+          >
+            <div className="wem-submit-left">
+              <i className="ti ti-check" />
+              <span>{confirmLabel}</span>
+            </div>
+            <div className="wem-submit-right">
+              <span className="wem-submit-weight">
+                {weight > 0 ? `${weightStr} ${unitSymbol}` : ''}
+              </span>
+              <span className="wem-submit-price">
+                {weight > 0 ? `${fmt(finalTotal)} دج` : ''}
+              </span>
+            </div>
+          </button>
+          <div className="wem-hints">
+            <kbd>Tab</kbd> تبديل
+            <span className="wem-hint-dot" />
+            <kbd>Enter</kbd> تأكيد
+            <span className="wem-hint-dot" />
+            <kbd>Esc</kbd> إلغاء
+          </div>
+        </div>
       </div>
-    </Modal>
+    </div>
   );
 }

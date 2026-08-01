@@ -36,7 +36,7 @@ interface PosProCartState {
   saleNumber:         number;
   _isDirty:           boolean;
 
-  addItem:              (variant: ProductVariant, qty?: number, packaging?: ProductPackaging | null) => void;
+  addItem:              (variant: ProductVariant, qty?: number, packaging?: ProductPackaging | null) => string | null;
   removeItem:           (id: string) => void;
   updateQty:            (id: string, qty: number) => void;
   updateDiscount:       (id: string, pct: number) => void;
@@ -88,94 +88,95 @@ function createCartStore(persistKey: string) {
         _isDirty:           false,
 
         addItem: (variant, qty = 1, packaging = null) => {
-          set(state => {
-            const isWeight = variant.is_sold_by_weight ?? variant.product?.is_sold_by_weight ?? false;
-            const rawQty = isWeight ? qty : Math.round(qty);
-            const safeQty = Math.max(isWeight ? 0.001 : 1, rawQty);
+          const state = get();
+          const isWeight = variant.is_sold_by_weight ?? variant.product?.is_sold_by_weight ?? false;
+          const rawQty = isWeight ? qty : Math.round(qty);
+          const safeQty = Math.max(isWeight ? 0.001 : 1, rawQty);
 
-            // Resolve default packaging when none provided
-            const resolvedPkg = packaging ?? (() => {
-              const pkgs = (variant.packagings ?? (variant as any).product?.packagings ?? []) as ProductPackaging[];
-              const active = pkgs.filter((p: ProductPackaging) => p.active !== false);
-              return active.find((p: ProductPackaging) => p.is_default) ?? active[0] ?? null;
-            })();
+          // Resolve default packaging when none provided
+          const resolvedPkg = packaging ?? (() => {
+            const pkgs = (variant.packagings ?? (variant as any).product?.packagings ?? []) as ProductPackaging[];
+            const active = pkgs.filter((p: ProductPackaging) => p.active !== false);
+            return active.find((p: ProductPackaging) => p.is_default) ?? active[0] ?? null;
+          })();
 
-            const packQty = resolvedPkg ? Math.max(1, Number(resolvedPkg.quantity) || 1) : 1;
-            const packId  = resolvedPkg?.id ?? null;
+          const packQty = resolvedPkg ? Math.max(1, Number(resolvedPkg.quantity) || 1) : 1;
+          const packId  = resolvedPkg?.id ?? null;
 
-            // Merge only if same product + same packaging
-            const existing = state.items.find(
-              i => i.variant_id === variant.id && (i.packaging_id ?? null) === packId,
-            );
-            if (existing) {
-              const newQty   = existing.quantity + safeQty;
-              const existPackQty = existing.pack_qty ?? 1;
-              const tierSource = variant.quantity_discounts ?? existing.quantity_discounts ?? [];
-              const hasTiers = tierSource.length > 0;
+          // Merge only if same product + same packaging
+          const existing = state.items.find(
+            i => i.variant_id === variant.id && (i.packaging_id ?? null) === packId,
+          );
+          if (existing) {
+            const newQty   = existing.quantity + safeQty;
+            const existPackQty = existing.pack_qty ?? 1;
+            const tierSource = variant.quantity_discounts ?? existing.quantity_discounts ?? [];
+            const hasTiers = tierSource.length > 0;
 
-              let discPatch: Partial<Pick<CartItem, 'discount_percentage' | 'discount_amount' | 'discount_mode'>>;
+            let discPatch: Partial<Pick<CartItem, 'discount_percentage' | 'discount_amount' | 'discount_mode'>>;
 
-              if (hasTiers) {
-                const resolved = resolveQuantityTier(tierSource, newQty, existPackQty);
-                discPatch = {
-                  discount_percentage: resolved?.discount_percentage ?? 0,
-                  discount_amount:     resolved?.mode === 'fixed_amount' ? resolved.discount_amount : 0,
-                  discount_mode:       resolved?.mode ?? 'percentage',
-                };
-              } else {
-                // No tier data — preserve existing discount
-                discPatch = {};
-              }
-
-              const updated  = recalcItem({ ...existing, quantity: newQty, ...discPatch });
-              return {
-                items: state.items.map(i =>
-                  i.variant_id === variant.id && (i.packaging_id ?? null) === packId ? updated : i,
-                ),
-                _isDirty: true,
+            if (hasTiers) {
+              const resolved = resolveQuantityTier(tierSource, newQty, existPackQty);
+              discPatch = {
+                discount_percentage: resolved?.discount_percentage ?? 0,
+                discount_amount:     resolved?.mode === 'fixed_amount' ? resolved.discount_amount : 0,
+                discount_mode:       resolved?.mode ?? 'percentage',
               };
+            } else {
+              // No tier data — preserve existing discount
+              discPatch = {};
             }
 
-            const priceHt  = variant.default_selling_price_ht * packQty;
-            const baseHt   = variant.default_selling_price_ht;
-            const tvaRate  = variant.tva?.rate ?? 0;
-            const resolved = resolveQuantityTier(variant.quantity_discounts, safeQty, packQty);
-
-            const newItem: CartItem = recalcItem({
-              id:                  nanoid(8),
-              product_id:          variant.product_id,
-              variant_id:          variant.id,
-              ref:                 variant.ref ?? '',
-              product_name:        variant.product?.name ?? '',
-              variant_name:        variant.variant_name ?? null,
-              barcode:             variant.barcode ?? null,
-              unit_symbol:         resolvedPkg?.label ?? getUnitSymbol(variant),
-              image_url:           (variant as any).image_url ?? variant.product?.default_image ?? variant.product?.images?.[0] ?? null,
-              quantity:            safeQty,
-              unit_price_ht:       priceHt,
-              selling_price_ttc:   priceHt * (1 + tvaRate / 100),
-              tva_rate:            tvaRate,
-              tva_id:              variant.tva_id ?? null,
-              discount_percentage: resolved?.discount_percentage ?? 0,
-              discount_amount:     resolved?.discount_amount ?? 0,
-              discount_mode:       resolved?.mode ?? 'percentage',
-              total_ht:            0,
-              total_ttc:           0,
-              manages_stock:       variant.manages_stock,
-              is_sold_by_weight:   variant.is_sold_by_weight ?? variant.product?.is_sold_by_weight ?? false,
-              max_stock:           variant.manages_stock
-                ? (variant.current_stock ?? null)
-                : null,
-              packaging_id:        packId,
-              pack_qty:            packQty,
-              packaging_label:     resolvedPkg?.label ?? null,
-              base_price_ht:       baseHt,
-              available_packagings: (variant.packagings ?? []).filter((p: ProductPackaging) => p.active !== false),
-              quantity_discounts:  variant.quantity_discounts ?? [],
+            const updated  = recalcItem({ ...existing, quantity: newQty, ...discPatch });
+            set({
+              items: state.items.map(i =>
+                i.variant_id === variant.id && (i.packaging_id ?? null) === packId ? updated : i,
+              ),
+              _isDirty: true,
             });
+            return existing.id;
+          }
 
-            return { items: [...state.items, newItem], _isDirty: true };
+          const priceHt  = variant.default_selling_price_ht * packQty;
+          const baseHt   = variant.default_selling_price_ht;
+          const tvaRate  = variant.tva?.rate ?? 0;
+          const resolved = resolveQuantityTier(variant.quantity_discounts, safeQty, packQty);
+
+          const newItem: CartItem = recalcItem({
+            id:                  nanoid(8),
+            product_id:          variant.product_id,
+            variant_id:          variant.id,
+            ref:                 variant.ref ?? '',
+            product_name:        variant.product?.name ?? '',
+            variant_name:        variant.variant_name ?? null,
+            barcode:             variant.barcode ?? null,
+            unit_symbol:         resolvedPkg?.label ?? getUnitSymbol(variant),
+            image_url:           (variant as any).image_url ?? variant.product?.default_image ?? variant.product?.images?.[0] ?? null,
+            quantity:            safeQty,
+            unit_price_ht:       priceHt,
+            selling_price_ttc:   priceHt * (1 + tvaRate / 100),
+            tva_rate:            tvaRate,
+            tva_id:              variant.tva_id ?? null,
+            discount_percentage: resolved?.discount_percentage ?? 0,
+            discount_amount:     resolved?.discount_amount ?? 0,
+            discount_mode:       resolved?.mode ?? 'percentage',
+            total_ht:            0,
+            total_ttc:           0,
+            manages_stock:       variant.manages_stock,
+            is_sold_by_weight:   variant.is_sold_by_weight ?? variant.product?.is_sold_by_weight ?? false,
+            max_stock:           variant.manages_stock
+              ? (variant.current_stock ?? null)
+              : null,
+            packaging_id:        packId,
+            pack_qty:            packQty,
+            packaging_label:     resolvedPkg?.label ?? null,
+            base_price_ht:       baseHt,
+            available_packagings: (variant.packagings ?? []).filter((p: ProductPackaging) => p.active !== false),
+            quantity_discounts:  variant.quantity_discounts ?? [],
           });
+
+          set({ items: [...state.items, newItem], _isDirty: true });
+          return newItem.id;
         },
 
         removeItem: (id) =>

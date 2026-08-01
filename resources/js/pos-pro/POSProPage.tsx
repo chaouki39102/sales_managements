@@ -71,6 +71,7 @@ import POSProScanbar from '@/pos-pro/components/POSProScanbar';
 import POSProWeightModal from '@/pos-pro/components/POSProWeightModal';
 import POSProSessionDrawer from '@/pos-pro/components/POSProSessionDrawer';
 import { TotalCard, CustomerCard } from '@/pos-pro/components/POSProTopCards';
+import { ReorderableTopCards } from '@/pos-pro/components/ReorderableTopCards';
 
 // ── مودالات مشتركة (lazy — نفس النهج في POSPage) ────────────────────────────
 const OpenSessionModal = React.lazy(() => import('@/pos/components/OpenSessionModal'));
@@ -426,10 +427,30 @@ export default function POSProPage() {
   }, [posTemplate, safeToast, companyData, settings.printMode, paperWidth, copies]);
 
   // ── زر الطباعة على اليسار: يطبع السلة الحالية كإيصال (بدون إتمام البيع) ──
-  const handlePrintCart = useCallback(() => {
+  //    يحاول توليد رقم "مسودة" (معاينة الرقم التالي) حتى تنجح الطباعة الحرارية
+  //    عبر WebUSB قبل إتمام البيع — الرقم غير مستهلَك ولا يُنشأ مستند.
+  const handlePrintCart = useCallback(async () => {
     if (pos.items.length === 0) { safeToast.error('السلة فارغة'); return; }
+
+    let draftNumber = '';
+    const typeCode = settings.defaultDocTypeCode;
+    const invType = documentTypes?.find(t => t.code === typeCode)
+      ?? documentTypes?.find(t => t.code === 'POS')
+      ?? documentTypes?.find(t => t.code === 'FV')
+      ?? documentTypes?.find(t => t.code === 'BL')
+      ?? documentTypes?.[0];
+
+    if (invType?.id) {
+      try {
+        const res = await documentsApi.nextNumber(invType.id);
+        draftNumber = res.next_number ?? '';
+      } catch {
+        draftNumber = '';
+      }
+    }
+
     const snap: POSSaleSnapshot = {
-      docNumber: '',
+      docNumber: draftNumber,
       docDate: new Date().toISOString().slice(0, 10),
       client: pos.client,
       items: pos.items.map(i => ({
@@ -457,7 +478,7 @@ export default function POSProPage() {
       newBalance: null,
     };
     void handlePrintDirect(snap);
-  }, [pos.items, pos.client, pos.totals, adjustedTotalTtcFinal, handlePrintDirect, safeToast]);
+  }, [pos.items, pos.client, pos.totals, adjustedTotalTtcFinal, handlePrintDirect, safeToast, documentTypes, settings.defaultDocTypeCode]);
 
   // ── إضافة منتج من المودال/المسح (يبقى المودال مفتوحاً لإضافة متعددة) ─────
   const handleAddItem = useCallback(async (v: ProductVariant) => {
@@ -487,7 +508,8 @@ export default function POSProPage() {
         if (!ok) return;
       }
     }
-    posRef.current.addItem(effective);
+    const addedId = posRef.current.addItem(effective);
+    if (addedId) setSelectedItemId(addedId);
     safeToast.success(effective.product?.name ?? 'تمت الإضافة', { id: 'pos-pro-last-added', duration: 1500 });
   }, [selectedPriceLevelId, priceLevelsList, allowNegSetting, safeToast, clearConfirm]);
 
@@ -497,12 +519,15 @@ export default function POSProPage() {
       safeToast.error('الكمية يجب أن تكون أكبر من صفر', { id: 'pos-pro-qty-err', duration: 1500 });
       return;
     }
-    if (!selectedItemId) {
-      safeToast.error('حدد صنفاً في السلة أولاً — الأسهم ↑↓ أو النقر', { id: 'pos-pro-qty-sel', duration: 1500 });
+    const items = posRef.current.items;
+    const targetId = selectedItemId ?? items[items.length - 1]?.id ?? null;
+    if (!targetId) {
+      safeToast.error('السلة فارغة — أضف صنفاً أولاً', { id: 'pos-pro-qty-sel', duration: 1500 });
       return;
     }
-    posRef.current.updateQty(selectedItemId, qty);
-    const itemName = posRef.current.items.find(i => i.id === selectedItemId)?.product_name ?? '';
+    if (!selectedItemId) setSelectedItemId(targetId);
+    posRef.current.updateQty(targetId, qty);
+    const itemName = items.find(i => i.id === targetId)?.product_name ?? '';
     safeToast.success(`${itemName} — الكمية ${qty}`, { id: 'pos-pro-qty-cmd', duration: 1200 });
   }, [selectedItemId, safeToast]);
 
@@ -1126,6 +1151,7 @@ export default function POSProPage() {
         <POSProRail
           canSell={canSell}
           isBusy={saleBusy}
+          onNewSale={handleNewSale}
           onOpenProducts={() => setDrawerOpen(true)}
           onPay={handleOpenPayment}
           onQuickPay={() => handleQuickPay(cashMode)}
@@ -1144,11 +1170,22 @@ export default function POSProPage() {
           onSettings={() => setShowSettings(true)}
         />
 
-        <div className="pos-pro-main">
-          <div className="pos-pro-top">
-            <CustomerCard client={pos.client ?? cashClient ?? null} onOpenCustomers={() => setCustomerModalOpen(true)} />
-            <TotalCard totals={pos.totals} adjustedTotal={adjustedTotalTtcFinal} invoiceDiscPct={pos.invoiceDiscountPct} />
-          </div>
+          <div className="pos-pro-main">
+            <ReorderableTopCards
+              customer={
+                <CustomerCard
+                  client={pos.client ?? cashClient ?? null}
+                  onOpenCustomers={() => setCustomerModalOpen(true)}
+                />
+              }
+              total={
+                <TotalCard
+                  totals={pos.totals}
+                  adjustedTotal={adjustedTotalTtcFinal}
+                  invoiceDiscPct={pos.invoiceDiscountPct}
+                />
+              }
+            />
 
           <div className="pos-pro-scan-row">
             <POSProScanbar
@@ -1184,8 +1221,10 @@ export default function POSProPage() {
               ref={cartHandleRef}
               items={pos.items}
               invoiceDiscountPct={pos.invoiceDiscountPct}
+              totals={pos.totals}
               onQty={pos.updateQty}
               onDiscount={pos.updateDiscount}
+              onDiscountAmount={pos.updateDiscountAmount}
               onPrice={pos.updatePrice}
               onPackaging={pos.updatePackaging}
               onWeight={(item) => setWeightTarget({ mode: 'edit', item })}
@@ -1234,7 +1273,15 @@ export default function POSProPage() {
         <Suspense fallback={null}>
           <CustomerSearchModal
             currentClient={pos.client}
-            onSelect={(c) => { pos.setClient(c); setCustomerModalOpen(false); }}
+            onSelect={(c) => {
+              pos.setClient(c);
+              // أعد فحص رصيد الزبون فوراً عند تغيير الزبون (يُكسر كاش الـ 30 ثانية)
+              if (c?.id) {
+                queryClient.invalidateQueries({ queryKey: tenantKeys.partyBalances.detail(slug ?? '', c.id) });
+                queryClient.invalidateQueries({ queryKey: tenantKeys.parties.detail(slug ?? '', c.id) });
+              }
+              setCustomerModalOpen(false);
+            }}
             onClose={() => setCustomerModalOpen(false)}
           />
         </Suspense>
@@ -1287,17 +1334,21 @@ export default function POSProPage() {
           name={weightTarget.mode === 'add'
             ? weightTarget.variant.product?.name ?? ''
             : weightTarget.item.product_name}
+          unitSymbol={weightTarget.mode === 'add'
+            ? weightTarget.variant.unit?.abbreviation ?? 'كغ'
+            : weightTarget.item.unit_symbol}
           priceHtPerKg={weightTarget.mode === 'add'
             ? weightTarget.variant.default_selling_price_ht
             : weightTarget.item.unit_price_ht / (weightTarget.item.pack_qty ?? 1)}
-          tvaRate={weightTarget.mode === 'add'
-            ? weightTarget.variant.tva?.rate ?? 0
-            : weightTarget.item.tva_rate}
+          quantityDiscounts={weightTarget.mode === 'add'
+            ? weightTarget.variant.quantity_discounts
+            : weightTarget.item.quantity_discounts}
           initialKg={weightTarget.mode === 'edit' ? weightTarget.item.quantity : undefined}
           confirmLabel={weightTarget.mode === 'edit' ? 'تحديث الوزن' : 'إضافة بالسلة'}
           onConfirm={(kg) => {
             if (weightTarget.mode === 'add') {
-              pos.addItem(weightTarget.variant, kg);
+              const addedId = pos.addItem(weightTarget.variant, kg);
+              if (addedId) setSelectedItemId(addedId);
               safeToast.success(weightTarget.variant.product?.name ?? 'تمت الإضافة', { id: 'pos-pro-last-added', duration: 1500 });
             } else {
               pos.updateQty(weightTarget.item.id, kg);
@@ -1350,7 +1401,8 @@ export default function POSProPage() {
           <ManualProductModal
             onClose={() => setManualOpen(false)}
             onAdd={(name, priceTtc, qty, tvaRate) => {
-              pos.addItem(makeFakeVariant(name, ttcToHt(priceTtc, tvaRate), tvaRate), qty);
+              const addedId = pos.addItem(makeFakeVariant(name, ttcToHt(priceTtc, tvaRate), tvaRate), qty);
+              if (addedId) setSelectedItemId(addedId);
               setManualOpen(false);
             }}
           />

@@ -9,6 +9,7 @@ use App\Services\CommercialDocumentService;
 use App\Services\PaymentSynchronizer;
 use App\Services\PartyBalanceService;
 use App\Models\CommercialDocument;
+use App\Models\DocumentType;
 use App\Services\NotificationService;
 use App\Models\Company;          // ✅ أضفنا هذا
 use Illuminate\Http\JsonResponse;
@@ -50,6 +51,40 @@ class CommercialDocumentController extends BaseApiController
         $exists = $query->exists();
 
         return response()->json(['exists' => $exists]);
+    }
+
+    /**
+     * معاينة الرقم التالي للوثيقة — رقم "مسودة" للطباعة قبل إتمام البيع.
+     * لا يُستهلك الرقم ولا يُنشأ مستند (قراءة فقط عبر previewNextDocumentNumber).
+     */
+    public function nextNumber(Request $request): JsonResponse
+    {
+        try {
+            $this->authorizeAction('create', CommercialDocument::class);
+
+            $documentTypeId = (int) $request->input('document_type_id');
+            if (!$documentTypeId) {
+                return $this->errorResponse('document_type_id مطلوب', 422);
+            }
+
+            $companyId = (int) app(\App\Services\CompanyContextService::class)->get();
+            $documentType = DocumentType::where('company_id', $companyId)
+                ->where('id', $documentTypeId)
+                ->first();
+
+            if (!$documentType) {
+                return $this->errorResponse('نوع الوثيقة غير موجود', 404);
+            }
+
+            $nextNumber = $this->commercialDocumentService->previewNextDocumentNumber($documentType, $companyId);
+
+            return $this->successResponse([
+                'document_type_id' => $documentType->id,
+                'next_number'      => $nextNumber,
+            ], 'معاينة الرقم التالي للوثيقة');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'nextNumber');
+        }
     }
 
     public function index(Request $request): JsonResponse

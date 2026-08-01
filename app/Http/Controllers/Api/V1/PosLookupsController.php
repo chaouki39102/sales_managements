@@ -25,6 +25,7 @@ class PosLookupsController extends Controller
                 ->where('active', true)->orderBy('name')->get(),
             'documentTypes'    => DB::table('document_types as dt')
                 ->join('document_base_operations as dbo', 'dt.document_base_operation_id', '=', 'dbo.id')
+                ->where('dt.company_id', $companyId)
                 ->where('dt.active', true)
                 ->select('dt.id', 'dt.name', 'dt.code', 'dbo.name as operation', 'dt.affects_accounting', 'dt.requires_party')
                 ->orderBy('dt.name')->get(),
