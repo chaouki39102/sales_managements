@@ -172,8 +172,8 @@ export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRe
             <i className="ti ti-x" />
           </button>
         )}
-        <button type="button" className="pp-scanbar-go" onClick={handleEnter} title="أضف">
-          <i className="ti ti-corner-down-left" />
+        <button type="button" className="pp-scanbar-go" onClick={handleEnter} aria-label="أضف">
+          <i className="ti ti-camera" />
         </button>
       </div>
 

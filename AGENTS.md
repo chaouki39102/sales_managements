@@ -43,6 +43,8 @@
 
 **Files modified**: `POSProCart.tsx`, `pos-pro.css` (`.pp-row-toggle`, `.pp-row-body--full`, `.pp-row-sub2`, nowrap header rules).
 
+**Follow-up — client-switch on avatar instead of button**: "remove btn تغيير الزبون and set when hover at the pp-avatar show تغيير الزبون when click at it show the modal". The `CustomerCard` "تغيير الزبون" button (`.pp-cust-change`) was removed; the avatar `.pp-avatar` is now a `<button>` that opens the customer modal directly. A `.pp-avatar-hint` pill (icon `ti-user-swap` + "تغيير الزبون", red tint for the debtor avatar) fades in on hover/focus BELOW the avatar (wrapped in `.pp-avatar-wrap`) so the full label is visible — no native `title` (avoids double tooltip). Being a `<button>` keeps it excluded from the ReorderableTopCards drag source (`closest('button, a, input…')` guard) so a click never starts a card swap. `.pp-cust-change` CSS deleted. Also: the scanbar "أضف" action is now a camera icon button (`ti-camera`, `aria-label="أضف"`, no tooltip). Files: `POSProTopCards.tsx`, `POSProScanbar.tsx`, `pos-pro.css`.
+
 ### Phase 44 — POS Pro Top Cards: Draggable Swap (Aug 1)
 
 **Request**: "set this two draggable — I can change the position one with other right to left" — the two top cards in POS Pro (`CustomerCard` + `TotalCard`, rendered in `.pos-pro-top` at `POSProPage.tsx`) must be swappable by drag to exchange their left/right positions in the RTL layout.

@@ -76,8 +76,16 @@ export function CustomerCard({ client, onOpenCustomers }: CustomerCardProps) {
   return (
     <div className={`pp-cust-card${isCash ? ' pp-cust-card--cash' : ''}`}>
       <div className="pp-cust-head">
-        <div className={`pp-avatar${isDebtor ? ' pp-avatar--debt' : ''}`}>
-          {client?.avatar ? <img src={client.avatar} alt="" /> : initials(client?.name ?? 'زبون الصندوق')}
+        <div className="pp-avatar-wrap">
+          <button
+            type="button"
+            className={`pp-avatar${isDebtor ? ' pp-avatar--debt' : ''}`}
+            onClick={onOpenCustomers}
+            aria-label="تغيير الزبون"
+          >
+            {client?.avatar ? <img src={client.avatar} alt="" /> : initials(client?.name ?? 'زبون الصندوق')}
+          </button>
+          <span className="pp-avatar-hint"><i className="ti ti-user-swap" /> تغيير الزبون</span>
         </div>
         <div className="pp-cust-id">
           <div className="pp-cust-name">
@@ -90,10 +98,6 @@ export function CustomerCard({ client, onOpenCustomers }: CustomerCardProps) {
             {client?.is_tva_exempt && <span className="exempt" title="معفى من ضريبة القيمة المضافة"><i className="ti ti-shield-check" /> معفى من TVA</span>}
           </div>
         </div>
-        <button type="button" className="btn btn-secondary pp-cust-change" onClick={onOpenCustomers}>
-          <i className="ti ti-users" />
-          تغيير الزبون
-        </button>
       </div>
 
       {(phone || client?.email || client?.address) && (
