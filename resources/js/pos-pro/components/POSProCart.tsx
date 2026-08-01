@@ -7,10 +7,10 @@
 // (+/-/إدخال مباشر، أو زر وزن للمنتجات بالوزن)، مبدّل التغليف، خصم النسبة،
 // إجمالي السطر، شارة المخزون المتبقي، وزر الحذف.
 // ════════════════════════════════════════════════════════════════════════════
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { formatDZD } from '@/pos/utils/calculations';
-import type { CartItem, ProductPackaging, PriceLevel } from '@/types';
+import type { CartItem, HeldCart, ProductPackaging, PriceLevel } from '@/types';
 
 interface Props {
   items:               CartItem[];
@@ -29,6 +29,19 @@ interface Props {
   onPriceLevelChange?: (plId: number | null) => void;
   note?:               string;
   onNoteChange?:       (note: string) => void;
+  selectedItemId?:     string | null;
+  onSelectItem?:       (id: string | null) => void;
+  heldCarts?:          HeldCart[];
+  saleNumber?:         number;
+  onNewSale?:          () => void;
+  onRestoreHeld?:      (id: string) => void;
+  onCloseHeld?:        (id: string) => void;
+  onCloseCurrent?:     () => void;
+}
+
+/** Handle برمجي للتمرير إلى صف محدد (يتوافق مع react-virtual) */
+export interface POSProCartHandle {
+  scrollToItemId: (id: string) => void;
 }
 
 /** عداد كمية مع إدخال مباشر يُثبَّت عند الخروج (Enter/blur) */
@@ -120,11 +133,13 @@ function StockBadge({ item }: { item: CartItem }) {
   );
 }
 
-export default function POSProCart({
+const POSProCart = forwardRef<POSProCartHandle, Props>(function POSProCart({
   items, invoiceDiscountPct, onQty, onDiscount, onPrice, onPackaging, onWeight,
   onRemove, onClear, onInvoiceDiscountChange, onOpenProducts,
   priceLevels = [], selectedPriceLevelId = null, onPriceLevelChange, note = '', onNoteChange,
-}: Props) {
+  selectedItemId, onSelectItem, heldCarts = [], saleNumber, onNewSale, onRestoreHeld,
+  onCloseHeld, onCloseCurrent,
+}, ref) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [noteOpen, setNoteOpen] = useState(false);
 
@@ -135,29 +150,85 @@ export default function POSProCart({
     overscan: 8,
   });
 
-  if (items.length === 0) {
-    return (
-      <div className="pp-cart pp-cart--empty">
-        <div className="pp-cart-empty-inner">
-          <i className="ti ti-basket-off" />
-          <h3>السلة فارغة</h3>
-          <p>اضغط زر «المنتجات» لإضافة أصناف، أو امسح باركود مباشرة</p>
-          <button type="button" className="btn btn-p" onClick={onOpenProducts}>
-            <i className="ti ti-plus" />
-            إضافة منتجات
-          </button>
-        </div>
-      </div>
-    );
-  }
+  useImperativeHandle(ref, () => ({
+    scrollToItemId: (id: string) => {
+      const idx = items.findIndex(i => i.id === id);
+      if (idx >= 0) virtualizer.scrollToIndex(idx, { align: 'auto' });
+    },
+  }), [items, virtualizer]);
+
+  // تبويبات السلة: مرتبة تصاعدياً حسب رقم السلة (سلة 1، سلة 2…) بحيث يبقى
+  // موضع كل تبويب ثابتاً — النقر يفعّل التبويب في مكانه دون إعادة ترتيب.
+  const tabs = useMemo(() => {
+    const currentNum = typeof saleNumber === 'number' && saleNumber > 0 ? saleNumber : 1;
+    const list: { key: string; kind: 'held' | 'current'; num: number; label: string; count: number }[] =
+      heldCarts.map(c => {
+        const m = (c.label ?? '').match(/\d+/);
+        return { key: c.id, kind: 'held' as const, num: m ? Number(m[0]) : 0, label: c.label || 'سلة', count: c.items.length };
+      });
+    list.push({ key: '__current__', kind: 'current', num: currentNum, label: `سلة ${currentNum}`, count: items.length });
+    list.sort((a, b) => a.num - b.num);
+    return list;
+  }, [heldCarts, saleNumber, items.length]);
 
   return (
-    <div className="pp-cart">
+    <div className={`pp-cart${items.length === 0 ? ' pp-cart--empty' : ''}`}>
       <div className="pp-cart-hd">
-        <span>
-          <i className="ti ti-shopping-cart" />
-          السلة <strong>{items.length}</strong> صنف
-        </span>
+        <div className="pp-cart-tabs">
+          {tabs.map(t => t.kind === 'held' ? (
+            <span
+              key={t.key}
+              role="button"
+              tabIndex={0}
+              className="pp-cart-tab pp-cart-tab--held"
+              onClick={() => onRestoreHeld?.(t.key)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRestoreHeld?.(t.key); } }}
+              title={`استرجاع "${t.label}" — ${t.count} صنف`}
+            >
+              <i className="ti ti-basket-pause" />
+              {t.label}
+              {onCloseHeld && (
+                <button
+                  type="button"
+                  className="pp-cart-tab-x"
+                  onClick={(e) => { e.stopPropagation(); onCloseHeld(t.key); }}
+                  title="إغلاق السلة"
+                  aria-label={`إغلاق ${t.label}`}
+                >
+                  <i className="ti ti-x" />
+                </button>
+              )}
+            </span>
+          ) : (
+            <span key={t.key} className="pp-cart-tab pp-cart-tab--current" title="السلة الحالية">
+              <i className="ti ti-shopping-cart" />
+              {t.label}
+              <em className="pp-cart-tab-count">{t.count} صنف</em>
+              {onCloseCurrent && (
+                <button
+                  type="button"
+                  className="pp-cart-tab-x"
+                  onClick={onCloseCurrent}
+                  title="إغلاق السلة الحالية"
+                  aria-label="إغلاق السلة الحالية"
+                >
+                  <i className="ti ti-x" />
+                </button>
+              )}
+            </span>
+          ))}
+          {onNewSale && (
+            <button
+              type="button"
+              className="pp-cart-new"
+              onClick={onNewSale}
+              title="بيع جديد"
+            >
+              <i className="ti ti-plus" />
+            </button>
+          )}
+        </div>
+
         <div className="pp-cart-hd-actions">
           {priceLevels.length > 0 && (
             <select
@@ -207,7 +278,18 @@ export default function POSProCart({
         </div>
       )}
 
-      <div ref={scrollRef} className="pp-cart-scroll">
+      {items.length === 0 ? (
+        <div className="pp-cart-empty-inner">
+          <i className="ti ti-basket-off" />
+          <h3>السلة فارغة</h3>
+          <p>اضغط زر «المنتجات» لإضافة أصناف، أو امسح باركود مباشرة</p>
+          <button type="button" className="btn btn-p" onClick={onOpenProducts}>
+            <i className="ti ti-plus" />
+            إضافة منتجات
+          </button>
+        </div>
+      ) : (
+        <div ref={scrollRef} className="pp-cart-scroll">
         <div
           className="pp-cart-vspace"
           style={{ height: virtualizer.getTotalSize(), position: 'relative' }}
@@ -216,12 +298,15 @@ export default function POSProCart({
             const item = items[vRow.index];
             const packagings = item.available_packagings ?? [];
             const showPack = packagings.length > 1;
+            const isSelected = selectedItemId === item.id;
             return (
               <div
                 key={item.id}
                 ref={virtualizer.measureElement}
                 data-index={vRow.index}
-                className="pp-row"
+                className={`pp-row${isSelected ? ' pp-row--selected' : ''}`}
+                onClick={() => onSelectItem?.(item.id)}
+                title={isSelected ? 'الصنف المحدد — *رقم+Enter لضبط الكمية' : 'انقر لتحديد الصنف'}
                 style={{ transform: `translateY(${vRow.start}px)` }}
               >
                 <div className="pp-row-main">
@@ -295,6 +380,9 @@ export default function POSProCart({
           })}
         </div>
       </div>
+      )}
     </div>
   );
-}
+});
+
+export default POSProCart;

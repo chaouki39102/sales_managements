@@ -5,6 +5,58 @@
 - **When reading how API data is returned**, ALWAYS check `extractData()` in `resources/js/lib/api/core/client.ts` — it is the single standard bridge between backend and frontend. Never assume the raw HTTP response shape reaches consumers directly.
 
 ## Date
+2026-08-01
+
+### Phase 40 — Audit Log Writer: `DataAuditSubscriber` (Aug 1)
+
+**Problem**: سجل التدقيق page showed "0 سجل" permanently. Root cause: the `audits` table existed with a working read side (`AuditController`/`AuditService`/`AuditLogPage.tsx`) but NOTHING ever wrote to it — no `Audit::create()` anywhere, no audit observer/subscriber registered.
+
+**Fix**: a single event subscriber captures create/update/delete on every `HasCompany` model — no per-model observers needed.
+
+- **New file** `app/Listeners/DataAuditSubscriber.php` — `subscribe(Dispatcher)` listens to the **wildcard** Eloquent events `eloquent.created: *`, `eloquent.updated: *`, `eloquent.deleted: *` (Laravel fires namespaced events like `eloquent.updated: App\Models\Product`, NOT bare `eloquent.updated` — a bare-name listener never fires). Wildcard handlers receive `(string $eventName, array $payload)` — the model is `$payload[0]`.
+- **Scope**: audits any model using the `HasCompany` trait (all ~55 company-scoped models). `Audit::class` itself is excluded (recursion guard — the Audit model also uses `HasCompany`).
+- **Diffs**: `created` → `old=[]`, `new=attributes`; `updated` → only **changed** keys via `$model->getChanges()` (old from `getOriginal`, new from `getAttribute`), skips no-op saves; `deleted` → `old=attributes`, `new=[]`. This feeds the existing `DiffView` in `AuditLogPage.tsx`.
+- **Metadata**: `company_id` from the model's own `company_id` (fallback `CompanyContextService::get()`); `user_id`/`user_type` from `Auth::user()` (null in console); `url`/`ip_address`/`user_agent` from the current request, skipped in console via `app()->runningInConsole()`; `user_agent` truncated to the 1023-char column limit.
+- **Registered** in `app/Providers/EventServiceProvider.php` alongside `NotificationEventSubscriber` via `Event::subscribe(DataAuditSubscriber::class)`.
+
+**Key architectural rules**:
+- Listen to `eloquent.<event>: *` wildcards, never bare `eloquent.<event>` — Laravel's `fireModelEvent()` dispatches `eloquent.{$event}: {ModelClass}` (verified in `vendor/laravel/.../Eloquent/Concerns/HasEvents.php:225`).
+- Wildcard listener signatures must be `(string $eventName, array $payload)` — the Dispatcher calls wildcard class listeners with `($event, $payload)` where `$payload` is an array-wrapped model (`createClassListener`), NOT spread args like non-wildcard listeners.
+- A model event fires only if the save was actually dirty (`saving/saved` always fire, but `updating/updated` are skipped when nothing changed). Use `$model->getChanges()` to detect real updates and to build the diff.
+- Console/seeders/tinker writes get null user + null request metadata but still audit — the writes during `Company::firstOrCreate` in tinker produce real rows (harmless).
+
+**Verification**: tinker smoke test — created/updated/deleted all produce audit rows with correct `company_id`, event, and old/new diffs (verified `updated Product#53 old={"name":...} new={"name":...}`). `php -l` clean on both files. `npx tsc --noEmit` clean. `npm test` — 174/174 pass. (Note: `php artisan test` / PHPUnit not runnable in this environment — Pest/PHPUnit are declared in composer.json but NOT installed in vendor here; pre-existing.) Uncommitted: `AuditLogPage.tsx` shadcn Table demo from the earlier visual swap.
+
+### Phase 39 — POS Pro: Qty-in-Search + Selected-Row Steppers + Cart Navigation + Held-Sale Chips (Aug 1)
+
+**Request**: port classic-POS ergonomics into POS Pro — (1) qty-in-search (`*N` + Enter sets the selected cart row's quantity), (2) qty steppers that target the SELECTED cart row ("the sold +"), (3) ArrowUp/Down in the empty search field navigate cart rows, (4) held-sale chips (سلة 1، سلة 2…) in the cart header plus a "+" new-sale button that holds the current cart and opens a fresh numbered cart.
+
+**Architecture** (POS Pro cart is independent: `usePosProCart`, zustand + persist key `pos-pro-cart`):
+- **Selection model**: rows selectable via click (`onSelectItem`), keyboard arrows when the search field is empty, or the new-sale/focusCart shortcut. Selection state lives in `POSProPage` (`selectedItemId`), not the store — survives row re-renders but not the page unmount.
+- **`*N` qty command**: `POSProScanbar` Enter parses `/^\*(\d+)$/` → `onQtyCommand(N)` (clears + re-focuses). Page applies to `selectedItemId`; errors with a toast if no row is selected or qty ≤ 0. Mirrors classic `POSPage.tsx` syntax.
+- **Selected-row steppers**: keyboard handler targets the selected row (fallback: last item, classic behavior) for qtyUp/qtyDown; also Enter / Ctrl++ / NumpadAdd → +1, Ctrl+- / NumpadSubtract → −1, and Delete removes the selected row.
+- **Empty-search arrows**: scanbar keydown routes ArrowUp/Down to `onCartNav('up'|'down')` when `code.trim()` is empty (results list otherwise). Page moves selection cyclically and `requestAnimationFrame`-scrolls via the imperative handle.
+- **`POSProCart` is now `forwardRef<POSProCartHandle>`** exposing `scrollToItemId` (via `virtualizer.scrollToIndex`). Selected rows get `.pp-row--selected` (em-colored inset bar + tinted bg).
+- **Held tabs + new sale**: the cart header renders a **tab strip** like a browser — ALWAYS visible, even when the cart is empty (empty-state moved into the scroll body). Tabs are **sorted ascending by cart number** (`سلة 1`، `سلة 2`…) so every tab's position is stable — clicking a held tab activates it **in place** (highlighted) without reordering the strip. One `.pp-cart-tab--held` (clickable `span[role=button]`, `ti-basket-pause`) per held cart + the active `.pp-cart-tab--current` span labeled `سلة {saleNumber}` with a `.pp-cart-tab-count` item-count pill + a textless `+` icon-only `.pp-cart-new` button (`ti-plus`, no label). Every tab (held + current) has an `.pp-cart-tab-x` × close button (`e.stopPropagation()` on held tabs). `saleNumber` (default 1) lives in the store and is the **cart identity**: `holdCart` labels `سلة {saleNumber}` and bumps to the next free number (skips numbers still used by held labels); `restoreCart` parses the label digits and sets `saleNumber` back so returning to `سلة 1` re-focuses that tab; `bumpSaleNumber` (empty-cart new-sale / close paths) also skips collisions.
+- **Tab lifecycle** (POS Pro = browser tabs): `handleRestoreHeld` ALWAYS re-holds the current cart first when switching (no `_isDirty` check — a restored-then-untouched cart is preserved as a tab instead of vanishing). `handleCloseHeld(id)` deletes a held tab; `handleCloseCurrent()` clears + bumps (fresh `سلة N+1`) — both confirm when the cart has items. `handleCompleteSale` now calls `bumpSaleNumber()` after clearing, so a confirmed payment **closes the sold cart** and leaves a fresh numbered empty cart active; the receipt's `onNewSale` therefore only closes the receipt (+ client modal per `settings.openClientOnNewSale`) instead of re-bumping.
+
+**Key architectural rules**:
+- Selected-row targeting uses the id, never index math at handler time — ids are stable across remove/merge; the last-item fallback mirrors classic POS exactly.
+- Selection is pure page state; the cart is a controlled component (`selectedItemId`/`onSelectItem`). Arrow nav lives in the scanbar (input focus is there) and re-derives index from the current `items` snapshot each press.
+- qty-in-search must clear + refocus the scanbar so a physical scanner's next scan isn't polluted by the `*N` text.
+
+**Files modified**:
+- `pos-pro/components/POSProScanbar.tsx` — `onQtyCommand`/`onCartNav` props, `*N` Enter parse, empty-arrow cart nav
+- `pos-pro/components/POSProCart.tsx` — `forwardRef` + `POSProCartHandle.scrollToItemId`, `selectedItemId`/`onSelectItem`, tab strip always rendered (empty-state in scroll body), `.pp-cart-tab-x` close buttons, `pp-row--selected`
+- `pos-pro/store/usePosProCart.ts` — `saleNumber: 1`, `holdCart` labels `سلة N` + bumps, `bumpSaleNumber`, partialize includes `saleNumber`/`heldCarts`/`_isDirty`
+- `pos-pro/hooks/usePosPro.ts` — exposes `saleNumber`, `bumpSaleNumber`
+- `pos-pro/hooks/usePosProKeyboardShortcuts.ts` — `selectedItemId` in state/setters, selected-row qty steppers + Delete + arrow nav, `newSale` shortcut, `focusCart` selects last row
+- `pos-pro/POSProPage.tsx` — `handleQtyCommand`, `moveCartSelection`, `handleNewSale` (hold→bump), `handleRestoreHeld` (always auto-hold current first), `handleCloseHeld`/`handleCloseCurrent`, `handleCompleteSale` bumps after clearing, `cartHandleRef`, selection cleared on remove/clear/restore, hint bar documents `*N` + arrows
+- `resources/css/theme/pos-pro.css` — `.pp-cart-tabs`, `.pp-cart-tab`/`--current`/`--held`, `.pp-cart-tab-count`, icon-only `.pp-cart-new`; `.pp-row--selected`; `.pp-cart-hd` now `flex-wrap`
+
+**Verification**: `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors, 185 precache entries.
+
+## Date
 2026-07-31
 
 ### Phase 38 — Sticker Designer: Multiple Paper Sizes + Test Print (July 31)

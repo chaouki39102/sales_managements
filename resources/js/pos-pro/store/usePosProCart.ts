@@ -32,6 +32,8 @@ interface PosProCartState {
   invoiceDiscountPct: number;
   payments:           DocumentPayment[];
   heldCarts:          HeldCart[];
+  /** عداد رقم السلة — يزيد عند كل بيع جديد/تعليق ليترقّم السلات: سلة 1، سلة 2… */
+  saleNumber:         number;
   _isDirty:           boolean;
 
   addItem:              (variant: ProductVariant, qty?: number, packaging?: ProductPackaging | null) => void;
@@ -49,6 +51,7 @@ interface PosProCartState {
   holdCart:   (params: { items: CartItem[]; totals: CartTotals; client: Party | null; label?: string }) => void;
   restoreCart:          (id: string) => void;
   deleteHeldCart:       (id: string) => void;
+  bumpSaleNumber:       () => void;
   markClean:            () => void;
 }
 
@@ -70,6 +73,7 @@ function createCartStore(persistKey: string) {
         invoiceDiscountPct: 0,
         payments:           [],
         heldCarts:          [],
+        saleNumber:         1,
         _isDirty:           false,
 
         addItem: (variant, qty = 1, packaging = null) => {
@@ -275,31 +279,55 @@ function createCartStore(persistKey: string) {
           if (!items.length) return;
           const held: HeldCart = {
             id:         nanoid(6),
-            label:      label ?? `عربة ${get().heldCarts.length + 1}`,
+            label:      label ?? `سلة ${get().saleNumber}`,
             items:      [...items],
             totals,
             client:     client ?? null,
             created_at: new Date().toISOString(),
           };
-          set(s => ({
-            heldCarts: [...s.heldCarts, held],
-            items: [], client: null, notes: '', invoiceDiscountPct: 0, payments: [], _isDirty: false,
-          }));
+          set(s => {
+            // الرقم الجديد يجب ألا يتصادم مع رقم سلة معلقة (حتى بعد الاسترجاع)
+            const heldNums = new Set(s.heldCarts.map(c => {
+              const m = (c.label ?? '').match(/\d+/);
+              return m ? Number(m[0]) : 0;
+            }));
+            let next = s.saleNumber + 1;
+            while (heldNums.has(next)) next++;
+            return {
+              heldCarts: [...s.heldCarts, held],
+              items: [], client: null, notes: '', invoiceDiscountPct: 0, payments: [], _isDirty: false,
+              saleNumber: next,
+            };
+          });
         },
 
         restoreCart: (id) => {
           const held = get().heldCarts.find(c => c.id === id);
           if (!held) return;
-          set(s => ({
-            items:      held.items,
-            client:     held.client ?? null,
-            heldCarts:  s.heldCarts.filter(c => c.id !== id),
-            _isDirty:   true,
-          }));
+          set(s => {
+            const m = (held.label ?? '').match(/\d+/);
+            return {
+              items:      held.items,
+              client:     held.client ?? null,
+              heldCarts:  s.heldCarts.filter(c => c.id !== id),
+              saleNumber: m ? Number(m[0]) : s.saleNumber,
+              _isDirty:   false,
+            };
+          });
         },
 
         deleteHeldCart: (id) =>
           set(s => ({ heldCarts: s.heldCarts.filter(c => c.id !== id) })),
+
+        bumpSaleNumber: () => set(s => {
+          const heldNums = new Set(s.heldCarts.map(c => {
+            const m = (c.label ?? '').match(/\d+/);
+            return m ? Number(m[0]) : 0;
+          }));
+          let next = s.saleNumber + 1;
+          while (heldNums.has(next)) next++;
+          return { saleNumber: next };
+        }),
 
         markClean: () => set({ _isDirty: false }),
       }),
@@ -312,6 +340,7 @@ function createCartStore(persistKey: string) {
           invoiceDiscountPct: state.invoiceDiscountPct,
           payments:           state.payments,
           heldCarts:          state.heldCarts,
+          saleNumber:         state.saleNumber,
           _isDirty:           true,
         }),
       },

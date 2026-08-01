@@ -16,6 +16,10 @@ interface Props {
   onAdd:      (variant: ProductVariant) => void;
   maxResults?: number;
   focusRef?:   (el: HTMLInputElement | null) => void;
+  /** أمر كمية: *رقم في الحقل + Enter → onQtyCommand(رقم) */
+  onQtyCommand?: (qty: number) => void;
+  /** عندما يكون الحقل فارغاً: الأسهم تتنقل في السلة (اختيار صف أعلى/أسفل) */
+  onCartNav?:   (dir: 'up' | 'down') => void;
 }
 
 function variantMatches(v: ProductVariant, q: string): boolean {
@@ -38,7 +42,7 @@ function variantExactBarcode(v: ProductVariant, code: string): boolean {
   );
 }
 
-export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRef }: Props) {
+export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRef, onQtyCommand, onCartNav }: Props) {
   const [code, setCode] = useState('');
   const [open, setOpen] = useState(false);
   const [hi, setHi]     = useState(0);
@@ -56,7 +60,7 @@ export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRe
 
   const results = useMemo(() => {
     const q = debouncedQuery;
-    if (!q) return [];
+    if (!q || q.startsWith('*')) return [];
     return variants.filter(v => variantMatches(v, q)).slice(0, maxResults);
   }, [variants, debouncedQuery, maxResults]);
 
@@ -95,6 +99,14 @@ export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRe
   };
 
   const handleEnter = () => {
+    const qtyMatch = code.trim().match(/^\*(\d+)$/);
+    if (qtyMatch) {
+      onQtyCommand?.(parseInt(qtyMatch[1], 10));
+      setCode('');
+      setOpen(false);
+      inputRef.current?.focus();
+      return;
+    }
     if (exact) { pick(exact); return; }
     if (results.length > 0) { pick(results[Math.min(hi, results.length - 1)]); return; }
     setOpen(false);
@@ -102,6 +114,15 @@ export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRe
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // حقل فارغ → الأسهم تتنقل بين صفوف السلة (وليس نتائج البحث)
+    if (!code.trim() && onCartNav) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        setOpen(false);
+        onCartNav(e.key === 'ArrowDown' ? 'down' : 'up');
+        return;
+      }
+    }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setOpen(true);
@@ -130,9 +151,13 @@ export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRe
             focusRef?.(el);
           }}
           value={code}
-          onChange={(e) => { setCode(e.target.value); setOpen(true); }}
+          onChange={(e) => {
+            const v = e.target.value;
+            setCode(v);
+            setOpen(!!v.trim() && !v.trim().startsWith('*'));
+          }}
           onKeyDown={handleKeyDown}
-          onFocus={() => { if (code.trim()) setOpen(true); }}
+          onFocus={() => { if (code.trim() && !code.trim().startsWith('*')) setOpen(true); }}
           placeholder="امسح الباركود أو ابحث عن منتج…"
           autoComplete="off"
           autoCorrect="off"
@@ -152,7 +177,7 @@ export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRe
         </button>
       </div>
 
-      {open && code.trim() && (
+      {open && code.trim() && !code.trim().startsWith('*') && (
         <div className="pp-scanbar-dd">
           {results.length === 0 ? (
             <div className="pp-scanbar-dd-empty">

@@ -16,6 +16,7 @@ export function usePosPro(fiscalStampEnabled = true) {
   const payments           = usePosProCart(s => s.payments);
   const notes              = usePosProCart(s => s.notes);
   const heldCarts          = usePosProCart(s => s.heldCarts);
+  const saleNumber         = usePosProCart(s => s.saleNumber);
 
   const addItem              = usePosProCart(s => s.addItem);
   const removeItem           = usePosProCart(s => s.removeItem);
@@ -31,6 +32,7 @@ export function usePosPro(fiscalStampEnabled = true) {
   const setInvoiceDiscountPct = usePosProCart(s => s.setInvoiceDiscountPct);
   const restoreCart          = usePosProCart(s => s.restoreCart);
   const deleteHeldCart       = usePosProCart(s => s.deleteHeldCart);
+  const bumpSaleNumber       = usePosProCart(s => s.bumpSaleNumber);
 
   const totals = useMemo(
     () => calcTotals(items, invoiceDiscountPct, fiscalStampEnabled, client?.is_tva_exempt ?? false),
@@ -43,13 +45,13 @@ export function usePosPro(fiscalStampEnabled = true) {
 
   return useMemo(() => ({
     items, client, invoiceDiscountPct, payments, notes, totals,
-    heldCarts, holdCart, restoreCart, deleteHeldCart,
+    heldCarts, saleNumber, holdCart, restoreCart, deleteHeldCart, bumpSaleNumber,
     addItem, removeItem, updateQty,
     updateDiscount, updateDiscountAmount, updatePrice, updatePackaging,
     clearCart, setClient, setNotes, setPayments, setInvoiceDiscountPct,
   }), [
     items, client, invoiceDiscountPct, payments, notes, totals,
-    heldCarts, holdCart, restoreCart, deleteHeldCart,
+    heldCarts, saleNumber, holdCart, restoreCart, deleteHeldCart, bumpSaleNumber,
     addItem, removeItem, updateQty,
     updateDiscount, updateDiscountAmount, updatePrice, updatePackaging,
     clearCart, setClient, setNotes, setPayments, setInvoiceDiscountPct,

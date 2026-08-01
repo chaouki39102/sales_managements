@@ -65,7 +65,7 @@ import type { PaginatedResponse, CommercialDocument } from '@/lib/api/core/types
 
 // ── مكوّنات POS PRO ───────────────────────────────────────────────────────────
 import POSProRail from '@/pos-pro/components/POSProRail';
-import POSProCart from '@/pos-pro/components/POSProCart';
+import POSProCart, { type POSProCartHandle } from '@/pos-pro/components/POSProCart';
 import POSProProductDrawer from '@/pos-pro/components/POSProProductDrawer';
 import POSProScanbar from '@/pos-pro/components/POSProScanbar';
 import POSProWeightModal from '@/pos-pro/components/POSProWeightModal';
@@ -286,6 +286,8 @@ export default function POSProPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [saleBusy, setSaleBusy] = useState(false);
   const cartWrapRef = useRef<HTMLDivElement>(null);
+  const cartHandleRef = useRef<POSProCartHandle>(null);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const receiptSnapshotRef = useRef<POSSaleSnapshot | null>(null);
   const [pinModal, setPinModal] = useState<{
     requestedDiscount: number;
@@ -489,6 +491,81 @@ export default function POSProPage() {
     safeToast.success(effective.product?.name ?? 'تمت الإضافة', { id: 'pos-pro-last-added', duration: 1500 });
   }, [selectedPriceLevelId, priceLevelsList, allowNegSetting, safeToast, clearConfirm]);
 
+  // ── أمر الكمية في حقل البحث: *رقم + Enter يضبط كمية الصنف المحدد ──────────
+  const handleQtyCommand = useCallback((qty: number) => {
+    if (qty <= 0) {
+      safeToast.error('الكمية يجب أن تكون أكبر من صفر', { id: 'pos-pro-qty-err', duration: 1500 });
+      return;
+    }
+    if (!selectedItemId) {
+      safeToast.error('حدد صنفاً في السلة أولاً — الأسهم ↑↓ أو النقر', { id: 'pos-pro-qty-sel', duration: 1500 });
+      return;
+    }
+    posRef.current.updateQty(selectedItemId, qty);
+    const itemName = posRef.current.items.find(i => i.id === selectedItemId)?.product_name ?? '';
+    safeToast.success(`${itemName} — الكمية ${qty}`, { id: 'pos-pro-qty-cmd', duration: 1200 });
+  }, [selectedItemId, safeToast]);
+
+  // ── حركة التحديد في السلة (الأسهم عندما يكون حقل البحث فارغاً) ────────────
+  const moveCartSelection = useCallback((dir: 'up' | 'down') => {
+    const items = posRef.current.items;
+    if (items.length === 0) return;
+    const cur = selectedItemId ?? null;
+    let idx = cur ? items.findIndex(i => i.id === cur) : -1;
+    if (idx === -1) idx = dir === 'down' ? 0 : items.length - 1;
+    else idx = dir === 'down' ? Math.min(idx + 1, items.length - 1) : Math.max(idx - 1, 0);
+    const next = items[idx];
+    setSelectedItemId(next.id);
+    requestAnimationFrame(() => cartHandleRef.current?.scrollToItemId(next.id));
+  }, [selectedItemId]);
+
+  // ── بيع جديد: تعليق السلة الحالية (إن لم تكن فارغة) + سلة فارغة برقم جديد ─
+  const handleNewSale = useCallback(() => {
+    clearEditingState();
+    const st = usePosProCart.getState();
+    if (st.items.length > 0) {
+      posRef.current.holdCart();
+    } else {
+      posRef.current.clearCart();
+      posRef.current.bumpSaleNumber();
+    }
+    setSelectedItemId(null);
+    if (settings.openClientOnNewSale) {
+      requestAnimationFrame(() => setCustomerModalOpen(true));
+    }
+  }, [clearEditingState, settings.openClientOnNewSale]);
+
+  // ── استرجاع سلة معلقة من تبويب رأس السلة (مع إعادة تعليق السلة الحالية) ──
+  const handleRestoreHeld = useCallback((id: string) => {
+    const st = usePosProCart.getState();
+    if (st.items.length > 0) posRef.current.holdCart();
+    pos.restoreCart(id);
+    setSelectedItemId(null);
+  }, [pos]);
+
+  // ── إغلاق تبويب سلة معلقة ─────────────────────────────────────────────────
+  const handleCloseHeld = useCallback((id: string) => {
+    clearConfirm.confirm('إغلاق هذه السلة؟ ستفقد أصنافها.').then(ok => {
+      if (ok) pos.deleteHeldCart(id);
+    });
+  }, [clearConfirm, pos]);
+
+  // ── إغلاق السلة الحالية (تبويبها) → سلة فارغة جديدة برقم جديد ────────────
+  const handleCloseCurrent = useCallback(() => {
+    const st = usePosProCart.getState();
+    const doClose = () => {
+      clearEditingState();
+      pos.clearCart();
+      pos.bumpSaleNumber();
+      setSelectedItemId(null);
+    };
+    if (st.items.length > 0) {
+      clearConfirm.confirm('إغلاق السلة الحالية؟ ستفقد أصنافها.').then(ok => { if (ok) doClose(); });
+    } else {
+      doClose();
+    }
+  }, [clearConfirm, clearEditingState, pos]);
+
   // ── إتمام البيع ───────────────────────────────────────────────────────────
   const handleCompleteSale = useCallback(async (params: {
     amountPaid: number;
@@ -672,6 +749,7 @@ export default function POSProPage() {
       posRef.current.clearCart();
       posRef.current.setInvoiceDiscountPct(0);
       posRef.current.setPayments([]);
+      posRef.current.bumpSaleNumber();
       setPaymentOpen(false);
 
       const st = (fn: () => void, ms: number) => {
@@ -1009,19 +1087,21 @@ export default function POSProPage() {
 
   usePosProKeyboardShortcuts(
     { posRef: posRef as { readonly current: any }, overridesRef: kbOverridesRef, scanRef, cartRef: cartWrapRef },
-    { isEmpty: pos.items.length === 0, hasSession: !!currentSession, anyModalOpen },
+    { isEmpty: pos.items.length === 0, hasSession: !!currentSession, anyModalOpen, selectedItemId },
     {
       setDrawerOpen, setPaymentOpen, setHeldOpen, setReturnsOpen, setHelpOpen,
       setManualOpen, setShowSessionInvoices, setShowSettings, setSessionOpen,
-      setShowScanner, setCustomerModalOpen,
+      setShowScanner, setCustomerModalOpen, setSelectedItemId,
     },
     {
       toggleFullscreen,
-      handleClearCart: () => clearConfirm.confirm('مسح السلة بالكامل؟').then(ok => { if (ok) { clearEditingState(); pos.clearCart(); } }),
+      handleClearCart: () => clearConfirm.confirm('مسح السلة بالكامل؟').then(ok => { if (ok) { clearEditingState(); pos.clearCart(); setSelectedItemId(null); } }),
       handleOpenDrawer: () => void handleOpenDrawer(),
       handleQuickCash: () => { void handleQuickPay(cashMode); },
       handlePrintCart,
       closeTopModal,
+      handleNewSale,
+      moveCartSelection,
     },
   );
 
@@ -1072,7 +1152,13 @@ export default function POSProPage() {
           </div>
 
           <div className="pos-pro-scan-row">
-            <POSProScanbar variants={allVariants} onAdd={handleAddItem} focusRef={(el) => { scanRef.current = el; }} />
+            <POSProScanbar
+              variants={allVariants}
+              onAdd={handleAddItem}
+              focusRef={(el) => { scanRef.current = el; }}
+              onQtyCommand={handleQtyCommand}
+              onCartNav={(dir) => moveCartSelection(dir)}
+            />
             <button
               type="button"
               className="pp-print-btn pp-cam-btn"
@@ -1096,6 +1182,7 @@ export default function POSProPage() {
 
           <div className="pos-pro-cart-wrap" ref={cartWrapRef}>
             <POSProCart
+              ref={cartHandleRef}
               items={pos.items}
               invoiceDiscountPct={pos.invoiceDiscountPct}
               onQty={pos.updateQty}
@@ -1103,8 +1190,8 @@ export default function POSProPage() {
               onPrice={pos.updatePrice}
               onPackaging={pos.updatePackaging}
               onWeight={(item) => setWeightTarget({ mode: 'edit', item })}
-              onRemove={pos.removeItem}
-              onClear={() => clearConfirm.confirm('مسح السلة بالكامل؟').then(ok => { if (ok) { clearEditingState(); pos.clearCart(); } })}
+              onRemove={(id) => { pos.removeItem(id); setSelectedItemId(prev => prev === id ? null : prev); }}
+              onClear={() => clearConfirm.confirm('مسح السلة بالكامل؟').then(ok => { if (ok) { clearEditingState(); pos.clearCart(); setSelectedItemId(null); } })}
               onInvoiceDiscountChange={handleInvoiceDiscountChange}
               onOpenProducts={() => setDrawerOpen(true)}
               priceLevels={priceLevelsList}
@@ -1112,13 +1199,21 @@ export default function POSProPage() {
               onPriceLevelChange={applyPriceLevel}
               note={pos.notes}
               onNoteChange={(n) => pos.setNotes(n)}
+              selectedItemId={selectedItemId}
+              onSelectItem={setSelectedItemId}
+              heldCarts={pos.heldCarts}
+              saleNumber={pos.saleNumber}
+              onNewSale={handleNewSale}
+              onRestoreHeld={handleRestoreHeld}
+              onCloseHeld={handleCloseHeld}
+              onCloseCurrent={handleCloseCurrent}
             />
           </div>
 
           {!productsLoading && (
             <div className="pos-pro-hint">
               <i className="ti ti-keyboard" />
-              F1 تخصيص الاختصارات · F2 البحث · F3 دفع سريع · F4 الدفع · F5 تعليق · F6 صنف يدوي · F7 المعلقة · F8 الجلسة · F9 الطباعة · F10 مرتجع · F11 ملء الشاشة · F12 مسح السلة · الباركود يُمسح في الشريط العلوي
+              F1 تخصيص الاختصارات · F2 البحث · F3 دفع سريع · F4 الدفع · F5 تعليق · F6 صنف يدوي · F7 المعلقة · F8 الجلسة · F9 الطباعة · F10 مرتجع · F11 ملء الشاشة · F12 مسح السلة · *رقم+Enter لضبط كمية الصنف المحدد · الأسهم ↑↓ تتنقل في السلة عند فراغ البحث
             </div>
           )}
         </div>

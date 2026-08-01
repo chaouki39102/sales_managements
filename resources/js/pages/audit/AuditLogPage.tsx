@@ -11,6 +11,7 @@ import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import Pagination from '@/components/ui/Pagination';
 import Card from '@/components/ui/Card';
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/shadcn/table';
 import type { BackendMeta } from '@/hooks/usePagination';
 
 const EVENT_CONFIG: Record<string, { label: string; variant: 'success' | 'info' | 'danger'; icon: string }> = {
@@ -113,59 +114,59 @@ export default function AuditLogPage() {
         ) : (
           <>
             <div style={{ overflowX: 'auto' }}>
-              <table className="audit-tbl">
-                <thead>
-                  <tr>
-                    <th className="audit-th">التاريخ</th>
-                    <th className="audit-th">المستخدم</th>
-                    <th className="audit-th">الحدث</th>
-                    <th className="audit-th">النوع</th>
-                    <th className="audit-th">الرقم</th>
-                    <th className="audit-th" style={{ width: 40 }} />
-                  </tr>
-                </thead>
-                <tbody>
+              <Table className="audit-tbl">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="audit-th">التاريخ</TableHead>
+                    <TableHead className="audit-th">المستخدم</TableHead>
+                    <TableHead className="audit-th">الحدث</TableHead>
+                    <TableHead className="audit-th">النوع</TableHead>
+                    <TableHead className="audit-th">الرقم</TableHead>
+                    <TableHead className="audit-th" style={{ width: 40 }} />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {items.map(log => {
                     const evt = EVENT_CONFIG[log.event] ?? EVENT_CONFIG.updated;
                     const isExpanded = expandedId === log.id;
                     const typeLabel = TYPE_LABELS[log.auditable_type.split('\\').pop() ?? ''] ?? log.auditable_type.split('\\').pop();
                     return (
                       <React.Fragment key={log.id}>
-                        <tr
+                        <TableRow
                           className={`audit-tr-hover ${isExpanded ? 'audit-tr-active' : ''}`}
                           onClick={() => setExpandedId(isExpanded ? null : log.id)}
                           style={{ cursor: 'pointer' }}
                         >
-                          <td className="audit-td" style={{ color: 'var(--t3)', fontSize: 12, whiteSpace: 'nowrap' }}>
+                          <TableCell className="audit-td" style={{ color: 'var(--t3)', fontSize: 12, whiteSpace: 'nowrap' }}>
                             {formatDate(log.created_at)}
-                          </td>
-                          <td className="audit-td">
+                          </TableCell>
+                          <TableCell className="audit-td">
                             <span style={{ fontWeight: 600 }}>
                               {log.user?.name ?? `#${log.user_id}`}
                             </span>
-                          </td>
-                          <td className="audit-td">
+                          </TableCell>
+                          <TableCell className="audit-td">
                             <Badge variant={evt.variant} noDot>
                               <i className={`ti ${evt.icon}`} style={{ marginLeft: 4, fontSize: 11 }} />
                               {evt.label}
                             </Badge>
-                          </td>
-                          <td className="audit-td" style={{ color: 'var(--t2)' }}>
+                          </TableCell>
+                          <TableCell className="audit-td" style={{ color: 'var(--t2)' }}>
                             {typeLabel}
-                          </td>
-                          <td className="audit-td" style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--t4)' }}>
+                          </TableCell>
+                          <TableCell className="audit-td" style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--t4)' }}>
                             #{log.auditable_id}
-                          </td>
-                          <td className="audit-td" style={{ textAlign: 'center' }}>
+                          </TableCell>
+                          <TableCell className="audit-td" style={{ textAlign: 'center' }}>
                             <i
                               className={`ti ti-chevron-${isExpanded ? 'up' : 'down'}`}
                               style={{ fontSize: 14, color: 'var(--t4)', transition: 'transform .2s' }}
                             />
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                         {isExpanded && (
-                          <tr>
-                            <td colSpan={6} style={{ padding: '16px 20px', background: 'var(--bg3)' }}>
+                          <TableRow>
+                            <TableCell colSpan={6} style={{ padding: '16px 20px', background: 'var(--bg3)' }}>
                               <DiffView oldValues={log.old_values} newValues={log.new_values} />
                               {log.ip_address && (
                                 <div style={{ marginTop: 10, fontSize: 11, color: 'var(--t4)', display: 'flex', gap: 12 }}>
@@ -173,14 +174,14 @@ export default function AuditLogPage() {
                                   {log.url && <span style={{ fontFamily: 'monospace', fontSize: 10, maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>{log.url}</span>}
                                 </div>
                               )}
-                            </td>
-                          </tr>
+                            </TableCell>
+                          </TableRow>
                         )}
                       </React.Fragment>
                     );
                   })}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
 
             {meta && meta.last_page > 1 && (

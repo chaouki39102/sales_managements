@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Listeners\DataAuditSubscriber;
 use App\Listeners\NotificationEventSubscriber;
 use App\Models\CommercialDocument;
 use App\Models\CommercialDocumentLine;
@@ -34,6 +35,7 @@ class EventServiceProvider extends ServiceProvider
         CommercialDocument::observe(CommercialDocumentObserver::class);
         Product::observe(ProductObserver::class);
 
+        Event::subscribe(DataAuditSubscriber::class);
         Event::subscribe(NotificationEventSubscriber::class);
     }
 }
