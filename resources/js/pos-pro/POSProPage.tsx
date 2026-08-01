@@ -1194,16 +1194,8 @@ export default function POSProPage() {
               focusRef={(el) => { scanRef.current = el; }}
               onQtyCommand={handleQtyCommand}
               onCartNav={(dir) => moveCartSelection(dir)}
+              onScanCamera={() => setShowScanner(true)}
             />
-            <button
-              type="button"
-              className="pp-print-btn pp-cam-btn"
-              onClick={() => setShowScanner(true)}
-              title="مسح باركود بالكاميرا"
-            >
-              <i className="ti ti-camera" />
-              <span>كاميرا</span>
-            </button>
             <button
               type="button"
               className="pp-print-btn"

@@ -20,6 +20,8 @@ interface Props {
   onQtyCommand?: (qty: number) => void;
   /** عندما يكون الحقل فارغاً: الأسهم تتنقل في السلة (اختيار صف أعلى/أسفل) */
   onCartNav?:   (dir: 'up' | 'down') => void;
+  /** فتح مسح الباركود بالكاميرا (زر الكاميرا) */
+  onScanCamera?: () => void;
 }
 
 function variantMatches(v: ProductVariant, q: string): boolean {
@@ -42,7 +44,7 @@ function variantExactBarcode(v: ProductVariant, code: string): boolean {
   );
 }
 
-export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRef, onQtyCommand, onCartNav }: Props) {
+export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRef, onQtyCommand, onCartNav, onScanCamera }: Props) {
   const [code, setCode] = useState('');
   const [open, setOpen] = useState(false);
   const [hi, setHi]     = useState(0);
@@ -172,7 +174,7 @@ export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRe
             <i className="ti ti-x" />
           </button>
         )}
-        <button type="button" className="pp-scanbar-go" onClick={handleEnter} aria-label="أضف">
+        <button type="button" className="pp-scanbar-go" onClick={() => onScanCamera?.()} aria-label="مسح بالكاميرا">
           <i className="ti ti-camera" />
         </button>
       </div>

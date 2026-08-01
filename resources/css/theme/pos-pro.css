@@ -1554,37 +1554,6 @@
 
 .pp-print-btn:disabled { opacity: .45; cursor: not-allowed; }
 
-.pp-cam-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 18px;
-  height: 46px;
-  flex-shrink: 0;
-  border: 1px solid var(--b2);
-  border-radius: var(--r2);
-  background: var(--bg2);
-  color: var(--t1);
-  font-family: inherit;
-  font-size: var(--fs-md);
-  font-weight: 900;
-  cursor: pointer;
-  box-shadow: var(--shadow);
-  transition: transform var(--d1), box-shadow var(--d1), border-color var(--d1), background var(--d1);
-}
-
-.pp-cam-btn i { font-size: 20px; color: var(--em); }
-
-.pp-cam-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow2);
-  border-color: var(--embo);
-  background: var(--bg3);
-}
-
-.pp-cam-btn:disabled { opacity: .45; cursor: not-allowed; }
-
 /* القائمة المنسدلة لنتائج البحث في حقل الباركود */
 .pp-scanbar-wrap {
   position: relative;
