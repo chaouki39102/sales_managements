@@ -60,10 +60,8 @@ import POSProRail from '@/pos-pro/components/POSProRail';
 import POSProCart from '@/pos-pro/components/POSProCart';
 import POSProProductDrawer from '@/pos-pro/components/POSProProductDrawer';
 import POSProScanbar from '@/pos-pro/components/POSProScanbar';
-import POSProQuickPay from '@/pos-pro/components/POSProQuickPay';
 import POSProWeightModal from '@/pos-pro/components/POSProWeightModal';
 import POSProSessionDrawer from '@/pos-pro/components/POSProSessionDrawer';
-import POSProRecentBar from '@/pos-pro/components/POSProRecentBar';
 import { TotalCard, CustomerCard } from '@/pos-pro/components/POSProTopCards';
 
 // ── مودالات مشتركة (lazy — نفس النهج في POSPage) ────────────────────────────
@@ -245,16 +243,6 @@ export default function POSProPage() {
     return byCode ?? list.find(m => m.is_cash === true) ?? list.find(m => m.is_default) ?? list[0] ?? null;
   }, [paymentModes, settings.defaultPaymentCode]);
 
-  const cardMode = useMemo(() => {
-    const list = paymentModes ?? [];
-    const re = /بطاقة|كارت|card|cie|cb|بنك|bank|الدفع الإلكتروني|شبكة/i;
-    const byName = list.find(m => re.test(m.name) && m.id !== cashMode?.id);
-    return byName
-      ?? list.find(m => m.is_cash === false && m.id !== cashMode?.id)
-      ?? list.find(m => m.id !== cashMode?.id)
-      ?? null;
-  }, [paymentModes, cashMode]);
-
   // ── الإجمالي النهائي (TTC + طابع جبائي) ─────────────────────────────────
   const adjustedTotalTtcFinal = pos.totals.total_ttc + pos.totals.fiscal_stamp;
 
@@ -330,6 +318,40 @@ export default function POSProPage() {
     }
   }, [posTemplate, safeToast, companyData, settings.printMode, paperWidth, copies]);
 
+  // ── زر الطباعة على اليسار: يطبع السلة الحالية كإيصال (بدون إتمام البيع) ──
+  const handlePrintCart = useCallback(() => {
+    if (pos.items.length === 0) { safeToast.error('السلة فارغة'); return; }
+    const snap: POSSaleSnapshot = {
+      docNumber: '',
+      docDate: new Date().toISOString().slice(0, 10),
+      client: pos.client,
+      items: pos.items.map(i => ({
+        name: i.product_name,
+        ref:  i.ref,
+        qty:  i.quantity,
+        unit_price_ht: i.unit_price_ht,
+        unit: i.unit_symbol,
+        tva_rate: i.tva_rate / 100,
+        discount_percentage: i.discount_percentage,
+        total_ht: i.total_ht,
+      })),
+      totals: {
+        total_ht:       pos.totals.total_ht,
+        total_tva:      pos.totals.total_tva,
+        total_ttc:      pos.totals.total_ttc,
+        fiscal_stamp:   pos.totals.fiscal_stamp,
+        total_discount: pos.totals.total_discount,
+        paid:           0,
+        change:         0,
+        remaining:      adjustedTotalTtcFinal,
+      },
+      payments: [],
+      prevBalance: null,
+      newBalance: null,
+    };
+    void handlePrintDirect(snap);
+  }, [pos.items, pos.client, pos.totals, adjustedTotalTtcFinal, handlePrintDirect, safeToast]);
+
   // ── إضافة منتج من المودال/المسح (يبقى المودال مفتوحاً لإضافة متعددة) ─────
   const handleAddItem = useCallback(async (v: ProductVariant) => {
     if (v.is_sold_by_weight) {
@@ -354,21 +376,6 @@ export default function POSProPage() {
     posRef.current.addItem(v);
     safeToast.success(v.product?.name ?? 'تمت الإضافة', { id: 'pos-pro-last-added', duration: 1500 });
   }, [safeToast, clearConfirm]);
-
-  // ── مسح الباركود من الشريط العلوي: تطابق دقيق ثم إضافة فورية ─────────────
-  const handleScan = useCallback((code: string): boolean => {
-    const hit = allVariants.find(v =>
-      v.barcode === code ||
-      v.ref === code ||
-      (v as any).barcodes?.some((bc: { barcode: string }) => bc.barcode === code),
-    );
-    if (!hit) {
-      safeToast.error(`لا يوجد منتج بالباركود «${code}»`);
-      return false;
-    }
-    void handleAddItem(hit);
-    return true;
-  }, [allVariants, safeToast, handleAddItem]);
 
   // ── إتمام البيع ───────────────────────────────────────────────────────────
   const handleCompleteSale = useCallback(async (params: {
@@ -640,23 +647,19 @@ export default function POSProPage() {
             <TotalCard totals={pos.totals} adjustedTotal={adjustedTotalTtcFinal} invoiceDiscPct={pos.invoiceDiscountPct} />
           </div>
 
-          <POSProScanbar onScan={handleScan} />
-
-          <POSProQuickPay
-            cashMode={cashMode}
-            cardMode={cardMode}
-            disabled={!canSell}
-            onCash={() => handleQuickPay(cashMode)}
-            onCard={() => handleQuickPay(cardMode)}
-          />
-
-          {!productsLoading && currentSession && (
-            <POSProRecentBar
-              top={currentSession.top_products ?? []}
-              variants={allVariants}
-              onAdd={handleAddItem}
-            />
-          )}
+          <div className="pos-pro-scan-row">
+            <POSProScanbar variants={allVariants} onAdd={handleAddItem} />
+            <button
+              type="button"
+              className="pp-print-btn"
+              onClick={handlePrintCart}
+              disabled={!canSell}
+              title="طباعة إيصال السلة الحالية"
+            >
+              <i className="ti ti-printer" />
+              <span>طباعة</span>
+            </button>
+          </div>
 
           <div className="pos-pro-cart-wrap" ref={cartWrapRef}>
             <POSProCart

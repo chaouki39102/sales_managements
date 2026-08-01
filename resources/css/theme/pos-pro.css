@@ -798,75 +798,144 @@
 }
 
 /* ════════════════════════════════════════════════════
-   شريط الأكثر مبيعاً (من جلسة اليوم)
+   صف المسح: شريط البحث + زر الطباعة على اليسار
 ════════════════════════════════════════════════════ */
-.pp-recent {
+.pos-pro-scan-row {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 10px;
   flex-shrink: 0;
-  min-height: 38px;
 }
 
-.pp-recent-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: var(--fs-sm);
-  font-weight: 800;
-  color: var(--t3);
-  white-space: nowrap;
-}
-
-.pp-recent-scroll {
+.pp-print-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
+  padding: 0 20px;
+  height: 46px;
+  flex-shrink: 0;
+  border: 1px solid var(--b2);
+  border-radius: var(--r2);
+  background: var(--bg2);
+  color: var(--t1);
+  font-family: inherit;
+  font-size: var(--fs-md);
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: transform var(--d1), box-shadow var(--d1), border-color var(--d1), background var(--d1);
+}
+
+.pp-print-btn i { font-size: 20px; color: var(--em); }
+
+.pp-print-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow2);
+  border-color: var(--embo);
+  background: var(--bg3);
+}
+
+.pp-print-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* القائمة المنسدلة لنتائج البحث في حقل الباركود */
+.pp-scanbar-wrap {
+  position: relative;
   flex: 1;
   min-width: 0;
 }
 
-.pp-recent-scroll::-webkit-scrollbar { display: none; }
-
-.pp-recent-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
-  padding: 5px 12px;
+.pp-scanbar-dd {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  max-height: 320px;
+  overflow-y: auto;
   border: 1px solid var(--b2);
   border-radius: var(--r2);
   background: var(--bg2);
-  cursor: pointer;
-  font-family: inherit;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: transform var(--d1), box-shadow var(--d1), border-color var(--d1);
-}
-
-.pp-recent-item:hover {
-  transform: translateY(-1px);
   box-shadow: var(--shadow2);
-  border-color: var(--embo);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.pp-recent-name {
+.pp-scanbar-dd-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 18px;
+  color: var(--t4);
+  font-size: var(--fs-sm);
+}
+
+.pp-scanbar-dd-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--r1);
+  background: transparent;
+  font-family: inherit;
+  text-align: right;
+  cursor: pointer;
+}
+
+.pp-scanbar-dd-item:hover,
+.pp-scanbar-dd-item.on { background: var(--b1); }
+
+.pp-scanbar-dd-img {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: var(--r1);
+  background: var(--b1);
+  color: var(--t4);
+  overflow: hidden;
+}
+
+.pp-scanbar-dd-img img { width: 100%; height: 100%; object-fit: cover; }
+
+.pp-scanbar-dd-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.pp-scanbar-dd-name {
   font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--t1);
-  max-width: 160px;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.pp-recent-meta {
+.pp-scanbar-dd-sub {
   font-size: var(--fs-2xs);
   color: var(--t4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.pp-recent-meta b { color: var(--em); }
+.pp-scanbar-dd-price {
+  font-size: var(--fs-sm);
+  font-weight: 900;
+  color: var(--em);
+  flex-shrink: 0;
+}
 
 /* ════════════════════════════════════════════════════
    شريط المسح الضوئي العام
@@ -942,54 +1011,6 @@
 }
 
 .pp-scanbar-go:hover { background: var(--em2); }
-
-/* ════════════════════════════════════════════════════
-   صف الدفع السريع (نقداً / بطاقة)
-════════════════════════════════════════════════════ */
-.pp-quickpay {
-  display: flex;
-  align-items: stretch;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.pp-quickpay-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 9px 12px;
-  border: 1px solid var(--b2);
-  border-radius: var(--r2);
-  font-family: inherit;
-  cursor: pointer;
-  transition: transform var(--d1), box-shadow var(--d1), opacity var(--d1);
-}
-
-.pp-quickpay-btn i { font-size: 18px; }
-
-.pp-quickpay-btn span { font-size: var(--fs-md); font-weight: 900; }
-
-.pp-quickpay-btn em { font-style: normal; font-size: var(--fs-2xs); opacity: .9; }
-
-.pp-quickpay-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow2); }
-
-.pp-quickpay-btn:disabled { opacity: .45; cursor: not-allowed; }
-
-.pp-quickpay-btn--cash {
-  background: linear-gradient(135deg, var(--gold), #e0a830);
-  color: #fff;
-  border-color: transparent;
-  box-shadow: 0 4px 14px var(--goldbo);
-}
-
-.pp-quickpay-btn--card {
-  background: var(--blue);
-  color: #fff;
-  border-color: transparent;
-  box-shadow: 0 4px 14px var(--bluebo);
-}
 
 /* ════════════════════════════════════════════════════
    مودال الوزن
