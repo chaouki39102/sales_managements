@@ -139,10 +139,13 @@ function StockBadge({ item }: { item: CartItem }) {
 
 type DiscMode = 'pct' | 'amount';
 
-/** صف واحد مبسّط — يمتلك حالة popover الخصم (% / دج) الخاص به */
+type RowStyle = 'simple' | 'full';
+const CART_ROW_KEY = 'pos-pro-cart-row';
+
+/** صف مبسّط (سطر واحد) أو مفصّل (سطران) — يمتلك حالة popover الخصم (% / دج) الخاص به */
 function PPRow({
   item, isSelected, onSelect, onQty, onDiscount, onDiscountAmount, onPrice,
-  onPackaging, onWeight, onRemove,
+  onPackaging, onWeight, onRemove, compact,
 }: {
   item: CartItem;
   isSelected: boolean;
@@ -154,6 +157,7 @@ function PPRow({
   onPackaging: (id: string, packaging: ProductPackaging | null, basePriceHt: number) => void;
   onWeight: (item: CartItem) => void;
   onRemove: (id: string) => void;
+  compact: boolean;
 }) {
   const [discOpen, setDiscOpen] = useState(false);
   const [discMode, setDiscMode] = useState<DiscMode>('amount');
@@ -224,7 +228,7 @@ function PPRow({
   return (
     <div
       ref={rowRef}
-      className={`pp-row-body${isSelected ? ' pp-row-body--selected' : ''}`}
+      className={`pp-row-body${isSelected ? ' pp-row-body--selected' : ''}${compact ? '' : ' pp-row-body--full'}`}
       onClick={onSelect}
     >
       <div className="pp-row-main">
@@ -236,32 +240,65 @@ function PPRow({
             {item.product_name}
             {item.variant_name && <span className="pp-row-variant"> — {item.variant_name}</span>}
           </div>
-          <div className="pp-row-sub">
-            {item.ref && <span>{item.ref}</span>}
-            {item.unit_symbol && <span>{item.unit_symbol}</span>}
-            {item.tva_rate > 0 && <span>TVA {item.tva_rate}%</span>}
-            <StockBadge item={item} />
-            {showPack && (
-              <select
-                className="pp-row-pack"
-                value={item.packaging_id ?? ''}
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) => {
-                  const id = e.target.value ? Number(e.target.value) : null;
-                  const pkg = id ? packagings.find(p => p.id === id) ?? null : null;
-                  onPackaging(item.id, pkg, item.base_price_ht ?? item.unit_price_ht);
-                }}
-                title="تغليف"
-              >
-                <option value="">واحد</option>
-                {packagings.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.label} (×{p.quantity})
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
+          {compact ? (
+            <div className="pp-row-sub">
+              {item.ref && <span>{item.ref}</span>}
+              {item.unit_symbol && <span>{item.unit_symbol}</span>}
+              {item.tva_rate > 0 && <span>TVA {item.tva_rate}%</span>}
+              <StockBadge item={item} />
+              {showPack && (
+                <select
+                  className="pp-row-pack"
+                  value={item.packaging_id ?? ''}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => {
+                    const id = e.target.value ? Number(e.target.value) : null;
+                    const pkg = id ? packagings.find(p => p.id === id) ?? null : null;
+                    onPackaging(item.id, pkg, item.base_price_ht ?? item.unit_price_ht);
+                  }}
+                  title="تغليف"
+                >
+                  <option value="">واحد</option>
+                  {packagings.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.label} (×{p.quantity})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="pp-row-sub">
+                {item.ref && <span>{item.ref}</span>}
+                {item.unit_symbol && <span>{item.unit_symbol}</span>}
+                {item.tva_rate > 0 && <span>TVA {item.tva_rate}%</span>}
+              </div>
+              <div className="pp-row-sub2">
+                <StockBadge item={item} />
+                {showPack && (
+                  <select
+                    className="pp-row-pack"
+                    value={item.packaging_id ?? ''}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => {
+                      const id = e.target.value ? Number(e.target.value) : null;
+                      const pkg = id ? packagings.find(p => p.id === id) ?? null : null;
+                      onPackaging(item.id, pkg, item.base_price_ht ?? item.unit_price_ht);
+                    }}
+                    title="تغليف"
+                  >
+                    <option value="">واحد</option>
+                    {packagings.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.label} (×{p.quantity})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -392,12 +429,44 @@ const POSProCart = forwardRef<POSProCartHandle, Props>(function POSProCart({
   const [noteOpen, setNoteOpen] = useState(false);
   const [invDiscMode, setInvDiscMode] = useState<DiscMode>('amount');
   const [invDiscAmtVal, setInvDiscAmtVal] = useState('');
+  const [invDiscOpen, setInvDiscOpen] = useState(false);
+  const [invDiscPos, setInvDiscPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const invDiscBtnRef = useRef<HTMLButtonElement>(null);
+  const invDiscPopRef = useRef<HTMLDivElement>(null);
+
+  const [rowStyle, setRowStyle] = useState<RowStyle>(() => {
+    try { return localStorage.getItem(CART_ROW_KEY) === 'full' ? 'full' : 'simple'; } catch { return 'simple'; }
+  });
+  const compact = rowStyle === 'simple';
+  const toggleRowStyle = useCallback(() => {
+    setRowStyle(prev => {
+      const next: RowStyle = prev === 'simple' ? 'full' : 'simple';
+      try { localStorage.setItem(CART_ROW_KEY, next); } catch {}
+      return next;
+    });
+  }, []);
 
   const invoiceDiscAmount = totals?.invoice_discount_amount ?? 0;
 
   useEffect(() => {
     if (!invoiceDiscountPct || invoiceDiscountPct <= 0) setInvDiscAmtVal('');
   }, [invoiceDiscountPct]);
+
+  useEffect(() => {
+    if (!invDiscOpen) return;
+    const onDown = (ev: MouseEvent) => {
+      const t = ev.target as Node;
+      if (invDiscBtnRef.current?.contains(t) || invDiscPopRef.current?.contains(t)) return;
+      setInvDiscOpen(false);
+    };
+    const onScroll = () => setInvDiscOpen(false);
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('scroll', onScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('scroll', onScroll, true);
+    };
+  }, [invDiscOpen]);
 
   const handleInvDiscAmount = useCallback((raw: string) => {
     setInvDiscAmtVal(raw);
@@ -415,7 +484,7 @@ const POSProCart = forwardRef<POSProCartHandle, Props>(function POSProCart({
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 48,
+    estimateSize: () => (compact ? 48 : 82),
     overscan: 8,
   });
 
@@ -514,6 +583,14 @@ const POSProCart = forwardRef<POSProCartHandle, Props>(function POSProCart({
           )}
           <button
             type="button"
+            className={`pp-row-toggle${compact ? '' : ' on'}`}
+            onClick={toggleRowStyle}
+            title={compact ? 'تبديل لصف مفصّل (سطران)' : 'تبديل لصف مبسّط (سطر واحد)'}
+          >
+            <i className={`ti ${compact ? 'ti-list' : 'ti-list-details'}`} />
+          </button>
+          <button
+            type="button"
             className={`pp-note-toggle${noteOpen || note ? ' on' : ''}`}
             onClick={() => setNoteOpen(o => !o)}
             title="ملاحظة على الفاتورة"
@@ -521,45 +598,94 @@ const POSProCart = forwardRef<POSProCartHandle, Props>(function POSProCart({
             <i className="ti ti-notes" />
           </button>
 
-          {/* ── شريط خصم الفاتورة (% / دج) ── */}
-          <div className={`pp-inv-disc${invoiceDiscountPct > 0 ? ' on' : ''}`} title="خصم على الفاتورة">
-            <span className="pp-inv-disc-lbl">خصم</span>
-            <div className="pp-inv-disc-modes">
-              <button
-                type="button"
-                className={invDiscMode === 'pct' ? 'on' : ''}
-                onClick={() => setInvDiscMode('pct')}
-              >
-                %
-              </button>
-              <button
-                type="button"
-                className={invDiscMode === 'amount' ? 'on' : ''}
-                onClick={() => setInvDiscMode('amount')}
-              >
-                دج
-              </button>
-            </div>
-            <input
-              className="pp-inv-disc-inp"
-              type="number"
-              min={0}
-              step={invDiscMode === 'pct' ? 0.01 : 1}
-              value={invDiscMode === 'pct' ? (invoiceDiscountPct || '') : invDiscAmtVal}
-              onChange={(e) => {
-                if (invDiscMode === 'pct') {
-                  onInvoiceDiscountChange(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)));
-                } else {
-                  handleInvDiscAmount(e.target.value);
-                }
-              }}
-              placeholder="0"
-            />
-            <span className="pp-inv-disc-unit">{invDiscMode === 'pct' ? '%' : 'دج'}</span>
-            {invoiceDiscAmount > 0 && (
-              <em className="pp-inv-disc-amt">-{formatDZD(invoiceDiscAmount)}</em>
-            )}
-          </div>
+          {/* ── خصم الفاتورة: زر مصغّر يفتح popover (% / دج) ── */}
+          <button
+            ref={invDiscBtnRef}
+            type="button"
+            className={`pp-inv-disc-btn${invoiceDiscountPct > 0 ? ' on' : ''}${invDiscOpen ? ' pop' : ''}`}
+            onClick={() => {
+              if (invDiscOpen) { setInvDiscOpen(false); return; }
+              const r = invDiscBtnRef.current?.getBoundingClientRect();
+              if (r) {
+                const w = 220;
+                let left = r.left;
+                if (left + w > window.innerWidth - 8) left = window.innerWidth - w - 8;
+                if (left < 8) left = 8;
+                setInvDiscPos({ top: r.bottom + 8, left });
+              }
+              setInvDiscOpen(true);
+            }}
+            title="خصم على الفاتورة"
+          >
+            <i className="ti ti-percentage" />
+            {invoiceDiscountPct > 0 ? `${invoiceDiscountPct}%` : 'خصم'}
+          </button>
+          {invDiscOpen && createPortal(
+            <div
+              ref={invDiscPopRef}
+              className="pp-disc-pop pp-inv-disc-pop"
+              onClick={(e) => e.stopPropagation()}
+              style={{ position: 'fixed', top: invDiscPos.top, left: invDiscPos.left, zIndex: 10000 }}
+            >
+              <div className="pp-disc-pop-arrow" />
+              <div className="pp-disc-pop-label">خصم على الفاتورة</div>
+              <div className="pp-disc-pop-modes">
+                <button
+                  type="button"
+                  className={`pp-disc-pop-mode ${invDiscMode === 'pct' ? 'on' : ''}`}
+                  onClick={() => setInvDiscMode('pct')}
+                >
+                  <i className="ti ti-percentage" /> نسبة %
+                </button>
+                <button
+                  type="button"
+                  className={`pp-disc-pop-mode ${invDiscMode === 'amount' ? 'on' : ''}`}
+                  onClick={() => setInvDiscMode('amount')}
+                >
+                  <i className="ti ti-currency-dinar" /> مبلغ دج
+                </button>
+              </div>
+              <div className="pp-disc-pop-inp-row">
+                <input
+                  autoFocus
+                  className="pp-disc-pop-inp"
+                  type="number"
+                  min={0}
+                  step={invDiscMode === 'pct' ? 0.01 : 1}
+                  value={invDiscMode === 'pct' ? (invoiceDiscountPct || '') : invDiscAmtVal}
+                  onChange={(e) => {
+                    if (invDiscMode === 'pct') {
+                      onInvoiceDiscountChange(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)));
+                    } else {
+                      handleInvDiscAmount(e.target.value);
+                    }
+                  }}
+                  placeholder="0"
+                />
+                <span className="pp-disc-pop-unit">{invDiscMode === 'pct' ? '%' : 'دج'}</span>
+              </div>
+              {invoiceDiscAmount > 0 && (
+                <div className="pp-disc-pop-preview">
+                  الخصم: <strong>-{formatDZD(invoiceDiscAmount)}</strong>
+                </div>
+              )}
+              <div className="pp-disc-pop-actions">
+                {invoiceDiscountPct > 0 && (
+                  <button
+                    type="button"
+                    className="pp-disc-pop-clear"
+                    onClick={() => { onInvoiceDiscountChange(0); setInvDiscAmtVal(''); }}
+                  >
+                    <i className="ti ti-x" /> إزالة
+                  </button>
+                )}
+                <button className="pp-disc-pop-cancel" onClick={() => setInvDiscOpen(false)} type="button">
+                  إغلاق
+                </button>
+              </div>
+            </div>,
+            document.body,
+          )}
 
           <button type="button" className="pp-clear" onClick={onClear}>
             <i className="ti ti-trash" />
@@ -618,6 +744,7 @@ const POSProCart = forwardRef<POSProCartHandle, Props>(function POSProCart({
                   onPackaging={onPackaging}
                   onWeight={onWeight}
                   onRemove={onRemove}
+                  compact={compact}
                 />
               </div>
             );

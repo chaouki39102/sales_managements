@@ -33,6 +33,16 @@
 
 **Verification**: `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors, 185 precache entries, `root sw == build sw: True` (SW MATCH).
 
+**Follow-up — invoice discount became a popup**: "set the discount with popup now it قام بتكبير header of cart" — the inline `.pp-inv-disc` bar (label + %/دج buttons + input + unit + readout, ~30px) made the `.pp-cart-hd` wrap into a taller two-line header. Fix: the invoice discount is now a compact **`.pp-inv-disc-btn`** (single 30px button: `ti-percentage` icon + `خصم` or the active `%` value, gold highlight `.on` when a discount is set) that opens a **portal popover** `.pp-inv-disc-pop` reusing the exact same `.pp-disc-pop-*` classes as the per-item `PPRow` popover (label, mode buttons with icons, input row, `-amount` preview, إزالة/إغلاق actions). Position is computed from the button's rect (clamped to the viewport, arrow anchored top), closes on outside mousedown / any scroll (capture phase). Store behaviour unchanged — still only persists `invoiceDiscountPct`; amount mode still reverse-engineers via `origHt = total_ht + invoice_discount_amount`.
+
+**Files modified**: `POSProCart.tsx` (`invDiscOpen`/`invDiscPos`/`invDiscBtnRef`/`invDiscPopRef` + outside/scroll close effect, button + portal popover), `pos-pro.css` (`.pp-inv-disc-btn`/`.on`/`.pop` replacing the `.pp-inv-disc` bar block).
+
+**Follow-up — simple-row toggle + one-line header**: "where is the new simple row cart where can i toggle it ++ now they are two line of btn in header cart set it one line ++ complete the rest tasks". Two changes:
+- **Row-style toggle**: `POSProCart` now has a `rowStyle: 'simple' | 'full'` state (`CART_ROW_KEY = 'pos-pro-cart-row'` in localStorage, default `'simple'` — the single-line row). A compact 30px `.pp-row-toggle` button in `.pp-cart-hd-actions` (`ti-list` when simple / `ti-list-details` when full, `.on` highlight) toggles it. `PPRow` gains `compact: boolean`: simple = the single-line row (image + name/meta inline + stepper + price + disc popover + total + remove, estimate 48); full = two-line row — name/variant line, then `.pp-row-sub` (ref/unit/TVA) + `.pp-row-sub2` (StockBadge + pack select) lines, `align-items:flex-start`, estimate 82. Same controls for both variants; `estimateSize` switches `48 → 82`.
+- **One-line header**: `.pp-cart-hd` `flex-wrap: wrap → nowrap` and `.pp-cart-hd-actions` got `flex-shrink:0; flex-wrap:nowrap` — tabs (`overflow-x:auto`, `min-width:0`) shrink and scroll horizontally while the action buttons stay on a single row.
+
+**Files modified**: `POSProCart.tsx`, `pos-pro.css` (`.pp-row-toggle`, `.pp-row-body--full`, `.pp-row-sub2`, nowrap header rules).
+
 ### Phase 44 — POS Pro Top Cards: Draggable Swap (Aug 1)
 
 **Request**: "set this two draggable — I can change the position one with other right to left" — the two top cards in POS Pro (`CustomerCard` + `TotalCard`, rendered in `.pos-pro-top` at `POSProPage.tsx`) must be swappable by drag to exchange their left/right positions in the RTL layout.

@@ -649,8 +649,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px 10px;
-  flex-wrap: wrap;
-  padding: 10px 14px;
+  flex-wrap: nowrap;
+  padding: 8px 14px;
   border-bottom: 1px solid var(--b2);
   background: var(--bg3);
   flex-shrink: 0;
@@ -746,58 +746,38 @@
   box-shadow: inset 3px 0 0 var(--em), 0 1px 0 var(--embo);
 }
 
-.pp-cart-hd-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pp-cart-hd-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: nowrap; }
 
-/* ── شريط خصم الفاتورة (% / دج) ── */
-.pp-inv-disc {
+/* ── زر خصم الفاتورة (يفتح popover % / دج) ── */
+.pp-inv-disc-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   height: 30px;
-  padding: 0 6px;
+  padding: 0 10px;
   border: 1px solid var(--b2);
   border-radius: var(--r2);
   background: var(--bg2);
-  transition: background var(--d1), border-color var(--d1);
-}
-.pp-inv-disc.on { background: var(--goldb); border-color: var(--goldbo); }
-.pp-inv-disc-lbl { font-size: var(--fs-2xs); font-weight: 700; color: var(--t3); }
-.pp-inv-disc-modes {
-  display: inline-flex;
-  overflow: hidden;
-  border: 1px solid var(--b2);
-  border-radius: var(--r1);
-  flex-shrink: 0;
-}
-.pp-inv-disc-modes button {
-  width: 24px;
-  height: 20px;
-  border: none;
-  background: var(--bg3);
-  color: var(--t4);
+  color: var(--t3);
   font-family: inherit;
-  font-size: var(--fs-2xs);
-  font-weight: 800;
-  cursor: pointer;
-  transition: background var(--d1), color var(--d1);
-}
-.pp-inv-disc-modes button.on { background: var(--gold); color: #fff; }
-.pp-inv-disc-inp {
-  width: 46px;
-  height: 20px;
-  border: 1px solid var(--b2);
-  border-radius: var(--r1);
-  background: var(--bg3);
-  color: var(--t1);
-  text-align: center;
-  font-family: inherit;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
   font-weight: 700;
-  outline: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--d1), color var(--d1), border-color var(--d1);
 }
-.pp-inv-disc-inp:focus { border-color: var(--goldbo); box-shadow: 0 0 0 2px var(--goldb); }
-.pp-inv-disc-unit { font-size: var(--fs-2xs); font-weight: 800; color: var(--t4); }
-.pp-inv-disc-amt { font-style: normal; font-size: var(--fs-xs); font-weight: 800; color: var(--red); }
+.pp-inv-disc-btn.on { background: var(--goldb); color: var(--gold); border-color: var(--goldbo); }
+.pp-inv-disc-btn.pop { border-color: var(--gold); box-shadow: 0 0 0 2px var(--goldb); }
+
+.pp-disc-pop-label {
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  color: var(--t2);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 
 .pp-clear {
   display: inline-flex;
@@ -831,6 +811,26 @@
 }
 
 .pp-note-toggle.on {
+  background: var(--embo);
+  color: var(--em);
+  border-color: var(--embo);
+}
+
+.pp-row-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--b2);
+  border-radius: var(--r2);
+  background: var(--bg2);
+  color: var(--t3);
+  cursor: pointer;
+  transition: background var(--d1), color var(--d1), border-color var(--d1);
+}
+
+.pp-row-toggle.on {
   background: var(--embo);
   color: var(--em);
   border-color: var(--embo);
@@ -948,6 +948,19 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  font-size: var(--fs-2xs);
+  color: var(--t4);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.pp-row-body--full { align-items: flex-start; padding: 2px 0; }
+.pp-row-body--full .pp-row-name { margin-top: 1px; }
+.pp-row-sub2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
   font-size: var(--fs-2xs);
   color: var(--t4);
   white-space: nowrap;
