@@ -18,7 +18,7 @@ interface POSState {
     label?:    string;
     clearCart: () => void;
   }) => void;
-  restoreCart:           (id: string) => void;
+  restoreCart:           (id: string) => HeldCart | null;
   deleteHeldCart:        (id: string) => void;
   setSearch:             (q: string) => void;
   setCategory:           (id: number | null) => void;
@@ -37,13 +37,21 @@ export const usePOSStore = create<POSState>((set, get) => ({
   holdCart: ({ items, totals, client, label, clearCart }) => {
     if (!items.length) return;
 
+    // Capture document provenance from the LIVE cart store BEFORE clearCart()
+    // runs (clearCart wipes it). This lets a cart held while an existing
+    // document was being edited be restored back into edit mode.
+    const cs = useCartStore.getState();
+
     const held: HeldCart = {
-      id:         nanoid(6),
-      label:      label ?? `عربة ${get().heldCarts.length + 1}`,
-      items:      [...items],
+      id:             nanoid(6),
+      label:          label ?? `عربة ${get().heldCarts.length + 1}`,
+      items:          [...items],
       totals,
-      client:     client ?? null,
-      created_at: new Date().toISOString(),
+      client:         client ?? null,
+      created_at:     new Date().toISOString(),
+      documentId:     cs.documentId ?? null,
+      documentNumber: cs.documentNumber ?? null,
+      documentDate:   cs.documentDate ?? null,
     };
 
     set(s => ({ heldCarts: [...s.heldCarts, held] }));
@@ -52,9 +60,16 @@ export const usePOSStore = create<POSState>((set, get) => ({
 
   restoreCart: (id) => {
     const held = get().heldCarts.find(c => c.id === id);
-    if (!held) return;
-    useCartStore.setState({ items: held.items, client: held.client ?? null });
+    if (!held) return null;
+    useCartStore.setState({
+      items:          held.items,
+      client:         held.client ?? null,
+      documentId:     held.documentId ?? null,
+      documentNumber: held.documentNumber ?? null,
+      documentDate:   held.documentDate ?? null,
+    });
     set(s => ({ heldCarts: s.heldCarts.filter(c => c.id !== id) }));
+    return held;
   },
 
   deleteHeldCart: (id) =>

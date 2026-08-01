@@ -369,7 +369,10 @@ export default function SessionStatsModal({ session, onClose, onEndSession }: Pr
                           </div>
                         </div>
                         <div className="ssm-prod-qty">
-                          <span>×{p.quantity_sold % 1 === 0 ? p.quantity_sold : p.quantity_sold.toFixed(2)}</span>
+                          <span>×{(() => {
+                            const q = Number(p.quantity_sold) || 0;
+                            return q % 1 === 0 ? q : q.toFixed(2);
+                          })()}</span>
                         </div>
                         <div className="ssm-prod-ttc ltr">
                           {formatDZD(p.total_ttc)}

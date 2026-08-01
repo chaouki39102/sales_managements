@@ -22,6 +22,12 @@ interface CartState {
   invoiceDiscountPct: number;
   payments:           DocumentPayment[];
   _isDirty:           boolean;
+  // Identity of the existing document this cart is editing (null = new sale).
+  // Survives hold/restore cycles so a restored cart keeps editing the SAME
+  // document on pay.
+  documentId?:    number | null;
+  documentNumber?: string | null;
+  documentDate?:  string | null;
 
   addItem:              (variant: ProductVariant, qty?: number, packaging?: ProductPackaging | null) => void;
   removeItem:           (id: string) => void;
@@ -35,6 +41,7 @@ interface CartState {
   setPayments:          (payments: DocumentPayment[]) => void;
   clearCart:            () => void;
   setInvoiceDiscountPct:(pct: number) => void;
+  setDocumentMeta:      (meta: { id?: number | null; number?: string | null; date?: string | null }) => void;
   markClean:            () => void;
 }
 
@@ -52,6 +59,9 @@ export const useCartStore = create<CartState>()(
       invoiceDiscountPct: 0,
       payments:           [],
       _isDirty:           false,
+      documentId:         null,
+      documentNumber:     null,
+      documentDate:       null,
 
       addItem: (variant, qty = 1, packaging = null) => {
         set(state => {
@@ -254,9 +264,16 @@ export const useCartStore = create<CartState>()(
       setClient: (client) => set({ client, _isDirty: true }),
       setNotes:  (notes)  => set({ notes, _isDirty: true }),
       setPayments: (payments) => set({ payments, _isDirty: true }),
-      clearCart: () => set({ items: [], client: null, notes: '', invoiceDiscountPct: 0, payments: [], _isDirty: false }),
+      clearCart: () => set({ items: [], client: null, notes: '', invoiceDiscountPct: 0, payments: [], _isDirty: false, documentId: null, documentNumber: null, documentDate: null }),
       setInvoiceDiscountPct: (pct) =>
         set({ invoiceDiscountPct: Math.min(100, Math.max(0, pct)), _isDirty: true }),
+
+      setDocumentMeta: ({ id, number, date }) =>
+        set({
+          documentId:      id ?? null,
+          documentNumber:  number ?? null,
+          documentDate:    date ?? null,
+        }),
 
       markClean: () => set({ _isDirty: false }),
     }),
@@ -268,6 +285,9 @@ export const useCartStore = create<CartState>()(
         notes:              state.notes,
         invoiceDiscountPct: state.invoiceDiscountPct,
         payments:           state.payments,
+        documentId:         state.documentId,
+        documentNumber:     state.documentNumber,
+        documentDate:       state.documentDate,
         _isDirty:           true,
       }),
     },

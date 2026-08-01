@@ -35,6 +35,12 @@ interface PosProCartState {
   /** رقم السلة الحالية — السلة الفارغة تأخذ دائماً أقل رقم حر بين السلات المعلّقة (ترقيم مضغوط) */
   saleNumber:         number;
   _isDirty:           boolean;
+  // Identity of the existing document this cart is editing (null = new sale).
+  // Lives in the STORE so it survives hold/restore + reload → pay always
+  // UPDATES the same document instead of creating a duplicate.
+  documentId?:    number | null;
+  documentNumber?: string | null;
+  documentDate?:  string | null;
 
   addItem:              (variant: ProductVariant, qty?: number, packaging?: ProductPackaging | null) => string | null;
   removeItem:           (id: string) => void;
@@ -48,8 +54,9 @@ interface PosProCartState {
   setPayments:          (payments: DocumentPayment[]) => void;
   clearCart:            () => void;
   setInvoiceDiscountPct:(pct: number) => void;
+  setDocumentMeta:      (meta: { id?: number | null; number?: string | null; date?: string | null }) => void;
   holdCart:   (params: { items: CartItem[]; totals: CartTotals; client: Party | null; label?: string }) => void;
-  restoreCart:          (id: string) => void;
+  restoreCart:          (id: string) => HeldCart | null;
   deleteHeldCart:       (id: string) => void;
   bumpSaleNumber:       () => void;
   markClean:            () => void;
@@ -87,6 +94,9 @@ function createCartStore(persistKey: string) {
         heldCarts:          [],
         saleNumber:         1,
         _isDirty:           false,
+        documentId:         null,
+        documentNumber:     null,
+        documentDate:       null,
 
         addItem: (variant, qty = 1, packaging = null) => {
           const state = get();
@@ -286,26 +296,38 @@ function createCartStore(persistKey: string) {
         setPayments: (payments) => set({ payments, _isDirty: true }),
         clearCart: () => set(s => ({
           items: [], client: null, notes: '', invoiceDiscountPct: 0, payments: [], _isDirty: false,
+          documentId: null, documentNumber: null, documentDate: null,
           saleNumber: smallestFreeNumber(s.heldCarts),
         })),
         setInvoiceDiscountPct: (pct) =>
           set({ invoiceDiscountPct: Math.min(100, Math.max(0, pct)), _isDirty: true }),
 
+        setDocumentMeta: ({ id, number, date }) =>
+          set({
+            documentId:      id ?? null,
+            documentNumber:  number ?? null,
+            documentDate:    date ?? null,
+          }),
+
         holdCart: ({ items, totals, client, label }) => {
           if (!items.length) return;
           const held: HeldCart = {
-            id:         nanoid(6),
-            label:      label ?? `سلة ${get().saleNumber}`,
-            items:      [...items],
+            id:             nanoid(6),
+            label:          label ?? `سلة ${get().saleNumber}`,
+            items:          [...items],
             totals,
-            client:     client ?? null,
-            created_at: new Date().toISOString(),
+            client:         client ?? null,
+            created_at:     new Date().toISOString(),
+            documentId:     get().documentId ?? null,
+            documentNumber: get().documentNumber ?? null,
+            documentDate:   get().documentDate ?? null,
           };
           set(s => {
             const heldCarts = [...s.heldCarts, held];
             return {
               heldCarts,
               items: [], client: null, notes: '', invoiceDiscountPct: 0, payments: [], _isDirty: false,
+              documentId: null, documentNumber: null, documentDate: null,
               saleNumber: smallestFreeNumber(heldCarts),
             };
           });
@@ -313,17 +335,21 @@ function createCartStore(persistKey: string) {
 
         restoreCart: (id) => {
           const held = get().heldCarts.find(c => c.id === id);
-          if (!held) return;
+          if (!held) return null;
           set(s => {
             const m = (held.label ?? '').match(/\d+/);
             return {
-              items:      held.items,
-              client:     held.client ?? null,
-              heldCarts:  s.heldCarts.filter(c => c.id !== id),
-              saleNumber: m ? Number(m[0]) : s.saleNumber,
-              _isDirty:   false,
+              items:           held.items,
+              client:          held.client ?? null,
+              heldCarts:       s.heldCarts.filter(c => c.id !== id),
+              saleNumber:      m ? Number(m[0]) : s.saleNumber,
+              documentId:      held.documentId ?? null,
+              documentNumber:  held.documentNumber ?? null,
+              documentDate:    held.documentDate ?? null,
+              _isDirty:        false,
             };
           });
+          return held;
         },
 
         deleteHeldCart: (id) =>
@@ -347,6 +373,9 @@ function createCartStore(persistKey: string) {
           payments:           state.payments,
           heldCarts:          state.heldCarts,
           saleNumber:         state.saleNumber,
+          documentId:         state.documentId,
+          documentNumber:     state.documentNumber,
+          documentDate:       state.documentDate,
           _isDirty:           true,
         }),
         merge: (persisted, current) => {

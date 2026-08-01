@@ -772,6 +772,12 @@ export interface HeldCart {
   totals:    CartTotals;
   client?:   Party | null;
   created_at:string;
+  // Provenance: when this cart was held while an existing document was being
+  // edited, keep the document identity so a restore→pay flow UPDATES the same
+  // document (PUT) instead of silently creating a new one (POST).
+  documentId?:    number | null;
+  documentNumber?: string | null;
+  documentDate?:  string | null;
 }
 
 // ─── Settings ─────────────────────────────────────────────────────────────────

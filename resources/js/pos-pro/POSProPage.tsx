@@ -313,6 +313,7 @@ export default function POSProPage() {
     setCartNote('');
     editingPrevBalanceRef.current = null;
     editingDocMetaRef.current = { dueDate: null, typeCode: null, currencyId: null };
+    usePosProCart.getState().setDocumentMeta({ id: null, number: null, date: null });
   }, []);
 
   // ── قائمة الأسعار ────────────────────────────────────────────────────────
@@ -547,11 +548,11 @@ export default function POSProPage() {
   // ── بيع جديد: تعليق السلة الحالية (إن لم تكن فارغة) + سلة فارغة برقم جديد ─
   // السلة فارغة → لا ننشئ سلة فارغة أخرى ولا نرفع العداد (رقمها يبقى أقل رقم حر).
   const handleNewSale = useCallback(() => {
-    clearEditingState();
     const st = usePosProCart.getState();
     if (st.items.length > 0) {
       posRef.current.holdCart();
     }
+    clearEditingState();
     setSelectedItemId(null);
     if (settings.openClientOnNewSale) {
       requestAnimationFrame(() => setCustomerModalOpen(true));
@@ -562,9 +563,17 @@ export default function POSProPage() {
   const handleRestoreHeld = useCallback((id: string) => {
     const st = usePosProCart.getState();
     if (st.items.length > 0) posRef.current.holdCart();
-    pos.restoreCart(id);
+    clearEditingState();
+    const held = pos.restoreCart(id);
+    if (held?.documentId) {
+      setEditingDocumentId(held.documentId);
+      setEditingDocumentDate(held.documentDate ?? null);
+      setEditingDocumentNumber(held.documentNumber ?? null);
+      editingPrevBalanceRef.current = null;
+      editingDocMetaRef.current = { dueDate: null, typeCode: null, currencyId: null };
+    }
     setSelectedItemId(null);
-  }, [pos]);
+  }, [pos, clearEditingState]);
 
   // ── إغلاق تبويب سلة معلقة ─────────────────────────────────────────────────
   const handleCloseHeld = useCallback((id: string) => {
@@ -672,16 +681,25 @@ export default function POSProPage() {
       const effectiveTotalTtc = effectiveTotalHt + effectiveTotalTva + (snapshot.totals.fiscal_stamp ?? 0);
 
       const currentSessionId = currentSession?.id ?? null;
-      const isEditingExistingDocument = !!editingDocumentId;
+      // SSOT: cart-store documentId (lives through hold/restore + reload). React
+      // editingDocumentId is UI-only and can lag behind (new-sale shortcut).
+      const cartDocMeta   = usePosProCart.getState();
+      const isEditingExistingDocument = !!cartDocMeta.documentId;
+      const effEditingDocId = isEditingExistingDocument
+        ? (editingDocumentId ?? cartDocMeta.documentId ?? null)
+        : null;
+      const effEditingDate = isEditingExistingDocument
+        ? (editingDocumentDate ?? cartDocMeta.documentDate ?? null)
+        : null;
 
       let res;
-      if (editingDocumentId) {
-        res = await documentsApi.update(editingDocumentId, {
+      if (isEditingExistingDocument) {
+        res = await documentsApi.update(effEditingDocId as number, {
           party_id:         currentClient?.id ?? null,
           warehouse_id:     activeWarehouse.id,
           fiscal_year_id:   fiscalYear.id,
           currency_id:      params.currencyId ?? defaultCurrency?.id ?? undefined,
-          document_date:    editingDocumentDate ?? today,
+          document_date:    effEditingDate ?? today,
           due_date:         params.dueDate ?? null,
           notes:            params.note ?? posRef.current.notes ?? null,
           lines:            linesPayload,
@@ -811,7 +829,7 @@ export default function POSProPage() {
     } finally {
       setSaleBusy(false);
     }
-  }, [settings, documentTypes, activeWarehouse, fiscalYear, defaultCurrency?.id, defaultTreasury?.id, currentSession?.id, incrementMut, queryClient, slug, handlePrintDirect, paymentModes, isPrintEnabled, template, safeToast]);
+  }, [settings, documentTypes, activeWarehouse, fiscalYear, defaultCurrency?.id, defaultTreasury?.id, currentSession?.id, incrementMut, queryClient, slug, handlePrintDirect, paymentModes, isPrintEnabled, template, safeToast, editingDocumentId, editingDocumentDate]);
 
   // ── الدفع السريع (نقدي/بطاقة بضغطة واحدة) ───────────────────────────────
   const handleQuickPay = useCallback(async (mode: PaymentMode | null) => {
@@ -985,6 +1003,11 @@ export default function POSProPage() {
       setEditingDocumentId(docId);
       setEditingDocumentDate(doc.document_date ?? null);
       setEditingDocumentNumber(doc.document_number ?? null);
+      usePosProCart.getState().setDocumentMeta({
+        id:     docId,
+        number: doc.document_number ?? null,
+        date:   doc.document_date ?? null,
+      });
       editingPrevBalanceRef.current = doc.balance_data?.previous_balance ?? null;
       editingDocMetaRef.current = {
         dueDate:    doc.due_date ?? null,
@@ -1011,6 +1034,21 @@ export default function POSProPage() {
       }
     }
   }, [searchParams, handleOpenInvoice, setSearchParams]);
+
+  // ── استرجاع وضع التعديل إذا أُعيد تحميل الصفحة أثناء تعديل فاتورة ─────────
+  const restoredEditFromCartRef = useRef(false);
+  useEffect(() => {
+    if (restoredEditFromCartRef.current) return;
+    restoredEditFromCartRef.current = true;
+    const cs = usePosProCart.getState();
+    if (cs.documentId && !editingDocumentId) {
+      setEditingDocumentId(cs.documentId);
+      setEditingDocumentDate(cs.documentDate ?? null);
+      setEditingDocumentNumber(cs.documentNumber ?? null);
+      editingPrevBalanceRef.current = null;
+      editingDocMetaRef.current = { dueDate: null, typeCode: null, currencyId: null };
+    }
+  }, [editingDocumentId]);
 
   // ── طباعة فاتورة محفوظة (من فواتير الجلسة) ───────────────────────────────
   const handlePrintDocument = useCallback(async (docId: number) => {
@@ -1366,7 +1404,18 @@ export default function POSProPage() {
           <HeldCartsModal
             carts={pos.heldCarts}
             onClose={() => setHeldOpen(false)}
-            onRestore={(id) => { pos.restoreCart(id); setHeldOpen(false); }}
+            onRestore={(id) => {
+              clearEditingState();
+              const held = pos.restoreCart(id);
+              if (held?.documentId) {
+                setEditingDocumentId(held.documentId);
+                setEditingDocumentDate(held.documentDate ?? null);
+                setEditingDocumentNumber(held.documentNumber ?? null);
+                editingPrevBalanceRef.current = null;
+                editingDocMetaRef.current = { dueDate: null, typeCode: null, currencyId: null };
+              }
+              setHeldOpen(false);
+            }}
             onDelete={pos.deleteHeldCart}
           />
         </Suspense>

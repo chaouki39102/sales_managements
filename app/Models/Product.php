@@ -248,13 +248,35 @@ class Product extends Model
             <= (float) $this->min_stock_alert;
     }
 
+    private static array $defaultPriceLevelIdByCompany = [];
+
     public function getDefaultSellingPriceHtAttribute(): float
     {
         if ($this->relationLoaded('prices')) {
-            $active = $this->prices->first(fn($p) => $p->active);
-            if ($active) {
-                $price = $active->computePrice((float) ($this->purchase_price_ht ?? $this->current_cost_price ?? 0));
-                if ($price > 0) return round($price, 4);
+            $prices = $this->prices->filter(fn($p) => (bool) $p->active);
+            if ($prices->isNotEmpty()) {
+                $companyId = (int) ($this->company_id ?? 0);
+                if (!array_key_exists($companyId, static::$defaultPriceLevelIdByCompany)) {
+                    static::$defaultPriceLevelIdByCompany[$companyId] = $companyId
+                        ? PriceLevel::where('company_id', $companyId)
+                            ->where('is_default', true)
+                            ->value('id')
+                        : null;
+                }
+                $defaultLevelId = static::$defaultPriceLevelIdByCompany[$companyId];
+
+                // Prefer the active price of the company's DEFAULT price level;
+                // fall back to the lowest price_level_id (deterministic) so the
+                // result never depends on product_prices row-insertion order.
+                $selected = $defaultLevelId
+                    ? $prices->first(fn($p) => (int) $p->price_level_id === (int) $defaultLevelId)
+                    : null;
+                $selected ??= $prices->sortBy('price_level_id')->first();
+
+                if ($selected) {
+                    $price = $selected->computePrice((float) ($this->purchase_price_ht ?? $this->current_cost_price ?? 0));
+                    if ($price > 0) return round($price, 4);
+                }
             }
         }
         // Fallback: purchase_price_ht × 1.3

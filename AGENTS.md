@@ -7,6 +7,38 @@
 ## Date
 2026-08-01
 
+### Phase 46 — POS Reopen-Edit Bug: Document Provenance Survives Hold/Restore (Aug 1)
+
+**Bug**: reopening an old POS sale (doc 287 «POS-2026-000278», 480 qty) to change the price, then paying, threw `الكمية المطلوبة (480) للمنتج «عصير جيليكس 2ل» تتجاوز المخزون المتاح (0)`. Root cause was NOT the backend stock check (legit: product stock = 0, a CREATE of 480 units correctly 409s). The browser was sending a **POST (create)** instead of a **PUT (edit)**. Classic POS `handleOpenInvoice` DOES set `editingDocumentId`, but every hold/restore path (`onHold`, `HeldCartsModal` restore + restore-and-pay, keyboard `newSale` shortcut) called `clearEditingState()` — wiping the editing flag. A reopen → change price → hold → restore → pay cycle therefore became a brand-new CREATE. A second latent bug: the keyboard new-sale shortcut cleared the cart but NOT `editingDocumentId`, so a fresh sale would have PUT into the old doc.
+
+**Fix — document identity now lives in the CART STORE (SSOT), not only React state**:
+- **`useCartStore` / `usePosProCart`**: new `documentId`/`documentNumber`/`documentDate` fields + `setDocumentMeta({id,number,date})`. Set when reopening a doc (`handleOpenInvoice`), cleared by `clearCart()`/`clearEditingState()`, persisted via `partialize` (survives reload). Neutral on `_isDirty` (the loader's `markClean()` stays authoritative).
+- **Held carts carry provenance**: `HeldCart` gained `documentId?/documentNumber?/documentDate?`. `holdCart()` snapshots the CURRENT store meta BEFORE `clearCart()` wipes it; `restoreCart()` writes it back into the store and **returns the held cart** so callers can re-seed React edit state.
+- **Pay decision = cart-store `documentId`**: `handleCompleteSale` (classic + Pro) decides PUT-vs-POST via `useCartStore.getState().documentId` (falling back to React `editingDocumentId`/`editingDocumentDate` for the payload). React `editingDocumentId` is UI-only and may lag behind. This makes every path correct: reopen→PUT; hold→restore→pay→PUT; keyboard new-sale (cart cleared, meta null)→POST (no more corrupting the old doc); page reload mid-edit→restore edit mode on mount via a one-shot effect reading persisted meta.
+- **Restore handlers** (classic `onRestore`/`onRestoreAndPay` + `handleRestoreHeld`/`onRestore` in Pro): order is `clearEditingState()` → `restoreCart(id)` (writes fresh meta) → re-seed React editing state from the returned held cart. `onHold` swapped to hold-then-clear. `handleUndoClear` (classic) snapshots+restores doc meta too.
+
+**Files modified**: `lib/api/core/types.ts` (HeldCart), `pos/utils/useCartStore.ts`, `pos/hooks/usePOSStore.ts`, `pages/pos/POSPage.tsx`, `pos-pro/store/usePosProCart.ts`, `pos-pro/POSProPage.tsx`. Backend `CommercialDocumentService` stock-check delta (PUT ignores the editing doc's own movements, `getAvailableStock(..., int $ignoreDocumentId = 0)` + hardened `deleteStockMovementsForDocument`) from the prior session is retained.
+
+**Key architectural rules**:
+- "Is this cart editing an existing document?" is decided by the CART STORE's `documentId`, NEVER by React component state alone — React state is cleared/never-set on keyboard shortcuts and reloads, and cannot survive hold→restore.
+- A held cart is a snapshot: it must carry its document provenance at hold time (read the store meta BEFORE `clearCart()`), and `restoreCart` must return the held cart so the caller can re-seed UI edit state.
+- `clearEditingState()` must also clear the cart-store meta; otherwise a lingering meta makes the NEXT sale update a stale doc. Conversely a keyboard `newSale` that only `clearCart()`s (not React state) is now SAFE because the pay decision reads the store meta (null → POST).
+
+**Verification**: `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors, 185 precache entries, `root sw == build sw: True` (SW MATCH).
+
+**Follow-up — stock repair + latent MySQL bug in `deleteStockMovementsForDocument` (Aug 1)**: after the Phase 46 fix, the user's product card «عصير جيليكس 2ل» showed stock `0` on hard refresh. The stock was genuinely **−160**: `getStockAt()` = in 960 − out 1120 across test docs 280–289 (all single-line product-983 docs, no payments, created 16:00–19:03). The card clamps negatives to 0 (`ProductCard.tsx:69` `Math.max(0, rawStock)`), so `0` was correct — removing an item from the cart never changes stock (the cart is not a reservation). Repair: deleted the 5 over-selling POS sales (281, 283, 285, 287, 289) via `CommercialDocumentService::delete()` (soft-deletes movements, detaches payments, forceDeletes doc + cascade lines); kept the 4 FA purchases (280/282/284/286) → stock now **+960**. Doc 288 was already gone.
+- **Latent bug fixed**: the prior session's "hardened" `deleteStockMovementsForDocument()` (`CommercialDocumentService.php`) referenced a `commercial_document_id` column on `stock_movements` that **does not exist in any migration** (verified: `Schema::getColumnListing('stock_movements')` has only `commercial_document_line_id`). On sqlite the model query silently ignores the unknown column (matches nothing) so delete/update worked by luck; on **MySQL it throws `Unknown column` and would 500 every `DELETE /documents/{id}` and every PUT-with-lines**. Fixed to `orWhereIn('commercial_document_line_id', $lineIds)` + `orWhereHas('commercialDocumentLine', where commercial_document_id = doc.id)` — valid on both engines. `php artisan test` — 3 passed. **Rule: `stock_movements` links to documents ONLY via `commercial_document_line_id` (FK nullOnDelete); there is no `commercial_document_id` column — never write a where on it.**
+
+### Phase 47 — Default Selling Price Honors Company Default Price Level + New-Item Price Level (Aug 1)
+
+**Bug**: adding product 983 «عصير جيليكس 2ل» to the classic POS cart priced it at **515** (Tarif Demi-Gros) instead of the selected default **520** (Tarif Détail). Root cause: `Product::getDefaultSellingPriceHtAttribute()` picked `prices->first(active)` — the `prices()` hasMany has **no ordering**, so the first-by-id active `product_prices` row (level 2 = Demi-Gros = 515) won over the company's default level (level 1, `is_default=1`; settings `default_price_level_id=1`).
+
+**Fix (2 parts)**:
+- `Product::getDefaultSellingPriceHtAttribute()` (Product.php) — resolves the company's **default price level** (`PriceLevel::where('company_id', …)->where('is_default', true)`, cached per company in a static map) and picks the ACTIVE price of that level; otherwise falls back to the lowest `price_level_id` (deterministic, independent of `product_prices` row order). The `purchase × 1.3` fallback runs only when NO prices exist at all.
+- `POSPage.tsx handleAddItem` — newly added cart items now apply `selectedPriceLevelId` (previously only `applyPriceLevel` re-priced EXISTING rows, so a level switch never reached fresh adds). Mirrors `applyPriceLevel`: exact `price_level_id` fixed-price match first, then `discount_percent` fallback. POS Pro already did this via `getVariantPrice` in `POSProPage.handleAddItem` (line ~487), so no Pro change was needed.
+
+**Verification**: tinker probe — product 983 `default_selling_price_ht` = **520** with `prices` loaded (was 515). `php -l` clean on `Product.php`.
+
 ### Phase 45 — POS Pro Parity: Weight Modal, Classic Discounts, Single-Line Cart, New-Sale Rail (Aug 1)
 
 **Request (continuing the parity drive)**: (1) a "جديد" new-sale button in the POS Pro right rail, (2) the weight modal must behave like the classic `WeightEntryModal`, (3) classic-style discount handling — per-item `%`/دج popover + invoice discount bar with `%`/دج toggle, (4) a simpler single-line cart row. Plus the customer-card balance must re-check when the client is created or changed.

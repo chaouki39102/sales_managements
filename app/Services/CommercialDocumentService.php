@@ -646,11 +646,20 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         try {
             // جلب IDs الأسطر
             $lineIds = $document->lines()->pluck('id');
-            if ($lineIds->isEmpty()) return;
 
-            // حذف حركات المخزون المرتبطة
-            \App\Models\StockMovement::whereIn('commercial_document_line_id', $lineIds)
-                ->delete();
+            // حذف كل حركات المخزون الخاصة بهذه الوثيقة عبر أسطرها. يُستدعى هذا
+            // قبل حذف الأسطر (في afterUpdate/delete)، لذا كل الحركات ما زالت مرتبطة
+            // بمعرّفات الأسطر الحالية. لا يوجد عمود commercial_document_id في
+            // stock_movements — الارتباط الوحيد هو commercial_document_line_id.
+            \App\Models\StockMovement::where(function ($q) use ($document, $lineIds) {
+                if ($lineIds->isNotEmpty()) {
+                    $q->orWhereIn('commercial_document_line_id', $lineIds);
+                }
+                // شبكة أمان: حركات مرتبطة بأسطر (ما زالت موجودة) تابعة لهذه الوثيقة
+                $q->orWhereHas('commercialDocumentLine', function ($q2) use ($document) {
+                    $q2->where('commercial_document_id', $document->id);
+                });
+            })->delete();
 
         } catch (\Throwable $e) {
             Log::warning("deleteStockMovementsForDocument: فشل حذف حركات المخزون للوثيقة #{$document->id}", [
@@ -805,7 +814,8 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                     $document->warehouse_id,
                     $document->fiscal_year_id,
                     $document->company_id,
-                    $document->document_date
+                    $document->document_date,
+                    $document->id
                 );
                 if ($baseQty > $available) {
                     throw new BusinessRuleException(
@@ -975,7 +985,14 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             ->value('rate') ?? 1.0);
     }
 
-    private function getAvailableStock(int $productId, int $warehouseId, int $fiscalYearId, int $companyId, string $date): float
+    private function getAvailableStock(
+        int $productId,
+        int $warehouseId,
+        int $fiscalYearId,
+        int $companyId,
+        string $date,
+        int $ignoreDocumentId = 0
+    ): float
     {
         $opening = (float) DB::table('opening_balances_stock')
             ->where('company_id', $companyId)
@@ -984,23 +1001,28 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             ->where('warehouse_id', $warehouseId)
             ->value('opening_quantity') ?? 0;
 
-        $incoming = (float) StockMovement::where('company_id', $companyId)
+        // التحقق من المخزون عند التعديل يجب أن يتجاهل حركات هذا المستند نفسه
+        // (الفروقات الدلتا): البضاعة التي صرفها البيع الأصلي استُهلكت بالفعل،
+        // فإذا حُدِّث السعر فقط دون تغيير الكمية يجب ألا يُحظر التعديل.
+        $base = StockMovement::where('company_id', $companyId)
             ->where('fiscal_year_id', $fiscalYearId)
             ->where('product_id', $productId)
             ->where('warehouse_id', $warehouseId)
             ->where('is_validated', true)
             ->where('movement_date', '<=', $date)
-            ->whereNull('deleted_at')
+            ->whereNull('deleted_at');
+
+        if ($ignoreDocumentId > 0) {
+            $base = $base->whereDoesntHave('commercialDocumentLine', function ($q) use ($ignoreDocumentId) {
+                $q->where('commercial_document_id', $ignoreDocumentId);
+            });
+        }
+
+        $incoming = (float) (clone $base)
             ->whereHas('stockMovementType', fn($q) => $q->where('direction', '>', 0))
             ->sum('quantity');
 
-        $outgoing = (float) StockMovement::where('company_id', $companyId)
-            ->where('fiscal_year_id', $fiscalYearId)
-            ->where('product_id', $productId)
-            ->where('warehouse_id', $warehouseId)
-            ->where('is_validated', true)
-            ->where('movement_date', '<=', $date)
-            ->whereNull('deleted_at')
+        $outgoing = (float) (clone $base)
             ->whereHas('stockMovementType', fn($q) => $q->where('direction', '<', 0))
             ->sum('quantity');
 

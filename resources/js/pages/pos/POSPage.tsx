@@ -285,6 +285,7 @@ function POSPage() {
     setEditingDocumentNumber(null);
     editingPrevBalanceRef.current = undefined;
     editingDocMetaRef.current = null;
+    useCartStore.getState().setDocumentMeta({ id: null, number: null, date: null });
   }, []);
 
 
@@ -630,6 +631,9 @@ function POSPage() {
     client: Party | null;
     note: string;
     invoiceDiscountPct: number;
+    documentId?: number | null;
+    documentNumber?: string | null;
+    documentDate?: string | null;
   } | null>(null);
   const [canUndoClear, setCanUndoClear] = useState(false);
   const [undoClearSecondsLeft, setUndoClearSecondsLeft] = useState(0);
@@ -642,11 +646,15 @@ function POSPage() {
       if (!await clearCartConfirm.confirm('هل تريد مسح كل الأصناف من السلة؟')) return;
     }
 
+    const csSnap = useCartStore.getState();
     lastClearedSnapshotRef.current = {
       items:               [...posRef.current.items],
       client:              posRef.current.client,
       note:                cartNote,
       invoiceDiscountPct:  posRef.current.invoiceDiscountPct,
+      documentId:          csSnap.documentId ?? null,
+      documentNumber:      csSnap.documentNumber ?? null,
+      documentDate:        csSnap.documentDate ?? null,
     };
     setCanUndoClear(true);
     const UNDO_SECONDS = 20;
@@ -677,6 +685,18 @@ function POSPage() {
       client:             snap.client,
       invoiceDiscountPct: snap.invoiceDiscountPct,
     });
+    if (snap.documentId) {
+      useCartStore.getState().setDocumentMeta({
+        id:     snap.documentId,
+        number: snap.documentNumber ?? null,
+        date:   snap.documentDate ?? null,
+      });
+      setEditingDocumentId(snap.documentId);
+      setEditingDocumentDate(snap.documentDate ?? null);
+      setEditingDocumentNumber(snap.documentNumber ?? null);
+      editingPrevBalanceRef.current = undefined;
+      editingDocMetaRef.current = null;
+    }
     setCartNote(snap.note);
     lastClearedSnapshotRef.current = null;
     setCanUndoClear(false);
@@ -777,6 +797,11 @@ function POSPage() {
       setEditingDocStatus(doc.status);
       setEditingDocumentDate(doc.document_date ?? null);
       setEditingDocumentNumber(doc.document_number ?? null);
+      useCartStore.getState().setDocumentMeta({
+        id:     docId,
+        number: doc.document_number ?? null,
+        date:   doc.document_date ?? null,
+      });
       editingPrevBalanceRef.current = doc.balance_data?.previous_balance;
       editingDocMetaRef.current = {
         dueDate:   doc.due_date ?? null,
@@ -812,6 +837,21 @@ function POSPage() {
       }
     }
   }, [searchParams, handleOpenInvoice, setSearchParams]);
+
+  // ── Restore edit mode if the page was reloaded mid-edit ────────────────────
+  const restoredEditFromCartRef = useRef(false);
+  useEffect(() => {
+    if (restoredEditFromCartRef.current) return;
+    restoredEditFromCartRef.current = true;
+    const cs = useCartStore.getState();
+    if (cs.documentId && !editingDocumentId) {
+      setEditingDocumentId(cs.documentId);
+      setEditingDocumentDate(cs.documentDate ?? null);
+      setEditingDocumentNumber(cs.documentNumber ?? null);
+      editingPrevBalanceRef.current = undefined;
+      editingDocMetaRef.current = null;
+    }
+  }, [editingDocumentId]);
 
   // ── Invoice discount ───────────────────────────────────────────────────────
   // ✅ pos.totals (من calcTotals) تُطبِّق الخصم بالفعل ومرة واحدة فقط
@@ -1126,17 +1166,26 @@ const handleCompleteSale = useCallback(async (params: {
 
       const currentSessionId = currentSession?.id ?? null;
 
-      // ✅ نحدّد نوع العملية قبل الإرسال لاستعمالها لاحقاً في شرط incrementMut
-      const isEditingExistingDocument = !!editingDocumentId;
+      // ✅ نحدّد نوع العملية قبل الإرسال لاستعمالها لاحقاً في شرط incrementMut.
+      // SSOT: cart-store documentId (يعيش عبر hold/restore + reload). React
+      // editingDocumentId مجرد حالة واجهة — قد يتأخر مسحها (new-sale shortcut).
+      const cartDocMeta   = useCartStore.getState();
+      const isEditingExistingDocument = !!cartDocMeta.documentId;
+      const effEditingDocId = isEditingExistingDocument
+        ? (editingDocumentId ?? cartDocMeta.documentId ?? null)
+        : null;
+      const effEditingDate = isEditingExistingDocument
+        ? (editingDocumentDate ?? cartDocMeta.documentDate ?? null)
+        : null;
 
       let res;
-      if (editingDocumentId) {
-        res = await documentsApi.update(editingDocumentId, {
+      if (isEditingExistingDocument) {
+        res = await documentsApi.update(effEditingDocId as number, {
           party_id:       currentClient?.id ?? null,
           warehouse_id:   defaultWarehouse.id,
           fiscal_year_id: fiscalYear.id,
           currency_id:    params.currencyId ?? defaultCurrency?.id ?? undefined,
-          document_date:  editingDocumentDate ?? new Date().toISOString().slice(0, 10),
+          document_date:  effEditingDate ?? new Date().toISOString().slice(0, 10),
           due_date:       params.dueDate ?? null,
           notes:          params.note ?? cartNote ?? null,
           lines:          linesPayload,
@@ -1365,6 +1414,23 @@ const handleCompleteSale = useCallback(async (params: {
       return;
     }
     posRef.current.addItem(v, qty, packaging);
+    // Apply the selected price level to the NEW item (addItem uses the product's
+    // default_selling_price_ht; the level picker only re-priced existing rows).
+    const activePlId = selectedPriceLevelId;
+    if (activePlId) {
+      const addedId = useCartStore.getState().items.find(i => i.variant_id === v.id)?.id;
+      if (addedId) {
+        const priceEntry = v.prices?.find(pr => pr.price_level_id === activePlId);
+        if (priceEntry?.price) {
+          pos.updatePrice(addedId, priceEntry.price);
+        } else {
+          const pl = priceLevelsList.find(p => p.id === activePlId);
+          if (pl?.discount_percent) {
+            pos.updatePrice(addedId, v.default_selling_price_ht * (1 - pl.discount_percent / 100));
+          }
+        }
+      }
+    }
     setRecentProducts(prev => {
       const filtered = prev.filter(p => p.id !== v.id);
       return [v, ...filtered].slice(0, 5);
@@ -1401,7 +1467,7 @@ const handleCompleteSale = useCallback(async (params: {
         });
       });
     });
-  }, [settings.clearSearchOnAdd, settings.advanceOnAdd, settings.playSoundOnAdd, settings.soundPreset, settings.soundVolume, filteredVariants, safeToast]);
+  }, [settings.clearSearchOnAdd, settings.advanceOnAdd, settings.playSoundOnAdd, settings.soundPreset, settings.soundVolume, filteredVariants, safeToast, selectedPriceLevelId, priceLevelsList, pos]);
 
   // ── فتح مودال الميزان لتعديل كمية صنف موجود بالسلة ────────────────────────
   const handleWeightEdit = useCallback((cartItemId: string) => {
@@ -1745,7 +1811,7 @@ const handleCompleteSale = useCallback(async (params: {
           onUpdatePackaging={pos.updatePackaging}
           packagingsMap={packagingsMap}
           onSetClient={pos.setClient}
-          onNoteChange={setCartNote} onHold={() => { clearEditingState(); pos.holdCart(); }}
+          onNoteChange={setCartNote} onHold={() => { pos.holdCart(); clearEditingState(); }}
           onSell={() => { if (allowCreditSale) setModal('payment'); }} onQuickSell={handleQuickCash} onClear={handleClearCart} onHeld={() => setModal('held')}
           totalTtcFinal={adjustedTotalTtcFinal}
           remainingToPay={remainingToPay}
@@ -1807,9 +1873,31 @@ const handleCompleteSale = useCallback(async (params: {
         <Suspense fallback={null}>
           <HeldCartsModal
             carts={pos.heldCarts} onClose={() => setModal('none')}
-            onRestore={id => { clearEditingState(); pos.restoreCart(id); setModal('none'); }}
+            onRestore={id => {
+              clearEditingState();
+              const held = pos.restoreCart(id);
+              if (held?.documentId) {
+                setEditingDocumentId(held.documentId);
+                setEditingDocumentDate(held.documentDate ?? null);
+                setEditingDocumentNumber(held.documentNumber ?? null);
+                editingPrevBalanceRef.current = undefined;
+                editingDocMetaRef.current = null;
+              }
+              setModal('none');
+            }}
             onDelete={pos.deleteHeldCart}
-            onRestoreAndPay={id => { clearEditingState(); pos.restoreCart(id); if (allowCreditSale) setModal('payment'); }}
+            onRestoreAndPay={id => {
+              clearEditingState();
+              const held = pos.restoreCart(id);
+              if (held?.documentId) {
+                setEditingDocumentId(held.documentId);
+                setEditingDocumentDate(held.documentDate ?? null);
+                setEditingDocumentNumber(held.documentNumber ?? null);
+                editingPrevBalanceRef.current = undefined;
+                editingDocMetaRef.current = null;
+              }
+              if (allowCreditSale) setModal('payment');
+            }}
           />
         </Suspense>
       )}
