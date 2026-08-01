@@ -51,6 +51,7 @@ export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRe
   const [miss, setMiss] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const wrapRef  = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef(new Map<number, HTMLButtonElement>());
   const missTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // نتائج البحث مُخفِّضة (debounced) حتى لا تُفلتر على كل ضغطة في الكتالوجات الكبيرة
@@ -75,6 +76,12 @@ export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRe
   const searching = code.trim().toLowerCase() !== debouncedQuery;
 
   useEffect(() => setHi(0), [results.length]);
+
+  // عند تغيير الصف المميز بالأسهم: مرّر القائمة لتُبقيه ظاهراً
+  useEffect(() => {
+    const el = itemRefs.current.get(hi);
+    if (el) el.scrollIntoView({ block: 'nearest' });
+  }, [hi]);
 
   // إغلاق القائمة عند النقر خارجها
   useEffect(() => {
@@ -202,6 +209,7 @@ export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRe
               return (
                 <button
                   key={v.id}
+                  ref={(el) => { if (el) itemRefs.current.set(i, el); else itemRefs.current.delete(i); }}
                   type="button"
                   className={`pp-scanbar-dd-item${i === hi ? ' on' : ''}`}
                   onMouseEnter={() => setHi(i)}

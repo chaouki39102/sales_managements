@@ -1023,6 +1023,7 @@
   overflow: hidden;
   background: var(--bg3);
   flex-shrink: 0;
+  width: 96px;
 }
 
 .pp-row-qty button {
@@ -1982,13 +1983,13 @@
 
 .pp-row-weight {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 1px;
-  height: 40px;
-  min-width: 56px;
-  padding: 0 10px;
+  gap: 4px;
+  height: 28px;
+  width: 96px;
+  padding: 0 6px;
   border: 1px solid var(--goldbo);
   border-radius: var(--r2);
   background: var(--goldb);
@@ -2001,9 +2002,9 @@
 
 .pp-row-weight:hover { background: var(--goldbo); transform: translateY(-1px); }
 
-.pp-row-weight i { font-size: 16px; }
+.pp-row-weight i { font-size: 15px; }
 
-.pp-row-weight span { font-size: var(--fs-md); font-weight: 900; line-height: 1; }
+.pp-row-weight span { font-size: var(--fs-md); font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
 
 .pp-row-weight em { font-style: normal; font-size: var(--fs-2xs); }
 

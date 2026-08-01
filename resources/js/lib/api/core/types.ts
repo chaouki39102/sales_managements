@@ -212,6 +212,7 @@ export interface TreasuryAccountType extends BaseModel {
 export interface Unit extends BaseModel {
   name:          string;
   abbreviation:  string;
+  symbol?:       string | null;
   description?:  string | null;
   active:        boolean;
   company_id:    number;

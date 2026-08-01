@@ -39,7 +39,8 @@ interface CartState {
 }
 
 function getUnitSymbol(v: ProductVariant): string {
-  return v.unit?.abbreviation ?? 'قطعة';
+  if (v.is_sold_by_weight) return 'كغ';
+  return v.unit?.symbol ?? v.unit?.abbreviation ?? 'قطعة';
 }
 
 export const useCartStore = create<CartState>()(

@@ -70,6 +70,37 @@ export default function POSProWeightModal({
   const priceRef  = useRef<HTMLInputElement>(null);
   const exactWeightRef = useRef<number | null>(null);
 
+  const cardRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
+  const [cardStyle, setCardStyle] = useState<React.CSSProperties>({});
+
+  const onResizeDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const el = cardRef.current;
+    if (!el) return;
+    dragRef.current = {
+      startX: e.clientX, startY: e.clientY,
+      startW: el.offsetWidth, startH: el.offsetHeight,
+    };
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return;
+      const dx = ev.clientX - dragRef.current.startX;
+      const dy = ev.clientY - dragRef.current.startY;
+      setCardStyle({
+        width:  Math.max(360, dragRef.current.startW + dx),
+        height: Math.max(300, dragRef.current.startH + dy),
+      });
+    };
+    const onUp = () => {
+      dragRef.current = null;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, []);
+
   useEffect(() => {
     if (open) {
       setWeightStr(initialKg && initialKg > 0 ? Number(initialKg).toFixed(3) : '');
@@ -189,7 +220,7 @@ export default function POSProWeightModal({
 
   return (
     <div className="wem-overlay" onClick={onClose}>
-      <div className="wem-card" onClick={e => e.stopPropagation()}>
+      <div className="wem-card" ref={cardRef} onClick={e => e.stopPropagation()} style={cardStyle}>
         {/* ── Header ── */}
         <div className="wem-header">
           <button className="wem-close" onClick={onClose} type="button" aria-label="إغلاق">
@@ -286,6 +317,10 @@ export default function POSProWeightModal({
                     if (e.key === 'Enter') handleOk();
                     if (e.key === 'Escape') onClose();
                     if (e.key === 'Tab') { e.preventDefault(); priceRef.current?.focus(); }
+                    if (e.key === 'ArrowDown') {
+                      const cur = parseFloat(weightStr) || 0;
+                      if (cur <= 0.001) { e.preventDefault(); priceRef.current?.focus(); }
+                    }
                   }}
                 />
                 <span className="wem-hero-unit">{unitSymbol}</span>
@@ -352,6 +387,10 @@ export default function POSProWeightModal({
                       if (e.key === 'Enter') handleOk();
                       if (e.key === 'Escape') onClose();
                       if (e.key === 'Tab') { e.preventDefault(); weightRef.current?.focus(); }
+                      if (e.key === 'ArrowUp') {
+                        const cur = parseFloat(priceStr) || 0;
+                        if (cur <= 0) { e.preventDefault(); weightRef.current?.focus(); }
+                      }
                     }}
                   />
                   <span className="wem-hero-unit wem-hero-unit--price">دج</span>
@@ -413,6 +452,13 @@ export default function POSProWeightModal({
             <kbd>Esc</kbd> إلغاء
           </div>
         </div>
+
+        {/* ── Resize handle ── */}
+        <FloatingTooltip content="سحب لتغيير الحجم">
+          <div className="wem-resize" onMouseDown={onResizeDown}>
+            <i className="ti ti-grip-vertical" />
+          </div>
+        </FloatingTooltip>
       </div>
     </div>
   );

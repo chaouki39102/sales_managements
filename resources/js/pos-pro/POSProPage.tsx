@@ -489,7 +489,7 @@ export default function POSProPage() {
         effective = { ...v, default_selling_price_ht: price };
       }
     }
-    if (effective.is_sold_by_weight) {
+    if (effective.is_sold_by_weight ?? effective.product?.is_sold_by_weight ?? false) {
       setWeightTarget({ mode: 'add', variant: effective });
       return;
     }
@@ -1327,7 +1327,7 @@ export default function POSProPage() {
             ? weightTarget.variant.product?.name ?? ''
             : weightTarget.item.product_name}
           unitSymbol={weightTarget.mode === 'add'
-            ? weightTarget.variant.unit?.abbreviation ?? 'كغ'
+            ? weightTarget.variant.unit?.symbol ?? weightTarget.variant.unit?.abbreviation ?? 'كغ'
             : weightTarget.item.unit_symbol}
           priceHtPerKg={weightTarget.mode === 'add'
             ? weightTarget.variant.default_selling_price_ht

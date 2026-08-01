@@ -78,6 +78,7 @@ export function productToVariant(p: Product): ProductVariant {
     min_stock_alert:            p.min_stock_alert ?? 0,
     max_stock_alert:            p.max_stock_alert,
     manages_quantity_discounts: p.manages_quantity_discounts,
+    is_sold_by_weight:          p.is_sold_by_weight,
     weight:                     p.weight,
     volume:                     p.volume,
     length:                     p.length,

@@ -310,7 +310,7 @@ function PPRow({
           title="تعديل الوزن"
         >
           <i className="ti ti-scale" />
-          <span>{item.quantity}</span>
+          <span>{Number(item.quantity).toFixed(3)}</span>
           <em>{item.unit_symbol ?? 'كغ'}</em>
         </button>
       ) : (
