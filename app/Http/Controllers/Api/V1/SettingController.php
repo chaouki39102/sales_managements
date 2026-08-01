@@ -176,7 +176,7 @@ class SettingController extends BaseApiController
             // documents
             'default_warehouse_id', 'default_currency_id', 'default_price_level_id',
             'default_payment_mode_id', 'default_treasury_account_id',
-            'default_apply_stamp', 'default_fiscal_year_behavior',
+            'default_fiscal_year_behavior',
             'documents_default_line_mode', 'documents_default_visible_cols',
 
             // inventory (expansion)

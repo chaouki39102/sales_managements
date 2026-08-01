@@ -3707,7 +3707,6 @@ function DocumentsTab({
     const [priceLevelId, setPriceLevelId] = useState("");
     const [paymentModeId, setPaymentModeId] = useState("");
     const [treasuryAccountId, setTreasuryAccountId] = useState("");
-    const [applyStamp, setApplyStamp] = useState(true);
     const [fyBehavior, setFyBehavior] = useState("current");
     const [lineMode, setLineMode] = useState("table");
     const [visibleCols, setVisibleCols] = useState("");
@@ -3757,7 +3756,6 @@ function DocumentsTab({
             default_price_level_id: Number(gs("default_price_level_id", "")),
             default_payment_mode_id: Number(gs("default_payment_mode_id", "")),
             default_treasury_account_id: Number(gs("default_treasury_account_id", "")),
-            default_apply_stamp: gs<boolean>("default_apply_stamp", true),
             default_fiscal_year_behavior: gs<string>("default_fiscal_year_behavior", "current"),
             documents_default_line_mode: gs<string>("documents_default_line_mode", "table"),
             documents_default_visible_cols: gs<string[]>("documents_default_visible_cols", []),
@@ -3776,7 +3774,6 @@ function DocumentsTab({
         setPriceLevelId(str(gs("default_price_level_id", "")));
         setPaymentModeId(str(gs("default_payment_mode_id", "")));
         setTreasuryAccountId(str(gs("default_treasury_account_id", "")));
-        setApplyStamp(gs<boolean>("default_apply_stamp", true));
         setFyBehavior(gs<string>("default_fiscal_year_behavior", "current"));
         setLineMode(gs<string>("documents_default_line_mode", "table"));
         const cols = gs<string[]>("documents_default_visible_cols", []);
@@ -3792,7 +3789,6 @@ function DocumentsTab({
             default_price_level_id: priceLevelId ? Number(priceLevelId) : null,
             default_payment_mode_id: paymentModeId ? Number(paymentModeId) : null,
             default_treasury_account_id: treasuryAccountId ? Number(treasuryAccountId) : null,
-            default_apply_stamp: applyStamp,
             default_fiscal_year_behavior: fyBehavior,
             documents_default_line_mode: lineMode,
             documents_default_visible_cols: visibleCols.split(",").map(s => s.trim()).filter(Boolean),
@@ -3892,12 +3888,6 @@ function DocumentsTab({
             <Card>
                 <SecHead icon="ti-toggle-left" label="خيارات التبديل" />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <ToggleRow
-                        label="تفعيل الطابع الجبائي تلقائياً"
-                        hint="عند إنشاء مستند جديد"
-                        checked={applyStamp}
-                        onChange={v => { setApplyStamp(v); markDirty(); onDirty?.(); }}
-                    />
                     <ToggleRow
                         label="منع البيع بدون مخزون كافٍ"
                         hint="تجاوز إعداد المنتج الفردي ومنع البيع نهائياً"

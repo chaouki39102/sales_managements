@@ -6,6 +6,7 @@ use App\Core\Http\Controllers\BaseApiController;
 use App\Http\Requests\ComputeLineRequest;
 use App\Models\CommercialDocument;
 use App\Models\DocumentType;
+use App\Models\Setting;
 use App\Services\ComputeLineService;
 use App\Services\DocumentConversionService;
 use App\Services\DocumentReturnService;
@@ -57,9 +58,12 @@ class DocumentComputeController extends BaseApiController
             ]);
 
             $companyId = app(\App\Services\CompanyContextService::class)->get();
+
+            $applyStamp = $validated['apply_stamp']
+                ?? Setting::getSetting('fiscal_stamp_enabled', true, $companyId) === true;
             $result    = $this->computeLineService->computeDocument(
                 $validated['lines'],
-                $validated['apply_stamp'] ?? false,
+                $applyStamp,
                 $companyId,
             );
 

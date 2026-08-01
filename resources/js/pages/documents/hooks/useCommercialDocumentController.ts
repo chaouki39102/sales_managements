@@ -140,11 +140,6 @@ export function useCommercialDocumentController({
     return '';
   }, [settingsDict, lookups.priceLevels]);
 
-  const settingsApplyStamp = useMemo(() => {
-    const v = settingsDict?.default_apply_stamp?.value;
-    return v === true || v === 'true';
-  }, [settingsDict]);
-
   const fiscalStampEnabled = useMemo(() => {
     const v = settingsDict?.fiscal_stamp_enabled?.value;
     return v === undefined || v === true || v === 'true' || v === 1 || v === '1';
@@ -179,7 +174,6 @@ export function useCommercialDocumentController({
     defaultWarehouseId: settingsWarehouseId,
     baseCurrencyId:     settingsCurrencyId,
     defaultPriceLevelId: settingsPriceLevelId,
-    defaultApplyStamp:   settingsApplyStamp,
     stampEnabled:        fiscalStampEnabled,
     selectedYearId:     selectedYear?.id ? String(selectedYear.id) : '',
     paymentModes:       lookups.paymentModes,
@@ -636,7 +630,6 @@ export function useCommercialDocumentController({
 
     // Settings
     settingsDict,
-    settingsApplyStamp,
 
     // Columns & line mode
     visibleCols, lineMode, handleColsChange, setLineMode,

@@ -56,18 +56,26 @@ class PartyBalanceService
             ->value('balance') ?? 0);
 
         // 3. Payments
-        // الدفعات تُقلّل الرصيد دائماً (سواء دفع الزبون أو دفعنا للمورد)
-        $paymentsTotal = (float) (DB::table('payments')
+        // الدفعات تُقلّل الرصيد دائماً، لكن الإشارة تعتمد على اتجاه الدفعة:
+        //   in  (دفعة مستلمة من زبون) → تُخصم من الرصيد (الزبون يدين لنا بأقل)
+        //   out (دفعة مدفوعة لمورد)   → تُضاف إلى الرصيد (نحن مدينون للمورد بأقل)
+        // الاتجاه null (دفعات قديمة) يُعامَل كـ in للمحافظة على السلوك السابق.
+        $paymentsRow = DB::table('payments')
             ->where('company_id',     $companyId)
             ->where('party_id',       $partyId)
             ->where('fiscal_year_id', $fiscalYearId)
             ->where('status',         'confirmed')
             ->whereDate('payment_date', '<=', $date)
             ->whereNull('deleted_at')
-            ->sum('amount') ?? 0);
+            ->selectRaw('COALESCE(SUM(amount), 0) as total')
+            ->selectRaw("COALESCE(SUM(CASE WHEN direction = 'out' THEN amount ELSE -amount END), 0) as adjustment")
+            ->first();
+
+        $paymentsTotal      = (float) ($paymentsRow->total ?? 0);
+        $paymentsAdjustment = (float) ($paymentsRow->adjustment ?? 0);
 
         $currentBalance = round(
-            $openingAmount + $documentsBalance - $paymentsTotal,
+            $openingAmount + $documentsBalance + $paymentsAdjustment,
             2
         );
 
@@ -161,6 +169,8 @@ class PartyBalanceService
             ->pluck('total', 'party_id');
 
         // 4. Payments (batch)
+        // نفس منطق getBalanceAt: out يُضاف إلى الرصيد، in يُخصم منه،
+        // والقيمة null (دفعات قديمة) تُعامَل كـ in للمحافظة على السلوك السابق.
         $paymentsMap = DB::table('payments')
             ->where('company_id',     $companyId)
             ->where('fiscal_year_id', $fiscalYearId)
@@ -169,16 +179,20 @@ class PartyBalanceService
             ->whereDate('payment_date', '<=', $date)
             ->whereNull('deleted_at')
             ->selectRaw('party_id, COALESCE(SUM(amount), 0) as total')
+            ->selectRaw("COALESCE(SUM(CASE WHEN direction = 'out' THEN amount ELSE -amount END), 0) as adjustment")
             ->groupBy('party_id')
-            ->pluck('total', 'party_id');
+            ->get()
+            ->keyBy('party_id');
 
         // 5. Merge
         $balances = [];
         foreach ($parties as $party) {
-            $opening   = (float) ($openingMap[$party->id]   ?? 0);
-            $documents = (float) ($documentsMap[$party->id] ?? 0);
-            $payments  = (float) ($paymentsMap[$party->id]  ?? 0);
-            $current   = round($opening + $documents - $payments, 4);
+            $opening    = (float) ($openingMap[$party->id]   ?? 0);
+            $documents  = (float) ($documentsMap[$party->id] ?? 0);
+            $pm         = $paymentsMap[$party->id] ?? null;
+            $payments   = (float) ($pm->total ?? 0);
+            $adjustment = (float) ($pm->adjustment ?? 0);
+            $current    = round($opening + $documents + $adjustment, 4);
 
             $balances[] = [
                 'party_id'          => $party->id,

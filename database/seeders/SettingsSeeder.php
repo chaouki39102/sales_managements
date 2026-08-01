@@ -480,15 +480,6 @@ class SettingsSeeder extends Seeder
                 'is_editable'   => true,
                 'display_order' => 74,
             ],
-            'default_apply_stamp' => [
-                'value'         => true,
-                'group'         => 'documents',
-                'type'          => 'boolean',
-                'description'   => 'تفعيل الطابع الجبائي تلقائياً عند إنشاء مستند جديد',
-                'is_public'     => false,
-                'is_editable'   => true,
-                'display_order' => 75,
-            ]            ,
             'default_fiscal_year_behavior' => [
                 'value'         => 'current',
                 'group'         => 'documents',

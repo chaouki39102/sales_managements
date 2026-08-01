@@ -1,4 +1,4 @@
-import { Section, TotalCard, Toggle } from '../components/DocumentUIPrimitives';
+import { Section, TotalCard } from '../components/DocumentUIPrimitives';
 import type { DocumentTotals, DocumentFormState } from '../types/document.types';
 import type { PartyBalanceInfo } from '../hooks/useDocumentForm';
 import { fmtDZD, toNum } from '../utils/document.utils';
@@ -11,17 +11,13 @@ interface DocumentTotalsSectionProps {
   selectedParty: { name?: string } | null;
   isPurchase: boolean;
   isEdit: boolean;
-  isReadOnly: boolean;
-  set: (field: string, value: unknown) => void;
-  stampEnabled?: boolean;
   existingDocument?: Record<string, unknown>;
 }
 
 export default function DocumentTotalsSection({
   totals, payments,
   partyBalance, form, selectedParty,
-  isPurchase, isEdit, isReadOnly, set,
-  stampEnabled = true,
+  isPurchase, isEdit,
   existingDocument,
 }: DocumentTotalsSectionProps) {
   const futureBalance = partyBalance && form.party_id && (totals.netToPay ?? 0) > 0
@@ -97,16 +93,6 @@ export default function DocumentTotalsSection({
             {futureBalance !== null ? `${fmtDZD(futureBalance)} دج` : ''}
           </b>
         </div>
-      )}
-
-      {stampEnabled && (
-        <Toggle
-          checked={form.apply_stamp}
-          onChange={(v: boolean) => set('apply_stamp', v)}
-          label="الطابع الجبائي"
-          subLabel="1% من TTC — بحد أدنى 5 دج وأقصى 2,500 دج"
-          disabled={isReadOnly}
-        />
       )}
     </Section>
   );

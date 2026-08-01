@@ -66,7 +66,7 @@ export default function CommercialDocumentPage() {
 
   const {
     docCode, isPurchase, isEdit,
-    lookups, lookupsReady, settingsApplyStamp,
+    lookups, lookupsReady,
     form, errors, lineErr, apiErr,
     set, handlePriceLevelChange,
     addLine, addLineWithProduct, removeLine, duplicateLine, updateLine,
@@ -382,9 +382,6 @@ export default function CommercialDocumentPage() {
               selectedParty={selectedParty!}
               isPurchase={isPurchase}
               isEdit={isEdit}
-              isReadOnly={isReadOnly}
-              set={set}
-              stampEnabled={settingsApplyStamp}
             />
           </div>
         </div>

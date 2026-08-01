@@ -102,7 +102,6 @@ interface UseDocumentFormOptions {
   defaultWarehouseId:  string;
   baseCurrencyId:      string;
   defaultPriceLevelId?: string;
-  defaultApplyStamp?:  boolean;
   stampEnabled?:       boolean;
   selectedYearId:      string;
   paymentModes: Array<{
@@ -371,14 +370,10 @@ export function buildPaymentFromApi(p: Record<string, unknown>): PaymentEntry {
 
 function buildDefaultForm(
   existingDocument: Record<string, unknown> | undefined,
-  defaults: { warehouseId: string; currencyId: string; yearId: string; priceLevelId?: string; applyStamp?: boolean },
+  defaults: { warehouseId: string; currencyId: string; yearId: string; priceLevelId?: string },
   defaultTvaRate: number,
   products?: Product[],
-  stampEnabled?: boolean,
 ): DocumentFormState {
-  const stamp = stampEnabled !== false
-    ? (defaults.applyStamp ?? false)
-    : false;
   const defaultShipping: ShippingInfo = {};
   const defaultPaymentTerms: PaymentTerm[] = [];
 
@@ -401,9 +396,6 @@ function buildDefaultForm(
       fiscal_year_id: String(doc.fiscal_year_id ?? ''),
       currency_id:    String(doc.currency_id    ?? ''),
       exchange_rate:  String(doc.exchange_rate  ?? '1'),
-      apply_stamp:    stampEnabled !== false
-        ? (toNum((doc as any).total_stamp ?? (doc as any).fiscal_stamp ?? 0) > 0)
-        : false,
       price_level_id: String(doc.price_level_id ?? ''),
       lines,
       payments: [],
@@ -421,7 +413,6 @@ function buildDefaultForm(
     fiscal_year_id: defaults.yearId,
     currency_id:    defaults.currencyId,
     exchange_rate:  '1',
-    apply_stamp:    stamp,
     price_level_id: defaults.priceLevelId ?? '',
     lines: [], payments: [],
     shipping_info:  { ...defaultShipping },
@@ -455,7 +446,6 @@ export function useDocumentForm({
   defaultWarehouseId,
   baseCurrencyId,
   defaultPriceLevelId = '',
-  defaultApplyStamp = false,
   stampEnabled = true,
   selectedYearId,
   paymentModes,
@@ -511,8 +501,7 @@ export function useDocumentForm({
       currencyId:  baseCurrencyId,
       yearId:      selectedYearId,
       priceLevelId: defaultPriceLevelId,
-      applyStamp:  defaultApplyStamp,
-    }, defaultTvaRate, products, stampEnabled),
+    }, defaultTvaRate, products),
   );
   const [errors,  setErrors]  = useState<FormErrors>({});
   const [lineErr, setLineErr] = useState('');
@@ -593,10 +582,9 @@ export function useDocumentForm({
 
     setForm(buildDefaultForm(
       existingDocument,
-      { warehouseId: defaultWarehouseId, currencyId: baseCurrencyId, yearId: selectedYearId, priceLevelId: defaultPriceLevelId, applyStamp: defaultApplyStamp },
+      { warehouseId: defaultWarehouseId, currencyId: baseCurrencyId, yearId: selectedYearId, priceLevelId: defaultPriceLevelId },
       defaultTvaRate,
       productsRef.current,
-      stampEnabled,
     ));
     setErrors({});
     setLineErr('');
@@ -616,19 +604,15 @@ export function useDocumentForm({
       currency_id:    f.currency_id    || baseCurrencyId,
       fiscal_year_id: f.fiscal_year_id || selectedYearId,
       price_level_id: f.price_level_id || defaultPriceLevelId,
-      apply_stamp:    stampEnabled !== false
-        ? ((!('apply_stamp' in f) || !f.apply_stamp) ? defaultApplyStamp : f.apply_stamp)
-        : false,
     }));
-  }, [defaultWarehouseId, baseCurrencyId, selectedYearId, defaultPriceLevelId, defaultApplyStamp, stampEnabled, isEdit, open]);
+  }, [defaultWarehouseId, baseCurrencyId, selectedYearId, defaultPriceLevelId, isEdit, open]);
 
   // ── set ───────────────────────────────────────────────────────────────────
 
   const set = useCallback((k: string, v: unknown) => {
-    if (k === 'apply_stamp' && stampEnabled === false) return;
     setForm((f) => ({ ...f, [k]: v }));
     setErrors((prev) => { const n = { ...prev }; delete n[k as string]; return n; });
-  }, [stampEnabled]);
+  }, []);
 
   const priceLevelId = useMemo(
     () => (form.price_level_id ? parseInt(form.price_level_id) : null),
@@ -1062,8 +1046,8 @@ export function useDocumentForm({
   // ── Totals ────────────────────────────────────────────────────────────────
 
   const totals = useMemo(
-    () => calcTotals(form.lines, form.apply_stamp, payments),
-    [form.lines, form.apply_stamp, payments],
+    () => calcTotals(form.lines, stampEnabled, payments),
+    [form.lines, stampEnabled, payments],
   );
 
   // ── validate ──────────────────────────────────────────────────────────────

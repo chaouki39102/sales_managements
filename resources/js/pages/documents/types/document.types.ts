@@ -223,7 +223,6 @@ export interface DocumentFormState {
   fiscal_year_id: string;
   currency_id:    string;
   exchange_rate:  string;
-  apply_stamp:    boolean;
   price_level_id: string;
   lines:          LineItem[];
   payments:       PaymentEntry[];

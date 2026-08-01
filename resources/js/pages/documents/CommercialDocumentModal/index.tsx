@@ -57,7 +57,7 @@ export default function CommercialDocumentModal({
 
   const {
     slug, qc, navigate, docCode, isPurchase, isEdit,
-    lookups, lookupsReady, settingsApplyStamp,
+    lookups, lookupsReady,
     form, errors, lineErr, apiErr,
     set, handlePriceLevelChange,
     addLine, addLineWithProduct, removeLine, duplicateLine, updateLine,
@@ -427,9 +427,6 @@ export default function CommercialDocumentModal({
               selectedParty={selectedParty as any}
               isPurchase={isPurchase}
               isEdit={isEdit}
-              isReadOnly={isReadOnly}
-              set={set}
-              stampEnabled={settingsApplyStamp}
               existingDocument={existingDocument}
             />
           </div>
