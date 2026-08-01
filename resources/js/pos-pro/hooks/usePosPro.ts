@@ -5,7 +5,7 @@
 // نفس نمط usePOS الكلاسيكي لكن دون الاعتماد على usePOSStore/useCartStore
 // حتى لا تتداخل الحالة بين الصفحتين.
 // ════════════════════════════════════════════════════════════════════════════
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { usePosProCart } from '../store/usePosProCart';
 import { calcTotals } from '@/pos/utils/calculations';
 
@@ -15,6 +15,7 @@ export function usePosPro(fiscalStampEnabled = true) {
   const invoiceDiscountPct = usePosProCart(s => s.invoiceDiscountPct);
   const payments           = usePosProCart(s => s.payments);
   const notes              = usePosProCart(s => s.notes);
+  const heldCarts          = usePosProCart(s => s.heldCarts);
 
   const addItem              = usePosProCart(s => s.addItem);
   const removeItem           = usePosProCart(s => s.removeItem);
@@ -28,19 +29,27 @@ export function usePosPro(fiscalStampEnabled = true) {
   const setNotes             = usePosProCart(s => s.setNotes);
   const setPayments          = usePosProCart(s => s.setPayments);
   const setInvoiceDiscountPct = usePosProCart(s => s.setInvoiceDiscountPct);
+  const restoreCart          = usePosProCart(s => s.restoreCart);
+  const deleteHeldCart       = usePosProCart(s => s.deleteHeldCart);
 
   const totals = useMemo(
     () => calcTotals(items, invoiceDiscountPct, fiscalStampEnabled, client?.is_tva_exempt ?? false),
     [items, invoiceDiscountPct, fiscalStampEnabled, client?.is_tva_exempt],
   );
 
+  const holdCart = useCallback((label?: string) => {
+    usePosProCart.getState().holdCart({ items, totals, client, label });
+  }, [items, totals, client]);
+
   return useMemo(() => ({
     items, client, invoiceDiscountPct, payments, notes, totals,
+    heldCarts, holdCart, restoreCart, deleteHeldCart,
     addItem, removeItem, updateQty,
     updateDiscount, updateDiscountAmount, updatePrice, updatePackaging,
     clearCart, setClient, setNotes, setPayments, setInvoiceDiscountPct,
   }), [
     items, client, invoiceDiscountPct, payments, notes, totals,
+    heldCarts, holdCart, restoreCart, deleteHeldCart,
     addItem, removeItem, updateQty,
     updateDiscount, updateDiscountAmount, updatePrice, updatePackaging,
     clearCart, setClient, setNotes, setPayments, setInvoiceDiscountPct,

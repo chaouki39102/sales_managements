@@ -11,7 +11,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { nanoid }  from 'nanoid';
-import type { CartItem, Party, ProductPackaging, ProductVariant } from '@/types';
+import type { CartItem, CartTotals, HeldCart, Party, ProductPackaging, ProductVariant } from '@/types';
 import { resolveQuantityTier, recalcItem } from '@/pos/utils/calculations';
 
 export interface DocumentPayment {
@@ -31,6 +31,7 @@ interface PosProCartState {
   notes:              string;
   invoiceDiscountPct: number;
   payments:           DocumentPayment[];
+  heldCarts:          HeldCart[];
   _isDirty:           boolean;
 
   addItem:              (variant: ProductVariant, qty?: number, packaging?: ProductPackaging | null) => void;
@@ -45,6 +46,9 @@ interface PosProCartState {
   setPayments:          (payments: DocumentPayment[]) => void;
   clearCart:            () => void;
   setInvoiceDiscountPct:(pct: number) => void;
+  holdCart:   (params: { items: CartItem[]; totals: CartTotals; client: Party | null; label?: string }) => void;
+  restoreCart:          (id: string) => void;
+  deleteHeldCart:       (id: string) => void;
   markClean:            () => void;
 }
 
@@ -59,12 +63,13 @@ function getUnitSymbol(v: ProductVariant): string {
 function createCartStore(persistKey: string) {
   return create<PosProCartState>()(
     persist(
-      (set) => ({
+      (set, get) => ({
         items:              [],
         client:             null,
         notes:              '',
         invoiceDiscountPct: 0,
         payments:           [],
+        heldCarts:          [],
         _isDirty:           false,
 
         addItem: (variant, qty = 1, packaging = null) => {
@@ -266,6 +271,36 @@ function createCartStore(persistKey: string) {
         setInvoiceDiscountPct: (pct) =>
           set({ invoiceDiscountPct: Math.min(100, Math.max(0, pct)), _isDirty: true }),
 
+        holdCart: ({ items, totals, client, label }) => {
+          if (!items.length) return;
+          const held: HeldCart = {
+            id:         nanoid(6),
+            label:      label ?? `عربة ${get().heldCarts.length + 1}`,
+            items:      [...items],
+            totals,
+            client:     client ?? null,
+            created_at: new Date().toISOString(),
+          };
+          set(s => ({
+            heldCarts: [...s.heldCarts, held],
+            items: [], client: null, notes: '', invoiceDiscountPct: 0, payments: [], _isDirty: false,
+          }));
+        },
+
+        restoreCart: (id) => {
+          const held = get().heldCarts.find(c => c.id === id);
+          if (!held) return;
+          set(s => ({
+            items:      held.items,
+            client:     held.client ?? null,
+            heldCarts:  s.heldCarts.filter(c => c.id !== id),
+            _isDirty:   true,
+          }));
+        },
+
+        deleteHeldCart: (id) =>
+          set(s => ({ heldCarts: s.heldCarts.filter(c => c.id !== id) })),
+
         markClean: () => set({ _isDirty: false }),
       }),
       {
@@ -276,6 +311,7 @@ function createCartStore(persistKey: string) {
           notes:              state.notes,
           invoiceDiscountPct: state.invoiceDiscountPct,
           payments:           state.payments,
+          heldCarts:          state.heldCarts,
           _isDirty:           true,
         }),
       },

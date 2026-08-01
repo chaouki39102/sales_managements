@@ -69,6 +69,9 @@ const OpenSessionModal = React.lazy(() => import('@/pos/components/OpenSessionMo
 const CustomerSearchModal = React.lazy(() => import('@/pos/components/CustomerSearchModal'));
 const ProfessionalPaymentModal = React.lazy(() => import('@/pos/components/ProfessionalPaymentModal'));
 const ProfessionalReceipt = React.lazy(() => import('@/pos/components/ProfessionalReceipt'));
+const HeldCartsModal    = React.lazy(() => import('@/pos/components/HeldCartsModal'));
+const ReturnsModal      = React.lazy(() => import('@/pos/components/ReturnsModal'));
+const POSProKeyboardHelp = React.lazy(() => import('@/pos-pro/components/POSProKeyboardHelp'));
 
 /** خصم تراكمي مطابق لـ POSPage — يجب أن يتطابق مع حساب الباكاند بالضبط */
 function compoundDiscountPct(linePct: number, invoicePct: number): number {
@@ -113,11 +116,30 @@ export default function POSProPage() {
   const defaultCurrency  = currencies?.find(c => c.is_base_currency) ?? currencies?.[0];
   const defaultTreasury  = treasuryAccounts?.find(a => a.is_default) ?? treasuryAccounts?.[0];
 
+  // ── المستودع النشط — قابل للتغيير من مودال الجلسة ────────────────────────
+  const [activeWarehouseId, setActiveWarehouseId] = useState<number | null>(null);
+  const activeWarehouse = useMemo(
+    () => (activeWarehouseId ? (warehouses?.find(w => w.id === activeWarehouseId) ?? null) : defaultWarehouse),
+    [activeWarehouseId, warehouses, defaultWarehouse],
+  );
+  // مزامنة: عند توفر المستودع الافتراضي، نعتمده افتراضياً
+  useEffect(() => {
+    if (!activeWarehouseId && defaultWarehouse) setActiveWarehouseId(defaultWarehouse.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultWarehouse?.id]);
+
   // ── الجلسة ─────────────────────────────────────────────────────────────────
   const { data: currentSession, isLoading: sessionLoading } = useCurrentPosSession();
   const openSessionMut  = useOpenSession();
   const incrementMut    = useIncrementSession(currentSession?.id ?? null);
   const [sessionError, setSessionError] = useState<string | null>(null);
+
+  // مزامنة: عند فتح جلسة جديدة نعتمد مستودعها
+  useEffect(() => {
+    const whId = currentSession?.warehouse?.id;
+    if (whId) setActiveWarehouseId(whId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSession?.id]);
 
   const getErrorMessage = (error: unknown, fallback: string) => {
     if (error instanceof Error && error.message) return error.message;
@@ -182,10 +204,10 @@ export default function POSProPage() {
 
   // ── المخزون (عبر stock-at) ────────────────────────────────────────────────
   const { data: stockData = {} } = useQuery<Record<number, number>>({
-    queryKey: [slug, 'pos-pro-stock', defaultWarehouse?.id ?? null, fiscalYear?.id],
+    queryKey: [slug, 'pos-pro-stock', activeWarehouse?.id ?? null, fiscalYear?.id],
     queryFn: () =>
       apiGet<unknown[]>('/inventory/stock-at', {
-        warehouse_id:   defaultWarehouse?.id,
+        warehouse_id:   activeWarehouse?.id,
         fiscal_year_id: fiscalYear?.id,
       }).then((rows) =>
         Object.fromEntries(
@@ -193,7 +215,7 @@ export default function POSProPage() {
             .map((r) => [r.id, r.current_stock ?? 0]),
         ),
       ),
-    enabled:   !!slug && !!defaultWarehouse?.id,
+    enabled:   !!slug && !!activeWarehouse?.id,
     staleTime: 10_000,
   });
 
@@ -221,6 +243,9 @@ export default function POSProPage() {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [sessionOpen, setSessionOpen] = useState(false);
+  const [heldOpen, setHeldOpen] = useState(false);
+  const [returnsOpen, setReturnsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [saleBusy, setSaleBusy] = useState(false);
   const cartWrapRef = useRef<HTMLDivElement>(null);
   const receiptSnapshotRef = useRef<POSSaleSnapshot | null>(null);
@@ -394,9 +419,9 @@ export default function POSProPage() {
       ?? documentTypes?.find(t => t.code === 'BL')
       ?? documentTypes?.[0];
 
-    if (!invType)           return { ok: false, message: 'لم يُعثَر على نوع مستند' };
-    if (!defaultWarehouse)  return { ok: false, message: 'لا يوجد مستودع مُفعَّل' };
-    if (!fiscalYear)        return { ok: false, message: 'لا توجد سنة مالية نشطة' };
+    if (!invType)            return { ok: false, message: 'لم يُعثَر على نوع مستند' };
+    if (!activeWarehouse)    return { ok: false, message: 'لا يوجد مستودع مُفعَّل' };
+    if (!fiscalYear)         return { ok: false, message: 'لا توجد سنة مالية نشطة' };
 
     const currentClient  = posRef.current.client;
     const currentItems   = posRef.current.items;
@@ -462,7 +487,7 @@ export default function POSProPage() {
 
       const res = await documentsApi.create({
         party_id:         currentClient?.id ?? null,
-        warehouse_id:     defaultWarehouse.id,
+        warehouse_id:     activeWarehouse.id,
         fiscal_year_id:   fiscalYear.id,
         currency_id:      params.currencyId ?? defaultCurrency?.id ?? undefined,
         document_date:    today,
@@ -578,7 +603,7 @@ export default function POSProPage() {
     } finally {
       setSaleBusy(false);
     }
-  }, [settings, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency?.id, defaultTreasury?.id, currentSession?.id, incrementMut, queryClient, slug, handlePrintDirect, paymentModes, isPrintEnabled, template, safeToast]);
+  }, [settings, documentTypes, activeWarehouse, fiscalYear, defaultCurrency?.id, defaultTreasury?.id, currentSession?.id, incrementMut, queryClient, slug, handlePrintDirect, paymentModes, isPrintEnabled, template, safeToast]);
 
   // ── الدفع السريع (نقدي/بطاقة بضغطة واحدة) ───────────────────────────────
   const handleQuickPay = useCallback(async (mode: PaymentMode | null) => {
@@ -599,12 +624,17 @@ export default function POSProPage() {
     setPaymentOpen(true);
   }, [safeToast]);
 
-  // ── اختصار لوحة المفاتيح: F2 = فتح المنتجات ─────────────────────────────
+  // ── اختصار لوحة المفاتيح: F1 = المساعدة، F2 = فتح المنتجات ────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'F2' && !e.repeat && !(e.target instanceof HTMLInputElement)) {
+      if (e.repeat) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === 'F2') {
         e.preventDefault();
         setDrawerOpen(true);
+      } else if (e.key === 'F1') {
+        e.preventDefault();
+        setHelpOpen(true);
       }
     };
     document.addEventListener('keydown', handler);
@@ -638,6 +668,11 @@ export default function POSProPage() {
           onQuickPay={() => handleQuickPay(cashMode)}
           onSession={() => setSessionOpen(true)}
           sessionAvailable={!!currentSession}
+          onHold={() => pos.holdCart()}
+          onHeld={() => setHeldOpen(true)}
+          heldCount={pos.heldCarts.length}
+          onReturns={() => setReturnsOpen(true)}
+          onHelp={() => setHelpOpen(true)}
           onScrollToCart={() => cartWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
         />
 
@@ -769,9 +804,39 @@ export default function POSProPage() {
       {sessionOpen && (
         <POSProSessionDrawer
           session={currentSession ?? null}
+          warehouses={warehouses ?? []}
+          warehouseId={activeWarehouse?.id ?? null}
+          onWarehouseChange={(id) => setActiveWarehouseId(id)}
           onClose={() => setSessionOpen(false)}
           onClosed={() => { pos.clearCart(); pos.setInvoiceDiscountPct(0); }}
         />
+      )}
+
+      {heldOpen && (
+        <Suspense fallback={null}>
+          <HeldCartsModal
+            carts={pos.heldCarts}
+            onClose={() => setHeldOpen(false)}
+            onRestore={(id) => { pos.restoreCart(id); setHeldOpen(false); }}
+            onDelete={pos.deleteHeldCart}
+          />
+        </Suspense>
+      )}
+
+      {returnsOpen && (
+        <Suspense fallback={null}>
+          <ReturnsModal
+            sessionId={currentSession?.id ?? null}
+            onClose={() => setReturnsOpen(false)}
+            onDone={() => setReturnsOpen(false)}
+          />
+        </Suspense>
+      )}
+
+      {helpOpen && (
+        <Suspense fallback={null}>
+          <POSProKeyboardHelp onClose={() => setHelpOpen(false)} />
+        </Suspense>
       )}
 
       <ConfirmDialog {...clearConfirm.confirmDialogProps} />

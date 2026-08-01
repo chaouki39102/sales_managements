@@ -1,18 +1,24 @@
 # POS PRO — Remaining Tasks & Resume Guide
 
-> Session checkpoint: work in progress — the user paused mid-task and will resume later.
-> **Last commit:** `56fec41` — pushed to `origin/main`. Working tree contains uncommitted changes from this session (below).
+> Session checkpoint: feature-parity work completed (held carts, returns, keyboard help, session print/warehouse, scanbar polish). Pushed as `790d576` + follow-up commit.
+> **Last commit:** `81774be` — pulled from `origin/main` (scanbar dropdown + print button + docs).
 
-## Current State (this session's changes — uncommitted)
+## Completed Tasks (POS PRO)
 
-| Change | Files |
-|--------|-------|
-| Barcode field → live search dropdown (name / ref / barcode, image + TTC price), arrow-key nav, Enter adds; exact barcode match adds instantly (scanner flow); Enter with no match flashes red | `resources/js/pos-pro/components/POSProScanbar.tsx` (rewritten) |
-| New **طباعة** button on the left of the scan bar — prints the current cart as a receipt without completing the sale | `POSProPage.tsx` (`handlePrintCart`), `pos-pro.css` (`.pos-pro-scan-row`, `.pp-print-btn`, `.pp-scanbar-dd*`) |
-| Removed the نقداً / بطاقة quick-pay row | deleted `POSProQuickPay.tsx`, `cardMode` memo removed |
-| Removed the "الأكثر مبيعاً" best-sellers bar | deleted `POSProRecentBar.tsx`, `.pp-recent*` CSS removed |
+| Task | Implementation |
+|------|----------------|
+| Held carts | `usePosProCart.ts` — `heldCarts` state, `holdCart` / `restoreCart` / `deleteHeldCart` actions, persisted via `partialize` (key `pos-pro-cart`); `usePosPro.ts` exposes them; `HeldCartsModal` reused from `@/pos/components` |
+| Returns | `ReturnsModal` reused from `@/pos/components`, lazy-loaded in `POSProPage.tsx` (`returnsOpen` state), button on rail |
+| Keyboard help | New `POSProKeyboardHelp.tsx` (static shortcut map — F1/F2/arrows/Enter/Esc/hold/held/returns); lazy-loaded, opened via rail help button or `F1` |
+| Split / multi-mode payment | Verified: `handleCompleteSale` maps `params.payments[]` → `DocumentPaymentInput[]` and passes `payments` to `documentsApi.create` (POSProPage ~line 435-498) |
+| Session print report | `POSProSessionDrawer.tsx` — «طباعة تقرير الجلسة» footer button → `TemplatePrintModal` (RPT templates, `DocumentDataBuilder.fromSessionReport`, `mapCompany`) |
+| Warehouse switch | `POSProSessionDrawer.tsx` — `<select>` entrepôt in body; `POSProPage` keeps `activeWarehouse` state synced with default warehouse + session warehouse; stock query + `documentsApi.create` + session increment all use `activeWarehouse` |
+| Scanbar low-stock badge | `POSProScanbar.tsx` — `.pp-badge--low/--out/--ok` in dropdown rows («متوفر: N» / «نفد») |
+| Scanbar debounce | 120 ms debounce (`debouncedQuery`) + `searching` state with «جارٍ البحث…» spinner |
 
-**Verified:** `npx tsc --noEmit` clean · `npm test` 174/174 pass · `npm run build` 0 errors (POSProPage chunk 43.23 kB).
+**Shortcuts added:** `F1` = keyboard help, `F2` = products picker.
+
+**Verified:** `npx tsc --noEmit` clean · `npm test` 174/174 pass · `npm run build` 0 errors.
 
 ## Remaining Tasks (POS PRO)
 
@@ -22,20 +28,8 @@
 - [ ] Print button: prints current cart via browser print; confirm empty-cart guard toast; disabled state when no active session.
 - [ ] Pre-sale thermal print: **blocked by design** — `handlePrintDirect` needs `docNumber` for the WebUSB thermal path, so the print-cart button only uses browser print. Decide: keep as-is (browser print) or generate a draft number.
 
-### 2. Feature parity with classic POS (in priority order)
-- [ ] **Held carts** — port `HeldCartsModal` (hold / retrieve / delete) into POS PRO; cart key `pos-pro-cart`.
-- [ ] **Returns** — add return flow from a completed document (reuse `ReturnsModal` pattern).
-- [ ] **Keyboard shortcuts map** — port `KeyboardHelpModal`; current shortcuts: `F2` open products, arrows in scanbar, `Enter` add, `Esc` close dropdown.
-- [ ] **Split / multi-mode payment** — the payment modal supports it; confirm the POS PRO flow passes `payments[]` correctly for mixed cash+card.
+### 2. Design decisions (need user confirmation)
 - [ ] **Favorites / pinned products** — user removed the best-sellers bar; a *manual* pin list (persisted) is the likely replacement. Confirm with the user.
-
-### 3. Session drawer polish
-- [ ] Add "طباعة تقرير الجلسة" (print session closing report) button using `SessionStatsModal` template pattern.
-- [ ] Warehouse switch inside the open session.
-
-### 4. Scanbar / dropdown polish
-- [ ] Show low-stock badge in dropdown rows (reuse `StockBadge` logic).
-- [ ] Debounce the filter for very large catalogs (current filter runs per keystroke over `allVariants` — fine at typical sizes).
 
 ## Global non-blocking items (from AGENTS.md — unrelated to POS PRO)
 - [ ] Sidebar: keyboard first-letter nav; group item-count badges when collapsed.
@@ -43,6 +37,6 @@
 - [ ] Playwright e2e suite requires `npx playwright install chromium`; not wired into CI yet.
 
 ## How to resume
-1. `git status` — confirm the uncommitted changes above are still present.
+1. `git status` — confirm no stray changes before starting a new session.
 2. Run the verification trio after any further edit: `npx tsc --noEmit` → `npm test` → `npm run build`.
 3. Complete tasks under "Remaining Tasks", then commit + push (repo style: concise imperative message, e.g. `feat: ...`).

@@ -140,6 +140,27 @@
   margin: 2px 0;
 }
 
+.pp-rail-btn--badge { position: relative; }
+
+.pp-rail-badge {
+  position: absolute;
+  top: -6px;
+  inset-inline-end: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--em);
+  color: #fff;
+  font-size: var(--fs-2xs);
+  font-weight: 800;
+  font-style: normal;
+  box-shadow: 0 2px 8px var(--embo);
+}
+
 .pp-rail-busy {
   display: flex;
   justify-content: center;
@@ -914,13 +935,22 @@
 }
 
 .pp-scanbar-dd-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--t1);
+}
+
+.pp-scanbar-dd-name-txt {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.pp-scanbar-dd-name .pp-badge { flex-shrink: 0; }
 
 .pp-scanbar-dd-sub {
   font-size: var(--fs-2xs);
@@ -1215,6 +1245,30 @@
   font-size: var(--fs-sm);
 }
 
+.pp-session-wh {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0 2px;
+  font-size: var(--fs-sm);
+  color: var(--t3);
+}
+
+.pp-session-wh select {
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--b2);
+  border-radius: var(--r2);
+  background: var(--bg3);
+  color: var(--t1);
+  font-family: inherit;
+  font-size: var(--fs-base);
+  outline: none;
+  cursor: pointer;
+}
+
+.pp-session-wh select:focus { border-color: var(--embo); box-shadow: 0 0 0 2px var(--emb); }
+
 /* ════════════════════════════════════════════════════
    صف السلة: سطر ثانوي + سعر قابل للتعديل + وزن + تغليف
 ════════════════════════════════════════════════════ */
@@ -1296,4 +1350,70 @@
   outline: none;
   box-shadow: 0 0 0 2px var(--emb);
   flex-shrink: 0;
+}
+
+/* ════════════════════════════════════════════════════
+   مساعدة لوحة المفاتيح
+════════════════════════════════════════════════════ */
+.pp-kb-help {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pp-kb-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pp-kb-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  color: var(--t2);
+}
+
+.pp-kb-group-title i { color: var(--em); }
+
+.pp-kb-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pp-kb-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 10px;
+  border-radius: var(--r1);
+  background: var(--bg3);
+}
+
+.pp-kb-keys {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 92px;
+}
+
+.pp-kb-keys kbd {
+  padding: 3px 8px;
+  border: 1px solid var(--b3);
+  border-bottom-width: 2px;
+  border-radius: var(--r1);
+  background: var(--bg2);
+  color: var(--t1);
+  font-family: inherit;
+  font-size: var(--fs-2xs);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.pp-kb-desc {
+  font-size: var(--fs-sm);
+  color: var(--t2);
 }

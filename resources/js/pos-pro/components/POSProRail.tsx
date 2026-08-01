@@ -16,11 +16,17 @@ interface Props {
   onQuickPay:   () => void;
   onSession:    () => void;
   sessionAvailable: boolean;
+  onHold:       () => void;
+  onHeld:       () => void;
+  heldCount:    number;
+  onReturns:    () => void;
+  onHelp:       () => void;
   onScrollToCart: () => void;
 }
 
 export default function POSProRail({
-  canSell, isBusy, onOpenProducts, onPay, onQuickPay, onSession, sessionAvailable, onScrollToCart,
+  canSell, isBusy, onOpenProducts, onPay, onQuickPay, onSession, sessionAvailable,
+  onHold, onHeld, heldCount, onReturns, onHelp, onScrollToCart,
 }: Props) {
   return (
     <aside className="pp-rail">
@@ -60,6 +66,38 @@ export default function POSProRail({
       <button
         type="button"
         className="pp-rail-btn pp-rail-btn--ghost"
+        onClick={onHold}
+        disabled={!canSell}
+        title="تعليق الفاتورة الحالية"
+      >
+        <i className="ti ti-clock-pause" />
+        <span>تعليق</span>
+      </button>
+
+      <button
+        type="button"
+        className="pp-rail-btn pp-rail-btn--ghost pp-rail-btn--badge"
+        onClick={onHeld}
+        title="الفواتير المعلقة"
+      >
+        <i className="ti ti-list-check" />
+        <span>المعلقة</span>
+        {heldCount > 0 && <em className="pp-rail-badge">{heldCount}</em>}
+      </button>
+
+      <button
+        type="button"
+        className="pp-rail-btn pp-rail-btn--ghost"
+        onClick={onReturns}
+        title="مرتجع من فاتورة"
+      >
+        <i className="ti ti-receipt-refund" />
+        <span>مرتجع</span>
+      </button>
+
+      <button
+        type="button"
+        className="pp-rail-btn pp-rail-btn--ghost"
         onClick={onSession}
         disabled={!sessionAvailable}
         title={sessionAvailable ? 'الجلسة الحالية' : 'لا توجد جلسة مفتوحة'}
@@ -76,6 +114,16 @@ export default function POSProRail({
       >
         <i className="ti ti-shopping-cart-down" />
         <span>السلة</span>
+      </button>
+
+      <button
+        type="button"
+        className="pp-rail-btn pp-rail-btn--ghost pp-rail-btn--help"
+        onClick={onHelp}
+        title="مساعدة لوحة المفاتيح (F1)"
+      >
+        <i className="ti ti-keyboard" />
+        <span>مساعدة</span>
       </button>
 
       {isBusy && (

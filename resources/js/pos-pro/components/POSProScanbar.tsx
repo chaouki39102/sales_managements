@@ -46,17 +46,26 @@ export default function POSProScanbar({ variants, onAdd, maxResults = 8 }: Props
   const wrapRef  = useRef<HTMLDivElement>(null);
   const missTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // نتائج البحث مُخفِّضة (debounced) حتى لا تُفلتر على كل ضغطة في الكتالوجات الكبيرة
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(code.trim().toLowerCase()), 120);
+    return () => clearTimeout(t);
+  }, [code]);
+
   const results = useMemo(() => {
-    const q = code.trim().toLowerCase();
+    const q = debouncedQuery;
     if (!q) return [];
     return variants.filter(v => variantMatches(v, q)).slice(0, maxResults);
-  }, [variants, code, maxResults]);
+  }, [variants, debouncedQuery, maxResults]);
 
   const exact = useMemo(() => {
     const c = code.trim();
     if (!c) return null;
     return variants.find(v => variantExactBarcode(v, c)) ?? null;
   }, [variants, code]);
+
+  const searching = code.trim().toLowerCase() !== debouncedQuery;
 
   useEffect(() => setHi(0), [results.length]);
 
@@ -143,14 +152,22 @@ export default function POSProScanbar({ variants, onAdd, maxResults = 8 }: Props
         <div className="pp-scanbar-dd">
           {results.length === 0 ? (
             <div className="pp-scanbar-dd-empty">
-              <i className="ti ti-search-off" />
-              لا توجد نتائج مطابقة
+              {searching ? (
+                <><i className="ti ti-loader animate-spin" /> جارٍ البحث…</>
+              ) : (
+                <><i className="ti ti-search-off" /> لا توجد نتائج مطابقة</>
+              )}
             </div>
           ) : (
             results.map((v, i) => {
               const tvaRate = v.tva?.rate ?? 0;
               const priceTtc = v.default_selling_price_ht * (1 + tvaRate / 100);
               const img = (v as any).image_url ?? v.product?.default_image ?? v.product?.images?.[0] ?? null;
+              const stock = v.current_stock ?? 0;
+              const showStock = v.manages_stock;
+              const stockCls = stock <= 0
+                ? 'pp-badge pp-badge--out'
+                : (stock <= 5 ? 'pp-badge pp-badge--low' : 'pp-badge pp-badge--ok');
               return (
                 <button
                   key={v.id}
@@ -163,7 +180,10 @@ export default function POSProScanbar({ variants, onAdd, maxResults = 8 }: Props
                     {img ? <img src={img} alt="" loading="lazy" /> : <i className="ti ti-package" />}
                   </span>
                   <span className="pp-scanbar-dd-main">
-                    <span className="pp-scanbar-dd-name">{v.product?.name ?? ''}</span>
+                    <span className="pp-scanbar-dd-name">
+                      <span className="pp-scanbar-dd-name-txt">{v.product?.name ?? ''}</span>
+                      {showStock && <span className={stockCls}>{stock <= 0 ? 'نفد' : `متوفر: ${stock}`}</span>}
+                    </span>
                     <span className="pp-scanbar-dd-sub">{v.ref || v.barcode || ''}</span>
                   </span>
                   <span className="pp-scanbar-dd-price" dir="ltr">{formatDZD(priceTtc)}</span>
