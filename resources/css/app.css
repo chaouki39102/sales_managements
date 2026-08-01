@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import 'shadcn.css';
 
 /* استدعاء الرموز والأنماط الأساسية */
 @import 'theme/tokens.css';

@@ -22,11 +22,17 @@ interface Props {
   onReturns:    () => void;
   onHelp:       () => void;
   onScrollToCart: () => void;
+  onManual:     () => void;
+  onSessionInvoices: () => void;
+  onFullscreen: () => void;
+  onOpenDrawer: () => void;
+  onSettings:   () => void;
 }
 
 export default function POSProRail({
   canSell, isBusy, onOpenProducts, onPay, onQuickPay, onSession, sessionAvailable,
   onHold, onHeld, heldCount, onReturns, onHelp, onScrollToCart,
+  onManual, onSessionInvoices, onFullscreen, onOpenDrawer, onSettings,
 }: Props) {
   return (
     <aside className="pp-rail">
@@ -66,6 +72,16 @@ export default function POSProRail({
       <button
         type="button"
         className="pp-rail-btn pp-rail-btn--ghost"
+        onClick={onManual}
+        title="إضافة صنف يدوي بدون منتج"
+      >
+        <i className="ti ti-square-plus" />
+        <span>يدوي</span>
+      </button>
+
+      <button
+        type="button"
+        className="pp-rail-btn pp-rail-btn--ghost"
         onClick={onHold}
         disabled={!canSell}
         title="تعليق الفاتورة الحالية"
@@ -95,6 +111,8 @@ export default function POSProRail({
         <span>مرتجع</span>
       </button>
 
+      <div className="pp-rail-sep" />
+
       <button
         type="button"
         className="pp-rail-btn pp-rail-btn--ghost"
@@ -109,6 +127,17 @@ export default function POSProRail({
       <button
         type="button"
         className="pp-rail-btn pp-rail-btn--ghost"
+        onClick={onSessionInvoices}
+        disabled={!sessionAvailable}
+        title="فواتير الجلسة الحالية"
+      >
+        <i className="ti ti-receipt-2" />
+        <span>فواتير الجلسة</span>
+      </button>
+
+      <button
+        type="button"
+        className="pp-rail-btn pp-rail-btn--ghost"
         onClick={onScrollToCart}
         title="مرّر إلى السلة"
       >
@@ -116,11 +145,43 @@ export default function POSProRail({
         <span>السلة</span>
       </button>
 
+      <div className="pp-rail-sep" />
+
+      <button
+        type="button"
+        className="pp-rail-btn pp-rail-btn--ghost"
+        onClick={onOpenDrawer}
+        title="فتح درج النقود"
+      >
+        <i className="ti ti-cash" />
+        <span>الدرج</span>
+      </button>
+
+      <button
+        type="button"
+        className="pp-rail-btn pp-rail-btn--ghost"
+        onClick={onFullscreen}
+        title="ملء الشاشة"
+      >
+        <i className="ti ti-arrows-maximize" />
+        <span>ملء الشاشة</span>
+      </button>
+
+      <button
+        type="button"
+        className="pp-rail-btn pp-rail-btn--ghost"
+        onClick={onSettings}
+        title="إعدادات نقطة البيع"
+      >
+        <i className="ti ti-settings" />
+        <span>الإعدادات</span>
+      </button>
+
       <button
         type="button"
         className="pp-rail-btn pp-rail-btn--ghost pp-rail-btn--help"
         onClick={onHelp}
-        title="مساعدة لوحة المفاتيح (F1)"
+        title="تخصيص الاختصارات (F1)"
       >
         <i className="ti ti-keyboard" />
         <span>مساعدة</span>

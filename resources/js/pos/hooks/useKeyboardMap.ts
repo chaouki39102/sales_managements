@@ -93,7 +93,12 @@ export function saveOverrides(slug: string | null, overrides: KbOverrides): void
 
 // ─── Matching ───────────────────────────────────────────────────────────────
 
-/** Check if event matches ANY shortcut assigned to the action */
+/**
+ * Check if event matches ANY shortcut assigned to the action.
+ * An existing entry (even an empty array) means the action is explicitly
+ * configured — the default is NOT applied. Only a missing entry falls back
+ * to KB_DEFAULTS. This lets users set a shortcut to "none" by removing all.
+ */
 export function matchOverrideFrom(
   overrides: KbOverrides,
   action: string,
@@ -101,7 +106,7 @@ export function matchOverrideFrom(
 ): boolean {
   const combo = normalizeEventKey(e);
   const assigned = overrides[action];
-  if (assigned && assigned.length > 0) {
+  if (assigned) {
     return assigned.includes(combo);
   }
   const def = KB_DEFAULTS[action];
@@ -110,22 +115,22 @@ export function matchOverrideFrom(
 
 // ─── Display helpers ────────────────────────────────────────────────────────
 
-/** Get the first/primary shortcut for badge display */
+/** Get the first/primary shortcut for badge display (null = none) */
 export function getEffectiveShortcut(slug: string | null, action: string): string | null {
   if (!slug) return null;
   const overrides = readOverrides(slug);
   const arr = overrides[action];
-  if (arr && arr.length > 0) return arr[0];
+  if (arr) return arr[0] ?? null;
   const def = KB_DEFAULTS[action];
   return def || null;
 }
 
-/** Get all shortcuts for an action */
+/** Get all shortcuts for an action (empty array = explicitly none) */
 export function getEffectiveShortcuts(slug: string | null, action: string): string[] {
   if (!slug) return [];
   const overrides = readOverrides(slug);
   const arr = overrides[action];
-  if (arr && arr.length > 0) return arr;
+  if (arr) return arr;
   const def = KB_DEFAULTS[action];
   return def ? [def] : [];
 }
@@ -139,7 +144,7 @@ export function addShortcut(overrides: KbOverrides, action: string, combo: strin
   return { ...overrides, [action]: [...existing, combo] };
 }
 
-/** Remove a specific shortcut from an action */
+/** Remove a specific shortcut from an action. When the last one is removed, stores [] = explicit "none". */
 export function removeShortcut(overrides: KbOverrides, action: string, combo: string): KbOverrides {
   const existing = overrides[action] ?? [];
   const next = existing.filter(k => k !== combo);
@@ -152,7 +157,7 @@ export function removeShortcut(overrides: KbOverrides, action: string, combo: st
   return result;
 }
 
-/** Clear all shortcuts for an action (sets to empty array) */
+/** Clear all shortcuts for an action — stores [] = explicit "none" (default NOT restored) */
 export function clearShortcuts(overrides: KbOverrides, action: string): KbOverrides {
   return { ...overrides, [action]: [] };
 }

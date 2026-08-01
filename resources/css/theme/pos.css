@@ -2653,6 +2653,13 @@ body.dark .pay-hero-amount { text-shadow: none; }
   color: var(--em);
   background: var(--emb);
 }
+.kb-none {
+  font-size: 10.5px;
+  font-style: italic;
+  color: var(--t4);
+  padding: 2px 6px;
+  white-space: nowrap;
+}
 .kb-capture {
   border-color: var(--em) !important;
   box-shadow: 0 0 0 3px var(--emb);

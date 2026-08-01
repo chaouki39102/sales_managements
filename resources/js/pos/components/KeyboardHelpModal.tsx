@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { KB_DEFAULTS, normalizeEventKey, type KbOverrides } from '@/pos/hooks/useKeyboardMap';
-import { readOverrides, saveOverrides, addShortcut, removeShortcut } from '@/pos/hooks/useKeyboardMap';
+import { readOverrides, saveOverrides, addShortcut, clearShortcuts } from '@/pos/hooks/useKeyboardMap';
 import Modal from '@/components/ui/Modal';
 
 interface KeyboardHelpModalProps {
@@ -132,7 +132,7 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
   /** Get the effective shortcuts for an action (overrides first, then default) */
   function getShortcuts(action: string): string[] {
     const arr = overrides[action];
-    if (arr && arr.length > 0) return arr;
+    if (arr) return arr;
     const def = KB_DEFAULTS[action];
     return def ? [def] : [];
   }
@@ -142,10 +142,12 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
     for (const g of groups) {
       for (const item of g.items) {
         if (item.action === excludeAction) continue;
-        const combos = overrides[item.action] ?? [];
-        if (combos.includes(combo)) return item.desc;
-        // Also check defaults if not overridden
-        if (combos.length === 0 && KB_DEFAULTS[item.action] === combo) return item.desc;
+        const assigned = overrides[item.action];
+        if (assigned) {
+          if (assigned.includes(combo)) return item.desc;
+        } else if (KB_DEFAULTS[item.action] === combo) {
+          return item.desc;
+        }
       }
     }
     return null;
@@ -205,9 +207,9 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
     setListening(false);
   }, [listening, editingAction]);
 
-  const removeAction = useCallback((action: string, combo: string) => {
+  const setNoneAction = useCallback((action: string) => {
     setConflict(null);
-    setOverrides(prev => removeShortcut(prev, action, combo));
+    setOverrides(prev => clearShortcuts(prev, action));
   }, []);
 
   const resetAll = useCallback(() => {
@@ -267,8 +269,8 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
                             {!isEditing && (
                               <button
                                 className="kb-key-remove"
-                                onClick={(e) => { e.stopPropagation(); removeAction(item.action, combo); }}
-                                title="إزالة"
+                                onClick={(e) => { e.stopPropagation(); setNoneAction(item.action); }}
+                                title="تعطيل (بدون اختصار)"
                               >
                                 ✕
                               </button>
@@ -281,6 +283,11 @@ export default function KeyboardHelpModal({ onClose }: KeyboardHelpModalProps) {
                           <kbd className="kb-key kb-capture kb-capture-mini" ref={captureRef}>
                             <i className="ti ti-plus" style={{ fontSize: 10 }} /> انتظر...
                           </kbd>
+                        )}
+
+                        {/* None indicator */}
+                        {!isEditing && combos.length === 0 && (
+                          <span className="kb-none">لا يوجد</span>
                         )}
 
                         {/* Add button (hidden while recording this action) */}

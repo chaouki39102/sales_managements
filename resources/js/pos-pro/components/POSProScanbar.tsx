@@ -15,6 +15,7 @@ interface Props {
   variants:   ProductVariant[];
   onAdd:      (variant: ProductVariant) => void;
   maxResults?: number;
+  focusRef?:   (el: HTMLInputElement | null) => void;
 }
 
 function variantMatches(v: ProductVariant, q: string): boolean {
@@ -37,12 +38,12 @@ function variantExactBarcode(v: ProductVariant, code: string): boolean {
   );
 }
 
-export default function POSProScanbar({ variants, onAdd, maxResults = 8 }: Props) {
+export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRef }: Props) {
   const [code, setCode] = useState('');
   const [open, setOpen] = useState(false);
   const [hi, setHi]     = useState(0);
   const [miss, setMiss] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const wrapRef  = useRef<HTMLDivElement>(null);
   const missTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -124,7 +125,10 @@ export default function POSProScanbar({ variants, onAdd, maxResults = 8 }: Props
       <div className={`pp-scanbar${miss ? ' pp-scanbar--miss' : ''}`}>
         <i className="ti ti-scan" />
         <input
-          ref={inputRef}
+          ref={(el) => {
+            inputRef.current = el;
+            focusRef?.(el);
+          }}
           value={code}
           onChange={(e) => { setCode(e.target.value); setOpen(true); }}
           onKeyDown={handleKeyDown}

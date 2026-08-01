@@ -10,7 +10,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { formatDZD } from '@/pos/utils/calculations';
-import type { CartItem, ProductPackaging } from '@/types';
+import type { CartItem, ProductPackaging, PriceLevel } from '@/types';
 
 interface Props {
   items:               CartItem[];
@@ -24,6 +24,11 @@ interface Props {
   onClear:             () => void;
   onInvoiceDiscountChange: (pct: number) => void;
   onOpenProducts:      () => void;
+  priceLevels?:        PriceLevel[];
+  selectedPriceLevelId?: number | null;
+  onPriceLevelChange?: (plId: number | null) => void;
+  note?:               string;
+  onNoteChange?:       (note: string) => void;
 }
 
 /** عداد كمية مع إدخال مباشر يُثبَّت عند الخروج (Enter/blur) */
@@ -118,8 +123,10 @@ function StockBadge({ item }: { item: CartItem }) {
 export default function POSProCart({
   items, invoiceDiscountPct, onQty, onDiscount, onPrice, onPackaging, onWeight,
   onRemove, onClear, onInvoiceDiscountChange, onOpenProducts,
+  priceLevels = [], selectedPriceLevelId = null, onPriceLevelChange, note = '', onNoteChange,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [noteOpen, setNoteOpen] = useState(false);
 
   const virtualizer = useVirtualizer({
     count: items.length,
@@ -152,6 +159,27 @@ export default function POSProCart({
           السلة <strong>{items.length}</strong> صنف
         </span>
         <div className="pp-cart-hd-actions">
+          {priceLevels.length > 0 && (
+            <select
+              className="pp-pl-select"
+              value={selectedPriceLevelId ?? ''}
+              onChange={(e) => onPriceLevelChange?.(e.target.value ? Number(e.target.value) : null)}
+              title="قائمة الأسعار المطبقة على السلة"
+            >
+              <option value="">سعر عادي</option>
+              {priceLevels.map(pl => (
+                <option key={pl.id} value={pl.id}>{pl.name}</option>
+              ))}
+            </select>
+          )}
+          <button
+            type="button"
+            className={`pp-note-toggle${noteOpen || note ? ' on' : ''}`}
+            onClick={() => setNoteOpen(o => !o)}
+            title="ملاحظة على الفاتورة"
+          >
+            <i className="ti ti-notes" />
+          </button>
           <button
             type="button"
             className={`pp-disc-toggle${invoiceDiscountPct > 0 ? ' on' : ''}`}
@@ -167,6 +195,17 @@ export default function POSProCart({
           </button>
         </div>
       </div>
+
+      {noteOpen && (
+        <div className="pp-cart-note">
+          <i className="ti ti-notes" />
+          <input
+            value={note}
+            onChange={(e) => onNoteChange?.(e.target.value)}
+            placeholder="ملاحظة تظهر على الفاتورة…"
+          />
+        </div>
+      )}
 
       <div ref={scrollRef} className="pp-cart-scroll">
         <div

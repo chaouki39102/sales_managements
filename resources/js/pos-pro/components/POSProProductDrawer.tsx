@@ -13,7 +13,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Modal from '@/components/ui/Modal';
 import { formatDZD } from '@/pos/utils/calculations';
-import type { ProductVariant, Family } from '@/types';
+import { getVariantPrice } from '@/pos/utils/posHelpers';
+import type { ProductVariant, Family, PriceLevel } from '@/types';
 
 interface Props {
   open:        boolean;
@@ -22,6 +23,8 @@ interface Props {
   cartCount:   number;
   onAdd:       (variant: ProductVariant) => void;
   onClose:     () => void;
+  priceLevels?: PriceLevel[];
+  selectedPriceLevelId?: number | null;
 }
 
 function StockBadge({ v }: { v: ProductVariant }) {
@@ -34,6 +37,7 @@ function StockBadge({ v }: { v: ProductVariant }) {
 
 export default function POSProProductDrawer({
   open, variants, families, cartCount, onAdd, onClose,
+  priceLevels = [], selectedPriceLevelId = null,
 }: Props) {
   const [query, setQuery]     = useState('');
   const [familyId, setFamilyId] = useState<number | null>(null);
@@ -167,7 +171,9 @@ export default function POSProProductDrawer({
         <div className="pp-grid">
           {filtered.map(v => {
             const tvaRate = v.tva?.rate ?? 0;
-            const priceTtc = v.default_selling_price_ht * (1 + tvaRate / 100);
+            const priceHt = getVariantPrice(v, selectedPriceLevelId, priceLevels);
+            const priceTtc = priceHt * (1 + tvaRate / 100);
+            const isLevelPriced = selectedPriceLevelId != null && priceHt !== v.default_selling_price_ht;
             const img = (v as any).image_url ?? v.product?.default_image ?? v.product?.images?.[0] ?? null;
             return (
               <button
@@ -181,10 +187,10 @@ export default function POSProProductDrawer({
                 </div>
                 <div className="pp-card-name">{v.product?.name ?? ''}</div>
                 <div className="pp-card-ref">{v.ref || v.barcode || ''}</div>
-                <div className="pp-card-price">{formatDZD(priceTtc)}</div>
+                <div className={`pp-card-price${isLevelPriced ? ' pp-card-price--lvl' : ''}`}>{formatDZD(priceTtc)}</div>
                 <div className="pp-card-bottom">
                   <StockBadge v={v} />
-                  <span className="pp-card-ht">{formatDZD(v.default_selling_price_ht)}</span>
+                  <span className="pp-card-ht">{formatDZD(priceHt)}</span>
                 </div>
               </button>
             );

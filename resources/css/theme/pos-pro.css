@@ -16,6 +16,13 @@
   font-family: 'Tajawal', sans-serif;
 }
 
+.pos-pro.pos-fullscreen {
+  height: 100vh;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+}
+
 .pos-pro-body {
   display: flex;
   flex: 1;
@@ -391,6 +398,63 @@
 
 .pp-clear:hover { background: var(--redb); color: var(--red); border-color: var(--redbo); }
 
+.pp-note-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--b2);
+  border-radius: var(--r2);
+  background: var(--bg2);
+  color: var(--t3);
+  cursor: pointer;
+  transition: background var(--d1), color var(--d1), border-color var(--d1);
+}
+
+.pp-note-toggle.on {
+  background: var(--embo);
+  color: var(--em);
+  border-color: var(--embo);
+}
+
+.pp-pl-select {
+  max-width: 120px;
+  padding: 5px 8px;
+  border: 1px solid var(--b2);
+  border-radius: var(--r2);
+  background: var(--bg2);
+  color: var(--t1);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pp-cart-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px dashed var(--b2);
+  border-radius: var(--r2);
+  background: var(--bg2);
+  flex-shrink: 0;
+}
+
+.pp-cart-note i { color: var(--t4); }
+
+.pp-cart-note input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--t1);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  outline: none;
+}
+
 .pp-cart-scroll {
   flex: 1;
   min-height: 0;
@@ -739,6 +803,21 @@
   color: var(--em);
 }
 
+.pp-card-price--lvl {
+  color: var(--green);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pp-card-price--lvl::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
 .pp-card-bottom {
   display: flex;
   align-items: center;
@@ -858,6 +937,37 @@
 }
 
 .pp-print-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.pp-cam-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  height: 46px;
+  flex-shrink: 0;
+  border: 1px solid var(--b2);
+  border-radius: var(--r2);
+  background: var(--bg2);
+  color: var(--t1);
+  font-family: inherit;
+  font-size: var(--fs-md);
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: transform var(--d1), box-shadow var(--d1), border-color var(--d1), background var(--d1);
+}
+
+.pp-cam-btn i { font-size: 20px; color: var(--em); }
+
+.pp-cam-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow2);
+  border-color: var(--embo);
+  background: var(--bg3);
+}
+
+.pp-cam-btn:disabled { opacity: .45; cursor: not-allowed; }
 
 /* القائمة المنسدلة لنتائج البحث في حقل الباركود */
 .pp-scanbar-wrap {
