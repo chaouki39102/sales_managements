@@ -204,7 +204,7 @@ const POSProCart = forwardRef<POSProCartHandle, Props>(function POSProCart({
               <i className="ti ti-shopping-cart" />
               {t.label}
               <em className="pp-cart-tab-count">{t.count} صنف</em>
-              {onCloseCurrent && (
+              {onCloseCurrent && items.length > 0 && (
                 <button
                   type="button"
                   className="pp-cart-tab-x"

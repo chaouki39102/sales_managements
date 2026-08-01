@@ -56,16 +56,22 @@ export default defineConfig({
             },
         }),
         // Copy sw.js and workbox-*.js to public/ root so SW is at /sw.js (default scope /)
+        // MUST run in closeBundle: vite-plugin-pwa generates sw.js in ITS closeBundle hook,
+        // so writeBundle would copy a stale build. closeBundle of a later-registered plugin
+        // runs after the PWA plugin's, so the freshly generated sw.js is copied.
         {
             name: 'copy-sw-to-root',
-            buildEnd() {
-                const buildDir = path.resolve(__dirname, 'public/build');
-                const publicDir = path.resolve(__dirname, 'public');
-                for (const file of fs.readdirSync(buildDir)) {
-                    if (file === 'sw.js' || file.startsWith('workbox-')) {
+            closeBundle: {
+                order: 'post',
+                sequential: true,
+                handler() {
+                    const buildDir = path.resolve(__dirname, 'public/build');
+                    const publicDir = path.resolve(__dirname, 'public');
+                    const files = fs.readdirSync(buildDir).filter(f => f === 'sw.js' || f.startsWith('workbox-'));
+                    for (const file of files) {
                         fs.copyFileSync(path.join(buildDir, file), path.join(publicDir, file));
                     }
-                }
+                },
             },
         },
     ],

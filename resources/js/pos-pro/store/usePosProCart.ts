@@ -32,7 +32,7 @@ interface PosProCartState {
   invoiceDiscountPct: number;
   payments:           DocumentPayment[];
   heldCarts:          HeldCart[];
-  /** عداد رقم السلة — يزيد عند كل بيع جديد/تعليق ليترقّم السلات: سلة 1، سلة 2… */
+  /** رقم السلة الحالية — السلة الفارغة تأخذ دائماً أقل رقم حر بين السلات المعلّقة (ترقيم مضغوط) */
   saleNumber:         number;
   _isDirty:           boolean;
 
@@ -57,6 +57,17 @@ interface PosProCartState {
 
 function getUnitSymbol(v: ProductVariant): string {
   return v.unit?.abbreviation ?? 'قطعة';
+}
+
+/** أقل رقم حر بين السلات المعلّقة — السلة الحالية الفارغة تأخذ دائماً هذا الرقم (ترقيم مضغوط) */
+function smallestFreeNumber(heldCarts: HeldCart[]): number {
+  const used = new Set(heldCarts.map(c => {
+    const m = (c.label ?? '').match(/\d+/);
+    return m ? Number(m[0]) : 0;
+  }));
+  let n = 1;
+  while (used.has(n)) n++;
+  return n;
 }
 
 /**
@@ -271,7 +282,10 @@ function createCartStore(persistKey: string) {
         setClient: (client) => set({ client, _isDirty: true }),
         setNotes:  (notes)  => set({ notes, _isDirty: true }),
         setPayments: (payments) => set({ payments, _isDirty: true }),
-        clearCart: () => set({ items: [], client: null, notes: '', invoiceDiscountPct: 0, payments: [], _isDirty: false }),
+        clearCart: () => set(s => ({
+          items: [], client: null, notes: '', invoiceDiscountPct: 0, payments: [], _isDirty: false,
+          saleNumber: smallestFreeNumber(s.heldCarts),
+        })),
         setInvoiceDiscountPct: (pct) =>
           set({ invoiceDiscountPct: Math.min(100, Math.max(0, pct)), _isDirty: true }),
 
@@ -286,17 +300,11 @@ function createCartStore(persistKey: string) {
             created_at: new Date().toISOString(),
           };
           set(s => {
-            // الرقم الجديد يجب ألا يتصادم مع رقم سلة معلقة (حتى بعد الاسترجاع)
-            const heldNums = new Set(s.heldCarts.map(c => {
-              const m = (c.label ?? '').match(/\d+/);
-              return m ? Number(m[0]) : 0;
-            }));
-            let next = s.saleNumber + 1;
-            while (heldNums.has(next)) next++;
+            const heldCarts = [...s.heldCarts, held];
             return {
-              heldCarts: [...s.heldCarts, held],
+              heldCarts,
               items: [], client: null, notes: '', invoiceDiscountPct: 0, payments: [], _isDirty: false,
-              saleNumber: next,
+              saleNumber: smallestFreeNumber(heldCarts),
             };
           });
         },
@@ -317,17 +325,13 @@ function createCartStore(persistKey: string) {
         },
 
         deleteHeldCart: (id) =>
-          set(s => ({ heldCarts: s.heldCarts.filter(c => c.id !== id) })),
+          set(s => {
+            const heldCarts = s.heldCarts.filter(c => c.id !== id);
+            if (s.items.length === 0) return { heldCarts, saleNumber: smallestFreeNumber(heldCarts) };
+            return { heldCarts };
+          }),
 
-        bumpSaleNumber: () => set(s => {
-          const heldNums = new Set(s.heldCarts.map(c => {
-            const m = (c.label ?? '').match(/\d+/);
-            return m ? Number(m[0]) : 0;
-          }));
-          let next = s.saleNumber + 1;
-          while (heldNums.has(next)) next++;
-          return { saleNumber: next };
-        }),
+        bumpSaleNumber: () => set(s => ({ saleNumber: smallestFreeNumber(s.heldCarts) })),
 
         markClean: () => set({ _isDirty: false }),
       }),
@@ -343,6 +347,11 @@ function createCartStore(persistKey: string) {
           saleNumber:         state.saleNumber,
           _isDirty:           true,
         }),
+        merge: (persisted, current) => {
+          const merged = { ...current, ...(persisted as Partial<PosProCartState> ?? {}) } as PosProCartState;
+          if (merged.items.length === 0) merged.saleNumber = smallestFreeNumber(merged.heldCarts);
+          return merged;
+        },
       },
     ),
   );

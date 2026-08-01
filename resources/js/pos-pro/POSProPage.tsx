@@ -208,7 +208,7 @@ export default function POSProPage() {
     prevSlugRef.current = slug;
   }, [slug]);
 
-  // ── الزبون الافتراضي "زبون نقدي" ─────────────────────────────────────────
+  // ── الزبون الافتراضي "Client Cash" ───────────────────────────────────────
   const { data: cashClient } = useCashClient();
   useEffect(() => {
     if (cashClient && !posRef.current.client) {
@@ -520,14 +520,12 @@ export default function POSProPage() {
   }, [selectedItemId]);
 
   // ── بيع جديد: تعليق السلة الحالية (إن لم تكن فارغة) + سلة فارغة برقم جديد ─
+  // السلة فارغة → لا ننشئ سلة فارغة أخرى ولا نرفع العداد (رقمها يبقى أقل رقم حر).
   const handleNewSale = useCallback(() => {
     clearEditingState();
     const st = usePosProCart.getState();
     if (st.items.length > 0) {
       posRef.current.holdCart();
-    } else {
-      posRef.current.clearCart();
-      posRef.current.bumpSaleNumber();
     }
     setSelectedItemId(null);
     if (settings.openClientOnNewSale) {
@@ -553,6 +551,7 @@ export default function POSProPage() {
   // ── إغلاق السلة الحالية (تبويبها) → سلة فارغة جديدة برقم جديد ────────────
   const handleCloseCurrent = useCallback(() => {
     const st = usePosProCart.getState();
+    if (st.items.length === 0) return; // فارغة — لا شيء لإغلاقه، لا نرفع العداد
     const doClose = () => {
       clearEditingState();
       pos.clearCart();
@@ -1147,7 +1146,7 @@ export default function POSProPage() {
 
         <div className="pos-pro-main">
           <div className="pos-pro-top">
-            <CustomerCard client={pos.client} onOpenCustomers={() => setCustomerModalOpen(true)} />
+            <CustomerCard client={pos.client ?? cashClient ?? null} onOpenCustomers={() => setCustomerModalOpen(true)} />
             <TotalCard totals={pos.totals} adjustedTotal={adjustedTotalTtcFinal} invoiceDiscPct={pos.invoiceDiscountPct} />
           </div>
 

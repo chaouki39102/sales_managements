@@ -68,10 +68,10 @@ export function CustomerCard({ client, onOpenCustomers }: CustomerCardProps) {
     <div className="pp-cust-card">
       <div className="pp-cust-head">
         <div className={`pp-avatar${isDebtor ? ' pp-avatar--debt' : ''}`}>
-          {client?.avatar ? <img src={client.avatar} alt="" /> : initials(client?.name ?? 'زبون نقدي')}
+          {client?.avatar ? <img src={client.avatar} alt="" /> : initials(client?.name ?? 'زبون الصندوق')}
         </div>
         <div className="pp-cust-id">
-          <div className="pp-cust-name">{client?.name ?? 'زبون نقدي'}</div>
+          <div className="pp-cust-name">{client?.name ?? 'زبون الصندوق'}</div>
           <div className="pp-cust-meta">
             {priceLevel && <span><i className="ti ti-tags" /> {priceLevel}</span>}
             {client?.nif && <span><i className="ti ti-id-badge" /> {client.nif}</span>}
