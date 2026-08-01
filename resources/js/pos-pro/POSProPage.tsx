@@ -51,7 +51,7 @@ import type { CompanyPreviewData } from '@/pages/settings/print-settings/types';
 import { useConfirm } from '@/hooks/useConfirm';
 import { ConfirmDialog } from '@/components/ui';
 import type {
-  Product, ProductVariant, CartTotals,
+  Product, ProductVariant, CartItem, CartTotals, PaymentMode,
 } from '@/types';
 import type { PaginatedResponse } from '@/lib/api/core/types';
 
@@ -59,6 +59,11 @@ import type { PaginatedResponse } from '@/lib/api/core/types';
 import POSProRail from '@/pos-pro/components/POSProRail';
 import POSProCart from '@/pos-pro/components/POSProCart';
 import POSProProductDrawer from '@/pos-pro/components/POSProProductDrawer';
+import POSProScanbar from '@/pos-pro/components/POSProScanbar';
+import POSProQuickPay from '@/pos-pro/components/POSProQuickPay';
+import POSProWeightModal from '@/pos-pro/components/POSProWeightModal';
+import POSProSessionDrawer from '@/pos-pro/components/POSProSessionDrawer';
+import POSProRecentBar from '@/pos-pro/components/POSProRecentBar';
 import { TotalCard, CustomerCard } from '@/pos-pro/components/POSProTopCards';
 
 // ── مودالات مشتركة (lazy — نفس النهج في POSPage) ────────────────────────────
@@ -217,9 +222,38 @@ export default function POSProPage() {
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [sessionOpen, setSessionOpen] = useState(false);
   const [saleBusy, setSaleBusy] = useState(false);
   const cartWrapRef = useRef<HTMLDivElement>(null);
   const receiptSnapshotRef = useRef<POSSaleSnapshot | null>(null);
+
+  type WeightTarget =
+    | { mode: 'add';  variant: ProductVariant }
+    | { mode: 'edit'; item: CartItem };
+  const [weightTarget, setWeightTarget] = useState<WeightTarget | null>(null);
+
+  // ── وسائل الدفع السريع: نقدي + بطاقة ─────────────────────────────────────
+  const cashMode = useMemo(() => {
+    const list = paymentModes ?? [];
+    const code = settings.defaultPaymentCode;
+    const byCode = code
+      ? list.find(m =>
+          new RegExp(code, 'i').test(m.name) ||
+          new RegExp(code, 'i').test(m.code),
+        )
+      : undefined;
+    return byCode ?? list.find(m => m.is_cash === true) ?? list.find(m => m.is_default) ?? list[0] ?? null;
+  }, [paymentModes, settings.defaultPaymentCode]);
+
+  const cardMode = useMemo(() => {
+    const list = paymentModes ?? [];
+    const re = /بطاقة|كارت|card|cie|cb|بنك|bank|الدفع الإلكتروني|شبكة/i;
+    const byName = list.find(m => re.test(m.name) && m.id !== cashMode?.id);
+    return byName
+      ?? list.find(m => m.is_cash === false && m.id !== cashMode?.id)
+      ?? list.find(m => m.id !== cashMode?.id)
+      ?? null;
+  }, [paymentModes, cashMode]);
 
   // ── الإجمالي النهائي (TTC + طابع جبائي) ─────────────────────────────────
   const adjustedTotalTtcFinal = pos.totals.total_ttc + pos.totals.fiscal_stamp;
@@ -296,18 +330,45 @@ export default function POSProPage() {
     }
   }, [posTemplate, safeToast, companyData, settings.printMode, paperWidth, copies]);
 
-  // ── إضافة منتج من المودال (يبقى المودال مفتوحاً لإضافة متعددة سريعة) ─────
-  const handleAddItem = useCallback((v: ProductVariant) => {
+  // ── إضافة منتج من المودال/المسح (يبقى المودال مفتوحاً لإضافة متعددة) ─────
+  const handleAddItem = useCallback(async (v: ProductVariant) => {
+    if (v.is_sold_by_weight) {
+      setWeightTarget({ mode: 'add', variant: v });
+      return;
+    }
     if (isVariantOutOfStock(v)) {
       safeToast.error(`${v.product?.name ?? ''} نفد المخزون`);
       return;
     }
-    if (v.product?.is_sold_by_weight) {
-      safeToast.info('منتج بالوزن — أُضيف بوحدة واحدة، عدّل الكمية من السلة');
+    if (v.manages_stock && v.current_stock !== undefined) {
+      const existing = posRef.current.items.find(i => i.variant_id === v.id);
+      const already  = existing ? existing.quantity * (existing.pack_qty ?? 1) : 0;
+      if (already + 1 > v.current_stock) {
+        const ok = await clearConfirm.confirm(
+          `${v.product?.name ?? ''} — المخزون المتبقي ${v.current_stock} فقط. هل تريد البيع بالرغم من ذلك؟`,
+          { title: 'مخزون غير كافٍ', variant: 'warning', icon: 'ti-alert-triangle' },
+        );
+        if (!ok) return;
+      }
     }
     posRef.current.addItem(v);
     safeToast.success(v.product?.name ?? 'تمت الإضافة', { id: 'pos-pro-last-added', duration: 1500 });
-  }, [safeToast]);
+  }, [safeToast, clearConfirm]);
+
+  // ── مسح الباركود من الشريط العلوي: تطابق دقيق ثم إضافة فورية ─────────────
+  const handleScan = useCallback((code: string): boolean => {
+    const hit = allVariants.find(v =>
+      v.barcode === code ||
+      v.ref === code ||
+      (v as any).barcodes?.some((bc: { barcode: string }) => bc.barcode === code),
+    );
+    if (!hit) {
+      safeToast.error(`لا يوجد منتج بالباركود «${code}»`);
+      return false;
+    }
+    void handleAddItem(hit);
+    return true;
+  }, [allVariants, safeToast, handleAddItem]);
 
   // ── إتمام البيع ───────────────────────────────────────────────────────────
   const handleCompleteSale = useCallback(async (params: {
@@ -512,21 +573,18 @@ export default function POSProPage() {
     }
   }, [settings, documentTypes, defaultWarehouse, fiscalYear, defaultCurrency?.id, defaultTreasury?.id, currentSession?.id, incrementMut, queryClient, slug, handlePrintDirect, paymentModes, isPrintEnabled, template, safeToast]);
 
-  // ── الدفع السريع (نقدي كامل بضغطة واحدة) ─────────────────────────────────
-  const handleQuickPay = useCallback(async () => {
+  // ── الدفع السريع (نقدي/بطاقة بضغطة واحدة) ───────────────────────────────
+  const handleQuickPay = useCallback(async (mode: PaymentMode | null) => {
     if (posRef.current.items.length === 0) return;
-    const cashMode = paymentModes?.find(m =>
-      new RegExp(settings.defaultPaymentCode, 'i').test(m.name),
-    ) ?? paymentModes?.find(m => m.is_default) ?? paymentModes?.[0];
-    if (!cashMode) { safeToast.error('لم يتم العثور على وسيلة الدفع النقدية'); return; }
+    if (!mode) { safeToast.error('لم يتم العثور على وسيلة الدفع'); return; }
     const totalTtcFinal = posRef.current.totals.total_ttc + posRef.current.totals.fiscal_stamp;
     await handleCompleteSale({
       amountPaid: totalTtcFinal,
-      payments: [{ paymentModeId: cashMode.id, amount: totalTtcFinal }],
+      payments: [{ paymentModeId: mode.id, amount: totalTtcFinal }],
       docTypeCode: settings.defaultDocTypeCode,
       skipPreview: true,
     });
-  }, [paymentModes, settings.defaultPaymentCode, settings.defaultDocTypeCode, handleCompleteSale, safeToast]);
+  }, [settings.defaultDocTypeCode, handleCompleteSale, safeToast]);
 
   // ── فتح الدفع / المنتجات ─────────────────────────────────────────────────
   const handleOpenPayment = useCallback(() => {
@@ -570,7 +628,9 @@ export default function POSProPage() {
           isBusy={saleBusy}
           onOpenProducts={() => setDrawerOpen(true)}
           onPay={handleOpenPayment}
-          onQuickPay={handleQuickPay}
+          onQuickPay={() => handleQuickPay(cashMode)}
+          onSession={() => setSessionOpen(true)}
+          sessionAvailable={!!currentSession}
           onScrollToCart={() => cartWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
         />
 
@@ -580,12 +640,33 @@ export default function POSProPage() {
             <TotalCard totals={pos.totals} adjustedTotal={adjustedTotalTtcFinal} invoiceDiscPct={pos.invoiceDiscountPct} />
           </div>
 
+          <POSProScanbar onScan={handleScan} />
+
+          <POSProQuickPay
+            cashMode={cashMode}
+            cardMode={cardMode}
+            disabled={!canSell}
+            onCash={() => handleQuickPay(cashMode)}
+            onCard={() => handleQuickPay(cardMode)}
+          />
+
+          {!productsLoading && currentSession && (
+            <POSProRecentBar
+              top={currentSession.top_products ?? []}
+              variants={allVariants}
+              onAdd={handleAddItem}
+            />
+          )}
+
           <div className="pos-pro-cart-wrap" ref={cartWrapRef}>
             <POSProCart
               items={pos.items}
               invoiceDiscountPct={pos.invoiceDiscountPct}
               onQty={pos.updateQty}
               onDiscount={pos.updateDiscount}
+              onPrice={pos.updatePrice}
+              onPackaging={pos.updatePackaging}
+              onWeight={(item) => setWeightTarget({ mode: 'edit', item })}
               onRemove={pos.removeItem}
               onClear={() => clearConfirm.confirm('مسح السلة بالكامل؟').then(ok => { if (ok) pos.clearCart(); })}
               onInvoiceDiscountChange={pos.setInvoiceDiscountPct}
@@ -596,7 +677,7 @@ export default function POSProPage() {
           {!productsLoading && (
             <div className="pos-pro-hint">
               <i className="ti ti-keyboard" />
-              F2 لفتح المنتجات · امسح الباركود ثم Enter داخل المودال
+              F2 لفتح المنتجات · الباركود يُمسح مباشرة في الشريط العلوي
             </div>
           )}
         </div>
@@ -654,6 +735,40 @@ export default function POSProPage() {
             onNewSale={() => { setReceiptOpen(false); if (settings.openClientOnNewSale) setCustomerModalOpen(true); }}
           />
         </Suspense>
+      )}
+
+      {weightTarget && (
+        <POSProWeightModal
+          open
+          name={weightTarget.mode === 'add'
+            ? weightTarget.variant.product?.name ?? ''
+            : weightTarget.item.product_name}
+          priceHtPerKg={weightTarget.mode === 'add'
+            ? weightTarget.variant.default_selling_price_ht
+            : weightTarget.item.unit_price_ht / (weightTarget.item.pack_qty ?? 1)}
+          tvaRate={weightTarget.mode === 'add'
+            ? weightTarget.variant.tva?.rate ?? 0
+            : weightTarget.item.tva_rate}
+          initialKg={weightTarget.mode === 'edit' ? weightTarget.item.quantity : undefined}
+          confirmLabel={weightTarget.mode === 'edit' ? 'تحديث الوزن' : 'إضافة بالسلة'}
+          onConfirm={(kg) => {
+            if (weightTarget.mode === 'add') {
+              pos.addItem(weightTarget.variant, kg);
+              safeToast.success(weightTarget.variant.product?.name ?? 'تمت الإضافة', { id: 'pos-pro-last-added', duration: 1500 });
+            } else {
+              pos.updateQty(weightTarget.item.id, kg);
+            }
+          }}
+          onClose={() => setWeightTarget(null)}
+        />
+      )}
+
+      {sessionOpen && (
+        <POSProSessionDrawer
+          session={currentSession ?? null}
+          onClose={() => setSessionOpen(false)}
+          onClosed={() => { pos.clearCart(); pos.setInvoiceDiscountPct(0); }}
+        />
       )}
 
       <ConfirmDialog {...clearConfirm.confirmDialogProps} />

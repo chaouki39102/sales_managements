@@ -150,6 +150,7 @@ function createCartStore(persistKey: string) {
               pack_qty:            packQty,
               packaging_label:     resolvedPkg?.label ?? null,
               base_price_ht:       baseHt,
+              available_packagings: (variant.packagings ?? []).filter((p: ProductPackaging) => p.active !== false),
               quantity_discounts:  variant.quantity_discounts ?? [],
             });
 

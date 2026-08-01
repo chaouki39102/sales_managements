@@ -750,6 +750,7 @@ export interface CartItem {
   pack_qty?:           number;
   packaging_label?:    string | null;
   base_price_ht?:      number;
+  available_packagings?: ProductPackaging[];
   quantity_discounts?: QuantityDiscount[];
 }
 export interface CartTotals {

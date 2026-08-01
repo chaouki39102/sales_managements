@@ -14,11 +14,13 @@ interface Props {
   onOpenProducts: () => void;
   onPay:        () => void;
   onQuickPay:   () => void;
+  onSession:    () => void;
+  sessionAvailable: boolean;
   onScrollToCart: () => void;
 }
 
 export default function POSProRail({
-  canSell, isBusy, onOpenProducts, onPay, onQuickPay, onScrollToCart,
+  canSell, isBusy, onOpenProducts, onPay, onQuickPay, onSession, sessionAvailable, onScrollToCart,
 }: Props) {
   return (
     <aside className="pp-rail">
@@ -54,6 +56,17 @@ export default function POSProRail({
       </button>
 
       <div className="pp-rail-sep" />
+
+      <button
+        type="button"
+        className="pp-rail-btn pp-rail-btn--ghost"
+        onClick={onSession}
+        disabled={!sessionAvailable}
+        title={sessionAvailable ? 'الجلسة الحالية' : 'لا توجد جلسة مفتوحة'}
+      >
+        <i className="ti ti-report-money" />
+        <span>الجلسة</span>
+      </button>
 
       <button
         type="button"

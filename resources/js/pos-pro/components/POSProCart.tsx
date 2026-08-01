@@ -3,19 +3,23 @@
 //
 // سلة POS PRO — قائمة افتراضية (react-virtual) لعدد صنوف كبير بدون تدهور
 // الأداء (نفس تقنية ProfessionalCart: nodeMap + measureElement + overscan).
-// الصف يعرض: الصورة/الاسم، السعر، عداد الكمية (+/-/إدخال مباشر)، خصم النسبة،
-// إجمالي السطر، وزر الحذف.
+// الصف يعرض: الصورة/الاسم، السعر (قابل للتعديل بنقرة)، عداد الكمية
+// (+/-/إدخال مباشر، أو زر وزن للمنتجات بالوزن)، مبدّل التغليف، خصم النسبة،
+// إجمالي السطر، شارة المخزون المتبقي، وزر الحذف.
 // ════════════════════════════════════════════════════════════════════════════
 import { useRef, useState, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { formatDZD } from '@/pos/utils/calculations';
-import type { CartItem } from '@/types';
+import type { CartItem, ProductPackaging } from '@/types';
 
 interface Props {
   items:               CartItem[];
   invoiceDiscountPct:  number;
   onQty:               (id: string, qty: number) => void;
   onDiscount:          (id: string, pct: number) => void;
+  onPrice:             (id: string, price: number) => void;
+  onPackaging:         (id: string, packaging: ProductPackaging | null, basePriceHt: number) => void;
+  onWeight:            (item: CartItem) => void;
   onRemove:            (id: string) => void;
   onClear:             () => void;
   onInvoiceDiscountChange: (pct: number) => void;
@@ -54,16 +58,73 @@ function QtyInput({
   );
 }
 
+/** سعر قابل للتحرير — نقرة تحوّل النص إلى حقل إدخال */
+function PriceInput({
+  item, onPrice,
+}: { item: CartItem; onPrice: (id: string, price: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText]       = useState(String(item.unit_price_ht));
+
+  useEffect(() => {
+    setText(String(item.unit_price_ht));
+    setEditing(false);
+  }, [item.unit_price_ht, item.id]);
+
+  const commit = () => {
+    const n = parseFloat(text);
+    if (Number.isFinite(n) && n >= 0) onPrice(item.id, n);
+    setEditing(false);
+  };
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        className="pp-row-price"
+        onClick={() => { setEditing(true); setText(String(item.unit_price_ht)); }}
+        title="انقر لتعديل السعر"
+      >
+        {formatDZD(item.unit_price_ht)}
+      </button>
+    );
+  }
+  return (
+    <input
+      autoFocus
+      className="pp-row-price-input"
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        if (e.key === 'Escape') setEditing(false);
+      }}
+      inputMode="decimal"
+    />
+  );
+}
+
+function StockBadge({ item }: { item: CartItem }) {
+  if (!item.manages_stock || item.max_stock == null) return null;
+  const remaining = item.max_stock - item.quantity;
+  const cls = remaining < 0 ? 'pp-badge--out' : (remaining <= 5 ? 'pp-badge--low' : 'pp-badge--ok');
+  return (
+    <span className={`pp-badge ${cls}`}>
+      {remaining < 0 ? `تجاوز: ${-remaining}` : `متبقي: ${remaining}`}
+    </span>
+  );
+}
+
 export default function POSProCart({
-  items, invoiceDiscountPct, onQty, onDiscount, onRemove, onClear,
-  onInvoiceDiscountChange, onOpenProducts,
+  items, invoiceDiscountPct, onQty, onDiscount, onPrice, onPackaging, onWeight,
+  onRemove, onClear, onInvoiceDiscountChange, onOpenProducts,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 66,
+    estimateSize: () => 72,
     overscan: 8,
   });
 
@@ -114,6 +175,8 @@ export default function POSProCart({
         >
           {virtualizer.getVirtualItems().map(vRow => {
             const item = items[vRow.index];
+            const packagings = item.available_packagings ?? [];
+            const showPack = packagings.length > 1;
             return (
               <div
                 key={item.id}
@@ -133,10 +196,47 @@ export default function POSProCart({
                       {item.unit_symbol && <span>{item.unit_symbol}</span>}
                       {item.tva_rate > 0 && <span>TVA {item.tva_rate}%</span>}
                     </div>
-                    <div className="pp-row-price">{formatDZD(item.unit_price_ht)}</div>
+                    <div className="pp-row-sub2">
+                      <StockBadge item={item} />
+                      {showPack && (
+                        <select
+                          className="pp-row-pack"
+                          value={item.packaging_id ?? ''}
+                          onChange={(e) => {
+                            const id = e.target.value ? Number(e.target.value) : null;
+                            const pkg = id ? packagings.find(p => p.id === id) ?? null : null;
+                            onPackaging(item.id, pkg, item.base_price_ht ?? item.unit_price_ht);
+                          }}
+                          title="تغليف"
+                        >
+                          <option value="">واحد</option>
+                          {packagings.map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.label} (×{p.quantity})
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <QtyInput item={item} onQty={onQty} />
+
+                {item.is_sold_by_weight ? (
+                  <button
+                    type="button"
+                    className="pp-row-weight"
+                    onClick={() => onWeight(item)}
+                    title="تعديل الوزن"
+                  >
+                    <i className="ti ti-scale" />
+                    <span>{item.quantity}</span>
+                    <em>{item.unit_symbol ?? 'كغ'}</em>
+                  </button>
+                ) : (
+                  <QtyInput item={item} onQty={onQty} />
+                )}
+
+                <PriceInput item={item} onPrice={onPrice} />
                 <div className="pp-row-disc">
                   <input
                     type="number"
