@@ -273,13 +273,18 @@ function buildLineFromApi(
     ? String(packagingRel.id)
     : l.packaging_id ? String(l.packaging_id) : '';
 
-  const packQty = resolvePackQty(
-    packagingId,
-    packagingRel,
-    productRel,
-    products,
-    String(l.product_id ?? ''),
-  );
+  // Frozen packaging_units_snapshot is the authoritative pack factor — never the
+  // live packaging row, whose quantity may have changed since the sale.
+  const snapshot = l.packaging_units_snapshot != null ? toNum(l.packaging_units_snapshot) : 0;
+  const packQty = snapshot > 0
+    ? snapshot
+    : resolvePackQty(
+        packagingId,
+        packagingRel,
+        productRel,
+        products,
+        String(l.product_id ?? ''),
+      );
 
   const stockLotRel =
     (l.stockLot  as Record<string, unknown> | null) ??
@@ -309,19 +314,30 @@ function buildLineFromApi(
   }
   if (isNaN(tvaRate)) tvaRate = defaultTvaRate;
 
-  // تحويل الكمية من وحدات أساسية إلى عدد عبوات
+  // Stored lines now use ONE convention: quantity = units of sale (packs), and
+  // unit_price_ht = PACK price (per-unit × snapshot). Legacy lines (snapshot NULL)
+  // used base units + per-unit price — keep their mapping unchanged.
+  const isPackConvention = snapshot > 0;
   const dbQty    = toNum(l.quantity ?? 1) || 1;
-  const displayQty = packQty > 1
-    ? Math.round((dbQty / packQty) * 1_000_000) / 1_000_000
-    : dbQty;
+  const perUnitPrice = isPackConvention && packQty > 0
+    ? Math.round((unitPrice / packQty) * 10_000) / 10_000
+    : unitPrice;
+  const displayQty = isPackConvention
+    ? dbQty
+    : packQty > 1
+      ? Math.round((dbQty / packQty) * 1_000_000) / 1_000_000
+      : dbQty;
+  const pricePerPack = isPackConvention
+    ? unitPrice
+    : Math.round(unitPrice * packQty * 10_000) / 10_000;
 
   return {
     id:                    l.id as number | undefined,
     product_id:            String(l.product_id ?? ''),
     description:           String(l.description ?? ''),
     quantity:              displayQty,
-    unit_price_ht:         unitPrice,
-    price_per_pack:        Math.round(unitPrice * packQty * 10_000) / 10_000,
+    unit_price_ht:         perUnitPrice,
+    price_per_pack:        pricePerPack,
     discount_mode:         discountMode,
     discount_percentage:   discountPercentage,
     discount_amount_fixed: discountAmountFixed,
@@ -1152,8 +1168,10 @@ export function useDocumentForm({
     const linesPayload = f.lines.map((line) => {
       const calc = calcLineTotal(line);
 
-      // تحويل الكمية للوحدات الأساسية
-      const effectiveQty = calc.baseQty;
+      // Contract: quantity = units of sale (packs when a packaging is selected),
+      // unit_price_ht = per-unit base price. The backend derives the stored PACK
+      // price (per-unit × frozen packaging_units_snapshot) — source of truth.
+      const effectiveQty = line.quantity;
 
       // discount_percentage: نسبة الخصم الفعلية
       const discountPercentage = Math.round(calc.discPct * 10_000) / 10_000;
@@ -1165,8 +1183,9 @@ export function useDocumentForm({
         ...(line.id ? { id: line.id } : {}),
         product_id:          parseInt(line.product_id),
         description:         line.description || null,
-        quantity:            effectiveQty,           // وحدات أساسية
+        quantity:            effectiveQty,           // وحدات البيع (عدد العبوات)
         unit_price_ht:       line.unit_price_ht,     // سعر الوحدة الأساسية
+        pack_qty:            line._packQty || 1,     // معامل العبوة — الباكند يشتق سعر العبوة
         tva_rate:            line.tva_rate,
         discount_percentage: discountPercentage,
         discount_amount:     discountAmount,          // خصم الوحدة الواحدة

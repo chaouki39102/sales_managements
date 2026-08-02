@@ -7,6 +7,39 @@
 ## Date
 2026-08-02
 
+### Phase 51 — Packaged Price Contract: Backend Is the Source of Truth for the × packQty (Aug 2)
+
+**Request**: after Phase 50 (frontend × packQty writes), the fix must be hardened so NO client can silently drop the pack multiplier again — "make the backend the source of truth". The backend now owns the pack price derivation, and all 4 sales payload builders send a uniform PER-UNIT contract.
+
+**New line contract** (stored `commercial_document_lines` convention, ONE convention everywhere):
+- `quantity` = units of sale (packs when a packaging is selected, base units otherwise)
+- `unit_price_ht` = **PACK price** = per-unit base price × `packaging_units_snapshot`
+- `packaging_units_snapshot` = frozen ProductPackaging.quantity at sale time
+
+**API payload contract** (all NEW-sale clients): send `unit_price_ht` = **PER-UNIT** base price + `pack_qty` (the pack factor). The backend computes and stores the pack price itself. A client that drops the × packQty (or sends a stale pack_qty) can never corrupt the stored price — the backend is the only place that multiplies.
+
+**Backend (`CommercialDocumentService::createDocumentLines`)** — snapshot resolution precedence:
+1. client-sent `pack_qty` (per-unit contract) → used as snapshot AND triggers the × snapshot price multiply
+2. payload `packaging_units_snapshot` → verbatim copies (returns/conversions) — NO price multiply (they already deliver the stored PACK price; multiplying would DOUBLE it)
+3. live `ProductPackaging` row → only legacy clients that sent neither
+
+**Copy paths preserve the frozen snapshot**: `DocumentReturnService::createReturn` and `DocumentConversionService` now copy `packaging_units_snapshot` from the source line (they previously dropped it, so a return/conversion of a pack line could re-derive from a CHANGED live packaging row).
+
+**Frontend changes (4 builders + doc form)**:
+- `POSPage.tsx` / `POSProPage.tsx` `handleCompleteSale` — `unit_price_ht: perUnitPrice` where `perUnitPrice = round(unit_price_ht / pack_qty, 4)` (invariant: cart `unit_price_ht` = per-unit × pack_qty, so division recovers the per-unit). `effectiveTotalHt/Tva` preview reducers now multiply `gross = quantity × unit_price_ht × pack_qty`.
+- `POSKioskPage.tsx` — same per-unit derivation + now sends `pack_qty`.
+- `useDocumentForm.ts` payload — sends `quantity: line.quantity` (units of sale) instead of `calc.baseQty`, plus `pack_qty: line._packQty || 1`. The doc form's `calcLineTotal` already multiplied `unit_price_ht × baseQty`, so totals are unchanged.
+- `useDocumentForm.ts` `buildLineFromApi` — `pack_qty` resolves from **frozen `packaging_units_snapshot` first** (fallback: `resolvePackQty` for pre-migration lines); pack-convention lines map to `quantity = dbQty` (packs) + `unit_price_ht = perUnit` + `price_per_pack = stored pack price`. Legacy snapshot-NULL lines keep the old base-units mapping unchanged.
+- `QuickSaleModal` (no `packaging_id`), `ReturnsModal` (uses `/documents/{id}/return` — backend copies lines) are unaffected.
+
+**Key architectural rules**:
+- The backend, not any client, is the ONLY place that multiplies per-unit price × packQty. Client payloads for new sales MUST send per-unit `unit_price_ht` + `pack_qty`; `packaging_id` alone means "I already sent the stored PACK price" (copy paths).
+- Copy paths (returns/conversions) must forward `packaging_units_snapshot` verbatim — dropping it silently re-derives the factor from a live packaging row that may have changed since the sale.
+- Stored costs stay correct in all quadrants: purchase lines store `cost_price_ht = pack price` (report multiplies `qty × cost` = baseQty × per-unit); sale lines store per-unit weighted-average (via `getCostPriceForSale(..., $baseQty)`) and `qty × cost` = baseQty × per-unit.
+- The cart invariant is unchanged: `unit_price_ht` on a cart row is ALWAYS `per-unit × pack_qty`; recovering per-unit at the network boundary is `round(unit_price_ht / pack_qty, 4)`.
+
+**Verification**: `php -l` clean ×3. `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors, 184 precache entries, `root sw == build sw: True` (SW MATCH).
+
 ### Phase 50 — POS Price-Level Override Drops packQty: Packaged *12 Charged as Single Unit (Aug 2)
 
 **Bug (4 symptoms, one root cause)**: (1) adding a product with *12 packaging charged it at the per-unit price (120 instead of 1440 for product 29, unit 120, Fardeau qty 12); (2) switching the unit *12 → *1 divided the "box price" by 12 (→ 10); (3) discount was computed on 1/12 of the correct `qty × packQty × unit price`; (4) stock display on the card looked wrong (user confirmed: perception only — the Σ `qty × pack_qty` subtraction in `ProductGrid.tsx:54` / `POSProPage.tsx:131` is correct).

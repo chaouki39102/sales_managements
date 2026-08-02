@@ -209,7 +209,12 @@ export default function POSKioskPage() {
         lines: pos.items.map(i => ({
           product_id:          i.product_id,
           quantity:            i.quantity,
-          unit_price_ht:       i.unit_price_ht,
+          // Contract: unit_price_ht is the PER-UNIT base price; the backend stores
+          // the PACK price (per-unit × frozen packaging_units_snapshot).
+          pack_qty:            i.pack_qty ?? 1,
+          unit_price_ht:       (i.pack_qty && i.pack_qty > 1)
+            ? Math.round((i.unit_price_ht / i.pack_qty) * 10000) / 10000
+            : i.unit_price_ht,
           discount_percentage: i.discount_percentage,
           tva_rate:            i.tva_rate,
           packaging_id:        i.packaging_id ?? null,

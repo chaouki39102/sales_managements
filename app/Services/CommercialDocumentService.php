@@ -533,7 +533,27 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                         422
                     );
                 }
-                $packagingUnitsSnapshot = (float) $packaging->quantity;
+
+                // Snapshot resolution (backend is the source of truth for the pack factor):
+                //   1. client-sent pack_qty — NEW-sales contract (unit_price_ht = PER-UNIT)
+                //   2. payload packaging_units_snapshot — verbatim copies (returns/conversions)
+                //   3. live packaging row — only when neither was provided (legacy clients)
+                $declaredPackQty = isset($lineData['pack_qty']) ? (float) $lineData['pack_qty'] : 0.0;
+                if ($declaredPackQty > 0) {
+                    $packagingUnitsSnapshot = $declaredPackQty;
+                } elseif (array_key_exists('packaging_units_snapshot', $lineData)
+                    && $lineData['packaging_units_snapshot'] !== null) {
+                    $packagingUnitsSnapshot = (float) $lineData['packaging_units_snapshot'];
+                } else {
+                    $packagingUnitsSnapshot = (float) $packaging->quantity;
+                }
+
+                // The × packQty applies ONLY to the per-unit contract (client declared pack_qty).
+                // Copy paths (returns/conversions) already deliver the stored PACK price, so
+                // re-multiplying would double the price.
+                if ($declaredPackQty > 0 && $packagingUnitsSnapshot > 0) {
+                    $lineData['unit_price_ht'] = round((float) $lineData['unit_price_ht'] * $packagingUnitsSnapshot, 4);
+                }
             }
 
             // Quantity-tier discount resolution — mutually exclusive with manual discount_percentage.

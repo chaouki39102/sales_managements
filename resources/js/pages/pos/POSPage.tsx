@@ -1168,11 +1168,16 @@ const handleCompleteSale = useCallback(async (params: {
         const baseQty = i.quantity * (i.pack_qty ?? 1);
         const lineDiscAmount = baseQty > 0 ? Math.round((i.discount_amount / baseQty) * 100) / 100 : 0;
         const isFixedAmount  = i.discount_mode === 'fixed_amount' && lineDiscAmount > 0;
+        // Contract: unit_price_ht in the API payload is the PER-UNIT base price.
+        // The backend derives the stored PACK price (per-unit × frozen snapshot).
+        const perUnitPrice = (i.pack_qty && i.pack_qty > 1)
+          ? Math.round((i.unit_price_ht / i.pack_qty) * 10000) / 10000
+          : i.unit_price_ht;
         return {
           product_id:               i.product_id,
           quantity:                 i.quantity,
           pack_qty:                 i.pack_qty ?? 1,
-          unit_price_ht:            i.unit_price_ht,
+          unit_price_ht:            perUnitPrice,
           discount_percentage:      isFixedAmount ? 0 : Math.min(100, compoundedDisc),
           discount_amount:          lineDiscAmount,
           discount_amount_per_unit: isFixedAmount ? lineDiscAmount : null,
@@ -1182,7 +1187,7 @@ const handleCompleteSale = useCallback(async (params: {
       });
 
       const effectiveTotalHt = linesPayload.reduce((s: number, l: Record<string, any>) => {
-        const gross = l.quantity * l.unit_price_ht;
+        const gross = l.quantity * l.unit_price_ht * l.pack_qty;
         const bq = l.quantity * l.pack_qty;
         const disc = l.discount_amount_per_unit
           ? l.discount_amount_per_unit * bq
@@ -1190,7 +1195,7 @@ const handleCompleteSale = useCallback(async (params: {
         return s + gross - disc;
       }, 0);
       const effectiveTotalTva = linesPayload.reduce((s: number, l: Record<string, any>) => {
-        const gross = l.quantity * l.unit_price_ht;
+        const gross = l.quantity * l.unit_price_ht * l.pack_qty;
         const bq = l.quantity * l.pack_qty;
         const disc = l.discount_amount_per_unit
           ? l.discount_amount_per_unit * bq

@@ -60,15 +60,16 @@ class DocumentReturnService
                 }
 
                 $linesPayload[] = [
-                    'product_id'          => $sourceLine->product_id,
-                    'description'         => $sourceLine->description . " (مرتجع)",
-                    'quantity'            => $returnLine['quantity'],
-                    'unit_price_ht'       => $sourceLine->unit_price_ht,
-                    'discount_percentage' => $sourceLine->discount_percentage,
-                    'discount_amount'     => $sourceLine->discount_amount,
-                    'tva_rate'            => $sourceLine->tva_rate,
-                    'packaging_id'        => $sourceLine->packaging_id,
-                    'notes'               => "مرتجع من سطر #{$sourceLine->id}",
+                    'product_id'               => $sourceLine->product_id,
+                    'description'              => $sourceLine->description . " (مرتجع)",
+                    'quantity'                 => $returnLine['quantity'],
+                    'unit_price_ht'            => $sourceLine->unit_price_ht,
+                    'discount_percentage'      => $sourceLine->discount_percentage,
+                    'discount_amount'          => $sourceLine->discount_amount,
+                    'tva_rate'                 => $sourceLine->tva_rate,
+                    'packaging_id'             => $sourceLine->packaging_id,
+                    'packaging_units_snapshot' => $sourceLine->packaging_units_snapshot,
+                    'notes'                    => "مرتجع من سطر #{$sourceLine->id}",
                 ];
             }
 

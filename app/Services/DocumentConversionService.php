@@ -74,15 +74,16 @@ class DocumentConversionService
             }
 
             $linesData = $sourceLines->map(fn($line) => [
-                'product_id'          => $line->product_id,
-                'description'         => $line->description,
-                'quantity'            => $line->quantity,
-                'unit_price_ht'       => $line->unit_price_ht,
-                'discount_percentage' => $line->discount_percentage,
-                'discount_amount'     => $line->discount_amount,
-                'tva_rate'            => $line->tva_rate,
-                'packaging_id'        => $line->packaging_id,
-                'notes'               => $line->notes,
+                'product_id'                  => $line->product_id,
+                'description'                 => $line->description,
+                'quantity'                    => $line->quantity,
+                'unit_price_ht'               => $line->unit_price_ht,
+                'discount_percentage'         => $line->discount_percentage,
+                'discount_amount'             => $line->discount_amount,
+                'tva_rate'                    => $line->tva_rate,
+                'packaging_id'                => $line->packaging_id,
+                'packaging_units_snapshot'    => $line->packaging_units_snapshot,
+                'notes'                       => $line->notes,
             ])->toArray();
 
             $newDoc = $this->documentService->create([
