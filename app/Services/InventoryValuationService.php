@@ -39,6 +39,7 @@ class InventoryValuationService
             ->where('stock_movements.product_id', $product->id)
             ->where('stock_movements.warehouse_id', $warehouseId)
             ->where('stock_movements.is_validated', true)
+            ->whereNull('stock_movements.deleted_at')
             ->selectRaw('
                 SUM(CASE WHEN stock_movement_types.direction > 0 THEN quantity * unit_price ELSE 0 END) as total_value_in,
                 SUM(CASE WHEN stock_movement_types.direction > 0 THEN quantity ELSE 0 END) as total_qty_in,

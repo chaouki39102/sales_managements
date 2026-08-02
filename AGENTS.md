@@ -7,6 +7,44 @@
 ## Date
 2026-08-02
 
+### Phase 50 — POS Price-Level Override Drops packQty: Packaged *12 Charged as Single Unit (Aug 2)
+
+**Bug (4 symptoms, one root cause)**: (1) adding a product with *12 packaging charged it at the per-unit price (120 instead of 1440 for product 29, unit 120, Fardeau qty 12); (2) switching the unit *12 → *1 divided the "box price" by 12 (→ 10); (3) discount was computed on 1/12 of the correct `qty × packQty × unit price`; (4) stock display on the card looked wrong (user confirmed: perception only — the Σ `qty × pack_qty` subtraction in `ProductGrid.tsx:54` / `POSProPage.tsx:131` is correct).
+
+**Root cause**: commit `33536d0` (Aug 1, "default price level fix", Phase 47) added a price-level override to classic `POSPage.handleAddItem` that called `pos.updatePrice(addedId, priceEntry.price)` — writing the RAW per-unit level price into `unit_price_ht`, AFTER `addItem` had already scaled it by packQty (`default × packQty`). A *12 box thus got re-priced as a single unit. The ÷12-on-switch was downstream: the bugged invoice saves `unit_price_ht=120, pack_qty=12`; reopening recomputes `base_price_ht = 120/12 = 10` (both `POSPage.tsx:778` and `POSProPage.tsx:1047`), so switching *12→*1 multiplies `10 × 1 = 10`. The discount symptom follows from `recalcItem`'s `gross = unit_price_ht × qty` being 1/12 (the tier lookup `baseQty = qty × packQty` in `calculations.ts:144` was already correct).
+
+**Fix (3 files)**: every price-level write now scales by the row's `pack_qty`:
+- `POSPage.tsx handleAddItem` — re-prices ALL rows of the added variant × their own `pack_qty` (also fixes a latent wrong-row bug: the old `find(i => i.variant_id === v.id)` hit the FIRST matching row, possibly a different packaging's row).
+- `POSPage.tsx applyPriceLevel` (917–938) — `priceEntry.price * packQty`, the `discount_percent` fallback × `packQty`, AND the `plId === null` reset path × `packQty` (that reset previously collapsed a *12 box to per-unit too).
+- `POSProPage.tsx applyPriceLevel` (914–936) — identical 3-path fix. (POS Pro's ADD path was already correct: it replaces `default_selling_price_ht` with the level price BEFORE `addItem`, so the × packQty survives. POS Kiosk passes `selectedPriceLevelId={null}` — unaffected.)
+- **Reopen derivation (`POSPage.tsx handleOpenInvoice` ~739 + `POSProPage.tsx` ~1014)** — `pack_qty` now resolves from the FROZEN `packaging_units_snapshot` first (`pkgSnap ? Number(pkgSnap) : (pkg ? Number(pkg.quantity) : 1)`), with the live `packaging` row only as a fallback for pre-migration lines. Previously the live row won, violating the column contract ("Frozen ProductPackaging.quantity at time of sale — never recompute from live packaging row") — if a packaging's quantity was later changed in settings, reopening an old invoice used the wrong qty. `base_price_ht = priceHt / frozenPackQty` uses the same frozen value.
+
+**Key architectural rules**:
+- `unit_price_ht` on a cart row is ALWAYS `per-unit × pack_qty`; `base_price_ht` is ALWAYS the per-unit base. Any price write (add, price-level apply, reset, reopen) must multiply by the row's `pack_qty` — the only correct way to target a packaged row is via its `packaging_id`/`pack_qty`, never "first row with this variant_id".
+- On REOPEN the pack qty must come from the FROZEN `commercial_document_lines.packaging_units_snapshot` (written by `CommercialDocumentService` from the packaging row at create time) — NEVER the live `ProductPackaging` row, whose quantity may have changed since the sale. Backend already honors this (`getBaseQuantityAttribute`, `computeLineTotals`); the frontend reopen path was the only place that inverted it.
+- The reopen derivation `base_price_ht = unit_price_ht / pack_qty` is CORRECT and must NOT be "defended" — a bugged historical line (unit=120, pack=12) legitimately yields 10 because its saved price was already wrong. Fix the source, don't guess at historical data.
+- `recalcItem`'s discount is already on total quantity when `unit_price_ht` is the box price; the tier LOOKUP uses `baseQty = qty × packQty` and fixed-amount tiers scale `discount_amount × baseQty` — no discount code change was needed once pricing was fixed.
+- Stacking model: classic POS = default × packQty in `addItem`, then level override × packQty; POS Pro = level price substituted into `default_selling_price_ht` BEFORE `addItem`. Both now produce the same correct box price.
+
+**Verification**: `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors, 184 precache entries, `root sw == build sw: True` (SW MATCH).
+
+### Phase 49 — Sales Report Cost Correction: Soft-Deleted Movements Pollute Weighted-Average PMP (Aug 2)
+
+**Bug**: the sales report (التكلفة column) showed wrong costs for product «جيليكس 2ل» (id 54, weighted-average): POS-2026-000319 cost 153 538,85 and POS-2026-000320 cost 230 447,18 instead of the correct 155 200 / 230 400. The cost was NOT above HT (249 600) — the user's stamp hypothesis was irrelevant (`total_stamp` = 0 on all POS docs). Root cause was the PMP, not the report.
+
+**Root cause**: `InventoryValuationService::updateWeightedAverage()` (the only stock query in the codebase missing the filter) did NOT exclude soft-deleted movements — every other query (`InventoryStockService`, `ComputeLineService`, `getAvailableStock`, fiscal services) uses `whereNull('sm.deleted_at')`/`whereNull('deleted_at')`. The stock-repair deletions from Phase 46 (orphaned out-movements id 970/973/974/975, `deleted_at` 2026-08-02 09:48–09:49, user 2, no line, cost 490) still counted in the PMP: with-deleted q_out=1123 vs q_in=960 (impossible), dragging PMP down to 479.8089/480.0983. Correct PMP excluding deleted movements: POS-318 → **490** (FA-2026-000003 @490, 160 u), POS-319 → **485** (FA-000004 @485, 320 u), POS-320 → **480** (FA-000005 @480, 480 u), final `current_cost_price` → **480**.
+
+**Fix (2 parts)**:
+1. **Code**: `InventoryValuationService.php:42` — added `->whereNull('stock_movements.deleted_at')` to `updateWeightedAverage()` (raw `DB::table` bypasses `SoftDeletes`). Future PMP computations are now clean.
+2. **Data recalc** (one-off, product 54 only): line `cost_price_ht` 979 → 485, 981 → 480 (977 was already 490); sale movements 978 → `cost_price 485 / total_price 155200`, 980 → `cost_price 480 / total_price 230400`; product 54 `current_cost_price` 480.0983 → 480. Other products with soft-deleted movements (29–43) have NO valuation method → `getCostPriceForSale` falls back to `purchase_price_ht` → unaffected.
+
+**Key architectural rules**:
+- ANY raw `DB::table('stock_movements')` query MUST add `whereNull('deleted_at')` — `SoftDeletes` is silently bypassed by query-builder/DB calls (this was the one place it was missing).
+- Sale line `cost_price_ht` is written at document creation from `getCostPriceForSale()` (weighted-average = product `current_cost_price`); fixing the data requires mirroring both the line `cost_price_ht` AND the corresponding stock movement `cost_price`/`total_price` (the PMP's `total_value_out` term), plus the product `current_cost_price`.
+- The sales report (`ReportService.php:57`) reads `doc_cost_ht` = Σ `qty × cost_price_ht` directly from lines — no report code change needed once the line costs are correct.
+
+**Verification**: report probe now shows POS-318 cost 78 400 / margin 4 800; POS-319 cost 155 200 / margin 11 200; POS-320 cost 230 400 / margin 19 200. `php -l` clean. `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors, 184 precache entries, `root sw == build sw: True` (SW MATCH).
+
 ### Phase 48 — POS Settings-Compliance: Per-Item Discount Gate + POS Pro Toggle Wiring (Aug 2)
 
 **Request (from the Phase 45 settings-compliance audit)**: the per-item cart discount (both POSes) bypassed `maxDiscountPct`/`discountRequirePin` (only the *invoice* discount was gated), `autoClosePayment` was dead in POS Pro, and 9 POS settings were silently ignored by POS Pro. All fixed.

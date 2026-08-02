@@ -48,6 +48,14 @@ export default function ProductGrid({
     return cartItems.find(i => i.variant_id === variantId)?.quantity ?? 0;
   }, [cartItems]);
 
+  const inCartUnits = useCallback((variantId: number) => {
+    let units = 0;
+    for (const i of cartItems) {
+      if (i.variant_id === variantId) units += i.quantity * (i.pack_qty ?? 1);
+    }
+    return units;
+  }, [cartItems]);
+
   const variantCountByProduct = useMemo(() => {
     const map = new Map<number, number>();
     for (const v of variants) {
@@ -278,6 +286,7 @@ export default function ProductGrid({
                     variant={item.variant}
                     idx={item.idx}
                     qtyInCart={inCartQty(item.variant.id)}
+                    qtyInCartUnits={inCartUnits(item.variant.id)}
                     highlighted={highlightedIndex === item.idx}
                     isPinned={isPinned(item.variant.id)}
                     priceLevels={priceLevels}

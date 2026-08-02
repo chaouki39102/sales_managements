@@ -23,6 +23,8 @@ interface ProductCardProps {
   searchQuery?:          string;
   scannedId?:            number | null;
   variantCount?:         number;
+  /** Base-unit quantity already in the cart for this variant (stock badge subtracts it) */
+  qtyInCartUnits?:       number;
 }
 
 const TAP_THRESHOLD = 300;
@@ -64,14 +66,15 @@ function ProductCardInner({
   searchQuery = '',
   scannedId,
   variantCount,
+  qtyInCartUnits = 0,
 }: ProductCardProps) {
   const rawStock      = v.current_stock;
-  const stock         = rawStock !== undefined ? Math.max(0, rawStock) : rawStock;
   const unknownStock  = rawStock === undefined;
-  const outStock      = isVariantOutOfStock(v, allowNegativeStock);
+  const available     = rawStock !== undefined ? Math.max(0, rawStock - qtyInCartUnits) : rawStock;
+  const outStock      = isVariantOutOfStock(v, allowNegativeStock) || (v.manages_stock && !unknownStock && (available ?? 0) <= 0 && !allowNegativeStock && !v.allow_negative_stock);
   const negStock      = v.manages_stock && !unknownStock && (rawStock ?? 0) < 0;
-  const lowStock      = v.manages_stock && !unknownStock && !negStock && (stock ?? 0) > 0 && (stock ?? 0) <= (v.min_stock_alert ?? 0);
-  const lastPiece     = v.manages_stock && !unknownStock && !negStock && (stock ?? 0) > 0 && (stock ?? 0) <= 2 && !lowStock;
+  const lowStock      = v.manages_stock && !unknownStock && !negStock && (available ?? 0) > 0 && (available ?? 0) <= (v.min_stock_alert ?? 0);
+  const lastPiece     = v.manages_stock && !unknownStock && !negStock && (available ?? 0) > 0 && (available ?? 0) <= 2 && !lowStock;
 
   const bestDiscount = useMemo(() => {
     const d = v.quantity_discounts?.filter(d => d.active !== false)
@@ -251,7 +254,7 @@ function ProductCardInner({
         )}
         {showStock && v.manages_stock && !unknownStock && (
           <span className={`pcard-stock-badge ${outStock ? 'out' : lowStock ? 'low' : negStock ? 'neg' : 'ok'}`}>
-            {outStock ? '0' : stock}{v.unit?.abbreviation ? ` ${v.unit.abbreviation}` : ''}
+            {outStock ? '0' : available}{v.unit?.abbreviation ? ` ${v.unit.abbreviation}` : ''}
           </span>
         )}
         {showStock && v.manages_stock && unknownStock && (
@@ -356,6 +359,7 @@ const ProductCard = React.memo(ProductCardInner, (prev, next) => {
   return prev.variant.id === next.variant.id
     && prev.idx === next.idx
     && prev.qtyInCart === next.qtyInCart
+    && prev.qtyInCartUnits === next.qtyInCartUnits
     && prev.highlighted === next.highlighted
     && prev.isPinned === next.isPinned
     && prev.selectedPriceLevelId === next.selectedPriceLevelId

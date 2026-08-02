@@ -82,6 +82,7 @@ import { isWebUsbSupported, printThermalViaWebUSBFromTemplate } from '@/pos/util
 import { useQueryClient }       from '@tanstack/react-query';
 import { partyBalancesApi } from '@/lib/api/endpoints/partyBalances';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
+import { toLocalDateKey } from '@/lib/utils';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
 import type { POSSaleSnapshot } from '@/pages/settings/print-settings/types/data';
 import type { PipelineSource } from '@/pages/settings/print-settings/runtime/UniversalPrintPipeline';
@@ -733,6 +734,9 @@ function POSPage() {
         const priceHt  = Number(line.unit_price_ht);
         const discPct  = Number(line.discount_percentage);
         const gross    = qty * priceHt;
+        // Frozen packaging qty at time of sale wins over the LIVE packaging row —
+        // the live row's quantity may have changed since the sale.
+        const frozenPackQty = pkgSnap ? Number(pkgSnap) : (pkg ? Number(pkg.quantity) : 1);
         // Native fixed-amount path: if discount_amount_per_unit is populated, use it
         // directly — NO percentage conversion, NO round-trip.
         const frozenPerUnit = Number((line as any).discount_amount_per_unit) || 0;
@@ -772,9 +776,9 @@ function POSPage() {
           manages_stock:       false,
           is_sold_by_weight:   prod?.is_sold_by_weight ?? false,
           packaging_id:        line.packaging_id ?? null,
-          pack_qty:            pkg ? Number(pkg.quantity) : (pkgSnap ? Number(pkgSnap) : 1),
+          pack_qty:            frozenPackQty,
           packaging_label:     pkg?.label ?? null,
-          base_price_ht:       priceHt / ((pkg ? Number(pkg.quantity) : (pkgSnap ? Number(pkgSnap) : 1)) || 1),
+          base_price_ht:       priceHt / (frozenPackQty || 1),
           quantity_discounts:  (prod as any)?.quantity_discounts ?? [],
         };
       });
@@ -795,12 +799,12 @@ function POSPage() {
       useCartStore.getState().markClean();
       setEditingDocumentId(docId);
       setEditingDocStatus(doc.status);
-      setEditingDocumentDate(doc.document_date ?? null);
+      setEditingDocumentDate(toLocalDateKey(doc.document_date) || null);
       setEditingDocumentNumber(doc.document_number ?? null);
       useCartStore.getState().setDocumentMeta({
         id:     docId,
         number: doc.document_number ?? null,
-        date:   doc.document_date ?? null,
+        date:   toLocalDateKey(doc.document_date) || null,
       });
       editingPrevBalanceRef.current = doc.balance_data?.previous_balance;
       editingDocMetaRef.current = {
@@ -919,7 +923,8 @@ function POSPage() {
       pos.items.forEach(item => {
         const variant   = allVariants.find(v => v.id === item.variant_id);
         const origPrice = variant?.default_selling_price_ht;
-        if (origPrice && origPrice !== item.unit_price_ht) pos.updatePrice(item.id, origPrice);
+        const packQty   = item.pack_qty ?? 1;
+        if (origPrice && origPrice * packQty !== item.unit_price_ht) pos.updatePrice(item.id, origPrice * packQty);
       });
       return;
     }
@@ -927,11 +932,12 @@ function POSPage() {
     if (!pl) return;
     pos.items.forEach(item => {
       const variant    = allVariants.find(v => v.id === item.variant_id);
+      const packQty    = item.pack_qty ?? 1;
       const priceEntry = variant?.prices?.find(pr => pr.price_level_id === plId);
-      if (priceEntry?.price)               pos.updatePrice(item.id, priceEntry.price);
+      if (priceEntry?.price)               pos.updatePrice(item.id, priceEntry.price * packQty);
       else if (pl.discount_percent) {
         const origPrice = variant?.default_selling_price_ht ?? item.unit_price_ht;
-        pos.updatePrice(item.id, origPrice * (1 - pl.discount_percent / 100));
+        pos.updatePrice(item.id, origPrice * (1 - pl.discount_percent / 100) * packQty);
       }
     });
   }, [priceLevelsList, allVariants, pos]);
@@ -1070,7 +1076,7 @@ function POSPage() {
       const balance = doc.balance_data;
       const snap: POSSaleSnapshot = {
         docNumber: doc.document_number,
-        docDate: doc.document_date?.slice(0, 10) ?? '',
+        docDate: toLocalDateKey(doc.document_date),
         client: doc.party ? { name: doc.party.name, nif: doc.party.nif, phone: doc.party.phone, address: doc.party.address } : null,
         items: (doc.lines ?? []).map(line => ({
           name: line.description ?? line.product?.name ?? '',
@@ -1448,18 +1454,22 @@ const handleCompleteSale = useCallback(async (params: {
     // default_selling_price_ht; the level picker only re-priced existing rows).
     const activePlId = selectedPriceLevelId;
     if (activePlId) {
-      const addedId = useCartStore.getState().items.find(i => i.variant_id === v.id)?.id;
-      if (addedId) {
-        const priceEntry = v.prices?.find(pr => pr.price_level_id === activePlId);
-        if (priceEntry?.price) {
-          pos.updatePrice(addedId, priceEntry.price);
-        } else {
-          const pl = priceLevelsList.find(p => p.id === activePlId);
-          if (pl?.discount_percent) {
-            pos.updatePrice(addedId, v.default_selling_price_ht * (1 - pl.discount_percent / 100));
+      // addItem already scaled unit_price_ht by packQty (default × pack) — the
+      // level override must scale by the same packQty, otherwise a *12 box gets
+      // re-priced as a single unit. Applied to every row of this variant so the
+      // just-added (possibly merged) row is always the one re-priced.
+      const priceEntry = v.prices?.find(pr => pr.price_level_id === activePlId);
+      const pl         = priceLevelsList.find(p => p.id === activePlId);
+      useCartStore.getState().items
+        .filter(i => i.variant_id === v.id)
+        .forEach(i => {
+          const packQty = i.pack_qty ?? 1;
+          if (priceEntry?.price) {
+            pos.updatePrice(i.id, priceEntry.price * packQty);
+          } else if (pl?.discount_percent) {
+            pos.updatePrice(i.id, v.default_selling_price_ht * (1 - pl.discount_percent / 100) * packQty);
           }
-        }
-      }
+        });
     }
     setRecentProducts(prev => {
       const filtered = prev.filter(p => p.id !== v.id);

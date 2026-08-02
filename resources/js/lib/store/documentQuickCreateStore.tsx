@@ -75,6 +75,7 @@ export function DocumentQuickCreateProvider({ children }: { children: React.Reac
 
   const handleSaved = useCallback(() => {
     if (slug) qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
+    setState((s) => ({ ...s, open: false }));
   }, [slug, qc]);
 
   const value = useMemo<DocumentQuickCreateContextValue>(() => ({

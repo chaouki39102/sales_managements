@@ -36,6 +36,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '@/lib/api/core/client';
+import { toLocalDateKey } from '@/lib/utils';
 import { useActiveSlug } from '@/lib/store/appStore';
 import type { DocumentType } from '@/lib/api/core/types';
 import {
@@ -361,7 +362,7 @@ export function buildPaymentFromApi(p: Record<string, unknown>): PaymentEntry {
     reference:           String(p.reference ?? ''),
     notes:               p.notes ? String(p.notes) : undefined,
     client_ref:          p.client_ref ? String(p.client_ref) : undefined,
-    payment_date:        String(p.payment_date ?? today()).split('T')[0],
+    payment_date:        toLocalDateKey(p.payment_date as string | null | undefined) || today(),
     treasury_account_id: treasuryId,
   };
 }
@@ -387,9 +388,9 @@ function buildDefaultForm(
 
     return {
       party_id:       String(doc.party_id       ?? ''),
-      document_date:  String(doc.document_date  ?? today()).split('T')[0],
-      due_date:       doc.due_date ? String(doc.due_date).split('T')[0] : '',
-      delivery_date:  doc.delivery_date ? String(doc.delivery_date).split('T')[0] : '',
+      document_date:  toLocalDateKey(doc.document_date as string | null | undefined) || today(),
+      due_date:       doc.due_date ? toLocalDateKey(doc.due_date as string | null | undefined) : '',
+      delivery_date:  doc.delivery_date ? toLocalDateKey(doc.delivery_date as string | null | undefined) : '',
       notes:          String(doc.notes          ?? ''),
       internal_notes: String(doc.internal_notes ?? ''),
       warehouse_id:   String(doc.warehouse_id   ?? ''),

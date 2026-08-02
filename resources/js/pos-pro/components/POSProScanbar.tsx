@@ -26,6 +26,8 @@ interface Props {
   keyboardNavEnabled?: boolean;
   /** إظهار شارة المخزون في النتائج (إعداد POS) */
   showStockOnCard?: boolean;
+  /** Base-unit quantity already in the cart per variant id (stock chip subtracts it) */
+  qtyInCartById?: Map<number, number>;
 }
 
 function variantMatches(v: ProductVariant, q: string): boolean {
@@ -48,7 +50,7 @@ function variantExactBarcode(v: ProductVariant, code: string): boolean {
   );
 }
 
-export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRef, onQtyCommand, onCartNav, onScanCamera, keyboardNavEnabled = true, showStockOnCard = true }: Props) {
+export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRef, onQtyCommand, onCartNav, onScanCamera, keyboardNavEnabled = true, showStockOnCard = true, qtyInCartById }: Props) {
   const [code, setCode] = useState('');
   const [open, setOpen] = useState(false);
   const [hi, setHi]     = useState(0);
@@ -208,10 +210,12 @@ export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRe
               const priceTtc = v.default_selling_price_ht * (1 + tvaRate / 100);
               const img = (v as any).image_url ?? v.product?.default_image ?? v.product?.images?.[0] ?? null;
               const stock = v.current_stock ?? 0;
+              const inCart = qtyInCartById?.get(v.id) ?? 0;
+              const remaining = Math.max(0, stock - inCart);
               const showStock = v.manages_stock;
-              const stockCls = stock <= 0
+              const stockCls = remaining <= 0
                 ? 'pp-badge pp-badge--out'
-                : (stock <= 5 ? 'pp-badge pp-badge--low' : 'pp-badge pp-badge--ok');
+                : (remaining <= 5 ? 'pp-badge pp-badge--low' : 'pp-badge pp-badge--ok');
               return (
                 <button
                   key={v.id}
@@ -227,7 +231,7 @@ export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRe
                   <span className="pp-scanbar-dd-main">
                     <span className="pp-scanbar-dd-name">
                       <span className="pp-scanbar-dd-name-txt">{v.product?.name ?? ''}</span>
-                      {showStockOnCard && showStock && <span className={stockCls}>{stock <= 0 ? 'نفد' : `متوفر: ${stock}`}</span>}
+                      {showStockOnCard && showStock && <span className={stockCls}>{remaining <= 0 ? 'نفد' : `متوفر: ${remaining}`}</span>}
                     </span>
                     <span className="pp-scanbar-dd-sub">{v.ref || v.barcode || ''}</span>
                   </span>

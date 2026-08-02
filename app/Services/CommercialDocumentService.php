@@ -994,6 +994,16 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         int $ignoreDocumentId = 0
     ): float
     {
+        // Normalize the date to the app's LOCAL calendar day. The incoming value
+        // may be a bare "Y-m-d", an app-local Carbon, or a UTC Carbon (from a
+        // re-sent API ISO string) whose calendar day differs from the business
+        // date (e.g. "2026-08-01T23:00:00.000000Z" == Aug 2 local in UTC+1).
+        // Comparing raw datetimes here caused same-day movements to be excluded
+        // → false "الكمية المطلوبة تتجاوز المخزون المتاح (0)" on doc edits.
+        $date = \Illuminate\Support\Carbon::parse($date)
+            ->setTimezone(config('app.timezone'))
+            ->format('Y-m-d');
+
         $opening = (float) DB::table('opening_balances_stock')
             ->where('company_id', $companyId)
             ->where('fiscal_year_id', $fiscalYearId)
@@ -1009,7 +1019,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             ->where('product_id', $productId)
             ->where('warehouse_id', $warehouseId)
             ->where('is_validated', true)
-            ->where('movement_date', '<=', $date)
+            ->whereDate('movement_date', '<=', $date)
             ->whereNull('deleted_at');
 
         if ($ignoreDocumentId > 0) {

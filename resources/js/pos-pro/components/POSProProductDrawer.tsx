@@ -40,13 +40,16 @@ interface Props {
   clearSearchOnAdd?: boolean;
   keyboardNavEnabled?: boolean;
   advanceOnAdd?: boolean;
+  /** Base-unit quantity already in the cart per variant id (stock badge subtracts it) */
+  qtyInCartById?: Map<number, number>;
 }
 
-function StockBadge({ v }: { v: ProductVariant }) {
+function StockBadge({ v, inCartUnits }: { v: ProductVariant; inCartUnits: number }) {
   if (!v.manages_stock) return null;
   const stock = v.current_stock ?? 0;
-  const cls = stock <= 0 ? 'pp-badge pp-badge--out' : (stock <= 5 ? 'pp-badge pp-badge--low' : 'pp-badge pp-badge--ok');
-  const label = stock <= 0 ? 'نفد المخزون' : `متوفر: ${stock}`;
+  const remaining = Math.max(0, stock - inCartUnits);
+  const cls = remaining <= 0 ? 'pp-badge pp-badge--out' : (remaining <= 5 ? 'pp-badge pp-badge--low' : 'pp-badge pp-badge--ok');
+  const label = remaining <= 0 ? 'نفد المخزون' : `متوفر: ${remaining}`;
   return <span className={cls}>{label}</span>;
 }
 
@@ -55,6 +58,7 @@ export default function POSProProductDrawer({
   priceLevels = [], selectedPriceLevelId = null,
   priceDisplayMode = 'ttc', showStockOnCard = true, gridSize = 'md',
   clearSearchOnAdd = false, keyboardNavEnabled = true, advanceOnAdd = true,
+  qtyInCartById,
 }: Props) {
   const [query, setQuery]     = useState('');
   const [familyId, setFamilyId] = useState<number | null>(null);
@@ -249,7 +253,7 @@ export default function POSProProductDrawer({
                 <div className="pp-card-ref">{v.ref || v.barcode || ''}</div>
                 <div className={`pp-card-price${isLevelPriced ? ' pp-card-price--lvl' : ''}`}>{formatDZD(primary)}</div>
                 <div className="pp-card-bottom">
-                  {showStockOnCard && <StockBadge v={v} />}
+                  {showStockOnCard && <StockBadge v={v} inCartUnits={qtyInCartById?.get(v.id) ?? 0} />}
                   <span className="pp-card-ht">{formatDZD(secondary)}</span>
                 </div>
               </button>

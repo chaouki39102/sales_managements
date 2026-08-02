@@ -52,6 +52,7 @@ import { htToTtc, ttcToHt } from '@/pos/utils/calculations';
 import { renderPreviewToHtml } from '@/pages/settings/print-settings/runtime/renderPreviewToHtml';
 import { mapCompany } from '@/pages/settings/print-settings/runtime/PrintRuntimeAdapter';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
+import { toLocalDateKey } from '@/lib/utils';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
 import type { POSSaleSnapshot } from '@/pages/settings/print-settings/types/data';
 import type { PipelineSource } from '@/pages/settings/print-settings/runtime/UniversalPrintPipeline';
@@ -122,6 +123,15 @@ export default function POSProPage() {
   const pos = usePosPro(systemFiscalStampEnabled);
   const posRef = useRef(pos);
   posRef.current = pos;
+
+  // خريطة الكمية (بالوحدات الأساسية) الموجودة في السلة لكل صنف — تُطرح من المخزون المعروض
+  const qtyInCartById = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const i of pos.items) {
+      m.set(i.variant_id, (m.get(i.variant_id) ?? 0) + i.quantity * (i.pack_qty ?? 1));
+    }
+    return m;
+  }, [pos.items]);
 
   // ── تخصيصات الاختصارات المشتركة مع POS الكلاسيكي (تُقرأ مرة واحدة) ─────────
   const kbOverrides    = useKbOverrides(slug);
@@ -907,7 +917,8 @@ export default function POSProPage() {
       pos.items.forEach(item => {
         const variant   = allVariants.find(v => v.id === item.variant_id);
         const origPrice = variant?.default_selling_price_ht;
-        if (origPrice && origPrice !== item.unit_price_ht) pos.updatePrice(item.id, origPrice);
+        const packQty   = item.pack_qty ?? 1;
+        if (origPrice && origPrice * packQty !== item.unit_price_ht) pos.updatePrice(item.id, origPrice * packQty);
       });
       return;
     }
@@ -915,12 +926,13 @@ export default function POSProPage() {
     if (!pl) return;
     pos.items.forEach(item => {
       const variant    = allVariants.find(v => v.id === item.variant_id);
+      const packQty    = item.pack_qty ?? 1;
       const priceEntry = variant?.prices?.find(pr => pr.price_level_id === plId);
       if (priceEntry?.price) {
-        pos.updatePrice(item.id, priceEntry.price);
+        pos.updatePrice(item.id, priceEntry.price * packQty);
       } else if (pl.discount_percent) {
         const origPrice = variant?.default_selling_price_ht ?? item.unit_price_ht;
-        pos.updatePrice(item.id, origPrice * (1 - pl.discount_percent / 100));
+        pos.updatePrice(item.id, origPrice * (1 - pl.discount_percent / 100) * packQty);
       }
     });
   }, [priceLevelsList, allVariants, pos]);
@@ -997,6 +1009,9 @@ export default function POSProPage() {
         const priceHt  = Number(line.unit_price_ht);
         const discPct  = Number(line.discount_percentage);
         const gross    = qty * priceHt;
+        // Frozen packaging qty at time of sale wins over the LIVE packaging row —
+        // the live row's quantity may have changed since the sale.
+        const frozenPackQty = pkgSnap ? Number(pkgSnap) : (pkg ? Number(pkg.quantity) : 1);
         const frozenPerUnit = Number((line as any).discount_amount_per_unit) || 0;
         let discountAmount: number;
         let discountMode: 'percentage' | 'fixed_amount';
@@ -1032,9 +1047,9 @@ export default function POSProPage() {
           manages_stock:       false,
           is_sold_by_weight:   prod?.is_sold_by_weight ?? false,
           packaging_id:        line.packaging_id ?? null,
-          pack_qty:            pkg ? Number(pkg.quantity) : (pkgSnap ? Number(pkgSnap) : 1),
+          pack_qty:            frozenPackQty,
           packaging_label:     pkg?.label ?? null,
-          base_price_ht:       priceHt / ((pkg ? Number(pkg.quantity) : (pkgSnap ? Number(pkgSnap) : 1)) || 1),
+          base_price_ht:       priceHt / (frozenPackQty || 1),
           quantity_discounts:  (prod as any)?.quantity_discounts ?? [],
         };
       });
@@ -1051,12 +1066,12 @@ export default function POSProPage() {
       usePosProCart.setState({ items, client: doc.party ?? null, payments, notes: doc.notes ?? '' });
       usePosProCart.getState().markClean();
       setEditingDocumentId(docId);
-      setEditingDocumentDate(doc.document_date ?? null);
+      setEditingDocumentDate(toLocalDateKey(doc.document_date) || null);
       setEditingDocumentNumber(doc.document_number ?? null);
       usePosProCart.getState().setDocumentMeta({
         id:     docId,
         number: doc.document_number ?? null,
-        date:   doc.document_date ?? null,
+        date:   toLocalDateKey(doc.document_date) || null,
       });
       editingPrevBalanceRef.current = doc.balance_data?.previous_balance ?? null;
       editingDocMetaRef.current = {
@@ -1110,7 +1125,7 @@ export default function POSProPage() {
       const balance = doc.balance_data;
       const snap: POSSaleSnapshot = {
         docNumber: doc.document_number,
-        docDate: doc.document_date?.slice(0, 10) ?? '',
+        docDate: toLocalDateKey(doc.document_date),
         client: doc.party ? { name: doc.party.name, nif: doc.party.nif, phone: doc.party.phone, address: doc.party.address } : null,
         items: (doc.lines ?? []).map(line => ({
           name: line.description ?? line.product?.name ?? '',
@@ -1292,6 +1307,7 @@ export default function POSProPage() {
               onScanCamera={() => setShowScanner(true)}
               keyboardNavEnabled={settings.keyboardNav}
               showStockOnCard={settings.showStockOnCard}
+              qtyInCartById={qtyInCartById}
             />
             <button
               type="button"
@@ -1369,6 +1385,7 @@ export default function POSProPage() {
         clearSearchOnAdd={settings.clearSearchOnAdd}
         keyboardNavEnabled={settings.keyboardNav}
         advanceOnAdd={settings.advanceOnAdd}
+        qtyInCartById={qtyInCartById}
       />
 
       {customerModalOpen && (
