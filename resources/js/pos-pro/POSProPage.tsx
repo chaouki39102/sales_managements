@@ -500,7 +500,7 @@ export default function POSProPage() {
   }, [pos.items, pos.client, pos.totals, adjustedTotalTtcFinal, handlePrintDirect, safeToast, documentTypes, settings.defaultDocTypeCode]);
 
   // ── إضافة منتج من المودال/المسح (يبقى المودال مفتوحاً لإضافة متعددة) ─────
-  const handleAddItem = useCallback(async (v: ProductVariant) => {
+  const handleAddItem = useCallback(async (v: ProductVariant, qty = 1, packaging: ProductPackaging | null = null) => {
     let effective = v;
     if (selectedPriceLevelId != null) {
       const price = getVariantPrice(v, selectedPriceLevelId, priceLevelsList);
@@ -517,9 +517,10 @@ export default function POSProPage() {
       return;
     }
     if (effective.manages_stock && effective.current_stock !== undefined) {
+      const packMult = packaging ? Math.max(1, Number(packaging.quantity) || 1) : 1;
       const existing = posRef.current.items.find(i => i.variant_id === effective.id);
       const already  = existing ? existing.quantity * (existing.pack_qty ?? 1) : 0;
-      if (already + 1 > effective.current_stock) {
+      if (already + qty * packMult > effective.current_stock) {
         const ok = await clearConfirm.confirm(
           `${effective.product?.name ?? ''} — المخزون المتبقي ${effective.current_stock} فقط. هل تريد البيع بالرغم من ذلك؟`,
           { title: 'مخزون غير كافٍ', variant: 'warning', icon: 'ti-alert-triangle' },
@@ -527,7 +528,7 @@ export default function POSProPage() {
         if (!ok) return;
       }
     }
-    const addedId = posRef.current.addItem(effective);
+    const addedId = posRef.current.addItem(effective, qty, packaging);
     if (addedId) setSelectedItemId(addedId);
     if (settings.playSoundOnAdd) playAddSound(settings.soundPreset as SoundPresetId, settings.soundVolume);
     safeToast.success(effective.product?.name ?? 'تمت الإضافة', { id: 'pos-pro-last-added', duration: 1500 });
@@ -550,6 +551,15 @@ export default function POSProPage() {
     const itemName = items.find(i => i.id === targetId)?.product_name ?? '';
     safeToast.success(`${itemName} — الكمية ${qty}`, { id: 'pos-pro-qty-cmd', duration: 1200 });
   }, [selectedItemId, safeToast]);
+
+  // ── تغيير كمية صنف من بطاقة المنتج في المودال (+/−) ───────────────────────
+  // نفس سلوك POS الكلاسيكي: qty<=0 يحذف السطر، وإلا يحدّث كمية أول سطر للصنف.
+  const handleCardQtyChange = useCallback((variantId: number, qty: number) => {
+    const item = posRef.current.items.find(i => i.variant_id === variantId);
+    if (!item) return;
+    if (qty <= 0) posRef.current.removeItem(item.id);
+    else posRef.current.updateQty(item.id, qty);
+  }, []);
 
   // ── حركة التحديد في السلة (الأسهم عندما يكون حقل البحث فارغاً) ────────────
   const moveCartSelection = useCallback((dir: 'up' | 'down') => {
@@ -667,11 +677,16 @@ export default function POSProPage() {
         const baseQty = i.quantity * (i.pack_qty ?? 1);
         const lineDiscAmount = baseQty > 0 ? Math.round((i.discount_amount / baseQty) * 100) / 100 : 0;
         const isFixedAmount  = i.discount_mode === 'fixed_amount' && lineDiscAmount > 0;
+        // Contract: unit_price_ht in the API payload is the PER-UNIT base price.
+        // The backend derives the stored PACK price (per-unit × frozen snapshot).
+        const perUnitPrice = (i.pack_qty && i.pack_qty > 1)
+          ? Math.round((i.unit_price_ht / i.pack_qty) * 10000) / 10000
+          : i.unit_price_ht;
         return {
           product_id:               i.product_id,
           quantity:                 i.quantity,
           pack_qty:                 i.pack_qty ?? 1,
-          unit_price_ht:            i.unit_price_ht,
+          unit_price_ht:            perUnitPrice,
           discount_percentage:      isFixedAmount ? 0 : Math.min(100, compoundedDisc),
           discount_amount:          lineDiscAmount,
           discount_amount_per_unit: isFixedAmount ? lineDiscAmount : null,
@@ -681,7 +696,7 @@ export default function POSProPage() {
       });
 
       const effectiveTotalHt = linesPayload.reduce((s: number, l: Record<string, any>) => {
-        const gross = l.quantity * l.unit_price_ht;
+        const gross = l.quantity * l.unit_price_ht * l.pack_qty;
         const bq = l.quantity * l.pack_qty;
         const disc = l.discount_amount_per_unit
           ? l.discount_amount_per_unit * bq
@@ -689,7 +704,7 @@ export default function POSProPage() {
         return s + gross - disc;
       }, 0);
       const effectiveTotalTva = linesPayload.reduce((s: number, l: Record<string, any>) => {
-        const gross = l.quantity * l.unit_price_ht;
+        const gross = l.quantity * l.unit_price_ht * l.pack_qty;
         const bq = l.quantity * l.pack_qty;
         const disc = l.discount_amount_per_unit
           ? l.discount_amount_per_unit * bq
@@ -1375,13 +1390,17 @@ export default function POSProPage() {
         variants={drawerVariants}
         families={families}
         cartCount={pos.items.length}
+        cartItems={pos.items}
         onAdd={handleAddItem}
         onClose={() => setDrawerOpen(false)}
+        onQty={handleCardQtyChange}
         priceLevels={priceLevelsList}
         selectedPriceLevelId={selectedPriceLevelId}
         priceDisplayMode={settings.priceDisplayMode}
         showStockOnCard={settings.showStockOnCard}
         gridSize={settings.defaultGridSize}
+        defaultView={settings.defaultView}
+        allowNegativeStock={allowNegSetting}
         clearSearchOnAdd={settings.clearSearchOnAdd}
         keyboardNavEnabled={settings.keyboardNav}
         advanceOnAdd={settings.advanceOnAdd}
