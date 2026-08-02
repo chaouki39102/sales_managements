@@ -35,7 +35,7 @@ class BusinessRuleException extends Exception
      * @param int $code كود HTTP (409 افتراضياً)
      * @param \Throwable|null $previous
      */
-    public function __construct(string $message = "Business rule violation", int $code = 409, \Throwable $previous = null)
+    public function __construct(string $message = "Business rule violation", int $code = 409, ?\Throwable $previous = null)
     {
         parent::__construct($message, $code, $previous);
     }

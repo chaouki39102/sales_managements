@@ -175,6 +175,13 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
         $this->recalculateTotals($item);
 
+        // Money gate #2 (stored level): recompute every money field from first
+        // principles and compare against what was stored. Runs inside the DB
+        // transaction BEFORE stock movements / payments / snapshots — a mismatch
+        // rolls the whole transaction back. Protects the accounting ledger from
+        // any client (or code change) that could corrupt prices/totals.
+        app(TransactionIntegrityService::class)->assertStoredDocumentClean($item);
+
         // ✅ حركات المخزون فوراً بعد الإنشاء (لأن الوثيقة معتمدة مباشرةً)
         $item->load('documentType', 'lines.product');
 
@@ -268,6 +275,10 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
         $this->recalculateTotals($item);
 
+        // Money gate #2 (stored level) — same as afterCreate: verify the edited
+        // transaction's money math before stock movements/payments are rewritten.
+        app(TransactionIntegrityService::class)->assertStoredDocumentClean($item);
+
         if (!empty($lines)) {
             $item->load('documentType', 'lines.product');
             if (($item->documentType?->affects_stock_direction ?? 0) !== 0) {
@@ -290,7 +301,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     // OVERRIDE: delete — حذف فعلي مع تنظيف المخزون والمدفوعات
     // ═══════════════════════════════════════════════════════════════════════
 
-    public function delete(Model $item, \Illuminate\Http\Request $request = null): bool
+    public function delete(Model $item, ?\Illuminate\Http\Request $request = null): bool
     {
         $document = $item instanceof CommercialDocument
             ? $item
@@ -510,6 +521,11 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             ?? \App\Models\Setting::getSetting('default_price_level_id', null, $document->company_id);
 
         foreach ($lines as $order => $lineData) {
+            // Money gate #1 (payload level): reject garbage/stale money fields before
+            // anything touches the ledger — negative qty, invalid price, out-of-range
+            // discounts/TVA, or a packaged line with no positive pack factor.
+            app(TransactionIntegrityService::class)->assertPayloadLine($lineData, $order);
+
             // Override TVA rate if party is exempt
             $product = isset($lineData['product_id'])
                 ? Product::find((int) $lineData['product_id'])
@@ -851,9 +867,17 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 )
                 : (float) $line->unit_price_ht;
 
-            // Store cost price on the document line for margin reporting
+            // Store cost price on the document line for margin reporting.
+            // cost_price_ht is stored PER UNIT OF SALE (mirrors unit_price_ht): for a
+            // packaged line that is per-unit cost × packaging_units_snapshot, so report
+            // math `quantity × cost_price_ht` = baseQty × per-unit cost — the SAME basis
+            // as total_ht (`quantity × unit_price_ht` = baseQty × per-unit price).
+            // The stock movement keeps per-unit cost_price / total_price (PMP correctness).
             if ($costPrice > 0) {
-                $line->update(['cost_price_ht' => $costPrice]);
+                $lineCostPrice = ($direction < 0 && $line->packaging_id && $line->packaging_units_snapshot)
+                    ? round($costPrice * (float) $line->packaging_units_snapshot, 4)
+                    : $costPrice;
+                $line->update(['cost_price_ht' => $lineCostPrice]);
             }
 
             StockMovement::create([
