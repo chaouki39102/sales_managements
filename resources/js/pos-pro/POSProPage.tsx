@@ -46,7 +46,7 @@ import { usePOSSettings, checkDiscountAllowed } from '@/pos/hooks/usePOSSettings
 import { usePrintSettings } from '@/pos/hooks/usePrintSettings';
 import { printReceiptDirect } from '@/pos/utils/printUtils';
 import { openCashDrawerViaWebUSB, isWebUsbSupported, printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
-import { playSaleSound } from '@/pos/utils/posSounds';
+import { playSaleSound, playAddSound } from '@/pos/utils/posSounds';
 import type { SoundPresetId } from '@/pos/utils/posSounds';
 import { htToTtc, ttcToHt } from '@/pos/utils/calculations';
 import { renderPreviewToHtml } from '@/pages/settings/print-settings/runtime/renderPreviewToHtml';
@@ -261,6 +261,14 @@ export default function POSProPage() {
     }),
     [rawProducts, stockData],
   );
+
+  // إخفاء النافد من الشبكة (مثل POS الكلاسيكي) — لا يمنع الإضافة عبر الباركود
+  const drawerVariants: ProductVariant[] = useMemo(() => {
+    if (!settings.hideOutOfStock || allowNegSetting) return allVariants;
+    return allVariants.filter(v =>
+      !v.manages_stock || v.current_stock === undefined || v.current_stock > 0,
+    );
+  }, [allVariants, settings.hideOutOfStock, allowNegSetting]);
 
   const families = useMemo(() => Array.from(
     new Map(
@@ -511,8 +519,9 @@ export default function POSProPage() {
     }
     const addedId = posRef.current.addItem(effective);
     if (addedId) setSelectedItemId(addedId);
+    if (settings.playSoundOnAdd) playAddSound(settings.soundPreset as SoundPresetId, settings.soundVolume);
     safeToast.success(effective.product?.name ?? 'تمت الإضافة', { id: 'pos-pro-last-added', duration: 1500 });
-  }, [selectedPriceLevelId, priceLevelsList, allowNegSetting, safeToast, clearConfirm]);
+  }, [selectedPriceLevelId, priceLevelsList, allowNegSetting, safeToast, clearConfirm, settings.playSoundOnAdd, settings.soundPreset, settings.soundVolume]);
 
   // ── أمر الكمية في حقل البحث: *رقم + Enter يضبط كمية الصنف المحدد ──────────
   const handleQtyCommand = useCallback((qty: number) => {
@@ -592,12 +601,12 @@ export default function POSProPage() {
       pos.bumpSaleNumber();
       setSelectedItemId(null);
     };
-    if (st.items.length > 0) {
+    if (settings.confirmOnClear) {
       clearConfirm.confirm('إغلاق السلة الحالية؟ ستفقد أصنافها.').then(ok => { if (ok) doClose(); });
     } else {
       doClose();
     }
-  }, [clearConfirm, clearEditingState, pos]);
+  }, [clearConfirm, clearEditingState, pos, settings.confirmOnClear]);
 
   // ── إتمام البيع ───────────────────────────────────────────────────────────
   const handleCompleteSale = useCallback(async (params: {
@@ -809,6 +818,13 @@ export default function POSProPage() {
         else if (action === 'print' && isPrintEnabled && template) st(() => { const snap = receiptSnapshotRef.current; if (snap) handlePrintDirect(snap); }, 300);
       }
 
+      const willShowPreview = params.skipPreview
+        ? settings.quickCashAction === 'preview'
+        : settings.afterSaleAction === 'preview';
+      if (settings.autoClosePayment && !willShowPreview) {
+        st(() => setReceiptOpen(false), 1200);
+      }
+
       safeToast.success(`تم حفظ الفاتورة ${res.document_number ?? ''}`);
       if (settings.playSoundOnSale) playSaleSound(settings.soundPreset as SoundPresetId, settings.soundVolume);
 
@@ -922,6 +938,40 @@ export default function POSProPage() {
       requestedDiscount: pct,
       reason: 'pin_required',
       onSuccess: () => posRef.current.setInvoiceDiscountPct(pct),
+    });
+  }, [settings, safeToast]);
+
+  // ── خصم صنف مع بوابة المدير (PIN) ───────────────────────────────────────
+  const handleItemDiscount = useCallback((id: string, pct: number) => {
+    const check = checkDiscountAllowed(pct, settings);
+    if (check.allowed) { posRef.current.updateDiscount(id, pct); return; }
+    if (check.reason === 'max_exceeded') {
+      safeToast.error(`الخصم ${pct}% تجاوز الحد الأقصى (${settings.maxDiscountPct}%)`);
+      return;
+    }
+    setPinModal({
+      requestedDiscount: pct,
+      reason: 'pin_required',
+      onSuccess: () => posRef.current.updateDiscount(id, pct),
+    });
+  }, [settings, safeToast]);
+
+  const handleItemDiscountAmount = useCallback((id: string, amount: number) => {
+    const items = posRef.current.items;
+    const item  = items.find(i => i.id === id);
+    const gross = item ? item.unit_price_ht * item.quantity : 0;
+    const pct   = gross > 0 ? Math.min(100, (amount / gross) * 100) : 0;
+    if (pct <= 0) { posRef.current.updateDiscountAmount(id, amount); return; }
+    const check = checkDiscountAllowed(pct, settings);
+    if (check.allowed) { posRef.current.updateDiscountAmount(id, amount); return; }
+    if (check.reason === 'max_exceeded') {
+      safeToast.error(`الخصم ${pct.toFixed(1)}% تجاوز الحد الأقصى (${settings.maxDiscountPct}%)`);
+      return;
+    }
+    setPinModal({
+      requestedDiscount: pct,
+      reason: 'pin_required',
+      onSuccess: () => posRef.current.updateDiscountAmount(id, amount),
     });
   }, [settings, safeToast]);
 
@@ -1157,7 +1207,14 @@ export default function POSProPage() {
     },
     {
       toggleFullscreen,
-      handleClearCart: () => clearConfirm.confirm('مسح السلة بالكامل؟').then(ok => { if (ok) { clearEditingState(); pos.clearCart(); setSelectedItemId(null); } }),
+      handleClearCart: () => {
+        const doClear = () => { clearEditingState(); pos.clearCart(); setSelectedItemId(null); };
+        if (settings.confirmOnClear) {
+          clearConfirm.confirm('مسح السلة بالكامل؟').then(ok => { if (ok) doClear(); });
+        } else {
+          doClear();
+        }
+      },
       handleOpenDrawer: () => void handleOpenDrawer(),
       handleQuickCash: () => { void handleQuickPay(cashMode); },
       handlePrintCart,
@@ -1233,6 +1290,8 @@ export default function POSProPage() {
               onQtyCommand={handleQtyCommand}
               onCartNav={(dir) => moveCartSelection(dir)}
               onScanCamera={() => setShowScanner(true)}
+              keyboardNavEnabled={settings.keyboardNav}
+              showStockOnCard={settings.showStockOnCard}
             />
             <button
               type="button"
@@ -1253,13 +1312,20 @@ export default function POSProPage() {
               invoiceDiscountPct={pos.invoiceDiscountPct}
               totals={pos.totals}
               onQty={pos.updateQty}
-              onDiscount={pos.updateDiscount}
-              onDiscountAmount={pos.updateDiscountAmount}
+              onDiscount={handleItemDiscount}
+              onDiscountAmount={handleItemDiscountAmount}
               onPrice={pos.updatePrice}
               onPackaging={pos.updatePackaging}
               onWeight={(item) => setWeightTarget({ mode: 'edit', item })}
               onRemove={(id) => { pos.removeItem(id); setSelectedItemId(prev => prev === id ? null : prev); }}
-              onClear={() => clearConfirm.confirm('مسح السلة بالكامل؟').then(ok => { if (ok) { clearEditingState(); pos.clearCart(); setSelectedItemId(null); } })}
+              onClear={() => {
+                const doClear = () => { clearEditingState(); pos.clearCart(); setSelectedItemId(null); };
+                if (settings.confirmOnClear) {
+                  clearConfirm.confirm('مسح السلة بالكامل؟').then(ok => { if (ok) doClear(); });
+                } else {
+                  doClear();
+                }
+              }}
               onInvoiceDiscountChange={handleInvoiceDiscountChange}
               onOpenProducts={() => setDrawerOpen(true)}
               priceLevels={priceLevelsList}
@@ -1290,13 +1356,19 @@ export default function POSProPage() {
       {/* مودال المنتجات — يبقى مفتوحاً أثناء الإضافة */}
       <POSProProductDrawer
         open={drawerOpen}
-        variants={allVariants}
+        variants={drawerVariants}
         families={families}
         cartCount={pos.items.length}
         onAdd={handleAddItem}
         onClose={() => setDrawerOpen(false)}
         priceLevels={priceLevelsList}
         selectedPriceLevelId={selectedPriceLevelId}
+        priceDisplayMode={settings.priceDisplayMode}
+        showStockOnCard={settings.showStockOnCard}
+        gridSize={settings.defaultGridSize}
+        clearSearchOnAdd={settings.clearSearchOnAdd}
+        keyboardNavEnabled={settings.keyboardNav}
+        advanceOnAdd={settings.advanceOnAdd}
       />
 
       {customerModalOpen && (

@@ -22,6 +22,10 @@ interface Props {
   onCartNav?:   (dir: 'up' | 'down') => void;
   /** فتح مسح الباركود بالكاميرا (زر الكاميرا) */
   onScanCamera?: () => void;
+  /** ↑↓ للتنقل بين النتائج (إعداد POS) */
+  keyboardNavEnabled?: boolean;
+  /** إظهار شارة المخزون في النتائج (إعداد POS) */
+  showStockOnCard?: boolean;
 }
 
 function variantMatches(v: ProductVariant, q: string): boolean {
@@ -44,7 +48,7 @@ function variantExactBarcode(v: ProductVariant, code: string): boolean {
   );
 }
 
-export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRef, onQtyCommand, onCartNav, onScanCamera }: Props) {
+export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRef, onQtyCommand, onCartNav, onScanCamera, keyboardNavEnabled = true, showStockOnCard = true }: Props) {
   const [code, setCode] = useState('');
   const [open, setOpen] = useState(false);
   const [hi, setHi]     = useState(0);
@@ -133,12 +137,14 @@ export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRe
       }
     }
     if (e.key === 'ArrowDown') {
+      if (!keyboardNavEnabled) return;
       e.preventDefault();
       setOpen(true);
       if (results.length > 0) setHi(h => Math.min(h + 1, results.length - 1));
       return;
     }
     if (e.key === 'ArrowUp') {
+      if (!keyboardNavEnabled) return;
       e.preventDefault();
       if (results.length > 0) setHi(h => Math.max(h - 1, 0));
       return;
@@ -221,7 +227,7 @@ export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRe
                   <span className="pp-scanbar-dd-main">
                     <span className="pp-scanbar-dd-name">
                       <span className="pp-scanbar-dd-name-txt">{v.product?.name ?? ''}</span>
-                      {showStock && <span className={stockCls}>{stock <= 0 ? 'نفد' : `متوفر: ${stock}`}</span>}
+                      {showStockOnCard && showStock && <span className={stockCls}>{stock <= 0 ? 'نفد' : `متوفر: ${stock}`}</span>}
                     </span>
                     <span className="pp-scanbar-dd-sub">{v.ref || v.barcode || ''}</span>
                   </span>

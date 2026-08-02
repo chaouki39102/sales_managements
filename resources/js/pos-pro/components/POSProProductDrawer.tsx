@@ -9,12 +9,21 @@
 //     أصناف ثم يغلق بـ "تم" أو Escape.
 //  3. البحث فوري بالكامل على العميل (مصفوفة المتغيرات كاملة في الذاكرة)،
 //     وحقل باركود مخصص: Enter → إضافة فورية للصنف دون مغادرة الحقل.
+//
+// يحترم إعدادات POS (قابلة للإيقاف من POSSettingsModal):
+//  • keyboardNavEnabled — الأسهم ↑↓ تتنقل في الشبكة و Enter تضيف الصنف المميز
+//  • advanceOnAdd       — بعد الإضافة يتقدم التمييز للصنف التالي (إضافة متسلسلة)
+//  • clearSearchOnAdd   — بعد الإضافة يُفرَّغ حقل البحث (يتعارض عمداً مع advance)
+//  • priceDisplayMode   — السعر الرئيسي الكبير: TTC أو HT
+//  • showStockOnCard    — إظهار شارة المخزون على البطاقة
+//  • gridSize           — حجم شبكة المنتجات (xs/sm/md/lg)
 // ════════════════════════════════════════════════════════════════════════════
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Modal from '@/components/ui/Modal';
 import { formatDZD } from '@/pos/utils/calculations';
 import { getVariantPrice } from '@/pos/utils/posHelpers';
 import type { ProductVariant, Family, PriceLevel } from '@/types';
+import type { GridDefaultSize, PriceDisplayMode } from '@/pos/hooks/usePOSSettings';
 
 interface Props {
   open:        boolean;
@@ -25,6 +34,12 @@ interface Props {
   onClose:     () => void;
   priceLevels?: PriceLevel[];
   selectedPriceLevelId?: number | null;
+  priceDisplayMode?: PriceDisplayMode;
+  showStockOnCard?: boolean;
+  gridSize?: GridDefaultSize;
+  clearSearchOnAdd?: boolean;
+  keyboardNavEnabled?: boolean;
+  advanceOnAdd?: boolean;
 }
 
 function StockBadge({ v }: { v: ProductVariant }) {
@@ -38,11 +53,15 @@ function StockBadge({ v }: { v: ProductVariant }) {
 export default function POSProProductDrawer({
   open, variants, families, cartCount, onAdd, onClose,
   priceLevels = [], selectedPriceLevelId = null,
+  priceDisplayMode = 'ttc', showStockOnCard = true, gridSize = 'md',
+  clearSearchOnAdd = false, keyboardNavEnabled = true, advanceOnAdd = true,
 }: Props) {
   const [query, setQuery]     = useState('');
   const [familyId, setFamilyId] = useState<number | null>(null);
   const [scanInput, setScanInput] = useState('');
+  const [hi, setHi]           = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
+  const cardRefs  = useRef(new Map<number, HTMLButtonElement>());
 
   useEffect(() => {
     if (open) {
@@ -73,6 +92,42 @@ export default function POSProProductDrawer({
     );
   }, [variants, familyId, query]);
 
+  // أعد التمييز لأول نتيجة عند تغيّر القائمة المفلترة
+  useEffect(() => { setHi(0); }, [filtered.length]);
+
+  // مرّر البطاقة المميزة لتبقى ظاهرة
+  useEffect(() => {
+    const el = cardRefs.current.get(hi);
+    if (el) el.scrollIntoView({ block: 'nearest' });
+  }, [hi]);
+
+  const handleAdd = useCallback((v: ProductVariant) => {
+    onAdd(v);
+    if (clearSearchOnAdd) setQuery('');
+    else if (advanceOnAdd && filtered.length > 0) {
+      setHi(h => (h + 1 < filtered.length ? h + 1 : 0));
+    }
+    searchRef.current?.focus();
+  }, [onAdd, clearSearchOnAdd, advanceOnAdd, filtered.length]);
+
+  // لوحة المفاتيح على حقل البحث: ↑↓ تتنقل في الشبكة (عند تفعيل keyboardNav)
+  // و Enter يضيف الصنف المميز (أو أول نتيجة عند تعطيل الأسهم — مثل POS الكلاسيكي)
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (filtered.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      if (!keyboardNavEnabled) return;
+      e.preventDefault();
+      setHi(h => (h + 1 < filtered.length ? h + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      if (!keyboardNavEnabled) return;
+      e.preventDefault();
+      setHi(h => (h - 1 + filtered.length) % filtered.length);
+    } else if (e.key === 'Enter') {
+      const v = filtered[Math.min(hi, filtered.length - 1)];
+      if (v) { e.preventDefault(); handleAdd(v); }
+    }
+  };
+
   // مطابقة الباركود بالضبط (أسرع من البحث النصي — يدعم الكاشير السريع)
   const handleScanEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter') return;
@@ -83,7 +138,7 @@ export default function POSProProductDrawer({
       (v as any).barcodes?.some((bc: { barcode: string }) => bc.barcode === code),
     );
     if (hit) {
-      onAdd(hit);
+      handleAdd(hit);
       setScanInput('');
     } else {
       const box = e.currentTarget;
@@ -122,6 +177,7 @@ export default function POSProProductDrawer({
               ref={searchRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
               placeholder="ابحث بالاسم أو الباركود أو الرمز…"
             />
             {query && (
@@ -168,29 +224,33 @@ export default function POSProProductDrawer({
         </div>
 
         {/* الشبكة */}
-        <div className="pp-grid">
-          {filtered.map(v => {
+        <div className={`pp-grid pp-grid--${gridSize}`}>
+          {filtered.map((v, i) => {
             const tvaRate = v.tva?.rate ?? 0;
             const priceHt = getVariantPrice(v, selectedPriceLevelId, priceLevels);
             const priceTtc = priceHt * (1 + tvaRate / 100);
             const isLevelPriced = selectedPriceLevelId != null && priceHt !== v.default_selling_price_ht;
             const img = (v as any).image_url ?? v.product?.default_image ?? v.product?.images?.[0] ?? null;
+            const primary = priceDisplayMode === 'ht' ? priceHt : priceTtc;
+            const secondary = priceDisplayMode === 'ht' ? priceTtc : priceHt;
             return (
               <button
                 key={v.id}
+                ref={(el) => { if (el) cardRefs.current.set(i, el); else cardRefs.current.delete(i); }}
                 type="button"
-                className="pp-card"
-                onClick={() => onAdd(v)}
+                className={`pp-card${i === hi ? ' pp-card--hi' : ''}`}
+                onMouseEnter={() => setHi(i)}
+                onClick={() => handleAdd(v)}
               >
                 <div className="pp-card-img">
                   {img ? <img src={img} alt="" loading="lazy" /> : <i className="ti ti-package" />}
                 </div>
                 <div className="pp-card-name">{v.product?.name ?? ''}</div>
                 <div className="pp-card-ref">{v.ref || v.barcode || ''}</div>
-                <div className={`pp-card-price${isLevelPriced ? ' pp-card-price--lvl' : ''}`}>{formatDZD(priceTtc)}</div>
+                <div className={`pp-card-price${isLevelPriced ? ' pp-card-price--lvl' : ''}`}>{formatDZD(primary)}</div>
                 <div className="pp-card-bottom">
-                  <StockBadge v={v} />
-                  <span className="pp-card-ht">{formatDZD(priceHt)}</span>
+                  {showStockOnCard && <StockBadge v={v} />}
+                  <span className="pp-card-ht">{formatDZD(secondary)}</span>
                 </div>
               </button>
             );

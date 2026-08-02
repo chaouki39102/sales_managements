@@ -936,7 +936,37 @@ function POSPage() {
     });
   }, [priceLevelsList, allVariants, pos]);
 
-  // ── Print Settings ──────────────────────────────────────────────────────────
+  // ── Per-item discount gate (maxDiscountPct + PIN) ─────────────────────────
+  const handleItemDiscount = useCallback((id: string, pct: number) => {
+    const check = checkDiscountAllowed(pct, settings);
+    if (!check.allowed && check.reason === 'max_exceeded') {
+      safeToast.error(`الخصم ${pct}% تجاوز الحد الأقصى (${settings.maxDiscountPct}%)`);
+      return;
+    }
+    if (!check.allowed && check.reason === 'pin_required') {
+      setPinModal({ requestedDiscount: pct, reason: 'pin_required', onSuccess: () => pos.updateDiscount(id, pct) });
+      return;
+    }
+    pos.updateDiscount(id, pct);
+  }, [settings, pos, safeToast]);
+
+  const handleItemDiscountAmount = useCallback((id: string, amount: number) => {
+    const item  = pos.items.find(i => i.id === id);
+    const gross = item ? item.unit_price_ht * item.quantity : 0;
+    const pct   = gross > 0 ? Math.min(100, (amount / gross) * 100) : 0;
+    if (pct <= 0) { pos.updateDiscountAmount(id, amount); return; }
+    const check = checkDiscountAllowed(pct, settings);
+    if (!check.allowed && check.reason === 'max_exceeded') {
+      safeToast.error(`الخصم ${pct.toFixed(1)}% تجاوز الحد الأقصى (${settings.maxDiscountPct}%)`);
+      return;
+    }
+    if (!check.allowed && check.reason === 'pin_required') {
+      setPinModal({ requestedDiscount: pct, reason: 'pin_required', onSuccess: () => pos.updateDiscountAmount(id, amount) });
+      return;
+    }
+    pos.updateDiscountAmount(id, amount);
+  }, [settings, pos, safeToast]);
+
   const { template, enabled: isPrintEnabled, copies: dbCopies, paperWidth }
     = usePrintSettings('POS');
 
@@ -1804,8 +1834,8 @@ const handleCompleteSale = useCallback(async (params: {
           note={cartNote} selectedItemId={selectedCartItemId}
           onSelectItem={setSelectedCartItemId}
           onQty={pos.updateQty}
-          onDiscount={pos.updateDiscount}
-          onDiscountAmount={pos.updateDiscountAmount}          // ✅ جديد
+          onDiscount={handleItemDiscount}
+          onDiscountAmount={handleItemDiscountAmount}
           onPrice={pos.updatePrice}
           onRemove={id => { pos.removeItem(id); if (selectedCartItemId === id) setSelectedCartItemId(null); }}
           onUpdatePackaging={pos.updatePackaging}

@@ -35,11 +35,11 @@ Classic POS features **not yet applied in POS Pro** (verified against `resources
 
 ## Settings / UI
 
-- [ ] **Add sound** (`playSoundOnAdd`) — POS Pro only plays the sale sound
+- [x] **Add sound** (`playSoundOnAdd`) — wired in `handleAddItem` (Aug 2, Phase 48)
 - [ ] **Kiosk mode** — touch-only POS kiosk (`POSKioskPage`)
 - [ ] **Mobile tabs** — Products/Cart bottom tabs with total + sell button
 - [ ] **Device name chip** in the header
-- [ ] **`hideOutOfStock` / `clearSearchOnAdd` toggles** — settings exist but are not wired in POS Pro
+- [x] **`hideOutOfStock` / `clearSearchOnAdd` toggles** — wired in the product drawer (Aug 2, Phase 48); also `keyboardNav` / `advanceOnAdd` / `priceDisplayMode` / `showStockOnCard` / `defaultGridSize` / `confirmOnClear` / `autoClosePayment`
 
 ## Keyboard
 
@@ -47,7 +47,7 @@ Classic POS features **not yet applied in POS Pro** (verified against `resources
 
 ## Already covered (no work needed)
 
-Payments (numpad, quick amounts, quick cash, multiple methods, credit, change, auto-close), weight modal, item/invoice discounts (incl. % / amount / PIN gate / quantity tiers), held-cart tabs, returns, session open/close, customer balance (re-check on client change), thermal/browser printing, price levels, packaging-in-cart, fiscal stamp, invoice reopen/edit, camera barcode scan, `*N` qty-in-search, remappable keyboard shortcuts, cart virtualization, row-style toggle.
+Payments (numpad, quick amounts, quick cash, multiple methods, credit, change, auto-close), weight modal, item/invoice discounts (incl. % / amount / PIN gate / quantity tiers — per-item gate added Aug 2), held-cart tabs, returns, session open/close, customer balance (re-check on client change), thermal/browser printing, price levels, packaging-in-cart, fiscal stamp, invoice reopen/edit, camera barcode scan, `*N` qty-in-search, remappable keyboard shortcuts, cart virtualization, row-style toggle, all 9 settings-compliance toggles (Aug 2, Phase 48).
 
 ## Priority
 

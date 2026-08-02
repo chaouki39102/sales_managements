@@ -1340,6 +1340,16 @@
   padding: 2px;
 }
 
+.pp-grid--xs { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+.pp-grid--sm { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+.pp-grid--md { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.pp-grid--lg { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+
+.pp-card--hi {
+  border-color: var(--em);
+  box-shadow: var(--shadow2);
+}
+
 .pp-card {
   display: flex;
   flex-direction: column;

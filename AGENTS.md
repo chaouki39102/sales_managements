@@ -5,7 +5,32 @@
 - **When reading how API data is returned**, ALWAYS check `extractData()` in `resources/js/lib/api/core/client.ts` — it is the single standard bridge between backend and frontend. Never assume the raw HTTP response shape reaches consumers directly.
 
 ## Date
-2026-08-01
+2026-08-02
+
+### Phase 48 — POS Settings-Compliance: Per-Item Discount Gate + POS Pro Toggle Wiring (Aug 2)
+
+**Request (from the Phase 45 settings-compliance audit)**: the per-item cart discount (both POSes) bypassed `maxDiscountPct`/`discountRequirePin` (only the *invoice* discount was gated), `autoClosePayment` was dead in POS Pro, and 9 POS settings were silently ignored by POS Pro. All fixed.
+
+**1. Per-item discount gate (classic + Pro)** — the per-item discount stores (`useCartStore`/`usePosProCart` `updateDiscount`/`updateDiscountAmount`) have NO access to settings and only clamp 0–100% / ≥0, so gating lives in the UI layer:
+- `POSPage.tsx` — new `handleItemDiscount(id,pct)` / `handleItemDiscountAmount(id,amount)`; wired into `ProfessionalCart` via `onDiscount`/`onDiscountAmount` (replacing the raw store actions). Amount mode derives an effective pct for the gate via `gross = unit_price_ht × quantity; pct = min(100, amount/gross×100)` — matches `recalcItem`'s fixed-amount semantics (amount is a TOTAL line discount). `max_exceeded` → toast; `pin_required` → `setPinModal({..., onSuccess})` reusing the invoice gate's `ManagerPinModal`; the `onSuccess` closure closes over the item id so the PIN applies to that exact row.
+- `POSProPage.tsx` — same two handlers against `posRef.current` (ref keeps them fresh, deps stay `[settings, safeToast]`), reusing the existing `pinModal` state; wired into `POSProCart` via `onDiscount`/`onDiscountAmount`.
+- **Architectural rule**: a per-item discount gate must be implemented at the UI handler boundary (CartRow/PPRow popover → page handler), never inside the stores (no settings access) and never by mutating the store's public actions. The effective-pct derivation for the amount mode must mirror `recalcItem` (amount is a TOTAL, pct = amount/gross×100), NOT `amount/unit_price_ht` (per-unit) — that was the Phase 25/26 trap.
+
+**2. `autoClosePayment` wired in POS Pro** — classic already consumed it (`POSPage.tsx` closes the modal 1200ms after a printed, non-preview sale). POS Pro had zero references. Mirror exactly: after a successful sale, `willShowPreview = skipPreview ? quickCashAction==='preview' : afterSaleAction==='preview'`; when `autoClosePayment && !willShowPreview` → `setReceiptOpen(false)` after 1200ms. In the preview path the receipt stays open (user interaction), matching classic.
+
+**3. POS Pro toggle wiring** (9 previously-ignored settings now consumed):
+- `playSoundOnAdd` — `playAddSound(settings.soundPreset, settings.soundVolume)` in `handleAddItem` (import updated).
+- `clearSearchOnAdd` — passed to `POSProProductDrawer`; after add clears the query (default `false` — the drawer stays open for multi-add by design). The scanbar already always clears on pick (scanner ergonomics) — unchanged.
+- `advanceOnAdd` — drawer highlight advances to the next result after add (`setHi(h => h+1 mod len)`, mirrors classic wrap-to-0). Mutually exclusive with `clearSearchOnAdd` by construction (advance branch only when not clearing).
+- `keyboardNavEnabled` — gates ArrowUp/Down over the **scanbar dropdown results** AND the **drawer grid** (new `hi` highlight + scroll-into-view via `cardRefs`). Enter still adds the highlighted/first result when arrows are disabled (matches classic's "keyboardNav off → Enter adds first result"). The scanbar's *empty-field cart-row* arrows (Phase 39 feature) stay independent of this setting.
+- `priceDisplayMode` — drawer card main price switches TTC↔HT; the secondary `.pp-card-ht` shows the other.
+- `showStockOnCard` — gates the `StockBadge` in the drawer AND the stock chip in the scanbar dropdown.
+- `hideOutOfStock` — new `drawerVariants` memo filters `!manages_stock || current_stock === undefined || current_stock > 0` (skipped when `allowNegSetting`), mirroring classic line-for-line; the scanbar still sees `allVariants` so barcode adds of out-of-stock items still work.
+- `defaultGridSize` — drawer grid gets `pp-grid--xs|sm|md|lg` column classes (96/120/150/200px minmax) + `.pp-card--hi` highlight style added to `pos-pro.css`.
+- `confirmOnClear` — gates the confirm in the cart clear button, the keyboard clear shortcut, and `handleCloseCurrent`; `handleCloseHeld` still always confirms (deletes a persisted cart).
+
+**Verification**: `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors, 185 precache entries, `root sw == build sw: True` (SW MATCH).
+
 
 ### Phase 46 — POS Reopen-Edit Bug: Document Provenance Survives Hold/Restore (Aug 1)
 
