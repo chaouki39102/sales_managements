@@ -152,6 +152,7 @@ export interface PortalDashboard {
 export const portalApi = {
   login:    (email: string, password: string) =>
     portalPost<PortalLoginResponse>('/portal/auth/login', { email, password }),
+  company:  ()    => portalGet<PortalCompany>('/portal/info'),
   me:       ()    => portalGet<PortalUser>('/portal/auth/me'),
   logout:   ()    => portalPost<void>('/portal/auth/logout'),
   dashboard:()    => portalGet<PortalDashboard>('/portal/dashboard'),

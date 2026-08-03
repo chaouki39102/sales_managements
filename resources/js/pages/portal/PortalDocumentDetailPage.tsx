@@ -7,11 +7,12 @@ import { portalApi } from '@/lib/api/portal/portal';
 import { fmtMoney, fmtMoneySigned, fmtDate, StatusBadge, PortalLoading, PortalError } from './portalUtils';
 
 export default function PortalDocumentDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const { id, slug } = useParams<{ id: string; slug: string }>();
   const docId = Number(id);
+  const base = `/portal/${slug}`;
 
   const { data: doc, isLoading, isError, error } = useQuery({
-    queryKey: ['portal', 'document', docId],
+    queryKey: ['portal', slug, 'document', docId],
     queryFn: () => portalApi.document(docId),
     enabled: !!docId && Number.isFinite(docId),
   });
@@ -23,7 +24,7 @@ export default function PortalDocumentDetailPage() {
     <>
       <div className="portal-doc-hd">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Link to="/portal/documents" className="portal-btn" style={{ padding: '7px 10px' }}>
+          <Link to={`${base}/documents`} className="portal-btn" style={{ padding: '7px 10px' }}>
             <i className="ti ti-chevron-right" />
           </Link>
           <div>

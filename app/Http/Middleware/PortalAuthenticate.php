@@ -57,6 +57,17 @@ class PortalAuthenticate
             );
         }
 
+        // فحص أمان إضافي: المؤسسة في الرابط {company} (يضبطها
+        // portal.company) يجب أن تطابق مؤسسة زبون البوابة نفسه.
+        $routeCompany = $request->input('_portal_company');
+        if ($routeCompany && (int) $routeCompany->id !== (int) $company->id) {
+            return $this->fail(
+                403,
+                'COMPANY_MISMATCH',
+                'لا تملك صلاحية الوصول لهذه المؤسسة.'
+            );
+        }
+
         // تحديث آخر استخدام للتوكن (كل طلب)
         $this->accessToken?->forceFill(['last_used_at' => now()])->save();
 

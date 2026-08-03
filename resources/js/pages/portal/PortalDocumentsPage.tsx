@@ -2,15 +2,17 @@
 // pages/portal/PortalDocumentsPage.tsx — قائمة مستندات الزبون (ترحيل)
 // ════════════════════════════════════════════════════════════════════════════
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { portalApi } from '@/lib/api/portal/portal';
 import { fmtMoney, fmtDate, StatusBadge, Pager, PortalLoading, PortalError, PortalEmpty } from './portalUtils';
 
 export default function PortalDocumentsPage() {
+  const { slug } = useParams<{ slug: string }>();
+  const base = `/portal/${slug}`;
   const [page, setPage] = useState(1);
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['portal', 'documents', page],
+    queryKey: ['portal', slug, 'documents', page],
     queryFn: () => portalApi.documents(page, 15),
     placeholderData: keepPreviousData,
   });
@@ -40,7 +42,7 @@ export default function PortalDocumentsPage() {
             <tbody>
               {rows.map((d) => (
                 <tr key={d.id}>
-                  <td><Link className="tbl-link" to={`/portal/documents/${d.id}`}>{d.document_number}</Link></td>
+                  <td><Link className="tbl-link" to={`${base}/documents/${d.id}`}>{d.document_number}</Link></td>
                   <td>{fmtDate(d.document_date)}</td>
                   <td>{d.type_name}</td>
                   <td>{d.due_date ? fmtDate(d.due_date) : '—'}</td>

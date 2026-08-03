@@ -20,7 +20,7 @@ class Company extends Model
     protected $table = 'companies';
 
     protected $fillable = [
-        'name', 'commercial_name', 'slug', 'activity',
+        'name', 'commercial_name', 'slug', 'portal_slug', 'activity',
         'rc', 'rc_date', 'nif', 'nis', 'ai', 'legal_form_id', 'capital_amount',
         'address', 'commune_id', 'wilaya_id', 'phone', 'mobile', 'fax', 'email', 'avatar',
         'bank_name', 'rib',
@@ -379,6 +379,17 @@ class Company extends Model
             $i++;
         }
         return $slug;
+    }
+
+    /**
+     * تطبيع رابط بوابة الزبائن: أحرف صغيرة + أرقام + شرطات فقط.
+     */
+    public static function sanitizePortalSlug(string $value): string
+    {
+        $slug = mb_strtolower(trim($value), 'UTF-8');
+        $slug = (string) preg_replace('/[^a-z0-9]+/', '-', $slug);
+        $slug = trim($slug, '-');
+        return mb_substr($slug, 0, 50);
     }
 
     public function getSetting(string $key, mixed $default = null): mixed

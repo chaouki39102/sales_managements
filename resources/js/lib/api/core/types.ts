@@ -64,6 +64,7 @@ export interface ActiveCompany {
   id:               number;
   name:             string;
   slug:             string;
+  portal_slug?:     string | null;
   commercial_name?: string | null;
   address?:         string | null;
   phone?:           string | null;
@@ -90,6 +91,7 @@ export interface Company extends BaseModel {
   name:             string;
   commercial_name?: string | null;
   slug:             string;
+  portal_slug?:     string | null;
   activity?:        string | null;
   email?:           string | null;
   phone?:           string | null;

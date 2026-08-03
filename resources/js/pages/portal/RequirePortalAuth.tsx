@@ -1,9 +1,9 @@
 // ════════════════════════════════════════════════════════════════════════════
 // pages/portal/RequirePortalAuth.tsx — حارس بوابة الزبائن
-// يعيد التوجيه إلى /portal/login إذا لم يكن هناك رمز portal_token
+// يعيد التوجيه إلى /portal/{slug}/login إذا لم يكن هناك رمز portal_token
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useState } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { portalApi } from '@/lib/api/portal/portal';
 import { portalTokenStorage } from '@/lib/api/portal/client';
@@ -12,14 +12,16 @@ import { PortalLoading } from './portalUtils';
 
 export default function RequirePortalAuth({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const { slug } = useParams<{ slug: string }>();
   const portalUser = usePortalStore((s) => s.portalUser);
   const [checked, setChecked] = useState(false);
   const [valid, setValid] = useState(true);
 
   const hasToken = !!portalTokenStorage.get();
+  const loginTo = slug ? `/portal/${slug}/login` : '/portal/login';
 
   useQuery({
-    queryKey: ['portal', 'me'],
+    queryKey: ['portal', slug, 'me'],
     queryFn: async () => {
       try {
         const me = await portalApi.me();
@@ -39,13 +41,13 @@ export default function RequirePortalAuth({ children }: { children: React.ReactN
     staleTime: Infinity,
   });
 
-  if (!hasToken) return <Navigate to="/portal/login" replace state={{ from: location }} />;
+  if (!hasToken) return <Navigate to={loginTo} replace state={{ from: location }} />;
 
   // إذا كان المستخدم معرّفاً أصلاً فلا داعي لانتظار الفحص
   if (portalUser) return <>{children}</>;
 
   if (!checked) return <PortalLoading text="جاري التحقق من الجلسة..." />;
-  if (!valid) return <Navigate to="/portal/login" replace state={{ from: location }} />;
+  if (!valid) return <Navigate to={loginTo} replace state={{ from: location }} />;
 
   return <>{children}</>;
 }

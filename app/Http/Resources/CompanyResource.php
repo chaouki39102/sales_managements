@@ -14,6 +14,7 @@ class CompanyResource extends JsonResource
             'name'                => $this->name,
             'commercial_name'     => $this->commercial_name,
             'slug'                => $this->slug,
+            'portal_slug'         => $this->portal_slug,
             'activity'            => $this->activity,
             'rc'                  => $this->rc,
             'nif'                 => $this->nif,

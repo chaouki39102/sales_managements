@@ -1,8 +1,9 @@
 // ════════════════════════════════════════════════════════════════════════════
-// pages/portal/PortalLoginPage.tsx — تسجيل دخول الزبون إلى البوابة
+// pages/portal/PortalLoginPage.tsx — تسجيل دخول الزبون إلى البوابة (لكل مؤسسة)
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { portalApi } from '@/lib/api/portal/portal';
 import { usePortalStore } from '@/lib/store/portalStore';
 import { portalTokenStorage } from '@/lib/api/portal/client';
@@ -11,13 +12,23 @@ import { PortalError } from './portalUtils';
 export default function PortalLoginPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const returnPath = params.get('return') || '/portal';
+  const { slug } = useParams<{ slug: string }>();
+  const base = `/portal/${slug}`;
+  const returnPath = params.get('return');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const { data: company } = useQuery({
+    queryKey: ['portal', slug, 'info'],
+    queryFn: () => portalApi.company(),
+    enabled: !!slug,
+    staleTime: Infinity,
+    retry: false,
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +42,8 @@ export default function PortalLoginPage() {
       const res = await portalApi.login(email, password);
       portalTokenStorage.set(res.token);
       usePortalStore.getState().setPortalUser(res.portal_user);
-      navigate(returnPath.startsWith('/portal') ? returnPath : '/portal', { replace: true });
+      const target = returnPath?.startsWith(base) ? returnPath : base;
+      navigate(target, { replace: true });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'بيانات الدخول غير صحيحة';
       setError(msg);
@@ -44,7 +56,7 @@ export default function PortalLoginPage() {
     <div className="portal-login">
       <div className="portal-login-box">
         <div className="portal-login-logo"><i className="ti ti-building-store" /></div>
-        <div className="portal-login-title">بوابة الزبائن</div>
+        <div className="portal-login-title">{company?.commercial_name || company?.name || 'بوابة الزبائن'}</div>
         <div className="portal-login-sub">تابع فواتيرك ودفعاتك وكشف حسابك</div>
 
         {error && <PortalError message={error} />}

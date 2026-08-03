@@ -33,6 +33,7 @@ import Switch from "@/components/ui/Switch";
 import Badge from "@/components/ui/Badge";
 import AlertBar from "@/components/ui/AlertBar";
 import {
+    companiesApi,
     useUpdateCompany,
     useDeactivateCompany,
     useCompanyMemberMutations,
@@ -56,6 +57,7 @@ import { useFiscalYear } from "@/context/FiscalYearContext";
 import { useAuth } from "@/context/AuthContext";
 import { useConfirm } from "@/hooks/useConfirm";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import Modal from "@/components/ui/Modal";
 import SimpleTable from "@/components/ui/SimpleTable";
 import type { Company, ActiveCompany } from "@/lib/api/core/types";
 import ImagePreviewModal from './print-settings/components/ImagePreviewModal';
@@ -82,6 +84,14 @@ const TABS = [
 type TabId = (typeof TABS)[number]["id"];
 
 const str = (v: unknown): string => (v == null ? "" : String(v));
+
+// يُطابق تطبيع الباك-إند Company::sanitizePortalSlug (أحرف صغيرة + شرطات)
+const slugifyPortal = (v: string): string =>
+    v
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 50);
 
 // ─── useDebounce ──────────────────────────────────────────────────────────────
 function useDebounce<T>(value: T, delay = 400): T {
@@ -1414,9 +1424,14 @@ function CompanyTab({
         email: "",
         bank_name: "",
         rib: "",
+        portal_slug: "",
     });
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [saveError, setSaveError] = useState<string | null>(null);
+
+    const [qrData, setQrData] = useState<{ url: string; data_uri: string } | null>(null);
+    const [qrLoading, setQrLoading] = useState(false);
+    const [copied, setCopied] = useState(false);
 
     useEffect(() => {
         if (!company) return;
@@ -1441,6 +1456,7 @@ function CompanyTab({
             email: str(company.email),
             bank_name: str(co.bank_name),
             rib: str(co.rib),
+            portal_slug: str(co.portal_slug ?? ""),
         });
     }, [company]);
 
@@ -1453,6 +1469,53 @@ function CompanyTab({
         });
         markDirty();
         onDirty?.();
+    };
+
+    const effectivePortalSlug = (form.portal_slug ?? "").trim()
+        ? slugifyPortal(form.portal_slug)
+        : (company?.slug ?? "");
+    const portalUrl = `${window.location.origin}/portal/${effectivePortalSlug}`;
+
+    const handleCopyLink = async () => {
+        try {
+            await navigator.clipboard.writeText(portalUrl);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        } catch {
+            /* clipboard غير متاح */
+        }
+    };
+
+    const handleQr = async () => {
+        if (!slug || !effectivePortalSlug) return;
+        setQrLoading(true);
+        try {
+            const res = await companiesApi.portalQr(slug, portalUrl);
+            setQrData(res);
+        } catch (err: unknown) {
+            const e = err as any;
+            setSaveError(e?.message ?? "فشل توليد رمز QR");
+        } finally {
+            setQrLoading(false);
+        }
+    };
+
+    const handleWaShare = () => {
+        window.open(
+            `https://wa.me/?text=${encodeURIComponent(
+                `بوابة الزبائن — ${portalUrl}`,
+            )}`,
+            "_blank",
+            "noopener",
+        );
+    };
+
+    const handleEmailShare = () => {
+        const subject = encodeURIComponent("بوابة الزبائن");
+        const body = encodeURIComponent(
+            `مرحباً، يمكنكم الاطلاع على حسابكم من خلال الرابط التالي:\n${portalUrl}`,
+        );
+        window.location.href = `mailto:?subject=${subject}&body=${body}`;
     };
 
     const { data: wilayas = [] } = useQuery({
@@ -1783,6 +1846,152 @@ function CompanyTab({
                         </div>
                     </div>
                 </Card>
+
+                <Card>
+                    <SecHead
+                        icon="ti-user-share"
+                        label="بوابة الزبائن"
+                        color="var(--em)"
+                    />
+                    <div className="fgrid c1" style={{ gap: 12 }}>
+                        <div className="fg">
+                            <label>رابط قصير لبوابة الزبائن</label>
+                            <input
+                                dir="ltr"
+                                placeholder="مثال: houda"
+                                value={form.portal_slug}
+                                onChange={(e) =>
+                                    set("portal_slug", e.target.value)
+                                }
+                                style={{
+                                    fontFamily: "monospace",
+                                    borderColor: fieldErrors.portal_slug
+                                        ? "var(--red)"
+                                        : undefined,
+                                }}
+                            />
+                            {fieldErrors.portal_slug && (
+                                <span style={{ color: "var(--red)", fontSize: 11 }}>
+                                    {fieldErrors.portal_slug}
+                                </span>
+                            )}
+                            <span style={{ fontSize: 11, color: "var(--t4)" }}>
+                                أحرف إنجليزية صغيرة وأرقام وشرطات فقط. إذا تُرك
+                                فارغاً يُستخدم الرابط الداخلي الحالي.
+                            </span>
+                        </div>
+
+                        <div className="fg">
+                            <label>رابط البوابة</label>
+                            <div
+                                style={{
+                                    display: "flex",
+                                    gap: 8,
+                                    alignItems: "center",
+                                    flexWrap: "wrap",
+                                }}
+                            >
+                                <code
+                                    dir="ltr"
+                                    style={{
+                                        flex: 1,
+                                        minWidth: 200,
+                                        padding: "7px 9px",
+                                        background: "var(--b3)",
+                                        borderRadius: 6,
+                                        fontSize: 12,
+                                        wordBreak: "break-all",
+                                    }}
+                                >
+                                    {portalUrl}
+                                </code>
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={handleCopyLink}
+                                >
+                                    <i
+                                        className={`ti ${
+                                            copied
+                                                ? "ti-check"
+                                                : "ti-copy"
+                                        }`}
+                                    />
+                                    {copied ? "تم النسخ" : "نسخ الرابط"}
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div
+                            style={{
+                                display: "flex",
+                                gap: 8,
+                                flexWrap: "wrap",
+                            }}
+                        >
+                            <Button size="sm" onClick={handleQr} loading={qrLoading}>
+                                <i className="ti ti-qrcode" />
+                                رمز QR
+                            </Button>
+                            <Button size="sm" variant="secondary" onClick={handleWaShare}>
+                                <i className="ti ti-brand-whatsapp" />
+                                واتساب
+                            </Button>
+                            <Button size="sm" variant="secondary" onClick={handleEmailShare}>
+                                <i className="ti ti-mail" />
+                                البريد
+                            </Button>
+                        </div>
+                    </div>
+                </Card>
+
+                <Modal
+                    open={!!qrData}
+                    onClose={() => setQrData(null)}
+                    title="بوابة الزبائن — رمز QR"
+                    size="sm"
+                    footer={
+                        <Button variant="primary" onClick={() => setQrData(null)}>
+                            إغلاق
+                        </Button>
+                    }
+                >
+                    {qrData && (
+                        <div
+                            style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                gap: 14,
+                                padding: 8,
+                            }}
+                        >
+                            <img
+                                src={qrData.data_uri}
+                                alt="QR بوابة الزبائن"
+                                style={{ width: 240, height: 240 }}
+                            />
+                            <code
+                                dir="ltr"
+                                style={{
+                                    fontSize: 12,
+                                    wordBreak: "break-all",
+                                    textAlign: "center",
+                                }}
+                            >
+                                {qrData.url}
+                            </code>
+                            <a
+                                href={qrData.data_uri}
+                                download="portal-qr.svg"
+                                className="btn btn-secondary btn-sm"
+                            >
+                                <i className="ti ti-download" />
+                                تحميل الرمز
+                            </a>
+                        </div>
+                    )}
+                </Modal>
 
                 <div
                     style={{

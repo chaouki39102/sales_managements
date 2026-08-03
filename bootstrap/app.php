@@ -22,10 +22,11 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
         $middleware->alias([
-            'company'       => \App\Http\Middleware\SetCompanyContext::class,
-            'api.auth'      => \App\Http\Middleware\ApiAuthenticate::class,   // ← اختياري مع sanctum
-            'super.admin'   => \App\Http\Middleware\SuperAdminOnly::class,    // ← جديد
-            'portal.auth'   => \App\Http\Middleware\PortalAuthenticate::class, // ← بوابة الزبائن
+            'company'        => \App\Http\Middleware\SetCompanyContext::class,
+            'portal.company' => \App\Http\Middleware\SetPortalCompanyContext::class, // ← حل slug بوابة الزبائن (بدون عضوية)
+            'api.auth'       => \App\Http\Middleware\ApiAuthenticate::class,   // ← اختياري مع sanctum
+            'super.admin'    => \App\Http\Middleware\SuperAdminOnly::class,    // ← جديد
+            'portal.auth'    => \App\Http\Middleware\PortalAuthenticate::class, // ← بوابة الزبائن
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

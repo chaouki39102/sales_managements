@@ -3,8 +3,9 @@
 //
 // استقلال كامل عن client.ts الرئيسي:
 //   - Token منفصل (portal_token) — لا يختلط مع auth_token الخاص بالإدارة
-//   - لا slug للشركة — مسارات البوابة خارج بادئة {company}
-//   - لا forcedLogout إلى /login — 401 يوجّه إلى /portal/login
+//   - slug المؤسسة يُقرأ من مسار الصفحة /portal/{slug}/... ويُضاف تلقائياً
+//     إلى المسارات + header X-Company-Slug (البوابة الآن لكل مؤسسة على حدة)
+//   - لا forcedLogout إلى /login — 401 يوجّه إلى /portal/{slug}/login
 //   - extractData نفسها (نسخة محلية) لأنها العقد الموحّد بين الباك-إند والفرونت
 // ════════════════════════════════════════════════════════════════════════════
 import axios, {
@@ -15,6 +16,13 @@ import axios, {
 } from 'axios';
 
 const PORTAL_TOKEN_KEY = 'portal_token';
+
+// slug المؤسسة يُقرأ من المسار الحالي: /portal/{slug}/...
+export function getPortalSlug(): string | null {
+  if (typeof window === 'undefined') return null;
+  const m = window.location.pathname.match(/^\/portal\/([^/]+)/);
+  return m ? m[1] : null;
+}
 
 export const portalTokenStorage = {
   get:   () => { try { return localStorage.getItem(PORTAL_TOKEN_KEY); } catch { return null; } },
@@ -47,6 +55,15 @@ portalClient.interceptors.request.use(
     const token = portalTokenStorage.get();
     if (token) config.headers.Authorization = `Bearer ${token}`;
 
+    const slug = getPortalSlug();
+    if (slug) {
+      const url = config.url ?? '';
+      if (!url.startsWith(`/${slug}/`) && url !== `/${slug}`) {
+        config.url = `/${slug}${url.startsWith('/') ? url : '/' + url}`;
+      }
+      config.headers['X-Company-Slug'] = slug;
+    }
+
     const method = config.method?.toLowerCase() ?? '';
     if (MUTATING_METHODS.has(method)) {
       const csrf = getCsrfToken();
@@ -63,10 +80,13 @@ portalClient.interceptors.response.use(
     const status = error.response?.status;
     const data   = error.response?.data;
 
-    if (status === 401 && !window.location.pathname.startsWith('/portal/login')) {
+    const isLoginPath = /^\/portal\/[^/]+\/login$/.test(window.location.pathname);
+
+    if (status === 401 && !isLoginPath) {
       portalTokenStorage.clear();
       const ret = window.location.pathname + window.location.search;
-      window.location.href = `/portal/login?return=${encodeURIComponent(ret)}`;
+      const slug = getPortalSlug() ?? '';
+      window.location.href = `/portal/${slug}/login?return=${encodeURIComponent(ret)}`;
     }
 
     return Promise.reject(makeError(status, data));

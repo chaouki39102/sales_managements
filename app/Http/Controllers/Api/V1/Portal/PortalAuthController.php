@@ -7,6 +7,7 @@ use App\Http\Requests\Portal\PortalLoginRequest;
 use App\Models\Company;
 use App\Models\Party;
 use App\Models\PortalUser;
+use App\Services\CompanyContextService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -16,10 +17,21 @@ class PortalAuthController extends BaseApiController
     protected string $resourceName = 'portal';
     protected ?string $resourceClass = null;
 
+    public function __construct(
+        private CompanyContextService $context,
+    ) {
+        parent::__construct();
+    }
+
     public function login(PortalLoginRequest $request): JsonResponse
     {
         try {
+            // تسجيل الدخول مُقيَّد بمؤسسة الرابط {company}: نفس البريد
+            // يمكن أن يوجد في عدة مؤسسات، ولكل زبون بوابته الخاصة.
+            $companyId = (int) $this->context->get();
+
             $accounts = PortalUser::query()
+                ->where('company_id', $companyId)
                 ->where('email', $request->email)
                 ->orderBy('id')
                 ->get();

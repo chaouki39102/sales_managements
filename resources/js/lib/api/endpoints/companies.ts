@@ -20,6 +20,12 @@ export const companiesApi = {
     update: (slug: string, data: Partial<Company>) =>
         apiPut<Company>(`/companies/${slug}`, data),
 
+    portalQr: (slug: string, url: string) =>
+        apiGet<{ url: string; data_uri: string }>(
+            `/companies/${slug}/portal-qr`,
+            { url },
+        ),
+
     switch: (companyId: number) =>
         apiPost<{ user: { company_id: number } }>("/companies/switch", {
             company_id: companyId,

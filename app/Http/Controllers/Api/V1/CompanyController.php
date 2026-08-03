@@ -7,6 +7,7 @@ use App\Http\Resources\CompanyResource;
 use App\Models\Company;
 use App\Services\CompanyService;
 use App\Services\CompanyContextService;
+use App\Services\QRCodeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,8 +22,9 @@ class CompanyController extends BaseApiController
     public function __construct(
         private readonly CompanyService        $companyService,
         private readonly CompanyContextService $context,
+        private readonly QRCodeService         $qrCodeService,
     ) {
-        parent::__construct(); // ✅ إلزامي
+        parent::__construct(); // �?? �?�?���?�?�?
     }
 
     protected function getService(): CompanyService
@@ -221,6 +223,14 @@ class CompanyController extends BaseApiController
             $company = $this->resolveCompany($id);
             $this->authorizeAction('update', $company);
 
+            // تطبيع رابط بوابة الزبائن قبل التحقق (أحرف صغيرة + شرطات)
+            if ($request->exists('portal_slug')) {
+                $raw = $request->input('portal_slug');
+                $request->merge(['portal_slug' => ($raw === null || trim((string) $raw) === '')
+                    ? null
+                    : Company::sanitizePortalSlug((string) $raw)]);
+            }
+
             $data = $request->validate([
                 'name'            => 'sometimes|string|max:255',
                 'commercial_name' => 'nullable|string|max:255',
@@ -247,6 +257,21 @@ class CompanyController extends BaseApiController
                 'max_warehouses'  => 'nullable|integer|min:1',
                 'max_products'    => 'nullable|integer|min:1',
                 'notes'           => 'nullable|string|max:5000',
+                'portal_slug'     => [
+                    'nullable',
+                    'string',
+                    'max:50',
+                    'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
+                    Rule::unique('companies', 'portal_slug')->ignore($company->id),
+                    function ($attribute, $value, $fail) use ($company) {
+                        if (!is_string($value) || $value === '') {
+                            return;
+                        }
+                        if (Company::where('slug', $value)->where('id', '!=', $company->id)->exists()) {
+                            $fail('هذا الرابط محجوز من مؤسسة أخرى.');
+                        }
+                    },
+                ],
             ]);
 
             if (!auth()->user()->isSuperAdmin()) {
@@ -264,6 +289,33 @@ class CompanyController extends BaseApiController
             );
         } catch (\Throwable $e) {
             return $this->handleError($e, 'update');
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // QR رمز بوابة الزبائن — لتبادل رابط البوابة
+    // ═══════════════════════════════════════════════════════════
+
+    public function portalQr(Request $request): JsonResponse
+    {
+        try {
+            $url = trim((string) $request->input('url', ''));
+
+            $valid = $url !== ''
+                && mb_strlen($url) <= 500
+                && filter_var($url, FILTER_VALIDATE_URL) !== false
+                && in_array(parse_url($url, PHP_URL_SCHEME), ['http', 'https'], true);
+
+            if (!$valid) {
+                return $this->errorResponse('رابط غير صالح', 422);
+            }
+
+            return $this->successResponse([
+                'url'      => $url,
+                'data_uri' => $this->qrCodeService->generateForUrl($url),
+            ], 'رمز QR لبوابة الزبائن');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'portalQr');
         }
     }
 

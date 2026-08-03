@@ -24,6 +24,24 @@ class PortalController extends BaseApiController
         parent::__construct();
     }
 
+    /**
+     * معلومات المؤسسة لصفحة الدخول — مسار عام (بدون مصادقة زبون)
+     */
+    public function companyInfo(Request $request): JsonResponse
+    {
+        try {
+            $company = Company::query()->find($this->context->get());
+
+            if (! $company || ! $company->active) {
+                return $this->errorResponse('المؤسسة غير موجودة أو غير متاحة.', 404, 'COMPANY_NOT_FOUND');
+            }
+
+            return $this->successResponse($this->companyRow($company), 'تم جلب بيانات المؤسسة بنجاح');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'portal.company_info');
+        }
+    }
+
     public function dashboard(Request $request): JsonResponse
     {
         try {

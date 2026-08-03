@@ -193,6 +193,12 @@ class CommercialDocumentController extends BaseApiController
                     }));
             }
 
+            // ✅ إصلاح فلتر التاريخ: القيم المخزنة بصيغة 'YYYY-MM-DD HH:MM:SS' (حتى في أعمدة date)
+            //    → مقارنة بنص التاريخ المجرد 'YYYY-MM-DD' تحذف مستندات يوم الحد الأقصى
+            //      (مثل '<= 2026-07-31' لا يطابق '2026-07-31 00:00:00')
+            //      وتجعل اليوم الواحد (min == max) يرجع 0 صفوف.
+            //    → الحل: نحوّل دائماً إلى حدود اليوم الكاملة 00:00:00 / 23:59:59
+            //      (تعمل على MySQL DATE و SQLite datetime على حد سواء)
             $dateFields = ['document_date', 'due_date', 'delivery_date', 'validated_at', 'created_at', 'updated_at'];
             foreach ($dateFields as $field) {
                 if (!isset($f[$field]) || $f[$field] === '') continue;
@@ -201,37 +207,13 @@ class CommercialDocumentController extends BaseApiController
                 $minDate = $parts[0] ?? '';
                 $maxDate = $parts[1] ?? '';
 
-                $isTimestamp = in_array($field, ['validated_at', 'created_at', 'updated_at']);
-
                 if ($minDate !== '' && $maxDate !== '') {
-                    if ($minDate === $maxDate) {
-                        if ($isTimestamp) {
-                            $query->where($field, '>=', $minDate . ' 00:00:00')
-                                  ->where($field, '<=', $minDate . ' 23:59:59');
-                        } else {
-                            $query->where($field, $minDate);
-                        }
-                    } else {
-                        if ($isTimestamp) {
-                            $query->where($field, '>=', $minDate . ' 00:00:00')
-                                  ->where($field, '<=', $maxDate . ' 23:59:59');
-                        } else {
-                            $query->where($field, '>=', $minDate)
-                                  ->where($field, '<=', $maxDate);
-                        }
-                    }
+                    $query->where($field, '>=', $minDate . ' 00:00:00')
+                          ->where($field, '<=', $maxDate . ' 23:59:59');
                 } elseif ($minDate !== '') {
-                    if ($isTimestamp) {
-                        $query->where($field, '>=', $minDate . ' 00:00:00');
-                    } else {
-                        $query->where($field, '>=', $minDate);
-                    }
+                    $query->where($field, '>=', $minDate . ' 00:00:00');
                 } elseif ($maxDate !== '') {
-                    if ($isTimestamp) {
-                        $query->where($field, '<=', $maxDate . ' 23:59:59');
-                    } else {
-                        $query->where($field, '<=', $maxDate);
-                    }
+                    $query->where($field, '<=', $maxDate . ' 23:59:59');
                 }
             }
 

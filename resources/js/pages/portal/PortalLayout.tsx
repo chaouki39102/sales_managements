@@ -1,27 +1,29 @@
 // ════════════════════════════════════════════════════════════════════════════
 // pages/portal/PortalLayout.tsx — هيكل بوابة الزبائن (هيدر + تنقل + خروج)
 // ════════════════════════════════════════════════════════════════════════════
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { portalApi } from '@/lib/api/portal/portal';
 import { usePortalStore } from '@/lib/store/portalStore';
 import { portalTokenStorage } from '@/lib/api/portal/client';
 
-const NAV_ITEMS = [
-  { to: '/portal', label: 'الرئيسية', icon: 'ti-layout-dashboard', end: true },
-  { to: '/portal/documents', label: 'المستندات', icon: 'ti-file-text', end: false },
-  { to: '/portal/payments', label: 'الدفعات', icon: 'ti-wallet', end: false },
-  { to: '/portal/statement', label: 'كشف الحساب', icon: 'ti-report-money', end: false },
-];
-
 export default function PortalLayout() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { slug } = useParams<{ slug: string }>();
   const portalUser = usePortalStore((s) => s.portalUser) as { name?: string } | null;
   const setPortalUser = usePortalStore((s) => s.setPortalUser);
 
+  const base = `/portal/${slug}`;
+  const NAV_ITEMS = [
+    { to: base, label: 'الرئيسية', icon: 'ti-layout-dashboard', end: true },
+    { to: `${base}/documents`, label: 'المستندات', icon: 'ti-file-text', end: false },
+    { to: `${base}/payments`, label: 'الدفعات', icon: 'ti-wallet', end: false },
+    { to: `${base}/statement`, label: 'كشف الحساب', icon: 'ti-report-money', end: false },
+  ];
+
   useQuery({
-    queryKey: ['portal', 'me'],
+    queryKey: ['portal', slug, 'me'],
     queryFn: async () => {
       const me = await portalApi.me();
       setPortalUser(me);
@@ -37,7 +39,7 @@ export default function PortalLayout() {
     portalTokenStorage.clear();
     usePortalStore.getState().clearSession();
     qc.clear();
-    navigate('/portal/login', { replace: true });
+    navigate(`/portal/${slug}/login`, { replace: true });
   };
 
   const userName = portalUser?.name;

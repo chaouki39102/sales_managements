@@ -2,17 +2,19 @@
 // pages/portal/PortalStatementPage.tsx — كشف حساب الزبون (رصيد متدرج)
 // ════════════════════════════════════════════════════════════════════════════
 import { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { portalApi } from '@/lib/api/portal/portal';
 import { fmtMoney, fmtMoneySigned, fmtDate, PortalLoading, PortalError, PortalEmpty } from './portalUtils';
 
 export default function PortalStatementPage() {
+  const { slug } = useParams<{ slug: string }>();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [applied, setApplied] = useState<{ from?: string; to?: string }>({});
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['portal', 'statement', applied.from ?? 'all', applied.to ?? 'all'],
+    queryKey: ['portal', slug, 'statement', applied.from ?? 'all', applied.to ?? 'all'],
     queryFn: () => portalApi.statement(applied.from, applied.to),
     staleTime: 30_000,
   });

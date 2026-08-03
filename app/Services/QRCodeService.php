@@ -23,6 +23,17 @@ class QRCodeService
         return $this->buildQRData($document);
     }
 
+    public function generateForUrl(string $url): string
+    {
+        $qrCode = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')
+            ->size(320)
+            ->errorCorrection('M')
+            ->margin(1)
+            ->generate($url);
+
+        return 'data:image/svg+xml;base64,' . base64_encode($qrCode);
+    }
+
     private function buildQRData(CommercialDocument $document): string
     {
         $supplier = $document->party;

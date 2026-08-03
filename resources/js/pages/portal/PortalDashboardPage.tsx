@@ -1,14 +1,16 @@
 // ════════════════════════════════════════════════════════════════════════════
 // pages/portal/PortalDashboardPage.tsx — لوحة معلومات الزبون
 // ════════════════════════════════════════════════════════════════════════════
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { portalApi } from '@/lib/api/portal/portal';
 import { fmtMoney, fmtMoneySigned, fmtDate, StatusBadge, PortalLoading, PortalError } from './portalUtils';
 
 export default function PortalDashboardPage() {
+  const { slug } = useParams<{ slug: string }>();
+  const base = `/portal/${slug}`;
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['portal', 'dashboard'],
+    queryKey: ['portal', slug, 'dashboard'],
     queryFn: portalApi.dashboard,
     staleTime: 30_000,
   });
@@ -83,7 +85,7 @@ export default function PortalDashboardPage() {
         <section className="portal-card">
           <div className="portal-card-hd">
             <h3><i className="ti ti-file-text" /> أحدث المستندات</h3>
-            <Link to="/portal/documents" style={{ fontSize: 12, color: 'var(--em)', fontWeight: 700, textDecoration: 'none' }}>
+            <Link to={`${base}/documents`} style={{ fontSize: 12, color: 'var(--em)', fontWeight: 700, textDecoration: 'none' }}>
               عرض الكل <i className="ti ti-chevron-left" style={{ fontSize: 10 }} />
             </Link>
           </div>
@@ -101,7 +103,7 @@ export default function PortalDashboardPage() {
                   <tbody>
                     {recent_documents.map((d) => (
                       <tr key={d.id}>
-                        <td><Link className="tbl-link" to={`/portal/documents/${d.id}`}>{d.document_number}</Link></td>
+                        <td><Link className="tbl-link" to={`${base}/documents/${d.id}`}>{d.document_number}</Link></td>
                         <td>{fmtDate(d.document_date)}</td>
                         <td>{d.type_name}</td>
                         <td><StatusBadge status={d.status_name} /></td>
@@ -118,7 +120,7 @@ export default function PortalDashboardPage() {
         <section className="portal-card">
           <div className="portal-card-hd">
             <h3><i className="ti ti-wallet" /> أحدث الدفعات</h3>
-            <Link to="/portal/payments" style={{ fontSize: 12, color: 'var(--em)', fontWeight: 700, textDecoration: 'none' }}>
+            <Link to={`${base}/payments`} style={{ fontSize: 12, color: 'var(--em)', fontWeight: 700, textDecoration: 'none' }}>
               عرض الكل <i className="ti ti-chevron-left" style={{ fontSize: 10 }} />
             </Link>
           </div>

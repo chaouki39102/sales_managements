@@ -2,14 +2,16 @@
 // pages/portal/PortalPaymentsPage.tsx — قائمة دفعات الزبون (ترحيل)
 // ════════════════════════════════════════════════════════════════════════════
 import { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { portalApi } from '@/lib/api/portal/portal';
 import { fmtMoney, fmtDate, DirBadge, Pager, PortalLoading, PortalError, PortalEmpty } from './portalUtils';
 
 export default function PortalPaymentsPage() {
+  const { slug } = useParams<{ slug: string }>();
   const [page, setPage] = useState(1);
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['portal', 'payments', page],
+    queryKey: ['portal', slug, 'payments', page],
     queryFn: () => portalApi.payments(page, 15),
     placeholderData: keepPreviousData,
   });

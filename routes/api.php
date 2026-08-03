@@ -130,14 +130,17 @@ Route::prefix('v1')->group(function () {
     });
 
     // ═══════════════════════════════════════════
-    // ①-b CUSTOMER PORTAL (بوابة الزبائن)
+    // ①-b CUSTOMER PORTAL (بوابة الزبائن) — لكل مؤسسة
     // ═══════════════════════════════════════════
-    // ⚠️ MUST be registered BEFORE the tenant group (⑤): the tenant prefix
-    //    `{company}` would otherwise swallow `/portal/documents|payments|dashboard`
-    //    as a company slug and 404. Portal routes win by registration order.
-    Route::prefix('portal')->group(function () {
+    // مسارات لكل مؤسسة على حدة: /api/v1/{company}/portal/*
+    //   - portal.company: يحل {company} slug ويضبط سياق الشركة (لا يتطلب عضوية)
+    //   - portal.auth:    يتحقق من توكن زبون البوابة (PortalUser)
+    // تسجيل الدخول و /info (معلومات المؤسسة لصفحة الدخول) بدون مصادقة.
+    Route::prefix('{company}/portal')->middleware('portal.company')->group(function () {
         Route::post('/auth/login', [PortalAuthController::class, 'login'])
             ->middleware('throttle:5,15');
+
+        Route::get('/info', [PortalController::class, 'companyInfo']);
 
         Route::middleware('portal.auth')->group(function () {
             Route::get('/auth/me',      [PortalAuthController::class, 'me']);
@@ -158,6 +161,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/current', [CompanyController::class, 'current']);
         Route::post('/switch', [CompanyController::class, 'switch']);
         Route::post('/{company}/avatar', [CompanyController::class, 'uploadAvatar']);
+        Route::get('/{company}/portal-qr', [CompanyController::class, 'portalQr']);
 
         Route::get('/',  [CompanyController::class, 'index']);
         Route::post('/', [CompanyController::class, 'store']);

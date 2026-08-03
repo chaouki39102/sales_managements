@@ -367,11 +367,11 @@ export function AppRoutes() {
                     <Route path="reports"   element={<AdminReportsPage />} />
         </Route>
 
-        {/* â‘¤ Customer Portal (بوابة الزبائن) — خارج نطاق الشركة */}
-        <Route path="/portal/login" element={<PortalLoginPage />} />
+        {/* â‘¤ Customer Portal (بوابة الزبائن) — لكل مؤسسة على حدة /portal/:slug */}
+        <Route path="/portal/:slug/login" element={<PortalLoginPage />} />
 
         <Route
-          path="/portal"
+          path="/portal/:slug"
           element={
             <RequirePortalAuth>
               <Suspense fallback={<PageLoader />}>
