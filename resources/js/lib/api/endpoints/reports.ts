@@ -5,7 +5,6 @@
 
 import { useQuery }                          from '@tanstack/react-query';
 import { apiGet }                            from '../core/client';
-import { tenantKeys }                        from '../core/queryKeys';
 import { useActiveSlug, useSelectedYearId }  from '../../store/appStore';
 
 
@@ -47,6 +46,7 @@ export interface InventoryReportParams extends ReportBaseParams {
   family_id?:     number;
   low_stock?:     boolean;
   out_of_stock?:  boolean;
+  as_of_date?:    string;   // رصيد المخزون حتى تاريخ (لقطة)
 }
 
 export interface PaymentsReportParams extends ReportBaseParams {
@@ -61,9 +61,29 @@ export interface TaxesReportParams extends ReportBaseParams {
 
 // ─── Report Response Types ────────────────────────────────────────────────────
 
+/** سطر وثيقة (تفاصيل تفاصيل التقرير) */
+export interface ReportDocumentLine {
+  product_id:          number;
+  product_name:        string;
+  product_ref:         string | null;
+  quantity:            number;
+  unit_price_ht:       number;
+  discount_percentage: number;
+  discount_amount:     number;   // خصم الوحدة الثابت (لكل وحدة مباعة)
+  discount_amount_per_unit: number;
+  total_discount_amount: number; // إجمالي خصم السطر = الكمية × discount_amount_per_unit
+  tva_rate:            number;
+  total_ht:            number;
+  total_tva:           number;
+  total_ttc:           number;
+  pack_qty?:           number | null;   // عامل التغليف (packaging_units_snapshot)
+}
+
 export interface SalesReportDocument {
   id:                number;
   document_number:   string;
+  document_type?:    string;
+  document_type_name?: string;
   date:              string;
   party_name:        string;
   total_ht:          number;
@@ -75,6 +95,7 @@ export interface SalesReportDocument {
   doc_cost_ht:       number;
   margin_value:      number;
   status:            string;
+  lines?:            ReportDocumentLine[];
 }
 
 export interface SalesProductRecapItem {
@@ -112,6 +133,8 @@ export interface SalesReportData {
 export interface PurchasesReportDocument {
   id:               number;
   document_number:  string;
+  document_type?:   string;
+  document_type_name?: string;
   date:             string;
   party_name:       string;
   total_ht:         number;
@@ -122,6 +145,7 @@ export interface PurchasesReportDocument {
   paid_amount:      number;
   remaining_amount: number;
   status:           string;
+  lines?:           ReportDocumentLine[];
 }
 
 export interface PurchasesProductRecapItem {
@@ -279,6 +303,14 @@ export interface ProductsReportRow {
   sales_cost:          number;
   margin_value:        number;
   margin_pct:          number;
+  qty_bought:          number;         // كمية مشتراة ضمن الفترة
+  purchase_ht:         number;         // قيمة المشتريات ضمن الفترة
+  avg_purchase_price:  number;         // متوسط سعر الشراء المرجح (كل الفترات)
+  cogs_estimated:      number;         // تكلفة البضاعة المباعة المقدرة
+  est_profit:          number;         // الربح المقدر
+  profit_pct:          number;         // هامش الربح % (مقدر)
+  stock_status:        string;         // good | reorder | out_of_stock
+  profit_rank:         number;         // ترتيب الربح
 }
 
 export interface ProductsReportData {
@@ -287,8 +319,92 @@ export interface ProductsReportData {
     total_stock_value:  number;
     total_sold:         number;
     total_sales_ht:     number;
+    total_qty_bought:   number;
+    total_purchase_ht:  number;
+    total_cogs:         number;
+    total_est_profit:   number;
+    margin_pct:         number;
+    reorder_count:      number;
   };
   products: ProductsReportRow[];
+  best_product:  { id: number; name: string; est_profit: number } | null;
+  worst_product: { id: number; name: string; est_profit: number } | null;
+}
+
+// ─── Dashboard KPIs Report (لوحة القيادة) ───────────────────────────────────
+
+export interface DashboardReportData {
+  summary: {
+    total_products:     number;
+    total_stock_value:  number;
+    total_sold:         number;
+    total_sales_ht:     number;
+    total_qty_bought:   number;
+    total_purchase_ht:  number;
+    total_cogs:         number;
+    total_est_profit:   number;
+    margin_pct:         number;
+    reorder_count:      number;
+  };
+  best_product:  { id: number; name: string; est_profit: number } | null;
+  worst_product: { id: number; name: string; est_profit: number } | null;
+}
+
+// ─── Forecast & Reorder Report (التنبؤ وإعادة الطلب) ────────────────────────
+
+export interface ForecastReportParams extends ReportBaseParams {
+  horizon?: number;   // أفق التنبؤ بالأيام
+}
+
+export interface ForecastReportRow {
+  product_id:         number;
+  product_name:       string;
+  product_ref:        string;
+  first_sale:         string;
+  last_sale:          string;
+  active_days:        number;
+  total_sold:         number;
+  sales_ht:           number;
+  daily_rate_qty:     number;
+  daily_rate_value:   number;
+  avg_purchase_price: number;
+  forecast_qty:       number;
+  forecast_value:     number;
+  forecast_profit:    number;
+  current_stock:      number;
+  suggested_qty:      number;
+  needs_reorder:      boolean;
+}
+
+export interface ForecastReportData {
+  items: ForecastReportRow[];
+  horizon: number;
+  summary: {
+    products_count:         number;
+    total_forecast_value:   number;
+    total_forecast_profit:  number;
+    total_suggested_qty:    number;
+    needs_reorder_count:    number;
+  };
+}
+
+// ─── Monthly Report (التقرير الشهري) ────────────────────────────────────────
+
+export interface MonthlyReportRow {
+  month:       string;   // YYYY-MM
+  sales_ht:    number;
+  purchase_ht: number;
+  diff:        number;   // sales − purchases (صافي التدفق)
+}
+
+export interface MonthlyReportData {
+  months: MonthlyReportRow[];
+  summary: {
+    months_count:   number;
+    total_sales:    number;
+    total_purchase: number;
+    total_diff:     number;
+  };
 }
 
 export interface InventoryReportRow {
@@ -450,6 +566,7 @@ export interface DailyDoc {
   total_tva:        number;
   total_ttc:        number;
   payment_status:   string;
+  lines?:           ReportDocumentLine[];
 }
 
 export interface DailyReportData {
@@ -534,8 +651,10 @@ export type ReturnsReportParams = ReportBaseParams
 export interface ReturnsReportData {
   documents: Array<{
     id: number; document_number: string; document_type: string;
+    document_type_name?: string;
     date: string; party_name: string | null;
     total_ht: number; total_ttc: number; reason: string | null;
+    lines?: ReportDocumentLine[];
   }>;
   product_recap: Array<{
     product_id: number; product_name: string; product_ref: string;
@@ -624,6 +743,9 @@ export const reportsApi = {
   customers: (p?: PartyReportParams)     => apiGet<CustomersReportData>('/reports/customers', p),
   suppliers: (p?: PartyReportParams)     => apiGet<SuppliersReportData>('/reports/suppliers', p),
   products:  (p?: ProductsReportParams)  => apiGet<ProductsReportData> ('/reports/products',  p),
+  forecast:  (p?: ForecastReportParams)  => apiGet<ForecastReportData>('/reports/forecast',   p),
+  monthly:   (p?: ReportBaseParams)      => apiGet<MonthlyReportData>('/reports/monthly',    p),
+  dashboard: (p?: ReportBaseParams)      => apiGet<DashboardReportData>('/reports/dashboard', p),
   inventory: (p?: InventoryReportParams) => apiGet<InventoryReportData>('/reports/inventory', p),
   payments:  (p?: PaymentsReportParams)  => apiGet<PaymentsReportData> ('/reports/payments',  p),
   taxes:     (p?: TaxesReportParams)     => apiGet<TaxesReportData>    ('/reports/taxes',     p),
@@ -698,6 +820,39 @@ export function useProductsReport(params?: Omit<ProductsReportParams, 'year_id'>
   });
 }
 
+export function useForecastReport(params?: Omit<ForecastReportParams, 'year_id'>) {
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'forecast', yearId, params],
+    queryFn:   () => reportsApi.forecast({ year_id: yearId ?? undefined, ...params }),
+    enabled:   !!slug && !!yearId,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useMonthlyReport(params?: Omit<ReportBaseParams, 'year_id'>) {
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'monthly', yearId, params],
+    queryFn:   () => reportsApi.monthly({ year_id: yearId ?? undefined, ...params }),
+    enabled:   !!slug && !!yearId,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useDashboardReport(params?: Omit<ReportBaseParams, 'year_id'>) {
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'dashboard', yearId, params],
+    queryFn:   () => reportsApi.dashboard({ year_id: yearId ?? undefined, ...params }),
+    enabled:   !!slug && !!yearId,
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useInventoryReport(params?: InventoryReportParams) {
   const slug = useActiveSlug();
   return useQuery({
@@ -723,7 +878,7 @@ export function useTvaReport(params?: Pick<TaxesReportParams, 'from_date' | 'to_
   const slug   = useActiveSlug();
   const yearId = useSelectedYearId();
   return useQuery({
-    queryKey:  tenantKeys.reports.tva(slug ?? '', yearId ?? 0),
+    queryKey:  [slug, 'reports', 'taxes', yearId, params],
     queryFn:   () => reportsApi.taxes({ year_id: yearId ?? undefined, ...params }),
     enabled:   !!slug && !!yearId,
     staleTime: 5 * 60_000,

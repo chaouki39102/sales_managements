@@ -23,6 +23,62 @@ class ReportService
         return (int) app(CompanyContextService::class)->get();
     }
 
+    /**
+     * يرفق أسطر كل وثيقة (تفاصيل التفاصيل) بقائمة الوثائق المبنية مسبقاً.
+     * يستخدم لإظهار تفاصيل قابلة للطي في تقارير المبيعات/المشتريات/الإرجاعات/اليومي.
+     */
+    private function attachDocumentLines(array $docsArray, \Illuminate\Support\Collection $documents): array
+    {
+        $docIds = $documents->pluck('id');
+        $linesByDoc = collect();
+        if ($docIds->isNotEmpty()) {
+            $linesByDoc = DB::table('commercial_document_lines as cdl')
+                ->join('products as p', 'p.id', '=', 'cdl.product_id')
+                ->whereIn('cdl.commercial_document_id', $docIds)
+                ->select(
+                    'cdl.commercial_document_id',
+                    'cdl.product_id',
+                    'p.name as product_name',
+                    'p.ref as product_ref',
+                    'cdl.quantity',
+                    'cdl.unit_price_ht',
+                    'cdl.discount_percentage',
+                    'cdl.discount_amount',
+                    'cdl.discount_amount_per_unit',
+                    'cdl.total_discount_amount',
+                    'cdl.tva_rate',
+                    'cdl.total_ht',
+                    'cdl.total_tva',
+                    'cdl.total_ttc',
+                    'cdl.packaging_units_snapshot'
+                )
+                ->orderBy('cdl.id')
+                ->get()
+                ->groupBy('commercial_document_id');
+        }
+
+        return array_map(function ($doc) use ($linesByDoc) {
+            $doc['lines'] = ($linesByDoc->get($doc['id']) ?? collect())
+                ->map(fn($l) => [
+                    'product_id'          => $l->product_id,
+                    'product_name'        => $l->product_name,
+                    'product_ref'         => $l->product_ref,
+                    'quantity'            => (float) $l->quantity,
+                    'unit_price_ht'       => round((float) $l->unit_price_ht, 2),
+                    'discount_percentage' => (float) $l->discount_percentage,
+                    'discount_amount'     => (float) $l->discount_amount,
+                    'discount_amount_per_unit' => (float) $l->discount_amount_per_unit,
+                    'total_discount_amount'    => round((float) $l->total_discount_amount, 2),
+                    'tva_rate'            => (float) $l->tva_rate,
+                    'total_ht'            => round((float) $l->total_ht, 2),
+                    'total_tva'           => round((float) $l->total_tva, 2),
+                    'total_ttc'           => round((float) $l->total_ttc, 2),
+                    'pack_qty'            => $l->packaging_units_snapshot ? (float) $l->packaging_units_snapshot : null,
+                ])->values()->toArray();
+            return $doc;
+        }, $docsArray);
+    }
+
     public function salesReport(array $filters = []): array
     {
         $query = CommercialDocument::with(['documentType', 'party', 'currency'])
@@ -116,6 +172,7 @@ class ReportService
                 'id'                => $doc->id,
                 'document_number'   => $doc->document_number,
                 'document_type'     => $doc->documentType?->code,
+                'document_type_name' => $doc->documentType?->name,
                 'date'              => $doc->document_date?->format('Y-m-d'),
                 'party_name'        => $doc->party?->name,
                 'total_ht'          => round($doc->total_ht, 2),
@@ -131,6 +188,8 @@ class ReportService
                 'status'            => $doc->remaining_amount > 0.01 ? 'unpaid' : 'paid',
             ];
         })->toArray();
+
+        $docsArray = $this->attachDocumentLines($docsArray, $documents);
 
         $totalCost = array_sum(array_column($docsArray, 'doc_cost_ht'));
         $totalDiscount = array_sum(array_column($docsArray, 'total_discount'));
@@ -236,6 +295,7 @@ class ReportService
                 'id'                => $doc->id,
                 'document_number'   => $doc->document_number,
                 'document_type'     => $doc->documentType?->code,
+                'document_type_name' => $doc->documentType?->name,
                 'date'              => $doc->document_date?->format('Y-m-d'),
                 'party_name'        => $doc->party?->name,
                 'total_ht'          => round($doc->total_ht, 2),
@@ -249,6 +309,8 @@ class ReportService
                 'status'            => $doc->remaining_amount > 0.01 ? 'unpaid' : 'paid',
             ];
         })->toArray();
+
+        $docsArray = $this->attachDocumentLines($docsArray, $documents);
 
         return [
             'documents'     => $docsArray,
@@ -506,6 +568,16 @@ class ReportService
 
     public function productsReport(array $filters = []): array
     {
+        return $this->productProfitData($filters);
+    }
+
+    /**
+     * بيانات المنتجات الغنية: مبيعات الفترة + مشتريات الفترة + متوسط سعر الشراء المرجح
+     * (كل الفترات) + تكلفة البضاعة المباعة المقدرة + الربح المقدر + حالة المخزون.
+     * تُستهلك من تقرير المنتجات ولوحة القيادة (KPIs) معاً.
+     */
+    private function productProfitData(array $filters = []): array
+    {
         $query = Product::with(['family', 'brand', 'unit', 'tva']);
 
         if (!empty($filters['family_id'])) {
@@ -518,6 +590,8 @@ class ReportService
         $products = $query->orderBy('name')->get();
 
         $productIds = $products->pluck('id');
+
+        // ─── مبيعات الفترة ────────────────────────────────────────────────────────
         $salesStats = [];
         if ($productIds->isNotEmpty()) {
             $statsQuery = DB::table('commercial_document_lines as cdl')
@@ -554,6 +628,63 @@ class ReportService
             }
         }
 
+        // ─── مشتريات الفترة (كمية + قيمة) ──────────────────────────────────────────
+        $purchaseStats = [];
+        if ($productIds->isNotEmpty()) {
+            $statsQuery = DB::table('commercial_document_lines as cdl')
+                ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+                ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->where('cd.company_id', $this->companyId())
+                ->whereIn('cdl.product_id', $productIds)
+                ->whereIn('dt.code', self::PURCHASE_CODES);
+            if (!empty($filters['fiscal_year_id'])) {
+                $statsQuery->where('cd.fiscal_year_id', $filters['fiscal_year_id']);
+            }
+            if (!empty($filters['from_date'])) {
+                $statsQuery->whereDate('cd.document_date', '>=', $filters['from_date']);
+            }
+            if (!empty($filters['to_date'])) {
+                $statsQuery->whereDate('cd.document_date', '<=', $filters['to_date']);
+            }
+            $stats = $statsQuery->select(
+                    'cdl.product_id',
+                    DB::raw("SUM(CASE WHEN dt.code = 'AA' THEN -cdl.quantity ELSE cdl.quantity END) as qty_bought"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AA' THEN -cdl.total_ht ELSE cdl.total_ht END) as purchase_ht")
+                )
+                ->groupBy('cdl.product_id')
+                ->get()
+                ->keyBy('product_id');
+
+            foreach ($stats as $sid => $s) {
+                $purchaseStats[$sid] = [
+                    'qty_bought'  => (float) $s->qty_bought,
+                    'purchase_ht' => round((float) $s->purchase_ht, 2),
+                ];
+            }
+        }
+
+        // ─── متوسط سعر الشراء المرجح (كل الفترات — بدون فلتر تاريخ) ─────────────────
+        $avgPurchase = [];
+        if ($productIds->isNotEmpty()) {
+            $avgRows = DB::table('commercial_document_lines as cdl')
+                ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+                ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->where('cd.company_id', $this->companyId())
+                ->whereIn('cdl.product_id', $productIds)
+                ->whereIn('dt.code', self::PURCHASE_CODES)
+                ->select(
+                    'cdl.product_id',
+                    DB::raw("SUM(CASE WHEN dt.code = 'AA' THEN -cdl.quantity ELSE cdl.quantity END) as total_qty"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AA' THEN -cdl.total_ht ELSE cdl.total_ht END) as total_value")
+                )
+                ->groupBy('cdl.product_id')
+                ->get();
+
+            foreach ($avgRows as $r) {
+                $avgPurchase[$r->product_id] = $r->total_qty > 0 ? (float) $r->total_value / (float) $r->total_qty : 0;
+            }
+        }
+
         $warehouseStockMap = [];
         $useWarehouseStock = !empty($filters['warehouse_id']) && $productIds->isNotEmpty();
         if ($useWarehouseStock) {
@@ -574,40 +705,290 @@ class ReportService
             }
         }
 
+        // ─── المخزون الحالي (SSOT: InventoryStockService — نفس مصدر صفحات المخزون) ──
+        $stockMap = [];
+        if (!$useWarehouseStock && $productIds->isNotEmpty()) {
+            $asOf = $filters['to_date'] ?? date('Y-m-d');
+            foreach (app(InventoryStockService::class)->getStockAt($asOf) as $s) {
+                $stockMap[$s['id']] = $s;
+            }
+        }
+
+        $rows = $products->map(function ($product) use ($salesStats, $purchaseStats, $avgPurchase, $useWarehouseStock, $warehouseStockMap, $stockMap) {
+            $ss = $salesStats[$product->id] ?? ['total_sold' => 0, 'sales_ht' => 0, 'sales_cost' => 0];
+            $ps = $purchaseStats[$product->id] ?? ['qty_bought' => 0, 'purchase_ht' => 0];
+            $stockQty = $useWarehouseStock ? ($warehouseStockMap[$product->id] ?? 0) : ($stockMap[$product->id]['current_stock'] ?? 0);
+            $avgCost = $avgPurchase[$product->id] ?? (float) $product->purchase_price_ht;
+            $stockVal = round($stockQty * $avgCost, 2);
+            $margin = $ss['sales_ht'] - $ss['sales_cost'];
+            // تكلفة البضاعة المباعة = التكلفة المسجلة على أسطر البيع (SSOT — تشمل خصم/إرجاع AV)
+            $cogs = $ss['sales_cost'] > 0 ? $ss['sales_cost'] : $ss['total_sold'] * $avgCost;
+            $estProfit = $ss['sales_ht'] - $cogs;
+            $status = $stockQty <= 0 ? 'out_of_stock' : ($stockQty < (float) $product->min_stock_alert ? 'reorder' : 'good');
+            return [
+                'id'                  => $product->id,
+                'ref'                 => $product->ref,
+                'name'                => $product->name,
+                'family'              => $product->family?->name,
+                'brand'               => $product->brand?->name,
+                'unit'                => $product->unit?->name,
+                'purchase_price_ht'   => round($product->purchase_price_ht, 2),
+                'current_cost_price'  => round($product->current_cost_price, 2),
+                'tva_rate'            => $product->tva?->rate,
+                'stock_quantity'       => round($stockQty, 2),
+                'min_stock_alert'     => $product->min_stock_alert,
+                'stock_value'         => $stockVal,
+                'total_sold'          => $ss['total_sold'],
+                'sales_ht'            => $ss['sales_ht'],
+                'sales_cost'          => $ss['sales_cost'],
+                'margin_value'        => round($margin, 2),
+                'margin_pct'          => $ss['sales_ht'] > 0 ? round($margin / $ss['sales_ht'] * 100, 2) : 0,
+                'qty_bought'          => round($ps['qty_bought'], 2),
+                'purchase_ht'         => $ps['purchase_ht'],
+                'avg_purchase_price'  => round($avgCost, 4),
+                'cogs_estimated'      => round($cogs, 2),
+                'est_profit'          => round($estProfit, 2),
+                'profit_pct'          => $ss['sales_ht'] > 0 ? round($estProfit / $ss['sales_ht'] * 100, 2) : 0,
+                'stock_status'        => $status,
+            ];
+        })->values();
+
+        // ترتيب حسب الربح المقدر (تنازلي) ثم تثبيت رقم الترتيب
+        $rows = $rows->sortByDesc('est_profit')->values()
+            ->map(function ($row, $i) {
+                $row['profit_rank'] = $i + 1;
+                return $row;
+            });
+
+        $totalSalesHt = round(array_sum(array_column($rows->toArray(), 'sales_ht')), 2);
+        $totalEstProfit = round(array_sum(array_column($rows->toArray(), 'est_profit')), 2);
+
+        $withSales = $rows->filter(fn($r) => (float) $r['sales_ht'] > 0)->values();
+        $best  = $withSales->sortByDesc('est_profit')->first();
+        $worst = $withSales->sortBy('est_profit')->first();
+
         return [
-            'products' => $products->map(function ($product) use ($salesStats, $useWarehouseStock, $warehouseStockMap) {
-                $ss = $salesStats[$product->id] ?? ['total_sold' => 0, 'sales_ht' => 0, 'sales_cost' => 0];
-                $stockQty = $useWarehouseStock ? ($warehouseStockMap[$product->id] ?? 0) : $product->current_stock;
-                $stockVal = round($stockQty * $product->current_cost_price, 2);
-                $margin = $ss['sales_ht'] - $ss['sales_cost'];
-                return [
-                    'id'                  => $product->id,
-                    'ref'                 => $product->ref,
-                    'name'                => $product->name,
-                    'family'              => $product->family?->name,
-                    'brand'               => $product->brand?->name,
-                    'unit'                => $product->unit?->name,
-                    'purchase_price_ht'   => round($product->purchase_price_ht, 2),
-                    'current_cost_price'  => round($product->current_cost_price, 2),
-                    'tva_rate'            => $product->tva?->rate,
-                    'stock_quantity'       => round($stockQty, 2),
-                    'min_stock_alert'     => $product->min_stock_alert,
-                    'stock_value'         => $stockVal,
-                    'total_sold'          => $ss['total_sold'],
-                    'sales_ht'            => $ss['sales_ht'],
-                    'sales_cost'          => $ss['sales_cost'],
-                    'margin_value'        => round($margin, 2),
-                    'margin_pct'          => $ss['sales_ht'] > 0 ? round($margin / $ss['sales_ht'] * 100, 2) : 0,
-                ];
-            })->toArray(),
+            'products' => $rows->toArray(),
             'summary' => [
                 'total_products'    => $products->count(),
-                'total_stock_value' => round((float) $products->sum(function ($p) use ($useWarehouseStock, $warehouseStockMap) {
-                    $qty = $useWarehouseStock ? ($warehouseStockMap[$p->id] ?? 0) : $p->current_stock;
-                    return $qty * $p->current_cost_price;
-                }), 2),
-                'total_sold'        => array_sum(array_column($salesStats, 'total_sold')),
-                'total_sales_ht'    => round(array_sum(array_column($salesStats, 'sales_ht')), 2),
+                'total_stock_value' => round(array_sum(array_column($rows->toArray(), 'stock_value')), 2),
+                'total_sold'        => array_sum(array_column($rows->toArray(), 'total_sold')),
+                'total_sales_ht'    => $totalSalesHt,
+                'total_qty_bought'  => round(array_sum(array_column($rows->toArray(), 'qty_bought')), 2),
+                'total_purchase_ht' => round(array_sum(array_column($rows->toArray(), 'purchase_ht')), 2),
+                'total_cogs'        => round(array_sum(array_column($rows->toArray(), 'cogs_estimated')), 2),
+                'total_est_profit'  => $totalEstProfit,
+                'margin_pct'        => $totalSalesHt > 0 ? round($totalEstProfit / $totalSalesHt * 100, 2) : 0,
+                'reorder_count'     => $rows->filter(fn($r) => $r['stock_status'] !== 'good')->count(),
+            ],
+            'best_product'  => $best  ? ['id' => $best['id'], 'name' => $best['name'], 'est_profit' => $best['est_profit']] : null,
+            'worst_product' => $worst ? ['id' => $worst['id'], 'name' => $worst['name'], 'est_profit' => $worst['est_profit']] : null,
+        ];
+    }
+
+    /**
+     * لوحة القيادة (KPIs): إجمالي المبيعات/المشتريات، الربح المقدر، هامش الربح،
+     * الوحدات المباعة، قيمة المخزون، عدد المنتجات التي تحتاج إعادة طلب + أفضل/أضعف منتج.
+     * تُبنى من نفس بيانات تقرير المنتجات (productProfitData).
+     */
+    public function dashboardReport(array $filters = []): array
+    {
+        $data = $this->productProfitData($filters);
+
+        return [
+            'summary'       => $data['summary'],
+            'best_product'  => $data['best_product'],
+            'worst_product' => $data['worst_product'],
+        ];
+    }
+
+    /**
+     * التنبؤ وإعادة الطلب: معدل البيع اليومي لكل منتج منذ أول عملية بيع (أيام النشاط =
+     * فرق التواريخ + 1)، التوقع = المعدل اليومي × أفق التنبؤ، الكمية المقترحة =
+     * التوقع − المخزون الحالي (لا تقل عن صفر).
+     */
+    public function forecastReport(array $filters = []): array
+    {
+        $horizon = max(1, (int) ($filters['horizon'] ?? 30));
+        $fyId = $filters['fiscal_year_id'] ?? null;
+        $from = $filters['from_date'] ?? null;
+        $to   = $filters['to_date']   ?? null;
+
+        $salesQ = DB::table('commercial_document_lines as cdl')
+            ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+            ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->where('cd.company_id', $this->companyId())
+            ->whereIn('dt.code', self::SALE_CODES);
+        if ($fyId) $salesQ->where('cd.fiscal_year_id', $fyId);
+        if ($from) $salesQ->whereDate('cd.document_date', '>=', $from);
+        if ($to)   $salesQ->whereDate('cd.document_date', '<=', $to);
+
+        $salesRows = $salesQ->select(
+                'cdl.product_id',
+                DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity ELSE cdl.quantity END) as total_qty"),
+                DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.total_ht ELSE cdl.total_ht END) as total_ht"),
+                DB::raw('MIN(cd.document_date) as first_sale'),
+                DB::raw('MAX(cd.document_date) as last_sale')
+            )
+            ->groupBy('cdl.product_id')
+            ->havingRaw('total_qty > 0')
+            ->get();
+
+        $productIds = $salesRows->pluck('product_id');
+        $products   = Product::whereIn('id', $productIds)->get()->keyBy('id');
+
+        // متوسط سعر الشراء المرجح (كل الفترات)
+        $avgPurchase = [];
+        if ($productIds->isNotEmpty()) {
+            $avgRows = DB::table('commercial_document_lines as cdl')
+                ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+                ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->where('cd.company_id', $this->companyId())
+                ->whereIn('cdl.product_id', $productIds)
+                ->whereIn('dt.code', self::PURCHASE_CODES)
+                ->select(
+                    'cdl.product_id',
+                    DB::raw("SUM(CASE WHEN dt.code = 'AA' THEN -cdl.quantity ELSE cdl.quantity END) as total_qty"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AA' THEN -cdl.total_ht ELSE cdl.total_ht END) as total_value")
+                )
+                ->groupBy('cdl.product_id')
+                ->get();
+
+            foreach ($avgRows as $r) {
+                $avgPurchase[$r->product_id] = $r->total_qty > 0 ? (float) $r->total_value / (float) $r->total_qty : 0;
+            }
+        }
+
+        // المخزون الحالي (SSOT)
+        $stockMap = [];
+        if ($productIds->isNotEmpty()) {
+            $asOf = $to ?? date('Y-m-d');
+            foreach (app(InventoryStockService::class)->getStockAt($asOf) as $s) {
+                $stockMap[$s['id']] = $s;
+            }
+        }
+
+        $items = $salesRows->map(function ($r) use ($products, $avgPurchase, $stockMap, $horizon) {
+            $p = $products->get($r->product_id);
+            $avgCost = $avgPurchase[$r->product_id] ?? (float) ($p?->purchase_price_ht ?? 0);
+            $first = Carbon::parse($r->first_sale);
+            $last  = Carbon::parse($r->last_sale);
+            $activeDays = max(1, (int) $first->diffInDays($last) + 1);
+            $totalQty = (float) $r->total_qty;
+            $totalHt  = (float) $r->total_ht;
+            $dailyQty   = $totalQty / $activeDays;
+            $dailyValue = $totalHt / $activeDays;
+            $forecastQty   = round($dailyQty * $horizon, 2);
+            $forecastValue = round($dailyValue * $horizon, 2);
+            $forecastProfit = round($forecastValue - $forecastQty * $avgCost, 2);
+            $stock = (float) ($stockMap[$r->product_id]['current_stock'] ?? 0);
+            $suggested = max(0, round($forecastQty - $stock, 2));
+            return [
+                'product_id'         => (int) $r->product_id,
+                'product_name'       => $p?->name ?? '—',
+                'product_ref'        => $p?->ref ?? '—',
+                'first_sale'         => $r->first_sale,
+                'last_sale'          => $r->last_sale,
+                'active_days'        => $activeDays,
+                'total_sold'         => round($totalQty, 2),
+                'sales_ht'           => round($totalHt, 2),
+                'daily_rate_qty'     => round($dailyQty, 4),
+                'daily_rate_value'   => round($dailyValue, 2),
+                'avg_purchase_price' => round($avgCost, 4),
+                'forecast_qty'       => $forecastQty,
+                'forecast_value'     => $forecastValue,
+                'forecast_profit'    => $forecastProfit,
+                'current_stock'      => round($stock, 2),
+                'suggested_qty'      => $suggested,
+                'needs_reorder'      => $suggested > 0,
+            ];
+        })->sortByDesc('suggested_qty')->values()->toArray();
+
+        return [
+            'items'   => $items,
+            'horizon' => $horizon,
+            'summary' => [
+                'products_count'        => count($items),
+                'total_forecast_value'  => round(array_sum(array_column($items, 'forecast_value')), 2),
+                'total_forecast_profit' => round(array_sum(array_column($items, 'forecast_profit')), 2),
+                'total_suggested_qty'   => round(array_sum(array_column($items, 'suggested_qty')), 2),
+                'needs_reorder_count'   => count(array_filter($items, fn($i) => $i['needs_reorder'])),
+            ],
+        ];
+    }
+
+    /**
+     * التقرير الشهري: صافي التدفق (نقدي تقريبي) = مبيعات الشهر − مشتريات الشهر،
+     * مجمّعة شهراً بشهر ضمن الفترة المعطاة (AV/AA بإشارة سالبة).
+     */
+    public function monthlyReport(array $filters = []): array
+    {
+        $fyId = $filters['fiscal_year_id'] ?? null;
+        $from = $filters['from_date'] ?? null;
+        $to   = $filters['to_date']   ?? null;
+
+        if ($fyId && (!$from || !$to)) {
+            $fy = \App\Models\FiscalYear::find($fyId);
+            if ($fy) {
+                $from = $from ?? $fy->start_date;
+                $to   = $to   ?? $fy->end_date;
+            }
+        }
+
+        $salesQ = DB::table('commercial_documents as cd')
+            ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->where('cd.company_id', $this->companyId())
+            ->whereIn('dt.code', self::SALE_CODES);
+        $purchaseQ = DB::table('commercial_documents as cd')
+            ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->where('cd.company_id', $this->companyId())
+            ->whereIn('dt.code', self::PURCHASE_CODES);
+
+        if ($from) { $salesQ->whereDate('cd.document_date', '>=', $from); $purchaseQ->whereDate('cd.document_date', '>=', $from); }
+        if ($to)   { $salesQ->whereDate('cd.document_date', '<=', $to);   $purchaseQ->whereDate('cd.document_date', '<=', $to); }
+
+        $salesRows    = $salesQ->select('cd.document_date', 'dt.code', 'cd.total_ht')->get();
+        $purchaseRows = $purchaseQ->select('cd.document_date', 'dt.code', 'cd.total_ht')->get();
+
+        $salesByMonth = [];
+        foreach ($salesRows as $r) {
+            $m = substr($r->document_date, 0, 7);
+            $salesByMonth[$m] = ($salesByMonth[$m] ?? 0) + ($r->code === 'AV' ? -$r->total_ht : $r->total_ht);
+        }
+        $purchaseByMonth = [];
+        foreach ($purchaseRows as $r) {
+            $m = substr($r->document_date, 0, 7);
+            $purchaseByMonth[$m] = ($purchaseByMonth[$m] ?? 0) + ($r->code === 'AA' ? -$r->total_ht : $r->total_ht);
+        }
+
+        $monthly = [];
+        if ($from && $to) {
+            $start = Carbon::parse($from)->startOfMonth();
+            $end   = Carbon::parse($to)->startOfMonth();
+            while ($start->lte($end)) {
+                $m = $start->format('Y-m');
+                $s = round($salesByMonth[$m] ?? 0, 2);
+                $p = round($purchaseByMonth[$m] ?? 0, 2);
+                $monthly[] = ['month' => $m, 'sales_ht' => $s, 'purchase_ht' => $p, 'diff' => round($s - $p, 2)];
+                $start->addMonth();
+            }
+        } else {
+            $months = array_unique(array_merge(array_keys($salesByMonth), array_keys($purchaseByMonth)));
+            sort($months);
+            foreach ($months as $m) {
+                $s = round($salesByMonth[$m] ?? 0, 2);
+                $p = round($purchaseByMonth[$m] ?? 0, 2);
+                $monthly[] = ['month' => $m, 'sales_ht' => $s, 'purchase_ht' => $p, 'diff' => round($s - $p, 2)];
+            }
+        }
+
+        return [
+            'months'  => $monthly,
+            'summary' => [
+                'months_count' => count($monthly),
+                'total_sales'    => round(array_sum(array_column($monthly, 'sales_ht')), 2),
+                'total_purchase' => round(array_sum(array_column($monthly, 'purchase_ht')), 2),
+                'total_diff'     => round(array_sum(array_column($monthly, 'diff')), 2),
             ],
         ];
     }
@@ -621,10 +1002,24 @@ class ReportService
         }
 
         $products = $query->orderBy('name')->get();
+        $productIds = $products->pluck('id');
 
-        $warehouseStockMap = [];
-        if (!empty($filters['warehouse_id']) && $products->isNotEmpty()) {
-            $productIds = $products->pluck('id');
+        // ─── مصدر المخزون: رصيد حتى تاريخ (as_of) | مستودع محدد | المخزون الحالي ──
+        $asOfDate = !empty($filters['as_of_date']) ? $filters['as_of_date'] : null;
+        $stockMap = [];
+
+        if ($asOfDate && $productIds->isNotEmpty()) {
+            $rows = app(InventoryStockService::class)->getStockAt(
+                $asOfDate,
+                !empty($filters['warehouse_id']) ? (int) $filters['warehouse_id'] : null
+            );
+            foreach ($rows as $row) {
+                $stockMap[$row['id']] = [
+                    'qty'  => $row['current_stock'],
+                    'cost' => $row['current_cost_price'],
+                ];
+            }
+        } elseif (!empty($filters['warehouse_id']) && $productIds->isNotEmpty()) {
             $stockRows = DB::table('stock_movements as sm')
                 ->join('stock_movement_types as smt', 'smt.id', '=', 'sm.stock_movement_type_id')
                 ->where('sm.company_id', $this->companyId())
@@ -638,51 +1033,59 @@ class ReportService
                 ->get();
 
             foreach ($stockRows as $row) {
-                $warehouseStockMap[$row->product_id] = (float) $row->qty;
+                $stockMap[$row->product_id] = ['qty' => (float) $row->qty, 'cost' => 0];
             }
         }
-        $useWarehouseStock = !empty($filters['warehouse_id']) && $products->isNotEmpty();
 
-        $lowStock = $products->filter(fn($p) => $p->current_stock <= $p->min_stock_alert && $p->current_stock > 0);
-        $outOfStock = $products->filter(fn($p) => $p->current_stock == 0);
+        $stockOf = function (Product $product) use ($stockMap, $asOfDate): array {
+            if (isset($stockMap[$product->id])) {
+                $entry = $stockMap[$product->id];
+                return [
+                    'qty'  => (float) $entry['qty'],
+                    'cost' => (float) $entry['cost'] > 0 ? (float) $entry['cost'] : (float) $product->current_cost_price,
+                ];
+            }
+            if ($asOfDate) {
+                return ['qty' => 0, 'cost' => (float) $product->current_cost_price];
+            }
+            return ['qty' => (float) $product->current_stock, 'cost' => (float) $product->current_cost_price];
+        };
+
+        $lowStock = $products->filter(fn($p) => $stockOf($p)['qty'] <= $p->min_stock_alert && $stockOf($p)['qty'] > 0);
+        $outOfStock = $products->filter(fn($p) => $stockOf($p)['qty'] == 0);
 
         $showLowStock = !empty($filters['low_stock']) && $filters['low_stock'] != '0';
         $showOutOfStock = !empty($filters['out_of_stock']) && $filters['out_of_stock'] != '0';
 
         if ($showLowStock && !$showOutOfStock) {
-            $products = $products->filter(fn($p) => $p->current_stock <= $p->min_stock_alert && $p->current_stock > 0);
+            $products = $products->filter(fn($p) => $stockOf($p)['qty'] <= $p->min_stock_alert && $stockOf($p)['qty'] > 0);
         } elseif (!$showLowStock && $showOutOfStock) {
-            $products = $products->filter(fn($p) => $p->current_stock == 0);
+            $products = $products->filter(fn($p) => $stockOf($p)['qty'] == 0);
         } elseif ($showLowStock && $showOutOfStock) {
-            $products = $products->filter(fn($p) => $p->current_stock <= $p->min_stock_alert);
+            $products = $products->filter(fn($p) => $stockOf($p)['qty'] <= $p->min_stock_alert);
         }
 
         return [
-            'products' => $products->map(function ($product) use ($useWarehouseStock, $warehouseStockMap) {
-                $stockQty = $useWarehouseStock ? ($warehouseStockMap[$product->id] ?? 0) : $product->current_stock;
+            'products' => $products->map(function ($product) use ($stockOf) {
+                $stock = $stockOf($product);
                 return [
                     'id'                => $product->id,
                     'ref'               => $product->ref,
                     'name'              => $product->name,
                     'family'            => $product->family?->name,
                     'brand'             => $product->brand?->name,
-                    'stock_quantity'     => round($stockQty, 2),
-                    'min_stock_alert'    => $product->min_stock_alert,
-                    'purchase_price_ht'  => round($product->purchase_price_ht, 2),
-                    'current_cost_price' => round($product->current_cost_price, 2),
-                    'stock_value'        => round($stockQty * $product->current_cost_price, 2),
-                    'status'             => $stockQty == 0 ? 'out_of_stock' : ($stockQty <= $product->min_stock_alert ? 'low_stock' : 'in_stock'),
+                    'stock_quantity'    => round($stock['qty'], 2),
+                    'min_stock_alert'   => $product->min_stock_alert,
+                    'purchase_price_ht' => round($product->purchase_price_ht, 2),
+                    'current_cost_price' => round($stock['cost'], 2),
+                    'stock_value'       => round($stock['qty'] * $stock['cost'], 2),
+                    'status'            => $stock['qty'] == 0 ? 'out_of_stock' : ($stock['qty'] <= $product->min_stock_alert ? 'low_stock' : 'in_stock'),
                 ];
             })->toArray(),
             'summary' => [
                 'total_products'    => $products->count(),
-                'total_quantity'    => round((float) $products->sum(function ($p) use ($useWarehouseStock, $warehouseStockMap) {
-                    return $useWarehouseStock ? ($warehouseStockMap[$p->id] ?? 0) : $p->current_stock;
-                }), 2),
-                'total_value'       => round((float) $products->sum(function ($p) use ($useWarehouseStock, $warehouseStockMap) {
-                    $qty = $useWarehouseStock ? ($warehouseStockMap[$p->id] ?? 0) : $p->current_stock;
-                    return $qty * $p->current_cost_price;
-                }), 2),
+                'total_quantity'    => round((float) $products->sum(fn($p) => $stockOf($p)['qty']), 2),
+                'total_value'       => round((float) $products->sum(fn($p) => $stockOf($p)['qty'] * $stockOf($p)['cost']), 2),
                 'low_stock_count'   => $lowStock->count(),
                 'out_of_stock_count' => $outOfStock->count(),
             ],
@@ -1114,6 +1517,8 @@ class ReportService
             'status'           => $doc->remaining_amount > 0.01 ? 'unpaid' : 'paid',
         ])->toArray();
 
+        $docDetails = $this->attachDocumentLines($docDetails, $docs);
+
         return [
             'date'       => $date,
             'documents'  => $docDetails,
@@ -1334,17 +1739,22 @@ class ReportService
                 ->toArray();
         }
 
+        $returnDocs = $documents->map(fn($doc) => [
+            'id'              => $doc->id,
+            'document_number' => $doc->document_number,
+            'document_type'   => $doc->documentType?->code,
+            'document_type_name' => $doc->documentType?->name,
+            'date'            => $doc->document_date?->format('Y-m-d'),
+            'party_name'      => $doc->party?->name,
+            'total_ht'        => round($doc->total_ht, 2),
+            'total_ttc'       => round($doc->total_ttc, 2),
+            'reason'          => $doc->notes,
+        ])->toArray();
+
+        $returnDocs = $this->attachDocumentLines($returnDocs, $documents);
+
         return [
-            'documents' => $documents->map(fn($doc) => [
-                'id'              => $doc->id,
-                'document_number' => $doc->document_number,
-                'document_type'   => $doc->documentType?->code,
-                'date'            => $doc->document_date?->format('Y-m-d'),
-                'party_name'      => $doc->party?->name,
-                'total_ht'        => round($doc->total_ht, 2),
-                'total_ttc'       => round($doc->total_ttc, 2),
-                'reason'          => $doc->notes,
-            ])->toArray(),
+            'documents' => $returnDocs,
             'product_recap' => array_map(fn($lr) => [
                 'product_id'   => $lr->product_id,
                 'product_name' => $lr->product_name,

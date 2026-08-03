@@ -139,6 +139,19 @@ td.b{color:var(--blue);font-weight:600;}
 .tbl-empty__inner{display:flex;flex-direction:column;align-items:center;gap:10px;color:var(--t4);font-size:13px;}
 .tbl-empty__icon{opacity:.45;}
 
+/* ═══ TABLE EXPANDABLE ROWS ═══ */
+.tw-exp-cell{width:34px;padding:8px 6px !important;text-align:center;}
+.tw-exp-btn{transition:background .12s, transform .12s;}
+.tw-exp-btn:hover{background:var(--bg3);}
+.tw-exp-row td{background:color-mix(in srgb, var(--em) 4%, transparent);padding:0 !important;}
+.tw-exp-content{padding:4px 10px 12px 10px;}
+.tw-exp-content .tw{overflow:visible;}
+.tw-exp-content table{background:transparent;}
+.tw-exp-content thead th{background:color-mix(in srgb, var(--t1) 6%, transparent);border-bottom:1px solid var(--b2);text-transform:none;letter-spacing:.3px;padding:7px 10px;font-size:11px;}
+.tw-exp-content tbody tr{background:transparent;}
+.tw-exp-content tbody tr:hover{background:color-mix(in srgb, var(--t1) 5%, transparent);}
+.tw-exp-content td{padding:7px 10px;font-size:12px;}
+
 /* ═══ BADGES / CHIPS ═══ */
 .bx{
   display:inline-flex;align-items:center;gap:4px;

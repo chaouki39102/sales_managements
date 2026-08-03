@@ -216,6 +216,9 @@ Route::prefix('v1')->group(function () {
                 Route::get('customers', [ReportController::class, 'customers']);
                 Route::get('suppliers', [ReportController::class, 'suppliers']);
                 Route::get('products',  [ReportController::class, 'products']);
+                Route::get('forecast',  [ReportController::class, 'forecast']);
+                Route::get('monthly',   [ReportController::class, 'monthly']);
+                Route::get('dashboard', [ReportController::class, 'dashboard']);
                 Route::get('inventory', [ReportController::class, 'inventory']);
                 Route::get('payments',  [ReportController::class, 'payments']);
                 Route::get('taxes',     [ReportController::class, 'taxes']);

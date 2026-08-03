@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/ui/PageHeader';
 import Button from '@/components/ui/Button';
 import AlertBar from '@/components/ui/AlertBar';
-import { useActiveSlug } from '@/lib/store/appStore';
 
 interface ReportShellProps {
   title: string;
@@ -16,10 +15,8 @@ interface ReportShellProps {
   children?: React.ReactNode;
 }
 
-export default function ReportShell({ title, subtitle, description, isLoading, isError, refetch, reportId, children }: ReportShellProps) {
+export default function ReportShell({ title, subtitle, description, isLoading, isError, refetch, children }: ReportShellProps) {
   const navigate = useNavigate();
-  const slug = useActiveSlug();
-  const exportUrl = (format: 'excel' | 'pdf') => `/api/v1/${slug}/reports/${reportId}?export=${format}`;
 
   return (
     <div>
@@ -29,8 +26,6 @@ export default function ReportShell({ title, subtitle, description, isLoading, i
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
             <Button size="sm" icon={<i className="ti ti-arrow-right"/>} onClick={() => navigate('/reports')}>العودة</Button>
-            <Button size="sm" icon={<i className="ti ti-download"/>} onClick={() => window.open(exportUrl('excel'), '_blank')}>تصدير Excel</Button>
-            <Button size="sm" icon={<i className="ti ti-printer"/>} onClick={() => window.open(exportUrl('pdf'), '_blank')}>PDF</Button>
             <Button size="sm" icon={<i className="ti ti-refresh"/>} onClick={refetch}>تحديث</Button>
           </div>
         }

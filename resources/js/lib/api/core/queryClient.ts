@@ -78,4 +78,23 @@ export function clearAllCache(): void {
   queryClient.clear();
 }
 
+/**
+ * إبطال كل مفاتيح كاش المخزون الخاصة بشركة — تُستدعى بعد أي عملية
+ * تُغيّر المخزون من خارج صفحة نقاط البيع (إنشاء/تعديل/حذف مستند، بيع سريع…).
+ *
+ * يغطي عائلات المفاتيح التالية (كُلَّها مسبوقة بادئة، لذا invalidateQueries يطابقها):
+ * - [slug, 'pos-stock', …]        — نقاط البيع الكلاسيكية (POSPage)
+ * - [slug, 'pos-pro-stock', …]    — نقاط البيع برو (POSProPage)
+ * - [slug, 'warehouse-stock', …]  — مستودع مستند إضافة/تعديل + useDocumentLookups
+ * - [slug, 'inventory', …]        — stock-at / movements / summary / lots (صفحة المخزون)
+ */
+export function invalidateStockQueries(qc: QueryClient, slug: string): Promise<void> {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: [slug, 'pos-stock'] }),
+    qc.invalidateQueries({ queryKey: [slug, 'pos-pro-stock'] }),
+    qc.invalidateQueries({ queryKey: [slug, 'warehouse-stock'] }),
+    qc.invalidateQueries({ queryKey: [slug, 'inventory'] }),
+  ]).then(() => undefined);
+}
+
 export default queryClient;

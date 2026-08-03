@@ -11,6 +11,7 @@ import React, {
 } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost } from '@/lib/api/core/client';
+import { invalidateStockQueries } from '@/lib/api/core/queryClient';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { settingsApi } from '@/lib/api/endpoints/settings';
 import { useActiveSlug } from '@/lib/store/appStore';
@@ -648,10 +649,10 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
         remaining: Math.max(0, totals.netPay - finalPayAmount),
       };
     },
-    onSuccess: state => {
+    onSuccess: async state => {
       if (slug) {
         qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
-        qc.invalidateQueries({ queryKey: tenantKeys.inventory.all(slug) });
+        await invalidateStockQueries(qc, slug);
         qc.invalidateQueries({ queryKey: [slug, 'payments'] });
       }
       setSuccess(state);

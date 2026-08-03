@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import ReportShell from './ReportShell';
-import { FMT, MONEY } from './helpers';
+import { FMT, MONEY, ReportLinesDetail } from './helpers';
 import { useDailyReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
@@ -48,6 +48,8 @@ export default function DailyReportPage() {
           {d.documents.length > 0 && (
             <Card title={`الوثائق (${d.documents.length})`} titleIcon="ti-file-text" padding="sm" style={{ borderRadius: 12 }}>
               <SimpleTable
+                expandable={(row) => Array.isArray((row as any).lines) && (row as any).lines.length > 0}
+                renderExpanded={(row) => <ReportLinesDetail lines={(row as any).lines} />}
                 columns={[
                   { key: 'document_number', label: 'رقم الوثيقة', render: (v) => <span style={{ fontWeight: 600 }}>{v as string}</span> },
                   { key: 'document_type', label: 'النوع', render: (v) => <Badge>{v as string}</Badge> },

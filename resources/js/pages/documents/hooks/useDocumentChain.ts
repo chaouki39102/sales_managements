@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost } from '@/lib/api/core/client';
+import { invalidateStockQueries } from '@/lib/api/core/queryClient';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
 
@@ -56,8 +57,11 @@ export function useConvertDocument() {
         document_date:    documentDate ?? null,
         include_line_ids: includeLineIds,
       }),
-    onSuccess: () => {
-      if (slug) qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
+    onSuccess: async () => {
+      if (slug) {
+        qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
+        await invalidateStockQueries(qc, slug);
+      }
     },
   });
 }
@@ -77,8 +81,11 @@ export function useCreateReturn() {
   return useMutation({
     mutationFn: ({ documentId, reason, lines }: ReturnPayload) =>
       apiPost(`/documents/${documentId}/return`, { reason, lines }),
-    onSuccess: () => {
-      if (slug) qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
+    onSuccess: async () => {
+      if (slug) {
+        qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
+        await invalidateStockQueries(qc, slug);
+      }
     },
   });
 }

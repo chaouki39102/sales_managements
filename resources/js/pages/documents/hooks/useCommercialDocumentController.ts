@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { apiPost, apiPut, apiGet, apiDelete } from '@/lib/api/core/client';
+import { invalidateStockQueries } from '@/lib/api/core/queryClient';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
 import { settingsApi } from '@/lib/api/endpoints/settings';
@@ -406,13 +407,13 @@ export function useCommercialDocumentController({
         ? apiPut<Record<string, unknown>>(url, payload)
         : apiPost<Record<string, unknown>>(url, payload);
     },
-    onSuccess: (savedDoc) => {
+    onSuccess: async (savedDoc) => {
       if (slug) {
         qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
         qc.invalidateQueries({ queryKey: tenantKeys.parties.all(slug) });
         qc.invalidateQueries({ queryKey: tenantKeys.partyBalances.all(slug) });
         if (affectsStock) {
-          qc.invalidateQueries({ queryKey: tenantKeys.inventory.all(slug) });
+          await invalidateStockQueries(qc, slug);
         }
         if (form.party_id) {
           qc.invalidateQueries({ queryKey: [slug, 'party-balance', parseInt(form.party_id)] });
@@ -441,8 +442,11 @@ export function useCommercialDocumentController({
 
   const deleteMut = useMutation({
     mutationFn: () => apiDelete(`/documents/${existingDocument!.id}`),
-    onSuccess: () => {
-      if (slug) qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
+    onSuccess: async () => {
+      if (slug) {
+        qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
+        await invalidateStockQueries(qc, slug);
+      }
       setSuccessMsg('تم حذف المستند بنجاح');
       successTimer.current = setTimeout(() => {
         setSuccessMsg(''); onSaved();

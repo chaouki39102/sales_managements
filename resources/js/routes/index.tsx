@@ -57,6 +57,9 @@ const PurchasesReportPage   = lazy(() => import('@/pages/reports/PurchasesReport
 const CustomersReportPage   = lazy(() => import('@/pages/reports/CustomersReportPage'));
 const SuppliersReportPage   = lazy(() => import('@/pages/reports/SuppliersReportPage'));
 const ProductsReportPage    = lazy(() => import('@/pages/reports/ProductsReportPage'));
+const ForecastReorderReportPage = lazy(() => import('@/pages/reports/ForecastReorderReportPage'));
+const MonthlyReportPage     = lazy(() => import('@/pages/reports/MonthlyReportPage'));
+const DashboardKpisReportPage = lazy(() => import('@/pages/reports/DashboardKpisReportPage'));
 const InventoryReportPage   = lazy(() => import('@/pages/reports/InventoryReportPage'));
 const PaymentsReportPage    = lazy(() => import('@/pages/reports/PaymentsReportPage'));
 const TaxesReportPage       = lazy(() => import('@/pages/reports/TaxesReportPage'));
@@ -264,6 +267,9 @@ export function AppRoutes() {
             <Route path="customers" element={<CustomersReportPage />} />
             <Route path="suppliers" element={<SuppliersReportPage />} />
             <Route path="products" element={<ProductsReportPage />} />
+            <Route path="forecast" element={<ForecastReorderReportPage />} />
+            <Route path="monthly" element={<MonthlyReportPage />} />
+            <Route path="dashboard" element={<DashboardKpisReportPage />} />
             <Route path="inventory" element={<InventoryReportPage />} />
             <Route path="payments" element={<PaymentsReportPage />} />
             <Route path="taxes" element={<TaxesReportPage />} />

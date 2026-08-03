@@ -73,7 +73,7 @@ class ReportController extends Controller
 
     public function products(Request $request): JsonResponse
     {
-        $filters = $this->prepareFilters($request, ['family_id', 'brand_id', 'warehouse_id']);
+        $filters = $this->prepareFilters($request, ['from_date', 'to_date', 'family_id', 'brand_id', 'warehouse_id']);
         $data = $this->reportService->productsReport($filters);
         
         return response()->json([
@@ -83,9 +83,45 @@ class ReportController extends Controller
         ]);
     }
 
+    public function forecast(Request $request): JsonResponse
+    {
+        $filters = $this->prepareFilters($request, ['horizon', 'from_date', 'to_date']);
+        $data = $this->reportService->forecastReport($filters);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم جلب تقرير التنبؤ وإعادة الطلب بنجاح',
+            'data' => $data,
+        ]);
+    }
+
+    public function monthly(Request $request): JsonResponse
+    {
+        $filters = $this->prepareFilters($request, ['from_date', 'to_date']);
+        $data = $this->reportService->monthlyReport($filters);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم جلب التقرير الشهري بنجاح',
+            'data' => $data,
+        ]);
+    }
+
+    public function dashboard(Request $request): JsonResponse
+    {
+        $filters = $this->prepareFilters($request, ['from_date', 'to_date']);
+        $data = $this->reportService->dashboardReport($filters);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم جلب لوحة القيادة بنجاح',
+            'data' => $data,
+        ]);
+    }
+
     public function inventory(Request $request): JsonResponse
     {
-        $filters = $this->prepareFilters($request, ['family_id', 'warehouse_id', 'low_stock', 'out_of_stock']);
+        $filters = $this->prepareFilters($request, ['as_of_date', 'family_id', 'warehouse_id', 'low_stock', 'out_of_stock']);
         $data = $this->reportService->inventoryReport($filters);
         
         return response()->json([

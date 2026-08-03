@@ -1,7 +1,7 @@
 // components/ui/SimpleTable.tsx
 // Lightweight table wrapper — replaces raw <table> across all pages.
 // Uses global table CSS from components.css (thead th, tbody tr, td, .tw).
-import { useMemo } from 'react';
+import { Fragment, useMemo, useRef, useState } from 'react';
 
 export interface SimpleColumn {
   /** Unique key matching data row property */
@@ -35,6 +35,10 @@ interface SimpleTableProps {
   isLoading?: boolean;
   /** Number of skeleton rows when loading */
   skeletonRows?: number;
+  /** If provided, rows where this returns true get an expand/collapse chevron */
+  expandable?: (row: any) => boolean;
+  /** Renders the expanded detail row content (shown under the expanded row) */
+  renderExpanded?: (row: any) => React.ReactNode;
 }
 
 export default function SimpleTable({
@@ -47,6 +51,8 @@ export default function SimpleTable({
   rowClassName,
   isLoading = false,
   skeletonRows = 5,
+  expandable,
+  renderExpanded,
 }: SimpleTableProps) {
   const getKey = useMemo(() => {
     if (typeof rowKey === 'function') return rowKey;
@@ -60,21 +66,79 @@ export default function SimpleTable({
     return Object.keys(s).length ? s : undefined;
   };
 
+  const hasExpand = !!(expandable && renderExpanded);
+
+  // Expanded-row keys (Set) — re-rendered via a counter bump on toggle.
+  const expandedRef = useRef(new Set<string>());
+  const [, forceRender] = useState(0);
+  const toggleExpanded = (key: string) => {
+    const s = expandedRef.current;
+    if (s.has(key)) s.delete(key); else s.add(key);
+    forceRender(v => v + 1);
+  };
+
+  const expandColumn: SimpleColumn | null = hasExpand ? {
+    key: '__expand__',
+    label: '',
+    className: 'tw-exp-cell',
+    render: (_v, row) => {
+      const key = String(getKey(row));
+      if (!expandable(row)) return null;
+      const open = expandedRef.current.has(key);
+      return (
+        <button
+          type="button"
+          className="tw-exp-btn"
+          title={open ? 'إغلاق التفاصيل' : 'عرض تفاصيل الوثيقة'}
+          aria-label={open ? 'إغلاق التفاصيل' : 'عرض التفاصيل'}
+          aria-expanded={open}
+          onClick={(e) => { e.stopPropagation(); toggleExpanded(key); }}
+          style={{
+            cursor: 'pointer',
+            border: 'none',
+            background: open ? 'var(--em-bg)' : 'transparent',
+            color: 'var(--em)',
+            width: 26,
+            height: 26,
+            borderRadius: 6,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <i className={`ti ${open ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
+        </button>
+      );
+    },
+  } : null;
+
+  const headColumns = hasExpand ? [expandColumn!, ...columns] : columns;
+
+  const renderHead = () => (
+    <thead>
+      <tr>
+        {headColumns.map(c => (
+          <th key={c.key} className={c.className} onClick={c.onHeaderClick} style={thStyle(c)}>{c.label}</th>
+        ))}
+      </tr>
+    </thead>
+  );
+
+  const renderCell = (c: SimpleColumn, row: any) => (
+    <td key={c.key} className={c.className} style={c.align ? { textAlign: c.align } : undefined}>
+      {c.render ? c.render(row[c.key], row, c.key) : (row[c.key] as React.ReactNode) ?? '—'}
+    </td>
+  );
+
   if (isLoading) {
     return (
       <div className="tw">
         <table className={className}>
-          <thead>
-            <tr>
-              {columns.map(c => (
-                <th key={c.key} className={c.className} onClick={c.onHeaderClick} style={thStyle(c)}>{c.label}</th>
-              ))}
-            </tr>
-          </thead>
+          {renderHead()}
           <tbody>
             {Array.from({ length: skeletonRows }).map((_, i) => (
               <tr key={`skel-${i}`}>
-                {columns.map(c => (
+                {headColumns.map(c => (
                   <td key={c.key}><span className="skel" style={{ display: 'inline-block', width: '60%', height: 14, borderRadius: 4 }} /></td>
                 ))}
               </tr>
@@ -101,27 +165,30 @@ export default function SimpleTable({
   return (
     <div className="tw">
       <table className={className}>
-        <thead>
-          <tr>
-            {columns.map(c => (
-              <th key={c.key} className={c.className} onClick={c.onHeaderClick} style={thStyle(c)}>{c.label}</th>
-            ))}
-          </tr>
-        </thead>
+        {renderHead()}
         <tbody>
-          {data.map((row, idx) => (
-            <tr
-              key={getKey(row)}
-              className={rowClassName?.(row, idx)}
-              onClick={onRowClick ? () => onRowClick(row, idx) : undefined}
-            >
-              {columns.map(c => (
-                <td key={c.key} className={c.className} style={c.align ? { textAlign: c.align } : undefined}>
-                  {c.render ? c.render(row[c.key], row, c.key) : (row[c.key] as React.ReactNode) ?? '—'}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {data.map((row, idx) => {
+            const key = String(getKey(row));
+            const isExpanded = hasExpand && expandable(row) && expandedRef.current.has(key);
+            return (
+              <Fragment key={key}>
+                <tr
+                  className={rowClassName?.(row, idx)}
+                  onClick={onRowClick ? () => onRowClick(row, idx) : undefined}
+                >
+                  {hasExpand && <td className="tw-exp-cell">{expandColumn!.render?.(undefined, row, '__expand__')}</td>}
+                  {columns.map(c => renderCell(c, row))}
+                </tr>
+                {isExpanded && (
+                  <tr className="tw-exp-row">
+                    <td colSpan={columns.length + 1}>
+                      <div className="tw-exp-content">{renderExpanded!(row)}</div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>

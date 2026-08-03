@@ -1,15 +1,68 @@
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
+import SimpleTable from '@/components/ui/SimpleTable';
+import type { ReportDocumentLine } from '@/lib/api/endpoints/reports';
 
 export const FMT = (n: number) => n.toLocaleString('fr-DZ');
 export const MONEY = (n: number) => `${FMT(n)} دج`;
 export const PCT = (n: number) => `${n.toFixed(1)}%`;
 
+const monthStart = () => {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+};
+
 export const REPORT_DEFAULTS = {
-  from: new Date().toISOString().slice(0, 10),
+  from: monthStart(),
   to:   new Date().toISOString().slice(0, 10),
-} as const;
+};
+
+/** سطر تفاصيل الوثيقة — "تفاصيل التفاصيل" للتقارير */
+export function ReportLinesDetail({ lines }: { lines?: ReportDocumentLine[] }) {
+  if (!lines?.length) {
+    return (
+      <div style={{ fontSize: 12, color: 'var(--t4)', padding: '8px 2px' }}>
+        لا توجد تفاصيل مسجلة لهذه الوثيقة
+      </div>
+    );
+  }
+  const columns = [
+    { key: 'product_name', label: 'المنتج' },
+    { key: 'product_ref', label: 'المرجع' },
+    {
+      key: 'quantity', label: 'الكمية', align: 'end' as const,
+      render: (v: unknown, row: ReportDocumentLine) => {
+        const q = Number(v ?? 0);
+        const pk = row.pack_qty ? Number(row.pack_qty) : 0;
+        return pk > 1 ? `${FMT(q)} × ${pk}` : FMT(q);
+      },
+    },
+    { key: 'unit_price_ht', label: 'سعر الوحدة HT', align: 'end' as const, render: (v: unknown) => MONEY(Number(v ?? 0)) },
+    {
+      key: 'discount_percentage', label: 'الخصم', align: 'end' as const,
+      render: (_v: unknown, row: ReportDocumentLine) => {
+        const pct = Number(row.discount_percentage ?? 0);
+        const amt = Number(row.total_discount_amount ?? 0);
+        if (amt > 0) return pct > 0 ? `${MONEY(amt)} (${pct.toFixed(2)}%)` : MONEY(amt);
+        if (pct > 0) return `${pct.toFixed(2)}%`;
+        return '—';
+      },
+    },
+    { key: 'tva_rate', label: 'TVA %', align: 'end' as const, render: (v: unknown) => `${Number(v ?? 0).toFixed(2)}%` },
+    { key: 'total_ht', label: 'المجموع HT', align: 'end' as const, render: (v: unknown) => MONEY(Number(v ?? 0)) },
+    { key: 'total_tva', label: 'TVA', align: 'end' as const, render: (v: unknown) => MONEY(Number(v ?? 0)) },
+    { key: 'total_ttc', label: 'المجموع TTC', align: 'end' as const, render: (v: unknown) => MONEY(Number(v ?? 0)) },
+  ];
+  return (
+    <SimpleTable
+      columns={columns}
+      data={lines}
+      rowKey={(row) => `${row.product_id}-${row.quantity}-${row.unit_price_ht}-${row.tva_rate}`}
+      emptyText="لا توجد تفاصيل"
+    />
+  );
+}
 
 export interface ReportCardMeta {
   id: string;
@@ -28,6 +81,9 @@ export const REPORT_CARDS: ReportCardMeta[] = [
   { id: 'customers', title: 'تقرير الزبائن', description: 'كشف حساب الزبائن والديون المستحقة', icon: 'ti-users', color: 'var(--purple)', href: '/reports/customers' },
   { id: 'suppliers', title: 'تقرير الموردين', description: 'كشف حساب الموردين والمستحقات', icon: 'ti-truck', color: 'var(--gold)', href: '/reports/suppliers' },
   { id: 'products', title: 'تقرير المنتجات', description: 'حركة المنتجات والمبيعات', icon: 'ti-package', color: 'var(--teal)', href: '/reports/products' },
+  { id: 'dashboard', title: 'لوحة القيادة', description: 'مؤشرات الأداء الرئيسية للفترة', icon: 'ti-gauge', color: 'var(--em)', badge: 'جديد', href: '/reports/dashboard' },
+  { id: 'forecast', title: 'التنبؤ وإعادة الطلب', description: 'توقع الطلب وكمية إعادة الطلب المقترحة', icon: 'ti-chart-line', color: 'var(--orange)', badge: 'جديد', href: '/reports/forecast' },
+  { id: 'monthly', title: 'التقرير الشهري', description: 'مبيعات ومشتريات شهراً بشهر', icon: 'ti-calendar-month', color: 'var(--blue)', badge: 'جديد', href: '/reports/monthly' },
   { id: 'inventory', title: 'تقرير المخزون', description: 'تقييم المخزون والمنتجات المنخفضة', icon: 'ti-building-warehouse', color: 'var(--orange)', href: '/reports/inventory' },
   { id: 'payments', title: 'تقرير الدفعات', description: 'سجل الدفعات والتحصيلات', icon: 'ti-cash', color: 'var(--em)', href: '/reports/payments' },
   { id: 'taxes', title: 'تقرير الضرائب', description: 'تقرير TVA والطابع الجبائي', icon: 'ti-calculator', color: 'var(--red)', href: '/reports/taxes' },

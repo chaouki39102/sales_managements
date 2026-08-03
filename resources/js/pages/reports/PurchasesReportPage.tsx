@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
-import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
+import { FMT, MONEY, REPORT_DEFAULTS, ReportLinesDetail } from './helpers';
 import { usePurchasesReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
@@ -77,6 +77,8 @@ export default function PurchasesReportPage() {
             <SimpleTable
               rowKey={(row) => (row as any).__isSummary ? '__summary__' : String(row.id ?? '')}
               rowClassName={(row, _index) => (row as any).__isSummary ? 'tw-sr' : ''}
+              expandable={(row) => !(row as any).__isSummary && Array.isArray(row.lines) && row.lines.length > 0}
+              renderExpanded={(row) => <ReportLinesDetail lines={row.lines} />}
               columns={[
                 { key: '_idx', label: '#' },
                 { key: 'document_number', label: 'الوثيقة', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },

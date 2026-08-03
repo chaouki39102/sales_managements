@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import ReportShell from './ReportShell';
-import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
 import { useInventoryReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
@@ -19,9 +18,8 @@ const STATUS_LABEL: Record<string, { text: string; variant: string }> = {
 const def = REPORT_DEFAULTS;
 
 export default function InventoryReportPage() {
-  const [fromDate, setFromDate] = useState(def.from);
-  const [toDate, setToDate] = useState(def.to);
-  const { data, isLoading, isError, refetch } = useInventoryReport({ from_date: fromDate || undefined, to_date: toDate || undefined });
+  const [asOfDate, setAsOfDate] = useState(def.to);
+  const { data, isLoading, isError, refetch } = useInventoryReport({ as_of_date: asOfDate || undefined });
 
   const handleExport = async () => {
     if (!data) return;
@@ -29,12 +27,13 @@ export default function InventoryReportPage() {
       name: 'المخزون',
       headers: ['#', 'المنتج', 'المرجع', 'العائلة', 'الكمية', 'سعر الشراء HT', 'التكلفة', 'القيمة', 'الحالة'],
       rows: data.products.map((r, i) => [i + 1, r.name, r.ref, r.family ?? '—', r.stock_quantity, r.purchase_price_ht, r.current_cost_price, r.stock_value, STATUS_LABEL[r.status]?.text ?? r.status]),
-    }], `تقرير المخزون ${fromDate}-${toDate}`);
+    }], `تقرير المخزون حتى ${asOfDate}`);
   };
 
-  return <ReportShell title="تقرير المخزون" subtitle={`أرصدة وحركة المنتجات في المستودعات — ${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="inventory">
+  return <ReportShell title="تقرير المخزون" subtitle={asOfDate ? `أرصدة المنتجات في المستودعات حتى ${asOfDate}` : 'أرصدة المنتجات (الرصيد الحالي)'} isLoading={isLoading} isError={isError} refetch={refetch} reportId="inventory">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-      <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
+      <label style={{ fontWeight: 600, fontSize: 13 }}>الرصيد حتى تاريخ:</label>
+      <input type="date" className="form-control" style={{ width: 200 }} value={asOfDate} onChange={(e) => setAsOfDate(e.target.value)} />
       <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
     </div>
     {data && (
