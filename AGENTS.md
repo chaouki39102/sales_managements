@@ -5,7 +5,34 @@
 - **When reading how API data is returned**, ALWAYS check `extractData()` in `resources/js/lib/api/core/client.ts` — it is the single standard bridge between backend and frontend. Never assume the raw HTTP response shape reaches consumers directly.
 
 ## Date
-2026-08-02
+2026-08-03
+
+### Phase 55 — Client Monthly Turnover + Grand Livre + Matrix Reports + Product History (Aug 3)
+
+**Request**: two matrix-style reports — **Client Monthly Turnover** (rows = clients, cols = months) and **Grand Livre** (chronological ledger with running balance) — plus finishing three low-priority modal tasks (customers date, suppliers كشف حساب, products history).
+
+**Client Monthly Turnover** (`clientMonthlyReport` in `ReportService.php`, `clientMonthly` controller, GET `reports/client-monthly`):
+- Rows = clients (party_type_id 1), cols = month buckets via a month-key (`YYYY-MM`), chronological month range over the from/to window with empty gaps filled; summary row at bottom.
+- Measure toggle in the page (qty / HT / TTC pills) — the backend returns all three per cell (`qty`, `ht`, `ttc`), the page picks the column to render.
+- AV/AA returns signed negative (`CASE WHEN dt.code = 'AV' THEN -1 ELSE 1`); sorted by total_ttc desc; `AR_MONTHS` const (`جانفي..ديسمبر`) added for month labels.
+
+**Grand Livre** (`grandLivreReport`, `grandLivre` controller, GET `reports/grand-livre`):
+- Chronological ledger of documents **and** confirmed payments for parties, filtered by `party_id` / `party_type_id` / from / to.
+- Sign convention: sale (FV/POS) → debit (+), AV → credit; purchase (FA) → credit (−), AA → debit; payments: in → debit, out → credit.
+- Opening balances via `PartyBalanceService::getAllBalancesAt($dateBefore, $typeId)`; filters `parties.deleted_at`, `cd.deleted_at`, payments `status='confirmed'` + `payments.deleted_at`; running balance, closing balance, summary totals; transactions formatted `date = YYYY-MM-DD` (10-char substr), sorted date → datetime → type (document before payment) → reference. `arabicMonthLabel()` used for the page subtitle.
+
+**Sales/Purchases matrix pages** (`SalesMatrixReportPage.tsx` / `PurchasesMatrixReportPage.tsx` sharing `MatrixReportPage.tsx` + `matrixDetail` endpoint): rows = products, cols = parties, cell click → per-document `MatrixDetailRow` modal. Registered as `'sales-matrix'` / `'purchases-matrix'` in `REPORT_CARDS`.
+
+**Product history** (low-priority #3): new `productHistoryReport` (GET `reports/product-history`) — per-document lines for one product in a period (document_number/date, type, party, qty, ht, tva, ttc; AV/AA signed negative). `ProductsReportPage` got a «الحركة» action button per row opening a `Modal` using `useProductHistory`.
+
+**Suppliers كشف حساب** (low-priority #2): `SuppliersReportPage` action column with a «كشف حساب» button (shown when `doc_count > 0`) opening the existing `TransactionHistoryModal`.
+
+**Key architectural rules**:
+- Sale doc codes `SALE_CODES = ['FV','AV','POS']`, purchases `PURCHASE_CODES = ['FA','AA']`; client `party_type_id = 1`, supplier `2`; AV/AA always negate.
+- Report rows' `id` must stay unique across data + summary rows (summary uses `id: '__summary'`) so `SimpleTable` rowKey stays valid.
+- `useProductHistory` is enabled only when `product_id` is set (query key includes params, so the selected product/range re-fetches).
+
+**Verification**: `php -l` clean ×3. `vendor\bin\pest.bat` — 15 passed (52 assertions). `npx tsc --noEmit` clean. `npm test` — 174/174 pass. `npm run build` — 0 errors, 193 precache entries, `root sw == build sw: True` (SW MATCH). Backend smoke (company context set — `ReportService::companyId()` is null in bare tinker): product 29 → 10 docs (POS qty +, ht 67116); product 54 → 8 docs FA/POS; product 33 AV lines signed negative (qty −3/−2/−3). Committed `826f47b`, pushed to `main`.
 
 ### Phase 54 — Report Date Filters + Missing Filters + "Detail of the Details" Drill-Down (Aug 2)
 
