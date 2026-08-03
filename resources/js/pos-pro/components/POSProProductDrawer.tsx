@@ -353,12 +353,13 @@ interface PPRowProps {
   outStock: boolean;
   onAdd: Props['onAdd'];
   onQty?: Props['onQty'];
+  onInfo: (v: ProductVariant) => void;
   onHi: (idx: number) => void;
   elRef?: (el: HTMLElement | null) => void;
 }
 
 const PPRow = React.memo(function PPRow({
-  v, idx, hi, query, priceLevels, selectedPriceLevelId, inCartQty, qtyInCartUnits, outStock, onAdd, onQty, onHi, elRef,
+  v, idx, hi, query, priceLevels, selectedPriceLevelId, inCartQty, qtyInCartUnits, outStock, onAdd, onQty, onInfo, onHi, elRef,
 }: PPRowProps) {
   const priceHt = getVariantPrice(v, selectedPriceLevelId, priceLevels);
   const tvaRate = v.tva?.rate ?? 0;
@@ -407,6 +408,15 @@ const PPRow = React.memo(function PPRow({
         )}
       </div>
       <div className="pp-lrow-actions">
+        <button
+          type="button"
+          className="pp-lrow-info"
+          onClick={(e) => { e.stopPropagation(); onInfo(v); }}
+          title="معلومات المنتج"
+          aria-label="معلومات المنتج"
+        >
+          <i className="ti ti-info-circle" />
+        </button>
         {inCart && onQty ? (
           <div className="pp-lrow-qty">
             <button type="button" className="pp-lrow-qty-btn" onClick={handleDec} title="تقليل">
@@ -448,7 +458,8 @@ const PPRow = React.memo(function PPRow({
   && prev.selectedPriceLevelId === next.selectedPriceLevelId
   && prev.priceLevels === next.priceLevels
   && prev.onAdd === next.onAdd
-  && prev.onQty === next.onQty);
+  && prev.onQty === next.onQty
+  && prev.onInfo === next.onInfo);
 
 export default function POSProProductDrawer({
   open, variants, families, cartCount, cartItems = [], onAdd, onClose, onQty,
@@ -470,7 +481,10 @@ export default function POSProProductDrawer({
     const saved = readLS('pos-pro-drawer-grid', gridSize);
     return (GRID_SIZE_OPTIONS as string[]).includes(saved) ? saved as GridDefaultSize : gridSize;
   });
-  const [sortBy, setSortBy] = useState<SortKey>('name');
+  const [sortBy, setSortBy] = useState<SortKey>(() => {
+    const saved = readLS('pos-pro-drawer-sort', 'name');
+    return (SORT_OPTIONS as readonly { v: string }[]).some(o => o.v === saved) ? saved as SortKey : 'name';
+  });
   const [infoVariant, setInfoVariant] = useState<ProductVariant | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const cardRefs  = useRef(new Map<number, HTMLElement>());
@@ -478,6 +492,7 @@ export default function POSProProductDrawer({
 
   useEffect(() => { writeLS('pos-pro-drawer-view', view); }, [view]);
   useEffect(() => { writeLS('pos-pro-drawer-grid', gsize); }, [gsize]);
+  useEffect(() => { writeLS('pos-pro-drawer-sort', sortBy); }, [sortBy]);
 
   useEffect(() => {
     if (open) {
@@ -801,6 +816,7 @@ export default function POSProProductDrawer({
                 outStock={isVariantOutOfStock(v, allowNegativeStock)}
                 onAdd={onAdd}
                 onQty={onQty}
+                onInfo={handleInfo}
                 onHi={handleHi}
                 elRef={registerRow}
               />

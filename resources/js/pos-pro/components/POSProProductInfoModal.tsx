@@ -13,7 +13,7 @@
 // نفس منطق تسعير بطاقة المنتج تماماً (getVariantPrice × تغليفة) حتى يبقى
 // السعر المعروض هو ما يُضاف فعلياً.
 // ════════════════════════════════════════════════════════════════════════════
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import { formatDZD } from '@/pos/utils/calculations';
 import { getVariantPrice, isVariantOutOfStock } from '@/pos/utils/posHelpers';
@@ -41,6 +41,20 @@ function activeDiscounts(v: ProductVariant) {
     .sort((a, b) => (a.min_qty ?? 0) - (b.min_qty ?? 0));
 }
 
+/** سعر الإضافة الفعلي لخيار (سعر الوحدة × تغليفته الافتراضية) — مطابق تماماً
+ *  لسلوك التبديل حتى يكون سعر الخيار المعروض هو ما يُضاف فعلياً. */
+function addPriceFor(
+  s: ProductVariant,
+  priceLevelId: number | null,
+  priceLevels: PriceLevel[],
+): number {
+  const base = getVariantPrice(s, priceLevelId, priceLevels);
+  const pkgs = (s.packagings ?? (s.product as any)?.packagings ?? [])
+    .filter((p: ProductPackaging) => p.active !== false);
+  const def = pkgs.find((p: ProductPackaging) => p.is_default) ?? pkgs[0] ?? null;
+  return base * (def ? Math.max(1, Number(def.quantity) || 1) : 1);
+}
+
 export default function POSProProductInfoModal({
   open, variant, siblings, priceLevels, selectedPriceLevelId,
   priceDisplayMode, allowNegativeStock, qtyInCartById, onAdd, onClose,
@@ -51,6 +65,11 @@ export default function POSProProductInfoModal({
   const v = activeVariant;
   const [qty, setQty] = useState(1);
   useEffect(() => { setQty(1); }, [v.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── تغذية راجعة فورية بعد الإضافة (بدون إغلاق النافذة) ─────────────────────
+  const [justAdded, setJustAdded] = useState(false);
+  const addTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (addTimerRef.current) clearTimeout(addTimerRef.current); }, []);
 
   // ── التغليف (نفس منطق بطاقة المنتج) ─────────────────────────────────────────
   const packagings = useMemo(() => {
@@ -100,6 +119,9 @@ export default function POSProProductInfoModal({
   const handleAdd = () => {
     if (outStock || qty <= 0) return;
     onAdd(v, qty, activePkg);
+    setJustAdded(true);
+    if (addTimerRef.current) clearTimeout(addTimerRef.current);
+    addTimerRef.current = setTimeout(() => setJustAdded(false), 900);
   };
 
   const stockCls = outStock ? 'pp-badge pp-badge--out'
@@ -137,9 +159,14 @@ export default function POSProProductInfoModal({
               <i className="ti ti-plus" />
             </button>
           </div>
-          <button type="button" className="btn btn-p" onClick={handleAdd} disabled={outStock}>
-            <i className="ti ti-shopping-cart-plus" />
-            إضافة إلى السلة
+          <button
+            type="button"
+            className={`btn btn-p${justAdded ? ' ok' : ''}`}
+            onClick={handleAdd}
+            disabled={outStock}
+          >
+            <i className={justAdded ? 'ti ti-check' : 'ti ti-shopping-cart-plus'} />
+            {justAdded ? 'تمت الإضافة' : 'إضافة إلى السلة'}
           </button>
         </div>
       }
@@ -165,6 +192,9 @@ export default function POSProProductInfoModal({
               </span>
             </div>
             <span className={stockCls}>{stockLabel}</span>
+            {inCartUnits > 0 && (
+              <span className="pp-info-incart"><i className="ti ti-shopping-cart" /> في السلة: {inCartUnits}</span>
+            )}
           </div>
         </div>
 
@@ -254,17 +284,21 @@ export default function POSProProductInfoModal({
             <span className="pp-info-cell-l"><i className="ti ti-variable" /> الخيارات ({siblings.length})</span>
             <div className="pp-info-variant-list">
               {siblings.map(s => {
-                const sPrice = getVariantPrice(s, selectedPriceLevelId, priceLevels);
+                const sPrice = addPriceFor(s, selectedPriceLevelId, priceLevels);
                 const sActive = s.id === v.id;
+                const sOut = isVariantOutOfStock(s, allowNegativeStock);
                 return (
                   <button
                     key={s.id}
                     type="button"
-                    className={`pp-info-variant${sActive ? ' on' : ''}`}
+                    className={`pp-info-variant${sActive ? ' on' : ''}${sOut ? ' off' : ''}`}
                     onClick={() => switchVariant(s)}
+                    disabled={sOut}
+                    title={sOut ? 'نفد المخزون' : undefined}
                   >
                     <span className="pp-info-variant-n">{s.variant_name?.trim() || s.ref || s.product?.name}</span>
                     <span className="pp-info-variant-p">{formatDZD(sPrice)}</span>
+                    {sOut && <span className="pp-info-variant-oos">نفد</span>}
                   </button>
                 );
               })}

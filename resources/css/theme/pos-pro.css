@@ -2769,3 +2769,77 @@
 
 .pp-info-add .btn-p:disabled { opacity: .45; cursor: not-allowed; }
 
+/* زر الإضافة — حالة "تمت الإضافة" (نبضة نجاح) */
+.pp-info-add .btn-p.ok {
+  background: var(--em3);
+  border-color: var(--em3);
+  color: #fff;
+  animation: ppAddedPop .3s cubic-bezier(.34,1.56,.64,1);
+}
+
+@keyframes ppAddedPop {
+  0%   { transform: scale(.92); }
+  60%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+/* شارة "في السلة" في رأس النافذة */
+.pp-info-incart {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: var(--bg4);
+  border: 1px dashed var(--embo);
+  color: var(--em);
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.pp-info-incart i { font-size: 13px; }
+
+/* خيارات نفدت — تعطيل + شارة */
+.pp-info-variant.off {
+  opacity: .5;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
+.pp-info-variant.off:hover {
+  border-color: var(--b3);
+  background: var(--bg2);
+  color: var(--t2);
+}
+
+.pp-info-variant-oos {
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--redb);
+  color: var(--red);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+/* زر معلومات في صفوف عرض القائمة */
+.pp-lrow-info {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--b2);
+  border-radius: 8px;
+  background: var(--bg3);
+  color: var(--t3);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all .12s;
+  flex-shrink: 0;
+}
+
+.pp-lrow-info:hover { color: var(--em); background: var(--emb); border-color: var(--embo); }
+
+.pp-lrow-info i { pointer-events: none; }
+
