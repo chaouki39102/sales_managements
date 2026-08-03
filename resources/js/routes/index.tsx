@@ -75,6 +75,10 @@ const CashFlowReportPage    = lazy(() => import('@/pages/reports/CashFlowReportP
 const ExpensesReportPage    = lazy(() => import('@/pages/reports/ExpensesReportPage'));
 const SalesTrendReportPage  = lazy(() => import('@/pages/reports/SalesTrendReportPage'));
 const StockMovementsReportPage = lazy(() => import('@/pages/reports/StockMovementsReportPage'));
+const SalesMatrixReportPage    = lazy(() => import('@/pages/reports/SalesMatrixReportPage'));
+const PurchasesMatrixReportPage = lazy(() => import('@/pages/reports/PurchasesMatrixReportPage'));
+const ClientMonthlyReportPage   = lazy(() => import('@/pages/reports/ClientMonthlyReportPage'));
+const GrandLivreReportPage      = lazy(() => import('@/pages/reports/GrandLivreReportPage'));
 
 // â”€â”€ Notifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const NotificationsPage = lazy(() => import('@/pages/notifications/NotificationsPage'));
@@ -285,6 +289,10 @@ export function AppRoutes() {
             <Route path="expenses" element={<ExpensesReportPage />} />
             <Route path="sales-trend" element={<SalesTrendReportPage />} />
             <Route path="stock-movements" element={<StockMovementsReportPage />} />
+            <Route path="sales-matrix" element={<SalesMatrixReportPage />} />
+            <Route path="purchases-matrix" element={<PurchasesMatrixReportPage />} />
+            <Route path="client-monthly" element={<ClientMonthlyReportPage />} />
+            <Route path="grand-livre" element={<GrandLivreReportPage />} />
           </Route>
 
           {/* HR */}

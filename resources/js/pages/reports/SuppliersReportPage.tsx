@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
 import { useSuppliersReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
+import { TransactionHistoryModal } from '@/pages/debts/TransactionHistoryModal';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -12,9 +14,18 @@ import SimpleTable from '@/components/ui/SimpleTable';
 const def = REPORT_DEFAULTS;
 
 export default function SuppliersReportPage() {
+  const navigate = useNavigate();
   const [fromDate, setFromDate] = useState(def.from);
   const [toDate, setToDate] = useState(def.to);
   const { data, isLoading, isError, refetch } = useSuppliersReport({ from_date: fromDate || undefined, to_date: toDate || undefined });
+
+  const [historyParty, setHistoryParty] = useState<{ id: number; name: string } | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  const openHistory = useCallback((id: number, name: string) => {
+    setHistoryParty({ id, name });
+    setHistoryOpen(true);
+  }, []);
 
   const handleExport = async () => {
     if (!data) return;
@@ -54,6 +65,10 @@ export default function SuppliersReportPage() {
                 if (row.id === '__summary') return <span style={{ fontWeight: 800, color: 'var(--red)' }}>{FMT(v as number)}</span>;
                 return <span style={{ color: (v as number) > 0 ? 'var(--red)' : 'var(--em)', fontWeight: 700 }}>{FMT(v as number)}</span>;
               }},
+              { key: 'action', label: '', render: (_v, row) => {
+                const r = row as any;
+                return r.id === '__summary' ? null : r.doc_count > 0 ? <Button size="xs" variant="gray" icon={<i className="ti ti-history"/>} onClick={() => openHistory(r.id, r.name)}>كشف حساب</Button> : null;
+              }},
             ]}
             data={[
               ...data.suppliers.map((r, i) => ({ ...r, _idx: i + 1 })),
@@ -63,6 +78,16 @@ export default function SuppliersReportPage() {
           />
         </Card>
       </>
+    )}
+    {historyParty && (
+      <TransactionHistoryModal
+        open={historyOpen}
+        partyId={historyParty.id}
+        partyName={historyParty.name}
+        date={toDate}
+        onClose={() => setHistoryOpen(false)}
+        navigate={navigate}
+      />
     )}
   </ReportShell>;
 }

@@ -17,6 +17,7 @@ class ReportService
 {
     private const SALE_CODES = ['FV', 'AV', 'POS'];
     private const PURCHASE_CODES = ['FA', 'AA'];
+    private const AR_MONTHS = ['جانفي', 'فيفري', 'مارس', 'أفريل', 'ماي', 'جوان', 'جويلية', 'أوت', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
 
     private function companyId(): int
     {
@@ -1611,6 +1612,76 @@ class ReportService
         ];
     }
 
+    /**
+     * سجل حركة منتج: كل وثيقة تحتوي على المنتج في الفترة، مع الإرجاعات بإشارة سالبة.
+     */
+    public function productHistoryReport(array $filters = []): array
+    {
+        $productId = $filters['product_id'] ?? null;
+        $from = $filters['from_date'] ?? null;
+        $to   = $filters['to_date']   ?? null;
+
+        $empty = [
+            'items'   => [],
+            'summary' => ['doc_count' => 0, 'total_qty' => 0, 'total_ht' => 0.0, 'total_ttc' => 0.0],
+        ];
+
+        if (!$productId || !$from || !$to) {
+            return $empty;
+        }
+
+        $rows = DB::table('commercial_document_lines as cdl')
+            ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+            ->join('document_types as dt',       'dt.id', '=', 'cd.document_type_id')
+            ->join('parties as pt',              'pt.id', '=', 'cd.party_id')
+            ->where('cd.company_id',   $this->companyId())
+            ->where('cdl.product_id',  $productId)
+            ->whereDate('cd.document_date', '>=', $from)
+            ->whereDate('cd.document_date', '<=', $to)
+            ->whereNull('cd.deleted_at')
+            ->whereNull('pt.deleted_at')
+            ->select(
+                'cd.id',
+                'cd.document_number',
+                'cd.document_date',
+                'dt.code as type_code',
+                'dt.name as type_name',
+                'pt.name as party_name',
+                'cdl.quantity',
+                'cdl.total_ht',
+                'cdl.total_tva',
+                'cdl.total_ttc'
+            )
+            ->orderBy('cd.document_date', 'asc')
+            ->orderBy('cd.id', 'asc')
+            ->get();
+
+        $sign = fn(string $code, float $val) => in_array($code, ['AV', 'AA']) ? -$val : $val;
+
+        $items = $rows->map(fn($r) => [
+            'id'              => $r->id,
+            'document_number' => $r->document_number,
+            'document_date'   => substr((string) $r->document_date, 0, 10),
+            'type_code'       => $r->type_code,
+            'type_name'       => $r->type_name,
+            'party_name'      => $r->party_name,
+            'quantity'        => round($sign((string) $r->type_code, (float) $r->quantity), 3),
+            'total_ht'        => round($sign((string) $r->type_code, (float) $r->total_ht), 2),
+            'total_tva'       => round($sign((string) $r->type_code, (float) $r->total_tva), 2),
+            'total_ttc'       => round($sign((string) $r->type_code, (float) $r->total_ttc), 2),
+        ])->values()->toArray();
+
+        return [
+            'items'   => $items,
+            'summary' => [
+                'doc_count' => count($items),
+                'total_qty' => round(array_sum(array_column($items, 'quantity')), 3),
+                'total_ht'  => round(array_sum(array_column($items, 'total_ht')), 2),
+                'total_ttc' => round(array_sum(array_column($items, 'total_ttc')), 2),
+            ],
+        ];
+    }
+
     public function profitLossReport(array $filters = []): array
     {
         $fiscalYearId = $filters['fiscal_year_id'] ?? null;
@@ -2013,5 +2084,577 @@ class ReportService
                 'movement_count'  => (int) ($totals->movement_count ?? 0),
             ],
         ];
+    }
+
+    /**
+     * تقرير المصفوفة: صفوف = أطراف (زبائن أو موردون)، أعمدة = منتجات.
+     * كل خلية = الكمية / HT / TTC / التكلفة للزوج (طرف × منتج).
+     * الإرجاعات (AV/AA) تُحتسب بقيمة سالبة في الخلية.
+     *
+     * @param string $mode 'sale' → زبائن (SALE_CODES) ، 'purchase' → موردون (PURCHASE_CODES)
+     */
+    public function matrixReport(array $filters = [], string $mode = 'sale'): array
+    {
+        $companyId    = $this->companyId();
+        $fiscalYearId = $filters['fiscal_year_id'] ?? null;
+        $fromDate     = $filters['from_date'] ?? null;
+        $toDate       = $filters['to_date'] ?? null;
+        $familyId     = $filters['family_id'] ?? null;
+        $brandId      = $filters['brand_id'] ?? null;
+
+        $isSale    = $mode === 'sale';
+        $docCodes  = $isSale ? self::SALE_CODES : self::PURCHASE_CODES;
+        $partyType = $isSale ? 1 : 2;
+
+        $query = DB::table('commercial_document_lines as cdl')
+            ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+            ->join('document_types as dt',       'dt.id', '=', 'cd.document_type_id')
+            ->join('parties as pt',              'pt.id', '=', 'cd.party_id')
+            ->join('products as p',              'p.id',  '=', 'cdl.product_id')
+            ->where('cd.company_id', $companyId)
+            ->where('pt.party_type_id', $partyType)
+            ->whereIn('dt.code', $docCodes)
+            ->whereNull('cd.deleted_at')
+            ->whereNull('pt.deleted_at');
+
+        if ($fiscalYearId) $query->where('cd.fiscal_year_id', $fiscalYearId);
+        if ($fromDate)     $query->whereDate('cd.document_date', '>=', $fromDate);
+        if ($toDate)       $query->whereDate('cd.document_date', '<=', $toDate);
+        if ($familyId)     $query->where('p.family_id', $familyId);
+        if ($brandId)      $query->where('p.brand_id', $brandId);
+
+        $sign = "CASE WHEN dt.code IN ('AV', 'AA') THEN -1 ELSE 1 END";
+
+        $rows = $query->select(
+            'cd.party_id',
+            'pt.name as party_name',
+            'pt.code as party_code',
+            'p.id as product_id',
+            'p.name as product_name',
+            'p.ref as product_ref',
+            DB::raw("SUM({$sign} * cdl.quantity) as qty"),
+            DB::raw("SUM({$sign} * cdl.total_ht)  as ht"),
+            DB::raw("SUM({$sign} * cdl.total_ttc) as ttc"),
+            DB::raw("SUM({$sign} * cdl.quantity * cdl.cost_price_ht) as cost")
+        )
+            ->groupBy('cd.party_id', 'pt.name', 'pt.code', 'p.id', 'p.name', 'p.ref')
+            ->get();
+
+        $partyMap   = [];
+        $productMap = [];
+
+        foreach ($rows as $r) {
+            $partyId = $r->party_id;
+            $prodId  = $r->product_id;
+            $qty     = (float) $r->qty;
+            $ht      = (float) $r->ht;
+            $ttc     = (float) $r->ttc;
+            $cost    = (float) $r->cost;
+
+            if (!isset($partyMap[$partyId])) {
+                $partyMap[$partyId] = [
+                    'id'          => $partyId,
+                    'name'        => $r->party_name,
+                    'code'        => $r->party_code,
+                    'total_qty'   => 0.0,
+                    'total_ht'    => 0.0,
+                    'total_ttc'   => 0.0,
+                    'total_cost'  => 0.0,
+                    'total_margin'=> 0.0,
+                    'cells'       => [],
+                ];
+            }
+            if (!isset($productMap[$prodId])) {
+                $productMap[$prodId] = [
+                    'id'          => $prodId,
+                    'name'        => $r->product_name,
+                    'ref'         => $r->product_ref,
+                    'total_qty'   => 0.0,
+                    'total_ht'    => 0.0,
+                    'total_ttc'   => 0.0,
+                    'total_cost'  => 0.0,
+                    'total_margin'=> 0.0,
+                ];
+            }
+
+            $partyMap[$partyId]['cells'][$prodId] = [
+                'qty'  => $qty,
+                'ht'   => $ht,
+                'ttc'  => $ttc,
+                'cost' => $cost,
+            ];
+
+            $partyMap[$partyId]['total_qty']  += $qty;
+            $partyMap[$partyId]['total_ht']   += $ht;
+            $partyMap[$partyId]['total_ttc']  += $ttc;
+            $partyMap[$partyId]['total_cost'] += $cost;
+            $partyMap[$partyId]['total_margin'] = $partyMap[$partyId]['total_ht'] - $partyMap[$partyId]['total_cost'];
+
+            $productMap[$prodId]['total_qty']  += $qty;
+            $productMap[$prodId]['total_ht']   += $ht;
+            $productMap[$prodId]['total_ttc']  += $ttc;
+            $productMap[$prodId]['total_cost'] += $cost;
+            $productMap[$prodId]['total_margin'] = $productMap[$prodId]['total_ht'] - $productMap[$prodId]['total_cost'];
+        }
+
+        $parties = array_values($partyMap);
+        foreach ($parties as &$p) {
+            $p['total_qty']    = round($p['total_qty'], 3);
+            $p['total_ht']     = round($p['total_ht'], 2);
+            $p['total_ttc']    = round($p['total_ttc'], 2);
+            $p['total_cost']   = round($p['total_cost'], 2);
+            $p['total_margin'] = round($p['total_margin'], 2);
+            $p['cells']        = array_map(fn($c) => [
+                'qty'  => round($c['qty'], 3),
+                'ht'   => round($c['ht'], 2),
+                'ttc'  => round($c['ttc'], 2),
+                'cost' => round($c['cost'], 2),
+            ], $p['cells']);
+        }
+        unset($p);
+
+        $products = array_values($productMap);
+        foreach ($products as &$pr) {
+            $pr['total_qty']    = round($pr['total_qty'], 3);
+            $pr['total_ht']     = round($pr['total_ht'], 2);
+            $pr['total_ttc']    = round($pr['total_ttc'], 2);
+            $pr['total_cost']   = round($pr['total_cost'], 2);
+            $pr['total_margin'] = round($pr['total_margin'], 2);
+        }
+        unset($pr);
+
+        // ترتيب: الأطراف والأعمدة حسب إجمالي HT تنازلياً (الأكثر مبيعاً أولاً)
+        usort($parties,  fn($a, $b) => $b['total_ht'] <=> $a['total_ht']);
+        usort($products, fn($a, $b) => $b['total_ht'] <=> $a['total_ht']);
+
+        return [
+            'mode'     => $mode,
+            'parties'  => $parties,
+            'products' => $products,
+            'summary'  => [
+                'party_count'   => count($parties),
+                'product_count' => count($products),
+                'total_qty'     => round(array_sum(array_column($parties, 'total_qty')), 3),
+                'total_ht'      => round(array_sum(array_column($parties, 'total_ht')), 2),
+                'total_ttc'     => round(array_sum(array_column($parties, 'total_ttc')), 2),
+                'total_cost'    => round(array_sum(array_column($parties, 'total_cost')), 2),
+                'total_margin'  => round(array_sum(array_column($parties, 'total_margin')), 2),
+            ],
+        ];
+    }
+
+    /**
+     * تفاصيل خلية المصفوفة: الوثائق الفعلية لزوج (طرف × منتج) ضمن الفترة.
+     * تُستخدم في "التنقيب" عند النقر على خلية في تقرير المصفوفة.
+     */
+    public function matrixDetail(array $filters = []): array
+    {
+        $companyId    = $this->companyId();
+        $fiscalYearId = $filters['fiscal_year_id'] ?? null;
+        $mode         = $filters['mode'] ?? 'sale';
+        $partyId      = $filters['party_id'] ?? null;
+        $productId    = $filters['product_id'] ?? null;
+        $fromDate     = $filters['from_date'] ?? null;
+        $toDate       = $filters['to_date'] ?? null;
+
+        if (!$partyId || !$productId) {
+            return [];
+        }
+
+        $docCodes = $mode === 'sale' ? self::SALE_CODES : self::PURCHASE_CODES;
+        $sign     = "CASE WHEN dt.code IN ('AV', 'AA') THEN -1 ELSE 1 END";
+
+        $query = DB::table('commercial_document_lines as cdl')
+            ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+            ->join('document_types as dt',       'dt.id', '=', 'cd.document_type_id')
+            ->where('cd.company_id', $companyId)
+            ->where('cd.party_id', $partyId)
+            ->where('cdl.product_id', $productId)
+            ->whereIn('dt.code', $docCodes)
+            ->whereNull('cd.deleted_at');
+
+        if ($fiscalYearId) $query->where('cd.fiscal_year_id', $fiscalYearId);
+        if ($fromDate)     $query->whereDate('cd.document_date', '>=', $fromDate);
+        if ($toDate)       $query->whereDate('cd.document_date', '<=', $toDate);
+
+        $rows = $query->select(
+            'cd.id',
+            'cd.document_number',
+            'cd.document_date',
+            'dt.name as type_name',
+            'dt.code as type_code',
+            'cdl.quantity',
+            'cdl.unit_price_ht',
+            'cdl.total_ht',
+            'cdl.total_ttc',
+            'cdl.cost_price_ht',
+            DB::raw("{$sign} * cdl.quantity as signed_qty"),
+            DB::raw("{$sign} * cdl.total_ht as signed_ht"),
+            DB::raw("{$sign} * cdl.total_ttc as signed_ttc"),
+            DB::raw("{$sign} * cdl.quantity * cdl.cost_price_ht as signed_cost")
+        )
+            ->orderBy('cd.document_date', 'asc')
+            ->orderBy('cd.id', 'asc')
+            ->get();
+
+        return $rows->map(fn($r) => [
+            'id'              => $r->id,
+            'document_number' => $r->document_number,
+            'document_date'   => $r->document_date,
+            'type_name'       => $r->type_name,
+            'type_code'       => $r->type_code,
+            'quantity'        => round((float) $r->signed_qty, 3),
+            'unit_price_ht'   => round((float) $r->unit_price_ht, 4),
+            'total_ht'        => round((float) $r->signed_ht, 2),
+            'total_ttc'       => round((float) $r->signed_ttc, 2),
+            'cost_ht'         => round((float) $r->signed_cost, 2),
+            'margin_value'    => round((float) $r->signed_ht - (float) $r->signed_cost, 2),
+        ])->toArray();
+    }
+
+    /**
+     * رقم الأعمال الشهري حسب الزبون (Chiffre d'affaires mensuel par client).
+     * الصفوف = الزبائن، الأعمدة = الأشهر، الخلية = إجمالي الزبون في ذلك الشهر.
+     * الإرجاعات (AV) تُحتسب بإشارة سالبة.
+     */
+    public function clientMonthlyReport(array $filters = []): array
+    {
+        $companyId    = $this->companyId();
+        $fiscalYearId = $filters['fiscal_year_id'] ?? null;
+        $fromDate     = $filters['from_date'] ?? null;
+        $toDate       = $filters['to_date'] ?? null;
+
+        $query = DB::table('commercial_document_lines as cdl')
+            ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+            ->join('document_types as dt',       'dt.id', '=', 'cd.document_type_id')
+            ->join('parties as pt',              'pt.id', '=', 'cd.party_id')
+            ->where('cd.company_id', $companyId)
+            ->where('pt.party_type_id', 1)
+            ->whereIn('dt.code', self::SALE_CODES)
+            ->whereNull('cd.deleted_at')
+            ->whereNull('pt.deleted_at');
+
+        if ($fiscalYearId) $query->where('cd.fiscal_year_id', $fiscalYearId);
+        if ($fromDate)     $query->whereDate('cd.document_date', '>=', $fromDate);
+        if ($toDate)       $query->whereDate('cd.document_date', '<=', $toDate);
+
+        $sign = "CASE WHEN dt.code = 'AV' THEN -1 ELSE 1 END";
+
+        $rows = $query->select(
+            'cd.party_id',
+            'pt.name as party_name',
+            'pt.code as party_code',
+            'cd.document_date',
+            DB::raw("SUM({$sign} * cdl.quantity) as qty"),
+            DB::raw("SUM({$sign} * cdl.total_ht)  as ht"),
+            DB::raw("SUM({$sign} * cdl.total_ttc) as ttc")
+        )
+            ->groupBy('cd.party_id', 'pt.name', 'pt.code', 'cd.document_date')
+            ->get();
+
+        $partyMap    = [];
+        $monthTotals = [];
+
+        foreach ($rows as $r) {
+            $month   = substr((string) $r->document_date, 0, 7);
+            $partyId = $r->party_id;
+            $qty     = (float) $r->qty;
+            $ht      = (float) $r->ht;
+            $ttc     = (float) $r->ttc;
+
+            if (!isset($partyMap[$partyId])) {
+                $partyMap[$partyId] = [
+                    'id'         => $partyId,
+                    'name'       => $r->party_name,
+                    'code'       => $r->party_code,
+                    'total_qty'  => 0.0,
+                    'total_ht'   => 0.0,
+                    'total_ttc'  => 0.0,
+                    'months'     => [],
+                ];
+            }
+
+            $partyMap[$partyId]['months'][$month] = [
+                'qty' => round($qty, 3),
+                'ht'  => round($ht, 2),
+                'ttc' => round($ttc, 2),
+            ];
+            $partyMap[$partyId]['total_qty'] += $qty;
+            $partyMap[$partyId]['total_ht']  += $ht;
+            $partyMap[$partyId]['total_ttc'] += $ttc;
+
+            $monthTotals[$month]['qty'] = ($monthTotals[$month]['qty'] ?? 0) + $qty;
+            $monthTotals[$month]['ht']  = ($monthTotals[$month]['ht']  ?? 0) + $ht;
+            $monthTotals[$month]['ttc'] = ($monthTotals[$month]['ttc'] ?? 0) + $ttc;
+        }
+
+        // أشهر الفترة (شهراً بشهر من «من» إلى «إلى»)
+        $monthKeys = [];
+        if ($fromDate && $toDate) {
+            $start = Carbon::parse($fromDate)->startOfMonth();
+            $end   = Carbon::parse($toDate)->startOfMonth();
+            while ($start->lte($end)) {
+                $monthKeys[] = $start->format('Y-m');
+                $start->addMonth();
+            }
+        } else {
+            $monthKeys = array_keys($monthTotals);
+            sort($monthKeys);
+        }
+
+        $months = array_map(fn($m) => [
+            'month'     => $m,
+            'label'     => self::arabicMonthLabel($m),
+            'total_qty' => round($monthTotals[$m]['qty'] ?? 0, 3),
+            'total_ht'  => round($monthTotals[$m]['ht']  ?? 0, 2),
+            'total_ttc' => round($monthTotals[$m]['ttc'] ?? 0, 2),
+        ], $monthKeys);
+
+        $parties = array_values($partyMap);
+        foreach ($parties as &$p) {
+            $p['total_qty'] = round($p['total_qty'], 3);
+            $p['total_ht']  = round($p['total_ht'], 2);
+            $p['total_ttc'] = round($p['total_ttc'], 2);
+        }
+        unset($p);
+
+        // الترتيب حسب رقم الأعمال (TTC) تنازلياً
+        usort($parties, fn($a, $b) => $b['total_ttc'] <=> $a['total_ttc']);
+
+        return [
+            'months'  => $months,
+            'parties' => $parties,
+            'summary' => [
+                'party_count' => count($parties),
+                'month_count' => count($months),
+                'total_qty'   => round(array_sum(array_column($parties, 'total_qty')), 3),
+                'total_ht'    => round(array_sum(array_column($parties, 'total_ht')), 2),
+                'total_ttc'   => round(array_sum(array_column($parties, 'total_ttc')), 2),
+            ],
+        ];
+    }
+
+    private static function arabicMonthLabel(string $ym): string
+    {
+        [$year, $month] = explode('-', $ym);
+        $idx = ((int) $month) - 1;
+        $name = self::AR_MONTHS[$idx] ?? $month;
+        return "{$name} {$year}";
+    }
+
+    /**
+     * دفتر الأستاذ العام (Grand Livre): سجل زمني لكل الحركات (وثائق + دفعات)
+     * لكل طرف في الفترة، مع الرصيد الافتتاحي قبل بداية الفترة والرصيد الجاري.
+     * debit = ما هو مستحق لنا / credit = ما هو مستحق منا.
+     */
+    public function grandLivreReport(array $filters = []): array
+    {
+        $companyId    = $this->companyId();
+        $partyId      = $filters['party_id'] ?? null;
+        $partyTypeId  = $filters['party_type_id'] ?? null;
+        $fromDate     = $filters['from_date'] ?? null;
+        $toDate       = $filters['to_date'] ?? null;
+
+        $empty = [
+            'parties' => [],
+            'summary' => [
+                'party_count'      => 0,
+                'transaction_count'=> 0,
+                'total_debit'      => 0.0,
+                'total_credit'     => 0.0,
+                'net'              => 0.0,
+            ],
+        ];
+
+        if (!$fromDate || !$toDate) {
+            return $empty;
+        }
+
+        $from = Carbon::parse($fromDate)->toDateString();
+        $to   = Carbon::parse($toDate)->toDateString();
+
+        // 1. نطاق الأطراف
+        $partyQuery = DB::table('parties as pt')
+            ->where('pt.company_id', $companyId)
+            ->whereNull('pt.deleted_at')
+            ->select('pt.id', 'pt.name', 'pt.code', 'pt.party_type_id');
+        if ($partyId)     $partyQuery->where('pt.id', $partyId);
+        if ($partyTypeId) $partyQuery->where('pt.party_type_id', $partyTypeId);
+
+        $parties  = $partyQuery->get();
+        $partyIds = $parties->pluck('id');
+        if ($partyIds->isEmpty()) {
+            return $empty;
+        }
+
+        // 2. الرصيد الافتتاحي لكل طرف قبل بداية الفترة (نفس SSOT الخاص بالرصيد)
+        $balanceService = app(PartyBalanceService::class);
+        $openingMap     = [];
+        $beforeDate     = Carbon::parse($from)->subDay()->toDateString();
+        foreach ($balanceService->getAllBalancesAt($beforeDate, $partyTypeId) as $ob) {
+            $openingMap[$ob['party_id']] = (float) $ob['current_balance'];
+        }
+
+        // 3. الوثائق
+        $documents = DB::table('commercial_documents as cd')
+            ->join('document_types as dt',             'cd.document_type_id',           '=', 'dt.id')
+            ->join('document_base_operations as dbo',  'dt.document_base_operation_id', '=', 'dbo.id')
+            ->where('cd.company_id',         $companyId)
+            ->whereIn('cd.party_id',         $partyIds)
+            ->where('dt.affects_accounting', true)
+            ->whereDate('cd.document_date',  '>=', $from)
+            ->whereDate('cd.document_date',  '<=', $to)
+            ->whereNull('cd.deleted_at')
+            ->select(
+                'cd.id',
+                'cd.party_id',
+                'cd.document_number',
+                'cd.document_date',
+                'cd.net_to_pay',
+                'cd.created_at',
+                'dt.name as type_name',
+                'dt.code as type_code',
+                'dbo.name as operation'
+            )
+            ->get();
+
+        // 4. الدفعات
+        $payments = DB::table('payments')
+            ->leftJoin('payment_modes as pm', 'payments.payment_mode_id', '=', 'pm.id')
+            ->where('payments.company_id',   $companyId)
+            ->whereIn('payments.party_id',   $partyIds)
+            ->where('payments.status',       'confirmed')
+            ->whereDate('payments.payment_date', '>=', $from)
+            ->whereDate('payments.payment_date', '<=', $to)
+            ->whereNull('payments.deleted_at')
+            ->select(
+                'payments.id',
+                'payments.party_id',
+                'payments.payment_number',
+                'payments.payment_date',
+                'payments.amount',
+                'payments.direction',
+                'payments.created_at',
+                'pm.name as mode_name'
+            )
+            ->get();
+
+        // 5. تجميع الحركات لكل طرف
+        $txByParty = [];
+        foreach ($documents as $doc) {
+            [$debit, $credit] = $this->ledgerSplit((string) $doc->operation, $doc->type_code, (float) $doc->net_to_pay);
+            $txByParty[$doc->party_id][] = [
+                'type'      => 'document',
+                'date'      => substr((string) $doc->document_date, 0, 10),
+                'datetime'  => (string) $doc->created_at,
+                'reference' => $doc->document_number,
+                'label'     => $doc->type_name,
+                'type_code' => $doc->type_code,
+                'debit'     => $debit,
+                'credit'    => $credit,
+            ];
+        }
+        foreach ($payments as $p) {
+            $amount = (float) $p->amount;
+            if ($p->direction === 'out') {
+                $debit  = round($amount, 2);
+                $credit = 0.0;
+            } else {
+                $debit  = 0.0;
+                $credit = round($amount, 2);
+            }
+            $txByParty[$p->party_id][] = [
+                'type'      => 'payment',
+                'date'      => substr((string) $p->payment_date, 0, 10),
+                'datetime'  => (string) $p->created_at,
+                'reference' => $p->payment_number,
+                'label'     => $p->mode_name ?: 'دفعة',
+                'type_code' => null,
+                'debit'     => $debit,
+                'credit'    => $credit,
+            ];
+        }
+
+        // 6. ترتيب زمني + رصيد جاري
+        $resultParties = [];
+        $totalDebit    = 0.0;
+        $totalCredit   = 0.0;
+        $txCount       = 0;
+
+        foreach ($parties as $party) {
+            $opening = round($openingMap[$party->id] ?? 0.0, 2);
+            $txs     = $txByParty[$party->id] ?? [];
+
+            // أطراف بلا حركة في الفترة ولا رصيد افتتاحي → تُتجاهل
+            if (empty($txs) && abs($opening) < 0.005) {
+                continue;
+            }
+
+            usort($txs, function ($a, $b) {
+                $cmp = strcmp($a['date'], $b['date']);
+                if ($cmp !== 0) return $cmp;
+                $cmp = strcmp($a['datetime'] ?? '', $b['datetime'] ?? '');
+                if ($cmp !== 0) return $cmp;
+                if ($a['type'] !== $b['type']) return $a['type'] === 'document' ? -1 : 1;
+                return strcmp((string) $a['reference'], (string) $b['reference']);
+            });
+
+            $running  = $opening;
+            $pDebit   = 0.0;
+            $pCredit  = 0.0;
+            foreach ($txs as $i => &$tx) {
+                $tx['seq']     = $i + 1;
+                $running += $tx['debit'] - $tx['credit'];
+                $tx['balance'] = round($running, 2);
+                $pDebit  += $tx['debit'];
+                $pCredit += $tx['credit'];
+            }
+            unset($tx);
+
+            $resultParties[] = [
+                'id'              => $party->id,
+                'name'            => $party->name,
+                'code'            => $party->code,
+                'party_type_id'   => $party->party_type_id,
+                'opening_balance' => $opening,
+                'closing_balance' => round($running, 2),
+                'total_debit'     => round($pDebit, 2),
+                'total_credit'    => round($pCredit, 2),
+                'transactions'    => $txs,
+            ];
+
+            $totalDebit  += $pDebit;
+            $totalCredit += $pCredit;
+            $txCount     += count($txs);
+        }
+
+        usort($resultParties, fn($a, $b) => strcmp($a['name'], $b['name']));
+
+        return [
+            'parties' => $resultParties,
+            'summary' => [
+                'party_count'       => count($resultParties),
+                'transaction_count' => $txCount,
+                'total_debit'       => round($totalDebit, 2),
+                'total_credit'      => round($totalCredit, 2),
+                'net'               => round($totalDebit - $totalCredit, 2),
+            ],
+        ];
+    }
+
+    /**
+     * تقسيم مبلغ حركة إلى (مدين / دائن) وفق اتفاقية الرصيد الموحدة:
+     * بيع → مدين (+)، إرجاع بيع (AV) → دائن، شراء → دائن (−)، إرجاع شراء (AA) → مدين.
+     */
+    private function ledgerSplit(string $operation, ?string $code, float $net): array
+    {
+        $net = round($net, 2);
+        if ($operation === 'sale') {
+            return $code === 'AV' ? [0.0, $net] : [$net, 0.0];
+        }
+        if ($operation === 'purchase') {
+            return $code === 'AA' ? [$net, 0.0] : [0.0, $net];
+        }
+        return [0.0, 0.0];
     }
 }

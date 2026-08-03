@@ -613,6 +613,35 @@ export interface ProductMovementData {
   };
 }
 
+export interface ProductHistoryParams {
+  product_id?: number;
+  from_date?:  string;
+  to_date?:    string;
+}
+
+export interface ProductHistoryItem {
+  id:              number;
+  document_number: string;
+  document_date:   string;
+  type_code:       string;
+  type_name:       string;
+  party_name:      string;
+  quantity:        number;
+  total_ht:        number;
+  total_tva:       number;
+  total_ttc:       number;
+}
+
+export interface ProductHistoryData {
+  items:   ProductHistoryItem[];
+  summary: {
+    doc_count: number;
+    total_qty: number;
+    total_ht:  number;
+    total_ttc: number;
+  };
+}
+
 // ─── Profit & Loss Report ─────────────────────────────────────────────────────
 
 export interface ProfitLossParams {
@@ -735,6 +764,163 @@ export interface StockMovementsData {
   };
 }
 
+// ─── Matrix Report (المبيعات حسب المنتج والزبون / المشتريات حسب المنتج والمورد) ──
+
+export interface MatrixReportParams extends ReportBaseParams {
+  family_id?: number;
+  brand_id?:  number;
+}
+
+/** خلية المصفوفة = زوج (طرف × منتج) */
+export interface MatrixCell {
+  qty:  number;   // الكمية (الإرجاعات سالبة)
+  ht:   number;
+  ttc:  number;
+  cost: number;
+}
+
+export interface MatrixParty {
+  id:           number;
+  name:         string;
+  code:         string | null;
+  total_qty:    number;
+  total_ht:     number;
+  total_ttc:    number;
+  total_cost:   number;
+  total_margin: number;
+  /** مفاتيح = product_id */
+  cells: Record<string, MatrixCell>;
+}
+
+export interface MatrixProduct {
+  id:           number;
+  name:         string;
+  ref:          string | null;
+  total_qty:    number;
+  total_ht:     number;
+  total_ttc:    number;
+  total_cost:   number;
+  total_margin: number;
+}
+
+export interface MatrixReportData {
+  mode:     'sale' | 'purchase';
+  parties:  MatrixParty[];
+  products: MatrixProduct[];
+  summary: {
+    party_count:   number;
+    product_count: number;
+    total_qty:     number;
+    total_ht:      number;
+    total_ttc:     number;
+    total_cost:    number;
+    total_margin:  number;
+  };
+}
+
+export interface MatrixDetailParams {
+  mode?:      'sale' | 'purchase';
+  party_id:   number;
+  product_id: number;
+  from_date?: string;
+  to_date?:   string;
+}
+
+export interface MatrixDetailRow {
+  id:              number;
+  document_number: string;
+  document_date:   string;
+  type_name:       string;
+  type_code:       string;
+  quantity:        number;
+  unit_price_ht:   number;
+  total_ht:        number;
+  total_ttc:       number;
+  cost_ht:         number;
+  margin_value:    number;
+}
+
+// ─── Client Monthly Report (رقم الأعمال الشهري حسب الزبون) ────────────────
+
+export interface ClientMonthlyMonth {
+  month:     string;   // YYYY-MM
+  label:     string;   // جانفي 2026
+  total_qty: number;
+  total_ht:  number;
+  total_ttc: number;
+}
+
+export interface ClientMonthlyCell {
+  qty: number;
+  ht:  number;
+  ttc: number;
+}
+
+export interface ClientMonthlyParty {
+  id:        number;
+  name:      string;
+  code:      string | null;
+  total_qty: number;
+  total_ht:  number;
+  total_ttc: number;
+  /** مفاتيح = YYYY-MM */
+  months: Record<string, ClientMonthlyCell>;
+}
+
+export interface ClientMonthlyReportData {
+  months:  ClientMonthlyMonth[];
+  parties: ClientMonthlyParty[];
+  summary: {
+    party_count: number;
+    month_count: number;
+    total_qty:   number;
+    total_ht:    number;
+    total_ttc:   number;
+  };
+}
+
+// ─── Grand Livre (دفتر الأستاذ العام) ─────────────────────────────────────
+
+export interface GrandLivreParams extends ReportBaseParams {
+  party_id?:      number;
+  party_type_id?: number;
+}
+
+export interface GrandLivreTransaction {
+  type:      'document' | 'payment';
+  seq:       number;
+  date:      string;
+  reference: string;
+  label:     string;
+  type_code: string | null;
+  debit:     number;
+  credit:    number;
+  balance:   number;
+}
+
+export interface GrandLivreParty {
+  id:              number;
+  name:            string;
+  code:            string | null;
+  party_type_id:   number;
+  opening_balance: number;
+  closing_balance: number;
+  total_debit:     number;
+  total_credit:    number;
+  transactions:    GrandLivreTransaction[];
+}
+
+export interface GrandLivreReportData {
+  parties: GrandLivreParty[];
+  summary: {
+    party_count:       number;
+    transaction_count: number;
+    total_debit:       number;
+    total_credit:      number;
+    net:               number;
+  };
+}
+
 // ─── API functions ────────────────────────────────────────────────────────────
 
 export const reportsApi = {
@@ -761,6 +947,12 @@ export const reportsApi = {
   expenses:   (p?: ExpensesReportParams)    => apiGet<ExpensesReportData>   ('/reports/expenses',        p),
   salesTrend: (p?: SalesTrendParams)        => apiGet<SalesTrendData>       ('/reports/sales-trend',     p),
   stockMovements: (p?: StockMovementsParams) => apiGet<StockMovementsData>  ('/reports/stock-movements',  p),
+  salesMatrix:     (p?: MatrixReportParams)   => apiGet<MatrixReportData>   ('/reports/sales-matrix',     p),
+  purchasesMatrix: (p?: MatrixReportParams)   => apiGet<MatrixReportData>   ('/reports/purchases-matrix', p),
+  matrixDetail:    (p: MatrixDetailParams)    => apiGet<MatrixDetailRow[]>  ('/reports/matrix-detail',    p),
+  clientMonthly:   (p?: ReportBaseParams)     => apiGet<ClientMonthlyReportData>('/reports/client-monthly', p),
+  grandLivre:      (p?: GrandLivreParams)     => apiGet<GrandLivreReportData>   ('/reports/grand-livre',    p),
+  productHistory:  (p?: ProductHistoryParams) => apiGet<ProductHistoryData>     ('/reports/product-history', p),
 } as const;
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
@@ -963,6 +1155,16 @@ export function useProductMovementReport(params?: Omit<ProductMovementParams, 'y
   });
 }
 
+export function useProductHistory(params?: ProductHistoryParams) {
+  const slug = useActiveSlug();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'product-history', params],
+    queryFn:   () => reportsApi.productHistory(params),
+    enabled:   !!slug && !!params?.product_id,
+    staleTime: 30 * 1000,
+  });
+}
+
 export function useProfitLossReport(params?: Omit<ProfitLossParams, 'year_id'>) {
   const slug   = useActiveSlug();
   const yearId = useSelectedYearId();
@@ -1025,5 +1227,73 @@ export function useStockMovementsReport(params?: StockMovementsParams) {
     queryFn:   () => reportsApi.stockMovements(params),
     enabled:   !!slug,
     staleTime: 3 * 60_000,
+  });
+}
+
+export function useMatrixReport(mode: 'sale' | 'purchase', params?: Omit<MatrixReportParams, 'year_id'>) {
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
+  const isSale = mode === 'sale';
+  return useQuery({
+    queryKey:  [slug, 'reports', isSale ? 'sales-matrix' : 'purchases-matrix', yearId, params],
+    queryFn:   () => isSale
+      ? reportsApi.salesMatrix({ year_id: yearId ?? undefined, ...params })
+      : reportsApi.purchasesMatrix({ year_id: yearId ?? undefined, ...params }),
+    enabled:   !!slug && !!yearId,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useSalesMatrixReport(params?: Omit<MatrixReportParams, 'year_id'>) {
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'sales-matrix', yearId, params],
+    queryFn:   () => reportsApi.salesMatrix({ year_id: yearId ?? undefined, ...params }),
+    enabled:   !!slug && !!yearId,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function usePurchasesMatrixReport(params?: Omit<MatrixReportParams, 'year_id'>) {
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'purchases-matrix', yearId, params],
+    queryFn:   () => reportsApi.purchasesMatrix({ year_id: yearId ?? undefined, ...params }),
+    enabled:   !!slug && !!yearId,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useMatrixDetail(params: MatrixDetailParams | null) {
+  const slug = useActiveSlug();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'matrix-detail', params],
+    queryFn:   () => reportsApi.matrixDetail(params!),
+    enabled:   !!slug && !!params,
+    staleTime: 2 * 60_000,
+  });
+}
+
+export function useClientMonthlyReport(params?: Omit<ReportBaseParams, 'year_id'>) {
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'client-monthly', yearId, params],
+    queryFn:   () => reportsApi.clientMonthly({ year_id: yearId ?? undefined, ...params }),
+    enabled:   !!slug && !!yearId,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useGrandLivreReport(params?: Omit<GrandLivreParams, 'year_id'>) {
+  const slug   = useActiveSlug();
+  const yearId = useSelectedYearId();
+  return useQuery({
+    queryKey:  [slug, 'reports', 'grand-livre', yearId, params],
+    queryFn:   () => reportsApi.grandLivre({ year_id: yearId ?? undefined, ...params }),
+    enabled:   !!slug && !!yearId,
+    staleTime: 5 * 60_000,
   });
 }

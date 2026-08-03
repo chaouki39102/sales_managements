@@ -98,6 +98,10 @@ export const REPORT_CARDS: ReportCardMeta[] = [
   { id: 'expenses', title: 'تقرير المصروفات', description: 'تحليل المصروفات حسب الفئة والشهر', icon: 'ti-wallet', color: 'var(--orange)', href: '/reports/expenses' },
   { id: 'sales-trend', title: 'اتجاهات المبيعات', description: 'مقارنة يومية/أسبوعية/شهرية', icon: 'ti-chart-line', color: 'var(--blue)', href: '/reports/sales-trend' },
   { id: 'stock-movements', title: 'حركات المخزون', description: 'تفاصيل الوارد والصادر والتسويات', icon: 'ti-arrows-exchange', color: 'var(--teal)', href: '/reports/stock-movements' },
+  { id: 'sales-matrix', title: 'المبيعات حسب الزبون والمنتج', description: 'مصفوفة الزبائن × المنتجات', icon: 'ti-grid-dots', color: 'var(--purple)', badge: 'جديد', href: '/reports/sales-matrix' },
+  { id: 'purchases-matrix', title: 'المشتريات حسب المورد والمنتج', description: 'مصفوفة الموردين × المنتجات', icon: 'ti-grid-dots', color: 'var(--blue)', badge: 'جديد', href: '/reports/purchases-matrix' },
+  { id: 'client-monthly', title: 'رقم الأعمال الشهري حسب الزبون', description: 'مصفوفة الزبائن × الأشهر', icon: 'ti-calendar-stats', color: 'var(--gold)', badge: 'جديد', href: '/reports/client-monthly' },
+  { id: 'grand-livre', title: 'دفتر الأستاذ العام', description: 'سجل زمني لكل الحركات مع الرصيد الجاري', icon: 'ti-book', color: 'var(--teal)', badge: 'جديد', href: '/reports/grand-livre' },
 ];
 
 export function QuickReportCard({ report, onSelect }: { report: ReportCardMeta; onSelect: () => void }) {

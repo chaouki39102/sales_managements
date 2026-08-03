@@ -287,4 +287,70 @@ class ReportController extends Controller
             'data' => $data,
         ]);
     }
+
+    public function salesMatrix(Request $request): JsonResponse
+    {
+        $filters = $this->prepareFilters($request, ['from_date', 'to_date', 'family_id', 'brand_id']);
+        $data = $this->reportService->matrixReport($filters, 'sale');
+        return response()->json([
+            'success' => true,
+            'message' => 'تم جلب تقرير المبيعات حسب المنتج والزبون بنجاح',
+            'data' => $data,
+        ]);
+    }
+
+    public function purchasesMatrix(Request $request): JsonResponse
+    {
+        $filters = $this->prepareFilters($request, ['from_date', 'to_date', 'family_id', 'brand_id']);
+        $data = $this->reportService->matrixReport($filters, 'purchase');
+        return response()->json([
+            'success' => true,
+            'message' => 'تم جلب تقرير المشتريات حسب المنتج والمورد بنجاح',
+            'data' => $data,
+        ]);
+    }
+
+    public function matrixDetail(Request $request): JsonResponse
+    {
+        $filters = $this->prepareFilters($request, ['mode', 'party_id', 'product_id', 'from_date', 'to_date']);
+        $data = $this->reportService->matrixDetail($filters);
+        return response()->json([
+            'success' => true,
+            'message' => 'تم جلب تفاصيل الخلية بنجاح',
+            'data' => $data,
+        ]);
+    }
+
+    public function clientMonthly(Request $request): JsonResponse
+    {
+        $filters = $this->prepareFilters($request, ['from_date', 'to_date']);
+        $data = $this->reportService->clientMonthlyReport($filters);
+        return response()->json([
+            'success' => true,
+            'message' => 'تم جلب رقم الأعمال الشهري حسب الزبون بنجاح',
+            'data' => $data,
+        ]);
+    }
+
+    public function grandLivre(Request $request): JsonResponse
+    {
+        $filters = $this->prepareFilters($request, ['from_date', 'to_date', 'party_id', 'party_type_id']);
+        $data = $this->reportService->grandLivreReport($filters);
+        return response()->json([
+            'success' => true,
+            'message' => 'تم جلب دفتر الأستاذ العام بنجاح',
+            'data' => $data,
+        ]);
+    }
+
+    public function productHistory(Request $request): JsonResponse
+    {
+        $filters = $this->prepareFilters($request, ['product_id', 'from_date', 'to_date']);
+        $data = $this->reportService->productHistoryReport($filters);
+        return response()->json([
+            'success' => true,
+            'message' => 'تم جلب سجل حركة المنتج بنجاح',
+            'data' => $data,
+        ]);
+    }
 }
