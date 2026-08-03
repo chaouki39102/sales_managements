@@ -26,17 +26,31 @@
 //  • كمية في السلة + أزرار +/− (تحل محل زر الإضافة)
 //  • أفضل خصم كمي (-% / -دج)
 //  • عدد الخيارات (N خيارات)
-//  • ضغطة مطوّلة (500ms) → popover معلومات (مرجع/باركود/عائلة/خصم/وصف)
+//  • ضغطة مطوّلة (500ms) أو زر "i" → فتح نافذة معلومات المنتج الكاملة
 //  • اختيار التغليف (عند وجود أكثر من تغليفة) — السعر يتبع التغليفة المختارة
+//
+// شريط أدوات العرض يحوي أيضاً ترتيب النتائج: الاسم / السعر (تصاعدي/تنازلي) /
+// المخزون (الأقل/الأعلى أولاً) — القائمة المفلترة تُرتَّب دون فقدان التمييز.
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Modal from '@/components/ui/Modal';
+import POSProProductInfoModal from './POSProProductInfoModal';
 import { formatDZD } from '@/pos/utils/calculations';
 import { getVariantPrice, isVariantOutOfStock } from '@/pos/utils/posHelpers';
 import type { ProductVariant, ProductPackaging, Family, PriceLevel, CartItem } from '@/types';
 import type { GridDefaultSize, PriceDisplayMode } from '@/pos/hooks/usePOSSettings';
 
 const GRID_SIZE_OPTIONS: GridDefaultSize[] = ['xs', 'sm', 'md', 'lg'];
+
+const SORT_OPTIONS = [
+  { v: 'name',       l: 'الاسم' },
+  { v: 'price-asc',  l: 'السعر (تصاعدي)' },
+  { v: 'price-desc', l: 'السعر (تنازلي)' },
+  { v: 'stock-asc',  l: 'المخزون (الأقل أولاً)' },
+  { v: 'stock-desc', l: 'المخزون (الأعلى أولاً)' },
+] as const;
+
+type SortKey = typeof SORT_OPTIONS[number]['v'];
 
 function readLS(key: string, fallback: string): string {
   try {
@@ -134,6 +148,7 @@ interface PPCardProps {
   variantCount: number;
   onAdd: Props['onAdd'];
   onQty?: Props['onQty'];
+  onInfo: (v: ProductVariant) => void;
   onHi: (idx: number) => void;
   elRef?: (el: HTMLElement | null) => void;
 }
@@ -141,7 +156,7 @@ interface PPCardProps {
 const PPCard = React.memo(function PPCard({
   v, idx, hi, query, priceLevels, selectedPriceLevelId, priceDisplayMode,
   showStockOnCard, allowNegativeStock, inCartQty, qtyInCartUnits, variantCount,
-  onAdd, onQty, onHi, elRef,
+  onAdd, onQty, onInfo, onHi, elRef,
 }: PPCardProps) {
   const rawStock = v.current_stock;
   const unknownStock = rawStock === undefined;
@@ -179,27 +194,25 @@ const PPCard = React.memo(function PPCard({
   const primary   = priceDisplayMode === 'ht' ? priceHt : priceTtc;
   const secondary = priceDisplayMode === 'ht' ? priceTtc : priceHtBase;
 
-  // ── ضغطة مطوّلة (500ms) → popover معلومات ──────────────────────────────────
-  const [showInfo, setShowInfo] = useState(false);
+  // ── ضغطة مطوّلة (500ms) → فتح نافذة معلومات المنتج ─────────────────────────
+  // longPressFired: يُفعَّل عند اشتغال المؤقّت ويمنع click الصادر بعد الإفلات
+  // من إضافة المنتج للسلة (نفس سبب منع النقر في شاشات اللمس).
+  const longPressFired = useRef(false);
   const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressStarted = useRef(false);
   const handlePointerDown = useCallback(() => {
     pressStarted.current = true;
     pressTimerRef.current = setTimeout(() => {
-      if (pressStarted.current) setShowInfo(true);
+      if (pressStarted.current) {
+        longPressFired.current = true;
+        onInfo(v);
+      }
     }, 500);
-  }, []);
+  }, [onInfo, v]);
   const handlePointerUp = useCallback(() => {
     pressStarted.current = false;
     if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
   }, []);
-  useEffect(() => {
-    if (showInfo) {
-      const close = () => setShowInfo(false);
-      window.addEventListener('pointerdown', close);
-      return () => window.removeEventListener('pointerdown', close);
-    }
-  }, [showInfo]);
 
   const inCart = inCartQty > 0;
 
@@ -226,6 +239,7 @@ const PPCard = React.memo(function PPCard({
         hi && 'pp-card--hi',
       ].filter(Boolean).join(' ')}
       onClick={() => {
+        if (longPressFired.current) { longPressFired.current = false; return; }
         if (outStock) { onHi(idx); return; }
         handleAdd(1);
       }}
@@ -237,6 +251,16 @@ const PPCard = React.memo(function PPCard({
     >
       <div className="pp-card-img">
         {img ? <img src={img} alt="" loading="lazy" /> : <i className="ti ti-package" />}
+
+        <button
+          type="button"
+          className="pp-card-info-btn"
+          onClick={(e) => { e.stopPropagation(); onInfo(v); }}
+          title="معلومات المنتج"
+          aria-label="معلومات المنتج"
+        >
+          <i className="ti ti-info-circle" />
+        </button>
 
         {bestDiscount && (
           <span className="pp-card-disc">
@@ -298,27 +322,6 @@ const PPCard = React.memo(function PPCard({
           </>
         )}
       </div>
-
-      {showInfo && (
-        <div className="pp-card-info">
-          <div className="pp-card-info-row"><span className="pp-card-info-label">المرجع:</span> {v.ref}</div>
-          {v.barcode && <div className="pp-card-info-row"><span className="pp-card-info-label">الباركود:</span> {v.barcode}</div>}
-          {v.product?.family?.name && <div className="pp-card-info-row"><span className="pp-card-info-label">العائلة:</span> {v.product.family.name}</div>}
-          {bestDiscount && (
-            <div className="pp-card-info-row">
-              <span className="pp-card-info-label">الخصم:</span>{' '}
-              <span style={{ color: 'var(--red)' }}>
-                {bestDiscount.discount_percentage != null && bestDiscount.discount_percentage > 0
-                  ? `${bestDiscount.discount_percentage}%`
-                  : bestDiscount.discount_amount != null && bestDiscount.discount_amount > 0
-                    ? `${formatDZD(bestDiscount.discount_amount)}/وحدة`
-                    : ''}
-              </span>
-            </div>
-          )}
-          {v.product?.description && <div className="pp-card-info-row pp-card-info-desc">{v.product.description}</div>}
-        </div>
-      )}
     </div>
   );
 }, (prev, next) =>
@@ -335,7 +338,8 @@ const PPCard = React.memo(function PPCard({
   && prev.priceDisplayMode === next.priceDisplayMode
   && prev.priceLevels === next.priceLevels
   && prev.onAdd === next.onAdd
-  && prev.onQty === next.onQty);
+  && prev.onQty === next.onQty
+  && prev.onInfo === next.onInfo);
 
 interface PPRowProps {
   v: ProductVariant;
@@ -466,6 +470,8 @@ export default function POSProProductDrawer({
     const saved = readLS('pos-pro-drawer-grid', gridSize);
     return (GRID_SIZE_OPTIONS as string[]).includes(saved) ? saved as GridDefaultSize : gridSize;
   });
+  const [sortBy, setSortBy] = useState<SortKey>('name');
+  const [infoVariant, setInfoVariant] = useState<ProductVariant | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const cardRefs  = useRef(new Map<number, HTMLElement>());
   const rowRefs   = useRef(new Map<number, HTMLElement>());
@@ -497,10 +503,35 @@ export default function POSProProductDrawer({
         (v as any).barcodes?.some((bc: { barcode: string }) => bc.barcode.toLowerCase().includes(q)),
       );
     }
-    return [...list].sort((a, b) =>
-      (a.product?.name ?? '').localeCompare(b.product?.name ?? '', 'ar'),
-    );
-  }, [variants, familyId, query]);
+    const byName = (a: ProductVariant, b: ProductVariant) =>
+      (a.product?.name ?? '').localeCompare(b.product?.name ?? '', 'ar');
+    return [...list].sort((a, b) => {
+      switch (sortBy) {
+        case 'price-asc': {
+          const d = getVariantPrice(a, selectedPriceLevelId, priceLevels) - getVariantPrice(b, selectedPriceLevelId, priceLevels);
+          return d !== 0 ? d : byName(a, b);
+        }
+        case 'price-desc': {
+          const d = getVariantPrice(b, selectedPriceLevelId, priceLevels) - getVariantPrice(a, selectedPriceLevelId, priceLevels);
+          return d !== 0 ? d : byName(a, b);
+        }
+        case 'stock-asc': {
+          const sA = a.manages_stock ? (a.current_stock ?? 0) : Infinity;
+          const sB = b.manages_stock ? (b.current_stock ?? 0) : Infinity;
+          const d = sA - sB;
+          return d !== 0 ? d : byName(a, b);
+        }
+        case 'stock-desc': {
+          const sA = a.manages_stock ? (a.current_stock ?? 0) : -Infinity;
+          const sB = b.manages_stock ? (b.current_stock ?? 0) : -Infinity;
+          const d = sB - sA;
+          return d !== 0 ? d : byName(a, b);
+        }
+        default:
+          return byName(a, b);
+      }
+    });
+  }, [variants, familyId, query, sortBy, selectedPriceLevelId, priceLevels]);
 
   // أعد التمييز لأول نتيجة عند تغيّر القائمة المفلترة
   useEffect(() => { setHi(0); }, [filtered.length]);
@@ -549,6 +580,7 @@ export default function POSProProductDrawer({
   }, [onAdd, clearSearchOnAdd, advanceOnAdd, filtered.length]);
 
   const handleHi = useCallback((i: number) => setHi(i), []);
+  const handleInfo = useCallback((v: ProductVariant) => setInfoVariant(v), []);
 
   // لوحة المفاتيح على حقل البحث: ↑↓ تتنقل في الشبكة (عند تفعيل keyboardNav)
   // و Enter يضيف الصنف المميز (أو أول نتيجة عند تعطيل الأسهم — مثل POS الكلاسيكي)
@@ -698,6 +730,18 @@ export default function POSProProductDrawer({
               ))}
             </div>
           )}
+          <div className="pp-sort" aria-label="ترتيب النتائج">
+            <i className="ti ti-sort-ascending" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortKey)}
+              title="ترتيب النتائج"
+            >
+              {SORT_OPTIONS.map(o => (
+                <option key={o.v} value={o.v}>{o.l}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* الشبكة أو القائمة */}
@@ -720,6 +764,7 @@ export default function POSProProductDrawer({
                 variantCount={variantCountById.get(v.product_id) ?? 1}
                 onAdd={onAdd}
                 onQty={onQty}
+                onInfo={handleInfo}
                 onHi={handleHi}
                 elRef={registerCard}
               />
@@ -767,6 +812,22 @@ export default function POSProProductDrawer({
               </div>
             )}
           </div>
+        )}
+
+        {/* نافذة معلومات المنتج (ضغطة مطوّلة أو زر i على البطاقة) */}
+        {infoVariant && (
+          <POSProProductInfoModal
+            open
+            variant={infoVariant}
+            siblings={variants.filter(v => v.product_id === infoVariant.product_id)}
+            priceLevels={priceLevels}
+            selectedPriceLevelId={selectedPriceLevelId}
+            priceDisplayMode={priceDisplayMode}
+            allowNegativeStock={allowNegativeStock}
+            qtyInCartById={qtyInCartById}
+            onAdd={onAdd}
+            onClose={() => setInfoVariant(null)}
+          />
         )}
       </div>
     </Modal>
