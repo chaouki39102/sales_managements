@@ -8,7 +8,6 @@ import { useClients, useSuppliers } from '@/lib/api/endpoints/parties';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
 import SimpleTable from '@/components/ui/SimpleTable';
 
 const PARTY_TYPES: { value: number | null; label: string }[] = [
@@ -135,7 +134,7 @@ export default function GrandLivreReportPage() {
   const subtitle = `سجل زمني لجميع الحركات — ${fromDate} → ${toDate}`;
 
   return (
-    <ReportShell title={title} subtitle={subtitle} isLoading={isLoading} isError={isError} refetch={refetch} reportId="grand-livre">
+    <ReportShell title={title} subtitle={subtitle} onExport={handleExport} isLoading={isLoading} isError={isError} refetch={refetch} reportId="grand-livre">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 4 }}>
         <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -153,7 +152,6 @@ export default function GrandLivreReportPage() {
             </select>
           </div>
         )}
-        <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet" />} onClick={handleExport}>تصدير Excel</Button>
       </div>
 
       {data && (

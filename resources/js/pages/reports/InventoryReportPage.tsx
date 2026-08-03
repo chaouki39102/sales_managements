@@ -6,7 +6,6 @@ import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
-import Button from '@/components/ui/Button';
 import SimpleTable from '@/components/ui/SimpleTable';
 
 const STATUS_LABEL: Record<string, { text: string; variant: string }> = {
@@ -30,11 +29,10 @@ export default function InventoryReportPage() {
     }], `تقرير المخزون حتى ${asOfDate}`);
   };
 
-  return <ReportShell title="تقرير المخزون" subtitle={asOfDate ? `أرصدة المنتجات في المستودعات حتى ${asOfDate}` : 'أرصدة المنتجات (الرصيد الحالي)'} isLoading={isLoading} isError={isError} refetch={refetch} reportId="inventory">
+  return <ReportShell title="تقرير المخزون" subtitle={asOfDate ? `أرصدة المنتجات في المستودعات حتى ${asOfDate}` : 'أرصدة المنتجات (الرصيد الحالي)'} onExport={handleExport} isLoading={isLoading} isError={isError} refetch={refetch} reportId="inventory">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
       <label style={{ fontWeight: 600, fontSize: 13 }}>الرصيد حتى تاريخ:</label>
       <input type="date" className="form-control" style={{ width: 200 }} value={asOfDate} onChange={(e) => setAsOfDate(e.target.value)} />
-      <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
     </div>
     {data && (
       <>

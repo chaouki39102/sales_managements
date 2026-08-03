@@ -7,7 +7,6 @@ import type { ClientMonthlyParty } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
 import SimpleTable from '@/components/ui/SimpleTable';
 
 type Measure = 'qty' | 'ht' | 'ttc';
@@ -143,10 +142,9 @@ export default function ClientMonthlyReportPage() {
   const subtitle = `الزبائن × الأشهر — ${fromDate} → ${toDate}`;
 
   return (
-    <ReportShell title={title} subtitle={subtitle} isLoading={isLoading} isError={isError} refetch={refetch} reportId="client-monthly">
+    <ReportShell title={title} subtitle={subtitle} onExport={handleExport} isLoading={isLoading} isError={isError} refetch={refetch} reportId="client-monthly">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 4 }}>
         <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
-        <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet" />} onClick={handleExport}>تصدير Excel</Button>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 12, marginTop: 8 }}>

@@ -12,10 +12,11 @@ interface ReportShellProps {
   isError: boolean;
   refetch: () => void;
   reportId: string;
+  onExport?: () => void | Promise<void>;
   children?: React.ReactNode;
 }
 
-export default function ReportShell({ title, subtitle, description, isLoading, isError, refetch, children }: ReportShellProps) {
+export default function ReportShell({ title, subtitle, description, isLoading, isError, refetch, onExport, children }: ReportShellProps) {
   const navigate = useNavigate();
 
   return (
@@ -27,6 +28,9 @@ export default function ReportShell({ title, subtitle, description, isLoading, i
           <div style={{ display: 'flex', gap: 8 }}>
             <Button size="sm" icon={<i className="ti ti-arrow-right"/>} onClick={() => navigate('/reports')}>العودة</Button>
             <Button size="sm" icon={<i className="ti ti-refresh"/>} onClick={refetch}>تحديث</Button>
+            {onExport && (
+              <Button size="sm" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={() => { void onExport(); }}>تصدير Excel</Button>
+            )}
           </div>
         }
       />

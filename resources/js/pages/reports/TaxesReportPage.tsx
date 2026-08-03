@@ -6,7 +6,6 @@ import { useTvaReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
 
 const def = REPORT_DEFAULTS;
 
@@ -40,10 +39,9 @@ export default function TaxesReportPage() {
     }], `تقرير الضرائب ${fromDate}-${toDate}`);
   };
 
-  return <ReportShell title="تقرير الضرائب — TVA" subtitle={`ضريبة القيمة المضافة — ${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="taxes">
+  return <ReportShell title="تقرير الضرائب — TVA" subtitle={`ضريبة القيمة المضافة — ${fromDate} → ${toDate}`} onExport={handleExport} isLoading={isLoading} isError={isError} refetch={refetch} reportId="taxes">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
       <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
-      <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
     </div>
     {data && (
       <>

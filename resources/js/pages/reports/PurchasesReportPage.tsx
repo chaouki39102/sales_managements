@@ -52,10 +52,9 @@ export default function PurchasesReportPage() {
     { __isSummary: true, _idx: `الإجمالي (${data.product_recap.length} منتج)`, total_qty: data.product_recap.reduce((s, r) => s + r.total_qty, 0), total_ht: data.summary.total_ht, total_discount: data.summary.total_discount, total_tva: data.summary.total_tva, total_ttc: data.summary.total_ttc },
   ] : [];
 
-  return <ReportShell title="تقرير المشتريات" subtitle={`المشتريات والموردون — ${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="purchases">
+  return <ReportShell title="تقرير المشتريات" subtitle={`المشتريات والموردون — ${fromDate} → ${toDate}`} onExport={handleExport} isLoading={isLoading} isError={isError} refetch={refetch} reportId="purchases">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
       <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
-      <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
     </div>
     {data && (
       <>

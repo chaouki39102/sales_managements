@@ -6,7 +6,6 @@ import { useExpensesReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
 import SimpleTable from '@/components/ui/SimpleTable';
 
 const def = REPORT_DEFAULTS;
@@ -38,10 +37,9 @@ export default function ExpensesReportPage() {
     { __isSummary: true, _idx: `الإجمالي (${data.expenses.length})`, amount: data.summary.total_expenses },
   ] : [];
 
-  return <ReportShell title="تقرير المصروفات" subtitle={`مصروفات وفئاتها — ${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="expenses">
+  return <ReportShell title="تقرير المصروفات" subtitle={`مصروفات وفئاتها — ${fromDate} → ${toDate}`} onExport={handleExport} isLoading={isLoading} isError={isError} refetch={refetch} reportId="expenses">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
       <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
-      <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
     </div>
     {data && (
       <>

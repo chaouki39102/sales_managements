@@ -55,10 +55,9 @@ export default function CustomersReportPage() {
     { __isSummary: true, _idx: `الإجمالي (${data.product_recap.length} منتج)`, total_qty: data.product_recap.reduce((s, r) => s + r.total_qty, 0), total_ht: data.product_recap.reduce((s, r) => s + r.total_ht, 0), total_discount: data.summary.total_discount, total_ttc: data.product_recap.reduce((s, r) => s + r.total_ttc, 0) },
   ] : [];
 
-  return <ReportShell title="تقرير الزبائن" subtitle={`أرصدة وحركة المبيعات — ${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="customers">
+  return <ReportShell title="تقرير الزبائن" subtitle={`أرصدة وحركة المبيعات — ${fromDate} → ${toDate}`} onExport={handleExport} isLoading={isLoading} isError={isError} refetch={refetch} reportId="customers">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
       <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
-      <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
     </div>
     {data && (
       <>

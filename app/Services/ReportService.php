@@ -1365,34 +1365,69 @@ class ReportService
 
     public function creativeReport(array $filters = []): array
     {
-        $fiscalYearId = $filters['fiscal_year_id'] ?? null;
-        $from = $filters['from_date'] ?? null;
-        $to   = $filters['to_date']   ?? null;
+        $companyId     = $this->companyId();
+        $fiscalYearId  = $filters['fiscal_year_id'] ?? null;
+        $from          = $filters['from_date'] ?? null;
+        $to            = $filters['to_date']   ?? null;
 
-        $salesQuery = CommercialDocument::with([])
-            ->whereHas('documentType', fn($q) => $q->whereIn('code', self::SALE_CODES));
-        if ($fiscalYearId) $salesQuery->where('fiscal_year_id', $fiscalYearId);
-        if ($from) $salesQuery->whereDate('document_date', '>=', $from);
-        if ($to)   $salesQuery->whereDate('document_date', '<=', $to);
+        if ($fiscalYearId && (!$from || !$to)) {
+            $fy = \App\Models\FiscalYear::find($fiscalYearId);
+            if ($fy) {
+                $from = $from ?? $fy->start_date;
+                $to   = $to   ?? $fy->end_date;
+            }
+        }
+        $from = $from ?: now()->startOfYear()->toDateString();
+        $to   = $to   ?: now()->toDateString();
+
+        $salesQuery = CommercialDocument::with(['documentType', 'party'])
+            ->whereHas('documentType', fn($q) => $q->whereIn('code', self::SALE_CODES))
+            ->whereDate('document_date', '>=', $from)
+            ->whereDate('document_date', '<=', $to);
         $salesDocs = $salesQuery->get();
 
-        $purchasesQuery = CommercialDocument::with([])
-            ->whereHas('documentType', fn($q) => $q->whereIn('code', self::PURCHASE_CODES));
-        if ($fiscalYearId) $purchasesQuery->where('fiscal_year_id', $fiscalYearId);
-        if ($from) $purchasesQuery->whereDate('document_date', '>=', $from);
-        if ($to)   $purchasesQuery->whereDate('document_date', '<=', $to);
+        $purchasesQuery = CommercialDocument::with(['documentType', 'party'])
+            ->whereHas('documentType', fn($q) => $q->whereIn('code', self::PURCHASE_CODES))
+            ->whereDate('document_date', '>=', $from)
+            ->whereDate('document_date', '<=', $to);
         $purchasesDocs = $purchasesQuery->get();
 
+        // مجموع موقّع: الإرجاعات (AV/AA) بسالب
+        $signedSum = fn($docs, string $negateCode, string $field) => $docs->reduce(
+            fn($sum, $d) => $sum + ($d->documentType?->code === $negateCode ? -$d->{$field} : $d->{$field}),
+            0
+        );
+
+        $totalSalesHt  = $signedSum($salesDocs, 'AV', 'total_ht');
+        $totalSalesTva = $signedSum($salesDocs, 'AV', 'total_tva');
+        $totalSalesTtc = $signedSum($salesDocs, 'AV', 'total_ttc');
+        $totalPurchasesHt  = $signedSum($purchasesDocs, 'AA', 'total_ht');
+        $totalPurchasesTva = $signedSum($purchasesDocs, 'AA', 'total_tva');
+        $totalPurchasesTtc = $signedSum($purchasesDocs, 'AA', 'total_ttc');
+
+        $saleReturns    = $salesDocs->filter(fn($d) => $d->documentType?->code === 'AV');
+        $purchaseReturns = $purchasesDocs->filter(fn($d) => $d->documentType?->code === 'AA');
+
+        // ── تكلفة المبيعات (كل الأسطر، وليس أفضل 10 فقط) + أفضل 10 منتجات ──
         $salesIds = $salesDocs->pluck('id');
-        $totalSalesCost = 0;
+        $totalSalesCost = 0.0;
         $productMargin = [];
 
         if ($salesIds->isNotEmpty()) {
+            $costAgg = DB::table('commercial_document_lines as cdl')
+                ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+                ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->where('cd.company_id', $companyId)
+                ->whereIn('cdl.commercial_document_id', $salesIds)
+                ->selectRaw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity * cdl.cost_price_ht ELSE cdl.quantity * cdl.cost_price_ht END) as total_cost")
+                ->first();
+            $totalSalesCost = (float) ($costAgg->total_cost ?? 0);
+
             $lineData = DB::table('commercial_document_lines as cdl')
                 ->join('products as p', 'p.id', '=', 'cdl.product_id')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
-                ->where('cd.company_id', $this->companyId())
+                ->where('cd.company_id', $companyId)
                 ->whereIn('cdl.commercial_document_id', $salesIds)
                 ->select(
                     'cdl.product_id',
@@ -1400,18 +1435,18 @@ class ReportService
                     'p.ref as product_ref',
                     DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity ELSE cdl.quantity END) as total_qty"),
                     DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.total_ht ELSE cdl.total_ht END) as total_ht"),
-                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity * cdl.cost_price_ht ELSE cdl.quantity * cdl.cost_price_ht END) as total_cost")
+                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity * cdl.cost_price_ht ELSE cdl.quantity * cdl.cost_price_ht END) as total_cost"),
+                    DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.total_ht ELSE cdl.total_ht END) - SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity * cdl.cost_price_ht ELSE cdl.quantity * cdl.cost_price_ht END) as total_margin")
                 )
                 ->groupBy('cdl.product_id', 'p.name', 'p.ref')
-                ->orderByDesc('total_ht')
+                ->orderByDesc('total_margin')
                 ->limit(10)
                 ->get();
 
             foreach ($lineData as $ld) {
                 $ht = (float) $ld->total_ht;
                 $cost = (float) $ld->total_cost;
-                $totalSalesCost += $cost;
-                $margin = $ht - $cost;
+                $margin = (float) $ld->total_margin;
                 $productMargin[] = [
                     'product_name'  => $ld->product_name,
                     'product_ref'   => $ld->product_ref,
@@ -1424,68 +1459,171 @@ class ReportService
             }
         }
 
-        $totalSalesHt = $salesDocs->sum('total_ht');
-        $totalSalesTtc = $salesDocs->sum('total_ttc');
-        $totalPurchasesHt = $purchasesDocs->sum('total_ht');
-        $totalPurchasesTtc = $purchasesDocs->sum('total_ttc');
+        // ── أفضل الزبائن / الموردين (كل الوثائق، موقّعة حسب الإرجاع) ──
+        $topCustomers = $this->topParties($salesDocs, 'AV', 10);
+        $topSuppliers = $this->topParties($purchasesDocs, 'AA', 10);
 
-        $topCustomers = CommercialDocument::with([])
-            ->whereHas('documentType', fn($q) => $q->whereIn('code', self::SALE_CODES))
-            ->where('remaining_amount', '>', 0);
-        if ($fiscalYearId) $topCustomers->where('fiscal_year_id', $fiscalYearId);
-        if ($from) $topCustomers->whereDate('document_date', '>=', $from);
-        if ($to)   $topCustomers->whereDate('document_date', '<=', $to);
-        $topCustomersRaw = $topCustomers
-            ->select('party_id', DB::raw('SUM(total_ttc) as total_ttc'), DB::raw('COUNT(*) as doc_count'))
-            ->groupBy('party_id')
-            ->orderByDesc('total_ttc')
-            ->limit(10)
+        // ── المصاريف: الإجمالي + التوزيع حسب التصنيف ──
+        $expenseRows = DB::table('expenses as e')
+            ->leftJoin('expense_categories as ec', 'ec.id', '=', 'e.expense_category_id')
+            ->where('e.company_id', $companyId)
+            ->whereBetween('e.date', [$from, $to])
+            ->select('e.date', 'e.amount', 'ec.name as category_name')
+            ->orderBy('e.date', 'desc')
             ->get();
+        $expensesTotal = (float) $expenseRows->sum('amount');
+        $expensesCount = $expenseRows->count();
+        $expensesByCategory = $expenseRows
+            ->groupBy('category_name')
+            ->map(fn($rows, $cat) => [
+                'category_name' => $cat === '' || $cat === null ? 'غير مصنف' : $cat,
+                'total'         => round((float) $rows->sum('amount'), 2),
+                'count'         => $rows->count(),
+            ])
+            ->sortByDesc('total')
+            ->take(5)
+            ->values()
+            ->toArray();
 
-        $partyIds = $topCustomersRaw->pluck('party_id')->filter()->unique();
-        $partiesMap = Party::whereIn('id', $partyIds)->get()->keyBy('id');
+        // ── الدفعات: مقبوض / مدفوع ──
+        $paymentsQuery = Payment::where('status', 'confirmed')
+            ->whereBetween('payment_date', [$from, $to]);
+        $paymentsIn  = (float) (clone $paymentsQuery)->where('direction', 'in')->sum('amount');
+        $paymentsOut = (float) (clone $paymentsQuery)->where('direction', 'out')->sum('amount');
 
-        $topCustomers = $topCustomersRaw->map(function ($row) use ($partiesMap) {
-            $party = $partiesMap->get($row->party_id);
-            return [
-                'party_name'   => $party?->name ?? '—',
-                'total_ttc'    => round((float) $row->total_ttc, 2),
-                'doc_count'    => (int) $row->doc_count,
+        $totalReceivable = (float) $salesDocs->sum('remaining_amount');
+        $totalPayable    = (float) $purchasesDocs->sum('remaining_amount');
+        $totalSalesMargin = round($totalSalesHt - $totalSalesCost, 2);
+        $netProfit        = round($totalSalesMargin - $expensesTotal, 2);
+
+        // ── الاتجاه الشهري (مبيعات/مشتريات/مصاريف/هامش) مع فراغات معبّأة ──
+        $trend = [];
+        $cursor = Carbon::parse($from)->startOfMonth();
+        $trendEnd = Carbon::parse($to)->startOfMonth();
+        while ($cursor->lte($trendEnd)) {
+            $key = $cursor->format('Y-m');
+            $trend[$key] = [
+                'month'        => $key,
+                'label'        => self::AR_MONTHS[$cursor->month - 1] ?? $key,
+                'sales_ht'     => 0.0,
+                'purchases_ht' => 0.0,
+                'margin'       => 0.0,
+                'expenses'     => 0.0,
             ];
-        });
-
-        $paymentsQuery = Payment::where('status', 'confirmed');
-        if ($fiscalYearId) {
-            $paymentsQuery->whereHas('commercialDocuments', fn($q) => $q->where('fiscal_year_id', $fiscalYearId));
+            $cursor->addMonth();
         }
-        if ($from) $paymentsQuery->whereDate('payment_date', '>=', $from);
-        if ($to)   $paymentsQuery->whereDate('payment_date', '<=', $to);
-        $totalPayments = $paymentsQuery->sum('amount');
+        foreach ($salesDocs as $d) {
+            $k = $d->document_date?->format('Y-m');
+            if ($k && isset($trend[$k])) {
+                $trend[$k]['sales_ht'] += $d->documentType?->code === 'AV' ? -$d->total_ht : $d->total_ht;
+            }
+        }
+        foreach ($purchasesDocs as $d) {
+            $k = $d->document_date?->format('Y-m');
+            if ($k && isset($trend[$k])) {
+                $trend[$k]['purchases_ht'] += $d->documentType?->code === 'AA' ? -$d->total_ht : $d->total_ht;
+            }
+        }
+        foreach ($expenseRows as $e) {
+            $k = substr((string) $e->date, 0, 7);
+            if (isset($trend[$k])) {
+                $trend[$k]['expenses'] += (float) $e->amount;
+            }
+        }
+        $monthlyCost = [];
+        if ($salesIds->isNotEmpty()) {
+            $monthlyCost = DB::table('commercial_document_lines as cdl')
+                ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+                ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->where('cd.company_id', $companyId)
+                ->whereIn('cdl.commercial_document_id', $salesIds)
+                ->selectRaw("substr(cd.document_date, 1, 7) as month, SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity * cdl.cost_price_ht ELSE cdl.quantity * cdl.cost_price_ht END) as cost")
+                ->groupBy('month')
+                ->pluck('cost', 'month');
+        }
+        $trend = array_map(function ($t) use ($monthlyCost) {
+            $cost = (float) ($monthlyCost[$t['month']] ?? 0);
+            $t['sales_ht']     = round($t['sales_ht'], 2);
+            $t['purchases_ht'] = round($t['purchases_ht'], 2);
+            $t['margin']       = round($t['sales_ht'] - $cost, 2);
+            $t['expenses']     = round($t['expenses'], 2);
+            return $t;
+        }, array_values($trend));
 
         return [
             'overview' => [
                 'total_sales_ht'       => round($totalSalesHt, 2),
+                'total_sales_tva'      => round($totalSalesTva, 2),
                 'total_sales_ttc'      => round($totalSalesTtc, 2),
                 'total_sales_cost'     => round($totalSalesCost, 2),
-                'total_sales_margin'   => round($totalSalesHt - $totalSalesCost, 2),
-                'sales_margin_pct'     => $totalSalesHt > 0 ? round(($totalSalesHt - $totalSalesCost) / $totalSalesHt * 100, 2) : 0,
+                'total_sales_margin'   => $totalSalesMargin,
+                'sales_margin_pct'     => $totalSalesHt > 0 ? round($totalSalesMargin / $totalSalesHt * 100, 2) : 0,
                 'total_purchases_ht'   => round($totalPurchasesHt, 2),
+                'total_purchases_tva'  => round($totalPurchasesTva, 2),
                 'total_purchases_ttc'  => round($totalPurchasesTtc, 2),
-                'total_payments'       => round((float) $totalPayments, 2),
-                'total_receivable'     => round($salesDocs->sum('remaining_amount'), 2),
-                'total_payable'        => round($purchasesDocs->sum('remaining_amount'), 2),
+                'total_payments_in'    => round($paymentsIn, 2),
+                'total_payments_out'   => round($paymentsOut, 2),
+                'total_receivable'     => round($totalReceivable, 2),
+                'total_payable'        => round($totalPayable, 2),
                 'sales_count'          => $salesDocs->count(),
                 'purchases_count'      => $purchasesDocs->count(),
                 'unpaid_sales_count'   => $salesDocs->where('remaining_amount', '>', 0.01)->count(),
+                'sale_returns_count'   => $saleReturns->count(),
+                'purchase_returns_count' => $purchaseReturns->count(),
+                'returns_ht'           => round($saleReturns->sum('total_ht') + $purchaseReturns->sum('total_ht'), 2),
+                'returns_ttc'          => round($saleReturns->sum('total_ttc') + $purchaseReturns->sum('total_ttc'), 2),
+                'expenses_total'       => round($expensesTotal, 2),
+                'expenses_count'       => $expensesCount,
+                'net_profit'           => $netProfit,
+                'net_profit_pct'       => $totalSalesHt > 0 ? round($netProfit / $totalSalesHt * 100, 2) : 0,
+                'tva_collected'        => round($totalSalesTva, 2),
+                'tva_deductible'       => round($totalPurchasesTva, 2),
+                'tva_balance'          => round($totalSalesTva - $totalPurchasesTva, 2),
             ],
             'top_products'    => $productMargin,
-            'top_customers'   => $topCustomers->toArray(),
+            'top_customers'   => $topCustomers,
+            'top_suppliers'   => $topSuppliers,
+            'expenses_by_category' => $expensesByCategory,
+            'trend'           => $trend,
             'cash_flow'       => [
-                'collected'         => round((float) $totalPayments, 2),
-                'outstanding'       => round($salesDocs->sum('remaining_amount'), 2),
-                'collection_rate'   => $totalSalesTtc > 0 ? round((float) $totalPayments / $totalSalesTtc * 100, 2) : 0,
+                'collected'         => round($paymentsIn, 2),
+                'paid_out'          => round($paymentsOut, 2),
+                'net_cash'          => round($paymentsIn - $paymentsOut, 2),
+                'outstanding'       => round($totalReceivable, 2),
+                'collection_rate'   => $totalSalesTtc > 0 ? round($paymentsIn / $totalSalesTtc * 100, 2) : 0,
             ],
         ];
+    }
+
+    /**
+     * أفضل الأطراف حسب القيمة، موقّعة حسب كود الإرجاع (AV/AA).
+     */
+    private function topParties(\Illuminate\Support\Collection $docs, string $negateCode, int $limit = 10): array
+    {
+        $grouped = $docs->groupBy('party_id')->map(function ($group, $pid) use ($negateCode) {
+            $ht = $group->reduce(fn($s, $d) => $s + ($d->documentType?->code === $negateCode ? -$d->total_ht : $d->total_ht), 0);
+            $ttc = $group->reduce(fn($s, $d) => $s + ($d->documentType?->code === $negateCode ? -$d->total_ttc : $d->total_ttc), 0);
+            return [
+                'party_id'  => (int) $pid,
+                'total_ht'  => round($ht, 2),
+                'total_ttc' => round($ttc, 2),
+                'doc_count' => $group->count(),
+            ];
+        });
+
+        $sorted = $grouped->sortByDesc('total_ttc')->take($limit);
+        $partyIds = $sorted->pluck('party_id')->filter()->unique();
+        $partiesMap = Party::whereIn('id', $partyIds)->get()->keyBy('id');
+
+        return $sorted->map(function ($row) use ($partiesMap) {
+            $party = $partiesMap->get($row['party_id']);
+            return [
+                'party_name' => $party?->name ?? '—',
+                'total_ht'   => $row['total_ht'],
+                'total_ttc'  => $row['total_ttc'],
+                'doc_count'  => $row['doc_count'],
+            ];
+        })->values()->toArray();
     }
 
     public function dailyReport(array $filters = []): array

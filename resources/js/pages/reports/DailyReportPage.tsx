@@ -6,7 +6,6 @@ import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
-import Button from '@/components/ui/Button';
 import SimpleTable from '@/components/ui/SimpleTable';
 
 export default function DailyReportPage() {
@@ -25,11 +24,10 @@ export default function DailyReportPage() {
   };
 
   return (
-    <ReportShell title="التقرير اليومي" subtitle={d?.date ? `يوم ${d.date} — حركة المبيعات والمدفوعات` : undefined} isLoading={isLoading} isError={isError} refetch={refetch} reportId="daily">
+    <ReportShell title="التقرير اليومي" subtitle={`حركة المبيعات والمدفوعات ليوم ${date}`} onExport={handleExport} isLoading={isLoading} isError={isError} refetch={refetch} reportId="daily">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
         <span style={{ fontWeight: 600 }}>التاريخ:</span>
         <input type="date" className="form-control" style={{ width: 200 }} value={date} onChange={(e) => setDate(e.target.value)} />
-        <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
       </div>
       {d && (
         <>

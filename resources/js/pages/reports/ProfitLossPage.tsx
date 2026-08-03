@@ -6,7 +6,6 @@ import { useProfitLossReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
 import SimpleTable from '@/components/ui/SimpleTable';
 
 export default function ProfitLossPage() {
@@ -37,10 +36,9 @@ export default function ProfitLossPage() {
   };
 
   return (
-    <ReportShell title="الأرباح والخسائر" subtitle={`تقرير شامل للمبيعات والتكاليف والمصروفات والأرباح — ${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="profit-loss">
+    <ReportShell title="الأرباح والخسائر" subtitle={`تقرير شامل للمبيعات والتكاليف والمصروفات والأرباح — ${fromDate} → ${toDate}`} onExport={handleExport} isLoading={isLoading} isError={isError} refetch={refetch} reportId="profit-loss">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
         <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
-        <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
       </div>
       {d && (
         <>

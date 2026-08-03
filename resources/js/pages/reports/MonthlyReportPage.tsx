@@ -6,7 +6,6 @@ import { useMonthlyReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
 import SimpleTable from '@/components/ui/SimpleTable';
 
 const def = REPORT_DEFAULTS;
@@ -36,10 +35,9 @@ export default function MonthlyReportPage() {
   };
 
   return (
-    <ReportShell title="التقرير الشهري" subtitle={`مقارنة المبيعات والمشتريات شهراً بشهر — ${fromDate} → ${toDate}`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="monthly">
+    <ReportShell title="التقرير الشهري" subtitle={`مقارنة المبيعات والمشتريات شهراً بشهر — ${fromDate} → ${toDate}`} onExport={handleExport} isLoading={isLoading} isError={isError} refetch={refetch} reportId="monthly">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
         <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
-        <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
       </div>
       {data && (
         <>

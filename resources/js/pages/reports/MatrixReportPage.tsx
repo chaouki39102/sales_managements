@@ -8,7 +8,6 @@ import { useFamilies, useBrands } from '@/lib/api/endpoints/lookups';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
 import SimpleTable from '@/components/ui/SimpleTable';
 import Modal from '@/components/ui/Modal';
 import AlertBar from '@/components/ui/AlertBar';
@@ -282,10 +281,9 @@ export default function MatrixReportPage({ mode }: { mode: 'sale' | 'purchase' }
   const subtitle = `${isSale ? 'الزبائن' : 'الموردون'} × المنتجات — ${fromDate} → ${toDate}`;
 
   return (
-    <ReportShell title={title} subtitle={subtitle} isLoading={isLoading} isError={isError} refetch={refetch} reportId={isSale ? 'sales-matrix' : 'purchases-matrix'}>
+    <ReportShell title={title} subtitle={subtitle} onExport={handleExport} isLoading={isLoading} isError={isError} refetch={refetch} reportId={isSale ? 'sales-matrix' : 'purchases-matrix'}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 4 }}>
         <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
-        <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet" />} onClick={handleExport}>تصدير Excel</Button>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>

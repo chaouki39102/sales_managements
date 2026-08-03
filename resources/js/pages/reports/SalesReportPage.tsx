@@ -61,10 +61,9 @@ export default function SalesReportPage() {
 
   const summaryRow = () => 'tw-sr';
 
-  return <ReportShell title="تقرير المبيعات" subtitle={fromDate && toDate ? `المبيعات والمستندات — ${fromDate} → ${toDate}` : 'المبيعات — سنة مالية كاملة'} isLoading={isLoading} isError={isError} refetch={refetch} reportId="sales">
+  return <ReportShell title="تقرير المبيعات" subtitle={fromDate && toDate ? `المبيعات والمستندات — ${fromDate} → ${toDate}` : 'المبيعات — سنة مالية كاملة'} onExport={handleExport} isLoading={isLoading} isError={isError} refetch={refetch} reportId="sales">
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
       <ReportDateFilter fromDate={fromDate} toDate={toDate} onChangeFrom={setFromDate} onChangeTo={setToDate} />
-      <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
     </div>
     {data && (
       <>

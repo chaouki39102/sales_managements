@@ -5,7 +5,6 @@ import { useForecastReport } from '@/lib/api/endpoints/reports';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
 import SimpleTable from '@/components/ui/SimpleTable';
 
 export default function ForecastReorderReportPage() {
@@ -22,7 +21,7 @@ export default function ForecastReorderReportPage() {
   };
 
   return (
-    <ReportShell title="التنبؤ وإعادة الطلب" subtitle={`توقع الطلب على ${horizon} يوم بناءً على معدل البيع اليومي منذ أول عملية بيع — مع الكمية المقترحة لإعادة الطلب`} isLoading={isLoading} isError={isError} refetch={refetch} reportId="forecast">
+    <ReportShell title="التنبؤ وإعادة الطلب" subtitle={`توقع الطلب على ${horizon} يوم بناءً على معدل البيع اليومي منذ أول عملية بيع — مع الكمية المقترحة لإعادة الطلب`} onExport={handleExport} isLoading={isLoading} isError={isError} refetch={refetch} reportId="forecast">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontWeight: 700, fontSize: 13 }}>أفق التنبؤ (يوم):</span>
@@ -34,7 +33,6 @@ export default function ForecastReorderReportPage() {
             onChange={(e) => setHorizon(Math.max(1, Number(e.target.value) || 1))}
           />
         </div>
-        <Button size="xs" variant="success" icon={<i className="ti ti-file-spreadsheet"/>} onClick={handleExport}>تصدير Excel</Button>
       </div>
       {data && (
         <>

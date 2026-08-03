@@ -875,7 +875,7 @@ const meta = useTopbarTitle();
         </div>
 
         {/* ════════ المحتوى ════════ */}
-        <div style={{ flex:1, minHeight:0 }}>
+        <div className={currentPath === 'pos' || currentPath.startsWith('pos/') ? 'page-content page-content--flush' : 'page-content'} style={{ flex:1, minHeight:0 }}>
           {fiscalState === 'loading' && (
             <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', gap:12, color:'var(--t4)' }}>
               <i className="ti ti-loader" style={{ fontSize:20, color:'var(--em)', animation:'spin 1s linear infinite' }} />

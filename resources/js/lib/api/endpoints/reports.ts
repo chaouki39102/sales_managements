@@ -508,19 +508,33 @@ export interface AgingReportData {
 // ─── Creative Report (التقرير الشامل) ──────────────────────────────────────
 
 export interface CreativeReportOverview {
-  total_sales_ht:       number;
-  total_sales_ttc:      number;
-  total_sales_cost:     number;
-  total_sales_margin:   number;
-  sales_margin_pct:     number;
-  total_purchases_ht:   number;
-  total_purchases_ttc:  number;
-  total_payments:       number;
-  total_receivable:     number;
-  total_payable:        number;
-  sales_count:          number;
-  purchases_count:      number;
-  unpaid_sales_count:   number;
+  total_sales_ht:         number;
+  total_sales_tva:        number;
+  total_sales_ttc:        number;
+  total_sales_cost:       number;
+  total_sales_margin:     number;
+  sales_margin_pct:       number;
+  total_purchases_ht:     number;
+  total_purchases_tva:    number;
+  total_purchases_ttc:    number;
+  total_payments_in:      number;
+  total_payments_out:     number;
+  total_receivable:       number;
+  total_payable:          number;
+  sales_count:            number;
+  purchases_count:        number;
+  unpaid_sales_count:     number;
+  sale_returns_count:     number;
+  purchase_returns_count: number;
+  returns_ht:             number;
+  returns_ttc:            number;
+  expenses_total:         number;
+  expenses_count:         number;
+  net_profit:             number;
+  net_profit_pct:         number;
+  tva_collected:          number;
+  tva_deductible:         number;
+  tva_balance:            number;
 }
 
 export interface CreativeTopProduct {

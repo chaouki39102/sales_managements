@@ -33,7 +33,7 @@ export default function ReportsPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, color: 'var(--t3)' }}>
           {[
             'جميع التقارير تدعم التصدير بصيغ Excel و PDF',
-            'التقرير الشامل يجمع البيانات من المبيعات والمشتريات والهومش في مكان واحد',
+            'التقرير الشامل يجمع البيانات من المبيعات والمشتريات والهامش في مكان واحد',
             'يمكن تصفية التقارير حسب السنة المالية المختارة من الشريط العلوي',
           ].map((text, i) => (
             <div key={i} style={{ display: 'flex', gap: 8 }}>
