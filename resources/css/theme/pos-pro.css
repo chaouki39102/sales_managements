@@ -1323,10 +1323,10 @@
   transition: background var(--d1), color var(--d1), border-color var(--d1);
 }
 
-.pp-chip:hover { background: var(--bg4); }
+.pp-chip:hover { background: var(--bg4); color: var(--t1); }
 
 .pp-chip.on {
-  background: var(--emb);
+  background: var(--em);
   color: #fff;
   border-color: transparent;
   box-shadow: var(--emglow);
