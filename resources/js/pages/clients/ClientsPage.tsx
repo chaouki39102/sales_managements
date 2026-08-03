@@ -18,7 +18,10 @@ import ClientModal from '@/components/modals/ClientModal';
 import ImportWizardModal from '@/pages/import/ImportWizardModal';
 import PortalAccessModal from '@/components/PortalAccessModal';
 import { PARTY_IMPORT_CONFIG } from '@/pages/import/entityConfig';
-import { useActiveSlug } from '@/lib/store/appStore';
+import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
+import { portalAccessApi } from '@/lib/api/endpoints/portalAccess';
+import { useNotification } from '@/hooks/useNotification';
+import { createPortal } from 'react-dom';
 import { apiGet } from '@/lib/api/core/client';
 import type { Party } from '@/types';
 import type { Column } from '@/components/ui/DataTable';
@@ -319,6 +322,9 @@ export default function ClientsPage() {
     { key: 'actions', label: '', thStyle: { width: 96 }, always: true,
       render: (c: any) => (
         <div style={{ display: 'flex', gap: 6 }}>
+          <Button size="xs" icon={<i className="ti ti-share" />} title="مشاركة البوابة"
+            disabled={shareCheckingId === c.id}
+            onClick={(e) => openShare(c, e)} />
           <Button size="xs" icon={<i className="ti ti-building-store" />} title="حساب البوابة"
             onClick={() => openPortalAccess(c)} />
           <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={() => openEdit(c)} />
@@ -387,6 +393,89 @@ export default function ClientsPage() {
   const openCreate = () => { setEditing(null); modal.openModal(); };
   const openEdit   = (c: Party) => { setEditing(c); modal.openModal(); };
   const openPortalAccess = (c: Party) => { setPortalParty(c); portalModal.openModal(); };
+
+  // ── مشاركة البوابة (واتساب / البريد) ────────────────────────────────────────
+  const notify            = useNotification();
+  const activeCompany     = useActiveCompany();
+  const [shareParty, setShareParty]         = useState<Party | null>(null);
+  const [sharePos, setSharePos]             = useState<{ x: number; y: number } | null>(null);
+  const [shareCheckingId, setShareCheckingId] = useState<number | null>(null);
+  const shareRef = useRef<HTMLDivElement>(null);
+
+  const sharePortalUrl = (() => {
+    const p = (activeCompany?.portal_slug ?? '').trim();
+    const base = p || activeCompany?.slug || slug || '';
+    return base ? `${window.location.origin}/portal/${base}` : null;
+  })();
+
+  const closeShare = useCallback(() => {
+    setShareParty(null);
+    setSharePos(null);
+  }, []);
+
+  useEffect(() => {
+    if (!shareParty) return;
+    const onDown = (e: MouseEvent) => {
+      if (shareRef.current && !shareRef.current.contains(e.target as Node)) closeShare();
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeShare(); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [shareParty, closeShare]);
+
+  const openShare = async (c: Party, e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    setShareCheckingId(c.id);
+    try {
+      // تحقق: هل أضيف حساب بوابة لهذا الزبون؟
+      const account = await portalAccessApi.forParty(c.id);
+      if (!account) {
+        notify.warning(
+          'حساب البوابة غير مضاف',
+          'لم تتم إضافة حساب بوابة لهذا الزبون. أضفه أولاً من أيقونة المتجر.',
+        );
+        return;
+      }
+      const rect = e.currentTarget.getBoundingClientRect();
+      setShareParty(c);
+      setSharePos({ x: rect.left, y: rect.bottom + 4 });
+    } catch {
+      notify.error('تعذر التحقق', 'تعذر التحقق من حساب البوابة لهذا الزبون.');
+    } finally {
+      setShareCheckingId(null);
+    }
+  };
+
+  const shareWhatsApp = () => {
+    const c = shareParty;
+    if (!c) return;
+    const phone = (c.mobile || c.phone || '').replace(/\D/g, '');
+    if (!phone) { notify.warning('لا يوجد رقم هاتف', 'لا يوجد رقم هاتف مسجل لهذا الزبون.'); closeShare(); return; }
+    if (!sharePortalUrl) { notify.warning('الرابط غير متاح', 'تعذر تحديد رابط البوابة.'); closeShare(); return; }
+    window.open(
+      `https://wa.me/${phone}?text=${encodeURIComponent(`بوابة الزبائن — ${sharePortalUrl}`)}`,
+      '_blank',
+      'noopener',
+    );
+    closeShare();
+  };
+
+  const shareEmail = () => {
+    const c = shareParty;
+    if (!c) return;
+    if (!c.email) { notify.warning('لا يوجد بريد إلكتروني', 'لا يوجد بريد إلكتروني مسجل لهذا الزبون.'); closeShare(); return; }
+    if (!sharePortalUrl) { notify.warning('الرابط غير متاح', 'تعذر تحديد رابط البوابة.'); closeShare(); return; }
+    const subject = encodeURIComponent('بوابة الزبائن');
+    const body = encodeURIComponent(
+      `مرحباً ${c.name}، يمكنكم الاطلاع على حسابكم من خلال الرابط التالي:\n${sharePortalUrl}`,
+    );
+    window.location.href = `mailto:${c.email}?subject=${subject}&body=${body}`;
+    closeShare();
+  };
 
   const { create: createMut, update: updateMut } = usePartyMutations();
   const isSubmitting = createMut.isPending || updateMut.isPending;
@@ -600,6 +689,27 @@ export default function ClientsPage() {
         partyName={portalParty?.name}
         partyEmail={portalParty?.email}
       />
+
+      {shareParty && sharePos && createPortal(
+        <div
+          ref={shareRef}
+          className="share-menu"
+          style={{ top: sharePos.y, left: Math.min(sharePos.x, window.innerWidth - 180) }}
+        >
+          <div style={{ padding: '6px 10px', fontSize: 12, color: 'var(--t3)', fontWeight: 600 }}>
+            مشاركة بوابة الزبائن — {shareParty.name}
+          </div>
+          <button type="button" className="share-menu-btn" onClick={shareWhatsApp}>
+            <i className="ti ti-brand-whatsapp" style={{ color: '#25D366', fontSize: 18 }} />
+            واتساب
+          </button>
+          <button type="button" className="share-menu-btn" onClick={shareEmail}>
+            <i className="ti ti-mail" style={{ fontSize: 18 }} />
+            البريد الإلكتروني
+          </button>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
