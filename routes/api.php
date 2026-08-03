@@ -136,7 +136,13 @@ Route::prefix('v1')->group(function () {
     //   - portal.company: يحل {company} slug ويضبط سياق الشركة (لا يتطلب عضوية)
     //   - portal.auth:    يتحقق من توكن زبون البوابة (PortalUser)
     // تسجيل الدخول و /info (معلومات المؤسسة لصفحة الدخول) بدون مصادقة.
-    Route::prefix('{company}/portal')->middleware('portal.company')->group(function () {
+    // بدون SubstituteBindings: الـ binding العام لـ {company} يحل بالـ slug فقط
+    // (AppServiceProvider::boot Route::bind) — البوابة تقبل portal_slug أو slug،
+    // لذا الحل يتم داخل SetPortalCompanyContext (portal.company).
+    Route::prefix('{company}/portal')
+        ->middleware('portal.company')
+        ->withoutMiddleware(\Illuminate\Routing\Middleware\SubstituteBindings::class)
+        ->group(function () {
         Route::post('/auth/login', [PortalAuthController::class, 'login'])
             ->middleware('throttle:5,15');
 
