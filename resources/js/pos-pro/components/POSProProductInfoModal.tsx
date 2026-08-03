@@ -151,7 +151,7 @@ export default function POSProProductInfoModal({
           </div>
           <div className="pp-info-main">
             <div className="pp-info-name">{v.product?.name}</div>
-            {variantLabel && <div className="pp-info-variant">{variantLabel}</div>}
+            {variantLabel && <div className="pp-info-sub-variant">{variantLabel}</div>}
             <div className="pp-info-refs">
               {v.ref && <span><i className="ti ti-hash" /> {v.ref}</span>}
               {v.barcode && <span><i className="ti ti-barcode" /> {v.barcode}</span>}
@@ -159,8 +159,9 @@ export default function POSProProductInfoModal({
             <div className="pp-info-price">
               <span className={isLevelPriced ? 'pp-info-price-lvl' : ''}>{formatDZD(primary)}</span>
               <span className="pp-info-price-unit">
-                {priceDisplayMode === 'ht' ? 'دج HT' : 'دج TTC'}
-                {tvaRate > 0 ? ` (HT ${formatDZD(priceHt)})` : ''}
+                {priceDisplayMode === 'ht'
+                  ? `دج HT (TTC ${formatDZD(priceTtc)})`
+                  : `دج TTC (HT ${formatDZD(priceHt)})`}
               </span>
             </div>
             <span className={stockCls}>{stockLabel}</span>

@@ -17,6 +17,28 @@ interface ModalProps {
 
 const sizeMap = { sm: 'modal-sm', md: '', lg: 'modal-lg', xl: 'modal-xl' };
 
+// ── تنسيق المودالات المتداخلة (مثل نافذة معلومات المنتج فوق مودال المنتجات) ──
+// كومة عامة على مستوى الوحدة تنسّق أمرين بين مودالات مفتوحة معاً:
+//  1. Escape يغلق المودال الأعلى فقط (وليس الكل معاً)
+//  2. قفل تمرير الصفحة يبقى فعّالاً ما دام أي مودال مفتوحاً
+const modalStack: Array<() => void> = [];
+let escInstalled = false;
+function installEscape() {
+  if (escInstalled) return;
+  escInstalled = true;
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const top = modalStack[modalStack.length - 1];
+    if (top) {
+      e.stopPropagation();
+      top();
+    }
+  });
+}
+function syncBodyLock() {
+  document.body.style.overflow = modalStack.length ? 'hidden' : '';
+}
+
 function loadStoredSize(key: string): { width: number; height: number } | null {
   try {
     const raw = localStorage.getItem(key);
@@ -43,6 +65,8 @@ export default function Modal({
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   const resolvedKey = useMemo(
     () => storageKey ?? (typeof title === 'string' ? hashTitle(title) : null),
@@ -86,17 +110,19 @@ export default function Modal({
     document.addEventListener('mouseup', onMouseUp);
   }, []);
 
-  // Close on Escape
+  // Close on Escape — يغلق المودال الأعلى فقط عبر كومة المودالات
+  // وقفل التمرير يبقى ما دام أي مودال مفتوحاً (يدعم التتالي).
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape' && open) onClose(); };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose]);
-
-  // Lock body scroll
-  useEffect(() => {
-    document.body.style.overflow = open ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    if (!open) return;
+    installEscape();
+    const closer = () => onCloseRef.current();
+    modalStack.push(closer);
+    syncBodyLock();
+    return () => {
+      const i = modalStack.lastIndexOf(closer);
+      if (i !== -1) modalStack.splice(i, 1);
+      syncBodyLock();
+    };
   }, [open]);
 
   const resizableStyle: React.CSSProperties = (resizable && dims) ? {
