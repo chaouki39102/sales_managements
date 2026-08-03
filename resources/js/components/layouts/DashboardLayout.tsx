@@ -17,29 +17,29 @@ const NAV_GROUPS = [
     label: 'الرئيسية',
     items: [
       { name: 'لوحة التحكم', href: 'dashboard', icon: 'ti-layout-dashboard' },
-      { name: 'نقطة البيع',  href: 'pos',         icon: 'ti-shopping-cart'   },
-      { name: 'جلسات POS',   href: 'pos/sessions', icon: 'ti-chart-bar'      },
-      { name: 'POS PRO',     href: 'pos/pro',      icon: 'ti-cash-register'  },
+      { name: 'نقطة البيع',  href: 'pos',        icon: 'ti-shopping-cart'   },
+      { name: 'POS PRO',     href: 'pos/pro',    icon: 'ti-cash-register'   },
+      { name: 'جلسات POS',   href: 'pos/sessions', icon: 'ti-chart-bar'     },
     ],
   },
   {
     label: 'المبيعات',
     items: [
-      { name: 'فاتورة شكلية',          href: 'documents/DEV', icon: 'ti-file-check'             },
-      { name: 'طلبيات الزبائن',        href: 'documents/BCC', icon: 'ti-clipboard-list'         },
-      { name: 'وصل التسليم ',        href: 'documents/BL',  icon: 'ti-truck'                  },
       { name: 'فواتير البيع',          href: 'documents/FV',  icon: 'ti-file-invoice', badge: 3 },
       { name: 'مبيعات POS',            href: 'documents/POS', icon: 'ti-cash-register'          },
+      { name: 'وصل التسليم',           href: 'documents/BL',  icon: 'ti-truck'                  },
+      { name: 'طلبيات الزبائن',        href: 'documents/BCC', icon: 'ti-clipboard-list'         },
+      { name: 'فاتورة شكلية',          href: 'documents/DEV', icon: 'ti-file-check'             },
       { name: 'مرتجعات البيع',         href: 'documents/AV',  icon: 'ti-corner-up-left'         },
     ],
   },
   {
     label: 'المشتريات',
     items: [
-      { name: 'طلبات فاتورة شكلية',    href: 'documents/DDP', icon: 'ti-file-search'           },
+      { name: 'فواتير الشراء',         href: 'documents/FA',  icon: 'ti-file-invoice'          },
       { name: 'أوامر الشراء للموردين', href: 'documents/BCF', icon: 'ti-clipboard-check'       },
       { name: 'وصل الاستلام',          href: 'documents/BR',  icon: 'ti-package-import'        },
-      { name: 'فواتير الشراء',         href: 'documents/FA',  icon: 'ti-file-invoice'          },
+      { name: 'طلبات فاتورة شكلية',    href: 'documents/DDP', icon: 'ti-file-search'           },
       { name: 'مرتجعات الشراء',        href: 'documents/AA',  icon: 'ti-corner-up-left-double' },
     ],
   },
@@ -48,30 +48,48 @@ const NAV_GROUPS = [
     items: [
       { name: 'المنتجات',       href: 'products',   icon: 'ti-package'                          },
       { name: 'إدارة المخزون',  href: 'inventory',  icon: 'ti-building-warehouse', badgeWarn: true },
+      { name: 'المستودعات',     href: 'warehouses', icon: 'ti-building-warehouse'               },
       { name: 'الفئات',         href: 'categories', icon: 'ti-folder-open'                      },
       { name: 'العلامات',       href: 'brands',     icon: 'ti-award'                            },
       { name: 'الوحدات',        href: 'units',      icon: 'ti-ruler'                            },
-      { name: 'الموردون',       href: 'suppliers',  icon: 'ti-truck'                            },
-      { name: 'المستودعات',     href: 'warehouses', icon: 'ti-building-warehouse'               },
     ],
   },
   {
-    label: 'المحاسبة والمالية',
+    label: 'الأطراف',
     items: [
-      { name: 'الزبائن',          href: 'clients',     icon: 'ti-users'           },
-      { name: 'الخزينة',          href: 'finance',     icon: 'ti-building-bank'   },
-      { name: 'الشيكات',          href: 'checks',      icon: 'ti-file-invoice'    },
-      { name: 'المصروفات',        href: 'expenses',    icon: 'ti-credit-card'     },
-      { name: 'الديون',           href: 'debts',       icon: 'ti-receipt'         },
-      { name: 'إعدادات الجباية',        href: 'fiscal/tax-settings',       icon: 'ti-settings'            },
-      { name: 'المواد المقننة',         href: 'fiscal/regulated-products',  icon: 'ti-package'             },
-      { name: 'المواد المدعمة',         href: 'fiscal/subsidized-products', icon: 'ti-package-off'        },
-      { name: 'إقرار G50 — TVA',       href: 'fiscal/g50',                 icon: 'ti-calculator'          },
-      { name: 'إقرار IFU — G12',       href: 'fiscal/ifu',                 icon: 'ti-file-barcode'        },
-      { name: 'السنوات المالية',  href: 'fiscalyears', icon: 'ti-calendar'        },
-      { name: 'العملات',          href: 'currencies',  icon: 'ti-currency-dollar' },
-      { name: 'مستويات الأسعار',  href: 'pricelevels', icon: 'ti-tag'             },
-      { name: 'المطابقة البنكية', href: 'bank-reconciliation', icon: 'ti-arrows-exchange' },
+      { name: 'الزبائن',   href: 'clients',   icon: 'ti-users'        },
+      { name: 'الموردون',  href: 'suppliers', icon: 'ti-truck'        },
+      { name: 'الديون',    href: 'debts',     icon: 'ti-receipt'      },
+    ],
+  },
+  {
+    label: 'الخزينة والمالية',
+    items: [
+      { name: 'الخزينة',           href: 'finance',              icon: 'ti-building-bank'  },
+      { name: 'الشيكات',           href: 'checks',               icon: 'ti-file-invoice'   },
+      { name: 'المطابقة البنكية',  href: 'bank-reconciliation',  icon: 'ti-arrows-exchange' },
+      { name: 'المصروفات',         href: 'expenses',             icon: 'ti-credit-card'    },
+      { name: 'فئات المصروفات',    href: 'expense-categories',   icon: 'ti-category'       },
+    ],
+  },
+  {
+    label: 'الجباية والضرائب',
+    items: [
+      { name: 'إعدادات الجباية',        href: 'fiscal/tax-settings',       icon: 'ti-settings'     },
+      { name: 'إقرار G50 — TVA',       href: 'fiscal/g50',                 icon: 'ti-calculator'   },
+      { name: 'إقرار IFU — G12',       href: 'fiscal/ifu',                 icon: 'ti-file-barcode' },
+      { name: 'المواد المقننة',         href: 'fiscal/regulated-products',  icon: 'ti-package'     },
+      { name: 'المواد المدعمة',         href: 'fiscal/subsidized-products', icon: 'ti-package-off' },
+    ],
+  },
+  {
+    label: 'البيانات الأساسية',
+    items: [
+      { name: 'السنوات المالية',  href: 'fiscalyears',          icon: 'ti-calendar'        },
+      { name: 'العملات',          href: 'currencies',           icon: 'ti-currency-dollar' },
+      { name: 'مستويات الأسعار',  href: 'pricelevels',          icon: 'ti-tag'             },
+      { name: 'سلاسل الترقيم',    href: 'numbering-series',     icon: 'ti-list-numbers'    },
+      { name: 'أنواع المستندات',  href: 'settings/document-types', icon: 'ti-file'         },
     ],
   },
   {
@@ -84,17 +102,14 @@ const NAV_GROUPS = [
   {
     label: 'النظام',
     items: [
+      { name: 'الإعدادات',       href: 'settings',                icon: 'ti-settings'     },
+      { name: 'إعدادات الطباعة', href: '/settings/print',         icon: 'ti-printer'       },
+      { name: 'مصمم القوالب',   href: '/settings/print/designer', icon: 'ti-brush'         },
       { name: 'الموظفون',        href: 'employees',               icon: 'ti-id-badge'     },
       { name: 'المستخدمون',      href: 'users',                   icon: 'ti-user'         },
       { name: 'التنبيهات',       href: 'notifications',           icon: 'ti-bell'         },
       { name: 'التنبيهات الذكية', href: 'alerts',                icon: 'ti-alert-triangle' },
       { name: 'سجل التدقيق',     href: 'audit-log',               icon: 'ti-history'      },
-      { name: 'الإعدادات',       href: 'settings',                icon: 'ti-settings'     },
-      { name: 'أنواع المستندات', href: 'settings/document-types', icon: 'ti-file'         },
-      { name: 'إعدادات الطباعة', href: '/settings/print',         icon: 'ti-printer'       },
-      { name: 'مصمم القوالب',   href: '/settings/print/designer', icon: 'ti-brush'         },
-      { name: 'سلاسل الترقيم',   href: 'numbering-series',        icon: 'ti-list-numbers' },
-      { name: 'فئات المصروفات',  href: 'expense-categories',      icon: 'ti-category'     },
       { name: 'الملف الشخصي',    href: 'profile',                 icon: 'ti-user-circle'  },
       { name: 'الإعداد الأولي',  href: '/onboarding',            icon: 'ti-rocket'       },
     ],
@@ -108,7 +123,7 @@ const NAV_GROUPS = [
   },
 ];
 
-const LABEL_COLORS = ['var(--em)','var(--blue)','var(--purple)','var(--gold)','var(--orange)','var(--teal)','var(--red)','var(--purple)'];
+const LABEL_COLORS = ['var(--em)','var(--blue)','var(--purple)','var(--gold)','var(--orange)','var(--teal)','var(--red)','var(--indigo)','var(--blue)','var(--purple)','var(--red)'];
 
 // يوحّد مقارنة الروابط مع المسار الحالي (بعض الروابط تبدأ بـ '/')
 const normHref = (h: string) => h.replace(/^\//, '');
