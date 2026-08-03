@@ -25,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'company'       => \App\Http\Middleware\SetCompanyContext::class,
             'api.auth'      => \App\Http\Middleware\ApiAuthenticate::class,   // ← اختياري مع sanctum
             'super.admin'   => \App\Http\Middleware\SuperAdminOnly::class,    // ← جديد
+            'portal.auth'   => \App\Http\Middleware\PortalAuthenticate::class, // ← بوابة الزبائن
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

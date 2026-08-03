@@ -15,6 +15,7 @@ import { queryClient }               from '@/lib/api/core/queryClient';
 import { connectSlugToInterceptor }  from '@/lib/api/core/client';
 import { appActions }                from '@/lib/store/appStore';
 import { AuthProvider }              from '@/context/AuthContext';
+import { RememberMeBoot }            from '@/context/RememberMeBoot';
 import { FiscalYearProvider }        from '@/context/FiscalYearContext';
 import { PrintRuntimeAdapter }       from '@/pages/settings/print-settings/runtime';
 import { DocumentQuickCreateProvider } from '@/lib/store/documentQuickCreateStore';
@@ -30,6 +31,7 @@ import '../css/theme/pages.css';
 import '../css/theme/utilities.css';
 import '../css/theme/pos.css';
 import '../css/theme/pos-search-enhanced.css';
+import '../css/theme/portal.css';
 
 // ربط Zustand بالـ interceptor — مرة واحدة عند تحميل الـ module
 connectSlugToInterceptor(() => appActions.getActiveSlug());
@@ -39,15 +41,17 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
-          <FiscalYearProvider>
-            <PrintRuntimeAdapter>
-              <DocumentQuickCreateProvider>
-                <AppRoutes />
-                <GlobalDocumentFAB />
-              </DocumentQuickCreateProvider>
-              <NotificationContainer />
-            </PrintRuntimeAdapter>
-          </FiscalYearProvider>
+          <RememberMeBoot>
+            <FiscalYearProvider>
+              <PrintRuntimeAdapter>
+                <DocumentQuickCreateProvider>
+                  <AppRoutes />
+                  <GlobalDocumentFAB />
+                </DocumentQuickCreateProvider>
+                <NotificationContainer />
+              </PrintRuntimeAdapter>
+            </FiscalYearProvider>
+          </RememberMeBoot>
         </AuthProvider>
       </BrowserRouter>
 

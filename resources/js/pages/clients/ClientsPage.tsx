@@ -16,6 +16,7 @@ import SearchInput from '@/components/ui/SearchInput';
 import Skeleton from '@/components/ui/Skeleton';
 import ClientModal from '@/components/modals/ClientModal';
 import ImportWizardModal from '@/pages/import/ImportWizardModal';
+import PortalAccessModal from '@/components/PortalAccessModal';
 import { PARTY_IMPORT_CONFIG } from '@/pages/import/entityConfig';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { apiGet } from '@/lib/api/core/client';
@@ -315,8 +316,14 @@ export default function ClientsPage() {
       render: (c: any) => c.created_at ? new Date(c.created_at).toLocaleDateString('ar-DZ') : '—' },
 
     // ── الإجراءات ──
-    { key: 'actions', label: '', thStyle: { width: 48 }, always: true,
-      render: (c: any) => <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={() => openEdit(c)} /> },
+    { key: 'actions', label: '', thStyle: { width: 96 }, always: true,
+      render: (c: any) => (
+        <div style={{ display: 'flex', gap: 6 }}>
+          <Button size="xs" icon={<i className="ti ti-building-store" />} title="حساب البوابة"
+            onClick={() => openPortalAccess(c)} />
+          <Button size="xs" icon={<i className="ti ti-pencil" />} onClick={() => openEdit(c)} />
+        </div>
+      ) },
   ].filter(col => col.always || !hidden.has(col.key));
 
   const [search, setSearch]             = useState('');
@@ -327,6 +334,8 @@ export default function ClientsPage() {
 
   const modal       = useModal();
   const importModal = useModal();
+  const portalModal = useModal();
+  const [portalParty, setPortalParty] = useState<Party | null>(null);
   const slug        = useActiveSlug();
 
   const activeParam: number | undefined =
@@ -377,6 +386,7 @@ export default function ClientsPage() {
   // ── Mutations ─────────────────────────────────────────────────────────────
   const openCreate = () => { setEditing(null); modal.openModal(); };
   const openEdit   = (c: Party) => { setEditing(c); modal.openModal(); };
+  const openPortalAccess = (c: Party) => { setPortalParty(c); portalModal.openModal(); };
 
   const { create: createMut, update: updateMut } = usePartyMutations();
   const isSubmitting = createMut.isPending || updateMut.isPending;
@@ -581,6 +591,14 @@ export default function ClientsPage() {
         open={importModal.open}
         onClose={importModal.closeModal}
         config={PARTY_IMPORT_CONFIG}
+      />
+
+      <PortalAccessModal
+        open={portalModal.open}
+        onClose={() => { portalModal.closeModal(); setPortalParty(null); }}
+        partyId={portalParty?.id ?? null}
+        partyName={portalParty?.name}
+        partyEmail={portalParty?.email}
       />
     </div>
   );

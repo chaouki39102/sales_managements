@@ -115,6 +115,16 @@ const ExpenseCategoriesPage = lazy(() => import('@/pages/lookups/ExpenseCategori
 const CurrenciesPage = lazy(() => import('@/pages/lookups/CurrenciesPage'));
 const TvasPage       = lazy(() => import('@/pages/lookups/TvasPage'));
 
+// ─── Customer Portal (بوابة الزبائن) ───────────────────────────────────────
+const PortalLoginPage        = lazy(() => import('@/pages/portal/PortalLoginPage'));
+const RequirePortalAuth      = lazy(() => import('@/pages/portal/RequirePortalAuth'));
+const PortalLayout           = lazy(() => import('@/pages/portal/PortalLayout'));
+const PortalDashboardPage    = lazy(() => import('@/pages/portal/PortalDashboardPage'));
+const PortalDocumentsPage    = lazy(() => import('@/pages/portal/PortalDocumentsPage'));
+const PortalDocumentDetailPage = lazy(() => import('@/pages/portal/PortalDocumentDetailPage'));
+const PortalPaymentsPage     = lazy(() => import('@/pages/portal/PortalPaymentsPage'));
+const PortalStatementPage    = lazy(() => import('@/pages/portal/PortalStatementPage'));
+
 // â”€â”€ Admin Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const AdminBootPage      = lazy(() => import('@/pages/admin/AdminBootPage'));
 const AdminDashboardPage = lazy(() => import('@/pages/admin/AdminDashboardPage'));
@@ -147,13 +157,13 @@ function PageLoader() {
 /** طھط³ط¬ظٹظ„ ط¯ط®ظˆظ„ + ظ„ط§ ط´ط±ظƒط© ظ†ط´ط·ط© + ظ„ظٹط³ super-admin */
 function RequireNoCompany({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, isSuperAdmin } = useAuth();
-  const _activeCompany = useActiveCompany();
-  void _activeCompany;
+  const activeCompany = useActiveCompany();
   if (isLoading) return <PageLoader />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  // ط§ظ„ط³ظˆط¨ط± ط£ط¯ظ…ظ† ظ„ط§ ظٹظ…ط± ظ…ظ† ظ‡ظ†ط§ ط£ط¨ط¯ط§ظ‹ â€” ظ„ظ‡ ط¯ط§ط´ط¨ظˆط±ط¯ظ‡ ط§ظ„ط®ط§طµ
+  // السوبر أدمن لا يمر من هنا أبداً — له داشبورده الخاص
   if (isSuperAdmin) return <Navigate to="/admin/dashboard" replace />;
-
+  // مستخدم عادي مع شركة نشطة (مُستعادة من "تذكر اختياري") → مباشرة للوحة
+  if (activeCompany?.slug) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
@@ -355,6 +365,26 @@ export function AppRoutes() {
           <Route path="settings"  element={<AdminSettingsPage />} />
                     <Route path="plans"     element={<AdminPlansPage />} />
                     <Route path="reports"   element={<AdminReportsPage />} />
+        </Route>
+
+        {/* â‘¤ Customer Portal (بوابة الزبائن) — خارج نطاق الشركة */}
+        <Route path="/portal/login" element={<PortalLoginPage />} />
+
+        <Route
+          path="/portal"
+          element={
+            <RequirePortalAuth>
+              <Suspense fallback={<PageLoader />}>
+                <PortalLayout />
+              </Suspense>
+            </RequirePortalAuth>
+          }
+        >
+          <Route index element={<PortalDashboardPage />} />
+          <Route path="documents" element={<PortalDocumentsPage />} />
+          <Route path="documents/:id" element={<PortalDocumentDetailPage />} />
+          <Route path="payments" element={<PortalPaymentsPage />} />
+          <Route path="statement" element={<PortalStatementPage />} />
         </Route>
 
         {/* Catch-all */}

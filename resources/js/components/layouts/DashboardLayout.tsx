@@ -351,9 +351,9 @@ function CompanySwitcher() {
       const full = await apiPost<any>('/companies/switch', { company_id: co.id });
       setActiveCompany(full ?? co);
       setOpen(false);
-      // نحذف السنة المالية المخزّنة ونوجّه للـ onboarding لاختيار السنة
-      sessionStorage.removeItem('selected_fiscal_year');
-      navigate('/onboarding', { replace: true });
+      // ✅ الدخول مباشرة للوحة التحكم: setActiveCompany يُصفّر selectedYearId،
+      //    و FiscalYearContext يختار تلقائياً السنة الحالية للشركة الجديدة.
+      navigate('/dashboard', { replace: true });
     } catch { /* silent */ }
     finally { setSwitching(null); }
   };

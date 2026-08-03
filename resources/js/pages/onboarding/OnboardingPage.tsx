@@ -18,6 +18,11 @@ import { apiGet, apiPost, apiPut, apiPatch } from '@/lib/api/core/client';
 import type { PaginatedResponse } from '@/lib/api/core/types';
 import { useAuth } from '@/context/AuthContext';
 import { appActions } from '@/lib/store/appStore';
+import {
+  getRememberPref,
+  setRememberPref,
+  setSavedSession,
+} from '@/lib/store/rememberMe';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useNotification } from '@/hooks/useNotification';
 import { ConfirmDialog } from '@/components/ui';
@@ -77,11 +82,15 @@ function getInitials(name: string): string {
 // GET /{slug}/fiscal-years  →  POST /{slug}/fiscal-years
 function FiscalYearModal({
   company,
+  remember,
+  onRememberChange,
   onConfirm,
   onClose,
 }: {
   company: Company;
-  onConfirm: (yearId: number | null) => void;
+  remember: boolean;
+  onRememberChange: (v: boolean) => void;
+  onConfirm: (yearId: number | null, remember: boolean) => void;
   onClose: () => void;
 }) {
   const currentYear = new Date().getFullYear();
@@ -265,16 +274,33 @@ function FiscalYearModal({
         </div>
 
         {/* Footer */}
-        <div style={{ padding:'12px 20px 20px', borderTop:'1px solid var(--b1)', display:'flex', gap:10 }}>
-          <button onClick={onClose} style={btnSecStyle}>إلغاء</button>
-          <button
-            onClick={() => onConfirm(selected)}
-            disabled={!canProceed}
-            style={{ ...btnPrimStyle, opacity: canProceed ? 1 : .5, cursor: canProceed ? 'pointer' : 'not-allowed' }}
-          >
-            <span>دخول</span>
-            <span style={{ fontSize:16 }}>←</span>
-          </button>
+        <div style={{ padding:'12px 20px 20px', borderTop:'1px solid var(--b1)' }}>
+          <label style={{
+            display:'flex', alignItems:'center', gap:10, cursor:'pointer',
+            padding:'2px 2px 12px', userSelect:'none',
+          }}>
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={e => onRememberChange(e.target.checked)}
+              style={{ accentColor:'var(--em)', width:16, height:16, cursor:'pointer' }}
+            />
+            <span style={{ fontSize:12.5, color:'var(--t2)', display:'flex', alignItems:'center', gap:7 }}>
+              <i className="ti ti-device-floppy" style={{ fontSize:14, color:'var(--em)' }} />
+              تذكر هذا الاختيار والدخول المباشر في المرات القادمة
+            </span>
+          </label>
+          <div style={{ display:'flex', gap:10 }}>
+            <button onClick={onClose} style={btnSecStyle}>إلغاء</button>
+            <button
+              onClick={() => onConfirm(selected, remember)}
+              disabled={!canProceed}
+              style={{ ...btnPrimStyle, opacity: canProceed ? 1 : .5, cursor: canProceed ? 'pointer' : 'not-allowed' }}
+            >
+              <span>دخول</span>
+              <span style={{ fontSize:16 }}>←</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -987,6 +1013,8 @@ export default function OnboardingPage() {
   const [showCreate, setShowCreate]         = useState(false);
   const [pendingCompany, setPendingCompany] = useState<Company | null>(null);
   const [switching, setSwitching]           = useState(false);
+  // ✅ "تذكر اختياري" — يحفظ { الشركة + السنة } ويعيد الدخول المباشر في المرات القادمة
+  const [remember, setRemember]             = useState(() => (user ? getRememberPref(user.id) : false));
   // ✅ مودال Super Admin
   const [showAdminModal, setShowAdminModal] = useState(false);
   // ✅ مودال إعداد البيانات الأولية — يظهر بعد إنشاء شركة جديدة
@@ -1027,11 +1055,20 @@ export default function OnboardingPage() {
   };
 
   // ── بعد اختيار السنة (للشركات القائمة)
-  const handleFiscalConfirm = (yearId: number | null) => {
+  const handleFiscalConfirm = (yearId: number | null, rememberChoice: boolean) => {
     if (!pendingCompany) return;
     if (yearId) {
       appActions.setSelectedYearId(yearId);
     }
+    // ✅ حفظ تفضيل "تذكر اختياري" + لقطة { شركة + سنة } للدخول المباشر
+    const uid = user?.id;
+    if (uid != null) {
+      setRememberPref(uid, rememberChoice);
+      if (rememberChoice && yearId) {
+        setSavedSession(uid, { company: pendingCompany as any, yearId });
+      }
+    }
+    setRemember(rememberChoice);
     setActiveCompany(pendingCompany as any);
     setPendingCompany(null);
     navigate('/dashboard', { replace: true });
@@ -1238,6 +1275,8 @@ const handleSeedingSkip = () => {
       {pendingCompany && (
         <FiscalYearModal
           company={pendingCompany}
+          remember={remember}
+          onRememberChange={setRemember}
           onConfirm={handleFiscalConfirm}
           onClose={() => setPendingCompany(null)}
         />

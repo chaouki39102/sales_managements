@@ -1,6 +1,7 @@
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useEffect } from 'react';
 import { useCurrentUser, useLogin, useLogout } from '@/lib/api/endpoints/auth';
 import { useActiveCompany, useAppStore } from '@/lib/store/appStore';
+import { getRememberPref, setSavedSession } from '@/lib/store/rememberMe';
 import type { User, ActiveCompany, LoginCredentials } from '@/lib/api/core/types';
 
 // ─── Context type ─────────────────────────────────────────────────────────────
@@ -23,7 +24,19 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { data: user, isLoading } = useCurrentUser();
   const activeCompany             = useActiveCompany();
+  const selectedYearId            = useAppStore(s => s.selectedYearId);
   const setActiveCompanyInStore   = useAppStore(s => s.setActiveCompany);
+
+  // ✅ "تذكرني": عندما يكون مفعّلاً للمستخدم، نُحدّث آخر { شركة + سنة } ناجحة
+  //    تلقائياً كلما تغيّر السياق (اختيار شركة في onboarding، تبديل شركة/سنة
+  //    من لوحة التحكم...). عند الدخول التالي تُستخدم هذه اللقطة للانتقال
+  //    المباشر إلى لوحة التحكم.
+  useEffect(() => {
+    if (!user) return;
+    if (!getRememberPref(user.id)) return;
+    if (!activeCompany?.id || !activeCompany.slug || !selectedYearId) return;
+    setSavedSession(user.id, { company: activeCompany, yearId: selectedYearId });
+  }, [user, activeCompany, selectedYearId]);
 
   const loginMutation  = useLogin();
   const logoutMutation = useLogout();

@@ -1,0 +1,395 @@
+/* ═══════════════════════════════════════════════════
+   portal.css — بوابة الزبائن (Customer Portal)
+   صفحة مستقلة عن لوحة التحكم، RTL، بدون sidebar
+═══════════════════════════════════════════════════ */
+
+/* ─── عام ─── */
+.portal-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg0);
+  direction: rtl;
+}
+
+.portal-body {
+  flex: 1;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+}
+
+.portal-card {
+  background: var(--bg2);
+  border: 1px solid var(--b1);
+  border-radius: var(--r2);
+  box-shadow: var(--sh1);
+}
+
+.portal-card-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--b1);
+}
+
+.portal-card-hd h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--t1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portal-card-hd h3 i { color: var(--em); font-size: 18px; }
+
+.portal-card-bd {
+  padding: 16px 18px;
+}
+
+/* ─── الهيدر ─── */
+.portal-hd {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--b1);
+}
+
+.portal-hd-in {
+  max-width: 1080px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+}
+
+.portal-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.portal-logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--grad-em);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 900;
+  font-size: 17px;
+  flex-shrink: 0;
+  box-shadow: var(--emglow);
+}
+
+.portal-brand-tx { min-width: 0; }
+.portal-brand-nm {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--t1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.portal-brand-sub { font-size: 11px; color: var(--t4); }
+
+.portal-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.portal-nav::-webkit-scrollbar { display: none; }
+
+.portal-nav a {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--r1);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--t3);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: .15s;
+}
+.portal-nav a:hover { background: var(--bg3); color: var(--t2); }
+.portal-nav a.on { background: var(--emb); color: var(--em); }
+
+.portal-hd-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.portal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--r1);
+  border: 1px solid var(--b2);
+  background: var(--bg3);
+  color: var(--t2);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Tajawal', sans-serif;
+  transition: .15s;
+}
+.portal-btn:hover { border-color: var(--b3); background: var(--bg4); }
+.portal-btn--em { background: var(--em); border-color: var(--em); color: #fff; }
+.portal-btn--em:hover { background: var(--em2); }
+.portal-btn--ghost { background: transparent; border-color: transparent; }
+.portal-btn--danger:hover { border-color: var(--red); color: var(--red); }
+
+/* ─── KPI cards ─── */
+.portal-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.portal-kpi {
+  background: var(--bg2);
+  border: 1px solid var(--b1);
+  border-radius: var(--r2);
+  padding: 16px 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.portal-kpi-ic {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.portal-kpi-ic--em { background: var(--emb); color: var(--em); }
+.portal-kpi-ic--gold { background: rgba(245,158,11,.14); color: var(--gold); }
+.portal-kpi-ic--red { background: rgba(239,68,68,.12); color: var(--red); }
+.portal-kpi-ic--blue { background: rgba(59,130,246,.13); color: var(--blue); }
+
+.portal-kpi-lb { font-size: 11.5px; color: var(--t4); margin-bottom: 3px; }
+.portal-kpi-v { font-size: 17px; font-weight: 800; color: var(--t1); }
+.portal-kpi-s { font-size: 11px; color: var(--t4); margin-top: 2px; }
+
+/* ─── الجداول ─── */
+.portal-table-wrap { overflow-x: auto; }
+.portal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.portal-table th {
+  text-align: right;
+  padding: 10px 12px;
+  color: var(--t4);
+  font-size: 11px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--b1);
+  white-space: nowrap;
+  background: var(--bg1);
+}
+.portal-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--b1);
+  color: var(--t2);
+  white-space: nowrap;
+}
+.portal-table tbody tr { transition: background .12s; }
+.portal-table tbody tr:hover { background: var(--bg1); }
+.portal-table .num { font-weight: 700; }
+.portal-table a.tbl-link { color: var(--em); font-weight: 700; text-decoration: none; }
+.portal-table a.tbl-link:hover { text-decoration: underline; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.badge--g { background: rgba(16,185,129,.12); color: #059669; }
+.badge--y { background: rgba(245,158,11,.14); color: var(--gold); }
+.badge--r { background: rgba(239,68,68,.12); color: var(--red); }
+.badge--b { background: rgba(59,130,246,.13); color: var(--blue); }
+.badge--z { background: var(--bg4); color: var(--t4); }
+
+/* ─── فوتر الترحيل ─── */
+.portal-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--b1);
+}
+.portal-pager-info { font-size: 11.5px; color: var(--t4); }
+.portal-pager-btns { display: flex; gap: 6px; }
+
+.portal-pgbtn {
+  min-width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border-radius: var(--r1);
+  border: 1px solid var(--b2);
+  background: var(--bg3);
+  color: var(--t2);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Tajawal', sans-serif;
+  transition: .14s;
+}
+.portal-pgbtn:hover:not(:disabled) { border-color: var(--em); color: var(--em); }
+.portal-pgbtn:disabled { opacity: .45; cursor: not-allowed; }
+.portal-pgbtn.on { background: var(--em); border-color: var(--em); color: #fff; }
+
+/* ─── شريط التحميل / الحالة ─── */
+.portal-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 80px 20px;
+  color: var(--t4);
+  font-size: 13px;
+}
+.portal-empty { text-align: center; padding: 48px 20px; color: var(--t4); }
+.portal-empty i { font-size: 36px; opacity: .25; display: block; margin-bottom: 10px; }
+.portal-err {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: var(--r2);
+  background: rgba(239,68,68,.08);
+  border: 1px solid rgba(239,68,68,.25);
+  color: var(--red);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ─── صفحة تسجيل الدخول ─── */
+.portal-login {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(600px 400px at 85% 10%, rgba(16,185,129,.08), transparent 60%),
+    radial-gradient(500px 380px at 10% 90%, rgba(59,130,246,.08), transparent 60%),
+    var(--bg0);
+  direction: rtl;
+}
+
+.portal-login-box {
+  width: 100%;
+  max-width: 400px;
+  background: var(--bg2);
+  border: 1px solid var(--b1);
+  border-radius: 16px;
+  padding: 32px 28px;
+  box-shadow: var(--sh2);
+}
+
+.portal-login-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: var(--grad-em);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 24px;
+  margin: 0 auto 16px;
+  box-shadow: var(--emglow);
+}
+.portal-login-title { text-align: center; font-size: 20px; font-weight: 900; color: var(--t1); margin-bottom: 6px; }
+.portal-login-sub { text-align: center; font-size: 12.5px; color: var(--t4); margin-bottom: 24px; }
+
+/* ─── كشف الحساب ─── */
+.portal-stmt-sum {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.portal-stmt-item {
+  background: var(--bg1);
+  border: 1px solid var(--b1);
+  border-radius: var(--r2);
+  padding: 12px 14px;
+}
+.portal-stmt-item .k { font-size: 11px; color: var(--t4); margin-bottom: 3px; }
+.portal-stmt-item .v { font-size: 15px; font-weight: 800; color: var(--t1); }
+
+.portal-row-credit td { color: var(--em); }
+.portal-row-debit td { color: var(--red); }
+
+/* ─── تفاصيل مستند ─── */
+.portal-doc-hd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.portal-doc-hd h2 { margin: 0; font-size: 18px; font-weight: 900; color: var(--t1); }
+
+.portal-doc-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.portal-doc-meta .portal-stmt-item { background: var(--bg2); }
+
+.portal-sec { margin-top: 20px; }
+.portal-sec-hd {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--t1);
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.portal-sec-hd i { color: var(--em); }
+
+/* ─── متجاوب ─── */
+@media (max-width: 760px) {
+  .portal-hd-in { flex-wrap: wrap; }
+  .portal-nav { order: 3; width: 100%; justify-content: flex-start; }
+  .portal-body { padding: 16px 12px 40px; }
+}

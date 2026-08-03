@@ -7,6 +7,32 @@
 ## Date
 2026-08-03
 
+### Phase 56 — Customer Portal Frontend (بوابة الزبائن): Pages + Guard + Admin Account Management (Aug 3)
+
+**Request**: build the customer portal UI on top of the already-verified Laravel portal API (PortalAuth/Portal/PortalAccess controllers), with full auth isolation from the admin panel, plus an admin modal to create/manage portal accounts.
+
+**Portal frontend** (fully isolated from the admin app):
+- `resources/js/lib/api/portal/client.ts` — separate axios instance `portalClient`, token key `portal_token`, no company slug (portal routes are outside `{company}`), no admin slug interceptor, 401 → redirect to `/portal/login?return=…` (never `/login`). Local `portalExtractData` mirrors the main envelope contract.
+- `resources/js/lib/api/portal/portal.ts` — `PortalCompany/Party/User/LoginResponse/Balance/Document/Line/DocumentPayment/DocumentDetail/Payment/StatementRow/Statement/Dashboard` types + `portalApi` (login, me, logout, dashboard, documents, document, payments, statement).
+- `resources/js/lib/store/portalStore.ts` — zustand portal session (`portalUser`, `setPortalUser`, `clearSession`).
+- `resources/js/pages/portal/` — `PortalLoginPage` (`/portal/login`, `return` param), `PortalLayout` (sticky header + nav: الرئيسية/المستندات/الدفعات/كشف الحساب + logout), `PortalDashboardPage` (KPI cards: current balance signed, unpaid total, month purchases, client card; recent documents/payments tables), `PortalDocumentsPage` (paginated), `PortalDocumentDetailPage` (lines + totals + linked payments), `PortalPaymentsPage` (paginated), `PortalStatementPage` (from/to filter + opening/closing/total debit/credit + ledger rows), `portalUtils.tsx` (`fmtMoney`, `fmtMoneySigned`, `fmtDate`, `StatusBadge`, `DirBadge`, `ActiveBadge`, `Pager`, `PortalLoading/Empty/Error`).
+- `resources/js/pages/portal/RequirePortalAuth.tsx` — guard: no token → redirect to login; validates token via `/portal/auth/me` on mount.
+- Routes in `resources/js/routes/index.tsx`: `/portal/login` public; `/portal` wrapped in `RequirePortalAuth` + `PortalLayout` with index/documents/documents/:id/payments/statement children. Registered BEFORE the catch-all. Portal is OUTSIDE all admin guards (`RequireCompany`/`RequireSuperAdmin`).
+- CSS `resources/css/theme/portal.css` imported in `App.tsx`.
+
+**Admin portal-account management**:
+- `resources/js/lib/api/endpoints/portalAccess.ts` — `portalAccessApi` (forParty/create/update/remove) + `usePortalAccessForParty` + `usePortalAccessMutations` (tenant routes `portal-access/*` inside `{company}`).
+- `resources/js/components/PortalAccessModal.tsx` — create/edit/delete a portal account for a party (email, name, password ≥8, active toggle, delete confirm). Uses shared `Modal` (`size="sm"`), `.btn/.btn-p/.btn-b/.btn-r/.btn-xs` + `.fg/.req/.sw` classes.
+- Wired into `ClientsPage.tsx` — actions column now has a `ti-building-store` button opening the modal for that client.
+
+**Key architectural rules**:
+- Portal auth MUST be isolated: separate `portal_token` (never `auth_token`), separate axios instance, no slug header, 401 redirect to `/portal/login`. The admin `client.ts` interceptor must never touch portal requests.
+- Portal pages must not use the admin dashboard layout/guards — `PortalLayout` is standalone (sticky header, no sidebar).
+- React Query `keepPreviousData` option is named `placeholderData: keepPreviousData` in this codebase (TanStack v5).
+- The portal modal/button lives in the admin tenant app (`portal-access/*` routes are inside `{company}`); the portal user-facing app (`/portal/*`) is outside.
+
+**Verification**: `npx tsc --noEmit` clean. `npm test` — 222/222 pass. `npm run build` — 0 errors, 205 precache entries, `root sw == build sw: True` (SW MATCH). Backend smoke: `GET /api/v1/portal/auth/me` without token → 401 (route + middleware active).
+
 ### Phase 55 — Client Monthly Turnover + Grand Livre + Matrix Reports + Product History (Aug 3)
 
 **Request**: two matrix-style reports — **Client Monthly Turnover** (rows = clients, cols = months) and **Grand Livre** (chronological ledger with running balance) — plus finishing three low-priority modal tasks (customers date, suppliers كشف حساب, products history).

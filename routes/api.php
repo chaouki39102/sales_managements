@@ -50,6 +50,9 @@ use App\Http\Controllers\Api\V1\G50DeclarationController;
 use App\Http\Controllers\Api\V1\IFUDeclarationController;
 use App\Http\Controllers\Api\V1\PrintTemplateController;
 use App\Http\Controllers\Api\V1\PdfExportController;
+use App\Http\Controllers\Api\V1\Portal\PortalAuthController;
+use App\Http\Controllers\Api\V1\Portal\PortalController;
+use App\Http\Controllers\Api\V1\Portal\PortalAccessController;
 
 
 // Tenant Lookup Controllers
@@ -123,6 +126,28 @@ Route::prefix('v1')->group(function () {
                 Route::post('/change-password',   [AuthController::class, 'changePassword'])
                     ->middleware('throttle:3,60');
             });
+        });
+    });
+
+    // ═══════════════════════════════════════════
+    // ①-b CUSTOMER PORTAL (بوابة الزبائن)
+    // ═══════════════════════════════════════════
+    // ⚠️ MUST be registered BEFORE the tenant group (⑤): the tenant prefix
+    //    `{company}` would otherwise swallow `/portal/documents|payments|dashboard`
+    //    as a company slug and 404. Portal routes win by registration order.
+    Route::prefix('portal')->group(function () {
+        Route::post('/auth/login', [PortalAuthController::class, 'login'])
+            ->middleware('throttle:5,15');
+
+        Route::middleware('portal.auth')->group(function () {
+            Route::get('/auth/me',      [PortalAuthController::class, 'me']);
+            Route::post('/auth/logout', [PortalAuthController::class, 'logout']);
+
+            Route::get('/dashboard',    [PortalController::class, 'dashboard']);
+            Route::get('/documents',    [PortalController::class, 'documents']);
+            Route::get('/documents/{id}', [PortalController::class, 'showDocument']);
+            Route::get('/payments',     [PortalController::class, 'payments']);
+            Route::get('/statement',    [PortalController::class, 'statement']);
         });
     });
 
@@ -562,7 +587,6 @@ Route::prefix('v1')->group(function () {
             });
 
             // ── Fiscal / Tax Management ──────────────────────────
-            Route::get('tax-config/ifu-settings',           [TaxConfigController::class, 'ifuSettings']);
             Route::get('tax-config/{regime}',               [TaxConfigController::class, 'show']);
             Route::get('tax-config/{regime}/history',       [TaxConfigController::class, 'history']);
 
@@ -593,6 +617,12 @@ Route::prefix('v1')->group(function () {
 
                 Route::post('g50-declaration/save-period',          [G50DeclarationController::class, 'savePeriod']);
                 Route::post('ifu-declaration/save-period',          [IFUDeclarationController::class, 'savePeriod']);
+
+                // ── حساب البوابة للزبائن (إدارة وصول الزبون) ─────────
+                Route::post('portal-access',                    [PortalAccessController::class, 'createPortal']);
+                Route::get('portal-access/for-party/{partyId}', [PortalAccessController::class, 'forParty']);
+                Route::put('portal-access/{id}',                [PortalAccessController::class, 'update']);
+                Route::delete('portal-access/{id}',             [PortalAccessController::class, 'destroy']);
             });
 
             // ── POS Sessions ──────────────────────────────────────
