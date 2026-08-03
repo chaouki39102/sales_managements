@@ -753,8 +753,8 @@ export default function CommercialDocumentsPage() {
 
         // حقول النطاق (تاريخ / رقم) — DataTable يُرسل "min|max" → Backend يتوقع "min,max"
         const rangeFields = new Set([
-            "document_date","due_date","total_ht","total_tva","total_ttc",
-            "net_to_pay","total_discount","total_stamp","remaining_amount",
+            "document_date","due_date","delivery_date","total_ht","total_tva","total_ttc",
+            "net_to_pay","paid_amount","total_discount","total_stamp","remaining_amount",
             "validated_at","created_at","updated_at",
         ]);
 
@@ -823,12 +823,15 @@ export default function CommercialDocumentsPage() {
             "party.name":             "filter[party.name]",
             "warehouse.name":         "filter[warehouse.name]",
             "document_status.name":   "filter[document_status.name]",
+            is_locked:                "filter[is_locked]",
             document_date:            "filter[document_date]",
             due_date:                 "filter[due_date]",
+            delivery_date:            "filter[delivery_date]",
             total_ht:                 "filter[total_ht]",
             total_tva:                "filter[total_tva]",
             total_ttc:                "filter[total_ttc]",
             net_to_pay:               "filter[net_to_pay]",
+            paid_amount:              "filter[paid_amount]",
             total_discount:           "filter[total_discount]",
             total_stamp:              "filter[total_stamp]",
             remaining_amount:         "filter[remaining_amount]",

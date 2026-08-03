@@ -105,6 +105,10 @@ class CommercialDocumentController extends BaseApiController
                 }
             }
 
+            if (isset($f['is_locked']) && $f['is_locked'] !== '') {
+                $query->where('is_locked', filter_var($f['is_locked'], FILTER_VALIDATE_BOOLEAN) ? 1 : 0);
+            }
+
             if (isset($f['document_number']) && $f['document_number'] !== '') {
                 $query->where('document_number', 'like', '%' . $f['document_number'] . '%');
             }
@@ -189,7 +193,7 @@ class CommercialDocumentController extends BaseApiController
                     }));
             }
 
-            $dateFields = ['document_date', 'due_date', 'validated_at', 'created_at', 'updated_at'];
+            $dateFields = ['document_date', 'due_date', 'delivery_date', 'validated_at', 'created_at', 'updated_at'];
             foreach ($dateFields as $field) {
                 if (!isset($f[$field]) || $f[$field] === '') continue;
                 $range = $f[$field];
@@ -231,7 +235,7 @@ class CommercialDocumentController extends BaseApiController
                 }
             }
 
-            $numericFields = ['total_ht','total_tva','total_ttc','total_discount','total_stamp','net_to_pay','remaining_amount'];
+            $numericFields = ['total_ht','total_tva','total_ttc','total_discount','total_stamp','net_to_pay','remaining_amount','paid_amount'];
             foreach ($numericFields as $field) {
                 if (!isset($f[$field]) || $f[$field] === '') continue;
                 $range = $f[$field];
