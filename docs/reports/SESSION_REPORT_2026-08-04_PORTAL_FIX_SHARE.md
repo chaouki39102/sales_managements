@@ -106,6 +106,53 @@ binder, and never add `Company $company` params to those controllers (LSP).
 
 ---
 
+## Portal Route Inventory (from `php artisan route:list --path=portal -v`)
+
+All 14 portal-related routes, with full middleware chains. The `{company}` segment in
+the `/api/v1/{company}/portal/*` group accepts **either** the `portal_slug` **or** the
+internal `slug` (after the Task 1 fix); the `{company}` segment in the admin routes
+(`companies/{company}/portal-qr`, `{company}/portal-access/*`) is resolved by internal
+`slug` only (admin `SetCompanyContext`).
+
+| # | Method(s) | URI | Controller@method | Middleware |
+|---|---|---|---|---|
+| 1 | `GET` | `api/v1/companies/{company}/portal-qr` | `Api\V1\CompanyController@portalQr` | `api`, `auth:sanctum` |
+| 2 | `POST` | `api/v1/{company}/portal-access` | `Portal\PortalAccessController@createPortal` | `api`, `auth:sanctum`, `SetCompanyContext`, `can:update_company` |
+| 3 | `GET` | `api/v1/{company}/portal-access/for-party/{partyId}` | `Portal\PortalAccessController@forParty` | `api`, `auth:sanctum`, `SetCompanyContext`, `can:update_company` |
+| 4 | `PUT` | `api/v1/{company}/portal-access/{id}` | `Portal\PortalAccessController@update` | `api`, `auth:sanctum`, `SetCompanyContext`, `can:update_company` |
+| 5 | `DELETE` | `api/v1/{company}/portal-access/{id}` | `Portal\PortalAccessController@destroy` | `api`, `auth:sanctum`, `SetCompanyContext`, `can:update_company` |
+| 6 | `POST` | `api/v1/{company}/portal/auth/login` | `Portal\PortalAuthController@login` | `api`, `SetPortalCompanyContext`, `throttle:5,15` |
+| 7 | `POST` | `api/v1/{company}/portal/auth/logout` | `Portal\PortalAuthController@logout` | `api`, `SetPortalCompanyContext`, `PortalAuthenticate` |
+| 8 | `GET` | `api/v1/{company}/portal/auth/me` | `Portal\PortalAuthController@me` | `api`, `SetPortalCompanyContext`, `PortalAuthenticate` |
+| 9 | `GET` | `api/v1/{company}/portal/dashboard` | `Portal\PortalController@dashboard` | `api`, `SetPortalCompanyContext`, `PortalAuthenticate` |
+| 10 | `GET` | `api/v1/{company}/portal/documents` | `Portal\PortalController@documents` | `api`, `SetPortalCompanyContext`, `PortalAuthenticate` |
+| 11 | `GET` | `api/v1/{company}/portal/documents/{id}` | `Portal\PortalController@showDocument` | `api`, `SetPortalCompanyContext`, `PortalAuthenticate` |
+| 12 | `GET` | `api/v1/{company}/portal/info` | `Portal\PortalController@companyInfo` | `api`, `SetPortalCompanyContext` |
+| 13 | `GET` | `api/v1/{company}/portal/payments` | `Portal\PortalController@payments` | `api`, `SetPortalCompanyContext`, `PortalAuthenticate` |
+| 14 | `GET` | `api/v1/{company}/portal/statement` | `Portal\PortalController@statement` | `api`, `SetPortalCompanyContext`, `PortalAuthenticate` |
+
+**Route-level notes**:
+
+- **Rows 1–5** are the **admin (tenant)** portal-management routes — they sit inside
+  the admin `{company}` (internal slug) namespace, require an authenticated admin user
+  with the `update_company` permission, and DO use the normal `SubstituteBindings`
+  path (the global `Route::bind('company', …)` applies — correct, they are admin routes).
+  - `portal-qr` returns the tenant's portal QR code (SVG data URI).
+  - `portal-access/*` manage a party's portal login account (create / check-for-party /
+    update / delete) — used by `PortalAccessModal` and the new share verification.
+- **Rows 6–14** are the **customer portal** group — now `withoutMiddleware(SubstituteBindings)`,
+  so `SetPortalCompanyContext` resolves `{company}` by `portal_slug` first then `slug`.
+  All rows except 6 (`login`) and 12 (`info`) require `PortalAuthenticate` (Bearer
+  `portal_token`). `login` is throttled to **5 attempts / 15 minutes**.
+- **Controllers**: `PortalAuthController` (login/logout/me), `PortalController`
+  (info/dashboard/documents/showDocument/payments/statement), `PortalAccessController`
+  (createPortal/forParty/update/destroy).
+- The frontend admin consumption points: `portalAccessApi` (rows 2–5) and the portal
+  app `portalApi`/`portalClient` (rows 6–14). The share action uses row 3 (`forParty`)
+  to verify an account exists.
+
+---
+
 ## Task 2 — Clients List: Share-Portal Action (WhatsApp / Email)
 
 ### Request
