@@ -116,9 +116,10 @@ export function applyClientFilter<T>(data: T[], filters: FilterMap, columns: Col
         return applySmartOperator(rv, rawVal);
       }
       if (type === 'date') {
+        // ✅ إصلاح: استبعاد الصف خارج النطاق فقط — الصف يبقى إذا كان ضمن [min, max]
         const { min, max } = decodeRange(rawVal);
-        if (min && !compareDates(rv, min, 'lt')) return false;
-        if (max && !compareDates(rv, max, 'gt')) return false;
+        if (min && compareDates(rv, min, 'lt')) return false;
+        if (max && compareDates(rv, max, 'gt')) return false;
         return true;
       }
       // text / fallback — يدعم SmartFilter operators أيضاً

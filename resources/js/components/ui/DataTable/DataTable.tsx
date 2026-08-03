@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// DataTable/DataTable.tsx  —  v10.3
+// DataTable/DataTable.tsx  —  v10.4
 //
 // ✅ كل ميزات v9 محفوظة بالكامل:
 //    • Virtual Scrolling
@@ -28,6 +28,14 @@
 //
 // ✅ v10.3:
 //    • VirtualRow كـ memo مستقل بمقارنة عميقة — scroll لا يُعيد render الصفوف
+//
+// ✅ v10.4:
+//    • onRowDoubleClick (نقر مزدوج على الصف)
+//    • autoFitAll (توسيط كل الأعمدة بعرض محتواها)
+//    • تصدير المحدد فقط (Export Selected Rows)
+//    • emptyNode / loadingNode (Overlays مخصصة)
+//    • Sparkline (مخطط مصغّر SVG — re-export مستقل)
+//    • pinTopRows / pinBottomRows (تثبيت صفوف أعلى/أسفل — غير virtual)
 // ════════════════════════════════════════════════════════════════════════════
 
 import './datatable.css';
@@ -171,12 +179,17 @@ export function DataTable<T = Record<string, unknown>>({
   title,
   emptyText = 'لا توجد بيانات',
   emptyAction,
+  emptyNode,
+  loadingNode,
   compact = false,
   exportable = false,
   exportName = 'export',
   onRowClick,
+  onRowDoubleClick,
   rowClassName,
   allData,
+  pinTopRows,
+  pinBottomRows,
 
   // v9
   virtual,
@@ -250,6 +263,8 @@ export function DataTable<T = Record<string, unknown>>({
   const colMenuRef = useRef<HTMLDivElement>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  // 🆕 v10.4 — نطاق التصدير: الكل أو المحدد فقط
+  const [exportScope, setExportScope] = useState<'all' | 'selected'>('all');
 
   useEffect(() => {
     if (!colMenuOpen) return;
@@ -302,7 +317,7 @@ export function DataTable<T = Record<string, unknown>>({
   const initialWidthsRef = useRef<Record<string, number>>(
     Object.fromEntries((columnDefs ?? columns).filter(c => c.width).map(c => [c.key, c.width!])),
   );
-  const { widths: colWidths, startResize, autoSize } = useColumnResize(initialWidthsRef.current);
+  const { widths: colWidths, startResize, autoSize, autoFitAll } = useColumnResize(initialWidthsRef.current);
 
   // ── Column Reorder (v9) ───────────────────────────────────────────────────
   const defaultOrder = useMemo(
@@ -494,7 +509,7 @@ export function DataTable<T = Record<string, unknown>>({
     expandAll: expandAllGroups,
     collapseAll: collapseAllGroups,
     groupSubTotals,
-  } = useRowGrouping(processedData, groupBy, orderedColumns as Column<any>[]);
+  } = useRowGrouping(processedData, groupBy, orderedColumns);
 
   // ── Virtual Scrolling (v9) — must come before quick filter & pagination ───
   const isVirtual = !!virtual;
@@ -541,37 +556,35 @@ export function DataTable<T = Record<string, unknown>>({
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [enableQuickFilter, qfIsOpen]);
-  const qfMatchCount = useMemo(() => {
-    if (!quickFilterQuery.trim()) return null;
+  // ✅ إصلاح: الحساب الأساسي للبحث السريع (الفلترة على processedData) يُنفَّذ
+  // مرة واحدة فقط هنا — qfMatchCount / effectiveDisplayData / quickFilterTotal
+  // كلها تُشتق منه بدلاً من تكرار منطق الفلترة 3 مرات.
+  const qfCols = useMemo(() => orderedColumns.filter(c => c.searchable !== false), [orderedColumns]);
+  const qfData = useMemo(() => {
+    if (!enableQuickFilter || !quickFilterQuery.trim()) return null;
     const q = quickFilterQuery.trim().toLowerCase();
-    const cols = orderedColumns.filter(c => c.searchable !== false);
     return processedData.filter(row =>
-      cols.some(col => {
-        const v = getRawValue(row, col as Column<T>);
-        return v != null && String(v).toLowerCase().includes(q);
-      }),
-    ).length;
-  }, [quickFilterQuery, processedData, orderedColumns]);
-  const qfCloseFn = useCallback(() => { setQfIsOpen(false); setQuickFilterQuery(''); }, []);
-  const isQuickFiltered = enableQuickFilter && !!quickFilterQuery.trim();
-
-  // Quick-filtered display data — computed from processedData directly (not displayData)
-  // to avoid circular dependency with selection/displayKeys
-  const effectiveDisplayData = useMemo(() => {
-    if (!isQuickFiltered) return displayData;
-    const q = quickFilterQuery.trim().toLowerCase();
-    const cols = orderedColumns.filter(c => c.searchable !== false);
-    const filtered = processedData.filter(row =>
-      cols.some(col => {
+      qfCols.some(col => {
         const v = getRawValue(row, col as Column<T>);
         return v != null && String(v).toLowerCase().includes(q);
       }),
     );
-    if (isVirtual) return filtered;
-    if (isServerPaged) return filtered;
+  }, [enableQuickFilter, quickFilterQuery, processedData, qfCols]);
+
+  const qfMatchCount = qfData ? qfData.length : null;
+  const quickFilterTotal = qfData ? qfData.length : 0;
+  const qfCloseFn = useCallback(() => { setQfIsOpen(false); setQuickFilterQuery(''); }, []);
+  const isQuickFiltered = enableQuickFilter && !!quickFilterQuery.trim();
+
+  // Quick-filtered display data — computed from qfData (not displayData)
+  // to avoid circular dependency with selection/displayKeys
+  const effectiveDisplayData = useMemo(() => {
+    if (!isQuickFiltered || !qfData) return displayData;
+    if (isVirtual) return qfData;
+    if (isServerPaged) return qfData;
     const s = (localPage - 1) * localPerPage;
-    return filtered.slice(s, s + localPerPage);
-  }, [isQuickFiltered, quickFilterQuery, processedData, orderedColumns, isVirtual, isServerPaged, localPage, localPerPage, displayData]);
+    return qfData.slice(s, s + localPerPage);
+  }, [isQuickFiltered, qfData, isVirtual, isServerPaged, localPage, localPerPage, displayData]);
 
   // ── Pagination (state مُعرَّف أعلاه قبل filters) ────────────────────────
 
@@ -583,18 +596,6 @@ export function DataTable<T = Record<string, unknown>>({
 
   const curPage = isServerPaged ? pagination!.page : localPage;
   const perPage = isServerPaged ? pagination!.perPage : localPerPage;
-  // Quick-filtered total (unpaginated count)
-  const quickFilterTotal = useMemo(() => {
-    if (!isQuickFiltered) return 0;
-    const q = quickFilterQuery.trim().toLowerCase();
-    const cols = orderedColumns.filter(c => c.searchable !== false);
-    return processedData.filter(row =>
-      cols.some(col => {
-        const v = getRawValue(row, col as Column<T>);
-        return v != null && String(v).toLowerCase().includes(q);
-      }),
-    ).length;
-  }, [isQuickFiltered, quickFilterQuery, processedData, orderedColumns]);
 
   const total = isServerPaged ? pagination!.total : isQuickFiltered ? quickFilterTotal : processedData.length;
   const lastPage = isServerPaged
@@ -714,7 +715,7 @@ export function DataTable<T = Record<string, unknown>>({
     });
   }, [allChecked, displayKeys]);
 
-  const toggleRow = useCallback((key: string | number, e: React.MouseEvent) => {
+  const toggleRow = useCallback((key: string | number, e: React.SyntheticEvent) => {
     e.stopPropagation();
     setSelectedKeys(prev => {
       const next = new Set(prev);
@@ -1059,7 +1060,14 @@ export function DataTable<T = Record<string, unknown>>({
           {
             label: 'تعديل الخلية',
             icon: 'edit',
-            onClick: () => {},
+            onClick: c => {
+              if (c.colKey && c.rowIndex !== undefined && c.row) {
+                const col = allColDefs.find(col => col.key === c.colKey);
+                if (!col?.editable) return;
+                const row = c.row as T;
+                startEdit(rowKey(row, c.rowIndex), c.colKey, getRawValue(row, col as Column<T>), c.originalEvent);
+              }
+            },
             disabled: !allColDefs.find(col => col.key === ctx.colKey)?.editable,
           },
         );
@@ -1102,7 +1110,7 @@ export function DataTable<T = Record<string, unknown>>({
       }
       return items;
     },
-    [allColDefs, data, rowKey, toggleExpanded, toggleColVisibility, pinColumn, setFilters],
+    [allColDefs, data, rowKey, toggleExpanded, toggleColVisibility, pinColumn, setFilters, startEdit],
   );
 
   const { menuState, closeMenu } = useContextMenu(
@@ -1173,9 +1181,16 @@ export function DataTable<T = Record<string, unknown>>({
     const includeHiddenColumns = cfg.includeHiddenColumns ?? legacy.includeHiddenColumns ?? false;
 
     // For server-paged tables, fetch ALL rows before exporting
-    const exportData = isServerPaged && fetchAllForExport
+    const allExportData = isServerPaged && fetchAllForExport
       ? await fetchAllForExport()
       : processedData;
+
+    // 🆕 v10.4 — نطاق التصدير: "المحدد فقط" يفلتر الصفوف حسب selectedKeys
+    const selectedOnly =
+      exportScope === 'selected' && selectable && selectedKeys.size > 0;
+    const exportData = selectedOnly
+      ? allExportData.filter((r, i) => selectedKeys.has(rowKey(r, i)))
+      : allExportData;
 
     // ✅ تحويل aggregates من format الـ state إلى format التصدير
     const aggregatesForExport = showAggregates && aggregates
@@ -1213,6 +1228,7 @@ export function DataTable<T = Record<string, unknown>>({
     exportConfig, excelExportOptions, exportName, processedData, visibleCols,
     documentInfo, excelExportAdvancedOptions,
     showAggregates, aggregates, isServerPaged, fetchAllForExport,
+    exportScope, selectable, selectedKeys, rowKey,
   ]);
 
   // helper: رتبة العمود في الفرز المتعدد
@@ -1247,6 +1263,7 @@ export function DataTable<T = Record<string, unknown>>({
             .join(' ')}
           style={isVirtual ? { height: rowHeight } : undefined}
           onClick={onRowClick ? () => onRowClick(row) : undefined}
+          onDoubleClick={onRowDoubleClick ? () => onRowDoubleClick(row) : undefined}
           onMouseEnter={hoverActions ? () => setHoveredRowKey(rKey) : undefined}
           onMouseLeave={hoverActions ? () => setHoveredRowKey(null) : undefined}
           aria-selected={selectable ? isSelected : undefined}
@@ -1277,7 +1294,11 @@ export function DataTable<T = Record<string, unknown>>({
                 className="dt-cb"
                 type="checkbox"
                 checked={isSelected}
-                onChange={() => {}}
+                onChange={e => {
+                  e.stopPropagation();
+                  toggleRow(rKey, e);
+                }}
+                onClick={e => e.stopPropagation()}
                 aria-label={`تحديد الصف ${absoluteIdx + 1}`}
               />
             </td>
@@ -1307,9 +1328,9 @@ export function DataTable<T = Record<string, unknown>>({
             const cfResult = conditionalFormatting?.length
               ? applyConditionalFormat(
                   rawVal,
-                  row as Record<string, unknown>,
+                  row,
                   col.key,
-                  conditionalFormatting as any,
+                  conditionalFormatting,
                 )
               : { style: {}, className: '' };
 
@@ -1433,11 +1454,70 @@ export function DataTable<T = Record<string, unknown>>({
     rowKey, selectable, expandable, showIndex, rowActions, hoverActions, keyboardNav,
     visibleCols, editingCell, batchEdit, batch, conditionalFormatting,
     getEffectiveSticky, activeCell, getError, startEdit, activateCell,
-    commitEdit, cancelEdit, onRowClick, rowClassName,
+    commitEdit, cancelEdit, onRowClick, onRowDoubleClick, rowClassName,
     curPage, perPage, isVirtual, rowHeight, totalColSpan,
     renderExpanded, expandedKeys, toggleExpanded, selectedKeys, toggleRow,
     enableRangeSelection, isInRange, selectCell, hoveredRowKey,
   ]);
+
+  // ─── helper: محتوى الحالة الفارغة (emptyNode مخصص أو الافتراضي) ───────────
+  const renderEmptyContent = useCallback((withAction: boolean) =>
+    emptyNode ?? (
+      <div className="dt-empty" role="status">
+        <i className="ti ti-inbox" aria-hidden="true" />
+        <span className="dt-empty-text">{emptyText}</span>
+        {withAction && emptyAction}
+      </div>
+    ),
+  [emptyNode, emptyText, emptyAction]);
+
+  // ─── helper: صف مثبَّت (أعلى / أسفل) — يعيد نفس خلايا الصف العادي ─────────
+  // قياس ارتفاع thead حتى تلتصق الصفوف المثبَّتة أسفله تماماً
+  const [pinnedTopOffset, setPinnedTopOffset] = useState(0);
+  useEffect(() => {
+    const el = tableWrapRef.current;
+    if (!el || (!pinTopRows?.length && !pinBottomRows?.length)) return;
+    const thead = el.querySelector('thead');
+    if (!thead) return;
+    const measure = () => setPinnedTopOffset(thead.offsetHeight);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(thead);
+    return () => ro.disconnect();
+  }, [pinTopRows?.length, pinBottomRows?.length, isVirtual]);  const renderPinnedRow = useCallback((row: T, index: number) => {
+    const rKey = rowKey(row, index);
+    return (
+      <tr key={`pin-${String(rKey)}`} className="dt-row dt-pinned-row" data-pinned-row={index}>
+        {expandable && <td className="dt-td-exp" />}
+        {selectable && <td className="dt-td-sel" />}
+        {showIndex && <td className="dt-td dt-td-idx" />}
+        {visibleCols.map(col => {
+          const rawVal = getRawValue(row, col as Column<T>);
+          const cfResult = conditionalFormatting?.length
+            ? applyConditionalFormat(rawVal, row, col.key, conditionalFormatting)
+            : { style: {}, className: '' };
+          const sticky = getEffectiveSticky(col as Column<T>);
+          return (
+            <td
+              key={col.key}
+              className={[
+                'dt-td',
+                sticky === 'start' ? 'dt-sticky-start dt-pinned' : '',
+                sticky === 'end' ? 'dt-sticky-end dt-pinned' : '',
+                cfResult.className,
+              ].filter(Boolean).join(' ')}
+              style={{ textAlign: getTextAlign(col.align), ...cfResult.style }}
+              data-col-key={col.key}
+            >
+              {col.render ? col.render(row, index) : String(rawVal ?? '—')}
+            </td>
+          );
+        })}
+        {rowActions && <td style={{ textAlign: 'center', padding: '0 6px' }} />}
+      </tr>
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowKey, expandable, selectable, showIndex, visibleCols, rowActions, conditionalFormatting, getEffectiveSticky]);
 
   // ════════════════════════════════════════════════════════════════════════
   // RENDER
@@ -1700,6 +1780,25 @@ export function DataTable<T = Record<string, unknown>>({
                         ? `${(pagination?.total ?? processedData.length).toLocaleString('ar-DZ')} سجل (الكل)`
                         : `${processedData.length.toLocaleString('ar-DZ')} سجل`}
                     </div>
+                    {/* 🆕 v10.4 — نطاق التصدير: الكل / المحدد فقط */}
+                    {selectable && selectedKeys.size > 0 && (
+                      <div className="dt-export-scope" role="group" aria-label="نطاق التصدير">
+                        <button
+                          type="button"
+                          className={exportScope === 'all' ? 'on' : ''}
+                          onClick={() => setExportScope('all')}
+                        >
+                          الكل ({processedData.length.toLocaleString('ar-DZ')})
+                        </button>
+                        <button
+                          type="button"
+                          className={exportScope === 'selected' ? 'on' : ''}
+                          onClick={() => setExportScope('selected')}
+                        >
+                          المحدد ({selectedKeys.size.toLocaleString('ar-DZ')})
+                        </button>
+                      </div>
+                    )}
                     {ITEMS.map(item => (
                       <button
                         key={item.fmt}
@@ -1720,6 +1819,19 @@ export function DataTable<T = Record<string, unknown>>({
               </div>
             );
           })()}
+
+          {/* 🆕 v10.4 — Auto-Fit All Columns */}
+          {visibleCols.length > 0 && (
+            <button
+              className="dt-tbtn"
+              onClick={() => autoFitAll(tableWrapRef.current, visibleCols.map(c => c.key))}
+              type="button"
+              title="توسيط عرض كل الأعمدة حسب محتواها"
+            >
+              <i className="ti ti-arrows-horizontal" aria-hidden="true" />
+              مقاس
+            </button>
+          )}
 
           <div className="dt-divider" />
 
@@ -2153,20 +2265,32 @@ export function DataTable<T = Record<string, unknown>>({
             </tr>
           </thead>
 
+          {/* ── 🆕 v10.4 — الصفوف المثبَّتة في الأعلى (ثابتة أثناء التمرير) ────── */}
+          {!isVirtual && pinTopRows && pinTopRows.length > 0 && (
+            <tbody
+              className="dt-tbody-pinned dt-tbody-pinned-top"
+              style={{ '--dt-pin-top': `${pinnedTopOffset}px` } as React.CSSProperties}
+            >
+              {pinTopRows.map((row, idx) => renderPinnedRow(row, idx))}
+            </tbody>
+          )}
+
           {/* ── tbody ──────────────────────────────────────────────────────── */}
           <tbody style={isVirtual ? { transform: `translateY(${offsetY}px)` } : undefined}>
             {loading ? (
-              <SkeletonRows rows={8} cols={totalColSpan} />
+              loadingNode ? (
+                <tr>
+                  <td colSpan={totalColSpan} className="dt-empty-td">{loadingNode}</td>
+                </tr>
+              ) : (
+                <SkeletonRows rows={8} cols={totalColSpan} />
+              )
             ) : isTreeMode ? (
               // ── Tree Data rendering ──────────────────────────────────────
               treeRows.length === 0 ? (
                 <tr>
                   <td colSpan={totalColSpan} className="dt-empty-td">
-                    <div className="dt-empty" role="status">
-                      <i className="ti ti-inbox" aria-hidden="true" />
-                      <span className="dt-empty-text">{emptyText}</span>
-                      {emptyAction}
-                    </div>
+                    {renderEmptyContent(true)}
                   </td>
                 </tr>
               ) : (
@@ -2177,6 +2301,7 @@ export function DataTable<T = Record<string, unknown>>({
                       key={String(rKey)}
                       className="dt-row"
                       onClick={onRowClick ? () => onRowClick(row) : undefined}
+                      onDoubleClick={onRowDoubleClick ? () => onRowDoubleClick(row) : undefined}
                       data-row-index={treeIdx}
                     >
                       {expandable && <td className="dt-td-exp" />}
@@ -2229,11 +2354,7 @@ export function DataTable<T = Record<string, unknown>>({
               groups.length === 0 ? (
                 <tr>
                   <td colSpan={totalColSpan} className="dt-empty-td">
-                    <div className="dt-empty" role="status">
-                      <i className="ti ti-inbox" aria-hidden="true" />
-                      <span className="dt-empty-text">{emptyText}</span>
-                      {emptyAction}
-                    </div>
+                    {renderEmptyContent(true)}
                   </td>
                 </tr>
               ) : (
@@ -2307,11 +2428,7 @@ export function DataTable<T = Record<string, unknown>>({
             ) : (isVirtual ? effectiveVirtualDisplayData : effectiveDisplayData).length === 0 ? (
               <tr>
                 <td colSpan={totalColSpan} className="dt-empty-td">
-                  <div className="dt-empty" role="status">
-                    <i className="ti ti-inbox" aria-hidden="true" />
-                    <span className="dt-empty-text">{emptyText}</span>
-                    {emptyAction}
-                  </div>
+                  {renderEmptyContent(true)}
                 </td>
               </tr>
             ) : (
@@ -2350,6 +2467,13 @@ export function DataTable<T = Record<string, unknown>>({
               })
             )}
           </tbody>
+
+          {/* ── 🆕 v10.4 — الصفوف المثبَّتة في الأسفل (ثابتة أثناء التمرير) ────── */}
+          {!isVirtual && pinBottomRows && pinBottomRows.length > 0 && (
+            <tbody className="dt-tbody-pinned dt-tbody-pinned-bottom">
+              {pinBottomRows.map((row, idx) => renderPinnedRow(row, idx))}
+            </tbody>
+          )}
 
           {/* ── Aggregates footer ──────────────────────────────────────────── */}
           {showAggregates && aggregates && !loading && processedData.length > 0 && !groupBy && (
@@ -2417,18 +2541,19 @@ export function DataTable<T = Record<string, unknown>>({
       {/* ══ CARDS — Mobile ══════════════════════════════════════════════════ */}
       <div className="dt-mobile dt-mobile-wrap">
         {loading ? (
-          <SkeletonCards count={4} />
+          loadingNode ? (
+            <div className="dt-mobile-loading">{loadingNode}</div>
+          ) : (
+            <SkeletonCards count={4} />
+          )
         ) : effectiveDisplayData.length === 0 ? (
-          <div className="dt-empty" role="status">
-            <i className="ti ti-inbox" aria-hidden="true" />
-            <span className="dt-empty-text">{emptyText}</span>
-          </div>
+          renderEmptyContent(false)
         ) : (
           effectiveDisplayData.map((row, idx) => {
             const rKey = rowKey(row, idx);
             const cardCols = visibleCols.slice(0, 4);
             return (
-              <div key={rKey} className="dt-card-item" onClick={() => onRowClick?.(row)}>
+              <div key={rKey} className="dt-card-item" onClick={() => onRowClick?.(row)} onDoubleClick={() => onRowDoubleClick?.(row)}>
                 <div className="dt-card-grid">
                   {cardCols.map(col => (
                     <div key={col.key}>

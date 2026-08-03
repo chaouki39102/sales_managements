@@ -72,17 +72,11 @@ export function useColumnResize(initialWidths: Record<string, number>) {
     setWidths(p => { const n = { ...p }; delete n[key]; return n; });
   }, []);
 
-  const autoSize = useCallback((tableEl: HTMLDivElement | null, key: string) => {
-    if (!tableEl) return;
-    const table = tableEl.querySelector('table');
-    if (!table) return;
+  // 🆕 v10.4 — قياس عمود واحد بأوسع محتوى (رأس + عيّنة حتى 100 صف)
+  const measureColumn = useCallback((table: HTMLTableElement, key: string): number | null => {
+    const headerCell = table.querySelector(`thead [data-col-key="${key}"]`) as HTMLElement | null;
+    if (!headerCell) return null;
 
-    // Find the col index for this key
-    const colKeyAttr = `[data-col-key="${key}"]`;
-    const headerCell = table.querySelector(`thead ${colKeyAttr}`) as HTMLElement | null;
-    if (!headerCell) return;
-
-    // Measure header text width
     const measure = document.createElement('div');
     measure.style.cssText = 'position:absolute;top:-9999px;left:-9999px;visibility:hidden;white-space:nowrap;font:inherit;direction:inherit;';
     document.body.appendChild(measure);
@@ -92,7 +86,7 @@ export function useColumnResize(initialWidths: Record<string, number>) {
     let maxWidth = measure.getBoundingClientRect().width;
 
     // Measure visible cells in this column (sample up to 100 rows)
-    const cells = table.querySelectorAll(`tbody td${colKeyAttr}`);
+    const cells = table.querySelectorAll(`tbody td[data-col-key="${key}"]`);
     const sample = Array.from(cells).slice(0, 100);
     for (const cell of sample) {
       measure.textContent = (cell as HTMLElement).textContent ?? '';
@@ -103,11 +97,32 @@ export function useColumnResize(initialWidths: Record<string, number>) {
     document.body.removeChild(measure);
 
     // Add padding (16px) + sort/filter icon space (24px)
-    const finalWidth = Math.ceil(maxWidth) + 44;
-    setWidths(p => ({ ...p, [key]: Math.max(MIN_COL_WIDTH, finalWidth) }));
+    return Math.max(MIN_COL_WIDTH, Math.ceil(maxWidth) + 44);
   }, []);
 
-  return { widths, startResize, resetWidth, autoSize };
+  const autoSize = useCallback((tableEl: HTMLDivElement | null, key: string) => {
+    if (!tableEl) return;
+    const table = tableEl.querySelector('table');
+    if (!table) return;
+    const w = measureColumn(table, key);
+    if (w == null) return;
+    setWidths(p => ({ ...p, [key]: w }));
+  }, [measureColumn]);
+
+  // 🆕 v10.4 — توسيط كل الأعمدة دفعة واحدة حسب محتواها
+  const autoFitAll = useCallback((tableEl: HTMLDivElement | null, keys: string[]) => {
+    if (!tableEl || !keys.length) return;
+    const table = tableEl.querySelector('table');
+    if (!table) return;
+    const next: Record<string, number> = {};
+    for (const key of keys) {
+      const w = measureColumn(table, key);
+      if (w != null) next[key] = w;
+    }
+    setWidths(p => ({ ...p, ...next }));
+  }, [measureColumn]);
+
+  return { widths, startResize, resetWidth, autoSize, autoFitAll };
 }
 
 export function useEscapeKey(onClose: () => void): void {

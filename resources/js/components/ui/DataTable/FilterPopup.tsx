@@ -271,7 +271,7 @@ const FilterPopup = memo(function FilterPopup({
   // ════════════════════════════════════════════════════════════════════════
   if (type === 'number') {
     const { min, max } = decodeRange(value);
-    const presets = (col.filter as any).presets as { label: string; min: string; max: string }[] | undefined;
+    const presets = col.filter.presets;
     return createPortal(
       <div ref={popupRef} className="dt-flt-popup dt-flt-popup--number"
         style={{ position:'fixed', top:pos.top, left:pos.left, zIndex:99999 }}
@@ -334,7 +334,7 @@ const FilterPopup = memo(function FilterPopup({
   if (type === 'date') {
     const { min, max } = decodeRange(value);
     // دعم presets مخصصة — المطوّر يُحدد مفاتيح فرعية من SHORTCUT_GROUPS
-    const allowedKeys = (col.filter as { presets?: string[] }).presets;
+    const allowedKeys = col.filter.presets;
     const visibleGroups = allowedKeys
       ? SHORTCUT_GROUPS
           .map(g => ({ ...g, items: g.items.filter(s => allowedKeys.includes(s.key)) }))
@@ -490,7 +490,7 @@ const FilterPopup = memo(function FilterPopup({
         {header && <div className="dt-flt-popup-title"><i className="ti ti-filter" />{header}</div>}
         <DynamicMultiSelect
           rawValues={rawValues}
-          labelFormatter={(col.filter as any).labelFormatter}
+          labelFormatter={col.filter.labelFormatter}
           value={value} onChange={onChange} onClose={onClose}
         />
       </div>,

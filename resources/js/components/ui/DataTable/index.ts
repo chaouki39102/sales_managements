@@ -1,5 +1,8 @@
-// DataTable/index.ts  —  v10.3
+// DataTable/index.ts  —  v10.4
 export { DataTable, DataTable as default, DataTableErrorBoundary } from './DataTable';
+
+export { Sparkline } from './Sparkline';
+export type { SparklineProps } from './Sparkline';
 
 export type {
   DataTableProps,

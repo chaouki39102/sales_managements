@@ -437,6 +437,38 @@
     margin-bottom: 4px;
 }
 
+/* 🆕 v10.4 — نطاق التصدير: الكل / المحدد فقط */
+.dt-export-scope {
+    display: flex;
+    gap: 3px;
+    margin: 0 8px 6px;
+    padding: 3px;
+    background: var(--bg3);
+    border: 1px solid var(--b1);
+    border-radius: var(--r2);
+}
+
+.dt-export-scope button {
+    flex: 1;
+    padding: 4px 6px;
+    background: none;
+    border: none;
+    border-radius: var(--r1);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--t3);
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    transition: background .1s, color .1s, box-shadow .1s;
+}
+
+.dt-export-scope button.on {
+    background: var(--bg2);
+    color: var(--em);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .12);
+}
+
 .dt-export-item {
     display: flex;
     align-items: center;
@@ -1007,6 +1039,35 @@
 
 .dt-empty-action {
     margin-top: 16px;
+}
+
+/* 🆕 v10.4 — الصفوف المثبَّتة (أعلى / أسفل) */
+.dt-tbody-pinned tr {
+    position: sticky;
+    z-index: 5;
+}
+
+.dt-tbody-pinned-top tr {
+    top: var(--dt-pin-top, 0);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .08);
+}
+
+.dt-tbody-pinned-bottom tr {
+    bottom: 0;
+    box-shadow: 0 -2px 6px rgba(0, 0, 0, .08);
+}
+
+.dt-pinned-row td {
+    background: var(--bg2);
+}
+
+.dt-pinned-row td.dt-sticky-start,
+.dt-pinned-row td.dt-sticky-end {
+    background: var(--bg2);
+}
+
+.dt-mobile-loading {
+    padding: 24px 8px;
 }
 
 .dt-agg-row td {

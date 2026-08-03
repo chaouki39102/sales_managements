@@ -47,7 +47,7 @@ export interface CellValidationRule {
   };
 }
 
-export interface Column<T = any> {
+export interface Column<T = Record<string, unknown>> {
   key: string;
   header: ReactNode;
   exportHeader?: string;
@@ -156,7 +156,7 @@ export interface URLStateConfig {
   search?: boolean;
 }
 
-export interface ConditionalFormat<T = any> {
+export interface ConditionalFormat<T = Record<string, unknown>> {
   colKey: string | '*';
   condition: (value: unknown, row: T) => boolean;
   style?: React.CSSProperties;
@@ -314,7 +314,7 @@ export interface ContextMenuState {
 // DataTable Props (موسعة)
 // ════════════════════════════════════════════════════════════════════════════
 
-export interface DataTableProps<T = any> {
+export interface DataTableProps<T = Record<string, unknown>> {
   data: T[];
   columns: Column<T>[];
   rowKey: (row: T, index: number) => string | number;
@@ -359,8 +359,18 @@ export interface DataTableProps<T = any> {
   exportable?: boolean;
   exportName?: string;
   onRowClick?: (row: T) => void;
+  /** 🆕 v10.4 — النقر المزدوج على صف (مثلاً فتح تفاصيل) */
+  onRowDoubleClick?: (row: T) => void;
   rowClassName?: (row: T) => string | undefined;
   allData?: T[];
+
+  // 🆕 v10.4 — Overlays (حالة فارغة / تحميل مخصصة)
+  emptyNode?: ReactNode;
+  loadingNode?: ReactNode;
+
+  // 🆕 v10.4 — تثبيت صفوف في الأعلى / الأسفل (غير virtual)
+  pinTopRows?: T[];
+  pinBottomRows?: T[];
 
   // v9
   virtual?: VirtualConfig;

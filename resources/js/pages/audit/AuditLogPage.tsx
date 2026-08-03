@@ -170,7 +170,7 @@ export default function AuditLogPage() {
                               <DiffView oldValues={log.old_values} newValues={log.new_values} />
                               {log.ip_address && (
                                 <div style={{ marginTop: 10, fontSize: 11, color: 'var(--t4)', display: 'flex', gap: 12 }}>
-                                  <span><i className="ti ti/world" style={{ marginLeft: 4 }} />IP: {log.ip_address}</span>
+                                  <span><i className="ti ti-world" style={{ marginLeft: 4 }} />IP: {log.ip_address}</span>
                                   {log.url && <span style={{ fontFamily: 'monospace', fontSize: 10, maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>{log.url}</span>}
                                 </div>
                               )}
