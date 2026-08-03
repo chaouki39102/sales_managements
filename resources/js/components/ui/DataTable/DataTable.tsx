@@ -1,5 +1,11 @@
 // ════════════════════════════════════════════════════════════════════════════
-// DataTable/DataTable.tsx  —  v10.4
+// DataTable/DataTable.tsx  —  v10.5
+//
+// ✅ v10.5:
+//    • إصلاح: فلاتر/بحث محفوظان في الرابط (URL State) للجداول server-paged
+//      — عند إعادة فتح الصفحة كانت القيم تُسترجَع إلى الواجهة لكن لا تُرسَل إلى
+//      onFilterChange/onSearchChange إطلاقاً → الجدول يفتح بدون أي فلترة.
+//      الآن تُدفع الحالة الأولية إلى المستدعي مرة واحدة عند التركيب.
 //
 // ✅ كل ميزات v9 محفوظة بالكامل:
 //    • Virtual Scrolling
@@ -398,6 +404,30 @@ export function DataTable<T = Record<string, unknown>>({
   }, [onFilterChange]);
 
   const isServerPaged = !!pagination;
+
+  // ✅ إصلاح v10.5: فلاتر/بحث محفوظان في الرابط (URL State) — عند إعادة فتح الصفحة
+  //    كانت القيم تُسترجَع إلى الواجهة (أيقونات الفلترة مضاءة) لكن لا تُرسَل إلى
+  //    onFilterChange/onSearchChange إطلاقاً (المستدعي الوحيد كان handleFilterChange
+  //    الذي لا يُنفَّذ عند التركيب) → الجدول server-paged يفتح بدون أي فلترة.
+  //    الآن ندفع الحالة الأولية إلى المستدعي مرة واحدة عند التركيب — العميل
+  //    (بلا pagination) لا يحتاج ذلك لأنه يُفلتر محلياً عبر useRowModel.
+  const mountRestoreDoneRef = useRef(false);
+  useEffect(() => {
+    if (mountRestoreDoneRef.current) return;
+    mountRestoreDoneRef.current = true;
+    if (!isServerPaged || !url.enabled) return;
+
+    const initialFilters = url.readInitialFilters();
+    const initialSearch   = url.readInitialSearch();
+
+    const hasRestoredState =
+      Object.values(initialFilters).some(v => v && v !== '|') || !!initialSearch;
+    if (!hasRestoredState) return;
+
+    onFilterChangeRef.current?.(initialFilters);
+    if (initialSearch) onSearchChangeRef.current?.(initialSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleFilterChange = useCallback(
     (key: string, val: string) => {
