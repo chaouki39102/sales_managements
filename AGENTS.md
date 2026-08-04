@@ -5,7 +5,26 @@
 - **When reading how API data is returned**, ALWAYS check `extractData()` in `resources/js/lib/api/core/client.ts` — it is the single standard bridge between backend and frontend. Never assume the raw HTTP response shape reaches consumers directly.
 
 ## Date
-2026-08-03
+2026-08-04
+
+### Phase 57 — Global Search on Documents Matches Party/Warehouse/Creator + Amounts (Aug 4)
+
+**Bug (user report)**: "global research don't give best result in text field, and in amounts it gives just the field of number doc" — typing a client name in the documents list search returned nothing, and typing an amount only matched documents whose **number** contained it.
+
+**Root cause**: the search placeholder promises `بحث برقم المستند أو اسم المتعامل…` (document number **or party name**), but the backend `filter[search]` handler (`CommercialDocumentController::index`) only matched `document_number` + `reference` (MySQL `MATCH … AGAINST … BOOLEAN` with prefix `{$search}*`, SQLite `LIKE`) + `notes` + `internal_notes`. No party name, no warehouse, no creator, and no amounts — so text queries hit the wrong fields and numeric queries only ever matched `document_number`.
+
+**Fix** (`app/Http/Controllers/Api/V1/CommercialDocumentController.php`, the `filter[search]` block in `index()`): inside the existing grouped `where`, added `orWhereHas` on the relations — `party` (`name`, `commercial_name`, `phone`), `warehouse` (`name`), `user` (`name` = creator). When the query is numeric (`is_numeric($search) || preg_match('/\d/', $search)`), also `orWhereRaw("CAST({$amountField} AS {$cast}) LIKE ?", ["%{$search}%"])` over `total_ht, total_tva, total_ttc, net_to_pay, paid_amount, remaining_amount, total_discount, total_stamp`, with `$cast = $isMysql ? 'CHAR' : 'TEXT'` (MySQL's `CAST` type list has NO `TEXT`; SQLite has no `CHAR` — must branch). Text-only queries skip the amount block. All inside the grouped `where` so other filters still AND on top.
+
+**Tests** (`tests/Feature/DocumentFiltersTest.php`): split the single search test into 3 — (1) document_number/reference/notes (existing + `ملاحظة خاصة` → 2); (2) party name `زبون ألف` → 2, `زبون باء` → 1, `مستودع فرعي` → 1, `Creator User` → 1, gibberish `غريب` → 0; (3) numeric `2000` → 1 (FV-2 via `total_ht`), `1190` → 1 (FV-1 via `total_ttc`), `238` → 1 (partial match). Fixtures unchanged.
+
+**Key architectural rules**:
+- The global search field is one WHERE group; it must OR across text columns, relation names, and (for numeric terms) money columns — never return early on just `document_number`+`reference` when the UI placeholder promises party-name search.
+- Amount matching in a portable query needs `CAST(col AS CHAR)` on MySQL but `CAST(col AS TEXT)` on SQLite — pick per-driver, never hardcode one cast type.
+- Guard the numeric block with `is_numeric || preg_match('/\d/', …)` so Arabic/name queries don't generate 8 CAST+LIKE ORs.
+- Relation `orWhereHas` closures inherit the model's company scope automatically — no manual `company_id` join needed.
+- `orWhereHas` lives INSIDE the same grouped `where` as the base search so `filter[search]` composes with the other filters via AND.
+
+**Verification**: `php -l` clean ×2. `vendor\bin\pest.bat` — 33 passed (155 assertions) incl. new DocumentFiltersTest 14 tests / 93 assertions. `npx tsc --noEmit` clean. `npm test` — 222/222. `npm run build` — 0 errors, 205 precache entries, SW MATCH. Also reverted a leftover `PORTAL_DEBUG showDocument` Log::debug block (raw SQL + bindings per request) that was uncommitted in `Portal/PortalController.php`. Committed `d6a97c9`, pushed (`8b7e33a..d6a97c9`).
 
 ### Phase 56 — Customer Portal Frontend (بوابة الزبائن): Pages + Guard + Admin Account Management (Aug 3)
 
