@@ -117,6 +117,11 @@ class CommercialDocumentController extends BaseApiController
                 $search = $f['search'];
                 $isMysql = DB::getDriverName() === 'mysql';
 
+                // ✅ إصلاح البحث العام: حقل البحث يَعِد «بحث برقم المستند أو اسم المتعامل»
+                //    لكنه كان يطابق document_number/reference/notes فقط →
+                //    كتابة اسم الزبون لا تُرجع شيئاً، وكتابة المبلغ تطابق رقم المستند فقط.
+                //    الآن: + اسم الزبون (name/commercial_name/phone) + المستودع + الكاشير،
+                //    وعند البحث الرقمي → مطابقة المبالغ أيضاً (CAST → LIKE على كلا المحركين).
                 $query->where(function ($q) use ($search, $isMysql) {
                     if ($isMysql) {
                         $q->whereRaw("MATCH(document_number, reference) AGAINST(? IN BOOLEAN MODE)", [$search . '*']);
@@ -125,7 +130,27 @@ class CommercialDocumentController extends BaseApiController
                           ->orWhere('reference', 'like', "%{$search}%");
                     }
                     $q->orWhere('notes', 'like', "%{$search}%")
-                      ->orWhere('internal_notes', 'like', "%{$search}%");
+                      ->orWhere('internal_notes', 'like', "%{$search}%")
+                      // أسماء العلاقات — الزبون/المستودع/الكاشير
+                      ->orWhereHas('party', function ($p) use ($search) {
+                          $p->where('name', 'like', "%{$search}%")
+                            ->orWhere('commercial_name', 'like', "%{$search}%")
+                            ->orWhere('phone', 'like', "%{$search}%");
+                      })
+                      ->orWhereHas('warehouse', function ($w) use ($search) {
+                          $w->where('name', 'like', "%{$search}%");
+                      })
+                      ->orWhereHas('user', function ($u) use ($search) {
+                          $u->where('name', 'like', "%{$search}%");
+                      });
+
+                    // بحث رقمي → المبالغ (لا نكتفي برقم المستند/المرجع)
+                    if (is_numeric($search) || preg_match('/\d/', $search)) {
+                        $cast = $isMysql ? 'CHAR' : 'TEXT';
+                        foreach (['total_ht','total_tva','total_ttc','net_to_pay','paid_amount','remaining_amount','total_discount','total_stamp'] as $amountField) {
+                            $q->orWhereRaw("CAST({$amountField} AS {$cast}) LIKE ?", ["%{$search}%"]);
+                        }
+                    }
                 });
             }
 

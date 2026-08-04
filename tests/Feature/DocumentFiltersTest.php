@@ -251,10 +251,31 @@ it('text filters on reference / notes / payment_terms', function () {
     $t->getJson(docFilterUrl('payment_terms', 'أجل'))->assertOk()->assertJsonPath('meta.total', 1);
 });
 
-it('global search (filter[search]) matches document_number and reference', function () {
+it('global search (filter[search]) matches document_number / reference / notes', function () {
     $t = actingAsAuthenticatedTenantUser();
     $t->getJson(docFilterUrl('search', 'BLUE'))->assertOk()->assertJsonPath('meta.total', 1);
     $t->getJson(docFilterUrl('search', 'FV-2'))->assertOk()->assertJsonPath('meta.total', 1);
+    $t->getJson(docFilterUrl('search', 'ملاحظة خاصة'))->assertOk()->assertJsonPath('meta.total', 2);
+});
+
+it('global search (filter[search]) matches party name / warehouse / creator', function () {
+    $t = actingAsAuthenticatedTenantUser();
+    $t->getJson(docFilterUrl('search', 'زبون ألف'))->assertOk()->assertJsonPath('meta.total', 2);
+    $t->getJson(docFilterUrl('search', 'زبون باء'))->assertOk()->assertJsonPath('meta.total', 1);
+    $t->getJson(docFilterUrl('search', 'مستودع فرعي'))->assertOk()->assertJsonPath('meta.total', 1);
+    $t->getJson(docFilterUrl('search', 'Creator User'))->assertOk()->assertJsonPath('meta.total', 1);
+    $t->getJson(docFilterUrl('search', 'غريب'))->assertOk()->assertJsonPath('meta.total', 0);
+});
+
+it('global search (filter[search]) matches amounts when the query is numeric', function () {
+    $t = actingAsAuthenticatedTenantUser();
+    // total_ht = 2000 (FV-2) — لا يطابق أي رقم مستند/مرجع
+    $t->getJson(docFilterUrl('search', '2000'))->assertOk()->assertJsonPath('meta.total', 1);
+    $t->getJson(docFilterUrl('search', '2000'))->assertJsonPath('data.0.document_number', 'FV-2');
+    // total_ttc / net_to_pay = 1190 (FV-1)
+    $t->getJson(docFilterUrl('search', '1190'))->assertOk()->assertJsonPath('meta.total', 1);
+    // جزء من مبلغ (238 → 2380)
+    $t->getJson(docFilterUrl('search', '238'))->assertOk()->assertJsonPath('meta.total', 1);
 });
 
 it('context filter on document_type_id', function () {
