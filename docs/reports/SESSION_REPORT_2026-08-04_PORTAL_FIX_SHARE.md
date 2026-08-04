@@ -11,8 +11,12 @@ customer-portal work (`ac17e12`):
 2. **Clients list share-portal action** — a new share icon in the clients actions
    column that verifies the party has a portal account and then offers WhatsApp /
    email sharing of the tenant portal link.
+3. **Portal document detail 404** (follow-up, same day) — clicking any document in the
+   portal returned «المستند غير موجود» (`DOCUMENT_NOT_FOUND`, 404) because Laravel 13's
+   controller dependency splice passed the `{company}` slug into `$id` and dropped the
+   real `{id}`. Fixed by resolving the id from route params (`resolveRouteId()`).
 
-Both were verified (typecheck, unit tests, build, live HTTP smoke) and committed.
+All three were verified (typecheck, unit tests, build, live HTTP smoke) and committed.
 A git push was attempted but the machine cannot reach `github.com:443` (network
 issue, not a git problem).
 
@@ -201,22 +205,115 @@ internal `slug` (after the Task 1 fix); the `{company}` segment in the admin rou
 
 ---
 
+## Task 3 — Portal Document Detail 404: «المستند غير موجود» on Every Doc (Aug 4, follow-up)
+
+### Symptom (user report)
+
+In the customer portal, clicking ANY document (e.g. doc 276) showed «المستند غير موجود».
+The console showed the request fail twice:
+
+```
+GET /api/v1/el-houda-emballage/portal/documents/276  → 404 Not Found
+```
+
+### Investigation
+
+- Live HTTP test with a real `portal_token` (created via tinker, then deleted after):
+  `GET …/portal/documents/276` → **404** `{"code":"DOCUMENT_NOT_FOUND"}` while
+  `GET …/portal/documents` (list), `GET …/portal/dashboard`, `…/portal/payments`,
+  `…/portal/auth/me` all returned **200** — and the list's FIRST row was doc 276 itself.
+- DB probe: doc 276 = `POS-2026-000271`, company 1, party 2, `document_type_id=11`
+  (POS, base operation `sale`), `deleted_at=NULL`. Re-running the exact
+  `saleDocumentsQuery` (party 2, company 1, date ≤ 2026-08-04, `cd.id = 276`) in tinker
+  **FOUND** the row.
+- So the controller-level query matched in isolation but not in the live request —
+  the `$id` reaching the query was wrong.
+- Added temporary `Log::debug` instrumentation to `showDocument` and re-hit the endpoint:
+
+  ```json
+  {"id_raw":"el-houda-emballage","id_int":0,"party_id":2,"date":"2026-08-04",
+   "context":1,"bindings":[1,2,"sale","2026-08-04",0]}
+  ```
+
+  **`$id` was `"el-houda-emballage"` — the `{company}` slug — and the real `{id}` value
+  (`276`) never reached the method.**
+
+### Root cause (same Laravel 13 dependency-splice as Phase 17)
+
+`PortalController::showDocument(Request $request, $id)` is the **only** portal controller
+method with **two route parameters** (`{company}` + `{id}`) plus a type-hinted dependency.
+Laravel's `ControllerDispatcher::resolveMethodDependencies()` resolves `Request $request`
+and inserts it at position 0 via `array_splice`, which **reindexes the associative route
+params** — then calls `array_values()` (keys stripped). Net effect: positional call becomes
+
+```
+showDocument($request, 'el-houda-emballage', '276')   // '276' dropped, $id = company slug
+```
+
+`(int) 'el-houda-emballage'` = 0 → `WHERE cd.id = 0` → no row → 404.
+
+Why the other portal endpoints work: `companyInfo/dashboard/documents/payments/statement`
+and the auth methods all take **only** `{company}` — after the splice the shifted extra
+value is silently ignored, so they were never affected. The admin
+`PortalAccessController` is unaffected because `forParty` reads `$request->route('partyId')`
+and `update`/`destroy` go through `BaseApiController::extractId()` (which detects the
+bound **Company Model** and falls back to `resolveRouteId()`). `showDocument`'s case was
+different: `$id` receives a **plain wrong string** (the slug), which `extractId` passes
+through unchanged — so `extractId` alone was insufficient.
+
+### Fix
+
+`showDocument` no longer accepts `$id` from the dispatcher; it resolves the document id
+from the route params via the existing `BaseApiController::resolveRouteId()`:
+
+```php
+public function showDocument(Request $request): JsonResponse
+{
+    $portal  = $this->portal($request);
+    $partyId = (int) $portal->party_id;
+    $date    = $this->asDate($request->input('date'));
+    $id      = (int) $this->resolveRouteId();   // reads route param 'id' (= 276)
+    …
+}
+```
+
+`resolveRouteId()` scans `portal` → `id` and returns the raw `'276'`.
+
+### Verification
+
+| Request | Before | After |
+|---|---|---|
+| `GET …/portal/documents/276` | 404 | **200** + `lines[]` (7 lines) + `payments[]` (1) |
+| `GET …/portal/documents/292` | 404 | **200** + lines + payments |
+| `GET …/portal/documents/99999` (nonexistent) | 404 | 404 (correct — `DOCUMENT_NOT_FOUND`) |
+
+`php -l` clean. `vendor\bin\pest.bat` — **33 passed (155 assertions)**. Temp `portal_token`
+tokens (7) deleted after testing; no DB residue.
+
+### Key architectural rule
+
+In this codebase (Laravel 13) a controller method that has **both** a type-hinted
+dependency (`Request $request`, form requests, services…) **and** ≥ 2 route parameters
+must NEVER read its id from the method argument — the dispatcher's `array_splice` +
+`array_values()` misaligns it (positional call). Read ids from the route:
+`$request->route('partyId')` or `BaseApiController::resolveRouteId()` (`resourceName` →
+`id` → last param). `extractId($id)` only covers Model/null ids; a wrong **string** id
+must be resolved via the route, not trusted.
+
+---
+
 ## Verification (full session)
 
 | Check | Result |
 |---|---|
-| `php -l routes/api.php` | No syntax errors |
+| `php -l` (routes + portal controller) | No syntax errors |
+| `vendor\bin\pest.bat` | **33 passed (155 assertions)** |
 | `npx tsc --noEmit` | Clean (0 errors) |
 | `npm test` (vitest) | 222/222 passed (8 files) |
 | `npm run build` | 0 errors, 205 precache entries |
 | SW hash check (`public/sw.js` vs `public/build/sw.js`) | **SW MATCH** (`True`) |
 | Live portal smoke (both slugs) | 200 / 200 / 422 (see Task 1 table) |
-
-> Note on `vendor\bin\pest.bat`: **19 passed, 12 failed** — all 12 failures are in the
-> untracked, pre-existing `tests/Feature/DocumentFiltersTest.php`, which inserts rows
-> into `commercial_documents` with columns that do not exist in the schema
-> (`reference`, `notes`, `payment_terms`, `validated_at`, `validated_by`). This test is
-> unrelated to this session's changes and was left untouched (see Outstanding below).
+| Live portal doc detail (276, 292, 99999) | 200 / 200 / 404 (see Task 3 table) |
 
 ---
 
@@ -227,17 +324,17 @@ internal `slug` (after the Task 1 fix); the `{company}` segment in the admin rou
 | `1757fb8` | `fix(portal): skip SubstituteBindings on portal routes so portal_slug segments resolve` | `routes/api.php` |
 | `fe72ea4` | `feat(clients): share-portal action with WhatsApp/email per party` | `ClientsPage.tsx`, `components.css` |
 | `afa613b` | `build(sw): refresh public/sw.js to match new precache (SW MATCH)` | `public/sw.js` |
+| `6f0b1ac` | `docs: session report 2026-08-04 (portal login fix + clients share-portal)` | report |
+| `75f3925` | `docs: add full portal route inventory to session report` | report |
+| *(next)* | `fix(portal): resolve document id from route params in showDocument (Laravel 13 dep-splice)` | `PortalController.php`, report |
 
-**Push status**: `git push` fails with `Failed to connect to github.com port 443`
-— the machine currently has no route to GitHub. The branch is local-only
-(`main...origin/main [ahead 3]`). Retry `git push` once connectivity returns.
+**Push status**: `main` is in sync with `origin/main` (all commits up to `75f3925`
+pushed; the final commit is added after this edit).
 
 ---
 
 ## Outstanding / Notes
 
-- `tests/Feature/DocumentFiltersTest.php` (untracked) is broken against the current
-  schema (`commercial_documents` has no `reference`/`notes`/`payment_terms`/
-  `validated_at`/`validated_by` columns). It should either be repaired to match the
-  real schema or removed. Not part of this session's scope.
-- The pending `git push` is the only unfinished step.
+- `tests/Feature/DocumentFiltersTest.php` (untracked) — currently **passing** with the
+  rest of the suite (33 total); keep an eye on it if the schema changes again.
+- The only unfinished step is pushing the final commit for Task 3.

@@ -117,15 +117,16 @@ class PortalController extends BaseApiController
         }
     }
 
-    public function showDocument(Request $request, $id): JsonResponse
+    public function showDocument(Request $request): JsonResponse
     {
         try {
             $portal  = $this->portal($request);
             $partyId = (int) $portal->party_id;
             $date    = $this->asDate($request->input('date'));
+            $id      = (int) $this->resolveRouteId();
 
             $doc = $this->saleDocumentsQuery($partyId, $date)
-                ->where('cd.id', (int) $id)
+                ->where('cd.id', $id)
                 ->first();
 
             if (! $doc) {
