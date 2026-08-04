@@ -21,6 +21,7 @@ class ProductVariantResource extends JsonResource
             'track_stock'  => $this->track_stock,
             'attributes'   => $this->attributes,
             'image'        => $this->image,
+            'image_url'    => $this->image,
             'weight'       => $this->weight,
             'volume'       => $this->volume,
             'active'       => $this->active,

@@ -52,7 +52,55 @@ export default defineConfig({
             workbox: {
                 globPatterns: ['**/*.{js,css,woff,woff2,ttf,png,svg,jpg,jpeg}'],
                 maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+                // NO navigateFallback: this is a Laravel+Blade SPA with no static
+                // index.html in the precache. Workbox's navigateFallback uses
+                // createHandlerBoundToURL which THROWS non-precached-url for any
+                // URL not in the precache manifest. Full-page navigations must hit
+                // the network (Laravel serves the app shell); SPA client-side nav
+                // is handled by react-router and never hits the SW.
                 navigateFallback: null,
+                runtimeCaching: [
+                    // API: network-first, fall back to cached response for 1 day
+                    {
+                        urlPattern: /\/api\/v1\//,
+                        handler: 'NetworkFirst',
+                        options: {
+                            cacheName: 'api-cache',
+                            networkTimeoutSeconds: 4,
+                            expiration: {
+                                maxEntries: 200,
+                                maxAgeSeconds: 24 * 60 * 60,
+                            },
+                            cacheableResponse: {
+                                statuses: [0, 200],
+                            },
+                        },
+                    },
+                    // Images (incl. external product photos via proxy): cache-first
+                    {
+                        urlPattern: /\.(?:png|jpg|jpeg|svg|webp|ico|gif|avif)(?:\?.*)?$/i,
+                        handler: 'CacheFirst',
+                        options: {
+                            cacheName: 'image-cache',
+                            expiration: {
+                                maxEntries: 500,
+                                maxAgeSeconds: 7 * 24 * 60 * 60,
+                            },
+                        },
+                    },
+                    // Static assets: serve from cache instantly, refresh in background
+                    {
+                        urlPattern: /\.(?:woff|woff2|ttf|otf|css|js)$/,
+                        handler: 'StaleWhileRevalidate',
+                        options: {
+                            cacheName: 'static-cache',
+                            expiration: {
+                                maxEntries: 120,
+                                maxAgeSeconds: 7 * 24 * 60 * 60,
+                            },
+                        },
+                    },
+                ],
             },
         }),
         // Copy sw.js and workbox-*.js to public/ root so SW is at /sw.js (default scope /)

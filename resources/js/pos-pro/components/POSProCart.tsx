@@ -12,6 +12,7 @@ import { useRef, useState, useEffect, useMemo, useCallback, forwardRef, useImper
 import { createPortal } from 'react-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { formatDZD } from '@/pos/utils/calculations';
+import { proxyImage } from '@/lib/api/imageProxy';
 import type { CartItem, HeldCart, ProductPackaging, PriceLevel, CartTotals } from '@/types';
 
 interface Props {
@@ -233,7 +234,7 @@ function PPRow({
     >
       <div className="pp-row-main">
         <div className="pp-row-img">
-          {item.image_url ? <img src={item.image_url} alt="" loading="lazy" /> : <i className="ti ti-package" />}
+          {item.image_url ? <img src={proxyImage(item.image_url, 96) ?? item.image_url} alt="" loading="lazy" /> : <i className="ti ti-package" />}
         </div>
         <div className="pp-row-info">
           <div className="pp-row-name" title={item.product_name}>

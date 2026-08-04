@@ -14,6 +14,9 @@ export interface PaginationMeta {
   has_more_pages: boolean;
   is_first_page:  boolean;
   is_last_page:   boolean;
+  /** keyset (cursor) pagination — ?cursor= (اختياري، 0/غائب = لا يوجد المزيد) */
+  next_cursor?:   number;
+  has_more?:      boolean;
 }
 export interface PaginationLinks {
   first:   string | null;

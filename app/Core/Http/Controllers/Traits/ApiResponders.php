@@ -5,6 +5,7 @@ namespace App\Core\Http\Controllers\Traits;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Contracts\Pagination\Paginator as PaginatorContract;
 use Illuminate\Pagination\LengthAwarePaginator;
+use App\Core\Pagination\KeysetPaginator;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -64,6 +65,15 @@ trait ApiResponders
                 $response['meta']['is_last_page'] = !$rawPaginator->hasMorePages();
                 $response['links']['first'] = $rawPaginator->url(1);
                 $response['links']['last']  = $rawPaginator->url($rawPaginator->lastPage());
+            }
+
+            // حقول cursor (keyset) — متاحة فقط في KeysetPaginator
+            if ($rawPaginator instanceof KeysetPaginator) {
+                $response['meta']['next_cursor']  = $rawPaginator->nextCursor();
+                $response['meta']['has_more']     = $rawPaginator->hasMorePages();
+                $response['links']['next_cursor'] = $rawPaginator->nextCursor() > 0
+                    ? $rawPaginator->nextCursor()
+                    : null;
             }
         }
         else {

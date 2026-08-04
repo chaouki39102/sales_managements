@@ -130,6 +130,14 @@ Route::prefix('v1')->group(function () {
     });
 
     // ═══════════════════════════════════════════
+    // ①-a IMAGE PROXY — خدمة صور بدون مصادقة (تُستعمل في وسم <img> مباشرة)
+    // ═══════════════════════════════════════════
+    // بدون auth:sanctum: المتصفح لا يرسل Authorization header مع <img>.
+    // يقيّد بأسماء نطاقات خارجية معروفة فقط (انظر ImageProxyController).
+    Route::get('/image-proxy', [\App\Http\Controllers\Api\V1\ImageProxyController::class, 'proxy'])
+        ->middleware('throttle:120,60');
+
+    // ═══════════════════════════════════════════
     // ①-b CUSTOMER PORTAL (بوابة الزبائن) — لكل مؤسسة
     // ═══════════════════════════════════════════
     // مسارات لكل مؤسسة على حدة: /api/v1/{company}/portal/*

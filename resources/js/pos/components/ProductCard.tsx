@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import type { ProductVariant, ProductPackaging, PriceLevel } from '@/types';
 import { formatDZD } from '../utils/calculations';
 import { getVariantPrice, familyStyleFromName, isVariantOutOfStock } from '../utils/posHelpers';
+import { proxiedVariantImage } from '@/lib/api/imageProxy';
 import { FloatingTooltip } from '@/components/ui/FloatingTooltip';
 
 interface ProductCardProps {
@@ -93,7 +94,7 @@ function ProductCardInner({
     selectedPriceLevelId !== (defaultPriceLevelId ?? priceLevels[0]?.id ?? null);
 
   const style = familyStyleFromName(v.product?.family?.name ?? '');
-  const imageUrl = v.image_url;
+  const imageUrl = proxiedVariantImage(v, 300);
 
   // ── Packaging ──────────────────────────────────────────────────────────────
   const packagings = useMemo(() => {

@@ -18,6 +18,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use App\Core\Exports\GenericExport;
 use App\Core\Filters\RangeFilter;
 use App\Core\Exceptions\ApiQueryBuilderException; // ✅ إضافة: استثناء مخصص لمعالجة أخطاء 400
+use App\Core\Pagination\KeysetPaginator;
 use RuntimeException;
 
 /**
@@ -75,6 +76,14 @@ class ApiListService
             $perPage = (int) $request->get('per_page', $config['default_per_page'] ?? 15);
             $perPage = min($perPage, $config['per_page_limit'] ?? 100);
 
+            // ✅ Cursor (keyset) pagination — ?cursor=<id> أو ?cursor_paginate=1
+            // يتجنب COUNT(*) والـ offset تماماً: الحدود عبر WHERE id > cursor
+            // مع ترتيب ثابت بالـ id (فريد — ترقيم مستقر مهما أُضيفت صفوف).
+            // مفيد فقط للنماذج القابلة للترتيب الحتمي (يُفعَّل عبر cursor_column).
+            if ($request->filled('cursor') || $request->boolean('cursor_paginate')) {
+                return self::applyCursorPagination($qb, $config, $request);
+            }
+
             // ✅ simplePaginate إذا لم يطلب المستخدم total count صراحةً
             // يتجنب COUNT(*) الثقيل على الجداول الكبيرة
             // يدعم التفعيل عبر إعداد الموديل (simple_paginate) أو طلب صريح ?simple=1
@@ -101,6 +110,45 @@ class ApiListService
             ]);
             throw $e; // Re-throw for the global handler
         }
+    }
+
+    /**
+     * تنفيذ استعلام Cursor (Keyset) pagination.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $qb
+     * @param array $config
+     * @param Request $request
+     * @return \App\Core\Pagination\KeysetPaginator
+     */
+    protected static function applyCursorPagination($qb, array $config, Request $request): KeysetPaginator
+    {
+        $perPage = (int) $request->get('per_page', $config['default_per_page'] ?? 15);
+        $perPage = min($perPage, $config['per_page_limit'] ?? 100);
+
+        // عمود الحدود: افتراضياً id (فريد). يُخصّص عبر cursor_column.
+        $column = $config['cursor_column'] ?? 'id';
+        $cursor = max(0, (int) $request->input('cursor', 0));
+
+        // keyset: بعد cursor، ترتيب حتمي بالعمود، +1 لاكتشاف "يوجد المزيد"
+        // دون COUNT(*). reorder() يتجاهل أي sort يضعه المستخدم (ترقيم غير مستقر).
+        $items = (clone $qb)
+            ->reorder($column, 'asc')
+            ->where($column, '>', $cursor)
+            ->limit($perPage + 1)
+            ->get();
+
+        $hasMore   = $items->count() > $perPage;
+        $pageItems = $items->take($perPage)->all();
+        $lastId    = ! empty($pageItems) ? (int) last($pageItems)->{$column} : 0;
+
+        return new KeysetPaginator(
+            $pageItems,
+            $perPage,
+            $cursor,
+            $hasMore ? $lastId : 0,
+            $hasMore,
+            $request->path(),
+        );
     }
 
     /**

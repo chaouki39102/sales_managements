@@ -429,6 +429,7 @@ function POSPage() {
     queryKey: [slug, 'products', 'pos', { cat: pos.selectedCategory, perPage: filterPerPage }],
     queryFn: () => productsApi.list({
       per_page:  filterPerPage,
+      simple:    1,
       include:   'tva,unit,family,prices,quantityDiscounts,packagings,barcodes',
       filter:    { active: 1, ...(queryFamilyId ? { family_id: queryFamilyId } : {}) },
     }),
@@ -761,7 +762,7 @@ function POSPage() {
           ref:                 v?.ref ?? prod?.ref ?? '',
           barcode:             v?.barcode ?? null,
           unit_symbol:         pkg?.label ?? v?.unit?.abbreviation ?? 'قطعة',
-          image_url:           null,
+          image_url:           v?.image_url ?? prod?.default_image ?? null,
           quantity:            qty,
           unit_price_ht:       priceHt,
           selling_price_ttc:   htToTtc(priceHt, Number(line.tva_rate)),

@@ -37,6 +37,7 @@ import Modal from '@/components/ui/Modal';
 import POSProProductInfoModal from './POSProProductInfoModal';
 import { formatDZD } from '@/pos/utils/calculations';
 import { getVariantPrice, isVariantOutOfStock } from '@/pos/utils/posHelpers';
+import { proxiedVariantImage } from '@/lib/api/imageProxy';
 import type { ProductVariant, ProductPackaging, Family, PriceLevel, CartItem } from '@/types';
 import type { GridDefaultSize, PriceDisplayMode } from '@/pos/hooks/usePOSSettings';
 
@@ -190,7 +191,7 @@ const PPCard = React.memo(function PPCard({
   const tvaRate  = v.tva?.rate ?? 0;
   const priceTtc = priceHt * (1 + tvaRate / 100);
   const isLevelPriced = selectedPriceLevelId != null && priceHtBase !== v.default_selling_price_ht;
-  const img = v.image_url ?? (v.product as any)?.default_image ?? null;
+  const img = proxiedVariantImage(v, 300);
   const primary   = priceDisplayMode === 'ht' ? priceHt : priceTtc;
   const secondary = priceDisplayMode === 'ht' ? priceTtc : priceHtBase;
 

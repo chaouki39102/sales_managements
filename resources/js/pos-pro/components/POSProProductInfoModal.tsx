@@ -17,6 +17,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import { formatDZD } from '@/pos/utils/calculations';
 import { getVariantPrice, isVariantOutOfStock } from '@/pos/utils/posHelpers';
+import { proxiedVariantImage } from '@/lib/api/imageProxy';
 import type { ProductVariant, ProductPackaging, PriceLevel } from '@/types';
 import type { PriceDisplayMode } from '@/pos/hooks/usePOSSettings';
 
@@ -104,7 +105,7 @@ export default function POSProProductInfoModal({
   const remaining = Math.max(0, stock - inCartUnits);
 
   const discounts = useMemo(() => activeDiscounts(v), [v.quantity_discounts]);
-  const img = v.image_url ?? (v.product as any)?.default_image ?? null;
+  const img = proxiedVariantImage(v, 480);
 
   const familyName = v.product?.family?.name;
   const brandName  = v.product?.brand?.name;

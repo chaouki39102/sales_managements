@@ -9,6 +9,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { formatDZD } from '@/pos/utils/calculations';
+import { proxyImage } from '@/lib/api/imageProxy';
 import type { ProductVariant } from '@/types';
 
 interface Props {
@@ -208,7 +209,7 @@ export default function POSProScanbar({ variants, onAdd, maxResults = 8, focusRe
             results.map((v, i) => {
               const tvaRate = v.tva?.rate ?? 0;
               const priceTtc = v.default_selling_price_ht * (1 + tvaRate / 100);
-              const img = (v as any).image_url ?? v.product?.default_image ?? v.product?.images?.[0] ?? null;
+              const img = proxyImage((v as any).image_url ?? v.product?.default_image ?? v.product?.images?.[0] ?? null, 120);
               const stock = v.current_stock ?? 0;
               const inCart = qtyInCartById?.get(v.id) ?? 0;
               const remaining = Math.max(0, stock - inCart);

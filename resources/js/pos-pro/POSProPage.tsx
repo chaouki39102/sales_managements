@@ -232,6 +232,7 @@ export default function POSProPage() {
     queryKey: [slug, 'pos-pro', 'products', { perPage: 2000 }],
     queryFn: () => productsApi.list({
       per_page: 2000,
+      simple: 1,
       include: 'tva,unit,family,prices,quantityDiscounts,packagings,barcodes',
       filter: { active: 1 },
     }),
@@ -1047,7 +1048,7 @@ export default function POSProPage() {
           ref:                 v?.ref ?? prod?.ref ?? '',
           barcode:             v?.barcode ?? null,
           unit_symbol:         pkg?.label ?? v?.unit?.abbreviation ?? 'قطعة',
-          image_url:           null,
+          image_url:           v?.image_url ?? prod?.default_image ?? null,
           quantity:            qty,
           unit_price_ht:       priceHt,
           selling_price_ttc:   htToTtc(priceHt, Number(line.tva_rate)),
