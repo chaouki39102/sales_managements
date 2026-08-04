@@ -11,6 +11,8 @@ use App\Services\PartyBalanceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password;
 
 class PortalController extends BaseApiController
 {
@@ -102,11 +104,36 @@ class PortalController extends BaseApiController
 
             $perPage = min((int) $request->input('per_page', 15), 100);
             $page    = max((int) $request->input('page', 1), 1);
+            $search  = $request->input('search', '');
+            $typeCode = $request->input('type_code', '');
+            $status  = $request->input('status', '');
+            $sort    = $request->input('sort', 'date_desc');
 
-            $paginator = $this->saleDocumentsQuery($partyId, $date)
-                ->orderByDesc('cd.document_date')
-                ->orderByDesc('cd.id')
-                ->paginate($perPage, ['*'], 'page', $page);
+            $query = $this->saleDocumentsQuery($partyId, $date);
+
+            if ($search !== '') {
+                $query->where(function ($q) use ($search) {
+                    $q->where('cd.document_number', 'LIKE', "%{$search}%")
+                      ->orWhere('dt.name', 'LIKE', "%{$search}%");
+                });
+            }
+
+            if ($typeCode !== '') {
+                $query->where('dt.code', $typeCode);
+            }
+
+            if ($status !== '') {
+                $query->where('ds.name', 'LIKE', "%{$status}%");
+            }
+
+            match ($sort) {
+                'date_asc'  => $query->orderBy('cd.document_date')->orderBy('cd.id'),
+                'amount_asc' => $query->orderBy('cd.net_to_pay')->orderByDesc('cd.document_date'),
+                'amount_desc' => $query->orderByDesc('cd.net_to_pay')->orderByDesc('cd.document_date'),
+                default      => $query->orderByDesc('cd.document_date')->orderByDesc('cd.id'),
+            };
+
+            $paginator = $query->paginate($perPage, ['*'], 'page', $page);
 
             return $this->successResponse(
                 $this->paginated($paginator->through(fn ($d) => $this->documentRow($d))),
@@ -186,8 +213,8 @@ class PortalController extends BaseApiController
 
             return $this->successResponse([
                 ...$this->documentRow($doc),
-                'lines'   => $lines,
-                'payments' => $payments,
+                'lines'          => $lines,
+                'payments'       => $payments,
             ], 'تم جلب تفاصيل المستند بنجاح');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal.document');
@@ -201,13 +228,39 @@ class PortalController extends BaseApiController
             $partyId = (int) $portal->party_id;
             $date    = $this->asDate($request->input('date'));
 
-            $perPage = min((int) $request->input('per_page', 15), 100);
-            $page    = max((int) $request->input('page', 1), 1);
+            $perPage  = min((int) $request->input('per_page', 15), 100);
+            $page     = max((int) $request->input('page', 1), 1);
+            $search   = $request->input('search', '');
+            $direction = $request->input('direction', '');
+            $mode     = $request->input('payment_mode', '');
+            $sort     = $request->input('sort', 'date_desc');
 
-            $paginator = $this->paymentsQuery($partyId, $date)
-                ->orderByDesc('p.payment_date')
-                ->orderByDesc('p.id')
-                ->paginate($perPage, ['*'], 'page', $page);
+            $query = $this->paymentsQuery($partyId, $date);
+
+            if ($search !== '') {
+                $query->where(function ($q) use ($search) {
+                    $q->where('p.payment_number', 'LIKE', "%{$search}%")
+                      ->orWhere('p.reference', 'LIKE', "%{$search}%")
+                      ->orWhere('pm.name', 'LIKE', "%{$search}%");
+                });
+            }
+
+            if ($direction !== '') {
+                $query->where('p.direction', $direction);
+            }
+
+            if ($mode !== '') {
+                $query->where('pm.code', $mode);
+            }
+
+            match ($sort) {
+                'date_asc'   => $query->orderBy('p.payment_date')->orderBy('p.id'),
+                'amount_asc' => $query->orderBy('p.amount')->orderByDesc('p.payment_date'),
+                'amount_desc'=> $query->orderByDesc('p.amount')->orderByDesc('p.payment_date'),
+                default      => $query->orderByDesc('p.payment_date')->orderByDesc('p.id'),
+            };
+
+            $paginator = $query->paginate($perPage, ['*'], 'page', $page);
 
             return $this->successResponse(
                 $this->paginated($paginator->through(fn ($p) => $this->paymentRow($p))),
@@ -320,6 +373,7 @@ class PortalController extends BaseApiController
                 'cd.id', 'cd.document_number', 'cd.document_date', 'cd.due_date',
                 'cd.total_ht', 'cd.total_tva', 'cd.total_discount', 'cd.total_stamp',
                 'cd.total_ttc', 'cd.net_to_pay', 'cd.paid_amount', 'cd.remaining_amount',
+                'cd.previous_balance_snapshot', 'cd.new_balance_snapshot',
                 'dt.code as type_code', 'dt.name as type_name',
                 'ds.name as status_name',
                 'dbo.name as operation'
@@ -366,8 +420,10 @@ class PortalController extends BaseApiController
             'total_stamp'     => (float) $d->total_stamp,
             'total_ttc'       => (float) $d->total_ttc,
             'net_to_pay'      => (float) $d->net_to_pay,
-            'paid_amount'     => (float) $d->paid_amount,
+            'paid_amount' => (float) $d->paid_amount,
             'remaining_amount' => (float) $d->remaining_amount,
+            'previous_balance' => $d->previous_balance_snapshot !== null ? (float) $d->previous_balance_snapshot : null,
+            'new_balance'      => $d->new_balance_snapshot !== null ? (float) $d->new_balance_snapshot : null,
         ];
     }
 
@@ -390,15 +446,32 @@ class PortalController extends BaseApiController
     protected function partyRow(Party $party): array
     {
         return [
-            'id'           => $party->id,
-            'name'         => $party->name,
-            'code'         => $party->code,
-            'nif'          => $party->nif,
-            'phone'        => $party->phone,
-            'email'        => $party->email,
-            'address'      => $party->address,
-            'credit_limit' => (float) $party->credit_limit,
-            'credit_days'  => $party->credit_days,
+            'id'               => $party->id,
+            'name'             => $party->name,
+            'commercial_name'  => $party->commercial_name,
+            'code'             => $party->code,
+            'activity'         => $party->activity,
+            'rc'               => $party->rc,
+            'nif'              => $party->nif,
+            'nis'              => $party->nis,
+            'mobile'           => $party->mobile,
+            'phone'            => $party->phone,
+            'fax'              => $party->fax,
+            'email'            => $party->email,
+            'address'          => $party->address,
+            'full_address'     => $party->full_address,
+            'bank_name'        => $party->bank_name,
+            'rib'              => $party->rib,
+            'credit_limit'     => (float) $party->credit_limit,
+            'credit_days'      => $party->credit_days,
+            'allow_credit_sale'=> (bool) $party->allow_credit_sale,
+            'is_tva_exempt'    => (bool) $party->is_tva_exempt,
+            'is_taxable'       => (bool) $party->is_taxable,
+            'tax_option'       => $party->tax_option,
+            'cnas_number'      => $party->cnas_number,
+            'tax_regime'       => $party->tax_regime,
+            'is_vat_registered'=> (bool) $party->is_vat_registered,
+            'active'           => (bool) $party->active,
         ];
     }
 
@@ -439,6 +512,67 @@ class PortalController extends BaseApiController
     protected function portal(Request $request): PortalUser
     {
         return $request->input('_portal_user');
+    }
+
+    public function profile(Request $request): JsonResponse
+    {
+        try {
+            $portal = $this->portal($request);
+            $portal->load('party');
+
+            return $this->successResponse([
+                'id'    => $portal->id,
+                'name'  => $portal->name,
+                'email' => $portal->email,
+                'party' => $this->partyRow($portal->party),
+            ], 'تم جلب الملف الشخصي بنجاح');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'portal.profile');
+        }
+    }
+
+    public function updateProfile(Request $request): JsonResponse
+    {
+        try {
+            $portal = $this->portal($request);
+
+            $validated = $request->validate([
+                'name'  => 'sometimes|string|max:255',
+                'email' => 'sometimes|email|max:255|unique:portal_users,email,' . $portal->id,
+            ]);
+
+            $portal->update($validated);
+
+            return $this->successResponse([
+                'id'    => $portal->id,
+                'name'  => $portal->name,
+                'email' => $portal->email,
+            ], 'تم تحديث الملف الشخصي بنجاح');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'portal.update_profile');
+        }
+    }
+
+    public function updatePassword(Request $request): JsonResponse
+    {
+        try {
+            $portal = $this->portal($request);
+
+            $validated = $request->validate([
+                'current_password' => 'required|string',
+                'password'         => ['required', 'string', 'min:8', 'confirmed'],
+            ]);
+
+            if (! Hash::check($validated['current_password'], $portal->password)) {
+                return $this->errorResponse('كلمة المرور الحالية غير صحيحة', 422, 'WRONG_PASSWORD');
+            }
+
+            $portal->update(['password' => Hash::make($validated['password'])]);
+
+            return $this->successResponse(null, 'تم تغيير كلمة المرور بنجاح');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'portal.update_password');
+        }
     }
 
     protected function asDate(mixed $value): string

@@ -160,3 +160,6 @@ export async function portalGet<T>(url: string, params?: Record<string, unknown>
 
 export const portalPost = <T>(url: string, data?: unknown, cfg?: AxiosRequestConfig): Promise<T> =>
   portalClient.post<{ data: unknown }>(url, data, cfg).then(r => portalExtractData<T>(r));
+
+export const portalPut = <T>(url: string, data?: unknown, cfg?: AxiosRequestConfig): Promise<T> =>
+  portalClient.put<{ data: unknown }>(url, data, cfg).then(r => portalExtractData<T>(r));

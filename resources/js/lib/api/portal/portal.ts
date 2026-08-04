@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // lib/api/portal/portal.ts — types + endpoints لبوابة الزبائن
 // ════════════════════════════════════════════════════════════════════════════
-import { portalGet, portalPost, portalTokenStorage } from './client';
+import { portalGet, portalPost, portalPut, portalTokenStorage } from './client';
 import type { PortalPaginated } from './client';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -18,15 +18,32 @@ export interface PortalCompany {
 }
 
 export interface PortalParty {
-  id:           number;
-  name:         string;
-  code:         string | null;
-  nif:          string | null;
-  phone:        string | null;
-  email:        string | null;
-  address:      string | null;
-  credit_limit: number;
-  credit_days:  number | null;
+  id:                number;
+  name:              string;
+  commercial_name:   string | null;
+  code:              string | null;
+  activity:          string | null;
+  rc:                string | null;
+  nif:               string | null;
+  nis:               string | null;
+  mobile:            string | null;
+  phone:             string | null;
+  fax:               string | null;
+  email:             string | null;
+  address:           string | null;
+  full_address:      string | null;
+  bank_name:         string | null;
+  rib:               string | null;
+  credit_limit:      number;
+  credit_days:       number | null;
+  allow_credit_sale: boolean;
+  is_tva_exempt:     boolean;
+  is_taxable:        boolean;
+  tax_option:        string | null;
+  cnas_number:       string | null;
+  tax_regime:        string | null;
+  is_vat_registered: boolean;
+  active:            boolean;
 }
 
 export interface PortalUser {
@@ -73,6 +90,8 @@ export interface PortalDocument {
   net_to_pay:       number;
   paid_amount:      number;
   remaining_amount: number;
+  previous_balance: number | null;
+  new_balance:      number | null;
 }
 
 export interface PortalDocumentLine {
@@ -148,7 +167,32 @@ export interface PortalDashboard {
   recent_payments:  PortalPayment[];
 }
 
+export interface PortalProfile {
+  id:    number;
+  name:  string;
+  email: string;
+  party: PortalParty | null;
+}
+
 // ─── API ──────────────────────────────────────────────────────────────────────
+export interface PortalDocFilters {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  type_code?: string;
+  status?: string;
+  sort?: 'date_desc' | 'date_asc' | 'amount_asc' | 'amount_desc';
+}
+
+export interface PortalPaymentFilters {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  direction?: 'in' | 'out';
+  payment_mode?: string;
+  sort?: 'date_desc' | 'date_asc' | 'amount_asc' | 'amount_desc';
+}
+
 export const portalApi = {
   login:    (email: string, password: string) =>
     portalPost<PortalLoginResponse>('/portal/auth/login', { email, password }),
@@ -156,13 +200,32 @@ export const portalApi = {
   me:       ()    => portalGet<PortalUser>('/portal/auth/me'),
   logout:   ()    => portalPost<void>('/portal/auth/logout'),
   dashboard:()    => portalGet<PortalDashboard>('/portal/dashboard'),
-  documents:(page = 1, perPage = 15) =>
-    portalGet<PortalPaginated<PortalDocument>>('/portal/documents', { page, per_page: perPage }),
+  documents:(filters: PortalDocFilters = {}) =>
+    portalGet<PortalPaginated<PortalDocument>>('/portal/documents', {
+      page: filters.page ?? 1,
+      per_page: filters.per_page ?? 15,
+      search: filters.search || undefined,
+      type_code: filters.type_code || undefined,
+      status: filters.status || undefined,
+      sort: filters.sort || undefined,
+    }),
   document: (id: number) => portalGet<PortalDocumentDetail>(`/portal/documents/${id}`),
-  payments: (page = 1, perPage = 15) =>
-    portalGet<PortalPaginated<PortalPayment>>('/portal/payments', { page, per_page: perPage }),
+  payments: (filters: PortalPaymentFilters = {}) =>
+    portalGet<PortalPaginated<PortalPayment>>('/portal/payments', {
+      page: filters.page ?? 1,
+      per_page: filters.per_page ?? 15,
+      search: filters.search || undefined,
+      direction: filters.direction || undefined,
+      payment_mode: filters.payment_mode || undefined,
+      sort: filters.sort || undefined,
+    }),
   statement:(from?: string, to?: string) =>
     portalGet<PortalStatement>('/portal/statement', { from: from || undefined, to: to || undefined }),
+  profile:      ()    => portalGet<PortalProfile>('/portal/profile'),
+  updateProfile:(data: { name?: string; email?: string }) =>
+    portalPut<PortalProfile>('/portal/profile', data),
+  updatePassword:(data: { current_password: string; password: string; password_confirmation: string }) =>
+    portalPut<void>('/portal/profile/password', data),
 };
 
 export function isPortalAuthenticated(): boolean {

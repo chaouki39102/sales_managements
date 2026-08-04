@@ -60,7 +60,7 @@ export default function PortalDocumentDetailPage() {
 
       <section className="portal-card portal-sec">
         <div className="portal-card-hd">
-          <h3><i className="ti ti-list-details" /> سطور المستند</h3>
+          <h3><i className="ti ti-list-details" /> المنتجات</h3>
         </div>
         {doc.lines.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 24, color: 'var(--t4)', fontSize: 12.5 }}>لا توجد سطور</div>
@@ -108,10 +108,21 @@ export default function PortalDocumentDetailPage() {
           {doc.total_stamp > 0 && (
             <div className="sr"><span className="sr-l">الطابع الجبائي</span><span className="sr-v num">{fmtMoney(doc.total_stamp)}</span></div>
           )}
-          <div className="sr" style={{ borderBottom: 'none' }}>
+          <div className="sr">
             <span className="sr-l" style={{ fontSize: 14, fontWeight: 800, color: 'var(--t1)' }}>الصافي للدفع</span>
             <span className="sr-v num" style={{ color: 'var(--em)', fontSize: 16 }}>{fmtMoney(doc.net_to_pay)}</span>
           </div>
+          <div className="sr"><span className="sr-l">المدفوع</span><span className="sr-v num" style={{ color: 'var(--em)' }}>{fmtMoney(doc.paid_amount)}</span></div>
+          <div className="sr"><span className="sr-l">المتبقي</span><span className="sr-v num" style={{ color: doc.remaining_amount > 0 ? 'var(--red)' : 'var(--t1)' }}>{fmtMoney(doc.remaining_amount)}</span></div>
+          {doc.previous_balance != null && (
+            <div className="sr"><span className="sr-l">الرصيد قبل المستند</span><span className="sr-v num">{fmtMoneySigned(doc.previous_balance)}</span></div>
+          )}
+          {doc.new_balance != null && (
+            <div className="sr" style={{ borderBottom: 'none' }}>
+              <span className="sr-l" style={{ fontSize: 14, fontWeight: 800, color: 'var(--t1)' }}>الرصيد بعد المستند</span>
+              <span className="sr-v num" style={{ color: doc.new_balance < 0 ? 'var(--red)' : 'var(--em)', fontSize: 16 }}>{fmtMoneySigned(doc.new_balance)}</span>
+            </div>
+          )}
         </div>
       </section>
 

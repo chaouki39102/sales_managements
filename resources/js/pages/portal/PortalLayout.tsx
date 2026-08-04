@@ -11,7 +11,7 @@ export default function PortalLayout() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { slug } = useParams<{ slug: string }>();
-  const portalUser = usePortalStore((s) => s.portalUser) as { name?: string } | null;
+  const portalUser = usePortalStore((s) => s.portalUser) as { name?: string; email?: string } | null;
   const setPortalUser = usePortalStore((s) => s.setPortalUser);
 
   const base = `/portal/${slug}`;
@@ -20,6 +20,7 @@ export default function PortalLayout() {
     { to: `${base}/documents`, label: 'المستندات', icon: 'ti-file-text', end: false },
     { to: `${base}/payments`, label: 'الدفعات', icon: 'ti-wallet', end: false },
     { to: `${base}/statement`, label: 'كشف الحساب', icon: 'ti-report-money', end: false },
+    { to: `${base}/profile`, label: 'الملف الشخصي', icon: 'ti-user-circle', end: false },
   ];
 
   useQuery({
@@ -72,9 +73,8 @@ export default function PortalLayout() {
 
           <div className="portal-hd-user">
             {userName && <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--t2)' }}>{userName}</span>}
-            <button className="portal-btn portal-btn--ghost portal-btn--danger" onClick={handleLogout}>
+            <button className="portal-btn portal-btn--ghost" onClick={handleLogout} title="خروج">
               <i className="ti ti-logout" />
-              خروج
             </button>
           </div>
         </div>
@@ -83,6 +83,21 @@ export default function PortalLayout() {
       <main className="portal-body">
         <Outlet />
       </main>
+
+      {/* ─── شريط تنقل موبايل سفلي ─── */}
+      <nav className="portal-mobile-bar">
+        {NAV_ITEMS.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            className={({ isActive }) => (isActive ? 'on' : '')}
+          >
+            <i className={`ti ${item.icon}`} />
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+      </nav>
     </div>
   );
 }

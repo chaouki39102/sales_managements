@@ -157,6 +157,10 @@ Route::prefix('v1')->group(function () {
             Route::get('/documents/{id}', [PortalController::class, 'showDocument']);
             Route::get('/payments',     [PortalController::class, 'payments']);
             Route::get('/statement',    [PortalController::class, 'statement']);
+
+            Route::get('/profile',          [PortalController::class, 'profile']);
+            Route::put('/profile',          [PortalController::class, 'updateProfile']);
+            Route::put('/profile/password', [PortalController::class, 'updatePassword']);
         });
     });
 

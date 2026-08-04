@@ -1,21 +1,53 @@
 // ════════════════════════════════════════════════════════════════════════════
-// pages/portal/PortalDocumentsPage.tsx — قائمة مستندات الزبون (ترحيل)
+// pages/portal/PortalDocumentsPage.tsx — قائمة مستندات الزبون
 // ════════════════════════════════════════════════════════════════════════════
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { portalApi } from '@/lib/api/portal/portal';
+import { portalApi, type PortalDocFilters } from '@/lib/api/portal/portal';
 import { fmtMoney, fmtDate, StatusBadge, Pager, PortalLoading, PortalError, PortalEmpty } from './portalUtils';
+
+const TYPE_OPTIONS = [
+  { value: '', label: 'جميع الأنواع' },
+  { value: 'FV', label: 'فاتورة مبيعات' },
+  { value: 'AV', label: 'مرجع مبيعات' },
+  { value: 'POS', label: 'بيع نقطي' },
+];
+
+const SORT_OPTIONS = [
+  { value: 'date_desc', label: 'الأحدث أولاً' },
+  { value: 'date_asc', label: 'الأقدم أولاً' },
+  { value: 'amount_desc', label: 'المبلغ (تتنازلي)' },
+  { value: 'amount_asc', label: 'المبلغ (تصاعدي)' },
+];
 
 export default function PortalDocumentsPage() {
   const { slug } = useParams<{ slug: string }>();
   const base = `/portal/${slug}`;
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [typeCode, setTypeCode] = useState('');
+  const [sort, setSort] = useState<PortalDocFilters['sort']>('date_desc');
+
+  const debouncedSearch = useDebounce(search, 350);
+
+  const filters: PortalDocFilters = {
+    page,
+    per_page: 15,
+    search: debouncedSearch || undefined,
+    type_code: typeCode || undefined,
+    sort,
+  };
+
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['portal', slug, 'documents', page],
-    queryFn: () => portalApi.documents(page, 15),
+    queryKey: ['portal', slug, 'documents', filters],
+    queryFn: () => portalApi.documents(filters),
     placeholderData: keepPreviousData,
   });
+
+  useEffect(() => { setPage(1); }, [debouncedSearch, typeCode, sort]);
+
+  const hasFilters = debouncedSearch || typeCode;
 
   if (isLoading) return <PortalLoading />;
   if (isError || !data) return <PortalError message={error instanceof Error ? error.message : 'تعذر تحميل المستندات'} />;
@@ -28,9 +60,42 @@ export default function PortalDocumentsPage() {
     <section className="portal-card">
       <div className="portal-card-hd">
         <h3><i className="ti ti-file-text" /> المستندات</h3>
+        <span className="portal-hd-count">{meta.total} سجل</span>
       </div>
+
+      {/* Toolbar */}
+      <div className="portal-toolbar">
+        <div className="portal-search">
+          <i className="ti ti-search" />
+          <input
+            type="text"
+            placeholder="بحث برقم المستند أو اسم النوع..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search && (
+            <button className="portal-search-x" onClick={() => setSearch('')} type="button">
+              <i className="ti ti-x" />
+            </button>
+          )}
+        </div>
+        <div className="portal-filters">
+          <select value={typeCode} onChange={(e) => setTypeCode(e.target.value)}>
+            {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          <select value={sort} onChange={(e) => setSort(e.target.value as PortalDocFilters['sort'])}>
+            {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          {hasFilters && (
+            <button className="portal-btn portal-btn--sm portal-btn--ghost" onClick={() => { setSearch(''); setTypeCode(''); setSort('date_desc'); }}>
+              <i className="ti ti-filter-off" /> مسح الفلتر
+            </button>
+          )}
+        </div>
+      </div>
+
       {rows.length === 0 ? (
-        <PortalEmpty icon="ti-file-text" text="لا توجد مستندات" />
+        <PortalEmpty icon="ti-file-text" text={hasFilters ? 'لا توجد نتائج مطابقة' : 'لا توجد مستندات'} />
       ) : (
         <div className="portal-table-wrap">
           <table className="portal-table">
@@ -60,4 +125,14 @@ export default function PortalDocumentsPage() {
       )}
     </section>
   );
+}
+
+// ─── useDebounce hook ─────────────────────────────────────────────────────
+function useDebounce<T>(value: T, ms: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return debounced;
 }

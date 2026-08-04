@@ -124,6 +124,7 @@ const PortalDocumentsPage    = lazy(() => import('@/pages/portal/PortalDocuments
 const PortalDocumentDetailPage = lazy(() => import('@/pages/portal/PortalDocumentDetailPage'));
 const PortalPaymentsPage     = lazy(() => import('@/pages/portal/PortalPaymentsPage'));
 const PortalStatementPage    = lazy(() => import('@/pages/portal/PortalStatementPage'));
+const PortalProfilePage      = lazy(() => import('@/pages/portal/PortalProfilePage'));
 
 // â”€â”€ Admin Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const AdminBootPage      = lazy(() => import('@/pages/admin/AdminBootPage'));
@@ -385,6 +386,7 @@ export function AppRoutes() {
           <Route path="documents/:id" element={<PortalDocumentDetailPage />} />
           <Route path="payments" element={<PortalPaymentsPage />} />
           <Route path="statement" element={<PortalStatementPage />} />
+          <Route path="profile" element={<PortalProfilePage />} />
         </Route>
 
         {/* Catch-all */}
