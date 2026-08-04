@@ -1,74 +1,68 @@
 import { test, expect } from '@playwright/test';
+import { bootstrapApp, navigateToPrintSettings, MockTemplate } from './helpers/test-utils';
+
+const POS_TPL: MockTemplate = {
+  id: 1, name: 'POS Template', doc_type_code: 'POS', paper_size: '80mm',
+  is_default: true, is_active: true,
+};
+const RPT_TPL: MockTemplate = {
+  id: 2, name: 'RPT Template', doc_type_code: 'RPT', paper_size: 'A4',
+  is_default: true, is_active: true,
+};
 
 test.describe('Print Settings — Lifecycle', () => {
-  test('loads the page without errors', async ({ page }) => {
-    const { mockApiResponse } = await import('./helpers/test-utils');
-    await mockApiResponse(page, { doc_type_code: 'FV', paper_size: '80mm' });
-    await page.goto('/settings/print-settings?doc_type=FV');
-    await page.waitForLoadState('networkidle');
-    await expect(page.locator('h1').first()).toContainText('Print');
+  test('loads the page with the default POS template selected', async ({ page }) => {
+    await bootstrapApp(page, [POS_TPL]);
+    await navigateToPrintSettings(page);
+
+    await expect(page.getByRole('button', { name: 'حفظ (Ctrl+S)' })).toBeVisible();
+    await expect(page.getByText('POS Template', { exact: true })).toBeVisible();
+    await expect(page.getByText('معاينة حية')).toBeVisible();
   });
 
-  test('save button triggers API call', async ({ page }) => {
-    const { mockApiResponse } = await import('./helpers/test-utils');
-    await mockApiResponse(page, { doc_type_code: 'FV', paper_size: '80mm' });
+  test('save button sends PUT /print-templates/{id} when dirty', async ({ page }) => {
+    await bootstrapApp(page, [POS_TPL]);
 
-    let putCalled = false;
-    await page.route('**/api/v1/print-templates/**', (route) => {
+    let putCount = 0;
+    await page.route('**/api/v1/*/print-templates/1', (route) => {
       if (route.request().method() === 'PUT') {
-        putCalled = true;
+        putCount++;
         route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ success: true }),
+          body: JSON.stringify({ data: { ...POS_TPL } }),
         });
-      } else if (route.request().method() === 'GET') {
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              id: 1, name: 'Test', doc_type_code: 'FV', paper_size: '80mm',
-              is_default: true, is_active: true,
-              config: {},
-            },
-          }),
-        });
+      } else {
+        route.fallback();
       }
     });
 
-    await page.goto('/settings/print-settings?doc_type=FV');
-    await page.waitForLoadState('networkidle');
+    await navigateToPrintSettings(page);
+    await expect(page.getByRole('button', { name: 'حفظ (Ctrl+S)' })).toBeDisabled();
 
-    const saveBtn = page.locator('button:has-text("حفظ")');
-    if (await saveBtn.isVisible()) {
-      await saveBtn.click();
-      await page.waitForTimeout(2000);
-      expect(putCalled).toBe(true);
-    }
+    await page.getByRole('button', { name: 'A4', exact: true }).click();
+    await page.getByRole('button', { name: 'حفظ (Ctrl+S)' }).click();
+
+    await expect.poll(() => putCount).toBeGreaterThan(0);
   });
 
-  test('should show template selector with templates', async ({ page }) => {
-    const { mockTemplatesList } = await import('./helpers/test-utils');
-    await mockTemplatesList(page, [
-      { id: 1, name: 'Template 1', doc_type_code: 'FV', paper_size: '80mm', is_default: true, is_active: true },
-    ]);
+  test('paper-size change marks the template dirty (save enabled)', async ({ page }) => {
+    await bootstrapApp(page, [POS_TPL]);
+    await navigateToPrintSettings(page);
 
-    await page.route('**/api/v1/print-templates/*', (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          data: {
-            id: 1, name: 'Template 1', doc_type_code: 'FV', paper_size: '80mm',
-            is_default: true, is_active: true,
-            config: { show_logo: true, title_text: 'FACTURE' },
-          },
-        }),
-      });
-    });
+    const saveBtn = page.getByRole('button', { name: 'حفظ (Ctrl+S)' });
+    await expect(saveBtn).toBeDisabled();
 
-    await page.goto('/settings/print-settings?doc_type=FV');
-    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: 'A4', exact: true }).click();
+    await expect(saveBtn).toBeEnabled();
+  });
+
+  test('switching doc type loads that doc type template', async ({ page }) => {
+    await bootstrapApp(page, [POS_TPL, RPT_TPL]);
+    await navigateToPrintSettings(page);
+
+    await expect(page.getByText('POS Template', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: /تقرير الجلسة/ }).click();
+    await expect(page.getByText('RPT Template', { exact: true })).toBeVisible();
   });
 });

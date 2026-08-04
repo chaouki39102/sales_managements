@@ -55,19 +55,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_sqlite, gd, zip
+          coverage: none
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-      - name: Install dependencies
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Install Node dependencies
         run: npm ci
+      - name: Build frontend
+        run: npm run build
       - name: Install Playwright browsers
         run: npx playwright install chromium
-      - name: Start server
+      - name: Prepare environment
         run: |
           cp .env.example .env
           php artisan key:generate
-          php artisan serve --port=8000 &
-          sleep 3
+          touch database/database.sqlite
+          php artisan migrate --force
       - name: Run Playwright tests
         run: npx playwright test --config=resources/js/pages/settings/print-settings/__tests__/playwright.config.ts

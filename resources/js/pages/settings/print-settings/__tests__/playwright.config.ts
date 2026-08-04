@@ -10,6 +10,9 @@ export default defineConfig({
     viewport: { width: 1440, height: 900 },
     actionTimeout: 10000,
     screenshot: 'only-on-failure',
+    // The PWA service worker (public/sw.js) precaches the bundle at scope "/".
+    // Block it so `page.route` mocks can't be bypassed by cache-first SW reads.
+    serviceWorkers: 'block',
   },
   webServer: {
     command: 'php artisan serve --port=8000',
