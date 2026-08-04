@@ -7,6 +7,33 @@
 ## Date
 2026-08-04
 
+### Phase 58 — Portal Orders (وصل طلب سلعة): Doc-Based CMD + Server Pricing + Admin Convert (Aug 4)
+
+**Request**: the customer portal's "اطلب سلعة" (order goods) feature — a catalog the customer browses, a cart, "my orders" tracking, and an admin page to manage orders and convert them into a real sale invoice. The order must be backed by a real commercial document so it feeds reports/integrity, and **pricing must come from the server** (price-level list prices), never from the client.
+
+**Architecture** — a portal order is a **wrapper around a real commercial document of type `CMD` (أمر زبون)**:
+- New `app/Services/Portal/PortalOrderService.php` — the ONLY place with order logic (create, update, status, convert). It is fully isolated: no `portal/order` condition was added to `CommercialDocumentService`. The CMD doc is created with the standard service but the CMD document type is seeded with `affects_accounting = false` and `affects_stock_direction = 0`, so creating an order runs **no** fiscal-stamp, stock-movement, or balance snapshots. Those only activate at conversion to FV.
+- New tables `portal_orders` + `portal_order_status_histories` (migration `2026_08_04_000002_create_portal_orders_tables.php`); `PortalOrder`/`PortalOrderStatusHistory` models; `PortalOrderInstaller` console command installs the CMD doc type + conversion rules for a company (`InstallPortalOrders`).
+- Customer API (`PortalOrderController`, under `portal.auth`, routes `/portal/orders`, `/portal/orders/catalog`, `/{id}`, `/{id}/cancel`): catalog with server price + stock + packagings; create/update (only while `pending`); cancel (pending only, by the customer). `validatePayload` groups duplicate product+packaging lines into one line.
+- Admin API (`PortalOrdersController`, under `update_company`, routes `/portal-orders`, `/{id}`, `PATCH /{id}`, `POST /{id}/convert`): list (status filter + search), detail (party + lines + histories), status change (history recorded), and **convert** — `PortalOrderService::convertToSale()` calls the standard `DocumentConversionService::convert($doc, 'FV')`, which sets the FV's real accounting side effects, then marks the order `completed` with a history note naming the FV number.
+- Frontend: customer `PortalOrdersPage` (catalog + cart + my orders, registered at `/portal/orders`, nav "اطلب سلعة"); admin `PortalOrdersAdminPage` (`/portal-orders`, sidebar "طلبات البوابة") with status change + a confirm-gated **تحويل إلى فاتورة** button that shows the resulting invoice number; `portalOrders.ts` (admin API incl. `convert`) + `portal.ts` order types/API.
+
+**Server-side pricing (security rule)**: the customer sends ONLY `product_id` + `quantity` + optional `packaging_id`. `PortalOrderService::resolveLines()` fetches `Product::with(['tva','unit','prices','packagings'])` and reads `default_selling_price_ht` — if `prices` is not eager-loaded the accessor silently falls back to `purchase_price_ht*1.3` (a real bug fixed: 325 instead of 120). It then emits the Phase 51 per-unit contract (`unit_price_ht` = base unit price + `pack_qty` = packaging factor) so `CommercialDocumentService` is the only place that multiplies by the pack factor. A forged client `unit_price_ht` is never read.
+
+**Bugs found & fixed**:
+- `CommercialDocumentService::recalculateTotals()` used `loadMissing('lines')` — after `lines()->delete()` (update path) or `create()` + `addLinesToDocument()` (conversion path) the stale already-loaded line collection was used, so updated/converted FV totals were 0. Now `load(['lines','documentType'])`. `PortalOrderService::update()` also `unsetRelation('lines')` after the delete.
+- Conversion snapshot: `persistBalanceSnapshots()` ran in `afterCreate` when `net_to_pay` was still 0 (lines are added after create). `DocumentConversionService::convert()` now calls `persistBalanceSnapshots($newDoc)` again after `addLinesToDocument(...)` so converted FVs carry prev/new balances.
+- `SettingsSeeder::seedForCompany()` hardcoded `default_price_level_id`/`default_currency_id` = 1 (currency ids are sequential after the first company). Now resolved per company. Note `Setting::getSetting` is `Cache::remember`-backed — after directly changing settings rows run `php artisan cache:clear`, and set `fiscal_stamp_enabled` via `DB::update(['value'=>'true'])` (settings are strings; the cast needs the literal `true`).
+- `PortalOrderService::toArray()` now also returns `items_count` and per-line `unit_name` (the customer list + admin page render them).
+
+**Key architectural rules**:
+- A portal order is a wrapper around a real CMD commercial document; `affects_accounting=false`/`affects_stock_direction=0` on the CMD type is what makes ordering free of financial side effects. Never special-case "portal" inside `CommercialDocumentService` — use the conversion mechanism to activate accounting.
+- Client prices are always ignored; server pricing comes from `Product::default_selling_price_ht` (price-level list) and `resolveLines` MUST eager-load `prices` or the accessor falls into the `purchase×1.3` fallback.
+- Convert is a real `DocumentConversionService::convert` (FV doc number, stamp, stock movement, balance snapshot) followed by order→completed + history note; the whole thing is one transaction.
+- Customer status transitions: pending→cancelled (customer only), anything else is admin; no transitions out of completed/cancelled.
+
+**Verification**: `php artisan documents:integrity-scan` — all clean. `vendor\bin\pest.bat` — 41 passed (232 assertions) incl. new `PortalOrderRequestTest` (catalog + server-price recompute, client prices ignored) and `PortalStatementBalanceTest`. Smoke on throwaway company 3 (full lifecycle, re-runnable via tinker: `php artisan tinker --execute="require 'C:/Users/PC/AppData/Local/Temp/opencode/portal_smoke.php';"`): create CMD (no stamp/stock/balance) → update qty 2→5 (69154.80) → pending→processing → convert to FV-2026-000002 (net 69846.35 incl. stamp 691.55, 1 stock movement, order completed). `npx tsc --noEmit` clean. `npm test` — 222/222. `npm run build` — 0 errors, 208 precache entries, `root sw == build sw: True` (SW MATCH). Company 1 (user's real data) untouched throughout.
+
 ### Phase 57 — Global Search on Documents Matches Party/Warehouse/Creator + Amounts (Aug 4)
 
 **Bug (user report)**: "global research don't give best result in text field, and in amounts it gives just the field of number doc" — typing a client name in the documents list search returned nothing, and typing an amount only matched documents whose **number** contained it.
