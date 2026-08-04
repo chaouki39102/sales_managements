@@ -63,6 +63,21 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         return app(PaymentSynchronizer::class);
     }
 
+    /**
+     * هوية المستخدم الفعلي المُنفّذ (سطر users.id فقط).
+     *
+     * في سياقات مثل بوابة الزبائن يكون المستخدم المصادَق هو PortalUser (جدول
+     * portal_users) — ولا يجب أبداً كتابة معرّفه في أعمدة users FKs
+     * (user_id / validated_by / updated_by) لأن ذلك يكسر القيد foreign key.
+     * نرجع null هناك ليبقى العمود فارغاً.
+     */
+    protected function actorUserId(): ?int
+    {
+        $actor = auth()->user();
+
+        return $actor instanceof \App\Models\User ? (int) $actor->id : null;
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // HOOK: beforeCreate
     // يُعدّ البيانات ويُولّد رقم المستند والسلسلة الترقيمية
@@ -84,7 +99,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         $data['company_id'] = $companyId;
 
         if (empty($data['user_id'])) {
-            $data['user_id'] = auth()->id();
+            $data['user_id'] = $this->actorUserId();
         }
 
         $data = $this->prepareDocumentData($data);
@@ -147,7 +162,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
         // ✅ الحالة مباشرةً "validated" — لا مسودة
         $data['validated_at'] = now();
-        $data['validated_by'] = auth()->id();
+        $data['validated_by'] = $this->actorUserId();
         $data['document_status_id'] = $this->getStatusId($companyId, 'validated');
 
         $this->validateTenantRelations($data, $companyId, [
@@ -197,9 +212,11 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $this->payments()->syncPayments($item, $payments);
         }
 
-        // ✅ التحقق من البيع بالدين: إذا كان التعامل لا يُسمح له بالبيع بالدين
-        //    فيجب أن تساوي الدفعات المبلغ الإجمالي كاملاً
-        if (!empty($data['party_id'])) {
+        // ✅ التحقق من البيع بالدين: يخص الفواتير فقط (المستندات المالية).
+        //    الطلبات/أوامر العمل (affects_accounting = false) ليست بيعاً بالدين،
+        //    لذا لا تُقيَّد بقيد الدفع الكامل عند الإنشاء.
+        $isAccounting = (bool) ($item->documentType?->affects_accounting ?? true);
+        if ($isAccounting && !empty($data['party_id'])) {
             $party = \App\Models\Party::find($data['party_id']);
             if ($party && !$party->allow_credit_sale) {
                 $totalPaid = $item->fresh()?->payments()->sum('amount')
@@ -216,8 +233,11 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             }
         }
 
-        // ✅ Freeze balance snapshots inside the transaction (SSOT for receipt reprinting)
-        $this->persistBalanceSnapshots($item);
+        // ✅ Freeze balance snapshots inside the transaction (SSOT for receipt
+        //    reprinting) — فقط للمستندات المالية. الطلبات لا تدخل في رصيد الزبون.
+        if ($isAccounting && $item->party_id) {
+            $this->persistBalanceSnapshots($item);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -270,6 +290,10 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         if (!empty($lines)) {
             $this->deleteStockMovementsForDocument($item);
             $item->lines()->delete();
+            // لا تنسَ إبطال علاقة lines المحمّلة: حذف/إدراج عبر الـ query builder
+            // لا يُحدّث collection المحمّل مسبقاً، فكان recalculateTotals و
+            // integrity gate يقرآن أسطراً قديمة (قبل التعديل) ويحسبان إجماليات خاطئة.
+            $item->unsetRelation('lines');
             $this->createDocumentLines($item, $lines);
         }
 
@@ -711,15 +735,24 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     private function recalculateTotals(CommercialDocument $document): void
     {
-        $document->load('lines');
+        // load() (ليس loadMissing): الإجماليات يجب أن تُحسب من أسطر CURRENT فعلياً.
+        // قد تكون علاقة lines محمّلة مسبقاً وقديمة (إنشاء عبر create() ثم addLinesToDocument،
+        // أو تعديل بعد lines()->delete()) — loadMissing لن تحدّثها وستُنتج إجماليات خاطئة.
+        $document->load(['lines', 'documentType']);
 
         $totalHt       = (float) $document->lines->sum('total_ht');
         $totalTva      = (float) $document->lines->sum('total_tva');
         $totalDiscount = (float) $document->lines->sum('total_discount_amount');
         $totalTtc      = $totalHt + $totalTva;
 
+        // الختم الجبائي يُطبَّق فقط على المستندات المالية (عند الفاتورة) —
+        // القاعدة حسب نوع المستند، لا حسب من أنشأها. الطلبات وأوامر العمل
+        // (affects_accounting = false) لا تحمل طابعاً جبائياً.
+        $isAccounting = (bool) ($document->documentType?->affects_accounting ?? true);
+
         $totalStamp = 0.0;
-        $stampEnabled = Setting::getSetting('fiscal_stamp_enabled', true, $document->company_id);
+        $stampEnabled = $isAccounting
+            && Setting::getSetting('fiscal_stamp_enabled', true, $document->company_id);
         if ($stampEnabled) {
             try {
                 $totalStamp = app(FiscalStampCalculator::class)->calculateFromAmount($totalTtc);

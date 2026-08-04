@@ -169,6 +169,15 @@ Route::prefix('v1')->group(function () {
             Route::get('/profile',          [PortalController::class, 'profile']);
             Route::put('/profile',          [PortalController::class, 'updateProfile']);
             Route::put('/profile/password', [PortalController::class, 'updatePassword']);
+
+            // ── طلبات السلع (وصل طلب سلعة) — كتالوج + الطلبات الخاصة بالزبون ──
+            Route::get('/orders/catalog',     [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'catalog']);
+            Route::get('/orders',             [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'index']);
+            Route::post('/orders',            [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'store']);
+            Route::get('/orders/{id}',        [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'showOrder']);
+            Route::put('/orders/{id}',        [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'update']);
+            Route::patch('/orders/{id}',      [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'update']);
+            Route::post('/orders/{id}/cancel',[\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'cancel']);
         });
     });
 
@@ -645,6 +654,12 @@ Route::prefix('v1')->group(function () {
                 Route::get('portal-access/for-party/{partyId}', [PortalAccessController::class, 'forParty']);
                 Route::put('portal-access/{id}',                [PortalAccessController::class, 'update']);
                 Route::delete('portal-access/{id}',             [PortalAccessController::class, 'destroy']);
+
+                // ── طلبات بوابة الزبائن (وصل طلب سلعة) ───────────
+                Route::get('portal-orders',               [\App\Http\Controllers\Api\V1\Portal\PortalOrdersController::class, 'index']);
+                Route::get('portal-orders/{id}',          [\App\Http\Controllers\Api\V1\Portal\PortalOrdersController::class, 'show']);
+                Route::patch('portal-orders/{id}',        [\App\Http\Controllers\Api\V1\Portal\PortalOrdersController::class, 'update']);
+                Route::post('portal-orders/{id}/convert', [\App\Http\Controllers\Api\V1\Portal\PortalOrdersController::class, 'convert']);
             });
 
             // ── POS Sessions ──────────────────────────────────────

@@ -179,7 +179,6 @@ class PartierSeeder extends Seeder
             'avatar'               => null,
             'bank_name'            => null,
             'rib'                  => null,
-            'initial_balance'      => 0.00,
             'credit_limit'         => 0.00,
             'default_price_level_id' => null,
             'credit_days'          => null,

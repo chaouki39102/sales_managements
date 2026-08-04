@@ -18,6 +18,7 @@ class DocumentConversionService
         'BL'  => ['FV'],
         'FV'  => ['AV'],             // فاتورة مبيعات → إشعار دائن
         'AV'  => ['FV'],             // إشعار دائن → فاتورة مبيعات (عكس)
+        'CMD' => ['FV', 'POS'],      // أمر زبون (بوابة) → فاتورة / فاتورة POS
         'DDP' => ['BCF'],
         'BCF' => ['BR', 'FA'],
         'BR'  => ['FA'],
@@ -105,6 +106,11 @@ class DocumentConversionService
             // BaseService::beforeCreate strips non-column keys (including 'lines'),
             // so we create lines + recalculate totals here.
             $this->documentService->addLinesToDocument($newDoc, $linesData);
+
+            // بعد إضافة الأسطر أصبح net_to_pay حقيقياً — أعد تجميد snapshot الرصيد.
+            // (خلال create() كان net_to_pay=0 لأن الأسطر تُضاف بعد الإنشاء،
+            //  فتُخزَّن قيم (0,0) خاطئة للمستندات المحاسبية المحوَّلة.)
+            $this->documentService->persistBalanceSnapshots($newDoc);
 
             if ($source->documentType?->code === 'BCC' && $targetType->code === 'BL') {
                 foreach ($sourceLines as $sourceLine) {

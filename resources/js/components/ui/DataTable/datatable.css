@@ -159,7 +159,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 8px;
     padding: 10px 14px;
     border-bottom: 1px solid var(--b2);
@@ -329,7 +329,7 @@
 .dt-search.srch {
     border-radius: var(--r2);
     flex: 1 1 auto;
-    min-width: 0;
+    min-width: 150px;
     max-width: 240px;
 }
 
@@ -2984,6 +2984,21 @@
     }
     .dt-toolbar-title {
         font-size: 13px;
+    }
+
+    /* لا تسمح لأزرار الشريط العلوي بسحق حقل البحث — يوضع البحث في صف كامل */
+    .dt-toolbar-left {
+        flex-wrap: wrap;
+    }
+    .dt-search.srch {
+        flex: 1 1 100%;
+        max-width: none;
+        min-width: 0;
+    }
+    .dt-toolbar-right {
+        flex: 1 1 100%;
+        flex-wrap: wrap;
+        justify-content: flex-start;
     }
 }
 

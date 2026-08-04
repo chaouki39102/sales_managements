@@ -197,8 +197,15 @@ class TransactionIntegrityService
             }
         }
 
-        // Fiscal stamp — only when the setting is on (recalculateTotals does the same).
-        $stampEnabled = Setting::getSetting('fiscal_stamp_enabled', true, $document->company_id);
+        // Fiscal stamp — only when the setting is on AND the doc type is an
+        // accounting document (mirrors recalculateTotals). Non-accounting docs
+        // (orders/quotes/delivery notes, affects_accounting = false) never carry
+        // a stamp, so expecting one would false-positive on them.
+        $document->loadMissing('documentType');
+        $isAccounting = (bool) ($document->documentType?->affects_accounting ?? true);
+
+        $stampEnabled = $isAccounting
+            && Setting::getSetting('fiscal_stamp_enabled', true, $document->company_id);
         if ($stampEnabled) {
             $expectedStamp = round($this->stampCalculator->calculateFromAmount($rawTtc), 2);
             $storedStamp   = (float) ($document->getAttribute('total_stamp') ?? 0);

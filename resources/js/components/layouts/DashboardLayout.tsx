@@ -60,6 +60,7 @@ const NAV_GROUPS = [
       { name: 'الزبائن',   href: 'clients',   icon: 'ti-users'        },
       { name: 'الموردون',  href: 'suppliers', icon: 'ti-truck'        },
       { name: 'الديون',    href: 'debts',     icon: 'ti-receipt'      },
+      { name: 'طلبات البوابة', href: 'portal-orders', icon: 'ti-clipboard-list' },
     ],
   },
   {

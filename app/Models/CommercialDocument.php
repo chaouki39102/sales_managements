@@ -283,6 +283,10 @@ class CommercialDocument extends Model
             'commercial_document_line_id'
         );
     }
+    public function portalOrder(): HasOne
+    {
+        return $this->hasOne(PortalOrder::class, 'commercial_document_id');
+    }
 
     public function isFullyPaid(): bool
     {

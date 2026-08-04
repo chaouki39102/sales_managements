@@ -1,11 +1,11 @@
 // ════════════════════════════════════════════════════════════════════════════
-// pages/portal/PortalDocumentsPage.tsx — قائمة مستندات الزبون
+// pages/portal/PortalDocumentsPage.tsx — قائمة مستندات الزبون (مُحسّنة)
 // ════════════════════════════════════════════════════════════════════════════
 import { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { portalApi, type PortalDocFilters } from '@/lib/api/portal/portal';
-import { fmtMoney, fmtDate, StatusBadge, Pager, PortalLoading, PortalError, PortalEmpty } from './portalUtils';
+import { fmtMoney, fmtDate, StatusBadge, DocTypeIcon, Pager, PortalLoading, PortalError, PortalEmpty } from './portalUtils';
 
 const TYPE_OPTIONS = [
   { value: '', label: 'جميع الأنواع' },
@@ -21,6 +21,8 @@ const SORT_OPTIONS = [
   { value: 'amount_asc', label: 'المبلغ (تصاعدي)' },
 ];
 
+type ViewMode = 'table' | 'cards';
+
 export default function PortalDocumentsPage() {
   const { slug } = useParams<{ slug: string }>();
   const base = `/portal/${slug}`;
@@ -28,6 +30,9 @@ export default function PortalDocumentsPage() {
   const [search, setSearch] = useState('');
   const [typeCode, setTypeCode] = useState('');
   const [sort, setSort] = useState<PortalDocFilters['sort']>('date_desc');
+  const [view, setView] = useState<ViewMode>(() => {
+    try { return (localStorage.getItem('portal-doc-view') as ViewMode) || 'table'; } catch { return 'table'; }
+  });
 
   const debouncedSearch = useDebounce(search, 350);
 
@@ -46,6 +51,7 @@ export default function PortalDocumentsPage() {
   });
 
   useEffect(() => { setPage(1); }, [debouncedSearch, typeCode, sort]);
+  useEffect(() => { try { localStorage.setItem('portal-doc-view', view); } catch {} }, [view]);
 
   const hasFilters = debouncedSearch || typeCode;
 
@@ -60,7 +66,17 @@ export default function PortalDocumentsPage() {
     <section className="portal-card">
       <div className="portal-card-hd">
         <h3><i className="ti ti-file-text" /> المستندات</h3>
-        <span className="portal-hd-count">{meta.total} سجل</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span className="portal-hd-count">{meta.total} سجل</span>
+          <div className="portal-view-toggle">
+            <button className={`portal-view-btn ${view === 'table' ? 'on' : ''}`} onClick={() => setView('table')} title="عرض جدول">
+              <i className="ti ti-list" />
+            </button>
+            <button className={`portal-view-btn ${view === 'cards' ? 'on' : ''}`} onClick={() => setView('cards')} title="عرض بطاقات">
+              <i className="ti ti-layout-grid" />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Toolbar */}
@@ -96,7 +112,7 @@ export default function PortalDocumentsPage() {
 
       {rows.length === 0 ? (
         <PortalEmpty icon="ti-file-text" text={hasFilters ? 'لا توجد نتائج مطابقة' : 'لا توجد مستندات'} />
-      ) : (
+      ) : view === 'table' ? (
         <div className="portal-table-wrap">
           <table className="portal-table">
             <thead>
@@ -107,17 +123,50 @@ export default function PortalDocumentsPage() {
             <tbody>
               {rows.map((d) => (
                 <tr key={d.id}>
-                  <td><Link className="tbl-link" to={`${base}/documents/${d.id}`}>{d.document_number}</Link></td>
-                  <td>{fmtDate(d.document_date)}</td>
+                  <td>
+                    <Link className="tbl-link" to={`${base}/documents/${d.id}`}>
+                      {d.document_number}
+                    </Link>
+                  </td>
+                  <td style={{ fontSize: 11.5 }}>{fmtDate(d.document_date)}</td>
                   <td>{d.type_name}</td>
-                  <td>{d.due_date ? fmtDate(d.due_date) : '—'}</td>
+                  <td style={{ fontSize: 11.5 }}>{d.due_date ? fmtDate(d.due_date) : '—'}</td>
                   <td><StatusBadge status={d.status_name} /></td>
                   <td className="num">{fmtMoney(d.net_to_pay)}</td>
-                  <td className="num">{fmtMoney(d.remaining_amount)}</td>
+                  <td className="num" style={{ color: d.remaining_amount > 0 ? 'var(--red)' : '#059669' }}>{fmtMoney(d.remaining_amount)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      ) : (
+        <div className="portal-doc-cards">
+          {rows.map((d) => (
+            <Link key={d.id} to={`${base}/documents/${d.id}`} className="portal-doc-card">
+              <div className="portal-doc-card-top">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <DocTypeIcon code={d.type_code} />
+                  <div>
+                    <div className="portal-doc-card-num">{d.document_number}</div>
+                    <div className="portal-doc-card-date">{fmtDate(d.document_date)}</div>
+                  </div>
+                </div>
+                <StatusBadge status={d.status_name} />
+              </div>
+              <div className="portal-doc-card-mid">
+                <div className="portal-doc-card-amount">{fmtMoney(d.net_to_pay)}</div>
+                {d.remaining_amount > 0 ? (
+                  <div className="portal-doc-card-remain portal-doc-card-remain--ow">متبقي: {fmtMoney(d.remaining_amount)}</div>
+                ) : (
+                  <div className="portal-doc-card-remain portal-doc-card-remain--ok">مدفوع</div>
+                )}
+              </div>
+              <div className="portal-doc-card-footer">
+                <span><i className="ti ti-tag" style={{ marginLeft: 4 }} />{d.type_name}</span>
+                {d.due_date && <span><i className="ti ti-calendar" style={{ marginLeft: 4 }} />{fmtDate(d.due_date)}</span>}
+              </div>
+            </Link>
+          ))}
         </div>
       )}
       {rows.length > 0 && (

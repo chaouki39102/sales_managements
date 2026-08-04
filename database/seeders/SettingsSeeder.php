@@ -571,6 +571,17 @@ class SettingsSeeder extends Seeder
             $settings['default_price_level_id']['value'] = $defaultPriceLevelId;
         }
 
+        // العملة الافتراضية: يجب أن تُحلّ من عملة المؤسسة الفعلية، لا قيمة ثابتة 1
+        // (currencies معرفاتها تسلسلية عامة — بعد المؤسسة الأولى لا تكون 1 بالضرورة).
+        $defaultCurrencyId = DB::table('currencies')
+            ->where('company_id', $companyId)
+            ->orderBy('is_default', 'desc')
+            ->orderBy('id')
+            ->value('id');
+        if ($defaultCurrencyId) {
+            $settings['default_currency_id']['value'] = $defaultCurrencyId;
+        }
+
         foreach ($settings as $key => $config) {
             // تحويل القيمة إلى نص باستخدام نفس منطق SettingService
             $storedValue = $this->toStorageValue($config['value']);

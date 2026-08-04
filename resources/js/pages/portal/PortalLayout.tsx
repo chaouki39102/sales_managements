@@ -18,6 +18,7 @@ export default function PortalLayout() {
   const NAV_ITEMS = [
     { to: base, label: 'الرئيسية', icon: 'ti-layout-dashboard', end: true },
     { to: `${base}/documents`, label: 'المستندات', icon: 'ti-file-text', end: false },
+    { to: `${base}/orders`, label: 'اطلب سلعة', icon: 'ti-building-store', end: false },
     { to: `${base}/payments`, label: 'الدفعات', icon: 'ti-wallet', end: false },
     { to: `${base}/statement`, label: 'كشف الحساب', icon: 'ti-report-money', end: false },
     { to: `${base}/profile`, label: 'الملف الشخصي', icon: 'ti-user-circle', end: false },
@@ -44,6 +45,7 @@ export default function PortalLayout() {
   };
 
   const userName = portalUser?.name;
+  const initials = userName ? userName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() : '؟';
 
   return (
     <div className="portal-page">
@@ -72,7 +74,12 @@ export default function PortalLayout() {
           </nav>
 
           <div className="portal-hd-user">
-            {userName && <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--t2)' }}>{userName}</span>}
+            {userName && (
+              <div className="portal-user-pill">
+                <span>{userName}</span>
+                <div className="portal-user-avatar">{initials}</div>
+              </div>
+            )}
             <button className="portal-btn portal-btn--ghost" onClick={handleLogout} title="خروج">
               <i className="ti ti-logout" />
             </button>

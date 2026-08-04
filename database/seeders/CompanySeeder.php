@@ -156,7 +156,6 @@ class CompanySeeder extends Seeder
             'phone'                => null,
             'mobile'               => null,
             'email'                => null,
-            'initial_balance'      => 0.00,
             'credit_limit'         => 0.00,
             'is_tva_exempt'        => true,
             'is_taxable'           => false,

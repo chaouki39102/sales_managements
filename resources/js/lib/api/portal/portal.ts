@@ -174,6 +174,50 @@ export interface PortalProfile {
   party: PortalParty | null;
 }
 
+// ─── طلبات السلع (وصل طلب سلعة) ────────────────────────────────────────────────
+export type PortalOrderStatus = 'pending' | 'processing' | 'completed' | 'cancelled';
+
+export interface PortalCatalogItem {
+  id:            number;
+  name:          string;
+  ref:           string | null;
+  barcode:       string | null;
+  unit_price_ht: number;
+  tva_rate:      number;
+  unit:          { name: string; symbol: string } | null;
+  manages_stock: boolean;
+  current_stock: number | null;
+}
+
+export interface PortalOrderItem {
+  product_id:    number;
+  product_name:  string;
+  product_ref:   string | null;
+  unit_name:     string | null;
+  unit_price_ht: number;
+  tva_rate:      number;
+  quantity:      number;
+  total_ht:      number;
+  total_tva:     number;
+  total_ttc:     number;
+}
+
+export interface PortalOrder {
+  id:           number;
+  reference:    string;
+  status:       PortalOrderStatus;
+  status_label: string;
+  notes:        string | null;
+  total_ht:     number;
+  total_tva:    number;
+  total_ttc:    number;
+  items_count:  number;
+  requested_at: string | null;
+  created_at:   string | null;
+  items?:       PortalOrderItem[];
+  party?:       { id: number; name: string; code: string | null } | null;
+}
+
 // ─── API ──────────────────────────────────────────────────────────────────────
 export interface PortalDocFilters {
   page?: number;
@@ -226,6 +270,20 @@ export const portalApi = {
     portalPut<PortalProfile>('/portal/profile', data),
   updatePassword:(data: { current_password: string; password: string; password_confirmation: string }) =>
     portalPut<void>('/portal/profile/password', data),
+  catalog:  (filters: { page?: number; per_page?: number; search?: string } = {}) =>
+    portalGet<PortalPaginated<PortalCatalogItem>>('/portal/orders/catalog', {
+      page: filters.page ?? 1,
+      per_page: filters.per_page ?? 24,
+      search: filters.search || undefined,
+    }),
+  orders:   (filters: { page?: number; per_page?: number; status?: PortalOrderStatus } = {}) =>
+    portalGet<PortalPaginated<PortalOrder>>('/portal/orders', {
+      page: filters.page ?? 1,
+      per_page: filters.per_page ?? 10,
+      status: filters.status || undefined,
+    }),
+  createOrder: (items: { product_id: number; quantity: number }[], notes?: string) =>
+    portalPost<PortalOrder>('/portal/orders', { items, notes: notes || undefined }),
 };
 
 export function isPortalAuthenticated(): boolean {

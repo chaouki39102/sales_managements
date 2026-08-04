@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// pages/portal/PortalPaymentsPage.tsx — قائمة دفعات الزبون
+// pages/portal/PortalPaymentsPage.tsx — قائمة دفعات الزبون (مُحسّنة)
 // ════════════════════════════════════════════════════════════════════════════
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
@@ -29,6 +29,8 @@ const SORT_OPTIONS = [
   { value: 'amount_asc', label: 'المبلغ (تصاعدي)' },
 ];
 
+type ViewMode = 'table' | 'timeline';
+
 export default function PortalPaymentsPage() {
   const { slug } = useParams<{ slug: string }>();
   const [page, setPage] = useState(1);
@@ -36,6 +38,9 @@ export default function PortalPaymentsPage() {
   const [direction, setDirection] = useState('');
   const [paymentMode, setPaymentMode] = useState('');
   const [sort, setSort] = useState<PortalPaymentFilters['sort']>('date_desc');
+  const [view, setView] = useState<ViewMode>(() => {
+    try { return (localStorage.getItem('portal-pay-view') as ViewMode) || 'table'; } catch { return 'table'; }
+  });
 
   const debouncedSearch = useDebounce(search, 350);
 
@@ -55,6 +60,7 @@ export default function PortalPaymentsPage() {
   });
 
   useEffect(() => { setPage(1); }, [debouncedSearch, direction, paymentMode, sort]);
+  useEffect(() => { try { localStorage.setItem('portal-pay-view', view); } catch {} }, [view]);
 
   const hasFilters = debouncedSearch || direction || paymentMode;
 
@@ -65,11 +71,24 @@ export default function PortalPaymentsPage() {
   const from = meta.per_page * (meta.current_page - 1) + 1;
   const to = Math.min(meta.per_page * meta.current_page, meta.total);
 
+  const totalIn = rows.filter(r => r.direction === 'in').reduce((s, r) => s + r.amount, 0);
+  const totalOut = rows.filter(r => r.direction === 'out').reduce((s, r) => s + r.amount, 0);
+
   return (
     <section className="portal-card">
       <div className="portal-card-hd">
         <h3><i className="ti ti-wallet" /> الدفعات</h3>
-        <span className="portal-hd-count">{meta.total} سجل</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span className="portal-hd-count">{meta.total} سجل</span>
+          <div className="portal-view-toggle">
+            <button className={`portal-view-btn ${view === 'table' ? 'on' : ''}`} onClick={() => setView('table')} title="عرض جدول">
+              <i className="ti ti-list" />
+            </button>
+            <button className={`portal-view-btn ${view === 'timeline' ? 'on' : ''}`} onClick={() => setView('timeline')} title="خط زمني">
+              <i className="ti ti-layout-list" />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Toolbar */}
@@ -106,9 +125,29 @@ export default function PortalPaymentsPage() {
         </div>
       </div>
 
+      {/* ─── ملخص سريع ─── */}
+      {rows.length > 0 && (
+        <div style={{
+          display: 'flex', gap: 16, padding: '12px 22px', borderBottom: '1px solid var(--b1)',
+          flexWrap: 'wrap',
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#059669' }}>
+            <i className="ti ti-arrow-down" style={{ marginLeft: 4 }} />
+            وارد: {fmtMoney(totalIn)}
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--red)' }}>
+            <i className="ti ti-arrow-up" style={{ marginLeft: 4 }} />
+            صادر: {fmtMoney(totalOut)}
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t2)' }}>
+            صافي: {fmtMoney(totalIn - totalOut)}
+          </div>
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <PortalEmpty icon="ti-wallet" text={hasFilters ? 'لا توجد نتائج مطابقة' : 'لا توجد دفعات'} />
-      ) : (
+      ) : view === 'table' ? (
         <div className="portal-table-wrap">
           <table className="portal-table">
             <thead>
@@ -120,17 +159,38 @@ export default function PortalPaymentsPage() {
               {rows.map((p) => (
                 <tr key={p.id}>
                   <td className="num">{p.payment_number}</td>
-                  <td>{fmtDate(p.payment_date)}</td>
+                  <td style={{ fontSize: 11.5 }}>{fmtDate(p.payment_date)}</td>
                   <td>{p.payment_mode}</td>
-                  <td>{p.reference || '—'}</td>
+                  <td style={{ fontSize: 11.5 }}>{p.reference || '—'}</td>
                   <td><DirBadge direction={p.direction} /></td>
-                  <td className="num" style={{ color: p.direction === 'in' ? 'var(--em)' : 'var(--red)' }}>
+                  <td className="num" style={{ color: p.direction === 'in' ? '#059669' : 'var(--red)' }}>
                     {fmtMoney(p.amount)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      ) : (
+        <div className="portal-pay-timeline">
+          {rows.map((p) => (
+            <div key={p.id} className="portal-pay-item">
+              <div className={`portal-pay-icon ${p.direction === 'in' ? 'portal-pay-icon--in' : 'portal-pay-icon--out'}`}>
+                <i className={`ti ${p.direction === 'in' ? 'ti-arrow-down' : 'ti-arrow-up'}`} />
+              </div>
+              <div className="portal-pay-info">
+                <div className="portal-pay-num">{p.payment_number}</div>
+                <div className="portal-pay-meta">
+                  {p.payment_mode}
+                  {p.reference && ` • ${p.reference}`}
+                  {' • '}{fmtDate(p.payment_date)}
+                </div>
+              </div>
+              <div className={`portal-pay-amt ${p.direction === 'in' ? 'portal-pay-amt--in' : 'portal-pay-amt--out'}`}>
+                {p.direction === 'in' ? '+' : '-'} {fmtMoney(p.amount)}
+              </div>
+            </div>
+          ))}
         </div>
       )}
       {rows.length > 0 && (

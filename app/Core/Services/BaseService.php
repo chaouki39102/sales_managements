@@ -442,9 +442,12 @@ abstract class BaseService
         unset($data['created_by']); // لا يتغير أبداً
         unset($data['deleted_by']); // يديره نظام الحذف فقط
 
-        // updated_by يعيّنه النظام تلقائياً
-        if ($this->modelHasColumn('updated_by') && auth()->check()) {
-            $data['updated_by'] = auth()->id();
+        // updated_by يعيّنه النظام تلقائياً — فقط للمستخدمين الفعليين (users).
+        // سياقات مثل بوابة الزبائن تُصادِق PortalUser ولا يجب كتابة معرّفه في
+        // عمود users FK.
+        $actor = auth()->user();
+        if ($this->modelHasColumn('updated_by') && $actor instanceof \App\Models\User) {
+            $data['updated_by'] = $actor->id;
         }
 
         return $data;

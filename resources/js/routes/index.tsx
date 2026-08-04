@@ -125,6 +125,8 @@ const PortalDocumentDetailPage = lazy(() => import('@/pages/portal/PortalDocumen
 const PortalPaymentsPage     = lazy(() => import('@/pages/portal/PortalPaymentsPage'));
 const PortalStatementPage    = lazy(() => import('@/pages/portal/PortalStatementPage'));
 const PortalProfilePage      = lazy(() => import('@/pages/portal/PortalProfilePage'));
+const PortalOrdersPage       = lazy(() => import('@/pages/portal/PortalOrdersPage'));
+const PortalOrdersAdminPage  = lazy(() => import('@/pages/portal/PortalOrdersAdminPage'));
 
 // â”€â”€ Admin Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const AdminBootPage      = lazy(() => import('@/pages/admin/AdminBootPage'));
@@ -257,6 +259,7 @@ export function AppRoutes() {
           {/* Parties */}
           <Route path="clients"   element={<ClientsPage />} />
           <Route path="suppliers" element={<SuppliersPage />} />
+          <Route path="portal-orders" element={<PortalOrdersAdminPage />} />
 
           {/* Finance */}
           <Route path="finance"  element={<FinancePage />} />
@@ -387,8 +390,8 @@ export function AppRoutes() {
           <Route path="payments" element={<PortalPaymentsPage />} />
           <Route path="statement" element={<PortalStatementPage />} />
           <Route path="profile" element={<PortalProfilePage />} />
+          <Route path="orders" element={<PortalOrdersPage />} />
         </Route>
-
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/login" replace />} />
 

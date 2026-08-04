@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Portal;
 
 use App\Core\Http\Controllers\BaseApiController;
+use App\Core\Traits\ResolvesFiscalYear;
 use App\Models\Company;
 use App\Models\Party;
 use App\Models\PortalUser;
@@ -16,6 +17,8 @@ use Illuminate\Validation\Rules\Password;
 
 class PortalController extends BaseApiController
 {
+    use ResolvesFiscalYear;
+
     protected string $resourceName = 'portal';
     protected ?string $resourceClass = null;
 
@@ -55,6 +58,7 @@ class PortalController extends BaseApiController
             $party   = Party::query()->findOrFail($partyId);
             $company = Company::query()->find($portal->company_id);
             $balance = $this->balanceService->getBalanceAt($partyId, $date);
+            $fiscalYearId = $this->resolveFiscalYearId((int) $portal->company_id, $date);
 
             $recentDocuments = $this->saleDocumentsQuery($partyId, $date)
                 ->orderByDesc('cd.document_date')
@@ -72,12 +76,19 @@ class PortalController extends BaseApiController
                 ->map(fn ($p) => $this->paymentRow($p))
                 ->values();
 
+            // ملاحظة: الإجماليات النقدية تُقيّد بنفس نطاق الرصيد
+            // (affects_accounting=1 + السنة المالية) حتى لا تتسرب مستندات
+            // غير محاسبية (مثل BL) إلى أرقام «المشتريات» و«الديون».
             $monthTotal = $this->saleDocumentsQuery($partyId, $date)
+                ->where('dt.affects_accounting', true)
+                ->where('cd.fiscal_year_id', $fiscalYearId)
                 ->whereDate('cd.document_date', '>=', $monthStart)
                 ->selectRaw("COALESCE(SUM(CASE WHEN dt.code = 'AV' THEN -cd.net_to_pay ELSE cd.net_to_pay END), 0) as total")
                 ->value('total') ?? 0;
 
             $unpaidTotal = $this->saleDocumentsQuery($partyId, $date)
+                ->where('dt.affects_accounting', true)
+                ->where('cd.fiscal_year_id', $fiscalYearId)
                 ->selectRaw('COALESCE(SUM(cd.remaining_amount), 0) as total')
                 ->value('total') ?? 0;
 
@@ -274,30 +285,42 @@ class PortalController extends BaseApiController
     public function statement(Request $request): JsonResponse
     {
         try {
-            $portal  = $this->portal($request);
-            $partyId = (int) $portal->party_id;
-            $from    = $this->asDate($request->input('from'));
-            $to      = $this->asDate($request->input('to', now()->toDateString()));
+            $portal    = $this->portal($request);
+            $partyId   = (int) $portal->party_id;
+            $from      = $this->asDate($request->input('from'));
+            $to        = $this->asDate($request->input('to', now()->toDateString()));
             $companyId = (int) $this->context->get();
 
             if ($from > $to) {
                 [$from, $to] = [$to, $from];
             }
 
+            // ══════════════════════════════════════════════════════════════════
+            // المصدر الوحيد للحقيقة: الرصيد الافتتاحي والختامي يُحسبان عبر
+            // getBalanceAt() — نفس الدالة التي يستعملها Dashboard و PartyBalance
+            // وكل تقارير الرصيد. صفوف الحركة أدناه تُقيّد بنفس النطاق تماماً
+            // (السنة المالية + affects_accounting=1) حتى يتطابق الرصيد الختامي
+            // مع الرصيد الحالي في الرئيسية مهما كان نطاق التواريخ.
+            // ══════════════════════════════════════════════════════════════════
+            $fiscalYearId = $this->resolveFiscalYearId($companyId, $to);
+
             $dayBefore = date('Y-m-d', strtotime($from . ' -1 day'));
             $opening   = $this->balanceService->getBalanceAt($partyId, $dayBefore);
+            $closing   = $this->balanceService->getBalanceAt($partyId, $to);
 
             $rows = [];
 
             $documents = $this->saleDocumentsQuery($partyId, $to)
+                ->where('dt.affects_accounting', true)
+                ->where('cd.fiscal_year_id', $fiscalYearId)
                 ->whereDate('cd.document_date', '>=', $from)
                 ->orderBy('cd.document_date')
                 ->orderBy('cd.id')
                 ->get();
 
             foreach ($documents as $doc) {
-                $isCredit  = $doc->type_code === 'AV';
-                $amount    = $isCredit ? -1 * (float) $doc->net_to_pay : (float) $doc->net_to_pay;
+                $isCredit = $doc->type_code === 'AV';
+                $amount   = $isCredit ? -1 * (float) $doc->net_to_pay : (float) $doc->net_to_pay;
                 $rows[] = [
                     'date'        => $doc->document_date,
                     'reference'   => $doc->document_number,
@@ -305,12 +328,13 @@ class PortalController extends BaseApiController
                     'label'       => $doc->type_name,
                     'debit'       => $isCredit ? 0 : round((float) $doc->net_to_pay, 2),
                     'credit'      => $isCredit ? round((float) $doc->net_to_pay, 2) : 0,
-                    'balance'     => round((float) $doc->net_to_pay, 2),
+                    'balance'     => round($amount, 2),
                     'remaining'   => (float) $doc->remaining_amount,
                 ];
             }
 
             $payments = $this->paymentsQuery($partyId, $to)
+                ->where('p.fiscal_year_id', $fiscalYearId)
                 ->whereDate('p.payment_date', '>=', $from)
                 ->orderBy('p.payment_date')
                 ->orderBy('p.id')
@@ -334,7 +358,10 @@ class PortalController extends BaseApiController
                 return [$a['date'], $a['type'] === 'PMT' ? 1 : 0] <=> [$b['date'], $b['type'] === 'PMT' ? 1 : 0];
             });
 
-            $running = (float) $opening['current_balance'] ?? 0;
+            // الرصيد الجاري يُبنى من الرصيد الافتتاحي (getBalanceAt للتاريخ الذي
+            // يسبق البداية) ثم يُضاف كل صف؛ النتيجة يجب أن تطابق الرصيد الختامي
+            // المحسوب مباشرة عبر getBalanceAt($to).
+            $running = (float) $opening['current_balance'];
             foreach ($rows as &$row) {
                 $running += (float) $row['balance'];
                 $row['balance'] = round($running, 2);
@@ -346,7 +373,7 @@ class PortalController extends BaseApiController
 
             return $this->successResponse([
                 'opening'  => round((float) $opening['current_balance'], 2),
-                'closing'  => round($running, 2),
+                'closing'  => round((float) $closing['current_balance'], 2),
                 'total_debit'  => round($totalDebit, 2),
                 'total_credit' => round($totalCredit, 2),
                 'from'     => $from,

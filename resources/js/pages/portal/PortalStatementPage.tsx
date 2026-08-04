@@ -1,11 +1,11 @@
 // ════════════════════════════════════════════════════════════════════════════
-// pages/portal/PortalStatementPage.tsx — كشف حساب الزبون (رصيد متدرج)
+// pages/portal/PortalStatementPage.tsx — كشف حساب الزبون (مُحسّن)
 // ════════════════════════════════════════════════════════════════════════════
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { portalApi } from '@/lib/api/portal/portal';
-import { fmtMoney, fmtMoneySigned, fmtDate, PortalLoading, PortalError, PortalEmpty } from './portalUtils';
+import { fmtMoney, fmtMoneySigned, fmtDate, Sparkline, PortalLoading, PortalError, PortalEmpty } from './portalUtils';
 
 export default function PortalStatementPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -19,6 +19,12 @@ export default function PortalStatementPage() {
     staleTime: 30_000,
   });
 
+  const sparkValues = useMemo(() => {
+    const rows = data?.rows ?? [];
+    if (rows.length === 0) return [];
+    return rows.slice(-12).map(r => r.balance);
+  }, [data]);
+
   if (isLoading) return <PortalLoading />;
   if (isError || !data) return <PortalError message={error instanceof Error ? error.message : 'تعذر تحميل كشف الحساب'} />;
 
@@ -26,18 +32,19 @@ export default function PortalStatementPage() {
 
   return (
     <>
-      <div className="portal-card" style={{ marginBottom: 16, padding: '14px 18px' }}>
+      {/* ─── فلتر التاريخ ─── */}
+      <div className="portal-card" style={{ marginBottom: 18, padding: '16px 20px' }}>
         <form
           onSubmit={(e) => { e.preventDefault(); setApplied({ from: from || undefined, to: to || undefined }); }}
           style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 10 }}
         >
           <div className="fg" style={{ flex: '1 1 160px' }}>
-            <label>من تاريخ</label>
-            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: 'var(--t3)', marginBottom: 5 }}>من تاريخ</label>
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="portal-form-input" />
           </div>
           <div className="fg" style={{ flex: '1 1 160px' }}>
-            <label>إلى تاريخ</label>
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: 'var(--t3)', marginBottom: 5 }}>إلى تاريخ</label>
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="portal-form-input" />
           </div>
           <button type="submit" className="portal-btn portal-btn--em">
             <i className="ti ti-filter" /> تطبيق
@@ -54,6 +61,7 @@ export default function PortalStatementPage() {
         </form>
       </div>
 
+      {/* ─── ملخص الرصيد ─── */}
       <div className="portal-stmt-sum">
         <div className="portal-stmt-item">
           <div className="k">الرصيد الافتتاحي</div>
@@ -65,14 +73,31 @@ export default function PortalStatementPage() {
         </div>
         <div className="portal-stmt-item">
           <div className="k">إجمالي الدائن</div>
-          <div className="v" style={{ color: 'var(--em)' }}>{fmtMoney(total_credit)}</div>
+          <div className="v" style={{ color: '#059669' }}>{fmtMoney(total_credit)}</div>
         </div>
         <div className="portal-stmt-item">
           <div className="k">الرصيد الختامي</div>
-          <div className="v" style={{ color: closing < 0 ? 'var(--red)' : 'var(--t1)' }}>{fmtMoneySigned(closing)}</div>
+          <div className="v" style={{ color: closing < 0 ? 'var(--red)' : '#059669' }}>{fmtMoneySigned(closing)}</div>
         </div>
       </div>
 
+      {/* ─── رسم بياني مصغّر ─── */}
+      {sparkValues.length > 1 && (
+        <div className="portal-card" style={{ marginBottom: 16 }}>
+          <div className="portal-card-bd">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <i className="ti ti-chart-line" style={{ color: 'var(--em)', fontSize: 16 }} />
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>تطور الرصيد</span>
+            </div>
+            <Sparkline
+              values={sparkValues.map(v => Math.abs(v))}
+              color={closing < 0 ? 'var(--red)' : 'var(--em)'}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ─── جدول الحركة ─── */}
       <section className="portal-card">
         <div className="portal-card-hd">
           <h3><i className="ti ti-report-money" /> حركة الحساب</h3>
@@ -93,12 +118,12 @@ export default function PortalStatementPage() {
               <tbody>
                 {rows.map((r, i) => (
                   <tr key={`${r.date}-${r.reference}-${i}`} className={r.balance < 0 ? 'portal-row-debit' : 'portal-row-credit'}>
-                    <td>{fmtDate(r.date)}</td>
+                    <td style={{ fontSize: 11.5 }}>{fmtDate(r.date)}</td>
                     <td className="num">{r.reference}</td>
                     <td>{r.label}</td>
                     <td className="num">{r.debit > 0 ? fmtMoney(r.debit) : '—'}</td>
                     <td className="num">{r.credit > 0 ? fmtMoney(r.credit) : '—'}</td>
-                    <td className="num">{fmtMoneySigned(r.balance)}</td>
+                    <td className="num" style={{ fontWeight: 900 }}>{fmtMoneySigned(r.balance)}</td>
                   </tr>
                 ))}
               </tbody>
