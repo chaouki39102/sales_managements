@@ -159,19 +159,25 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 8px;
     padding: 10px 14px;
     border-bottom: 1px solid var(--b2);
     background: var(--bg2);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--b3) transparent;
 }
+.dt-toolbar::-webkit-scrollbar { height: 5px; }
+.dt-toolbar::-webkit-scrollbar-thumb { background: var(--b3); border-radius: 3px; }
 
 .dt-toolbar-left {
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-wrap: wrap;
-    flex: 1;
+    flex-wrap: nowrap;
+    flex: 1 1 auto;
     min-width: 0;
 }
 
@@ -179,8 +185,9 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    flex-wrap: wrap;
-    flex-shrink: 0;
+    flex-wrap: nowrap;
+    flex-shrink: 1;
+    min-width: 0;
 }
 
 .dt-toolbar-title {
@@ -321,12 +328,14 @@
 
 .dt-search.srch {
     border-radius: var(--r2);
-    flex-shrink: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 240px;
 }
 
 .dt-search.srch input {
-    width: 190px;
-    min-width: 140px;
+    width: 100%;
+    min-width: 0;
 }
 
 .dt-search-clear {

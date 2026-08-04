@@ -48,7 +48,7 @@ import './datatable.css';
 
 import React, {
   useState, useMemo, useCallback,
-  useRef, useEffect, memo,
+  useRef, useEffect, useLayoutEffect, memo,
 } from 'react';
 
 import type {
@@ -879,6 +879,7 @@ export function DataTable<T = Record<string, unknown>>({
 
   // ── Copy/Paste from Excel 🆕 ──────────────────────────────────────────────
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
+  const toolbarRef   = useRef<HTMLDivElement>(null);
   // نمرر onCellEditRef.current عبر wrapper مستقر لتجنب stale closure
   const stableOnCellEdit = useCallback(
     (...args: Parameters<NonNullable<typeof onCellEdit>>) => onCellEditRef.current?.(...args),
@@ -987,9 +988,37 @@ export function DataTable<T = Record<string, unknown>>({
   );
   const [savedViewsList, setSavedViewsList] = useState<SavedView[]>([]);
   const [viewsMenuOpen, setViewsMenuOpen] = useState(false);
+  const viewsMenuRef    = useRef<HTMLDivElement>(null);
   const [saveViewDialogOpen, setSaveViewDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (!viewsMenuOpen) return;
+    const h = (e: MouseEvent) => {
+      if (viewsMenuRef.current && !viewsMenuRef.current.contains(e.target as Node))
+        setViewsMenuOpen(false);
+    };
+    document.addEventListener('mousedown', h, true);
+    return () => document.removeEventListener('mousedown', h, true);
+  }, [viewsMenuOpen]);
   const [saveViewName, setSaveViewName] = useState('');
   const saveViewInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Dropdown position state (viewport-fixed for scrollable toolbar) ─────
+  type MenuPos = { top: number; left: number; menuW: number } | null;
+  const [viewsMenuPos, setViewsMenuPos]   = useState<MenuPos>(null);
+  const [colMenuPos,   setColMenuPos]     = useState<MenuPos>(null);
+  const [exportMenuPos, setExportMenuPos] = useState<MenuPos>(null);
+
+  const computeMenuPos = useCallback((anchor: HTMLElement, menuW: number): MenuPos => {
+    const rect = anchor.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return null;
+    let left = rect.left;
+    if (left + menuW > window.innerWidth - 8)  left = window.innerWidth - menuW - 8;
+    if (left < 8) left = 8;
+    const spaceBelow = window.innerHeight - rect.bottom - 8;
+    const top = spaceBelow >= 200 ? rect.bottom + 4 : Math.max(8, rect.top - 300 - 4);
+    return { top, left, menuW };
+  }, []);
 
   useEffect(() => {
     if (enableSavedViews) setSavedViewsList(loadViews());
@@ -1064,6 +1093,25 @@ export function DataTable<T = Record<string, unknown>>({
       setLocalPage, url, urlState,
     ],
   );
+
+  // ── Menu positioning: fixed viewport-anchored for scrollable toolbar ─────
+  const bindMenuPos = useCallback((anchorRef: React.RefObject<HTMLElement | null>, open: boolean, menuW: number, setter: (p: MenuPos) => void) => {
+    if (!open || !anchorRef.current) { setter(null); return; }
+    const anchor = anchorRef.current;
+    const update = () => { setter(computeMenuPos(anchor, menuW)); };
+    update();
+    const t = setTimeout(update, 16);
+    const onMove = () => update();
+    window.addEventListener('scroll',  onMove, true);
+    window.addEventListener('resize', onMove);
+    const tb = toolbarRef.current;
+    tb?.addEventListener('scroll', onMove);
+    return () => { clearTimeout(t); window.removeEventListener('scroll', onMove, true); window.removeEventListener('resize', onMove); tb?.removeEventListener('scroll', onMove); };
+  }, [computeMenuPos]);
+
+  useLayoutEffect(() => bindMenuPos(viewsMenuRef, viewsMenuOpen, 220, setViewsMenuPos), [viewsMenuOpen, bindMenuPos]);
+  useLayoutEffect(() => bindMenuPos(colMenuRef,   colMenuOpen,   260, setColMenuPos),   [colMenuOpen,   bindMenuPos]);
+  useLayoutEffect(() => bindMenuPos(exportMenuRef, exportMenuOpen, 180, setExportMenuPos), [exportMenuOpen, bindMenuPos]);
 
   // ── Context Menu 🆕 ───────────────────────────────────────────────────────
   const defaultContextMenuItems = useCallback(
@@ -1560,7 +1608,7 @@ export function DataTable<T = Record<string, unknown>>({
       onKeyDown={keyboardNav ? kbHandleKeyDown : undefined}
     >
       {/* ══ TOOLBAR ═════════════════════════════════════════════════════════ */}
-      <div className="dt-toolbar">
+      <div ref={toolbarRef} className="dt-toolbar">
         <div className="dt-toolbar-left">
           {title && <span className="dt-toolbar-title">{title}</span>}
 
@@ -1727,7 +1775,7 @@ export function DataTable<T = Record<string, unknown>>({
 
           {/* 🆕 Saved Views */}
           {enableSavedViews && (
-            <div className="dt-col-menu-wrap">
+            <div ref={viewsMenuRef} className="dt-col-menu-wrap">
               <button
                 className="dt-tbtn"
                 onClick={() => setViewsMenuOpen(v => !v)}
@@ -1737,7 +1785,13 @@ export function DataTable<T = Record<string, unknown>>({
                 العروض
               </button>
               {viewsMenuOpen && (
-                <div className="dt-col-menu" style={{ minWidth: '200px' }}>
+                <div className="dt-col-menu" style={{
+                  position: 'fixed',
+                  top:    viewsMenuPos?.top    ?? 'calc(100% + 6px)',
+                  left:   viewsMenuPos?.left   ?? 0,
+                  minWidth: '200px',
+                  zIndex: 300,
+                }}>
                   <div className="dt-col-menu-header">
                     <span>العروض المحفوظة</span>
                     <button
@@ -1803,7 +1857,12 @@ export function DataTable<T = Record<string, unknown>>({
                 </button>
 
                 {exportMenuOpen && (
-                  <div className="dt-export-menu" role="menu">
+                  <div className="dt-export-menu" role="menu" style={{
+                    position: 'fixed',
+                    top:  exportMenuPos?.top  ?? 'calc(100% + 6px)',
+                    left: exportMenuPos?.left ?? 0,
+                    zIndex: 300,
+                  }}>
                     <div className="dt-export-menu-title">تصدير البيانات</div>
                     <div className="dt-export-menu-count">
                       {isServerPaged
@@ -1880,7 +1939,12 @@ export function DataTable<T = Record<string, unknown>>({
             </button>
 
             {colMenuOpen && (
-              <div className="dt-col-menu" role="menu">
+              <div className="dt-col-menu" role="menu" style={{
+                position: 'fixed',
+                top:    colMenuPos?.top    ?? 'calc(100% + 6px)',
+                left:   colMenuPos?.left   ?? 0,
+                zIndex: 300,
+              }}>
                 <div className="dt-col-menu-header">
                   <span>الأعمدة</span>
                   <button onClick={toggleCollapseAll} type="button">
