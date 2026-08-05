@@ -26,6 +26,7 @@ const InvoicesPage            = lazy(() => import('@/pages/invoices/InvoicesPage
 const POSPage                 = lazy(() => import('@/pages/pos/POSPage'));
 const POSKioskPage            = lazy(() => import('@/pages/pos/POSKioskPage'));const PosSessionsPage         = lazy(() => import('@/pages/pos/PosSessionsPage'));
 const POSProPage              = lazy(() => import('@/pos-pro/POSProPage'));
+const POSProMobilePage        = lazy(() => import('@/pos-pro/POSProMobilePage'));
 
 // â”€â”€ Products / Inventory â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ProductsPage   = lazy(() => import('@/pages/products/ProductsPage'));
@@ -399,6 +400,18 @@ export function AppRoutes() {
           <Route path="profile" element={<PortalProfilePage />} />
           <Route path="orders" element={<PortalOrdersPage />} />
         </Route>
+        {/* POS Pro Mobile — شاشة هاتف كاملة (خارج لوحة التحكم) */}
+        <Route
+          path="/pos/pro/mobile"
+          element={
+            <RequireCompany>
+              <Suspense fallback={<PageLoader />}>
+                <POSProMobilePage />
+              </Suspense>
+            </RequireCompany>
+          }
+        />
+
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/login" replace />} />
 

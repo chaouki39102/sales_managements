@@ -19,7 +19,7 @@
 - [x] **10. Discount sheet** — %/amount toggle, presets, custom input → invoice discount with PIN gate.
 - [x] **11. Held-sales sheet** — list held carts, resume/delete.
 - [x] **12. Payment + post-sale** — PUT/POST via cart-store `documentId`, receipt/print (`ProfessionalReceipt`), success overlay, cart reset.
-- [ ] **13. Route** — register `/pos/pro/mobile` (standalone full-screen, `RequireCompany`) in `routes/index.tsx`.
+- [x] **13. Route** — register `/pos/pro/mobile` (standalone full-screen, `RequireCompany`) in `routes/index.tsx`.
 - [ ] **14. Verification** — `npx tsc --noEmit`, `npm test`, `npm run build`, SW MATCH (`Get-FileHash public/sw.js` vs `public/build/sw.js`).
 - [ ] **15. Docs** — record Phase 65 in `AGENTS.md`.
 
@@ -29,8 +29,9 @@
 |------|--------|-------|
 | 1 | done | read before this checklist was created |
 | 2 | done | CSS file + app.css import committed |
-| 3–12 | done | `POSProMobilePage.tsx` written as one file, `tsc` + tests green; committed+pushed in this step |
-| 13–15 | pending | route → verify/build → docs |
+| 3–12 | done | `POSProMobilePage.tsx` written as one file, `tsc` + tests green; committed+pushed |
+| 13 | done | standalone full-screen route (`/pos/pro/mobile`, `RequireCompany`, no DashboardLayout) committed+pushed |
+| 14–15 | pending | verify/build → docs |
 
 ## Commits
 
