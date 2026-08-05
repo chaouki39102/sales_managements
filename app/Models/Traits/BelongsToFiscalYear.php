@@ -49,18 +49,20 @@ trait BelongsToFiscalYear
     }
 
     /**
-     * تحميل السنوات المقفلة من Cache أو DB (مرة واحدة فقط)
+     * تحميل السنوات المقفلة من Cache أو DB.
+     *
+     * ملاحظة: لا يوجد early-return على الـ static — الـ static يبقى حياً بين
+     * الطلبات على خادم `php artisan serve`، وTTL طويل + early-return كان يعني أن
+     * أي إعادة فتح لسنة مقفلة تبقى محجوبة حتى انتهاء الـ cache أو إعادة التشغيل.
+     * TTL قصير (5 دقائق) يجعل الفحص ذاتي-الإصلاح بعد إعادة فتح السنة، و
+     * `refreshClosedYearsCache()` يُجبر التحديث الفوري عند الإقفال/الفتح.
      */
     protected static function loadClosedYears(): void
     {
-        if (! empty(static::$closedYearsCache)) {
-            return;
-        }
-
         try {
             static::$closedYearsCache = Cache::remember(
                 'closed_fiscal_years',
-                now()->addHours(24),
+                now()->addMinutes(5),
                 fn () => FiscalYear::where('is_closed', true)
                     ->pluck('id')
                     ->toArray()
