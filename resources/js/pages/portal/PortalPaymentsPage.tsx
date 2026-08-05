@@ -78,7 +78,7 @@ export default function PortalPaymentsPage() {
     <section className="portal-card">
       <div className="portal-card-hd">
         <h3><i className="ti ti-wallet" /> الدفعات</h3>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="portal-inline">
           <span className="portal-hd-count">{meta.total} سجل</span>
           <div className="portal-view-toggle">
             <button className={`portal-view-btn ${view === 'table' ? 'on' : ''}`} onClick={() => setView('table')} title="عرض جدول">
@@ -127,19 +127,16 @@ export default function PortalPaymentsPage() {
 
       {/* ─── ملخص سريع ─── */}
       {rows.length > 0 && (
-        <div style={{
-          display: 'flex', gap: 16, padding: '12px 22px', borderBottom: '1px solid var(--b1)',
-          flexWrap: 'wrap',
-        }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#059669' }}>
-            <i className="ti ti-arrow-down" style={{ marginLeft: 4 }} />
+        <div className="portal-pay-summary">
+          <div className="portal-pay-sum portal-pay-sum--in">
+            <i className="ti ti-arrow-down" />
             وارد: {fmtMoney(totalIn)}
           </div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--red)' }}>
-            <i className="ti ti-arrow-up" style={{ marginLeft: 4 }} />
+          <div className="portal-pay-sum portal-pay-sum--out">
+            <i className="ti ti-arrow-up" />
             صادر: {fmtMoney(totalOut)}
           </div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t2)' }}>
+          <div className="portal-pay-sum portal-pay-sum--net">
             صافي: {fmtMoney(totalIn - totalOut)}
           </div>
         </div>
@@ -159,11 +156,11 @@ export default function PortalPaymentsPage() {
               {rows.map((p) => (
                 <tr key={p.id}>
                   <td className="num">{p.payment_number}</td>
-                  <td style={{ fontSize: 11.5 }}>{fmtDate(p.payment_date)}</td>
+                  <td className="portal-t-sm">{fmtDate(p.payment_date)}</td>
                   <td>{p.payment_mode}</td>
-                  <td style={{ fontSize: 11.5 }}>{p.reference || '—'}</td>
+                  <td className="portal-t-sm">{p.reference || '—'}</td>
                   <td><DirBadge direction={p.direction} /></td>
-                  <td className="num" style={{ color: p.direction === 'in' ? '#059669' : 'var(--red)' }}>
+                  <td className={`num ${p.direction === 'in' ? 'pos' : 'ow'}`}>
                     {fmtMoney(p.amount)}
                   </td>
                 </tr>

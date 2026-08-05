@@ -132,12 +132,22 @@ class PaymentSynchronizer
             } else {
                 // ── INSERT جديد ──────────────────────────────────────────
                 $direction = $this->resolveDirectionFromDocument($document);
+
+                // حساب الخزينة يُستنتج من طريقة الدفع إن لم يُرسل في الحمولة
+                // (العمود NOT NULL — لا يمكن إدراج دفعة بدونه)
+                $treasuryAccountId = isset($paymentData['treasury_account_id'])
+                    ? (int) $paymentData['treasury_account_id']
+                    : 0;
+                if (!$treasuryAccountId) {
+                    $treasuryAccountId = (int) \App\Models\PaymentMode::where('id', (int) $paymentData['payment_mode_id'])
+                        ->value('treasury_account_id') ?: 0;
+                }
+
                 $payment = Payment::create([
                     'company_id'          => $companyId,
                     'client_ref'          => $paymentData['client_ref'] ?? null,
                     'payment_mode_id'     => (int) $paymentData['payment_mode_id'],
-                    'treasury_account_id' => isset($paymentData['treasury_account_id'])
-                        ? (int) $paymentData['treasury_account_id'] : null,
+                    'treasury_account_id' => $treasuryAccountId ?: null,
                     'amount'              => $amount,
                     'direction'           => $direction,
                     'payment_date'        => $paymentData['payment_date'] ?? $document->document_date,

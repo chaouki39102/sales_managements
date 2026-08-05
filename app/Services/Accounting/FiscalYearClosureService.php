@@ -7,6 +7,7 @@ use App\Models\FiscalYear;
 use App\Models\Traits\BelongsToFiscalYear; // ✅ إصلاح: namespace صحيح
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Exception;
 
 /**
@@ -33,6 +34,7 @@ class FiscalYearClosureService
                 $this->transferAccountBalances($yearToClose, $newYear);
                 $this->transferPartyBalances($yearToClose, $newYear);
                 $this->transferStockBalances($yearToClose, $newYear);
+                $this->transferTreasuryBalances($yearToClose, $newYear);
 
                 // ✅ ترحيل TVA وأرصدة الجرد وفق قانون الضرائب الجزائري
                 $this->transferTvaBalances($yearToClose, $newYear);
@@ -73,18 +75,21 @@ class FiscalYearClosureService
             throw new FiscalYearClosedException('السنة المالية مقفلة بالفعل');
         }
 
-        // ✅ تحقق من القيود غير المتوازنة
-        $unbalancedCount = $year->journalEntries()
-            ->where('is_balanced', false)
-            ->count();
+        // ✅ تحقق من القيود غير المتوازنة (فقط عند تثبيت وحدة المحاسبة/القيود)
+        if (Schema::hasTable('journal_entries') && Schema::hasColumn('journal_entries', 'is_balanced')) {
+            $unbalancedCount = DB::table('journal_entries')
+                ->where('fiscal_year_id', $year->id)
+                ->where('is_balanced', false)
+                ->count();
 
-        if ($unbalancedCount > 0) {
-            throw new Exception("لا يمكن الإقفال: يوجد {$unbalancedCount} قيود غير متوازنة");
+            if ($unbalancedCount > 0) {
+                throw new Exception("لا يمكن الإقفال: يوجد {$unbalancedCount} قيود غير متوازنة");
+            }
         }
 
-        // ✅ تحقق من المستندات المفتوحة (Draft)
+        // ✅ تحقق من المستندات المفتوحة (Draft) — document_statuses.name وليس عمود status
         $openDocumentsCount = $year->commercialDocuments()
-            ->where('status', 'draft')
+            ->whereHas('documentStatus', fn($q) => $q->where('name', 'draft'))
             ->count();
 
         if ($openDocumentsCount > 0) {
@@ -99,7 +104,18 @@ class FiscalYearClosureService
     {
         $nextYearName = (int)$currentYear->name + 1;
 
+        // ✅ إذا كانت السنة التالية موجودة مسبقاً (أُنشئت يدوياً/تلقائياً)، نعيد استخدامها
+        //    بدل كسر قيد التفرد (company_id, name) عند الإقفال.
+        $existing = FiscalYear::where('company_id', $currentYear->company_id)
+            ->where('name', (string)$nextYearName)
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
         return FiscalYear::create([
+            'company_id' => $currentYear->company_id,
             'name' => (string)$nextYearName,
             'start_date' => $currentYear->end_date->addDay(),
             'end_date' => $currentYear->end_date->copy()->addYear(),
@@ -113,6 +129,12 @@ class FiscalYearClosureService
      */
     protected function transferAccountBalances(FiscalYear $oldYear, FiscalYear $newYear): void
     {
+        // ✅ وحدة المحاسبة (القيود) قد لا تكون مثبتة — نتخطى بأمان بدل تعطل الإقفال
+        if (! Schema::hasTable('journal_entries')) {
+            Log::info("transferAccountBalances: جدول journal_entries غير موجود (وحدة المحاسبة غير مثبتة) — تم التخطي");
+            return;
+        }
+
         // ✅ استعلام واحد لحساب كل الأرصدة
         $balances = DB::table('journal_entry_lines as jel')
             ->join('journal_entries as je', 'je.id', '=', 'jel.journal_entry_id')
@@ -132,6 +154,7 @@ class FiscalYearClosureService
             $netBalance = $balance->total_debit - $balance->total_credit;
 
             $openingBalances[] = [
+                'company_id' => $oldYear->company_id,
                 'fiscal_year_id' => $newYear->id,
                 'account_id' => $balance->account_id,
                 'opening_debit' => $netBalance > 0 ? $netBalance : 0,
@@ -151,22 +174,26 @@ class FiscalYearClosureService
      */
     protected function transferPartyBalances(FiscalYear $oldYear, FiscalYear $newYear): void
     {
-        // ✅ حساب الأرصدة من المستندات التجارية
-        $partyBalances = DB::table('commercial_documents')
-            ->where('fiscal_year_id', $oldYear->id)
-            ->whereNotNull('party_id')
-            ->where('status', '!=', 'cancelled')
+        // ✅ حساب الأرصدة من المستندات التجارية (مع فلترة الشركة و المستندات المحذوفة)
+        $partyBalances = DB::table('commercial_documents as cd')
+            ->join('document_statuses as ds', 'ds.id', '=', 'cd.document_status_id')
+            ->where('cd.company_id', $oldYear->company_id)
+            ->where('cd.fiscal_year_id', $oldYear->id)
+            ->whereNotNull('cd.party_id')
+            ->where('ds.name', '!=', 'cancelled')
+            ->whereNull('cd.deleted_at')
             ->select(
-                'party_id',
-                DB::raw('SUM(remaining_amount) as balance')
+                'cd.party_id',
+                DB::raw('SUM(cd.remaining_amount) as balance')
             )
-            ->groupBy('party_id')
+            ->groupBy('cd.party_id')
             ->having('balance', '!=', 0)
             ->get();
 
         $openingBalances = [];
         foreach ($partyBalances as $balance) {
             $openingBalances[] = [
+                'company_id' => $oldYear->company_id,
                 'fiscal_year_id' => $newYear->id,
                 'party_id' => $balance->party_id,
                 'opening_balance' => abs($balance->balance),
@@ -187,32 +214,37 @@ class FiscalYearClosureService
     protected function transferStockBalances(FiscalYear $oldYear, FiscalYear $newYear): void
     {
         // ✅ حساب الرصيد النهائي لكل صنف في كل مستودع
-        $stockBalances = DB::table('stock_movements')
-            ->where('fiscal_year_id', $oldYear->id)
-            ->where('is_validated', true)
+        //    join على stock_movement_types مقيدة بـ sm.company_id (مصطلح الحركة خاص بكل شركة)
+        //    + whereNull(sm.deleted_at) — DB::table لا يطبق SoftDeletes تلقائياً
+        $stockBalances = DB::table('stock_movements as sm')
+            ->join('stock_movement_types as smt', function ($join) {
+                $join->on('smt.id', '=', 'sm.stock_movement_type_id')
+                     ->on('smt.company_id', '=', 'sm.company_id');
+            })
+            ->where('sm.company_id', $oldYear->company_id)
+            ->where('sm.fiscal_year_id', $oldYear->id)
+            ->where('sm.is_validated', true)
+            ->whereNull('sm.deleted_at')
             ->select(
-                'product_id',
-                'warehouse_id',
+                'sm.product_id',
+                'sm.warehouse_id',
                 DB::raw('SUM(
                     CASE
-                        WHEN stock_movement_type_id IN (
-                            SELECT id FROM stock_movement_types WHERE direction = 1
-                        ) THEN quantity
-                        WHEN stock_movement_type_id IN (
-                            SELECT id FROM stock_movement_types WHERE direction = -1
-                        ) THEN -quantity
+                        WHEN smt.direction > 0 THEN sm.quantity
+                        WHEN smt.direction < 0 THEN -sm.quantity
                         ELSE 0
                     END
                 ) as final_quantity'),
-                DB::raw('AVG(cost_price) as avg_cost_price')
+                DB::raw('AVG(sm.cost_price) as avg_cost_price')
             )
-            ->groupBy('product_id', 'warehouse_id')
+            ->groupBy('sm.product_id', 'sm.warehouse_id')
             ->having('final_quantity', '>', 0)
             ->get();
 
         $openingBalances = [];
         foreach ($stockBalances as $balance) {
             $openingBalances[] = [
+                'company_id' => $oldYear->company_id,
                 'fiscal_year_id' => $newYear->id,
                 'product_id' => $balance->product_id,
                 'warehouse_id' => $balance->warehouse_id,
@@ -233,25 +265,98 @@ class FiscalYearClosureService
     // ─────────────────────────────────────────────────────────────
 
     /**
+     * ترحيل أرصدة الخزينة إلى السنة الجديدة.
+     *
+     * نفس معادلة العرض في TreasuryBalanceService (opening + in - out)
+     * لكن محسوبة مباشرة بـ company_id صريح حتى تعمل من سطر الأوامر
+     * دون الحاجة إلى سياق الشركة (CompanyContextService).
+     *
+     * upsert() → آمن لإعادة التشغيل
+     * (UNIQUE: company_id + fiscal_year_id + treasury_account_id)
+     */
+    protected function transferTreasuryBalances(FiscalYear $oldYear, FiscalYear $newYear): void
+    {
+        $companyId = $oldYear->company_id;
+
+        $accountIds = DB::table('treasury_accounts')
+            ->where('company_id', $companyId)
+            ->where('active', true)
+            ->whereNull('deleted_at')
+            ->pluck('id');
+
+        $rows = [];
+        foreach ($accountIds as $accountId) {
+            $opening = (float) DB::table('opening_balances_treasury')
+                ->where('company_id', $companyId)
+                ->where('treasury_account_id', $accountId)
+                ->where('fiscal_year_id', $oldYear->id)
+                ->value('opening_balance') ?? 0;
+
+            $totalIn = (float) DB::table('payments')
+                ->where('company_id', $companyId)
+                ->where('treasury_account_id', $accountId)
+                ->where('fiscal_year_id', $oldYear->id)
+                ->where('status', 'confirmed')
+                ->where('direction', 'in')
+                ->whereNull('deleted_at')
+                ->sum('amount');
+
+            $totalOut = (float) DB::table('payments')
+                ->where('company_id', $companyId)
+                ->where('treasury_account_id', $accountId)
+                ->where('fiscal_year_id', $oldYear->id)
+                ->where('status', 'confirmed')
+                ->where('direction', 'out')
+                ->whereNull('deleted_at')
+                ->sum('amount');
+
+            $balance = round($opening + $totalIn - $totalOut, 4);
+
+            if (abs($balance) < 0.0001) continue;
+
+            $rows[] = [
+                'company_id'          => $companyId,
+                'fiscal_year_id'      => $newYear->id,
+                'treasury_account_id' => $accountId,
+                'opening_balance'     => $balance,
+                'created_at'          => now(),
+                'updated_at'          => now(),
+            ];
+        }
+
+        if (empty($rows)) return;
+
+        DB::table('opening_balances_treasury')->upsert(
+            $rows,
+            ['company_id', 'fiscal_year_id', 'treasury_account_id'],
+            ['opening_balance', 'updated_at']
+        );
+    }
+
+    /**
      * ترحيل رصيد TVA الصافي وفق المادة 76 من قانون الرسوم على رقم الأعمال.
      */
     protected function transferTvaBalances(FiscalYear $oldYear, FiscalYear $newYear): void
     {
         $tvaCollectee = DB::table('commercial_documents as cd')
             ->join('document_types as dt', 'cd.document_type_id', '=', 'dt.id')
+            ->join('document_base_operations as dbo', 'dbo.id', '=', 'dt.document_base_operation_id')
+            ->where('cd.company_id', $oldYear->company_id)
             ->where('cd.fiscal_year_id', $oldYear->id)
             ->where('cd.is_locked', true)
             ->whereNull('cd.deleted_at')
-            ->where('dt.base_operation', 'sale')
-            ->sum('cd.tva_amount');
+            ->where('dbo.name', 'sale')
+            ->sum('cd.total_tva');
 
         $tvaDeductible = DB::table('commercial_documents as cd')
             ->join('document_types as dt', 'cd.document_type_id', '=', 'dt.id')
+            ->join('document_base_operations as dbo', 'dbo.id', '=', 'dt.document_base_operation_id')
+            ->where('cd.company_id', $oldYear->company_id)
             ->where('cd.fiscal_year_id', $oldYear->id)
             ->where('cd.is_locked', true)
             ->whereNull('cd.deleted_at')
-            ->where('dt.base_operation', 'purchase')
-            ->sum('cd.tva_amount');
+            ->where('dbo.name', 'purchase')
+            ->sum('cd.total_tva');
 
         $rows = [];
         $now  = now();
@@ -350,70 +455,17 @@ class FiscalYearClosureService
     }
 
     /**
-     * ترحيل فروق إعادة تقييم العملات الأجنبية (scaffold فقط).
+     * ترحيل فروق إعادة تقييم العملات الأجنبية.
+     *
+     * ملاحظة: هذا المسار لا يزال مسودة (scaffold) — حساب الفرق يتطلب
+     * سعر الصرف الافتتاحي المسجل عند ترحيل الرصيد الافتتاحي، وهو غير
+     * متوفر في الجدول الحالي. حتى اكتمال المتطلبات، نعود بأمان بدون
+     * تعطيل إقفال السنة (كان الكود السابق يعطل الإقفال بسبب عمود currency_id
+     * غير الموجود في جدول exchange_rates).
      */
     protected function transferForexDifferences(FiscalYear $oldYear, FiscalYear $newYear): void
     {
-        if (! \Schema::hasTable('exchange_rates')) {
-            Log::info("transferForexDifferences: جدول exchange_rates غير موجود — تم التخطي");
-            return;
-        }
-
-        $now = now();
-
-        $foreignAccounts = DB::table('treasury_accounts as ta')
-            ->join('currencies as c', 'ta.currency_id', '=', 'c.id')
-            ->where('ta.company_id', $oldYear->company_id)
-            ->where('c.is_base_currency', false)
-            ->whereNull('ta.deleted_at')
-            ->select('ta.id', 'ta.currency_id')
-            ->get();
-
-        if ($foreignAccounts->isEmpty()) return;
-
-        $rows = [];
-        $endDate = $oldYear->end_date->toDateString();
-
-        foreach ($foreignAccounts as $account) {
-            $rateRecord = DB::table('exchange_rates')
-                ->where('currency_id', $account->currency_id)
-                ->where('rate_date', '<=', $endDate)
-                ->orderByDesc('rate_date')
-                ->first();
-
-            if (!$rateRecord) continue;
-
-            $openingDzd = DB::table('opening_balances_treasury')
-                ->where('fiscal_year_id', $oldYear->id)
-                ->where('treasury_account_id', $account->id)
-                ->value('opening_balance') ?? 0;
-
-            $diff = 0;
-
-            if (abs($diff) < 0.0001) continue;
-
-            $rows[] = [
-                'company_id'           => $oldYear->company_id,
-                'fiscal_year_id'       => $newYear->id,
-                'source_fiscal_year_id'=> $oldYear->id,
-                'category'             => 'forex_diff',
-                'amount'               => round(abs($diff), 4),
-                'currency_id'          => $account->currency_id,
-                'exchange_rate'        => $rateRecord->rate,
-                'amount_dzd'           => round(abs($diff), 4),
-                'notes'                => "فرق صرف SY {$oldYear->name}",
-                'created_at'           => $now,
-                'updated_at'           => $now,
-            ];
-        }
-
-        if (empty($rows)) return;
-
-        DB::table('fiscal_year_carry_forward')->upsert(
-            $rows,
-            ['company_id', 'fiscal_year_id', 'category', 'currency_id'],
-            ['amount', 'exchange_rate', 'amount_dzd', 'notes', 'updated_at']
-        );
+        Log::info("transferForexDifferences: ميزة فروق الصرف ما زالت قيد التطوير — تم التخطي بأمان أثناء إقفال {$oldYear->name}");
     }
 
     /**
@@ -421,18 +473,20 @@ class FiscalYearClosureService
      */
     protected function transferTimbreFiscal(FiscalYear $oldYear, FiscalYear $newYear): void
     {
-        if (! \Schema::hasColumn('commercial_documents', 'timbre_fiscal_amount')) {
-            Log::info("transferTimbreFiscal: عمود timbre_fiscal_amount غير موجود — تم التخطي");
+        if (! \Schema::hasColumn('commercial_documents', 'total_stamp')) {
+            Log::info("transferTimbreFiscal: عمود total_stamp غير موجود — تم التخطي");
             return;
         }
 
         $total = DB::table('commercial_documents as cd')
             ->join('document_types as dt', 'cd.document_type_id', '=', 'dt.id')
+            ->join('document_base_operations as dbo', 'dbo.id', '=', 'dt.document_base_operation_id')
+            ->where('cd.company_id', $oldYear->company_id)
             ->where('cd.fiscal_year_id', $oldYear->id)
             ->where('cd.is_locked', true)
             ->whereNull('cd.deleted_at')
-            ->whereIn('dt.base_operation', ['sale'])
-            ->sum('cd.timbre_fiscal_amount');
+            ->where('dbo.name', 'sale')
+            ->sum('cd.total_stamp');
 
         if (abs($total) < 0.0001) return;
 

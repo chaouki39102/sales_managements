@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>POS PRO — معاينة الهاتف v5</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=IBM+Plex+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg0:#e8eef7; --bg1:#f0f4fa; --bg2:#ffffff; --bg3:#f5f8fd; --bg4:#eaf0f8; --bg5:#dde5f0;
+  --b1:rgba(0,0,0,.05); --b2:rgba(0,0,0,.08); --b3:rgba(0,0,0,.13); --b4:rgba(0,0,0,.20);
+  --t1:#0d1b2a; --t2:#1e3a5f; --t3:#4a6785; --t4:#6e87a6;
+  --em:#0a8a5c; --em2:#077a50; --em3:#0dbf84;
+  --emb:rgba(10,138,92,.08); --embo:rgba(10,138,92,.20); --em2b:rgba(10,138,92,.15);
+  --gold:#b87d0a; --goldb:rgba(184,125,10,.08); --goldbo:rgba(184,125,10,.22);
+  --red:#d42b2b; --redb:rgba(212,43,43,.07); --redbo:rgba(212,43,43,.20);
+  --blue:#1a4fd6; --blueb:rgba(26,79,214,.08);
+  --purple:#6920d4; --purb:rgba(105,32,212,.08);
+  --orange:#c43a0a; --orb:rgba(196,58,10,.08);
+  --teal:#0d7a8c; --tealb:rgba(13,122,140,.08);
+  --indigo:#3730a3; --indigob:rgba(55,48,163,.08);
+  --r1:5px; --r2:10px; --r3:14px; --r4:20px; --r5:28px;
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.05);
+  --shadow2:0 4px 20px rgba(0,0,0,.09),0 1px 4px rgba(0,0,0,.06);
+  --shadow3:0 12px 40px rgba(13,27,42,.14);
+  --grad-em:linear-gradient(135deg,#0a8a5c,#0dbf84);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+html,body{height:100%; overscroll-behavior:none;}
+body{font-family:'Tajawal',sans-serif; background:var(--bg1); overflow:hidden;}
+button{font-family:inherit;border:none;background:none;cursor:pointer;color:inherit;}
+input{font-family:inherit;}
+.ic svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;display:block;}
+
+.screen{ width:100%; height:100dvh; background:var(--bg1); position:relative; display:flex; flex-direction:column; padding-top:env(safe-area-inset-top,0px); }
+
+/* ═══ Swatches — بديل موثوق عن الصور الخارجية (بدون أي اتصال شبكة) ═══ */
+.sw{ display:flex; align-items:center; justify-content:center; flex-shrink:0; width:44px; height:44px; border-radius:var(--r2); box-shadow:inset 0 0 0 1px rgba(13,27,42,.05); }
+.sw svg{ width:44%; height:44%; stroke-width:1.7; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+.sw-gold{ background:var(--goldb); color:var(--gold); }
+.sw-blue{ background:var(--blueb); color:var(--blue); }
+.sw-orange{ background:var(--orb); color:var(--orange); }
+.sw-purple{ background:var(--purb); color:var(--purple); }
+.sw-teal{ background:var(--tealb); color:var(--teal); }
+.sw-indigo{ background:var(--indigob); color:var(--indigo); }
+.avatar-init{ display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; flex-shrink:0; }
+
+.appbar{ height:56px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between; padding:0 14px; gap:8px; }
+.customer-chip{ display:flex; align-items:center; gap:9px; padding:5px 12px 5px 5px; border-radius:999px; background:var(--bg2); box-shadow:var(--shadow); flex-shrink:1; min-width:0; flex:1; max-width:230px; }
+.customer-chip .av{ width:32px; height:32px; border-radius:50%; font-size:11px; box-shadow:0 0 0 2px var(--bg2), 0 0 0 3px var(--embo); }
+.customer-chip .av.placeholder{ background:var(--bg4)!important; color:var(--t4)!important; box-shadow:0 0 0 2px var(--bg2), 0 0 0 3px var(--b2); }
+.customer-chip .av.placeholder svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;}
+.customer-chip .txt{ min-width:0; text-align:right; }
+.customer-chip .txt .name{ font-size:12px; font-weight:800; color:var(--t1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.customer-chip .txt .bal{ font-size:10.5px; font-weight:700; color:var(--em); font-family:'IBM Plex Mono',monospace; direction:ltr; }
+.customer-chip .txt .cta{ font-size:11.5px; font-weight:700; color:var(--t3); }
+.appbar-btn{ width:38px; height:38px; border-radius:50%; background:var(--bg2); box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; color:var(--t3); flex-shrink:0; position:relative; }
+.session-strip{ display:flex; align-items:center; gap:6px; padding:0 18px 8px; flex-shrink:0; font-size:10px; font-weight:700; color:var(--t4); font-family:'IBM Plex Mono',monospace; letter-spacing:.3px; }
+.session-strip .dot{ width:6px; height:6px; border-radius:50%; background:var(--em); box-shadow:0 0 0 3px var(--embo); flex-shrink:0; }
+.debug-btn{ margin-right:auto; width:20px; height:20px; border-radius:50%; background:var(--bg3); color:var(--t4); font-size:11px; display:flex; align-items:center; justify-content:center; opacity:.6; }
+.badge{ position:absolute; top:-3px; left:-3px; min-width:16px; height:16px; padding:0 3px; border-radius:999px; background:var(--gold); color:#fff; font-size:9px; font-weight:800; display:flex; align-items:center; justify-content:center; }
+
+.total-card{ margin:2px 14px 10px; padding:14px 18px; border-radius:var(--r3); background:var(--bg2); box-shadow:var(--shadow2); flex-shrink:0; position:relative; overflow:hidden; }
+.total-card::before{ content:''; position:absolute; top:0; right:0; left:0; height:3px; background:var(--grad-em); }
+.total-top{ display:flex; align-items:flex-end; justify-content:space-between; }
+.total-top .l{ font-size:11px; font-weight:800; color:var(--t4); letter-spacing:.4px; }
+.total-top .val{ font-family:'IBM Plex Mono',monospace; font-weight:800; font-size:30px; color:var(--em); direction:ltr; letter-spacing:-1px; line-height:1; }
+.total-top .unit{ font-size:12px; font-weight:700; color:var(--t3); margin-right:4px; }
+.total-chips{ display:flex; gap:6px; margin-top:9px; }
+.tchip{ font-size:10px; font-weight:700; padding:4px 9px; border-radius:999px; background:var(--bg3); color:var(--t3); }
+.tchip.disc{ background:var(--redb); color:var(--red); }
+
+.qa-strip{ display:flex; gap:8px; padding:0 14px 12px; flex-shrink:0; }
+.qa-btn{ flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding:9px 4px; border-radius:var(--r2); background:var(--bg2); box-shadow:var(--shadow); color:var(--t3); font-size:10px; font-weight:700; }
+.qa-btn .ic svg{ width:16px;height:16px; }
+
+.cart-hd{ display:flex; align-items:center; justify-content:space-between; padding:0 18px 8px; flex-shrink:0; }
+.cart-hd h1{ font-size:11.5px; font-weight:800; color:var(--t3); letter-spacing:.6px; text-transform:uppercase; }
+.cart-hd .count{ font-size:11px; font-weight:700; color:var(--t4); font-family:'IBM Plex Mono',monospace; }
+
+.cart-scroll{ flex:1; overflow-y:auto; padding:0 14px 140px; }
+.cart-empty{ display:none; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:60px 20px; color:var(--t4); text-align:center; }
+.cart-empty .ic svg{ width:36px;height:36px; stroke-width:1.3; opacity:.55; }
+.cart-empty .t{ font-size:13px; font-weight:700; color:var(--t3); }
+.cart-empty .s{ font-size:11px; }
+
+.swipe-row{ position:relative; border-radius:var(--r2); overflow:hidden; margin-bottom:9px; }
+.swipe-bg{ position:absolute; inset:0; background:var(--red); display:flex; align-items:center; justify-content:flex-start; padding-right:22px; }
+.swipe-bg .ic{ color:#fff; }
+.line{ position:relative; background:var(--bg2); box-shadow:var(--shadow); border-radius:var(--r2); padding:12px 14px; display:flex; align-items:center; gap:12px; transition:transform .2s, background .3s; touch-action:pan-y; }
+.line.just-added{ animation:justAdded .9s ease-out; }
+@keyframes justAdded{ 0%{ background:var(--emb); } 100%{ background:var(--bg2); } }
+.line-photo{ width:48px; height:48px; border-radius:var(--r2); }
+.line-info{ flex:1; min-width:0; }
+.line-name{ font-size:13.5px; font-weight:700; color:var(--t1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.line-sub{ font-size:10.5px; color:var(--t4); margin-top:2px; font-family:'IBM Plex Mono',monospace; direction:ltr; text-align:right; }
+.qty{ display:flex; align-items:center; gap:0; background:var(--bg3); border-radius:999px; flex-shrink:0; }
+.qty button{ width:32px; height:32px; display:flex; align-items:center; justify-content:center; color:var(--t3); font-size:16px; font-weight:600; }
+.qty button:active{ color:var(--em); }
+.qty .val{ width:22px; text-align:center; font-size:12.5px; font-weight:800; color:var(--t1); font-family:'IBM Plex Mono',monospace; }
+.line-total{ flex-shrink:0; min-width:64px; text-align:left; font-family:'IBM Plex Mono',monospace; font-weight:800; font-size:14px; color:var(--t1); direction:ltr; }
+.swipe-hint{ text-align:center; font-size:10px; color:var(--t4); padding:2px 0 10px; }
+
+.bottombar{ position:absolute; left:0; right:0; bottom:0; z-index:35; display:flex; align-items:stretch; gap:8px;
+  padding:12px 14px calc(14px + env(safe-area-inset-bottom,0px));
+  background:linear-gradient(180deg, rgba(240,244,250,.55), rgba(240,244,250,.85) 40%);
+  backdrop-filter:blur(18px) saturate(160%); -webkit-backdrop-filter:blur(18px) saturate(160%);
+  border-top:1px solid rgba(255,255,255,.6); }
+.bb-new{ width:54px; min-height:54px; flex-shrink:0; border-radius:var(--r2); background:rgba(255,255,255,.7); box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; color:var(--t3); }
+.bb-quick{ flex-shrink:0; width:88px; min-height:54px; border-radius:var(--r2); background:rgba(184,125,10,.14); border:1.5px solid var(--goldbo); color:var(--gold); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:10.5px; font-weight:800; }
+.bb-quick .ic svg{ width:16px;height:16px; }
+.bb-pay{ flex:1; min-height:54px; border-radius:var(--r2); background:var(--grad-em); color:#fff; display:flex; align-items:center; justify-content:center; gap:9px; font-size:15px; font-weight:900; box-shadow:0 10px 24px rgba(10,138,92,.4); }
+.bb-pay .amt{ font-family:'IBM Plex Mono',monospace; font-size:14px; font-weight:700; opacity:.95; direction:ltr; }
+
+.fab{ position:absolute; right:18px; bottom:126px; width:54px; height:54px; border-radius:50%; background:var(--grad-em); color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 12px 28px rgba(10,138,92,.45); z-index:34; }
+.fab .ic svg{ width:23px;height:23px; }
+
+.backdrop{ position:absolute; inset:0; background:rgba(13,27,42,.45); z-index:50; opacity:0; visibility:hidden; transition:.25s; }
+.backdrop.show{ opacity:1; visibility:visible; }
+.sheet{ position:absolute; left:0; right:0; bottom:0; z-index:51; background:var(--bg1); border-radius:22px 22px 0 0; box-shadow:0 -10px 40px rgba(13,27,42,.2); transform:translateY(100%); transition:transform .28s cubic-bezier(.32,.72,0,1); max-height:84%; display:flex; flex-direction:column; }
+.sheet.show{ transform:translateY(0); }
+.sheet-handle{ width:36px; height:4px; border-radius:3px; background:var(--b3); margin:10px auto 6px; }
+.sheet-hd{ display:flex; align-items:center; justify-content:space-between; padding:6px 18px 10px; flex-shrink:0; }
+.sheet-hd h2{ font-size:14px; font-weight:800; color:var(--t1); }
+.sheet-close{ width:30px; height:30px; border-radius:50%; background:var(--bg2); box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; color:var(--t3); }
+.sheet-close .ic svg{ width:14px;height:14px; }
+
+.freq-scroll{ display:flex; gap:10px; padding:0 18px 12px; overflow-x:auto; flex-shrink:0; }
+.freq-item{ flex-shrink:0; width:58px; text-align:center; }
+.freq-item .sw{ width:52px; height:52px; border-radius:50%; margin:0 auto 4px; box-shadow:var(--shadow); }
+.freq-item .n{ font-size:9.5px; font-weight:700; color:var(--t3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cat-scroll{ display:flex; gap:8px; padding:0 18px 12px; overflow-x:auto; flex-shrink:0; }
+.cat-chip{ flex-shrink:0; padding:7px 14px; border-radius:999px; background:var(--bg2); box-shadow:var(--shadow); font-size:11.5px; font-weight:700; color:var(--t3); }
+.cat-chip.on{ background:var(--em); color:#fff; box-shadow:0 4px 14px rgba(10,138,92,.35); }
+.psearch{ margin:0 18px 12px; display:flex; align-items:center; gap:9px; background:var(--bg2); box-shadow:var(--shadow); border-radius:var(--r2); padding:10px 14px; flex-shrink:0; }
+.psearch .ic{ color:var(--t4); }
+.psearch input{ flex:1; border:none; outline:none; background:transparent; color:var(--t1); font-size:13px; direction:rtl; }
+.pgrid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; overflow-y:auto; padding:0 18px 22px; }
+.pcard{ background:var(--bg2); border-radius:var(--r2); box-shadow:var(--shadow); overflow:hidden; text-align:right; transition:transform .1s; position:relative; }
+.pcard:active{ transform:scale(.97); }
+.pcard.is-out{ opacity:.55; }
+.pcard.is-out:active{ transform:none; }
+.stock-badge{ position:absolute; top:6px; left:6px; font-size:9px; font-weight:800; padding:3px 7px; border-radius:999px; z-index:2; }
+.stock-badge.low{ background:var(--goldb); color:var(--gold); box-shadow:0 0 0 1px var(--goldbo); }
+.stock-badge.out{ background:var(--redb); color:var(--red); box-shadow:0 0 0 1px var(--redbo); }
+.pcard .sw{ width:100%; height:82px; border-radius:0; }
+.pcard .sw svg{ width:30%; height:30%; }
+.pcard .pc-body{ padding:8px 10px 10px; }
+.pcard .pc-name{ font-size:12px; font-weight:700; color:var(--t1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pcard .pc-row{ display:flex; align-items:center; justify-content:space-between; margin-top:4px; }
+.pcard .pc-price{ font-size:12.5px; font-weight:800; color:var(--em); font-family:'IBM Plex Mono',monospace; }
+.pcard .pc-add{ width:22px; height:22px; border-radius:50%; background:var(--emb); color:var(--em); display:flex; align-items:center; justify-content:center; }
+.pcard .pc-add .ic svg{ width:13px;height:13px; }
+
+.csheet-body{ padding:8px 24px 26px; text-align:center; overflow-y:auto; }
+.c-avatar{ width:90px; height:90px; border-radius:50%; margin:6px auto 12px; font-size:28px; box-shadow:0 0 0 4px var(--bg2), 0 0 0 7px var(--embo); }
+.c-name{ font-size:16px; font-weight:800; color:var(--t1); }
+.c-phone{ font-size:11.5px; color:var(--t4); margin-top:2px; font-family:'IBM Plex Mono',monospace; direction:ltr; }
+.c-balance{ margin:16px 0 12px; padding:14px; border-radius:var(--r3); background:var(--bg2); box-shadow:var(--shadow); }
+.c-balance .l{ font-size:10.5px; color:var(--t4); font-weight:700; }
+.c-balance .v{ font-size:24px; font-weight:800; color:var(--em); font-family:'IBM Plex Mono',monospace; direction:ltr; margin-top:2px; }
+.c-stats{ display:flex; gap:8px; }
+.c-stat{ flex:1; padding:10px 6px; border-radius:var(--r2); background:var(--bg2); box-shadow:var(--shadow); }
+.c-stat .v{ font-size:15px; font-weight:800; color:var(--t1); font-family:'IBM Plex Mono',monospace; }
+.c-stat .l{ font-size:9.5px; color:var(--t4); font-weight:700; margin-top:2px; }
+.c-actions{ display:flex; gap:8px; margin-top:16px; }
+.c-actions button{ flex:1; padding:12px; border-radius:var(--r2); background:var(--bg2); box-shadow:var(--shadow); color:var(--t2); font-size:12px; font-weight:700; }
+.c-actions button.danger{ color:var(--red); }
+
+.csearch{ margin:0 18px 10px; display:flex; align-items:center; gap:9px; background:var(--bg2); box-shadow:var(--shadow); border-radius:var(--r2); padding:10px 14px; flex-shrink:0; }
+.csearch .ic{ color:var(--t4); }
+.csearch input{ flex:1; border:none; outline:none; background:transparent; color:var(--t1); font-size:13px; direction:rtl; }
+.clist{ overflow-y:auto; padding:0 18px 22px; }
+.crow{ display:flex; align-items:center; gap:12px; padding:10px 8px; border-radius:var(--r2); }
+.crow:active{ background:var(--bg3); }
+.crow .av{ width:42px; height:42px; border-radius:50%; font-size:13px; box-shadow:var(--shadow); }
+.crow .info{ flex:1; min-width:0; text-align:right; }
+.crow .info .n{ font-size:13px; font-weight:700; color:var(--t1); }
+.crow .info .p{ font-size:10.5px; color:var(--t4); font-family:'IBM Plex Mono',monospace; direction:ltr; }
+.crow .bal{ font-size:12px; font-weight:800; color:var(--em); font-family:'IBM Plex Mono',monospace; direction:ltr; flex-shrink:0; }
+
+.disc-body{ padding:6px 18px 26px; }
+.disc-toggle{ display:flex; gap:8px; margin-bottom:16px; }
+.disc-toggle button{ flex:1; padding:10px; border-radius:var(--r2); background:var(--bg2); box-shadow:var(--shadow); font-size:12.5px; font-weight:700; color:var(--t3); }
+.disc-toggle button.on{ background:var(--em); color:#fff; box-shadow:0 4px 14px rgba(10,138,92,.35); }
+.disc-presets{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:16px; }
+.disc-presets button{ padding:12px 4px; border-radius:var(--r2); background:var(--bg2); box-shadow:var(--shadow); font-size:13px; font-weight:800; color:var(--t1); font-family:'IBM Plex Mono',monospace; }
+.disc-custom{ display:flex; align-items:center; gap:10px; background:var(--bg2); box-shadow:var(--shadow); border-radius:var(--r2); padding:10px 14px; margin-bottom:16px; }
+.disc-custom input{ flex:1; border:none; outline:none; background:transparent; font-size:16px; font-weight:800; color:var(--t1); font-family:'IBM Plex Mono',monospace; direction:ltr; }
+.disc-apply{ width:100%; padding:14px; border-radius:var(--r2); background:var(--grad-em); color:#fff; font-size:13.5px; font-weight:800; box-shadow:0 10px 24px rgba(10,138,92,.35); }
+
+.held-body{ padding:0 18px 22px; overflow-y:auto; }
+.held-empty{ text-align:center; padding:30px 10px; color:var(--t4); font-size:12.5px; }
+.held-row{ display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-radius:var(--r2); background:var(--bg2); box-shadow:var(--shadow); margin-bottom:10px; }
+.held-row .info .n{ font-size:12.5px; font-weight:700; color:var(--t1); }
+.held-row .info .s{ font-size:10.5px; color:var(--t4); font-family:'IBM Plex Mono',monospace; margin-top:2px; direction:ltr; }
+.held-row button{ padding:8px 14px; border-radius:var(--r1); background:var(--emb); color:var(--em); font-size:11.5px; font-weight:800; }
+
+.snackbar{ position:absolute; left:16px; right:16px; bottom:20px; z-index:70; background:var(--t1); color:#fff; border-radius:var(--r2); padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:10px; box-shadow:var(--shadow3); transform:translateY(120%); transition:transform .25s; font-size:12.5px; font-weight:700; }
+.snackbar.show{ transform:translateY(0); }
+.snackbar button{ color:var(--em3); font-weight:800; font-size:12.5px; flex-shrink:0; }
+
+.pay-success{ position:absolute; inset:0; z-index:90; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
+  background:rgba(240,244,250,.7); backdrop-filter:blur(20px) saturate(160%); -webkit-backdrop-filter:blur(20px) saturate(160%);
+  opacity:0; visibility:hidden; transition:opacity .2s, visibility .2s; }
+.pay-success.show{ opacity:1; visibility:visible; }
+.ps-circle{ width:96px; height:96px; border-radius:50%; background:var(--grad-em); display:flex; align-items:center; justify-content:center; box-shadow:0 20px 50px rgba(10,138,92,.4); transform:scale(0); transition:transform .35s cubic-bezier(.34,1.56,.64,1); }
+.pay-success.show .ps-circle{ transform:scale(1); }
+.ps-circle svg{ width:46px; height:46px; stroke:#fff; stroke-width:2.6; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+.ps-check{ stroke-dasharray:40; stroke-dashoffset:40; transition:stroke-dashoffset .35s ease .15s; }
+.pay-success.show .ps-check{ stroke-dashoffset:0; }
+.ps-title{ font-size:16px; font-weight:800; color:var(--t1); opacity:0; transform:translateY(6px); transition:opacity .3s ease .25s, transform .3s ease .25s; }
+.pay-success.show .ps-title{ opacity:1; transform:translateY(0); }
+.ps-amt{ font-family:'IBM Plex Mono',monospace; font-size:26px; font-weight:800; color:var(--em); direction:ltr; opacity:0; transition:opacity .3s ease .32s; }
+.pay-success.show .ps-amt{ opacity:1; }
+.ps-circle.fail{ background:linear-gradient(160deg,#e0645a,#c23b3b); box-shadow:0 20px 50px rgba(212,43,43,.35); }
+.ps-title.fail{ color:var(--red); }
+
+/* offline banner */
+.offline-banner{ position:absolute; top:0; left:0; right:0; z-index:95; background:var(--t1); color:#fff;
+  font-size:11px; font-weight:700; text-align:center; padding:8px; transform:translateY(-100%); transition:transform .25s; }
+.offline-banner.show{ transform:translateY(0); }
+
+/* session expired overlay */
+.session-lock{ position:absolute; inset:0; z-index:96; background:rgba(13,27,42,.92); backdrop-filter:blur(4px);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; padding:0 30px;
+  opacity:0; visibility:hidden; transition:.2s; }
+.session-lock.show{ opacity:1; visibility:visible; }
+.session-lock .ic{ width:56px; height:56px; border-radius:50%; background:rgba(255,255,255,.08); display:flex; align-items:center; justify-content:center; }
+.session-lock .ic svg{ width:26px;height:26px; stroke:#fff; stroke-width:1.6; }
+.session-lock h3{ color:#fff; font-size:15px; font-weight:800; }
+.session-lock p{ color:rgba(255,255,255,.6); font-size:12px; line-height:1.6; }
+.session-lock button{ margin-top:6px; padding:11px 28px; border-radius:999px; background:var(--grad-em); color:#fff; font-size:13px; font-weight:800; }
+
+/* debug sheet */
+.debug-body{ padding:0 18px 22px; }
+.debug-row{ width:100%; display:flex; align-items:center; justify-content:space-between; padding:13px 14px; border-radius:var(--r2); background:var(--bg2); box-shadow:var(--shadow); margin-bottom:8px; font-size:12.5px; font-weight:700; color:var(--t2); }
+.debug-row .ic svg{ width:14px;height:14px; color:var(--t4); }
+
+/* accessibility: visible focus ring for keyboard/assistive use */
+button:focus-visible, input:focus-visible{ outline:2px solid var(--em); outline-offset:2px; }
+</style>
+</head>
+<body>
+
+  <div class="screen">
+
+    <div class="appbar">
+      <button class="customer-chip" id="customerChip" onclick="onCustomerChipTap()" aria-label="اختيار العميل"></button>
+      <button class="appbar-btn" onclick="openSheet('heldSheet')" aria-label="المبيعات المعلّقة">
+        <span class="ic"><svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg></span>
+        <span class="badge" id="heldBadge" style="display:none;">0</span>
+      </button>
+    </div>
+
+    <div class="session-strip">
+      <span class="dot"></span>REG-01 · SESSION #012
+      <button class="debug-btn" onclick="openSheet('debugSheet')" aria-label="معاينة حالات إضافية">⚙</button>
+    </div>
+
+    <div class="total-card">
+      <div class="total-top">
+        <div><div class="l">الإجمالي المستحق (TTC)</div></div>
+        <div><span class="val" id="mGrand">0.00</span><span class="unit">دج</span></div>
+      </div>
+      <div class="total-chips">
+        <span class="tchip">فرعي <span id="mSub">0.00</span></span>
+        <span class="tchip disc" id="discChip" style="display:none;">خصم <span id="mDiscVal">0.00</span></span>
+        <span class="tchip">TVA 19% <span id="mTva">0.00</span></span>
+        <span class="tchip">الطابع الجبائي <span id="mStamp">—</span></span>
+      </div>
+    </div>
+
+    <div class="qa-strip">
+      <button class="qa-btn" onclick="openSheet('discountSheet')"><span class="ic"><svg viewBox="0 0 24 24"><path d="M5 9.5 9.5 5l9.5 9.5-4.5 4.5L5 9.5z"/><path d="M14 6l4 4"/></svg></span>خصم</button>
+      <button class="qa-btn"><span class="ic"><svg viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></span>ملاحظة</button>
+      <button class="qa-btn" onclick="holdSale()"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 21c0-4-6-7-6-12a6 6 0 0 1 12 0c0 5-6 8-6 12z"/></svg></span>تعليق</button>
+    </div>
+
+    <div class="cart-hd"><h1>السلة</h1><span class="count" id="mCount">0 عناصر</span></div>
+
+    <div class="cart-scroll" id="mCartScroll">
+      <div class="cart-empty" id="cartEmpty">
+        <span class="ic"><svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
+        <div class="t">السلة فارغة</div>
+        <div class="s">اضغط على + لإضافة منتج</div>
+      </div>
+      <div class="swipe-hint" id="swipeHint" style="display:none;">اسحب السطر لليسار للحذف</div>
+    </div>
+
+    <button class="fab" onclick="openSheet('productSheet')" aria-label="إضافة منتج">
+      <span class="ic"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+    </button>
+
+    <div class="bottombar">
+      <button class="bb-new" onclick="newSale()" aria-label="بيع جديد"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 12h18M12 3v18"/></svg></span></button>
+      <button class="bb-quick"><span class="ic"><svg viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 11-13h-7l1-7z"/></svg></span>دفع سريع</button>
+      <button class="bb-pay" onclick="completePayment()"><span class="ic"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/></svg></span>دفع <span class="amt" id="mPayAmt">0.00</span></button>
+    </div>
+
+    <div class="backdrop" id="backdrop" onclick="closeSheets()"></div>
+
+    <div class="pay-success" id="paySuccess">
+      <div class="ps-circle" id="psCircle"><svg viewBox="0 0 24 24"><path class="ps-check" id="psCheck" d="M5 13l4 4L19 7"/></svg></div>
+      <div class="ps-title" id="psTitle">تمت العملية بنجاح</div>
+      <div class="ps-amt" id="psAmt">0.00 دج</div>
+    </div>
+
+    <div class="offline-banner" id="offlineBanner">لا يوجد اتصال بالإنترنت — سيتم مزامنة العمليات عند عودة الاتصال</div>
+
+    <div class="session-lock" id="sessionLock">
+      <div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
+      <h3>انتهت صلاحية الجلسة</h3>
+      <p>تم تسجيل خروجك تلقائياً لعدم النشاط. تحتاج لإعادة فتح جلسة صندوق للمتابعة.</p>
+      <button onclick="document.getElementById('sessionLock').classList.remove('show')">فتح جلسة جديدة</button>
+    </div>
+
+    <!-- Product sheet -->
+    <div class="sheet" id="productSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-hd"><h2>إضافة منتج</h2><button class="sheet-close" onclick="closeSheets()" aria-label="إغلاق"><span class="ic"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></span></button></div>
+      <div class="psearch"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></span><input placeholder="ابحث بالاسم أو امسح الباركود…"></div>
+      <div class="freq-scroll" id="freqScroll"></div>
+      <div class="cat-scroll">
+        <span class="cat-chip on">الكل</span><span class="cat-chip">مشروبات</span><span class="cat-chip">ألبان</span><span class="cat-chip">مواد غذائية</span><span class="cat-chip">تنظيف</span>
+      </div>
+      <div class="pgrid" id="productGrid"></div>
+    </div>
+
+    <!-- Customer view sheet -->
+    <div class="sheet" id="customerSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-hd"><h2>بطاقة العميل</h2><button class="sheet-close" onclick="closeSheets()" aria-label="إغلاق"><span class="ic"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></span></button></div>
+      <div class="csheet-body">
+        <div class="c-avatar avatar-init" id="cvAvatar"></div>
+        <div class="c-name" id="cvName"></div>
+        <div class="c-phone" id="cvPhone"></div>
+        <div class="c-balance"><div class="l">الرصيد الحالي</div><div class="v" id="cvBalance"></div></div>
+        <div class="c-stats">
+          <div class="c-stat"><div class="v" id="cvOrders"></div><div class="l">طلب</div></div>
+          <div class="c-stat"><div class="v" id="cvTier"></div><div class="l">المستوى</div></div>
+          <div class="c-stat"><div class="v" id="cvLast"></div><div class="l">آخر شراء</div></div>
+        </div>
+        <div class="c-actions">
+          <button onclick="openSheet('selectCustomerSheet')">تغيير العميل</button>
+          <button class="danger" onclick="clearCustomer()">إزالة</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Select customer sheet -->
+    <div class="sheet" id="selectCustomerSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-hd"><h2>اختيار عميل</h2><button class="sheet-close" onclick="closeSheets()" aria-label="إغلاق"><span class="ic"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></span></button></div>
+      <div class="csearch"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></span><input placeholder="ابحث بالاسم أو الهاتف…"></div>
+      <div class="clist" id="customerList"></div>
+    </div>
+
+    <!-- Discount sheet -->
+    <div class="sheet" id="discountSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-hd"><h2>تطبيق خصم</h2><button class="sheet-close" onclick="closeSheets()" aria-label="إغلاق"><span class="ic"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></span></button></div>
+      <div class="disc-body">
+        <div class="disc-toggle">
+          <button class="on" id="discPct" onclick="setDiscMode('pct')">نسبة %</button>
+          <button id="discAmt" onclick="setDiscMode('amt')">مبلغ ثابت</button>
+        </div>
+        <div class="disc-presets">
+          <button onclick="applyPresetDiscount(5)">5%</button>
+          <button onclick="applyPresetDiscount(10)">10%</button>
+          <button onclick="applyPresetDiscount(15)">15%</button>
+          <button onclick="applyPresetDiscount(20)">20%</button>
+        </div>
+        <div class="disc-custom"><input id="discInput" type="number" placeholder="0"><span id="discSuffix" style="color:var(--t4); font-weight:700;">%</span></div>
+        <button class="disc-apply" onclick="applyCustomDiscount()">تطبيق الخصم</button>
+      </div>
+    </div>
+
+    <!-- Held sales sheet -->
+    <div class="sheet" id="heldSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-hd"><h2>المبيعات المعلّقة</h2><button class="sheet-close" onclick="closeSheets()" aria-label="إغلاق"><span class="ic"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></span></button></div>
+      <div class="held-body" id="heldList"><div class="held-empty">لا توجد مبيعات معلّقة حالياً</div></div>
+    </div>
+
+    <!-- Debug sheet: preview-only — hidden edge states for review, remove before build -->
+    <div class="sheet" id="debugSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-hd"><h2>معاينة حالات إضافية (لغرض المراجعة فقط)</h2><button class="sheet-close" onclick="closeSheets()" aria-label="إغلاق"><span class="ic"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></span></button></div>
+      <div class="debug-body">
+        <button class="debug-row" onclick="closeSheets(); triggerPaymentFailure();">
+          <span>محاكاة فشل الدفع</span><span class="ic"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span>
+        </button>
+        <button class="debug-row" onclick="closeSheets(); showSessionExpired();">
+          <span>محاكاة انتهاء الجلسة</span><span class="ic"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span>
+        </button>
+        <button class="debug-row" onclick="closeSheets(); toggleOffline();">
+          <span>محاكاة انقطاع الاتصال</span><span class="ic"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="snackbar" id="snackbar">
+      <span id="snackText"></span>
+      <button id="snackAction">تراجع</button>
+    </div>
+
+  </div>
+
+<script>
+/* ═══ أيقونات SVG بسيطة لكل تصنيف — بديل موثوق 100% عن صور خارجية ═══ */
+const ICONS = {
+  droplet: '<path d="M12 3s6 7 6 11a6 6 0 1 1-12 0c0-4 6-11 6-11z"/>',
+  cup:     '<path d="M4 3h13v9a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V3z"/><path d="M17 6h2a3 3 0 0 1 0 6h-2"/>',
+  wedge:   '<path d="M3 17h18L12 4 3 17z"/><circle cx="10" cy="14" r="1" fill="currentColor" stroke="none"/><circle cx="14" cy="15" r="1" fill="currentColor" stroke="none"/>',
+  loaf:    '<rect x="3" y="9" width="18" height="9" rx="4"/><path d="M3 9c0-3 4-5 9-5s9 2 9 5"/>',
+};
+function swatchHTML(colorClass, iconKey){ return `<svg viewBox="0 0 24 24">${ICONS[iconKey]}</svg>`.replace('<svg', `<svg class="sw ${colorClass}"`); }
+/* أبسط: نبني عنصر div.sw ونحقن svg بداخله */
+function makeSwatch(colorClass, iconKey, sizeClass){
+  return `<div class="sw ${colorClass} ${sizeClass||''}"><svg viewBox="0 0 24 24">${ICONS[iconKey]}</svg></div>`;
+}
+function initials(name){
+  const parts = name.trim().split(' ');
+  return ((parts[0]?.[0]||'') + (parts[1]?.[0]||'')).toUpperCase();
+}
+const AVATAR_COLORS = ['linear-gradient(135deg,#0a8a5c,#0dbf84)','linear-gradient(135deg,#1a4fd6,#3d6bf0)','linear-gradient(135deg,#6920d4,#8b4de0)'];
+
+/* ═══ بيانات المنتجات ═══ */
+const products = [
+  {id:'juice',  name:'عصير برتقال 1 لتر',       price:180,  color:'sw-orange', icon:'droplet', stock:24},
+  {id:'oil',    name:'زيت عباد الشمس 2 لتر',     price:225,  color:'sw-gold',   icon:'droplet', stock:58},
+  {id:'cheese', name:'جبن شيدر مبروش 400غ',      price:1240, color:'sw-teal',   icon:'wedge',   stock:6},
+  {id:'coffee', name:'قهوة سريعة الذوبان 200غ',  price:170,  color:'sw-purple', icon:'cup',     stock:40},
+  {id:'water',  name:'مياه معدنية 1.5 لتر',      price:150,  color:'sw-blue',   icon:'droplet', stock:96},
+  {id:'bread',  name:'خبز فينو',                  price:25,   color:'sw-indigo', icon:'loaf',    stock:0},
+];
+const FREQUENT_IDS = ['oil','water','coffee','cheese','juice'];
+
+const customers = [
+  {id:1, name:'أحمد بلقاسم', phone:'+213 555 12 34 56', balance:2450, orders:37, tier:'VIP', last:'3ي', avColor:0},
+  {id:2, name:'سارة حمداني', phone:'+213 661 22 44 10', balance:0, orders:12, tier:'عادي', last:'أسبوع', avColor:1},
+  {id:3, name:'يوسف زيتوني', phone:'+213 770 98 12 33', balance:-350, orders:5, tier:'عادي', last:'شهر', avColor:2},
+];
+
+/* ═══ الحالة ═══ */
+let cart = { oil:2, water:4, cheese:1, coffee:2 }; // id -> qty
+let currentCustomer = customers[0];
+let discountPct = 0, discountAmt = 0, discMode = 'pct';
+let heldSales = [];
+
+function fmt(n){ return Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function productById(id){ return products.find(p=>p.id===id); }
+
+/* ═══ عرض السلة ═══ */
+function renderCart(justAddedId){
+  const wrap = document.getElementById('mCartScroll');
+  const ids = Object.keys(cart).filter(id => cart[id] > 0);
+  document.getElementById('cartEmpty').style.display = ids.length ? 'none' : 'flex';
+  document.getElementById('swipeHint').style.display = ids.length ? 'block' : 'none';
+  wrap.querySelectorAll('.swipe-row').forEach(r=>r.remove());
+  ids.forEach(id=>{
+    const p = productById(id); const qty = cart[id];
+    const row = document.createElement('div');
+    row.className = 'swipe-row'; row.dataset.id = id;
+    row.innerHTML = `
+      <div class="swipe-bg"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg></span></div>
+      <div class="line ${id===justAddedId ? 'just-added' : ''}" data-id="${id}">
+        ${makeSwatch(p.color, p.icon, 'line-photo')}
+        <div class="line-info"><div class="line-name">${p.name}</div><div class="line-sub">${fmt(p.price)} × <span class="q">${qty}</span></div></div>
+        <div class="qty"><button onclick="stepQty('${id}',-1)">−</button><span class="val">${qty}</span><button onclick="stepQty('${id}',1)">+</button></div>
+        <div class="line-total">${fmt(p.price*qty)}</div>
+      </div>`;
+    wrap.insertBefore(row, document.getElementById('cartEmpty'));
+    attachSwipe(row);
+  });
+  recalc();
+}
+function recalc(){
+  const ids = Object.keys(cart).filter(id=>cart[id]>0);
+  let sub = ids.reduce((s,id)=> s + productById(id).price*cart[id], 0);
+  let disc = discMode==='pct' ? sub*discountPct/100 : discountAmt;
+  if(disc>sub) disc=sub;
+  const grand = sub-disc;
+  document.getElementById('mSub').textContent = fmt(sub);
+  document.getElementById('mGrand').textContent = fmt(grand);
+  document.getElementById('mPayAmt').textContent = fmt(grand);
+  const discChip = document.getElementById('discChip');
+  if(disc>0.001){ discChip.style.display='inline-block'; document.getElementById('mDiscVal').textContent = fmt(disc); }
+  else { discChip.style.display='none'; }
+  /* الأسعار المعروضة TTC (شامل الضريبة) — نستخرج حصة TVA فقط للعرض المعلوماتي، لا تُضاف مجدداً */
+  const tvaPortion = grand - (grand / 1.19);
+  document.getElementById('mTva').textContent = fmt(tvaPortion);
+  document.getElementById('mStamp').textContent = grand > 0 ? 'يُحتسب عند الدفع نقداً' : '—';
+  document.getElementById('mCount').textContent = ids.reduce((s,id)=>s+cart[id],0) + ' عناصر';
+}
+function stepQty(id, dir){
+  const next = (cart[id]||0) + dir;
+  if(next < 1) return; // لا تحذف العنصر عبر الزر — الحذف فقط بالسحب (مع تراجع)
+  cart[id] = next;
+  renderCart();
+}
+function addProduct(id){
+  const p = productById(id);
+  const inCart = cart[id]||0;
+  if(p.stock <= 0){
+    showSnackbar('"'+p.name+'" غير متوفر بالمخزون حالياً', 'إغلاق', ()=>{});
+    return;
+  }
+  if(inCart >= p.stock){
+    showSnackbar('الكمية المتاحة من "'+p.name+'" منتهية ('+p.stock+' فقط)', 'إغلاق', ()=>{});
+    return;
+  }
+  cart[id] = inCart + 1;
+  renderCart(id);
+  showSnackbar('تمت إضافة "'+p.name+'"', 'تراجع', ()=>{ cart[id] = Math.max(0,(cart[id]||0)-1); renderCart(); });
+}
+
+/* ═══ قائمة المنتجات (Sheet) ═══ */
+function renderProductGrid(){
+  document.getElementById('productGrid').innerHTML = products.map(p => {
+    const out = p.stock <= 0;
+    const low = !out && p.stock <= 8;
+    const badge = out ? `<span class="stock-badge out">نفذ من المخزون</span>` : low ? `<span class="stock-badge low">متبقي ${p.stock}</span>` : '';
+    return `
+    <button class="pcard ${out?'is-out':''}" onclick="addProduct('${p.id}')" ${out?'aria-disabled="true"':''}>
+      ${makeSwatch(p.color, p.icon)}
+      ${badge}
+      <div class="pc-body">
+        <div class="pc-name">${p.name}</div>
+        <div class="pc-row"><span class="pc-price">${fmt(p.price)}</span>
+          <span class="pc-add"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></span>
+        </div>
+      </div>
+    </button>`; }).join('');
+}
+function renderFrequent(){
+  document.getElementById('freqScroll').innerHTML = FREQUENT_IDS.map(id=>{
+    const p = productById(id);
+    return `<button class="freq-item" onclick="addProduct('${id}')">${makeSwatch(p.color,p.icon)}<div class="n">${p.name.split(' ')[0]}</div></button>`;
+  }).join('');
+}
+
+/* ═══ العميل ═══ */
+function balColor(v){ return v < 0 ? 'var(--red)' : 'var(--em)'; }
+function renderCustomerChip(){
+  const chip = document.getElementById('customerChip');
+  if(currentCustomer){
+    chip.innerHTML = `<div class="av avatar-init" style="background:${AVATAR_COLORS[currentCustomer.avColor]}">${initials(currentCustomer.name)}</div><span class="txt"><span class="name">${currentCustomer.name}</span><br><span class="bal" style="color:${balColor(currentCustomer.balance)}">${fmt(currentCustomer.balance)} دج</span></span>`;
+  } else {
+    chip.innerHTML = `<span class="av placeholder" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span><span class="txt"><span class="cta">اختر عميل</span></span>`;
+  }
+}
+function onCustomerChipTap(){
+  if(currentCustomer){ renderCustomerView(); openSheet('customerSheet'); }
+  else { openSheet('selectCustomerSheet'); }
+}
+function renderCustomerView(){
+  document.getElementById('cvAvatar').style.background = AVATAR_COLORS[currentCustomer.avColor];
+  document.getElementById('cvAvatar').textContent = initials(currentCustomer.name);
+  document.getElementById('cvName').textContent = currentCustomer.name;
+  document.getElementById('cvPhone').textContent = currentCustomer.phone;
+  const balEl = document.getElementById('cvBalance');
+  balEl.textContent = fmt(currentCustomer.balance) + ' دج';
+  balEl.style.color = balColor(currentCustomer.balance);
+  document.getElementById('cvOrders').textContent = currentCustomer.orders;
+  document.getElementById('cvTier').textContent = currentCustomer.tier;
+  document.getElementById('cvLast').textContent = currentCustomer.last;
+}
+function renderCustomerList(){
+  document.getElementById('customerList').innerHTML = customers.map(c => `
+    <div class="crow" onclick="selectCustomer(${c.id})">
+      <div class="av avatar-init" style="background:${AVATAR_COLORS[c.avColor]}">${initials(c.name)}</div>
+      <div class="info"><div class="n">${c.name}</div><div class="p">${c.phone}</div></div>
+      <div class="bal" style="color:${balColor(c.balance)}">${fmt(c.balance)}</div>
+    </div>`).join('');
+}
+function selectCustomer(id){ currentCustomer = customers.find(c=>c.id===id); renderCustomerChip(); closeSheets(); }
+function clearCustomer(){ currentCustomer = null; renderCustomerChip(); closeSheets(); }
+
+/* ═══ Sheets ═══ */
+function openSheet(id){
+  if(id==='customerSheet') renderCustomerView();
+  if(id==='selectCustomerSheet') renderCustomerList();
+  if(id==='productSheet'){ renderProductGrid(); renderFrequent(); }
+  document.getElementById('backdrop').classList.add('show');
+  document.getElementById(id).classList.add('show');
+}
+function closeSheets(){
+  document.getElementById('backdrop').classList.remove('show');
+  document.querySelectorAll('.sheet').forEach(s=> s.classList.remove('show'));
+}
+
+/* ═══ خصم ═══ */
+function setDiscMode(mode){
+  discMode = mode;
+  document.getElementById('discPct').classList.toggle('on', mode==='pct');
+  document.getElementById('discAmt').classList.toggle('on', mode==='amt');
+  document.getElementById('discSuffix').textContent = mode==='pct' ? '%' : 'دج';
+}
+function applyPresetDiscount(v){ discMode='pct'; discountPct=v; discountAmt=0; setDiscMode('pct'); recalc(); closeSheets(); }
+function applyCustomDiscount(){
+  const v = parseFloat(document.getElementById('discInput').value)||0;
+  if(discMode==='pct'){ discountPct=v; discountAmt=0; } else { discountAmt=v; discountPct=0; }
+  recalc(); closeSheets();
+}
+
+/* ═══ Snackbar ═══ */
+function showSnackbar(text, actionLabel, onAction){
+  const bar = document.getElementById('snackbar');
+  document.getElementById('snackText').textContent = text;
+  const btn = document.getElementById('snackAction');
+  btn.textContent = actionLabel;
+  btn.onclick = ()=>{ onAction(); bar.classList.remove('show'); };
+  bar.classList.add('show');
+  clearTimeout(bar._t);
+  bar._t = setTimeout(()=> bar.classList.remove('show'), 3200);
+}
+
+/* ═══ تعليق البيع ═══ */
+function holdSale(){
+  const ids = Object.keys(cart).filter(id=>cart[id]>0);
+  if(ids.length===0) return;
+  const sub = ids.reduce((s,id)=> s + productById(id).price*cart[id], 0);
+  const count = ids.reduce((s,id)=>s+cart[id],0);
+  heldSales.push({label:'بيع #'+(1001+heldSales.length), count, total:sub, customer: currentCustomer ? currentCustomer.name : null, cart:{...cart}});
+  cart = {}; currentCustomer = null; discountPct=0; discountAmt=0;
+  renderCart(); renderCustomerChip(); renderHeld();
+  showSnackbar('تم تعليق البيع', 'عرض', ()=> openSheet('heldSheet'));
+}
+function renderHeld(){
+  const badge = document.getElementById('heldBadge');
+  if(heldSales.length>0){ badge.style.display='flex'; badge.textContent = heldSales.length; } else { badge.style.display='none'; }
+  const list = document.getElementById('heldList');
+  list.innerHTML = heldSales.length===0 ? '<div class="held-empty">لا توجد مبيعات معلّقة حالياً</div>' :
+    heldSales.map((h,i)=>`
+      <div class="held-row">
+        <div class="info"><div class="n">${h.label}${h.customer? ' · '+h.customer : ''}</div><div class="s">${h.count} عناصر · ${fmt(h.total)} دج</div></div>
+        <button onclick="resumeHeld(${i})">استئناف</button>
+      </div>`).join('');
+}
+function resumeHeld(i){
+  const h = heldSales.splice(i,1)[0];
+  cart = {...h.cart};
+  renderCart(); renderHeld(); closeSheets();
+  showSnackbar('تم استئناف البيع', 'إغلاق', ()=>{});
+}
+function newSale(){
+  cart = {}; discountPct=0; discountAmt=0;
+  renderCart();
+  showSnackbar('بدأت عملية بيع جديدة', 'إغلاق', ()=>{});
+}
+let simulateNextPaymentFailure = false;
+function completePayment(){
+  const amount = document.getElementById('mPayAmt').textContent;
+  const circle = document.getElementById('psCircle');
+  const title = document.getElementById('psTitle');
+  const check = document.getElementById('psCheck');
+  document.getElementById('psAmt').textContent = amount + ' دج';
+
+  if(simulateNextPaymentFailure){
+    simulateNextPaymentFailure = false;
+    circle.classList.add('fail'); title.classList.add('fail');
+    check.setAttribute('d','M6 6l12 12M18 6L6 18');
+    title.textContent = 'فشلت عملية الدفع — حاول مرة أخرى';
+    document.getElementById('paySuccess').classList.add('show');
+    setTimeout(()=>{
+      document.getElementById('paySuccess').classList.remove('show');
+      circle.classList.remove('fail'); title.classList.remove('fail');
+      check.setAttribute('d','M5 13l4 4L19 7');
+      title.textContent = 'تمت العملية بنجاح';
+    }, 2200);
+    return;
+  }
+  document.getElementById('paySuccess').classList.add('show');
+  setTimeout(()=>{ document.getElementById('paySuccess').classList.remove('show'); newSale(); }, 1700);
+}
+function triggerPaymentFailure(){
+  simulateNextPaymentFailure = true;
+  showSnackbar('سيتم محاكاة فشل الدفع في المحاولة القادمة', 'إغلاق', ()=>{});
+}
+function showSessionExpired(){ document.getElementById('sessionLock').classList.add('show'); }
+function toggleOffline(){
+  const b = document.getElementById('offlineBanner');
+  b.classList.add('show');
+  setTimeout(()=> b.classList.remove('show'), 3500);
+}
+
+/* ═══ سحب للحذف ═══ */
+function attachSwipe(row){
+  const line = row.querySelector('.line');
+  let startX=0, dx=0, dragging=false;
+  line.addEventListener('touchstart', e=>{ startX = e.touches[0].clientX; dragging=true; line.style.transition='none'; });
+  line.addEventListener('touchmove', e=>{
+    if(!dragging) return;
+    dx = e.touches[0].clientX - startX;
+    if(dx > 0) dx = 0;
+    line.style.transform = 'translateX('+dx+'px)';
+  });
+  line.addEventListener('touchend', ()=>{
+    dragging=false; line.style.transition='transform .2s';
+    if(dx < -90){
+      const id = row.dataset.id; const p = productById(id); const prevQty = cart[id];
+      line.style.transform = 'translateX(-100%)';
+      row.style.maxHeight = row.offsetHeight+'px';
+      setTimeout(()=>{
+        row.style.transition='max-height .2s, opacity .2s, margin .2s';
+        row.style.maxHeight='0px'; row.style.opacity='0'; row.style.marginBottom='0px';
+        setTimeout(()=>{
+          cart[id] = 0; renderCart();
+          showSnackbar('تم حذف "'+p.name+'"', 'تراجع', ()=>{ cart[id] = prevQty; renderCart(); });
+        }, 200);
+      },10);
+    } else { line.style.transform = 'translateX(0)'; }
+  });
+}
+
+renderCustomerChip();
+renderCart();
+</script>
+</body>
+</html>

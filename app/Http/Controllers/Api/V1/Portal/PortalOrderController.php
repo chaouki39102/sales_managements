@@ -77,7 +77,21 @@ class PortalOrderController extends BaseApiController
     {
         try {
             $search  = trim((string) $request->input('search'));
-            $perPage = min((int) $request->input('per_page', 24), 100);
+            $perPage = min(max((int) $request->input('per_page', 24), 1), 100);
+
+            // زبون البوابة المعتمد — نحتاج حالته الجبائية ومستوى السعر الشخصي
+            // لنعرض بالضبط ما سيحاسَب عليه الطلب (لا نعرض TVA لزبون معفى،
+            // ولا خصومات مستوى لا يطبّقها محرك الطلبات).
+            $portal = $request->input('_portal_user');
+            $party  = $portal?->party;
+            $partyIsTvaExempt = (bool) ($party?->is_tva_exempt ?? false);
+
+            // نفس مستوى السعر الذي يحاسب به محرك الطلبات (createDocumentLines):
+            // مستوى الزبون إن وُجد، وإلا المستوى الافتراضي للمؤسسة. تُصفّى
+            // خصومات الكميات بهذا المستوى حتى يطابق الكتالوج التحصيل الفعلي.
+            $priceLevelId = $party?->default_price_level_id
+                ? (int) $party->default_price_level_id
+                : $this->defaultPriceLevelId();
 
             $query = Product::query()
                 ->with(['tva', 'unit', 'prices', 'packagings', 'quantityDiscounts'])
@@ -97,7 +111,7 @@ class PortalOrderController extends BaseApiController
                 $stockMap[(int) $row['id']] = $row['current_stock'];
             }
 
-            $items = collect($rows->items())->map(function (Product $p) use ($stockMap) {
+            $items = collect($rows->items())->map(function (Product $p) use ($stockMap, $partyIsTvaExempt, $priceLevelId) {
                 return [
                     'id'            => $p->id,
                     'name'          => $p->name,
@@ -127,14 +141,15 @@ class PortalOrderController extends BaseApiController
                         ])
                         ->values()
                         ->all(),
-                    // خصومات الكميات المفعّلة لمستوى السعر الافتراضي للمؤسسة —
-                    // نفس المستوى الذي يحاسب به محرك الطلبات (applicableDiscount)
-                    // عند الإنشاء، حتى تعرض البوابة ما سيُطبق فعلاً.
+                    // خصومات الكميات المفعّلة لمستوى السعر الذي يحاسب به محرك
+                    // الطلبات (applicableDiscount) عند الإنشاء — مستوى الزبون
+                    // الشخصي إن وُجد، وإلا المستوى الافتراضي للمؤسسة.
                     'manages_quantity_discounts' => (bool) $p->manages_quantity_discounts,
+                    'party_is_tva_exempt' => $partyIsTvaExempt,
                     'discounts' => $p->quantityDiscounts
                         ->filter(fn(QuantityDiscount $d) => (bool) $d->active && !(bool) $d->is_blocked)
-                        ->filter(fn(QuantityDiscount $d) => $this->defaultPriceLevelId()
-                            ? ((int) $d->price_level_id === (int) $this->defaultPriceLevelId())
+                        ->filter(fn(QuantityDiscount $d) => $priceLevelId
+                            ? ((int) $d->price_level_id === (int) $priceLevelId)
                             : true)
                         ->map(fn(QuantityDiscount $d) => [
                             'id'                  => $d->id,

@@ -12,7 +12,13 @@ use Illuminate\Support\Facades\DB;
 
 class DocumentConversionService
 {
-    private static ?array $staticFallbackMap = [
+    /**
+     * القائمة الموثوقة الوحيدة لتحويلات أنواع المستندات الافتراضية.
+     * يُستخدم منها staticFallbackMap كخيار عند خلوّ جدول document_type_conversions،
+     * ويبني منها PortalOrderInstaller صفوف الجدول نفسه — أي تعديل (مثل إضافة
+     * CMD → FV/POS) يُكتب في مكان واحد فقط.
+     */
+    public const DEFAULT_RULES = [
         'DEV' => ['BCC', 'BL', 'FV'],
         'BCC' => ['BL', 'FV'],
         'BL'  => ['FV'],
@@ -25,6 +31,8 @@ class DocumentConversionService
         'FA'  => ['AA'],             // فاتورة مشتريات → إشعار مدين
         'AA'  => ['FA'],             // إشعار مدين → فاتورة مشتريات (عكس)
     ];
+
+    private static ?array $staticFallbackMap = self::DEFAULT_RULES;
 
     public function __construct(
         private CommercialDocumentService $documentService,

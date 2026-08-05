@@ -194,9 +194,9 @@ export function CreditBar({ used, limit }: { used: number; limit: number }) {
       <div className="portal-credit-bar">
         <div className="portal-credit-bar-fill" style={{ width: `${pct}%`, background: color }} />
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 10.5, fontWeight: 600 }}>
-        <span style={{ color: 'var(--t4)' }}>{fmtMoneyShort(used)} مستعمل</span>
-        <span style={{ color: 'var(--t4)' }}>{fmtMoneyShort(limit)} سقف</span>
+      <div className="portal-credit-meta">
+        <span>{fmtMoneyShort(used)} مستعمل</span>
+        <span>{fmtMoneyShort(limit)} سقف</span>
       </div>
     </>
   );
@@ -209,7 +209,7 @@ export function StatusSteps({ steps }: { steps: { label: string; done: boolean; 
       {steps.map((s, i) => (
         <div key={i} className={`portal-step ${s.done ? 'portal-step--done' : ''} ${s.active ? 'portal-step--active' : ''}`}>
           <div className="portal-step-dot">
-            {s.done ? <i className="ti ti-check" style={{ fontSize: 12 }} /> : i + 1}
+            {s.done ? <i className="ti ti-check" /> : i + 1}
           </div>
           <span className="portal-step-label">{s.label}</span>
         </div>

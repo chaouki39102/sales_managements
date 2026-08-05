@@ -69,7 +69,10 @@ class InventoryStockService
 
         // ─── 2. حركات المخزون حتى التاريخ ───────────────────────────────────
         $movementsQuery = DB::table('stock_movements as sm')
-            ->join('stock_movement_types as smt', 'sm.stock_movement_type_id', '=', 'smt.id')
+            ->join('stock_movement_types as smt', function ($j) {
+                $j->on('smt.id', '=', 'sm.stock_movement_type_id')
+                  ->on('smt.company_id', '=', 'sm.company_id');
+            })
             ->select(
                 'sm.product_id',
                 DB::raw('SUM(CASE WHEN smt.direction > 0 THEN sm.quantity ELSE 0 END) as total_in'),

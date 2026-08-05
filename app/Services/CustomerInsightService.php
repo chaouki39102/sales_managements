@@ -80,13 +80,17 @@ class CustomerInsightService
 
     private function getAveragePaymentDays(int $partyId): ?float
     {
+        $dayDiff = DB::getDriverName() === 'sqlite'
+            ? 'JULIANDAY(payments.payment_date) - JULIANDAY(commercial_documents.due_date)'
+            : 'DATEDIFF(payments.payment_date, commercial_documents.due_date)';
+
         $result = Payment::query()
             ->join('document_payment', 'payments.id', '=', 'document_payment.payment_id')
             ->join('commercial_documents', 'document_payment.commercial_document_id', '=', 'commercial_documents.id')
             ->where('payments.party_id', $partyId)
             ->whereNotNull('commercial_documents.due_date')
             ->where('payments.status', 'confirmed')
-            ->select(DB::raw('AVG(JULIANDAY(payments.payment_date) - JULIANDAY(commercial_documents.due_date)) as avg_days'))
+            ->select(DB::raw("AVG({$dayDiff}) as avg_days"))
             ->first();
 
         $avg = $result?->avg_days;

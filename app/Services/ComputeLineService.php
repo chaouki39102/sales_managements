@@ -169,7 +169,11 @@ class ComputeLineService
                 ->sum('opening_quantity');
 
             $incoming = DB::table('stock_movements as sm')
-                ->join('stock_movement_types as smt', 'sm.stock_movement_type_id', '=', 'smt.id')
+                ->join('stock_movement_types as smt', function ($j) {
+                    $j->on('smt.id', '=', 'sm.stock_movement_type_id')
+                      ->on('smt.company_id', '=', 'sm.company_id');
+                })
+                ->where('sm.company_id', $companyId)
                 ->where('sm.product_id', $productId)
                 ->where('sm.warehouse_id', $warehouseId)
                 ->where('sm.is_validated', true)
@@ -179,7 +183,11 @@ class ComputeLineService
                 ->sum('sm.quantity');
 
             $outgoing = DB::table('stock_movements as sm')
-                ->join('stock_movement_types as smt', 'sm.stock_movement_type_id', '=', 'smt.id')
+                ->join('stock_movement_types as smt', function ($j) {
+                    $j->on('smt.id', '=', 'sm.stock_movement_type_id')
+                      ->on('smt.company_id', '=', 'sm.company_id');
+                })
+                ->where('sm.company_id', $companyId)
                 ->where('sm.product_id', $productId)
                 ->where('sm.warehouse_id', $warehouseId)
                 ->where('sm.is_validated', true)

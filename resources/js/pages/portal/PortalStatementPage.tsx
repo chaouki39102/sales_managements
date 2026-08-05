@@ -33,17 +33,17 @@ export default function PortalStatementPage() {
   return (
     <>
       {/* ─── فلتر التاريخ ─── */}
-      <div className="portal-card" style={{ marginBottom: 18, padding: '16px 20px' }}>
+      <div className="portal-card portal-stmt-filter">
         <form
           onSubmit={(e) => { e.preventDefault(); setApplied({ from: from || undefined, to: to || undefined }); }}
-          style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 10 }}
+          className="portal-stmt-filter-form"
         >
-          <div className="fg" style={{ flex: '1 1 160px' }}>
-            <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: 'var(--t3)', marginBottom: 5 }}>من تاريخ</label>
+          <div className="fg portal-flex160">
+            <label className="portal-form-label">من تاريخ</label>
             <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="portal-form-input" />
           </div>
-          <div className="fg" style={{ flex: '1 1 160px' }}>
-            <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: 'var(--t3)', marginBottom: 5 }}>إلى تاريخ</label>
+          <div className="fg portal-flex160">
+            <label className="portal-form-label">إلى تاريخ</label>
             <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="portal-form-input" />
           </div>
           <button type="submit" className="portal-btn portal-btn--em">
@@ -69,25 +69,25 @@ export default function PortalStatementPage() {
         </div>
         <div className="portal-stmt-item">
           <div className="k">إجمالي المدين</div>
-          <div className="v" style={{ color: 'var(--red)' }}>{fmtMoney(total_debit)}</div>
+          <div className="v portal-red">{fmtMoney(total_debit)}</div>
         </div>
         <div className="portal-stmt-item">
           <div className="k">إجمالي الدائن</div>
-          <div className="v" style={{ color: '#059669' }}>{fmtMoney(total_credit)}</div>
+          <div className="v portal-green">{fmtMoney(total_credit)}</div>
         </div>
         <div className="portal-stmt-item">
           <div className="k">الرصيد الختامي</div>
-          <div className="v" style={{ color: closing < 0 ? 'var(--red)' : '#059669' }}>{fmtMoneySigned(closing)}</div>
+          <div className={`v ${closing < 0 ? 'portal-red' : 'portal-green'}`}>{fmtMoneySigned(closing)}</div>
         </div>
       </div>
 
       {/* ─── رسم بياني مصغّر ─── */}
       {sparkValues.length > 1 && (
-        <div className="portal-card" style={{ marginBottom: 16 }}>
+        <div className="portal-card portal-mb-16">
           <div className="portal-card-bd">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <i className="ti ti-chart-line" style={{ color: 'var(--em)', fontSize: 16 }} />
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>تطور الرصيد</span>
+            <div className="portal-inline--8 portal-mb-10">
+              <i className="ti ti-chart-line portal-em-icon" />
+              <span className="portal-sec-title">تطور الرصيد</span>
             </div>
             <Sparkline
               values={sparkValues.map(v => Math.abs(v))}
@@ -101,7 +101,7 @@ export default function PortalStatementPage() {
       <section className="portal-card">
         <div className="portal-card-hd">
           <h3><i className="ti ti-report-money" /> حركة الحساب</h3>
-          <span style={{ fontSize: 11.5, color: 'var(--t4)' }}>
+          <span className="portal-muted portal-t-sm">
             {stFrom || 'البداية'} ← {stTo || 'اليوم'}
           </span>
         </div>
@@ -118,12 +118,12 @@ export default function PortalStatementPage() {
               <tbody>
                 {rows.map((r, i) => (
                   <tr key={`${r.date}-${r.reference}-${i}`} className={r.balance < 0 ? 'portal-row-debit' : 'portal-row-credit'}>
-                    <td style={{ fontSize: 11.5 }}>{fmtDate(r.date)}</td>
+                    <td className="portal-t-sm">{fmtDate(r.date)}</td>
                     <td className="num">{r.reference}</td>
                     <td>{r.label}</td>
                     <td className="num">{r.debit > 0 ? fmtMoney(r.debit) : '—'}</td>
                     <td className="num">{r.credit > 0 ? fmtMoney(r.credit) : '—'}</td>
-                    <td className="num" style={{ fontWeight: 900 }}>{fmtMoneySigned(r.balance)}</td>
+                    <td className="num portal-tbl-bold">{fmtMoneySigned(r.balance)}</td>
                   </tr>
                 ))}
               </tbody>

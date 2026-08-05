@@ -2,6 +2,7 @@
 
 namespace App\Services\Portal;
 
+use App\Services\DocumentConversionService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -118,27 +119,18 @@ class PortalOrderInstaller
 
     private function ensureConversions(int $companyId): void
     {
-        $conversions = [
-            // ─── سلسلة المبيعات ───────────────────────────────────
-            ['source_code' => 'DEV', 'target_code' => 'BCC', 'display_order' => 1],
-            ['source_code' => 'DEV', 'target_code' => 'BL',  'display_order' => 2],
-            ['source_code' => 'DEV', 'target_code' => 'FV',  'display_order' => 3],
-            ['source_code' => 'BCC', 'target_code' => 'BL',  'display_order' => 1],
-            ['source_code' => 'BCC', 'target_code' => 'FV',  'display_order' => 2],
-            ['source_code' => 'BL',  'target_code' => 'FV',  'display_order' => 1],
-            ['source_code' => 'FV',  'target_code' => 'AV',  'display_order' => 1], // فاتورة → إشعار دائن
-            ['source_code' => 'AV',  'target_code' => 'FV',  'display_order' => 1], // إشعار دائن → فاتورة (عكس)
-            // ─── بوابة الزبائن ────────────────────────────────────
-            ['source_code' => 'CMD', 'target_code' => 'FV',  'display_order' => 1], // أمر زبون → فاتورة بيع
-            ['source_code' => 'CMD', 'target_code' => 'POS', 'display_order' => 2], // أمر زبون → فاتورة POS
-            // ─── سلسلة المشتريات ─────────────────────────────────
-            ['source_code' => 'DDP', 'target_code' => 'BCF', 'display_order' => 1],
-            ['source_code' => 'BCF', 'target_code' => 'BR',  'display_order' => 1],
-            ['source_code' => 'BCF', 'target_code' => 'FA',  'display_order' => 2],
-            ['source_code' => 'BR',  'target_code' => 'FA',  'display_order' => 1],
-            ['source_code' => 'FA',  'target_code' => 'AA',  'display_order' => 1], // فاتورة شراء → إشعار مدين
-            ['source_code' => 'AA',  'target_code' => 'FA',  'display_order' => 1], // إشعار شراء → فاتورة (عكس)
-        ];
+        // مصدر القواعد الموحد = DocumentConversionService::DEFAULT_RULES.
+        // تُبنى منه صفوف الجدول (source → targets) — لا قائمة مكررة يدوياً.
+        $conversions = [];
+        foreach (DocumentConversionService::DEFAULT_RULES as $sourceCode => $targetCodes) {
+            foreach ($targetCodes as $i => $targetCode) {
+                $conversions[] = [
+                    'source_code'   => $sourceCode,
+                    'target_code'   => $targetCode,
+                    'display_order' => $i + 1,
+                ];
+            }
+        }
 
         foreach ($conversions as $conv) {
             DB::table('document_type_conversions')->updateOrInsert(

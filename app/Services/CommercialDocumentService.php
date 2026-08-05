@@ -811,9 +811,10 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // PUBLIC: إضافة أسطر لمستند موجود + إعادة حساب الإجماليات
-    // يُستخدم من DocumentConversionService لأن BaseService::beforeCreate
-    // يزيل المفاتيح غير المرتبطة بعمود (مثل 'lines') من $data
+    // PUBLIC: إضافة أسطر لمستند موجود + إعادة حساب الإجماليات + حركات المخزون
+    // يُستخدم من DocumentConversionService: يُنشئ المستند بالعنوان أولاً ثم
+    // يضيف الأسطر هنا بعد الإنشاء — فيخضع لهذا المسار (أسطر + إجماليات + حركة)
+    // دون المرور بـ afterCreate، وتُجمَّد snapshots لاحقاً بقيم net_to_pay الحقيقية.
     // ═══════════════════════════════════════════════════════════════════════
 
     public function addLinesToDocument(CommercialDocument $document, array $linesData): void

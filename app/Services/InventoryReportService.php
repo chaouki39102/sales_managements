@@ -30,7 +30,10 @@ class InventoryReportService
             })
             ->leftJoin('families as f', 'f.id', '=', 'p.family_id')
             ->leftJoin('brands as b', 'b.id', '=', 'p.brand_id')
-            ->join('stock_movement_types as smt', 'smt.id', '=', 'sm.stock_movement_type_id')
+            ->join('stock_movement_types as smt', function ($j) use ($companyId) {
+                $j->on('smt.id', '=', 'sm.stock_movement_type_id')
+                  ->where('smt.company_id', $companyId);
+            })
             ->where('sm.company_id', $companyId)   // ✅ عزل الحركات
             ->whereBetween('sm.movement_date', [$fromDate, $toDate])
             ->where('sm.is_validated', true)
@@ -74,7 +77,10 @@ class InventoryReportService
         $companyId = $this->companyId();
 
         return DB::table('stock_movements as sm')
-            ->join('stock_movement_types as smt', 'smt.id', '=', 'sm.stock_movement_type_id')
+            ->join('stock_movement_types as smt', function ($j) use ($companyId) {
+                $j->on('smt.id', '=', 'sm.stock_movement_type_id')
+                  ->where('smt.company_id', $companyId);
+            })
             ->leftJoin('commercial_document_lines as cdl', 'cdl.id', '=', 'sm.commercial_document_line_id')
             ->leftJoin('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
             ->where('sm.company_id', $companyId)   // ✅ عزل

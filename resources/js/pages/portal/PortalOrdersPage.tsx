@@ -236,7 +236,7 @@ export default function PortalOrdersPage() {
       }
     }
     const ht  = Math.max(0, gross - discount);
-    const tva = ht * (product.tva_rate / 100);
+    const tva = partyIsTvaExempt ? 0 : ht * (product.tva_rate / 100);
     return { unitPrice, factor, baseQty, gross, discount, tier, ht, tva, ttc: ht + tva };
   };
 
@@ -244,6 +244,11 @@ export default function PortalOrdersPage() {
     d.discount_amount !== null && d.discount_amount > 0
       ? `خصم ${fmtMoney(d.discount_amount)} دج/وحدة`
       : `خصم ${d.discount_percentage}%`;
+
+  // زبون معفى جبائياً (من back-office: is_tva_exempt) — المحرك يخزّن tva_rate=0
+  // على الأسطر، لذلك يجب أن تُصفَّر TVA في المعاينة أيضاً وإلا ظهر مبلغ أكبر
+  // مما سيُحتسب فعلاً.
+  const partyIsTvaExempt = catalogQuery.data?.data[0]?.party_is_tva_exempt ?? false;
 
   const tierHint = (d: PortalCatalogDiscount): string => {
     const to = d.max_qty !== null && d.max_qty !== undefined ? d.max_qty : null;
@@ -428,7 +433,13 @@ export default function PortalOrdersPage() {
                       ) : null}
                     </div>
                     <div className="portal-prod-meta">
-                      {p.tva_rate > 0 ? `TVA ${p.tva_rate}%` : ''}
+                      {partyIsTvaExempt ? (
+                        <span className="portal-prod-exempt">
+                          <i className="ti ti-shield-check" /> معفى من TVA
+                        </span>
+                      ) : (
+                        p.tva_rate > 0 ? `TVA ${p.tva_rate}%` : ''
+                      )}
                       {p.manages_stock && p.current_stock !== null && (
                         <span className={p.current_stock > 0 ? 'portal-prod-stock' : 'portal-prod-stock out'}>
                           {p.current_stock > 0 ? `المخزون: ${p.current_stock}` : 'نفد المخزون'}
@@ -501,7 +512,7 @@ export default function PortalOrdersPage() {
               })}
             </div>
             {catalogMeta && catalogMeta.last_page > 1 && (
-              <div style={{ marginTop: 16 }}>
+              <div className="portal-mt-16">
                 <Pager
                   page={catalogMeta.current_page}
                   lastPage={catalogMeta.last_page}
@@ -517,7 +528,7 @@ export default function PortalOrdersPage() {
       </div>
 
       {/* ─── سلة الطلب ─── */}
-      <div className="portal-card" style={{ marginTop: 22 }}>
+      <div className="portal-card portal-mt-22">
         <div className="portal-card-hd">
           <h3><i className="ti ti-basket" /> {editingId ? 'تعديل الطلب' : 'سلة الطلب'}</h3>
           <span className="portal-hd-count">{cartEntries.length} صنف</span>
@@ -538,7 +549,7 @@ export default function PortalOrdersPage() {
                         {fmtMoney(cl.unitPrice)}
                         {cl.factor > 1 ? ` ×${cl.factor}` : ''}
                         {`/${unitLabelFor(product, entry.packaging_id)}`}
-                        {product.tva_rate > 0 ? ` • TVA ${product.tva_rate}%` : ''}
+                        {partyIsTvaExempt ? ' • معفى من TVA' : product.tva_rate > 0 ? ` • TVA ${product.tva_rate}%` : ''}
                       </div>
                       {cl.discount > 0 && cl.tier && (
                         <div className="portal-cart-disc">
@@ -577,7 +588,6 @@ export default function PortalOrdersPage() {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={2}
-                style={{ resize: 'vertical' }}
               />
               <div className="portal-cart-totals">
                 <div className="portal-cart-total-row"><span>المجموع قبل الخصم</span><b>{fmtMoney(totals.gross)}</b></div>
@@ -624,13 +634,13 @@ export default function PortalOrdersPage() {
       </div>
 
       {/* ─── طلباتي ─── */}
-      <div className="portal-card" style={{ marginTop: 22 }}>
+      <div className="portal-card portal-mt-22">
         <div className="portal-card-hd">
           <h3><i className="ti ti-clipboard-list" /> طلباتي</h3>
           <span className="portal-hd-count">{meta?.total ?? 0} طلب</span>
         </div>
 
-        <div className="portal-toolbar" style={{ paddingBottom: 4 }}>
+        <div className="portal-toolbar portal-toolbar--tight">
           <div className="portal-filters" role="tablist" aria-label="تصفية حسب الحالة">
             {STATUS_TABS.map((tab) => (
               <button

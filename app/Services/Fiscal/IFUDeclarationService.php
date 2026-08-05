@@ -255,7 +255,10 @@ class IFUDeclarationService
         }
 
         $costData = DB::table('stock_movements as sm')
-            ->join('stock_movement_types as smt', 'smt.id', '=', 'sm.stock_movement_type_id')
+            ->join('stock_movement_types as smt', function ($join) {
+                $join->on('smt.id', '=', 'sm.stock_movement_type_id')
+                     ->on('smt.company_id', '=', 'sm.company_id');
+            })
             ->whereIn('sm.product_id', $productIds)
             ->where('sm.fiscal_year_id', $fiscalYearId)
             ->where('sm.company_id', $companyId)

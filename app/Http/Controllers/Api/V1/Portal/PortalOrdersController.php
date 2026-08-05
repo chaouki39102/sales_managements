@@ -162,8 +162,20 @@ class PortalOrdersController extends BaseApiController
 
             $order = PortalOrder::query()->findOrFail($resolvedId);
 
-            $targetCode = (string) $request->input('target', 'FV');
-            $sale       = $this->orders->convertToSale($order, $targetCode);
+            $validated = $request->validate([
+                'target'                    => ['nullable', 'string', 'in:FV,POS'],
+                'payment'                   => ['nullable', 'array'],
+                'payment.payment_mode_id'   => ['required_with:payment', 'integer'],
+                'payment.amount'            => ['required_with:payment', 'numeric', 'min:0.01'],
+                'payment.payment_date'      => ['nullable', 'date'],
+                'payment.reference'         => ['nullable', 'string', 'max:255'],
+                'payment.treasury_account_id' => ['nullable', 'integer'],
+                'payment.notes'             => ['nullable', 'string', 'max:1000'],
+            ]);
+
+            $targetCode = (string) ($validated['target'] ?? 'FV');
+            $payment    = $validated['payment'] ?? [];
+            $sale       = $this->orders->convertToSale($order, $targetCode, $payment);
 
             return $this->successResponse([
                 'order' => $this->orders->toArray($order->fresh()->load('histories')),
@@ -173,6 +185,8 @@ class PortalOrdersController extends BaseApiController
                     'document_type'   => $sale->documentType?->code,
                     'net_to_pay'      => (float) $sale->net_to_pay,
                     'total_ttc'       => (float) $sale->total_ttc,
+                    'paid_amount'     => (float) $sale->paid_amount,
+                    'remaining_amount'=> (float) $sale->remaining_amount,
                     'document_date'   => $sale->document_date?->format('Y-m-d'),
                 ],
             ], 'تم تحويل الطلب إلى فاتورة بنجاح');

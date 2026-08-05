@@ -28,6 +28,7 @@ class PortalOrder extends Model
         'party_id',
         'user_id',
         'commercial_document_id',
+        'sale_document_id',
         'reference',
         'status',
         'notes',
@@ -130,6 +131,20 @@ class PortalOrder extends Model
     public function document(): BelongsTo
     {
         return $this->belongsTo(CommercialDocument::class, 'commercial_document_id');
+    }
+
+    /**
+     * المستند التجاري الناتج عن التحويل (FV/POS) — يُكتب مرة واحدة فقط
+     * داخل معاملة التحويل. وجوده يعني أن الطلب حوّل بالفعل ولا يقبل تحويلاً ثانياً.
+     */
+    public function saleDocument(): BelongsTo
+    {
+        return $this->belongsTo(CommercialDocument::class, 'sale_document_id');
+    }
+
+    public function getIsConvertedAttribute(): bool
+    {
+        return (bool) $this->sale_document_id;
     }
 
     public function histories(): HasMany

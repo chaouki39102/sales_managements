@@ -17,7 +17,7 @@ class ReportService
 {
     private const SALE_CODES = ['FV', 'AV', 'POS'];
     private const PURCHASE_CODES = ['FA', 'AA'];
-    private const AR_MONTHS = ['جانفي', 'فيفري', 'مارس', 'أفريل', 'ماي', 'جوان', 'جويلية', 'أوت', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+    private const AR_MONTHS = ['ط¬ط§ظ†ظپظٹ', 'ظپظٹظپط±ظٹ', 'ظ…ط§ط±ط³', 'ط£ظپط±ظٹظ„', 'ظ…ط§ظٹ', 'ط¬ظˆط§ظ†', 'ط¬ظˆظٹظ„ظٹط©', 'ط£ظˆطھ', 'ط³ط¨طھظ…ط¨ط±', 'ط£ظƒطھظˆط¨ط±', 'ظ†ظˆظپظ…ط¨ط±', 'ط¯ظٹط³ظ…ط¨ط±'];
 
     private function companyId(): int
     {
@@ -25,8 +25,8 @@ class ReportService
     }
 
     /**
-     * يرفق أسطر كل وثيقة (تفاصيل التفاصيل) بقائمة الوثائق المبنية مسبقاً.
-     * يستخدم لإظهار تفاصيل قابلة للطي في تقارير المبيعات/المشتريات/الإرجاعات/اليومي.
+     * ظٹط±ظپظ‚ ط£ط³ط·ط± ظƒظ„ ظˆط«ظٹظ‚ط© (طھظپط§طµظٹظ„ ط§ظ„طھظپط§طµظٹظ„) ط¨ظ‚ط§ط¦ظ…ط© ط§ظ„ظˆط«ط§ط¦ظ‚ ط§ظ„ظ…ط¨ظ†ظٹط© ظ…ط³ط¨ظ‚ط§ظ‹.
+     * ظٹط³طھط®ط¯ظ… ظ„ط¥ط¸ظ‡ط§ط± طھظپط§طµظٹظ„ ظ‚ط§ط¨ظ„ط© ظ„ظ„ط·ظٹ ظپظٹ طھظ‚ط§ط±ظٹط± ط§ظ„ظ…ط¨ظٹط¹ط§طھ/ط§ظ„ظ…ط´طھط±ظٹط§طھ/ط§ظ„ط¥ط±ط¬ط§ط¹ط§طھ/ط§ظ„ظٹظˆظ…ظٹ.
      */
     private function attachDocumentLines(array $docsArray, \Illuminate\Support\Collection $documents): array
     {
@@ -573,9 +573,9 @@ class ReportService
     }
 
     /**
-     * بيانات المنتجات الغنية: مبيعات الفترة + مشتريات الفترة + متوسط سعر الشراء المرجح
-     * (كل الفترات) + تكلفة البضاعة المباعة المقدرة + الربح المقدر + حالة المخزون.
-     * تُستهلك من تقرير المنتجات ولوحة القيادة (KPIs) معاً.
+     * ط¨ظٹط§ظ†ط§طھ ط§ظ„ظ…ظ†طھط¬ط§طھ ط§ظ„ط؛ظ†ظٹط©: ظ…ط¨ظٹط¹ط§طھ ط§ظ„ظپطھط±ط© + ظ…ط´طھط±ظٹط§طھ ط§ظ„ظپطھط±ط© + ظ…طھظˆط³ط· ط³ط¹ط± ط§ظ„ط´ط±ط§ط، ط§ظ„ظ…ط±ط¬ط­
+     * (ظƒظ„ ط§ظ„ظپطھط±ط§طھ) + طھظƒظ„ظپط© ط§ظ„ط¨ط¶ط§ط¹ط© ط§ظ„ظ…ط¨ط§ط¹ط© ط§ظ„ظ…ظ‚ط¯ط±ط© + ط§ظ„ط±ط¨ط­ ط§ظ„ظ…ظ‚ط¯ط± + ط­ط§ظ„ط© ط§ظ„ظ…ط®ط²ظˆظ†.
+     * طھظڈط³طھظ‡ظ„ظƒ ظ…ظ† طھظ‚ط±ظٹط± ط§ظ„ظ…ظ†طھط¬ط§طھ ظˆظ„ظˆط­ط© ط§ظ„ظ‚ظٹط§ط¯ط© (KPIs) ظ…ط¹ط§ظ‹.
      */
     private function productProfitData(array $filters = []): array
     {
@@ -592,7 +592,7 @@ class ReportService
 
         $productIds = $products->pluck('id');
 
-        // ─── مبيعات الفترة ────────────────────────────────────────────────────────
+        // â”€â”€â”€ ظ…ط¨ظٹط¹ط§طھ ط§ظ„ظپطھط±ط© â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         $salesStats = [];
         if ($productIds->isNotEmpty()) {
             $statsQuery = DB::table('commercial_document_lines as cdl')
@@ -629,7 +629,7 @@ class ReportService
             }
         }
 
-        // ─── مشتريات الفترة (كمية + قيمة) ──────────────────────────────────────────
+        // â”€â”€â”€ ظ…ط´طھط±ظٹط§طھ ط§ظ„ظپطھط±ط© (ظƒظ…ظٹط© + ظ‚ظٹظ…ط©) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         $purchaseStats = [];
         if ($productIds->isNotEmpty()) {
             $statsQuery = DB::table('commercial_document_lines as cdl')
@@ -664,7 +664,7 @@ class ReportService
             }
         }
 
-        // ─── متوسط سعر الشراء المرجح (كل الفترات — بدون فلتر تاريخ) ─────────────────
+        // â”€â”€â”€ ظ…طھظˆط³ط· ط³ط¹ط± ط§ظ„ط´ط±ط§ط، ط§ظ„ظ…ط±ط¬ط­ (ظƒظ„ ط§ظ„ظپطھط±ط§طھ â€” ط¨ط¯ظˆظ† ظپظ„طھط± طھط§ط±ظٹط®) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         $avgPurchase = [];
         if ($productIds->isNotEmpty()) {
             $avgRows = DB::table('commercial_document_lines as cdl')
@@ -690,7 +690,10 @@ class ReportService
         $useWarehouseStock = !empty($filters['warehouse_id']) && $productIds->isNotEmpty();
         if ($useWarehouseStock) {
             $stockRows = DB::table('stock_movements as sm')
-                ->join('stock_movement_types as smt', 'smt.id', '=', 'sm.stock_movement_type_id')
+                ->join('stock_movement_types as smt', function ($j) {
+                $j->on('smt.id', '=', 'sm.stock_movement_type_id')
+                  ->on('smt.company_id', '=', 'sm.company_id');
+            })
                 ->where('sm.company_id', $this->companyId())
                 ->where('sm.warehouse_id', $filters['warehouse_id'])
                 ->whereIn('sm.product_id', $productIds)
@@ -706,7 +709,7 @@ class ReportService
             }
         }
 
-        // ─── المخزون الحالي (SSOT: InventoryStockService — نفس مصدر صفحات المخزون) ──
+        // â”€â”€â”€ ط§ظ„ظ…ط®ط²ظˆظ† ط§ظ„ط­ط§ظ„ظٹ (SSOT: InventoryStockService â€” ظ†ظپط³ ظ…طµط¯ط± طµظپط­ط§طھ ط§ظ„ظ…ط®ط²ظˆظ†) â”€â”€
         $stockMap = [];
         if (!$useWarehouseStock && $productIds->isNotEmpty()) {
             $asOf = $filters['to_date'] ?? date('Y-m-d');
@@ -722,7 +725,7 @@ class ReportService
             $avgCost = $avgPurchase[$product->id] ?? (float) $product->purchase_price_ht;
             $stockVal = round($stockQty * $avgCost, 2);
             $margin = $ss['sales_ht'] - $ss['sales_cost'];
-            // تكلفة البضاعة المباعة = التكلفة المسجلة على أسطر البيع (SSOT — تشمل خصم/إرجاع AV)
+            // طھظƒظ„ظپط© ط§ظ„ط¨ط¶ط§ط¹ط© ط§ظ„ظ…ط¨ط§ط¹ط© = ط§ظ„طھظƒظ„ظپط© ط§ظ„ظ…ط³ط¬ظ„ط© ط¹ظ„ظ‰ ط£ط³ط·ط± ط§ظ„ط¨ظٹط¹ (SSOT â€” طھط´ظ…ظ„ ط®طµظ…/ط¥ط±ط¬ط§ط¹ AV)
             $cogs = $ss['sales_cost'] > 0 ? $ss['sales_cost'] : $ss['total_sold'] * $avgCost;
             $estProfit = $ss['sales_ht'] - $cogs;
             $status = $stockQty <= 0 ? 'out_of_stock' : ($stockQty < (float) $product->min_stock_alert ? 'reorder' : 'good');
@@ -754,7 +757,7 @@ class ReportService
             ];
         })->values();
 
-        // ترتيب حسب الربح المقدر (تنازلي) ثم تثبيت رقم الترتيب
+        // طھط±طھظٹط¨ ط­ط³ط¨ ط§ظ„ط±ط¨ط­ ط§ظ„ظ…ظ‚ط¯ط± (طھظ†ط§ط²ظ„ظٹ) ط«ظ… طھط«ط¨ظٹطھ ط±ظ‚ظ… ط§ظ„طھط±طھظٹط¨
         $rows = $rows->sortByDesc('est_profit')->values()
             ->map(function ($row, $i) {
                 $row['profit_rank'] = $i + 1;
@@ -788,9 +791,9 @@ class ReportService
     }
 
     /**
-     * لوحة القيادة (KPIs): إجمالي المبيعات/المشتريات، الربح المقدر، هامش الربح،
-     * الوحدات المباعة، قيمة المخزون، عدد المنتجات التي تحتاج إعادة طلب + أفضل/أضعف منتج.
-     * تُبنى من نفس بيانات تقرير المنتجات (productProfitData).
+     * ظ„ظˆط­ط© ط§ظ„ظ‚ظٹط§ط¯ط© (KPIs): ط¥ط¬ظ…ط§ظ„ظٹ ط§ظ„ظ…ط¨ظٹط¹ط§طھ/ط§ظ„ظ…ط´طھط±ظٹط§طھطŒ ط§ظ„ط±ط¨ط­ ط§ظ„ظ…ظ‚ط¯ط±طŒ ظ‡ط§ظ…ط´ ط§ظ„ط±ط¨ط­طŒ
+     * ط§ظ„ظˆط­ط¯ط§طھ ط§ظ„ظ…ط¨ط§ط¹ط©طŒ ظ‚ظٹظ…ط© ط§ظ„ظ…ط®ط²ظˆظ†طŒ ط¹ط¯ط¯ ط§ظ„ظ…ظ†طھط¬ط§طھ ط§ظ„طھظٹ طھط­طھط§ط¬ ط¥ط¹ط§ط¯ط© ط·ظ„ط¨ + ط£ظپط¶ظ„/ط£ط¶ط¹ظپ ظ…ظ†طھط¬.
+     * طھظڈط¨ظ†ظ‰ ظ…ظ† ظ†ظپط³ ط¨ظٹط§ظ†ط§طھ طھظ‚ط±ظٹط± ط§ظ„ظ…ظ†طھط¬ط§طھ (productProfitData).
      */
     public function dashboardReport(array $filters = []): array
     {
@@ -804,9 +807,9 @@ class ReportService
     }
 
     /**
-     * التنبؤ وإعادة الطلب: معدل البيع اليومي لكل منتج منذ أول عملية بيع (أيام النشاط =
-     * فرق التواريخ + 1)، التوقع = المعدل اليومي × أفق التنبؤ، الكمية المقترحة =
-     * التوقع − المخزون الحالي (لا تقل عن صفر).
+     * ط§ظ„طھظ†ط¨ط¤ ظˆط¥ط¹ط§ط¯ط© ط§ظ„ط·ظ„ط¨: ظ…ط¹ط¯ظ„ ط§ظ„ط¨ظٹط¹ ط§ظ„ظٹظˆظ…ظٹ ظ„ظƒظ„ ظ…ظ†طھط¬ ظ…ظ†ط° ط£ظˆظ„ ط¹ظ…ظ„ظٹط© ط¨ظٹط¹ (ط£ظٹط§ظ… ط§ظ„ظ†ط´ط§ط· =
+     * ظپط±ظ‚ ط§ظ„طھظˆط§ط±ظٹط® + 1)طŒ ط§ظ„طھظˆظ‚ط¹ = ط§ظ„ظ…ط¹ط¯ظ„ ط§ظ„ظٹظˆظ…ظٹ أ— ط£ظپظ‚ ط§ظ„طھظ†ط¨ط¤طŒ ط§ظ„ظƒظ…ظٹط© ط§ظ„ظ…ظ‚طھط±ط­ط© =
+     * ط§ظ„طھظˆظ‚ط¹ âˆ’ ط§ظ„ظ…ط®ط²ظˆظ† ط§ظ„ط­ط§ظ„ظٹ (ظ„ط§ طھظ‚ظ„ ط¹ظ† طµظپط±).
      */
     public function forecastReport(array $filters = []): array
     {
@@ -838,7 +841,7 @@ class ReportService
         $productIds = $salesRows->pluck('product_id');
         $products   = Product::whereIn('id', $productIds)->get()->keyBy('id');
 
-        // متوسط سعر الشراء المرجح (كل الفترات)
+        // ظ…طھظˆط³ط· ط³ط¹ط± ط§ظ„ط´ط±ط§ط، ط§ظ„ظ…ط±ط¬ط­ (ظƒظ„ ط§ظ„ظپطھط±ط§طھ)
         $avgPurchase = [];
         if ($productIds->isNotEmpty()) {
             $avgRows = DB::table('commercial_document_lines as cdl')
@@ -860,7 +863,7 @@ class ReportService
             }
         }
 
-        // المخزون الحالي (SSOT)
+        // ط§ظ„ظ…ط®ط²ظˆظ† ط§ظ„ط­ط§ظ„ظٹ (SSOT)
         $stockMap = [];
         if ($productIds->isNotEmpty()) {
             $asOf = $to ?? date('Y-m-d');
@@ -886,8 +889,8 @@ class ReportService
             $suggested = max(0, round($forecastQty - $stock, 2));
             return [
                 'product_id'         => (int) $r->product_id,
-                'product_name'       => $p?->name ?? '—',
-                'product_ref'        => $p?->ref ?? '—',
+                'product_name'       => $p?->name ?? 'â€”',
+                'product_ref'        => $p?->ref ?? 'â€”',
                 'first_sale'         => $r->first_sale,
                 'last_sale'          => $r->last_sale,
                 'active_days'        => $activeDays,
@@ -919,8 +922,8 @@ class ReportService
     }
 
     /**
-     * التقرير الشهري: صافي التدفق (نقدي تقريبي) = مبيعات الشهر − مشتريات الشهر،
-     * مجمّعة شهراً بشهر ضمن الفترة المعطاة (AV/AA بإشارة سالبة).
+     * ط§ظ„طھظ‚ط±ظٹط± ط§ظ„ط´ظ‡ط±ظٹ: طµط§ظپظٹ ط§ظ„طھط¯ظپظ‚ (ظ†ظ‚ط¯ظٹ طھظ‚ط±ظٹط¨ظٹ) = ظ…ط¨ظٹط¹ط§طھ ط§ظ„ط´ظ‡ط± âˆ’ ظ…ط´طھط±ظٹط§طھ ط§ظ„ط´ظ‡ط±طŒ
+     * ظ…ط¬ظ…ظ‘ط¹ط© ط´ظ‡ط±ط§ظ‹ ط¨ط´ظ‡ط± ط¶ظ…ظ† ط§ظ„ظپطھط±ط© ط§ظ„ظ…ط¹ط·ط§ط© (AV/AA ط¨ط¥ط´ط§ط±ط© ط³ط§ظ„ط¨ط©).
      */
     public function monthlyReport(array $filters = []): array
     {
@@ -1005,7 +1008,7 @@ class ReportService
         $products = $query->orderBy('name')->get();
         $productIds = $products->pluck('id');
 
-        // ─── مصدر المخزون: رصيد حتى تاريخ (as_of) | مستودع محدد | المخزون الحالي ──
+        // â”€â”€â”€ ظ…طµط¯ط± ط§ظ„ظ…ط®ط²ظˆظ†: ط±طµظٹط¯ ط­طھظ‰ طھط§ط±ظٹط® (as_of) | ظ…ط³طھظˆط¯ط¹ ظ…ط­ط¯ط¯ | ط§ظ„ظ…ط®ط²ظˆظ† ط§ظ„ط­ط§ظ„ظٹ â”€â”€
         $asOfDate = !empty($filters['as_of_date']) ? $filters['as_of_date'] : null;
         $stockMap = [];
 
@@ -1022,7 +1025,10 @@ class ReportService
             }
         } elseif (!empty($filters['warehouse_id']) && $productIds->isNotEmpty()) {
             $stockRows = DB::table('stock_movements as sm')
-                ->join('stock_movement_types as smt', 'smt.id', '=', 'sm.stock_movement_type_id')
+                ->join('stock_movement_types as smt', function ($j) {
+                $j->on('smt.id', '=', 'sm.stock_movement_type_id')
+                  ->on('smt.company_id', '=', 'sm.company_id');
+            })
                 ->where('sm.company_id', $this->companyId())
                 ->where('sm.warehouse_id', $filters['warehouse_id'])
                 ->whereIn('sm.product_id', $productIds)
@@ -1171,8 +1177,8 @@ class ReportService
 
         $items = $rows->map(fn($r) => [
             'product_id'   => $r->product_id,
-            'product_name' => $products->get($r->product_id)?->name ?? '—',
-            'product_ref'  => $products->get($r->product_id)?->ref ?? '—',
+            'product_name' => $products->get($r->product_id)?->name ?? 'â€”',
+            'product_ref'  => $products->get($r->product_id)?->ref ?? 'â€”',
             'total_qty'    => (float) $r->total_qty,
             'doc_count'    => (int) $r->doc_count,
             'avg_price'    => round((float) $r->avg_price, 2),
@@ -1221,8 +1227,8 @@ class ReportService
 
         $items = $rows->map(fn($r) => [
             'product_id'    => $r->product_id,
-            'product_name'  => $products->get($r->product_id)?->name ?? '—',
-            'product_ref'   => $products->get($r->product_id)?->ref ?? '—',
+            'product_name'  => $products->get($r->product_id)?->name ?? 'â€”',
+            'product_ref'   => $products->get($r->product_id)?->ref ?? 'â€”',
             'total_qty'     => (float) $r->total_qty,
             'total_ht'      => round((float) $r->total_ht, 2),
             'cost_price'    => (float) $r->total_qty > 0 ? round((float) $r->total_cost / (float) $r->total_qty, 2) : 0,
@@ -1274,10 +1280,10 @@ class ReportService
         $parties = $invoices->groupBy('party_id');
 
         $buckets = [
-            '0_30'   => ['label' => '0–30 يوم',  'total' => 0, 'count' => 0],
-            '31_60'  => ['label' => '31–60 يوم', 'total' => 0, 'count' => 0],
-            '61_90'  => ['label' => '61–90 يوم', 'total' => 0, 'count' => 0],
-            '90_plus' => ['label' => 'أكثر من 90 يوم', 'total' => 0, 'count' => 0],
+            '0_30'   => ['label' => '0â€“30 ظٹظˆظ…',  'total' => 0, 'count' => 0],
+            '31_60'  => ['label' => '31â€“60 ظٹظˆظ…', 'total' => 0, 'count' => 0],
+            '61_90'  => ['label' => '61â€“90 ظٹظˆظ…', 'total' => 0, 'count' => 0],
+            '90_plus' => ['label' => 'ط£ظƒط«ط± ظ…ظ† 90 ظٹظˆظ…', 'total' => 0, 'count' => 0],
         ];
 
         $rows = $parties->map(function ($docs, $partyId) use ($ref, &$buckets) {
@@ -1291,7 +1297,7 @@ class ReportService
 
             return [
                 'party_id'      => (int) $partyId,
-                'party_name'    => $party?->name ?? '—',
+                'party_name'    => $party?->name ?? 'â€”',
                 'total_due'     => round($total, 2),
                 'invoice_count' => $docs->count(),
                 'max_days'      => $days,
@@ -1392,7 +1398,7 @@ class ReportService
             ->whereDate('document_date', '<=', $to);
         $purchasesDocs = $purchasesQuery->get();
 
-        // مجموع موقّع: الإرجاعات (AV/AA) بسالب
+        // ظ…ط¬ظ…ظˆط¹ ظ…ظˆظ‚ظ‘ط¹: ط§ظ„ط¥ط±ط¬ط§ط¹ط§طھ (AV/AA) ط¨ط³ط§ظ„ط¨
         $signedSum = fn($docs, string $negateCode, string $field) => $docs->reduce(
             fn($sum, $d) => $sum + ($d->documentType?->code === $negateCode ? -$d->{$field} : $d->{$field}),
             0
@@ -1408,7 +1414,7 @@ class ReportService
         $saleReturns    = $salesDocs->filter(fn($d) => $d->documentType?->code === 'AV');
         $purchaseReturns = $purchasesDocs->filter(fn($d) => $d->documentType?->code === 'AA');
 
-        // ── تكلفة المبيعات (كل الأسطر، وليس أفضل 10 فقط) + أفضل 10 منتجات ──
+        // â”€â”€ طھظƒظ„ظپط© ط§ظ„ظ…ط¨ظٹط¹ط§طھ (ظƒظ„ ط§ظ„ط£ط³ط·ط±طŒ ظˆظ„ظٹط³ ط£ظپط¶ظ„ 10 ظپظ‚ط·) + ط£ظپط¶ظ„ 10 ظ…ظ†طھط¬ط§طھ â”€â”€
         $salesIds = $salesDocs->pluck('id');
         $totalSalesCost = 0.0;
         $productMargin = [];
@@ -1459,11 +1465,11 @@ class ReportService
             }
         }
 
-        // ── أفضل الزبائن / الموردين (كل الوثائق، موقّعة حسب الإرجاع) ──
+        // â”€â”€ ط£ظپط¶ظ„ ط§ظ„ط²ط¨ط§ط¦ظ† / ط§ظ„ظ…ظˆط±ط¯ظٹظ† (ظƒظ„ ط§ظ„ظˆط«ط§ط¦ظ‚طŒ ظ…ظˆظ‚ظ‘ط¹ط© ط­ط³ط¨ ط§ظ„ط¥ط±ط¬ط§ط¹) â”€â”€
         $topCustomers = $this->topParties($salesDocs, 'AV', 10);
         $topSuppliers = $this->topParties($purchasesDocs, 'AA', 10);
 
-        // ── المصاريف: الإجمالي + التوزيع حسب التصنيف ──
+        // â”€â”€ ط§ظ„ظ…طµط§ط±ظٹظپ: ط§ظ„ط¥ط¬ظ…ط§ظ„ظٹ + ط§ظ„طھظˆط²ظٹط¹ ط­ط³ط¨ ط§ظ„طھطµظ†ظٹظپ â”€â”€
         $expenseRows = DB::table('expenses as e')
             ->leftJoin('expense_categories as ec', 'ec.id', '=', 'e.expense_category_id')
             ->where('e.company_id', $companyId)
@@ -1476,7 +1482,7 @@ class ReportService
         $expensesByCategory = $expenseRows
             ->groupBy('category_name')
             ->map(fn($rows, $cat) => [
-                'category_name' => $cat === '' || $cat === null ? 'غير مصنف' : $cat,
+                'category_name' => $cat === '' || $cat === null ? 'ط؛ظٹط± ظ…طµظ†ظپ' : $cat,
                 'total'         => round((float) $rows->sum('amount'), 2),
                 'count'         => $rows->count(),
             ])
@@ -1485,7 +1491,7 @@ class ReportService
             ->values()
             ->toArray();
 
-        // ── الدفعات: مقبوض / مدفوع ──
+        // â”€â”€ ط§ظ„ط¯ظپط¹ط§طھ: ظ…ظ‚ط¨ظˆط¶ / ظ…ط¯ظپظˆط¹ â”€â”€
         $paymentsQuery = Payment::where('status', 'confirmed')
             ->whereBetween('payment_date', [$from, $to]);
         $paymentsIn  = (float) (clone $paymentsQuery)->where('direction', 'in')->sum('amount');
@@ -1496,7 +1502,7 @@ class ReportService
         $totalSalesMargin = round($totalSalesHt - $totalSalesCost, 2);
         $netProfit        = round($totalSalesMargin - $expensesTotal, 2);
 
-        // ── الاتجاه الشهري (مبيعات/مشتريات/مصاريف/هامش) مع فراغات معبّأة ──
+        // â”€â”€ ط§ظ„ط§طھط¬ط§ظ‡ ط§ظ„ط´ظ‡ط±ظٹ (ظ…ط¨ظٹط¹ط§طھ/ظ…ط´طھط±ظٹط§طھ/ظ…طµط§ط±ظٹظپ/ظ‡ط§ظ…ط´) ظ…ط¹ ظپط±ط§ط؛ط§طھ ظ…ط¹ط¨ظ‘ط£ط© â”€â”€
         $trend = [];
         $cursor = Carbon::parse($from)->startOfMonth();
         $trendEnd = Carbon::parse($to)->startOfMonth();
@@ -1596,7 +1602,7 @@ class ReportService
     }
 
     /**
-     * أفضل الأطراف حسب القيمة، موقّعة حسب كود الإرجاع (AV/AA).
+     * ط£ظپط¶ظ„ ط§ظ„ط£ط·ط±ط§ظپ ط­ط³ط¨ ط§ظ„ظ‚ظٹظ…ط©طŒ ظ…ظˆظ‚ظ‘ط¹ط© ط­ط³ط¨ ظƒظˆط¯ ط§ظ„ط¥ط±ط¬ط§ط¹ (AV/AA).
      */
     private function topParties(\Illuminate\Support\Collection $docs, string $negateCode, int $limit = 10): array
     {
@@ -1618,7 +1624,7 @@ class ReportService
         return $sorted->map(function ($row) use ($partiesMap) {
             $party = $partiesMap->get($row['party_id']);
             return [
-                'party_name' => $party?->name ?? '—',
+                'party_name' => $party?->name ?? 'â€”',
                 'total_ht'   => $row['total_ht'],
                 'total_ttc'  => $row['total_ttc'],
                 'doc_count'  => $row['doc_count'],
@@ -1728,8 +1734,8 @@ class ReportService
 
             return [
                 'product_id'    => $pid,
-                'product_name'  => $product?->name ?? '—',
-                'product_ref'   => $product?->ref ?? '—',
+                'product_name'  => $product?->name ?? 'â€”',
+                'product_ref'   => $product?->ref ?? 'â€”',
                 'sales_qty'     => (int) $salesQty,
                 'sales_ht'      => round($salesHt, 2),
                 'purchase_qty'  => (int) $purchaseQty,
@@ -1751,7 +1757,7 @@ class ReportService
     }
 
     /**
-     * سجل حركة منتج: كل وثيقة تحتوي على المنتج في الفترة، مع الإرجاعات بإشارة سالبة.
+     * ط³ط¬ظ„ ط­ط±ظƒط© ظ…ظ†طھط¬: ظƒظ„ ظˆط«ظٹظ‚ط© طھط­طھظˆظٹ ط¹ظ„ظ‰ ط§ظ„ظ…ظ†طھط¬ ظپظٹ ط§ظ„ظپطھط±ط©طŒ ظ…ط¹ ط§ظ„ط¥ط±ط¬ط§ط¹ط§طھ ط¨ط¥ط´ط§ط±ط© ط³ط§ظ„ط¨ط©.
      */
     public function productHistoryReport(array $filters = []): array
     {
@@ -2008,7 +2014,7 @@ class ReportService
 
         $byMode = $payments->groupBy('paymentMode.name')
             ->map(fn($pms, $name) => [
-                'mode'   => $name ?? 'غير محدد',
+                'mode'   => $name ?? 'ط؛ظٹط± ظ…ط­ط¯ط¯',
                 'count'  => $pms->count(),
                 'total'  => round($pms->sum('amount'), 2),
             ])->values()->toArray();
@@ -2088,7 +2094,7 @@ class ReportService
                 'status'         => $r->status,
             ])->toArray(),
             'by_category' => $byCategory->map(fn($r) => [
-                'category_name' => $r->category_name ?? 'غير مصنف',
+                'category_name' => $r->category_name ?? 'ط؛ظٹط± ظ…طµظ†ظپ',
                 'total'         => round((float) $r->total, 2),
                 'count'         => (int) $r->count,
             ])->toArray(),
@@ -2168,7 +2174,10 @@ class ReportService
         $query = DB::table('stock_movements as sm')
             ->join('products as p', 'p.id', '=', 'sm.product_id')
             ->leftJoin('warehouses as w', 'w.id', '=', 'sm.warehouse_id')
-            ->leftJoin('stock_movement_types as smt', 'smt.id', '=', 'sm.stock_movement_type_id')
+            ->leftJoin('stock_movement_types as smt', function ($j) {
+            $j->on('smt.id', '=', 'sm.stock_movement_type_id')
+              ->on('smt.company_id', '=', 'sm.company_id');
+        })
             ->where('sm.company_id', $this->companyId());
 
         if (!empty($filters['product_id'])) $query->where('sm.product_id', $filters['product_id']);
@@ -2185,7 +2194,10 @@ class ReportService
         )->orderBy('sm.movement_date', 'desc')->limit(500)->get();
 
         $summaryQuery = DB::table('stock_movements as sm')
-            ->leftJoin('stock_movement_types as smt', 'smt.id', '=', 'sm.stock_movement_type_id')
+            ->leftJoin('stock_movement_types as smt', function ($j) {
+            $j->on('smt.id', '=', 'sm.stock_movement_type_id')
+              ->on('smt.company_id', '=', 'sm.company_id');
+        })
             ->where('sm.company_id', $this->companyId());
 
         if (!empty($filters['product_id'])) $summaryQuery->where('sm.product_id', $filters['product_id']);
@@ -2225,11 +2237,11 @@ class ReportService
     }
 
     /**
-     * تقرير المصفوفة: صفوف = أطراف (زبائن أو موردون)، أعمدة = منتجات.
-     * كل خلية = الكمية / HT / TTC / التكلفة للزوج (طرف × منتج).
-     * الإرجاعات (AV/AA) تُحتسب بقيمة سالبة في الخلية.
+     * طھظ‚ط±ظٹط± ط§ظ„ظ…طµظپظˆظپط©: طµظپظˆظپ = ط£ط·ط±ط§ظپ (ط²ط¨ط§ط¦ظ† ط£ظˆ ظ…ظˆط±ط¯ظˆظ†)طŒ ط£ط¹ظ…ط¯ط© = ظ…ظ†طھط¬ط§طھ.
+     * ظƒظ„ ط®ظ„ظٹط© = ط§ظ„ظƒظ…ظٹط© / HT / TTC / ط§ظ„طھظƒظ„ظپط© ظ„ظ„ط²ظˆط¬ (ط·ط±ظپ أ— ظ…ظ†طھط¬).
+     * ط§ظ„ط¥ط±ط¬ط§ط¹ط§طھ (AV/AA) طھظڈط­طھط³ط¨ ط¨ظ‚ظٹظ…ط© ط³ط§ظ„ط¨ط© ظپظٹ ط§ظ„ط®ظ„ظٹط©.
      *
-     * @param string $mode 'sale' → زبائن (SALE_CODES) ، 'purchase' → موردون (PURCHASE_CODES)
+     * @param string $mode 'sale' â†’ ط²ط¨ط§ط¦ظ† (SALE_CODES) طŒ 'purchase' â†’ ظ…ظˆط±ط¯ظˆظ† (PURCHASE_CODES)
      */
     public function matrixReport(array $filters = [], string $mode = 'sale'): array
     {
@@ -2361,7 +2373,7 @@ class ReportService
         }
         unset($pr);
 
-        // ترتيب: الأطراف والأعمدة حسب إجمالي HT تنازلياً (الأكثر مبيعاً أولاً)
+        // طھط±طھظٹط¨: ط§ظ„ط£ط·ط±ط§ظپ ظˆط§ظ„ط£ط¹ظ…ط¯ط© ط­ط³ط¨ ط¥ط¬ظ…ط§ظ„ظٹ HT طھظ†ط§ط²ظ„ظٹط§ظ‹ (ط§ظ„ط£ظƒط«ط± ظ…ط¨ظٹط¹ط§ظ‹ ط£ظˆظ„ط§ظ‹)
         usort($parties,  fn($a, $b) => $b['total_ht'] <=> $a['total_ht']);
         usort($products, fn($a, $b) => $b['total_ht'] <=> $a['total_ht']);
 
@@ -2382,8 +2394,8 @@ class ReportService
     }
 
     /**
-     * تفاصيل خلية المصفوفة: الوثائق الفعلية لزوج (طرف × منتج) ضمن الفترة.
-     * تُستخدم في "التنقيب" عند النقر على خلية في تقرير المصفوفة.
+     * طھظپط§طµظٹظ„ ط®ظ„ظٹط© ط§ظ„ظ…طµظپظˆظپط©: ط§ظ„ظˆط«ط§ط¦ظ‚ ط§ظ„ظپط¹ظ„ظٹط© ظ„ط²ظˆط¬ (ط·ط±ظپ أ— ظ…ظ†طھط¬) ط¶ظ…ظ† ط§ظ„ظپطھط±ط©.
+     * طھظڈط³طھط®ط¯ظ… ظپظٹ "ط§ظ„طھظ†ظ‚ظٹط¨" ط¹ظ†ط¯ ط§ظ„ظ†ظ‚ط± ط¹ظ„ظ‰ ط®ظ„ظٹط© ظپظٹ طھظ‚ط±ظٹط± ط§ظ„ظ…طµظپظˆظپط©.
      */
     public function matrixDetail(array $filters = []): array
     {
@@ -2451,9 +2463,9 @@ class ReportService
     }
 
     /**
-     * رقم الأعمال الشهري حسب الزبون (Chiffre d'affaires mensuel par client).
-     * الصفوف = الزبائن، الأعمدة = الأشهر، الخلية = إجمالي الزبون في ذلك الشهر.
-     * الإرجاعات (AV) تُحتسب بإشارة سالبة.
+     * ط±ظ‚ظ… ط§ظ„ط£ط¹ظ…ط§ظ„ ط§ظ„ط´ظ‡ط±ظٹ ط­ط³ط¨ ط§ظ„ط²ط¨ظˆظ† (Chiffre d'affaires mensuel par client).
+     * ط§ظ„طµظپظˆظپ = ط§ظ„ط²ط¨ط§ط¦ظ†طŒ ط§ظ„ط£ط¹ظ…ط¯ط© = ط§ظ„ط£ط´ظ‡ط±طŒ ط§ظ„ط®ظ„ظٹط© = ط¥ط¬ظ…ط§ظ„ظٹ ط§ظ„ط²ط¨ظˆظ† ظپظٹ ط°ظ„ظƒ ط§ظ„ط´ظ‡ط±.
+     * ط§ظ„ط¥ط±ط¬ط§ط¹ط§طھ (AV) طھظڈط­طھط³ط¨ ط¨ط¥ط´ط§ط±ط© ط³ط§ظ„ط¨ط©.
      */
     public function clientMonthlyReport(array $filters = []): array
     {
@@ -2526,7 +2538,7 @@ class ReportService
             $monthTotals[$month]['ttc'] = ($monthTotals[$month]['ttc'] ?? 0) + $ttc;
         }
 
-        // أشهر الفترة (شهراً بشهر من «من» إلى «إلى»)
+        // ط£ط´ظ‡ط± ط§ظ„ظپطھط±ط© (ط´ظ‡ط±ط§ظ‹ ط¨ط´ظ‡ط± ظ…ظ† آ«ظ…ظ†آ» ط¥ظ„ظ‰ آ«ط¥ظ„ظ‰آ»)
         $monthKeys = [];
         if ($fromDate && $toDate) {
             $start = Carbon::parse($fromDate)->startOfMonth();
@@ -2556,7 +2568,7 @@ class ReportService
         }
         unset($p);
 
-        // الترتيب حسب رقم الأعمال (TTC) تنازلياً
+        // ط§ظ„طھط±طھظٹط¨ ط­ط³ط¨ ط±ظ‚ظ… ط§ظ„ط£ط¹ظ…ط§ظ„ (TTC) طھظ†ط§ط²ظ„ظٹط§ظ‹
         usort($parties, fn($a, $b) => $b['total_ttc'] <=> $a['total_ttc']);
 
         return [
@@ -2581,9 +2593,9 @@ class ReportService
     }
 
     /**
-     * دفتر الأستاذ العام (Grand Livre): سجل زمني لكل الحركات (وثائق + دفعات)
-     * لكل طرف في الفترة، مع الرصيد الافتتاحي قبل بداية الفترة والرصيد الجاري.
-     * debit = ما هو مستحق لنا / credit = ما هو مستحق منا.
+     * ط¯ظپطھط± ط§ظ„ط£ط³طھط§ط° ط§ظ„ط¹ط§ظ… (Grand Livre): ط³ط¬ظ„ ط²ظ…ظ†ظٹ ظ„ظƒظ„ ط§ظ„ط­ط±ظƒط§طھ (ظˆط«ط§ط¦ظ‚ + ط¯ظپط¹ط§طھ)
+     * ظ„ظƒظ„ ط·ط±ظپ ظپظٹ ط§ظ„ظپطھط±ط©طŒ ظ…ط¹ ط§ظ„ط±طµظٹط¯ ط§ظ„ط§ظپطھطھط§ط­ظٹ ظ‚ط¨ظ„ ط¨ط¯ط§ظٹط© ط§ظ„ظپطھط±ط© ظˆط§ظ„ط±طµظٹط¯ ط§ظ„ط¬ط§ط±ظٹ.
+     * debit = ظ…ط§ ظ‡ظˆ ظ…ط³طھط­ظ‚ ظ„ظ†ط§ / credit = ظ…ط§ ظ‡ظˆ ظ…ط³طھط­ظ‚ ظ…ظ†ط§.
      */
     public function grandLivreReport(array $filters = []): array
     {
@@ -2611,7 +2623,7 @@ class ReportService
         $from = Carbon::parse($fromDate)->toDateString();
         $to   = Carbon::parse($toDate)->toDateString();
 
-        // 1. نطاق الأطراف
+        // 1. ظ†ط·ط§ظ‚ ط§ظ„ط£ط·ط±ط§ظپ
         $partyQuery = DB::table('parties as pt')
             ->where('pt.company_id', $companyId)
             ->whereNull('pt.deleted_at')
@@ -2625,7 +2637,7 @@ class ReportService
             return $empty;
         }
 
-        // 2. الرصيد الافتتاحي لكل طرف قبل بداية الفترة (نفس SSOT الخاص بالرصيد)
+        // 2. ط§ظ„ط±طµظٹط¯ ط§ظ„ط§ظپطھطھط§ط­ظٹ ظ„ظƒظ„ ط·ط±ظپ ظ‚ط¨ظ„ ط¨ط¯ط§ظٹط© ط§ظ„ظپطھط±ط© (ظ†ظپط³ SSOT ط§ظ„ط®ط§طµ ط¨ط§ظ„ط±طµظٹط¯)
         $balanceService = app(PartyBalanceService::class);
         $openingMap     = [];
         $beforeDate     = Carbon::parse($from)->subDay()->toDateString();
@@ -2633,7 +2645,7 @@ class ReportService
             $openingMap[$ob['party_id']] = (float) $ob['current_balance'];
         }
 
-        // 3. الوثائق
+        // 3. ط§ظ„ظˆط«ط§ط¦ظ‚
         $documents = DB::table('commercial_documents as cd')
             ->join('document_types as dt',             'cd.document_type_id',           '=', 'dt.id')
             ->join('document_base_operations as dbo',  'dt.document_base_operation_id', '=', 'dbo.id')
@@ -2656,7 +2668,7 @@ class ReportService
             )
             ->get();
 
-        // 4. الدفعات
+        // 4. ط§ظ„ط¯ظپط¹ط§طھ
         $payments = DB::table('payments')
             ->leftJoin('payment_modes as pm', 'payments.payment_mode_id', '=', 'pm.id')
             ->where('payments.company_id',   $companyId)
@@ -2677,7 +2689,7 @@ class ReportService
             )
             ->get();
 
-        // 5. تجميع الحركات لكل طرف
+        // 5. طھط¬ظ…ظٹط¹ ط§ظ„ط­ط±ظƒط§طھ ظ„ظƒظ„ ط·ط±ظپ
         $txByParty = [];
         foreach ($documents as $doc) {
             [$debit, $credit] = $this->ledgerSplit((string) $doc->operation, $doc->type_code, (float) $doc->net_to_pay);
@@ -2706,14 +2718,14 @@ class ReportService
                 'date'      => substr((string) $p->payment_date, 0, 10),
                 'datetime'  => (string) $p->created_at,
                 'reference' => $p->payment_number,
-                'label'     => $p->mode_name ?: 'دفعة',
+                'label'     => $p->mode_name ?: 'ط¯ظپط¹ط©',
                 'type_code' => null,
                 'debit'     => $debit,
                 'credit'    => $credit,
             ];
         }
 
-        // 6. ترتيب زمني + رصيد جاري
+        // 6. طھط±طھظٹط¨ ط²ظ…ظ†ظٹ + ط±طµظٹط¯ ط¬ط§ط±ظٹ
         $resultParties = [];
         $totalDebit    = 0.0;
         $totalCredit   = 0.0;
@@ -2723,7 +2735,7 @@ class ReportService
             $opening = round($openingMap[$party->id] ?? 0.0, 2);
             $txs     = $txByParty[$party->id] ?? [];
 
-            // أطراف بلا حركة في الفترة ولا رصيد افتتاحي → تُتجاهل
+            // ط£ط·ط±ط§ظپ ط¨ظ„ط§ ط­ط±ظƒط© ظپظٹ ط§ظ„ظپطھط±ط© ظˆظ„ط§ ط±طµظٹط¯ ط§ظپطھطھط§ط­ظٹ â†’ طھظڈطھط¬ط§ظ‡ظ„
             if (empty($txs) && abs($opening) < 0.005) {
                 continue;
             }
@@ -2781,8 +2793,8 @@ class ReportService
     }
 
     /**
-     * تقسيم مبلغ حركة إلى (مدين / دائن) وفق اتفاقية الرصيد الموحدة:
-     * بيع → مدين (+)، إرجاع بيع (AV) → دائن، شراء → دائن (−)، إرجاع شراء (AA) → مدين.
+     * طھظ‚ط³ظٹظ… ظ…ط¨ظ„ط؛ ط­ط±ظƒط© ط¥ظ„ظ‰ (ظ…ط¯ظٹظ† / ط¯ط§ط¦ظ†) ظˆظپظ‚ ط§طھظپط§ظ‚ظٹط© ط§ظ„ط±طµظٹط¯ ط§ظ„ظ…ظˆط­ط¯ط©:
+     * ط¨ظٹط¹ â†’ ظ…ط¯ظٹظ† (+)طŒ ط¥ط±ط¬ط§ط¹ ط¨ظٹط¹ (AV) â†’ ط¯ط§ط¦ظ†طŒ ط´ط±ط§ط، â†’ ط¯ط§ط¦ظ† (âˆ’)طŒ ط¥ط±ط¬ط§ط¹ ط´ط±ط§ط، (AA) â†’ ظ…ط¯ظٹظ†.
      */
     private function ledgerSplit(string $operation, ?string $code, float $net): array
     {

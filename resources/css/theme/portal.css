@@ -2077,6 +2077,7 @@ html.dark .portal-login-box {
 .portal-mobile-bar { display: none; }
 
 @media (max-width: 640px) {
+  .portal-nav { display: none; }
   .portal-mobile-bar {
     display: flex;
     position: fixed;
@@ -2540,3 +2541,268 @@ body.dark .poa-date input::-webkit-calendar-picker-indicator { opacity: .85; }
 .poa-cv-rem { flex: 1; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--t4, #94a3b8); min-width: 0; }
 .poa-cv-rem.ok { color: var(--g, #16a34a); }
 .poa-cv-rem.over { color: var(--r, #dc2626); }
+
+/* ═══════════════════════════════════════════════════════════
+   أدوات موحّدة (Unified utilities) — تحل محل الأنماط المضمّنة
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── صف أفقي (Flex row) ── */
+.portal-inline        { display: flex; align-items: center; gap: 10px; }
+.portal-inline--6     { gap: 6px; }
+.portal-inline--8     { gap: 8px; }
+.portal-inline--12    { gap: 12px; }
+.portal-inline--14    { gap: 14px; }
+.portal-inline--16    { gap: 16px; }
+.portal-between       { display: flex; align-items: center; justify-content: space-between; }
+.portal-between--start { align-items: flex-start; }
+.portal-between--wrap { flex-wrap: wrap; }
+.portal-grow          { flex: 1; min-width: 0; }
+
+/* ── شبكات (Grids) ── */
+.portal-grid-wide  { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; }
+.portal-stats      { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.portal-stats-item { text-align: center; padding: 12px 8px; }
+.portal-stat-num   { font-size: 24px; font-weight: 900; line-height: 1.2; }
+.portal-stat-lbl   { font-size: 11.5px; color: var(--t4); font-weight: 600; margin-top: 4px; }
+.portal-stats-foot { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--b1); }
+.portal-stat-key   { font-size: 12px; font-weight: 600; color: var(--t3); }
+.portal-stat-val   { font-size: 12px; font-weight: 800; }
+
+/* ── هوامش (Margins) ── */
+.portal-mt-4  { margin-top: 4px; }
+.portal-mt-6  { margin-top: 6px; }
+.portal-mt-8  { margin-top: 8px; }
+.portal-mt-10 { margin-top: 10px; }
+.portal-mt-12 { margin-top: 12px; }
+.portal-mt-14 { margin-top: 14px; }
+.portal-mt-16 { margin-top: 16px; }
+.portal-mt-20 { margin-top: 20px; }
+.portal-mt-22 { margin-top: 22px; }
+.portal-mb-4  { margin-bottom: 4px; }
+.portal-mb-6  { margin-bottom: 6px; }
+.portal-mb-8  { margin-bottom: 8px; }
+.portal-mb-10 { margin-bottom: 10px; }
+.portal-mb-12 { margin-bottom: 12px; }
+.portal-mb-14 { margin-bottom: 14px; }
+.portal-mb-16 { margin-bottom: 16px; }
+.portal-mb-20 { margin-bottom: 20px; }
+.portal-mb-24 { margin-bottom: 24px; }
+
+/* ── حشوات (Padding) ── */
+.portal-p-0  { padding: 0; }
+.portal-p-12 { padding: 12px; }
+
+/* ── نص / ألوان (Text & colors) ── */
+.portal-center { text-align: center; }
+.portal-muted  { color: var(--t4); }
+.portal-em     { color: var(--em); }
+.portal-red    { color: var(--red); }
+.portal-green  { color: #059669; }
+.portal-gold   { color: var(--gold); }
+.portal-blue   { color: var(--blue); }
+.portal-t-xs   { font-size: 10.5px; }
+.portal-t-sm   { font-size: 11.5px; }
+.portal-t-md   { font-size: 13px; }
+.portal-nowrap { white-space: nowrap; }
+
+/* ── إضافات تحل محل أنماط مضمّنة متكررة ── */
+.portal-form-input { resize: vertical; }
+.portal-doc-card-footer i { margin-inline-end: 4px; }
+.portal-step-dot i { font-size: 12px; line-height: 1; }
+.portal-toolbar--tight { padding-bottom: 4px; }
+.portal-btn--icon { padding: 8px 10px; }
+
+/* ── خلايا الجدول (Table cell helpers) ── */
+.portal-table td.ow      { color: var(--red); }
+.portal-table td.pos     { color: #059669; }
+.portal-table td.ix      { color: var(--t4); }
+.portal-table td.bold    { font-weight: 800; }
+.portal-table td .b      { font-weight: 700; }
+.portal-table td .sm     { font-size: 10.5px; color: var(--t4); }
+.portal-table td .ow     { color: var(--red); }
+.portal-table td .pos    { color: #059669; }
+.portal-table td.portal-tbl-bold { font-weight: 900; }
+
+/* ── تفاصيل مستند (Document detail) ── */
+.portal-doc-sub { font-size: 12px; color: var(--t4); margin-top: 2px; }
+.portal-doc-prog-title { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--t2); }
+.portal-doc-prog-pct { font-size: 14px; font-weight: 900; }
+.portal-doc-prog-meta { font-size: 11px; font-weight: 600; color: var(--t4); }
+
+.portal-stmt-item .v.md { font-size: 13px; }
+.portal-stmt-item .v.ok { color: #059669; }
+.portal-stmt-item .v.ow { color: var(--red); }
+.portal-stmt-item .v.t1 { color: var(--t1); }
+
+.portal-empty-inline { text-align: center; padding: 28px; color: var(--t4); font-size: 12.5px; }
+.portal-empty-ic { display: block; margin: 0 auto 10px; font-size: 32px; opacity: .15; line-height: 1; }
+
+.portal-card .sr .sr-l.total { font-size: 14px; font-weight: 800; color: var(--t1); }
+.portal-card .sr .sr-v.total { font-size: 16px; color: var(--em); }
+.portal-card .sr .sr-v.ok    { color: #059669; }
+.portal-card .sr .sr-v.ow    { color: var(--red); }
+.portal-card .sr .sr-v.t1    { color: var(--t1); }
+
+/* ── لوحة معلومات الزبون (Dashboard) ── */
+.portal-card--pad-sm { padding: 16px 20px; }
+.portal-logo--sm { width: 44px; height: 44px; font-size: 17px; }
+.portal-company-name { font-size: 15px; font-weight: 900; color: var(--t1); letter-spacing: .3px; }
+.portal-company-sub { font-size: 11.5px; color: var(--t4); margin-top: 2px; }
+.portal-kpi-v--sm { font-size: 15px; }
+.portal-kpi-s--gold { color: var(--gold); }
+.portal-grid-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; }
+.portal-card-link i { font-size: 10px; }
+.portal-card-bd--flush { padding: 0; }
+.portal-empty { text-align: center; padding: 28px; color: var(--t4); font-size: 12.5px; }
+.portal-empty i { font-size: 32px; opacity: .15; display: block; margin: 0 auto 10px; line-height: 1; }
+.portal-table td.em     { color: var(--em); }
+.portal-table td.tx-sm  { font-size: 11.5px; }
+.portal-sum-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.portal-sum-item { text-align: center; padding: 12px 8px; }
+.portal-sum-num { font-size: 24px; font-weight: 900; }
+.portal-sum-lbl { font-size: 11.5px; color: var(--t4); font-weight: 600; margin-top: 4px; }
+.portal-sum-ft { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--b1); }
+.portal-sum-ft-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.portal-sum-ft-k { font-size: 12px; font-weight: 600; color: var(--t3); }
+.portal-sum-ft-v { font-size: 12px; font-weight: 800; color: var(--em); }
+.portal-credit-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--t4);
+}
+
+/* ── تسجيل الدخول (Portal login) ── */
+.portal-login-form { display: flex; flex-direction: column; gap: 16px; }
+.portal-login-label { display: block; font-size: 11.5px; font-weight: 700; color: var(--t3); margin-bottom: 6px; }
+.portal-login-eye {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; color: var(--t4);
+  padding: 4px; font-size: 16px; border-radius: 6px; transition: color .2s;
+}
+.portal-login-eye:hover { color: var(--t1); }
+.portal-login-submit { justify-content: center; padding: 13px 14px; font-size: 14px; border-radius: 12px; margin-top: 4px; }
+.portal-login-foot {
+  margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--b1);
+  font-size: 12px; color: var(--t4); text-align: center; line-height: 1.6;
+}
+
+/* ── أدوات عامة إضافية ── */
+.portal-relative { position: relative; }
+.portal-form-input--r { text-align: right; }
+.portal-form-input--pass { text-align: right; padding-left: 40px; }
+
+/* ── ملخص الدفعات ── */
+.portal-pay-summary {
+  display: flex; gap: 16px; padding: 12px 22px;
+  border-bottom: 1px solid var(--b1); flex-wrap: wrap;
+}
+.portal-pay-sum { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; }
+.portal-pay-sum--in  { color: #059669; }
+.portal-pay-sum--out { color: var(--red); }
+.portal-pay-sum--net { color: var(--t2); }
+
+/* ── فلتر كشف الحساب ── */
+.portal-stmt-filter { margin-bottom: 18px; padding: 16px 20px; }
+.portal-stmt-filter-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.portal-flex160 { flex: 1 1 160px; }
+.portal-form-label { display: block; font-size: 11.5px; font-weight: 700; color: var(--t3); margin-bottom: 5px; }
+
+/* ── عناوين و عناصر مشتركة ── */
+.portal-em-icon  { color: var(--em); font-size: 16px; }
+.portal-sec-title { font-size: 13px; font-weight: 700; color: var(--t1); }
+.portal-tbl-bold { font-weight: 900; }
+
+/* ── ملف الزبون (Profile page) ── */
+.pr-row-ic { margin-inline-end: 5px; font-size: 13px; opacity: .55; }
+.pr-tag i { font-size: 10px; }
+.pr-tag--ok { background: rgba(16,185,129,.08); color: #059669; border-color: transparent; }
+.pr-credit-num--muted { color: var(--t4); }
+.pr-acct-stat-icon--g { background: rgba(10,138,92,.08); color: var(--em); }
+.pr-acct-stat-icon--b { background: rgba(59,130,246,.08); color: #3b82f6; }
+.pr-acct-stat-icon--y { background: rgba(245,158,11,.08); color: #f59e0b; }
+.pr-acct-stat-val--r { text-align: right; }
+.pr-pass-wrap input { text-align: right; padding-left: 40px; }
+.pr-security-tip--em i { color: var(--em); }
+.pr-security-tip--b i { color: #3b82f6; }
+
+/* ── لوحة طلبات البوابة (Admin Orders) ── */
+.poa-sec--tight { padding: 6px 12px; }
+.poa-sec--goldbg { background: var(--goldb); border-color: var(--b3); }
+.poa-sec--embg { background: var(--emb); border-color: var(--b3); }
+.poa-sec-t--gold { color: var(--gold); }
+.poa-sec-t--gold i { color: var(--gold); }
+.poa-mono { direction: ltr; font-family: Consolas, monospace; font-size: 12.5px; }
+.poa-cell-date { color: var(--t3); font-weight: 600; font-size: 12px; }
+.poa-cell-num { color: var(--t3); font-weight: 700; }
+.poa-ttc-unit { font-size: 10.5px; font-weight: 600; color: var(--t4); }
+.poa-bar--mt6 { margin-top: 6px; }
+.poa-flex-gap6 { display: flex; gap: 6px; }
+.poa-col { display: flex; flex-direction: column; gap: 12px; }
+.poa-col10 { display: flex; flex-direction: column; gap: 10px; }
+.poa-grow { flex: 1; min-width: 0; }
+.poa-chip-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.poa-item-name { font-weight: 800; font-size: 12.5px; color: var(--t1); }
+.poa-item-ref { font-size: 10.5px; color: var(--t4); font-weight: 600; }
+.poa-bold { font-weight: 700; }
+.poa-pack-em { color: var(--em); font-size: 10.5px; }
+.poa-pack-note { color: var(--em); }
+.poa-tva-cell { display: inline-flex; align-items: center; gap: 4px; }
+.poa-unit-note { margin-inline-start: 5px; color: var(--t4); font-size: 11px; }
+.poa-stock-over { color: var(--red); font-size: 10.5px; font-weight: 800; margin-top: 2px; }
+.poa-cell-ttc { font-size: 12.5px; }
+.poa-notes-txt { font-size: 12.5px; font-weight: 600; color: var(--t2); }
+.poa-tl-by { color: var(--t4); font-weight: 600; font-size: 11px; }
+.poa-tbl-empty { padding: 18px; text-align: center; color: var(--t4); font-size: 12px; }
+.poa-tas { text-align: start; }
+.poa-tac { text-align: center; }
+.poa-tae { text-align: end; }
+.poa-taw40 { width: 40px; }
+.poa-hint--mt6 { margin-top: 6px; }
+.poa-hint--pad { padding: 30px; justify-content: center; }
+.poa-hint--pad20 { padding: 20px; justify-content: center; }
+.poa-hint--auto { margin-inline-start: auto; }
+.poa-hint--ok { color: var(--g); }
+.poa-hint--ok i { color: var(--g); }
+.poa-hint--gold { color: var(--gold); }
+.poa-hint--gold i { color: var(--gold); }
+.poa-badge-auto { margin-inline-start: auto; }
+.poa-conv-title { font-weight: 800; color: var(--g); }
+.poa-conv-title i { margin-inline-end: 6px; }
+.poa-conv-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; font-size: 12.5px; font-weight: 700; color: var(--t2); }
+.poa-conv-meta b { direction: ltr; }
+.poa-proc-warn { color: var(--red); }
+.poa-proc-info { color: var(--gold); }
+.poa-addbox { border: 1px dashed var(--b3); border-radius: var(--r2); padding: 10px; margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.poa-addrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.poa-add-input {
+  flex: 1; min-width: 180px; padding: 8px 10px; border-radius: var(--r2);
+  border: 1px solid var(--b3); background: var(--bg1); color: var(--t1);
+  font-size: 12.5px; font-family: Tajawal, sans-serif; outline: none;
+}
+.poa-add-input:focus { border-color: var(--em); box-shadow: 0 0 0 3px color-mix(in srgb, var(--em) 14%, transparent); }
+.poa-add-qty { width: 64px; }
+.poa-search-box { max-height: 180px; overflow-y: auto; border: 1px solid var(--b1); border-radius: var(--r2); background: var(--bg2); }
+.poa-search-msg { padding: 12px; text-align: center; color: var(--t4); font-size: 12px; }
+.poa-search-row {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 8px 10px; border: none; border-bottom: 1px solid var(--b1);
+  background: none; cursor: pointer; font-size: 12.5px; font-family: Tajawal, sans-serif;
+  color: var(--t1); text-align: start;
+}
+.poa-search-row:hover { background: var(--bg3); }
+.poa-search-name { font-weight: 700; }
+.poa-search-sub { color: var(--t4); font-weight: 500; font-size: 11px; margin-inline-start: 6px; }
+.poa-search-price { color: var(--em); font-weight: 700; font-size: 12px; }
+.poa-total .poa-val-sm { font-size: 12px; font-weight: 700; }
+.poa-total .poa-val-gold { color: var(--gold); }
+.poa-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.poa-check-lbl { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; cursor: pointer; }
+.poa-row-end { display: flex; gap: 8px; align-items: flex-end; }
+.poa-row-center { display: flex; gap: 8px; align-items: center; }
+.poa-field { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.poa-field-lbl { font-size: 12px; font-weight: 700; color: var(--t2); }
+.poa-alloc--full { width: 100%; text-align: right; }
+.btn.btn-p.poa-btn-gold { background: var(--gold); border-color: var(--gold); color: #fff; }

@@ -34,8 +34,11 @@ import {
   type PortalAdminOrder,
   type PortalAdminOrderItem,
   type PortalAdminStockInfo,
+  type PortalConvertTarget,
+  type PortalConvertPayment,
   type PortalOrderConvertResult,
 } from '@/lib/api/endpoints/portalOrders';
+import { usePaymentModes } from '@/lib/api/endpoints/lookups';
 import type { PortalOrderStatus } from '@/lib/api/portal/portal';
 import OrderPipeline from './OrderPipeline';
 import { exportToExcel } from '@/pages/reports/exportUtils';
@@ -211,6 +214,15 @@ export default function PortalOrdersAdminPage() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [allocs, setAllocs] = useState<AllocLine[]>([]);
 
+  // ── تحويل إلى فاتورة (FV/POS + دفعة اختيارية) ─────────────────────────
+  const [convertOpen, setConvertOpen] = useState(false);
+  const [convertTarget, setConvertTarget] = useState<'FV' | 'POS'>('FV');
+  const [payEnabled, setPayEnabled] = useState(false);
+  const [payModeId, setPayModeId] = useState<number | ''>('');
+  const [payAmount, setPayAmount] = useState('');
+  const [payDate, setPayDate] = useState('');
+  const [payReference, setPayReference] = useState('');
+
   const perPage = 15;
 
   const { data, isLoading } = usePortalOrders({ page, per_page: perPage, status, search: debouncedSearch, from_date: fromDate || undefined, to_date: toDate || undefined });
@@ -235,7 +247,11 @@ export default function PortalOrdersAdminPage() {
   );
 
   const canEdit = !!order && !['shipped', 'delivered', 'returned', 'cancelled', 'completed'].includes(order.status);
-  const convertable = !!order && ['confirmed', 'processed', 'shipped'].includes(order.status);
+  // التحويل متاح من مؤكد/تم المعالجة/الشحن (يقفز إلى تم التسليم) ومن
+  // تم التسليم نفسه (يبقى الوضع كما هو) — لا من مرتجع/ملغى.
+  // التحويل مسموح مرة واحدة فقط: طلب محوّل (is_converted) يفقد الزر نهائياً.
+  const convertable = !!order && !order.is_converted && ['confirmed', 'processed', 'shipped', 'delivered'].includes(order.status);
+  const paymentModes = usePaymentModes();
 
   // ── بحث مع إبطاء ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -443,17 +459,46 @@ export default function PortalOrdersAdminPage() {
     applyStatus(target);
   };
 
-  const handleConvert = async () => {
+  const openConvert = () => {
+    if (!order) return;
+    if (order.is_converted) {
+      notify.warning('تم تحويل هذا الطلب إلى فاتورة مسبقاً — التحويل مسموح مرة واحدة فقط.');
+      return;
+    }
+    setConvertTarget('FV');
+    setPayEnabled(false);
+    setPayModeId('');
+    setPayAmount('');
+    setPayDate(new Date().toISOString().slice(0, 10));
+    setPayReference('');
+    setConvertOpen(true);
+  };
+
+  const doConvert = () => {
     if (!detailId) return;
-    const ok = await confirm(
-      'سيتم تحويل هذا الطلب إلى فاتورة بيع (FV) — تُفعَّل حركة المخزون والطابع الجبائي وقيود الرصيد ولا يمكن التراجع. متابعة؟',
-      { title: 'تحويل الطلب إلى فاتورة', confirmText: 'تحويل الآن', variant: 'warning', icon: 'ti-file-invoice' },
-    );
-    if (!ok) return;
+    if (payEnabled && !Number(payModeId)) {
+      notify.error('اختر طريقة الدفع أولاً.');
+      return;
+    }
+    const amount = Number(payAmount);
+    if (payEnabled && (!amount || amount <= 0)) {
+      notify.error('أدخل مبلغاً صحيحاً أكبر من صفر.');
+      return;
+    }
+    const payment: PortalConvertPayment | undefined = payEnabled
+      ? {
+          payment_mode_id: Number(payModeId),
+          amount,
+          payment_date: payDate || new Date().toISOString().slice(0, 10),
+          reference: payReference.trim() || undefined,
+        }
+      : undefined;
+    const data: PortalConvertTarget = { target: convertTarget, ...(payment ? { payment } : {}) };
     convert.mutate(
-      { id: detailId },
+      { id: detailId, data },
       {
         onSuccess: (res) => {
+          setConvertOpen(false);
           setConvertResult(res.sale);
           notify.success(`تم التحويل — الفاتورة ${res.sale.document_number}`);
         },
@@ -569,7 +614,7 @@ export default function PortalOrdersAdminPage() {
         </div>
 
         {/* ── شريط خط الأنابيب (ملخص) ─────────────────────────────────── */}
-        <div className="poa-sec" style={{ padding: '6px 12px' }}>
+        <div className="poa-sec poa-sec--tight">
           <OrderPipeline
             status={status === '' ? 'preparing' : status}
             counts={summaryQuery.data}
@@ -642,11 +687,11 @@ export default function PortalOrdersAdminPage() {
           columns={[
             {
               key: 'reference', label: 'المرجع', align: 'center',
-              render: (v) => <b style={{ direction: 'ltr', fontFamily: 'Consolas, monospace', fontSize: 12.5 }}>{v as string}</b>,
+              render: (v) => <b className="poa-mono">{v as string}</b>,
             },
             {
               key: 'requested_at', label: 'التاريخ', align: 'center',
-              render: (v) => <span style={{ color: 'var(--t3)', fontWeight: 600, fontSize: 12 }}>{fmtDate(v as string)}</span>,
+              render: (v) => <span className="poa-cell-date">{fmtDate(v as string)}</span>,
             },
             {
               key: 'party', label: 'الزبون',
@@ -665,11 +710,11 @@ export default function PortalOrdersAdminPage() {
             },
             {
               key: 'items_count', label: 'المنتجات', align: 'center',
-              render: (v) => <span style={{ color: 'var(--t3)', fontWeight: 700 }}>{v as number}</span>,
+              render: (v) => <span className="poa-cell-num">{v as number}</span>,
             },
             {
               key: 'total_ttc', label: 'المجموع TTC', align: 'end',
-              render: (v) => <b>{fmt(Number(v))} <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--t4)' }}>دج</span></b>,
+              render: (v) => <b>{fmt(Number(v))} <span className="poa-ttc-unit">دج</span></b>,
             },
             {
               key: 'status', label: 'الحالة', align: 'center',
@@ -697,9 +742,9 @@ export default function PortalOrdersAdminPage() {
 
         {/* ── ترقيم الصفحات ────────────────────────────────────────────── */}
         {meta && meta.total > perPage && (
-          <div className="poa-bar" style={{ marginTop: 6 }}>
+          <div className="poa-bar poa-bar--mt6">
             <span className="poa-hint">صفحة {meta.current_page} من {meta.last_page}</span>
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div className="poa-flex-gap6">
               <Button
                 variant="outline" size="sm" aria-label="السابق"
                 icon={<i className="ti ti-chevron-right" />}
@@ -745,9 +790,8 @@ export default function PortalOrdersAdminPage() {
                 <Button
                   variant="primary"
                   icon={<i className="ti ti-file-invoice" />}
-                  loading={convert.isPending}
-                  onClick={handleConvert}
-                  style={{ background: 'var(--gold)', borderColor: 'var(--gold)', color: '#fff' }}
+                  onClick={openConvert}
+                  className="poa-btn-gold"
                 >
                   تحويل إلى فاتورة
                 </Button>
@@ -772,9 +816,9 @@ export default function PortalOrdersAdminPage() {
         }
       >
         {detail.isLoading ? (
-          <div className="poa-hint" style={{ padding: 30, justifyContent: 'center' }}>جاري التحميل...</div>
+          <div className="poa-hint poa-hint--pad">جاري التحميل...</div>
         ) : order ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="poa-col">
             {/* ── الزبون ─────────────────────────────────────────────── */}
             <div className="poa-sec">
               <div className="poa-cust-card">
@@ -785,11 +829,11 @@ export default function PortalOrdersAdminPage() {
                     أمر زبون {order.document?.document_number ?? ''} · أُرسل في {fmtDate(order.requested_at)}
                   </span>
                 </span>
-                <Badge variant={stMeta(order.status).badge} style={{ marginInlineStart: 'auto' }}>
+                <Badge variant={stMeta(order.status).badge} className="poa-badge-auto">
                   {order.status_label}
                 </Badge>
               </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+              <div className="poa-chip-row">
                 {order.party?.code && (
                   <span className="poa-chip"><i className="ti ti-barcode" /> {order.party.code}</span>
                 )}
@@ -803,7 +847,7 @@ export default function PortalOrdersAdminPage() {
             </div>
 
             {/* ── المسار ──────────────────────────────────────────────── */}
-            <div className="poa-sec" style={{ padding: '6px 12px' }}>
+            <div className="poa-sec poa-sec--tight">
               <OrderPipeline status={order.status} />
             </div>
 
@@ -821,8 +865,8 @@ export default function PortalOrdersAdminPage() {
                         const it = row as PortalAdminOrderItem;
                         return (
                           <div>
-                            <div style={{ fontWeight: 800, fontSize: 12.5, color: 'var(--t1)' }}>{it.product_name}</div>
-                            {it.product_ref && <div style={{ fontSize: 10.5, color: 'var(--t4)', fontWeight: 600 }}>{it.product_ref}</div>}
+                            <div className="poa-item-name">{it.product_name}</div>
+                            {it.product_ref && <div className="poa-item-ref">{it.product_ref}</div>}
                           </div>
                         );
                       },
@@ -832,10 +876,10 @@ export default function PortalOrdersAdminPage() {
                       render: (_v, row) => {
                         const it = row as PortalAdminOrderItem;
                         return (
-                          <span style={{ fontWeight: 700 }}>
+                          <span className="poa-bold">
                             {it.quantity}
                             {it.unit_name ? ` ${it.unit_name}` : ''}
-                            {it.pack_qty > 1 ? <span style={{ color: 'var(--em)', fontSize: 10.5 }}> × {it.pack_qty}</span> : null}
+                            {it.pack_qty > 1 ? <span className="poa-pack-em"> × {it.pack_qty}</span> : null}
                           </span>
                         );
                       },
@@ -848,7 +892,7 @@ export default function PortalOrdersAdminPage() {
                         const live = it.tva_rate_live ?? it.tva_rate ?? 0;
                         const exempt = !!order?.party?.is_tva_exempt && live > (it.tva_rate ?? 0);
                         return (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <span className="poa-tva-cell">
                             <span>{live}%</span>
                             {exempt && (
                               <span className="poa-exempt" title={`معفى جبائياً — نُطبق 0% على هذا الزبون`}>معفى</span>
@@ -873,7 +917,7 @@ export default function PortalOrdersAdminPage() {
               <div className="poa-sec">
                 <div className="poa-sec-t">
                   <i className="ti ti-edit" /> تحرير المنتجات
-                  <span className="poa-hint" style={{ marginInlineStart: 'auto' }}>
+                  <span className="poa-hint poa-hint--auto">
                     <i className="ti ti-info-circle" /> الكمية 0 تحذف المنتج — سعر الوحدة والخصم قابلان للتعديل
                   </span>
                 </div>
@@ -881,14 +925,14 @@ export default function PortalOrdersAdminPage() {
                 <table className="poa-edit-tbl">
                   <thead>
                     <tr>
-                      <th style={{ textAlign: 'start' }}>المنتج</th>
-                      <th style={{ textAlign: 'center' }}>الكمية</th>
-                      <th style={{ textAlign: 'center' }}>سعر الوحدة HT</th>
-                      <th style={{ textAlign: 'center' }}>الخصم %</th>
-                      <th style={{ textAlign: 'center' }}>TVA</th>
-                      <th style={{ textAlign: 'center' }}>المخزون</th>
-                      <th style={{ textAlign: 'end' }}>المجموع TTC</th>
-                      <th style={{ width: 40 }}></th>
+                      <th className="poa-tas">المنتج</th>
+                      <th className="poa-tac">الكمية</th>
+                      <th className="poa-tac">سعر الوحدة HT</th>
+                      <th className="poa-tac">الخصم %</th>
+                      <th className="poa-tac">TVA</th>
+                      <th className="poa-tac">المخزون</th>
+                      <th className="poa-tae">المجموع TTC</th>
+                      <th className="poa-taw40"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -905,13 +949,13 @@ export default function PortalOrdersAdminPage() {
                       return (
                         <tr key={l.line_id ?? `new-${i}`}>
                           <td>
-                            <div style={{ fontWeight: 800, fontSize: 12.5, color: 'var(--t1)' }}>{l.product_name}</div>
-                            <div style={{ fontSize: 10.5, color: 'var(--t4)', fontWeight: 600 }}>
+                            <div className="poa-item-name">{l.product_name}</div>
+                            <div className="poa-item-ref">
                               {l.product_ref}
-                              {l.pack_qty > 1 ? <span style={{ color: 'var(--em)' }}> · تعبئة × {l.pack_qty}</span> : null}
+                              {l.pack_qty > 1 ? <span className="poa-pack-note"> · تعبئة × {l.pack_qty}</span> : null}
                             </div>
                           </td>
-                          <td style={{ textAlign: 'center' }}>
+                          <td className="poa-tac">
                             <input
                               type="number"
                               min={0}
@@ -923,9 +967,9 @@ export default function PortalOrdersAdminPage() {
                               }}
                               className={`poa-alloc${insufficient ? ' bad' : ''}`}
                             />
-                            {l.unit_name ? <span style={{ marginInlineStart: 5, color: 'var(--t4)', fontSize: 11 }}>{l.unit_name}</span> : null}
+                            {l.unit_name ? <span className="poa-unit-note">{l.unit_name}</span> : null}
                           </td>
-                          <td style={{ textAlign: 'center' }}>
+                          <td className="poa-tac">
                             <input
                               type="number"
                               min={0}
@@ -938,7 +982,7 @@ export default function PortalOrdersAdminPage() {
                               className="poa-alloc poa-price"
                             />
                           </td>
-                          <td style={{ textAlign: 'center' }}>
+                          <td className="poa-tac">
                             <input
                               type="number"
                               min={0}
@@ -952,26 +996,26 @@ export default function PortalOrdersAdminPage() {
                               className="poa-alloc poa-disc"
                             />
                           </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <span style={{ fontWeight: 700 }}>
+                          <td className="poa-tac">
+                            <span className="poa-bold">
                               {l.tva_rate_live ?? l.tva_rate ?? 0}%
                             </span>
                             {!!order?.party?.is_tva_exempt && (l.tva_rate_live ?? 0) > (l.tva_rate ?? 0) && (
                               <span className="poa-exempt" title="معفى جبائياً — نُطبق 0%">معفى</span>
                             )}
                           </td>
-                          <td style={{ textAlign: 'center' }}>
+                          <td className="poa-tac">
                             <StockCell stock={stock} />
                             {insufficient && (
-                              <div style={{ color: 'var(--red)', fontSize: 10.5, fontWeight: 800, marginTop: 2 }}>
+                              <div className="poa-stock-over">
                                 يتجاوز المخزون
                               </div>
                             )}
                           </td>
-                          <td style={{ textAlign: 'end' }}>
-                            <b style={{ fontSize: 12.5 }}>{fmt(lineTtc)}</b>
+                          <td className="poa-tae">
+                            <b className="poa-cell-ttc">{fmt(lineTtc)}</b>
                           </td>
-                          <td style={{ textAlign: 'center' }}>
+                          <td className="poa-tac">
                             <button
                               type="button"
                               className="icon-btn hover-red"
@@ -986,7 +1030,7 @@ export default function PortalOrdersAdminPage() {
                     })}
                     {draft.length === 0 && (
                       <tr>
-                        <td colSpan={8} style={{ padding: '18px', textAlign: 'center', color: 'var(--t4)', fontSize: 12 }}>
+                        <td colSpan={8} className="poa-tbl-empty">
                           لا توجد منتجات — أضف منتجاً من الأسفل
                         </td>
                       </tr>
@@ -995,18 +1039,14 @@ export default function PortalOrdersAdminPage() {
                 </table>
 
                 {/* إضافة منتج */}
-                <div style={{ border: '1px dashed var(--b3)', borderRadius: 'var(--r2)', padding: 10, marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div className="poa-addbox">
                   <div className="poa-hint"><i className="ti ti-plus" /> إضافة منتج للطلب</div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div className="poa-addrow">
                     <input
                       value={addQuery}
                       onChange={(e) => setAddQuery(e.target.value)}
                       placeholder="ابحث بالاسم أو المرجع..."
-                      style={{
-                        flex: 1, minWidth: 180, padding: '8px 10px', borderRadius: 'var(--r2)',
-                        border: '1px solid var(--b3)', background: 'var(--bg1)', color: 'var(--t1)',
-                        fontSize: 12.5, fontFamily: 'Tajawal, sans-serif', outline: 'none',
-                      }}
+                      className="poa-add-input"
                     />
                     <input
                       type="number"
@@ -1014,38 +1054,32 @@ export default function PortalOrdersAdminPage() {
                       step="any"
                       value={addQty}
                       onChange={(e) => setAddQty(Number(e.target.value) || 1)}
-                      className="poa-alloc"
-                      style={{ width: 64 }}
+                      className="poa-alloc poa-add-qty"
                       title="الكمية"
                     />
                   </div>
                   {addQuery.trim().length >= 2 && (
-                    <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--b1)', borderRadius: 'var(--r2)', background: 'var(--bg2)' }}>
+                    <div className="poa-search-box">
                       {productSearch.isLoading && (
-                        <div style={{ padding: 12, textAlign: 'center', color: 'var(--t4)', fontSize: 12 }}>جاري البحث...</div>
+                        <div className="poa-search-msg">جاري البحث...</div>
                       )}
                       {!productSearch.isLoading && productResults.length === 0 && (
-                        <div style={{ padding: 12, textAlign: 'center', color: 'var(--t4)', fontSize: 12 }}>لا توجد منتجات مطابقة</div>
+                        <div className="poa-search-msg">لا توجد منتجات مطابقة</div>
                       )}
                       {productResults.map((v) => (
                         <button
                           key={v.id}
                           type="button"
                           onClick={() => addProduct(v)}
-                          style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            width: '100%', padding: '8px 10px', border: 'none', borderBottom: '1px solid var(--b1)',
-                            background: 'none', cursor: 'pointer', fontSize: 12.5, fontFamily: 'Tajawal, sans-serif',
-                            color: 'var(--t1)', textAlign: 'start',
-                          }}
+                          className="poa-search-row"
                         >
-                          <span style={{ fontWeight: 700 }}>
+                          <span className="poa-search-name">
                             {v.name}
-                            <span style={{ color: 'var(--t4)', fontWeight: 500, fontSize: 11, marginInlineStart: 6 }}>
+                            <span className="poa-search-sub">
                               {[v.ref, v.unit?.symbol].filter(Boolean).join(' · ')}
                             </span>
                           </span>
-                          <span style={{ color: 'var(--em)', fontWeight: 700, fontSize: 12 }}>{fmt(v.default_selling_price_ht ?? 0)} دج</span>
+                          <span className="poa-search-price">{fmt(v.default_selling_price_ht ?? 0)} دج</span>
                         </button>
                       ))}
                     </div>
@@ -1060,12 +1094,12 @@ export default function PortalOrdersAdminPage() {
               <div className="poa-totals">
                 <div className="poa-total">
                   <div className="lbl">الزبون</div>
-                  <div className="val" style={{ fontSize: 12, fontWeight: 700 }}>{order.party?.name ?? '—'}</div>
+                  <div className="val poa-val-sm">{order.party?.name ?? '—'}</div>
                 </div>
                 {(editing ? draftTotals.disc : order.total_discount ?? 0) > 0.004 && (
                   <div className="poa-total">
                     <div className="lbl">الخصم</div>
-                    <div className="val" style={{ color: 'var(--gold)' }}>− {fmt(editing ? draftTotals.disc : order.total_discount ?? 0)} دج</div>
+                    <div className="val poa-val-gold">− {fmt(editing ? draftTotals.disc : order.total_discount ?? 0)} دج</div>
                   </div>
                 )}
                 <div className="poa-total"><div className="lbl">المجموع HT</div><div className="val">{fmt(editing ? draftTotals.ht : order.total_ht)}</div></div>
@@ -1073,7 +1107,7 @@ export default function PortalOrdersAdminPage() {
                 <div className="poa-total em"><div className="lbl">المجموع TTC</div><div className="val">{fmt(editing ? draftTotals.ttc : order.total_ttc)} دج</div></div>
               </div>
               {editing && (
-                <div className="poa-hint" style={{ marginTop: 6 }}>
+                <div className="poa-hint poa-hint--mt6">
                   <i className="ti ti-calculator" /> إجماليات حيّة أثناء التعديل — تُحدَّث عند الحفظ
                 </div>
               )}
@@ -1081,9 +1115,9 @@ export default function PortalOrdersAdminPage() {
 
             {/* ── ملاحظات الزبون ──────────────────────────────────────── */}
             {order.notes && (
-              <div className="poa-sec" style={{ background: 'var(--goldb)', borderColor: 'var(--b3)' }}>
-                <div className="poa-sec-t" style={{ color: 'var(--gold)' }}><i className="ti ti-message" /> ملاحظات الزبون</div>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--t2)' }}>{order.notes}</div>
+              <div className="poa-sec poa-sec--goldbg">
+                <div className="poa-sec-t poa-sec-t--gold"><i className="ti ti-message" /> ملاحظات الزبون</div>
+                <div className="poa-notes-txt">{order.notes}</div>
               </div>
             )}
 
@@ -1098,7 +1132,7 @@ export default function PortalOrdersAdminPage() {
                   >
                     <div className="poa-tl-who">
                       <Badge variant={stMeta(h.status).badge} noDot>{stMeta(h.status).label}</Badge>
-                      <span style={{ color: 'var(--t4)', fontWeight: 600, fontSize: 11 }}>
+                      <span className="poa-tl-by">
                         بواسطة {h.changed_by_name ?? (h.changed_by === 'customer' ? 'الزبون' : 'المسؤول')}
                       </span>
                     </div>
@@ -1114,21 +1148,28 @@ export default function PortalOrdersAdminPage() {
 
             {/* ── نتيجة التحويل ───────────────────────────────────────── */}
             {convertResult && (
-              <div className="poa-sec" style={{ background: 'var(--emb)', borderColor: 'var(--b3)' }}>
-                <div style={{ fontWeight: 800, color: 'var(--g)' }}>
-                  <i className="ti ti-circle-check" style={{ marginInlineEnd: 6 }} />
-                  تم التحويل بنجاح — أمر الزبون أصبح فاتورة بيع
+              <div className="poa-sec poa-sec--embg">
+                <div className="poa-conv-title">
+                  <i className="ti ti-circle-check" />
+                  تم التحويل بنجاح — أمر الزبون أصبح مستند بيع
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6, fontSize: 12.5, fontWeight: 700, color: 'var(--t2)' }}>
-                  <b style={{ direction: 'ltr' }}>{convertResult.document_number}</b>
+                <div className="poa-conv-meta">
+                  <b className="poa-mono">{convertResult.document_number}</b>
+                  <span className="poa-chip"><i className="ti ti-file-invoice" /> {convertResult.document_type === 'POS' ? 'فاتورة POS' : 'فاتورة بيع (FV)'}</span>
                   <span className="poa-hint"><i className="ti ti-calendar" /> {fmtDate(convertResult.document_date)}</span>
                   <span className="poa-hint"><i className="ti ti-coins" /> الصافي للدفع <b>{fmt(convertResult.net_to_pay)} DZD</b></span>
+                  {convertResult.paid_amount > 0 && (
+                    <span className="poa-hint poa-hint--ok"><i className="ti ti-wallet" /> مدفوع <b>{fmt(convertResult.paid_amount)} DZD</b></span>
+                  )}
+                  {convertResult.remaining_amount > 0 && (
+                    <span className="poa-hint poa-hint--gold"><i className="ti ti-alert-triangle" /> باقي <b>{fmt(convertResult.remaining_amount)} DZD</b></span>
+                  )}
                 </div>
               </div>
             )}
           </div>
         ) : (
-          <div className="poa-hint" style={{ padding: 30, justifyContent: 'center' }}>الطلب غير موجود</div>
+          <div className="poa-hint poa-hint--pad">الطلب غير موجود</div>
         )}
       </Modal>
 
@@ -1155,7 +1196,7 @@ export default function PortalOrdersAdminPage() {
           </>
         }
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="poa-col">
           {/* ── مقياس الجاهزية ───────────────────────────────────────── */}
           <div className="poa-proc-hd">
             <div className="poa-proc-gauge-wrap">
@@ -1165,8 +1206,8 @@ export default function PortalOrdersAdminPage() {
               <div className="poa-proc-meta">
                 <span>مطلوب <b>{fmt(wizTotals.orderedBase)}</b></span>
                 <span>مُوزَّع <b>{fmt(wizTotals.allocBase)}</b></span>
-                {wizTotals.anyBad && <span style={{ color: 'var(--red)' }}>⚠ كميات تتجاوز المخزون الكلي</span>}
-                {!wizTotals.anyBad && wizTotals.anyWarn && <span style={{ color: 'var(--gold)' }}>ⓘ تُغطّى من مستودعات أخرى</span>}
+                {wizTotals.anyBad && <span className="poa-proc-warn">⚠ كميات تتجاوز المخزون الكلي</span>}
+                {!wizTotals.anyBad && wizTotals.anyWarn && <span className="poa-proc-info">ⓘ تُغطّى من مستودعات أخرى</span>}
               </div>
             </div>
             <div className="poa-proc-pct">{wizTotals.pct}%</div>
@@ -1181,7 +1222,7 @@ export default function PortalOrdersAdminPage() {
               const fit = fitOf(a);
               return (
                 <div key={a.line_id} className="poa-proc-row">
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="poa-grow">
                     <div className="poa-proc-name">{a.product_name}</div>
                     <div className="poa-proc-ref">{a.product_ref ?? ''}</div>
                   </div>
@@ -1230,7 +1271,7 @@ export default function PortalOrdersAdminPage() {
               );
             })}
             {allocs.length === 0 && (
-              <div className="poa-hint" style={{ justifyContent: 'center', padding: 20 }}>لا توجد منتجات للمعالجة</div>
+              <div className="poa-hint poa-hint--pad20">لا توجد منتجات للمعالجة</div>
             )}
           </div>
 
@@ -1238,6 +1279,136 @@ export default function PortalOrdersAdminPage() {
             <i className="ti ti-info-circle" />
             الكمية 0 تحذف المنتج — التحقق من المخزون غير حاجز هنا، لكن التحويل إلى الفاتورة يتطلب كمية كافية.
           </div>
+        </div>
+      </Modal>
+
+      {/* ════ نافذة تحويل الطلب إلى فاتورة (FV/POS + دفعة اختيارية) ════ */}
+      <Modal
+        open={convertOpen}
+        onClose={() => {
+          if (!convert.isPending) setConvertOpen(false);
+        }}
+        title="تحويل الطلب إلى فاتورة"
+        subtitle={order?.reference ? `إنشاء مستند البيع — ${order.reference}` : undefined}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConvertOpen(false)} disabled={convert.isPending}>
+              إلغاء
+            </Button>
+            <Button
+              variant="primary"
+              icon={<i className="ti ti-file-invoice" />}
+              loading={convert.isPending}
+              onClick={doConvert}
+              className="poa-btn-gold"
+            >
+              تحويل الآن
+            </Button>
+          </>
+        }
+      >
+        <div className="poa-col">
+          {/* ── ملخص إجماليات الطلب قبل التحويل ─────────────────────── */}
+          {order && (
+            <div className="poa-cv-sum">
+              <div><i className="ti ti-box" /> المنتجات <b>{order.items_count}</b></div>
+              <div><i className="ti ti-percentage" /> الخصم <b>{fmt(order.total_discount ?? 0)}</b></div>
+              <div><i className="ti ti-coin" /> إجمالي HT <b>{fmt(order.total_ht ?? 0)}</b></div>
+              <div><i className="ti ti-cash" /> TVA <b>{fmt(order.total_tva ?? 0)}</b></div>
+              <div className="poa-cv-total"><i className="ti ti-wallet" /> الصافي للدفع <b>{fmt(order.total_ttc ?? 0)} دج</b></div>
+            </div>
+          )}
+
+          {/* ── اختيار نوع مستند البيع ───────────────────────────────── */}
+          <div className="poa-grid2">
+            <button type="button" className={`poa-cv-t${convertTarget === 'FV' ? ' on' : ''}`} onClick={() => setConvertTarget('FV')}>
+              <i className="ti ti-file-invoice" />
+              <b>فاتورة بيع (FV)</b>
+              <span>مستند بيع محاسبي كامل</span>
+            </button>
+            <button type="button" className={`poa-cv-t${convertTarget === 'POS' ? ' on' : ''}`} onClick={() => setConvertTarget('POS')}>
+              <i className="ti ti-device-mobile" />
+              <b>فاتورة POS</b>
+              <span>مستند نقطة البيع</span>
+            </button>
+          </div>
+
+          <div className="poa-hint">
+            <i className="ti ti-info-circle" />
+            التحويل يُنشئ مستند بيع يُفعِّل حركة المخزون والطابع الجبائي وقيود الرصيد — مرة واحدة فقط ولا يمكن التراجع.
+            {order && order.status !== 'delivered' ? ' الوضع يقفز إلى «تم التسليم».' : ''}
+          </div>
+
+          {/* ── دفعة اختيارية ─────────────────────────────────────────── */}
+          <label className="poa-check-lbl">
+            <input type="checkbox" checked={payEnabled} onChange={(e) => {
+              const on = e.target.checked;
+              setPayEnabled(on);
+              if (on && !payAmount && order) setPayAmount(String(Math.round(order.total_ttc * 100) / 100));
+            }} />
+            تسجيل دفعة الآن (اختياري)
+          </label>
+
+          {payEnabled && order && (() => {
+            const net = Number(order.total_ttc) || 0;
+            const amt = Number(payAmount) || 0;
+            const rem = net - amt;
+            const overpay = amt > 0 && rem < 0;
+            return (
+              <div className="poa-col10">
+                <div className="poa-select">
+                  <i className="ti ti-credit-card" />
+                  <select value={payModeId} onChange={(e) => setPayModeId(e.target.value ? Number(e.target.value) : '')}>
+                    <option value="">— اختر طريقة الدفع —</option>
+                    {(paymentModes.data ?? []).map((m) => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="poa-row-end">
+                  <div className="poa-field">
+                    <label className="poa-field-lbl">المبلغ (دج)</label>
+                    <input
+                      type="number" min={0.01} step="any"
+                      className="poa-alloc poa-alloc--full"
+                      value={payAmount}
+                      placeholder="مبلغ الدفعة"
+                      onChange={(e) => setPayAmount(e.target.value)}
+                    />
+                  </div>
+                  <div className="poa-date">
+                    <i className="ti ti-calendar" />
+                    <input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+                  </div>
+                </div>
+                <div className="poa-row-center">
+                  <button
+                    type="button"
+                    className="poa-cv-full"
+                    onClick={() => setPayAmount(String(Math.round(net * 100) / 100))}
+                  >
+                    <i className="ti ti-coins" /> المبلغ كاملاً
+                  </button>
+                  <span className={`poa-cv-rem${overpay ? ' over' : amt > 0 ? ' ok' : ''}`}>
+                    <i className={`ti ${overpay ? 'ti-alert-triangle' : 'ti-scale'}`} />
+                    {amt > 0
+                      ? (overpay
+                          ? `تنبيه: المبلغ أكبر من الصافي — الزيادة ${fmt(Math.abs(rem))} دج`
+                          : `المتبقي بعد الدفعة: ${fmt(rem)} دج`)
+                      : 'المتبقي بعد الدفعة: كامل الصافي (أدخل المبلغ)'}
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  className="poa-alloc poa-alloc--full"
+                  placeholder="مرجع الدفعة (اختياري)"
+                  value={payReference}
+                  onChange={(e) => setPayReference(e.target.value)}
+                />
+              </div>
+            );
+          })()}
         </div>
       </Modal>
 

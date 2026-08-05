@@ -16,7 +16,7 @@ function Row({ label, value, dir, icon }: { label: string; value: React.ReactNod
   return (
     <div className="pr-row">
       <span className="pr-row-lb">
-        {icon && <i className={`ti ${icon}`} style={{ marginLeft: 5, fontSize: 13, opacity: .55 }} />}
+        {icon && <i className={`ti ${icon} pr-row-ic`} />}
         {label}
       </span>
       <span className="pr-row-val" dir={dir || 'rtl'}>{value || '—'}</span>
@@ -28,7 +28,7 @@ function BoolRow({ label, value, icon }: { label: string; value: boolean; icon?:
   return (
     <div className="pr-row">
       <span className="pr-row-lb">
-        {icon && <i className={`ti ${icon}`} style={{ marginLeft: 5, fontSize: 13, opacity: .55 }} />}
+        {icon && <i className={`ti ${icon} pr-row-ic`} />}
         {label}
       </span>
       <span className={`pr-badge ${value ? 'pr-badge--g' : 'pr-badge--z'}`}>
@@ -166,11 +166,11 @@ export default function PortalProfilePage() {
           <p>{p.email}</p>
           {party && (
             <div className="pr-hero-tags">
-              {party.code && <span className="pr-tag"><i className="ti ti-hashtag" style={{ fontSize: 10 }} /> {party.code}</span>}
-              {party.nif && <span className="pr-tag"><i className="ti ti-id" style={{ fontSize: 10 }} /> NIF: {party.nif}</span>}
-              {party.is_tva_exempt && <span className="pr-tag pr-tag--gold"><i className="ti ti-star" style={{ fontSize: 10 }} /> معفى من TVA</span>}
-              {party.active && <span className="pr-tag" style={{ background: 'rgba(16,185,129,.08)', color: '#059669', borderColor: 'transparent' }}>
-                <i className="ti ti-circle-check" style={{ fontSize: 10 }} /> نشط
+              {party.code && <span className="pr-tag"><i className="ti ti-hashtag" /> {party.code}</span>}
+              {party.nif && <span className="pr-tag"><i className="ti ti-id" /> NIF: {party.nif}</span>}
+              {party.is_tva_exempt && <span className="pr-tag pr-tag--gold"><i className="ti ti-star" /> معفى من TVA</span>}
+              {party.active && <span className="pr-tag pr-tag--ok">
+                <i className="ti ti-circle-check" /> نشط
               </span>}
             </div>
           )}
@@ -207,7 +207,7 @@ export default function PortalProfilePage() {
                 </div>
                 <div className="pr-credit-sep" />
                 <div className="pr-credit-used">
-                  <span className="pr-credit-num" style={{ color: 'var(--t4)' }}><AnimatedCounter value={party.credit_limit} /></span>
+                  <span className="pr-credit-num portal-muted"><AnimatedCounter value={party.credit_limit} /></span>
                   <span className="pr-credit-lbl">السقف</span>
                 </div>
               </div>
@@ -271,7 +271,7 @@ export default function PortalProfilePage() {
             <div className="pr-grid">
               <Row
                 label="سقف الائتمان"
-                value={party.credit_limit > 0 ? <strong style={{ color: 'var(--em)' }}>{fmtMoney(party.credit_limit)}</strong> : null}
+                value={party.credit_limit > 0 ? <strong className="portal-em">{fmtMoney(party.credit_limit)}</strong> : null}
                 icon="ti-coins"
               />
               <Row
@@ -292,7 +292,7 @@ export default function PortalProfilePage() {
           {/* Account stats */}
           <div className="pr-acct-stats">
             <div className="pr-acct-stat">
-              <div className="pr-acct-stat-icon" style={{ background: 'rgba(10,138,92,.08)', color: 'var(--em)' }}>
+              <div className="pr-acct-stat-icon pr-acct-stat-icon--g">
                 <i className="ti ti-user-check" />
               </div>
               <div>
@@ -301,17 +301,17 @@ export default function PortalProfilePage() {
               </div>
             </div>
             <div className="pr-acct-stat">
-              <div className="pr-acct-stat-icon" style={{ background: 'rgba(59,130,246,.08)', color: '#3b82f6' }}>
+              <div className="pr-acct-stat-icon pr-acct-stat-icon--b">
                 <i className="ti ti-mail" />
               </div>
               <div>
-                <div className="pr-acct-stat-val" dir="ltr" style={{ textAlign: 'right' }}>{p.email}</div>
+                <div className="pr-acct-stat-val pr-acct-stat-val--r" dir="ltr">{p.email}</div>
                 <div className="pr-acct-stat-lbl">البريد الإلكتروني</div>
               </div>
             </div>
             {party && (
               <div className="pr-acct-stat">
-                <div className="pr-acct-stat-icon" style={{ background: 'rgba(245,158,11,.08)', color: '#f59e0b' }}>
+                <div className="pr-acct-stat-icon pr-acct-stat-icon--y">
                   <i className="ti ti-building-store" />
                 </div>
                 <div>
@@ -342,7 +342,7 @@ export default function PortalProfilePage() {
                     onChange={(e) => setEditEmail(e.target.value)}
                     required
                     dir="ltr"
-                    style={{ textAlign: 'right' }}
+                    className="portal-form-input--r"
                     placeholder="email@example.com"
                   />
                 </div>
@@ -368,12 +368,12 @@ export default function PortalProfilePage() {
         <div className="pr-body">
           {/* Security tips */}
           <div className="pr-security-tips">
-            <div className="pr-security-tip">
-              <i className="ti ti-shield-check" style={{ color: 'var(--em)' }} />
+            <div className="pr-security-tip pr-security-tip--em">
+              <i className="ti ti-shield-check" />
               <span>استخدم كلمة مرور قوية تحتوي على أحرف وأرقام ورموز</span>
             </div>
-            <div className="pr-security-tip">
-              <i className="ti ti-lock" style={{ color: '#3b82f6' }} />
+            <div className="pr-security-tip pr-security-tip--b">
+              <i className="ti ti-lock" />
               <span>لا تشارك كلمة المرور مع أي شخص آخر</span>
             </div>
           </div>
@@ -389,7 +389,6 @@ export default function PortalProfilePage() {
                     onChange={(e) => setCurrentPass(e.target.value)}
                     required
                     dir="ltr"
-                    style={{ textAlign: 'right', paddingLeft: 40 }}
                     placeholder="••••••••"
                   />
                   <button type="button" className="pr-pass-eye" onClick={() => setShowCurrent(v => !v)}>
@@ -409,7 +408,6 @@ export default function PortalProfilePage() {
                       required
                       minLength={8}
                       dir="ltr"
-                      style={{ textAlign: 'right', paddingLeft: 40 }}
                       placeholder="٨ أحرف على الأقل"
                     />
                     <button type="button" className="pr-pass-eye" onClick={() => setShowNew(v => !v)}>
@@ -440,7 +438,6 @@ export default function PortalProfilePage() {
                       required
                       minLength={8}
                       dir="ltr"
-                      style={{ textAlign: 'right', paddingLeft: 40 }}
                       placeholder="أعد إدخال كلمة المرور"
                     />
                     <button type="button" className="pr-pass-eye" onClick={() => setShowConfirm(v => !v)}>

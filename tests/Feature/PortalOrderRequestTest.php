@@ -49,6 +49,28 @@ beforeEach(function () {
         'created_at' => $now, 'updated_at' => $now,
     ]);
 
+    $tatId = DB::table('treasury_account_types')->insertGetId([
+        'company_id' => $companyId, 'name' => 'cash', 'label' => 'صندوق', 'active' => true,
+        'display_order' => 1,
+        'created_at' => $now, 'updated_at' => $now,
+    ]);
+
+    $treasuryId = DB::table('treasury_accounts')->insertGetId([
+        'company_id' => $companyId, 'name' => 'الصندوق الرئيسي', 'code' => 'CASH',
+        'treasury_account_type_id' => $tatId, 'currency_id' => $curId,
+        'is_default' => true, 'active' => true,
+        'created_at' => $now, 'updated_at' => $now,
+    ]);
+
+    $payModeId = DB::table('payment_modes')->insertGetId([
+        'company_id' => $companyId, 'name' => 'نقداً', 'code' => 'CASH',
+        'description' => null, 'treasury_account_id' => $treasuryId,
+        'is_cash' => true, 'active' => true,
+        'display_order' => 1,
+        'created_at' => $now, 'updated_at' => $now,
+    ]);
+    $this->paymentModeId = $payModeId;
+
     $ptId = DB::table('party_types')->insertGetId([
         'company_id' => $companyId, 'name' => 'client', 'label' => 'زبون', 'active' => true,
         'created_at' => $now, 'updated_at' => $now,
@@ -348,4 +370,177 @@ it('stock availability is scoped to the order warehouse and fiscal year', functi
         ->and($lineA['required'])->toBe(2)
         ->and($lineA['sufficient'])->toBe(false)
         ->and($lineA['warehouse_id'])->not->toBeNull();
+});
+
+it('admin converts a confirmed order into an FV invoice', function () {
+    $url = '/api/v1/'.TEST_COMPANY_SLUG.'/portal/orders';
+    $created = test()->withToken(test()->token)->postJson(
+        $url,
+        ['items' => [['product_id' => test()->productA, 'quantity' => 2]]]
+    )->assertStatus(201)->json('data');
+
+    actingAsAuthenticatedTenantUser();
+    $adminOrderUrl = '/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$created['id'];
+
+    // لا مخزون في التجهيز — نسمح بالمخزون السالب لإتمام حركة التحويل
+    DB::table('products')->where('id', test()->productA)->update(['allow_negative_stock' => true]);
+    test()->patchJson($adminOrderUrl, ['status' => 'confirmed'])->assertOk();
+
+    $res = test()->postJson($adminOrderUrl.'/convert', ['target' => 'FV'])
+        ->assertOk()
+        ->json('data');
+
+    expect($res['sale']['document_type'])->toBe('FV')
+        ->and($res['sale']['document_number'])->toMatch('/^FV-\d{4}-\d{6}$/')
+        // بدون دفعة: المدفوع صفر والباقي كامل الصافي
+        ->and((float) $res['sale']['paid_amount'])->toBe(0.0)
+        ->and((float) $res['sale']['remaining_amount'])->toBe((float) $res['sale']['net_to_pay'])
+        // التحويل = القفزة القانونية إلى «تم التسليم»
+        ->and($res['order']['status'])->toBe('delivered')
+        ->and($res['order']['allowed_next'])->toBe(['returned']);
+
+    // السجل التوثيقي يذكر الفاتورة الناتجة
+    $notes = collect($res['order']['histories'])->pluck('note')->implode(' | ');
+    expect($notes)->toContain('تم تحويل الطلب إلى فاتورة')
+        ->and($notes)->toContain($res['sale']['document_number']);
+});
+
+it('admin converts a shipped order into a POS sale and records a payment atomically', function () {
+    $url = '/api/v1/'.TEST_COMPANY_SLUG.'/portal/orders';
+    $created = test()->withToken(test()->token)->postJson(
+        $url,
+        ['items' => [['product_id' => test()->productA, 'quantity' => 2]]]
+    )->assertStatus(201)->json('data');
+
+    actingAsAuthenticatedTenantUser();
+    $adminOrderUrl = '/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$created['id'];
+
+    DB::table('products')->where('id', test()->productA)->update(['allow_negative_stock' => true]);
+    foreach (['confirmed', 'processed', 'shipped'] as $step) {
+        test()->patchJson($adminOrderUrl, ['status' => $step])->assertOk();
+    }
+
+    $res = test()->postJson($adminOrderUrl.'/convert', [
+        'target' => 'POS',
+        'payment' => [
+            'payment_mode_id' => test()->paymentModeId,
+            'amount'          => 100,
+            'payment_date'    => '2026-08-05',
+            'reference'       => 'PAY-TEST',
+        ],
+    ])->assertOk()->json('data');
+
+    expect($res['sale']['document_type'])->toBe('POS')
+        ->and($res['sale']['document_number'])->toMatch('/^POS-\d{4}-\d{6}$/')
+        ->and((float) $res['sale']['paid_amount'])->toBe(100.0)
+        ->and((float) $res['sale']['remaining_amount'])->toBe(round((float) $res['sale']['net_to_pay'] - 100.0, 2))
+        ->and($res['order']['status'])->toBe('delivered');
+
+    // دفعة حقيقية مرتبطة بالفاتورة الناتجة عبر الجدول الوسيط
+    $saleId = $res['sale']['id'];
+    expect(DB::table('document_payment')->where('commercial_document_id', $saleId)->count())->toBe(1);
+
+    $pay = DB::table('payments')->where('reference', 'PAY-TEST')->first();
+    expect((float) $pay->amount)->toBe(100.0)
+        ->and((int) $pay->payment_mode_id)->toBe(test()->paymentModeId);
+});
+
+it('admin converts from delivered keeping the status (history still recorded)', function () {
+    $url = '/api/v1/'.TEST_COMPANY_SLUG.'/portal/orders';
+    $created = test()->withToken(test()->token)->postJson(
+        $url,
+        ['items' => [['product_id' => test()->productA, 'quantity' => 2]]]
+    )->assertStatus(201)->json('data');
+
+    actingAsAuthenticatedTenantUser();
+    $adminOrderUrl = '/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$created['id'];
+
+    DB::table('products')->where('id', test()->productA)->update(['allow_negative_stock' => true]);
+    foreach (['confirmed', 'processed', 'shipped', 'delivered'] as $step) {
+        test()->patchJson($adminOrderUrl, ['status' => $step])->assertOk();
+    }
+
+    $res = test()->postJson($adminOrderUrl.'/convert', ['target' => 'FV'])
+        ->assertOk()
+        ->json('data');
+
+    // من «تم التسليم» يبقى الوضع كما هو (لا قفزة) لكن السجل التوثيقي يُكتب
+    expect($res['order']['status'])->toBe('delivered')
+        ->and($res['order']['allowed_next'])->toBe(['returned'])
+        ->and(collect($res['order']['histories'])->pluck('note')->implode(' | '))
+        ->toContain('تم تحويل الطلب إلى فاتورة');
+});
+
+it('admin cannot convert the same order twice (transfer-once)', function () {
+    $url = '/api/v1/'.TEST_COMPANY_SLUG.'/portal/orders';
+    $created = test()->withToken(test()->token)->postJson(
+        $url,
+        ['items' => [['product_id' => test()->productA, 'quantity' => 2]]]
+    )->assertStatus(201)->json('data');
+
+    actingAsAuthenticatedTenantUser();
+    $adminOrderUrl = '/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$created['id'];
+
+    DB::table('products')->where('id', test()->productA)->update(['allow_negative_stock' => true]);
+    test()->patchJson($adminOrderUrl, ['status' => 'confirmed'])->assertOk();
+
+    // أول تحويل ناجح: يُثبَّت sale_document_id ويصبح is_converted صحيحاً
+    $first = test()->postJson($adminOrderUrl.'/convert', ['target' => 'FV'])
+        ->assertOk()
+        ->json('data');
+    expect((bool) $first['order']['is_converted'])->toBeTrue()
+        ->and($first['order']['sale_document_id'])->not->toBeNull();
+
+    // تحويل ثانٍ (حتى من «تم التسليم») مرفوض — لا فاتورتين من طلب واحد
+    test()->postJson($adminOrderUrl.'/convert', ['target' => 'FV'])
+        ->assertStatus(409)
+        ->assertJsonPath('message', 'تم تحويل هذا الطلب إلى فاتورة مسبقاً — التحويل مسموح مرة واحدة فقط.');
+
+    // التغيير من عدم التحويل قبل النجاح: فاتورة واحدة فقط ناتجة
+    $saleId = $first['sale']['id'];
+    expect(DB::table('commercial_documents')->where('id', $saleId)->count())->toBe(1);
+});
+
+it('admin convert guards: invalid target 422 and cancelled/returned orders 409', function () {
+    $url = '/api/v1/'.TEST_COMPANY_SLUG.'/portal/orders';
+
+    // إنشاء كل الطلبات أولاً بجلسة الزبون ثم التحويل إلى جلسة الإدارة
+    // (withToken بعد actingAs يعيد المصادقة إلى زبون البوابة)
+    $created = test()->withToken(test()->token)->postJson(
+        $url,
+        ['items' => [['product_id' => test()->productA, 'quantity' => 1]]]
+    )->assertStatus(201)->json('data');
+
+    $created2 = test()->withToken(test()->token)->postJson(
+        $url,
+        ['items' => [['product_id' => test()->productB, 'quantity' => 1]]]
+    )->assertStatus(201)->json('data');
+
+    $created3 = test()->withToken(test()->token)->postJson(
+        $url,
+        ['items' => [['product_id' => test()->productB, 'quantity' => 1]]]
+    )->assertStatus(201)->json('data');
+
+    actingAsAuthenticatedTenantUser();
+    $adminUrl = '/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$created['id'];
+    $adminUrl2 = '/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$created2['id'];
+    $adminUrl3 = '/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$created3['id'];
+
+    // هدف غير مسموح من أمر زبون → 422 (التحقق قبل النداء للخدمة)
+    test()->patchJson($adminUrl, ['status' => 'confirmed'])->assertOk();
+    test()->postJson($adminUrl.'/convert', ['target' => 'BCF'])
+        ->assertStatus(422);
+
+    // طلب مُلغى → 409
+    test()->patchJson($adminUrl2, ['status' => 'cancelled'])->assertOk();
+    test()->postJson($adminUrl2.'/convert', ['target' => 'FV'])
+        ->assertStatus(409)
+        ->assertJsonPath('message', 'لا يمكن تحويل طلب تم إرجاعه أو إلغاؤه إلى فاتورة.');
+
+    // طلب مرتجع → 409
+    foreach (['confirmed', 'processed', 'shipped', 'delivered', 'returned'] as $step) {
+        test()->patchJson($adminUrl3, ['status' => $step])->assertOk();
+    }
+    test()->postJson($adminUrl3.'/convert', ['target' => 'FV'])
+        ->assertStatus(409);
 });

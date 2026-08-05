@@ -50,16 +50,16 @@ export default function PortalDashboardPage() {
     <>
       {/* ─── بطاقة الشركة ─── */}
       {company?.name && (
-        <div className="portal-card" style={{ marginBottom: 20, padding: '16px 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div className="portal-logo" style={{ width: 44, height: 44, fontSize: 17 }}>
+        <div className="portal-card portal-mb-20 portal-card--pad-sm">
+          <div className="portal-inline--14">
+            <div className="portal-logo portal-logo--sm">
               {(company.name || 'ش').charAt(0)}
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--t1)', letterSpacing: '.3px' }}>
+            <div className="portal-grow">
+              <div className="portal-company-name">
                 {company.commercial_name || company.name}
               </div>
-              <div style={{ fontSize: 11.5, color: 'var(--t4)', marginTop: 2 }}>
+              <div className="portal-company-sub">
                 {[company.nif && `NIF: ${company.nif}`, company.phone, company.email].filter(Boolean).join(' • ') || '—'}
               </div>
             </div>
@@ -73,7 +73,7 @@ export default function PortalDashboardPage() {
           <div className="portal-kpi-ic portal-kpi-ic--em"><i className="ti ti-scale" /></div>
           <div>
             <div className="portal-kpi-lb">الرصيد الحالي</div>
-            <div className="portal-kpi-v" style={{ color: sign < 0 ? 'var(--red)' : 'var(--t1)' }}>
+            <div className={`portal-kpi-v ${sign < 0 ? 'portal-red' : ''}`}>
               <AnimatedCounter value={sign} />
             </div>
             <div className="portal-kpi-s">
@@ -104,7 +104,7 @@ export default function PortalDashboardPage() {
           <div className="portal-kpi-ic portal-kpi-ic--red"><i className="ti ti-user" /></div>
           <div>
             <div className="portal-kpi-lb">العميل</div>
-            <div className="portal-kpi-v" style={{ fontSize: 15 }}>{party.name}</div>
+            <div className="portal-kpi-v portal-kpi-v--sm">{party.name}</div>
             <div className="portal-kpi-s">
               {[party.nif && `NIF: ${party.nif}`, creditLimit > 0 && `سقف: ${fmtMoney(creditLimit)}`].filter(Boolean).join(' • ') || '—'}
             </div>
@@ -116,7 +116,7 @@ export default function PortalDashboardPage() {
           <div>
             <div className="portal-kpi-lb">طلبات السلع</div>
             <div className="portal-kpi-v"><AnimatedCounter value={orders?.total ?? 0} /></div>
-            <div className="portal-kpi-s" style={{ color: openOrders > 0 ? 'var(--gold)' : 'var(--t4)' }}>
+            <div className={`portal-kpi-s ${openOrders > 0 ? 'portal-kpi-s--gold' : ''}`}>
               {openOrders > 0 ? `${openOrders} طلب قيد المعالجة` : 'لا توجد طلبات قيد المعالجة'}
             </div>
           </div>
@@ -125,17 +125,17 @@ export default function PortalDashboardPage() {
 
       {/* ─── شريط الائتمان + مقياس الرصيد ─── */}
       {creditLimit > 0 && (
-        <div className="portal-card" style={{ marginBottom: 16, padding: '18px 22px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <i className="ti ti-credit-card" style={{ color: 'var(--em)', fontSize: 16 }} />
-            <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--t1)' }}>الاستهلاك الائتماني</span>
+        <div className="portal-card portal-mb-16 portal-card--pad-sm">
+          <div className="portal-inline--8 portal-mb-10">
+            <i className="ti ti-credit-card portal-em" />
+            <span className="portal-sec-title">الاستهلاك الائتماني</span>
           </div>
           <CreditBar used={creditUsed} limit={creditLimit} />
         </div>
       )}
 
       {/* ─── أزرار الإجراءات السريعة ─── */}
-      <div className="portal-actions" style={{ marginBottom: 20 }}>
+      <div className="portal-actions portal-mb-20">
         <Link to={`${base}/orders`} className="portal-action portal-action--em">
           <i className="ti ti-building-store" />
           اطلب سلعة
@@ -159,20 +159,20 @@ export default function PortalDashboardPage() {
       </div>
 
       {/* ─── آخر المستندات + آخر الدفعات ─── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16 }}>
+      <div className="portal-grid-col">
 
         {/* ─── آخر المستندات ─── */}
         <section className="portal-card">
           <div className="portal-card-hd">
             <h3><i className="ti ti-file-text" /> أحدث المستندات</h3>
             <Link to={`${base}/documents`} className="portal-card-link">
-              عرض الكل <i className="ti ti-chevron-left" style={{ fontSize: 10 }} />
+              عرض الكل <i className="ti ti-chevron-left" />
             </Link>
           </div>
-          <div className="portal-card-bd" style={{ padding: 0 }}>
+          <div className="portal-card-bd portal-card-bd--flush">
             {recent_documents.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 28, color: 'var(--t4)', fontSize: 12.5 }}>
-                <i className="ti ti-file-off" style={{ fontSize: 32, opacity: .15, display: 'block', marginBottom: 10 }} />
+              <div className="portal-empty">
+                <i className="ti ti-file-off" />
                 لا توجد مستندات
               </div>
             ) : (
@@ -191,7 +191,7 @@ export default function PortalDashboardPage() {
                             {d.document_number}
                           </Link>
                         </td>
-                        <td style={{ fontSize: 11.5 }}>{fmtDate(d.document_date)}</td>
+                        <td className="tx-sm">{fmtDate(d.document_date)}</td>
                         <td>{d.type_name}</td>
                         <td><StatusBadge status={d.status_name} /></td>
                         <td className="num">{fmtMoney(d.net_to_pay)}</td>
@@ -209,13 +209,13 @@ export default function PortalDashboardPage() {
           <div className="portal-card-hd">
             <h3><i className="ti ti-wallet" /> أحدث الدفعات</h3>
             <Link to={`${base}/payments`} className="portal-card-link">
-              عرض الكل <i className="ti ti-chevron-left" style={{ fontSize: 10 }} />
+              عرض الكل <i className="ti ti-chevron-left" />
             </Link>
           </div>
-          <div className="portal-card-bd" style={{ padding: 0 }}>
+          <div className="portal-card-bd portal-card-bd--flush">
             {recent_payments.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 28, color: 'var(--t4)', fontSize: 12.5 }}>
-                <i className="ti ti-wallet-off" style={{ fontSize: 32, opacity: .15, display: 'block', marginBottom: 10 }} />
+              <div className="portal-empty">
+                <i className="ti ti-wallet-off" />
                 لا توجد دفعات
               </div>
             ) : (
@@ -230,14 +230,14 @@ export default function PortalDashboardPage() {
                     {recent_payments.map((p) => (
                       <tr key={p.id}>
                         <td className="num">{p.payment_number}</td>
-                        <td style={{ fontSize: 11.5 }}>{fmtDate(p.payment_date)}</td>
+                        <td className="tx-sm">{fmtDate(p.payment_date)}</td>
                         <td>{p.payment_mode}</td>
                         <td>
                           {p.direction === 'in'
                             ? <span className="badge badge--g"><i className="ti ti-arrow-down" /> وارد</span>
                             : <span className="badge badge--r"><i className="ti ti-arrow-up" /> صادر</span>}
                         </td>
-                        <td className="num" style={{ color: p.direction === 'in' ? 'var(--em)' : 'var(--red)' }}>
+                        <td className={`num ${p.direction === 'in' ? 'em' : 'ow'}`}>
                           {fmtMoney(p.amount)}
                         </td>
                       </tr>
@@ -251,19 +251,19 @@ export default function PortalDashboardPage() {
       </div>
 
       {/* ─── أحدث طلبات السلع ─── */}
-      <section className="portal-card" style={{ marginTop: 16 }}>
+      <section className="portal-card portal-mt-16">
         <div className="portal-card-hd">
           <h3><i className="ti ti-clipboard-list" /> أحدث طلبات السلع</h3>
           <Link to={`${base}/orders`} className="portal-card-link">
-            عرض الكل <i className="ti ti-chevron-left" style={{ fontSize: 10 }} />
+            عرض الكل <i className="ti ti-chevron-left" />
           </Link>
         </div>
-        <div className="portal-card-bd" style={{ padding: 0 }}>
+        <div className="portal-card-bd portal-card-bd--flush">
           {!recent_orders || recent_orders.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 28, color: 'var(--t4)', fontSize: 12.5 }}>
-              <i className="ti ti-clipboard-off" style={{ fontSize: 32, opacity: .15, display: 'block', marginBottom: 10 }} />
+            <div className="portal-empty">
+              <i className="ti ti-clipboard-off" />
               لا توجد طلبات سلع بعد
-              <div style={{ marginTop: 12 }}>
+              <div className="portal-mt-12">
                 <Link to={`${base}/orders`} className="portal-btn portal-btn--em portal-btn--sm">
                   <i className="ti ti-plus" /> اطلب سلعة الآن
                 </Link>
@@ -281,7 +281,7 @@ export default function PortalDashboardPage() {
                   {recent_orders.map((o) => (
                     <tr key={o.id}>
                       <td className="num">{o.reference}</td>
-                      <td style={{ fontSize: 11.5 }}>{fmtDate(o.requested_at || o.created_at)}</td>
+                      <td className="tx-sm">{fmtDate(o.requested_at || o.created_at)}</td>
                       <td>{o.items_count} صنف</td>
                       <td>
                         <span className={`badge ${ORDER_STATUS_CLS[o.status]}`}>{o.status_label}</span>
@@ -297,34 +297,34 @@ export default function PortalDashboardPage() {
       </section>
 
       {/* ─── ملخص سريع ─── */}
-      <div className="portal-card" style={{ marginTop: 16 }}>
+      <div className="portal-card portal-mt-16">
         <div className="portal-card-hd">
           <h3><i className="ti ti-chart-dots" /> ملخص سريع</h3>
         </div>
         <div className="portal-card-bd">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
-            <div style={{ textAlign: 'center', padding: '12px 8px' }}>
-              <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--em)' }}>{recent_documents.length}</div>
-              <div style={{ fontSize: 11.5, color: 'var(--t4)', fontWeight: 600, marginTop: 4 }}>إجمالي المستندات</div>
+          <div className="portal-sum-grid">
+            <div className="portal-sum-item">
+              <div className="portal-sum-num portal-em">{recent_documents.length}</div>
+              <div className="portal-sum-lbl">إجمالي المستندات</div>
             </div>
-            <div style={{ textAlign: 'center', padding: '12px 8px' }}>
-              <div style={{ fontSize: 24, fontWeight: 900, color: '#059669' }}>{paidDocs.length}</div>
-              <div style={{ fontSize: 11.5, color: 'var(--t4)', fontWeight: 600, marginTop: 4 }}>مستندات مدفوعة</div>
+            <div className="portal-sum-item">
+              <div className="portal-sum-num portal-green">{paidDocs.length}</div>
+              <div className="portal-sum-lbl">مستندات مدفوعة</div>
             </div>
-            <div style={{ textAlign: 'center', padding: '12px 8px' }}>
-              <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--red)' }}>{unpaidDocs.length}</div>
-              <div style={{ fontSize: 11.5, color: 'var(--t4)', fontWeight: 600, marginTop: 4 }}>مستندات غير مسددة</div>
+            <div className="portal-sum-item">
+              <div className="portal-sum-num portal-red">{unpaidDocs.length}</div>
+              <div className="portal-sum-lbl">مستندات غير مسددة</div>
             </div>
-            <div style={{ textAlign: 'center', padding: '12px 8px' }}>
-              <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--blue)' }}>{recent_payments.length}</div>
-              <div style={{ fontSize: 11.5, color: 'var(--t4)', fontWeight: 600, marginTop: 4 }}>عدد الدفعات</div>
+            <div className="portal-sum-item">
+              <div className="portal-sum-num portal-blue">{recent_payments.length}</div>
+              <div className="portal-sum-lbl">عدد الدفعات</div>
             </div>
           </div>
           {recent_documents.length > 0 && (
-            <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--b1)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--t3)' }}>نسبة السداد</span>
-                <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--em)' }}>
+            <div className="portal-sum-ft">
+              <div className="portal-sum-ft-row">
+                <span className="portal-sum-ft-k">نسبة السداد</span>
+                <span className="portal-sum-ft-v">
                   {recent_documents.length > 0 ? Math.round((paidDocs.length / recent_documents.length) * 100) : 0}%
                 </span>
               </div>

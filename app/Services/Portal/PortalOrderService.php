@@ -14,6 +14,7 @@ use App\Models\Warehouse;
 use App\Services\CommercialDocumentService;
 use App\Services\CompanyContextService;
 use App\Services\DocumentConversionService;
+use App\Services\PaymentSynchronizer;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
@@ -39,7 +40,8 @@ class PortalOrderService
     // إلى الوراء (مثل تم التسليم → مؤكد). كل حالة لها مجموعة الانتقالات
     // التالية الوحيدة المسموحة، والخادم يرفض أي شيء خارجها بخطأ 409.
     // التحويل إلى فاتورة هو الاستثناء الوحيد: من مؤكد/تم المعالجة/الشحن
-    // يقفز مباشرة إلى «تم التسليم» (يُنفَّذ داخل convertToSale، خارج المصفوفة).
+    // يقفز مباشرة إلى «تم التسليم»، ومن «تم التسليم» نفسه يُسمح به (يبقى
+    // الوضع كما هو) — يُنفَّذ داخل convertToSale، خارج المصفوفة.
     // ═══════════════════════════════════════════════════════════════════
     public const ALLOWED_ADMIN_TRANSITIONS = [
         PortalOrder::STATUS_PREPARING => [PortalOrder::STATUS_CONFIRMED, PortalOrder::STATUS_CANCELLED],
@@ -68,6 +70,7 @@ class PortalOrderService
         private CommercialDocumentService $documents,
         private DocumentConversionService $converter,
         private CompanyContextService     $companyContext,
+        private PaymentSynchronizer       $payments,
     ) {}
 
     // ═══════════════════════════════════════════════════════════════════
@@ -354,15 +357,26 @@ class PortalOrderService
     {
         $companyId = $this->companyContext->get();
 
+        // التحميل المسبق الكامل لما يحتاجه toArray — يمنع N+1 على كل صف
+        // (party + documentType + lines + tva/unit + histories) ويمدّد
+        // select الـ party بـ is_tva_exempt لشارة «معفى» في قوائم الإدارة.
         $query = PortalOrder::query()
-            ->with(['party:id,name,code,phone', 'document:id,document_number,document_date,net_to_pay,document_type_id'])
+            ->with([
+                'party:id,name,code,phone,is_tva_exempt',
+                'document.documentType',
+                'document.lines.product.tva',
+                'document.lines.product.unit',
+                'histories',
+            ])
             ->where('company_id', $companyId);
 
         if ($partyId) {
             $query->where('party_id', $partyId);
         }
 
-        if ($status !== '' && in_array($status, PortalOrder::STATUSES, true)) {
+        // legacy pending طلبات قديمة (قبل إدخال «قيد الاعداد») ما زالت ممكنة
+        // في بيانات بعض المؤسسات — الفلتر يجب أن يقبلها مثل summary تماماً.
+        if ($status !== '' && in_array($status, array_merge(PortalOrder::STATUSES, [PortalOrder::LEGACY_PENDING]), true)) {
             $query->where('status', $status);
         }
 
@@ -523,46 +537,61 @@ class PortalOrderService
     // (المخزون، الطابع الجبائي، قيود الرصيد) عبر آلية التحويل القياسية.
     // ═══════════════════════════════════════════════════════════════════
 
-    public function convertToSale(PortalOrder $order, string $targetCode = 'FV'): CommercialDocument
+    public function convertToSale(PortalOrder $order, string $targetCode = 'FV', array $payment = []): CommercialDocument
     {
+        // قاعدة «التحويل مرة واحدة فقط»: أول تحويل ناجح يثبّت sale_document_id،
+        // وأي محاولة ثانية (حتى من «تم التسليم») تُرفض — لا فاتورتين من طلب واحد.
+        if ($order->is_converted) {
+            throw new BusinessRuleException('تم تحويل هذا الطلب إلى فاتورة مسبقاً — التحويل مسموح مرة واحدة فقط.', 409);
+        }
+
         // الطريقة الاحترافية: لا تحويل إلا بعد تأكيد الطلب (preparing → confirmed)
-        // ومروره بمرحلة التحليل (تم المعالجة / الشحن). «قيد الاعداد» يعني أن
-        // الزبون لم يثبّت الطلب بعد — لا يجوز فوترته قبل موافقته.
+        // ومروره بمرحلة التحليل. «قيد الاعداد» يعني أن الزبون لم يثبّت الطلب بعد —
+        // لا يجوز فوترته قبل موافقته.
         if ($order->status === PortalOrder::STATUS_PREPARING
             || $order->status === PortalOrder::LEGACY_PENDING) {
             throw new BusinessRuleException('يجب تأكيد الطلب أولاً (من الزبون أو من المسؤول) قبل تحويله إلى فاتورة.', 409);
         }
         if (in_array($order->status, [
-            PortalOrder::STATUS_DELIVERED,
             PortalOrder::STATUS_RETURNED,
             PortalOrder::STATUS_CANCELLED,
         ], true)) {
-            throw new BusinessRuleException('لا يمكن تحويل طلب تم تسليمه أو إرجاعه أو إلغاؤه إلى فاتورة.', 409);
+            throw new BusinessRuleException('لا يمكن تحويل طلب تم إرجاعه أو إلغاؤه إلى فاتورة.', 409);
         }
 
-        $doc = $order->document ?? throw new ModelNotFoundException('المستند المرتبط بالطلب غير موجود');
+        // التحويل (إنشاء الفاتورة) + تسجيل الدفعة الاختيارية + كتابة الحالة
+        // في معاملة واحدة — لا يمكن أن يبقى الطلب محوّلاً دون دفعة/سجل تام.
+        return DB::transaction(function () use ($order, $targetCode, $payment) {
+            $doc = $order->document ?? throw new ModelNotFoundException('المستند المرتبط بالطلب غير موجود');
 
-        $allowed = $this->converter->getAllowedTargets('CMD');
-        if (!in_array($targetCode, $allowed, true)) {
-            throw new BusinessRuleException(
-                "التحويل إلى {$targetCode} غير مسموح من أمر زبون. المسموح: " . implode(', ', $allowed),
-                422
+            // لا تحقق مكرر من الهدف هنا: DocumentConversionService::convert يتحقق
+            // بنفسه (من خريطة التحويل نفسها) أن الهدف مسموح من نوع المستند الفعلي،
+            // والمسؤول محصور أصلاً في FV/POS في طبقة التحقق من الطلب.
+            $sale = $this->converter->convert($doc, $targetCode);
+
+            // قفل «التحويل مرة واحدة»: ربط الفاتورة الناتجة بالطلب داخل نفس
+            // المعاملة — أي فشل لاحق يتراجع والطلب يبقى غير محوّل.
+            $order->forceFill(['sale_document_id' => $sale->id])->save();
+
+            // دفعة اختيارية تُربط بالفاتورة مباشرة عبر المسار القياسي
+            // (PaymentSynchronizer) — نفس سلوك تعديل دفعات أي مستند.
+            if (!empty($payment)) {
+                $this->payments->syncPayments($sale, [$payment]);
+            }
+
+            // التحويل هو القفزة القانونية إلى «تم التسليم» من مؤكد/تم المعالجة/
+            // الشحن — يُنفَّذ خارج المصفوفة الصارمة. من «تم التسليم» تبقى
+            // الحالة كما هي، والسجل التوثيقي يُكتب في الحالتين.
+            $this->forceSetStatus(
+                $order,
+                PortalOrder::STATUS_DELIVERED,
+                PortalOrder::CHANGED_BY_ADMIN,
+                auth()->user()?->name,
+                "تم تحويل الطلب إلى فاتورة {$sale->document_number}"
             );
-        }
 
-        $sale = $this->converter->convert($doc, $targetCode);
-
-        // التحويل هو القفزة القانونية الوحيدة إلى «تم التسليم» من
-        // مؤكد/تم المعالجة/الشحن — يُنفَّذ خارج المصفوفة الصارمة.
-        $this->forceSetStatus(
-            $order,
-            PortalOrder::STATUS_DELIVERED,
-            PortalOrder::CHANGED_BY_ADMIN,
-            auth()->user()?->name,
-            "تم تحويل الطلب إلى فاتورة {$sale->document_number}"
-        );
-
-        return $sale;
+            return $sale;
+        });
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -581,6 +610,8 @@ class PortalOrderService
             'status'           => $order->status,
             'status_label'     => $order->status_label,
             'allowed_next'     => $this->allowedNextByStatus($order->status),
+            'is_converted'     => $order->is_converted,
+            'sale_document_id' => $order->sale_document_id ? (int) $order->sale_document_id : null,
             'notes'            => $order->notes,
             'total_ht'         => (float) $order->total_ht,
             'total_tva'        => (float) $order->total_tva,

@@ -35,7 +35,11 @@ class InventoryValuationService
     private function updateWeightedAverage(Product $product, int $warehouseId): void
     {
         $result = DB::table('stock_movements')
-            ->join('stock_movement_types', 'stock_movement_types.id', '=', 'stock_movements.stock_movement_type_id')
+            ->join('stock_movement_types', function ($join) {
+                $join->on('stock_movement_types.id', '=', 'stock_movements.stock_movement_type_id')
+                     ->on('stock_movement_types.company_id', '=', 'stock_movements.company_id');
+            })
+            ->where('stock_movements.company_id', $product->company_id)
             ->where('stock_movements.product_id', $product->id)
             ->where('stock_movements.warehouse_id', $warehouseId)
             ->where('stock_movements.is_validated', true)

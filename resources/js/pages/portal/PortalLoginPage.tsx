@@ -61,10 +61,10 @@ export default function PortalLoginPage() {
 
         {error && <PortalError message={error} />}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <form onSubmit={handleSubmit} className="portal-login-form">
           <div className="fg">
-            <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: 'var(--t3)', marginBottom: 6 }}>
-              البريد الإلكتروني <span style={{ color: 'var(--red)' }}>*</span>
+            <label className="portal-login-label">
+              البريد الإلكتروني <span className="portal-red">*</span>
             </label>
             <input
               type="email"
@@ -74,16 +74,15 @@ export default function PortalLoginPage() {
               autoComplete="email"
               autoFocus
               dir="ltr"
-              style={{ textAlign: 'right' }}
-              className="portal-form-input"
+              className="portal-form-input portal-form-input--r"
             />
           </div>
 
           <div className="fg">
-            <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: 'var(--t3)', marginBottom: 6 }}>
-              كلمة المرور <span style={{ color: 'var(--red)' }}>*</span>
+            <label className="portal-login-label">
+              كلمة المرور <span className="portal-red">*</span>
             </label>
-            <div style={{ position: 'relative' }}>
+            <div className="portal-relative">
               <input
                 type={showPass ? 'text' : 'password'}
                 value={password}
@@ -91,19 +90,12 @@ export default function PortalLoginPage() {
                 placeholder="••••••••"
                 autoComplete="current-password"
                 dir="ltr"
-                style={{ textAlign: 'right', paddingLeft: 40 }}
-                className="portal-form-input"
+                className="portal-form-input portal-form-input--pass"
               />
               <button
                 type="button"
                 onClick={() => setShowPass((v) => !v)}
-                style={{
-                  position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
-                  background: 'none', border: 'none', cursor: 'pointer', color: 'var(--t4)', padding: 4, fontSize: 16,
-                  borderRadius: 6, transition: 'color .2s',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--t1)')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--t4)')}
+                className="portal-login-eye"
               >
                 <i className={`ti ${showPass ? 'ti-eye-off' : 'ti-eye'}`} />
               </button>
@@ -112,12 +104,8 @@ export default function PortalLoginPage() {
 
           <button
             type="submit"
-            className="portal-btn portal-btn--em"
+            className="portal-btn portal-btn--em portal-login-submit"
             disabled={loading}
-            style={{
-              justifyContent: 'center', padding: '13px 14px', fontSize: 14, borderRadius: 12,
-              marginTop: 4,
-            }}
           >
             {loading ? (
               <>
@@ -133,10 +121,7 @@ export default function PortalLoginPage() {
           </button>
         </form>
 
-        <div style={{
-          marginTop: 24, paddingTop: 18, borderTop: '1px solid var(--b1)',
-          fontSize: 12, color: 'var(--t4)', textAlign: 'center', lineHeight: 1.6,
-        }}>
+        <div className="portal-login-foot">
           حسابك مسجل لدى المؤسسة التي تتعامل معها.
           <br />
           إذا لم تملك حساباً، تواصل معها مباشرة.

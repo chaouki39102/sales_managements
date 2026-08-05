@@ -66,7 +66,7 @@ export default function PortalDocumentsPage() {
     <section className="portal-card">
       <div className="portal-card-hd">
         <h3><i className="ti ti-file-text" /> المستندات</h3>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="portal-inline">
           <span className="portal-hd-count">{meta.total} سجل</span>
           <div className="portal-view-toggle">
             <button className={`portal-view-btn ${view === 'table' ? 'on' : ''}`} onClick={() => setView('table')} title="عرض جدول">
@@ -128,12 +128,12 @@ export default function PortalDocumentsPage() {
                       {d.document_number}
                     </Link>
                   </td>
-                  <td style={{ fontSize: 11.5 }}>{fmtDate(d.document_date)}</td>
+                  <td className="portal-t-sm">{fmtDate(d.document_date)}</td>
                   <td>{d.type_name}</td>
-                  <td style={{ fontSize: 11.5 }}>{d.due_date ? fmtDate(d.due_date) : '—'}</td>
+                  <td className="portal-t-sm">{d.due_date ? fmtDate(d.due_date) : '—'}</td>
                   <td><StatusBadge status={d.status_name} /></td>
                   <td className="num">{fmtMoney(d.net_to_pay)}</td>
-                  <td className="num" style={{ color: d.remaining_amount > 0 ? 'var(--red)' : '#059669' }}>{fmtMoney(d.remaining_amount)}</td>
+                  <td className={`num ${d.remaining_amount > 0 ? 'ow' : 'pos'}`}>{fmtMoney(d.remaining_amount)}</td>
                 </tr>
               ))}
             </tbody>
@@ -144,7 +144,7 @@ export default function PortalDocumentsPage() {
           {rows.map((d) => (
             <Link key={d.id} to={`${base}/documents/${d.id}`} className="portal-doc-card">
               <div className="portal-doc-card-top">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className="portal-inline">
                   <DocTypeIcon code={d.type_code} />
                   <div>
                     <div className="portal-doc-card-num">{d.document_number}</div>
@@ -162,8 +162,8 @@ export default function PortalDocumentsPage() {
                 )}
               </div>
               <div className="portal-doc-card-footer">
-                <span><i className="ti ti-tag" style={{ marginLeft: 4 }} />{d.type_name}</span>
-                {d.due_date && <span><i className="ti ti-calendar" style={{ marginLeft: 4 }} />{fmtDate(d.due_date)}</span>}
+                <span><i className="ti ti-tag" />{d.type_name}</span>
+                {d.due_date && <span><i className="ti ti-calendar" />{fmtDate(d.due_date)}</span>}
               </div>
             </Link>
           ))}

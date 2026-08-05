@@ -222,6 +222,7 @@ export interface PortalCatalogItem {
   has_packaging: boolean;
   packagings:    PortalCatalogPackaging[];
   manages_quantity_discounts: boolean;
+  party_is_tva_exempt: boolean;
   discounts:     PortalCatalogDiscount[];
 }
 

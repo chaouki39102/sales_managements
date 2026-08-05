@@ -118,7 +118,8 @@ export function GlobalDocumentFAB() {
   }, [menuOpen]);
 
   const isDocEditor = /^\/documents\/[^/]+\/(new|[^/]+\/edit)$/.test(location.pathname);
-  if (isDocEditor) return null;
+  const isPortal = location.pathname.startsWith('/portal');
+  if (isDocEditor || isPortal) return null;
 
   return (
     <div

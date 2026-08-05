@@ -44,6 +44,10 @@ export interface PortalAdminOrder {
   status:       PortalOrderStatus;
   status_label: string;
   allowed_next: PortalOrderStatus[];
+  // التحويل إلى فاتورة مسموح مرة واحدة فقط — أول تحويل ناجح يثبّت
+  // sale_document_id ويجعل is_converted صحيحاً (الزر يُخفى في الواجهة).
+  is_converted: boolean;
+  sale_document_id: number | null;
   notes:        string | null;
   total_ht:     number;
   total_tva:    number;
@@ -94,6 +98,21 @@ export interface PortalAdminOrderFilters {
   to_date?: string;
 }
 
+/** دفعة اختيارية تُسجَّل مع تحويل الطلب إلى فاتورة (FV/POS). */
+export interface PortalConvertPayment {
+  payment_mode_id:   number;
+  amount:            number;
+  payment_date?:     string;
+  reference?:        string;
+  treasury_account_id?: number;
+  notes?:            string;
+}
+
+export interface PortalConvertTarget {
+  target: 'FV' | 'POS';
+  payment?: PortalConvertPayment;
+}
+
 export interface PortalAdminOrderListMeta {
   current_page: number;
   last_page: number;
@@ -122,12 +141,23 @@ export const portalOrdersApi = {
     apiPatch<PortalAdminOrder>(`/portal-orders/${id}`, data),
   updateLines: (id: number, lines: PortalAdminOrderLineInput[]) =>
     apiPatch<PortalAdminOrder>(`/portal-orders/${id}/lines`, { lines }),
-  convert: (id: number, target = 'FV') =>
-    apiPost<{ order: PortalAdminOrder; sale: { id: number; document_number: string; document_type: string | null; net_to_pay: number; total_ttc: number; document_date: string | null } }>(
+  convert: (id: number, data: PortalConvertTarget = { target: 'FV' }) =>
+    apiPost<{ order: PortalAdminOrder; sale: PortalConvertSale }>(
       `/portal-orders/${id}/convert`,
-      { target },
+      data,
     ),
 } as const;
+
+export interface PortalConvertSale {
+  id: number;
+  document_number: string;
+  document_type: string | null;
+  net_to_pay: number;
+  total_ttc: number;
+  paid_amount: number;
+  remaining_amount: number;
+  document_date: string | null;
+}
 
 export const PORTAL_ORDER_STATUSES: { value: PortalOrderStatus; label: string; cls: string }[] = [
   { value: 'preparing', label: 'قيد الاعداد',  cls: 'badge--y' },
@@ -218,21 +248,15 @@ export function usePortalOrderLinesUpdate() {
 
 export interface PortalOrderConvertResult {
   order: PortalAdminOrder;
-  sale: {
-    id: number;
-    document_number: string;
-    document_type: string | null;
-    net_to_pay: number;
-    total_ttc: number;
-    document_date: string | null;
-  };
+  sale: PortalConvertSale;
 }
 
 export function usePortalOrderConvert() {
   const slug = useActiveSlug();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id }: { id: number }) => portalOrdersApi.convert(id, 'FV'),
+    mutationFn: ({ id, data }: { id: number; data: PortalConvertTarget }) =>
+      portalOrdersApi.convert(id, data),
     onSuccess: () => {
       if (!slug) return;
       qc.invalidateQueries({ queryKey: ['portal-orders', slug] });
