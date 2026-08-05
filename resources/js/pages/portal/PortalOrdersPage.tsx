@@ -4,7 +4,9 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { portalApi, type PortalCatalogItem, type PortalOrderStatus } from '@/lib/api/portal/portal';
+import { portalApi, type PortalCatalogItem, type PortalOrder, type PortalOrderStatus } from '@/lib/api/portal/portal';
+import { useConfirm } from '@/hooks/useConfirm';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import {
   fmtMoney, fmtMoneySigned, fmtDate, Pager,
   PortalLoading, PortalError, PortalEmpty,
@@ -38,6 +40,8 @@ export default function PortalOrdersPage() {
   const [catalogPage, setCatalogPage] = useState(1);
   const [toast, setToast] = useState('');
   const [submitted, setSubmitted] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const { confirm, confirmDialogProps } = useConfirm();
 
   const debouncedSearch = useDebounce(search, 350);
 
@@ -68,6 +72,7 @@ export default function PortalOrdersPage() {
       setCart({});
       setQty({});
       setNotes('');
+      setEditingId(null);
       setSubmitted(order.id);
       setPage(1);
       qc.invalidateQueries({ queryKey: ['portal', slug, 'orders', 'list'] });
@@ -75,6 +80,75 @@ export default function PortalOrdersPage() {
     },
     onError: (err: Error) => showToast(err.message || 'تعذر إرسال الطلب'),
   });
+
+  const updateOrder = useMutation({
+    mutationFn: ({ id }: { id: number }) =>
+      portalApi.updateOrder(
+        id,
+        Object.entries(cart).map(([productId, quantity]) => ({ product_id: Number(productId), quantity })),
+        notes.trim() || undefined,
+      ),
+    onSuccess: (order) => {
+      setCart({});
+      setQty({});
+      setNotes('');
+      setEditingId(null);
+      setSubmitted(order.id);
+      qc.invalidateQueries({ queryKey: ['portal', slug, 'orders', 'list'] });
+      showToast('تم تعديل الطلب بنجاح');
+    },
+    onError: (err: Error) => showToast(err.message || 'تعذر تعديل الطلب'),
+  });
+
+  const cancelOrder = useMutation({
+    mutationFn: ({ id }: { id: number }) => portalApi.cancelOrder(id),
+    onSuccess: (order) => {
+      setSubmitted(order.id);
+      qc.invalidateQueries({ queryKey: ['portal', slug, 'orders', 'list'] });
+      showToast('تم إلغاء الطلب');
+    },
+    onError: (err: Error) => showToast(err.message || 'تعذر إلغاء الطلب'),
+  });
+
+  const submit = () => {
+    if (editingId != null) {
+      updateOrder.mutate({ id: editingId });
+    } else {
+      createOrder.mutate();
+    }
+  };
+
+  const startEdit = (o: PortalOrder) => {
+    const nextCart: Record<number, number> = {};
+    const nextQty: Record<number, number> = {};
+    (o.items ?? []).forEach((it) => {
+      if (!it.product_id) return;
+      nextCart[it.product_id] = it.quantity;
+      nextQty[it.product_id] = it.quantity;
+    });
+    setCart(nextCart);
+    setQty(nextQty);
+    setNotes(o.notes ?? '');
+    setEditingId(o.id);
+    setSubmitted(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setCart({});
+    setQty({});
+    setNotes('');
+  };
+
+  const handleCancel = async (o: PortalOrder) => {
+    const ok = await confirm(
+      `سيتم إلغاء الطلب ${o.reference} نهائياً ولا يمكن التراجع. متابعة؟`,
+      { title: 'إلغاء الطلب', confirmText: 'إلغاء الطلب', variant: 'danger', icon: 'ti-basket-x' },
+    );
+    if (!ok) return;
+    cancelOrder.mutate({ id: o.id });
+  };
 
   const byId = useMemo(() => {
     const m = new Map<number, PortalCatalogItem>();
@@ -233,8 +307,13 @@ export default function PortalOrdersPage() {
       {/* ─── سلة الطلب ─── */}
       <div className="portal-card" style={{ marginTop: 22 }}>
         <div className="portal-card-hd">
-          <h3><i className="ti ti-basket" /> سلة الطلب</h3>
-          <span className="portal-hd-count">{cartEntries.length} صنف</span>
+          <h3>
+            <i className={`ti ${editingId != null ? 'ti-pencil' : 'ti-basket'}`} />
+            {editingId != null ? 'تعديل الطلب' : 'سلة الطلب'}
+          </h3>
+          <span className="portal-hd-count">
+            {editingId != null ? 'تعديل طلب قيد الانتظار' : `${cartEntries.length} صنف`}
+          </span>
         </div>
 
         {cartEntries.length === 0 ? (
@@ -292,18 +371,33 @@ export default function PortalOrdersPage() {
                   <span>المجموع TTC</span><b>{fmtMoney(totals.ttc)}</b>
                 </div>
               </div>
-              <button
-                className="portal-btn portal-btn--em"
-                disabled={createOrder.isPending || cartEntries.length === 0}
-                onClick={() => createOrder.mutate()}
-                type="button"
-              >
-                {createOrder.isPending ? (
-                  <><i className="ti ti-loader animate-spin" /> جاري الإرسال...</>
-                ) : (
-                  <><i className="ti ti-send" /> إرسال الطلب</>
+              <div className="portal-cart-foot-actions">
+                {editingId != null && (
+                  <button
+                    className="portal-btn portal-btn--ghost"
+                    onClick={cancelEdit}
+                    type="button"
+                  >
+                    <i className="ti ti-x" /> إلغاء التعديل
+                  </button>
                 )}
-              </button>
+                <button
+                  className="portal-btn portal-btn--em"
+                  disabled={(editingId != null ? updateOrder.isPending : createOrder.isPending) || cartEntries.length === 0}
+                  onClick={submit}
+                  type="button"
+                >
+                  {editingId != null ? (
+                    updateOrder.isPending
+                      ? <><i className="ti ti-loader animate-spin" /> جاري الحفظ...</>
+                      : <><i className="ti ti-save" /> حفظ التعديلات</>
+                  ) : (
+                    createOrder.isPending
+                      ? <><i className="ti ti-loader animate-spin" /> جاري الإرسال...</>
+                      : <><i className="ti ti-send" /> إرسال الطلب</>
+                  )}
+                </button>
+              </div>
             </div>
           </>
         )}
@@ -356,7 +450,34 @@ export default function PortalOrdersPage() {
                           <div className="portal-cart-total">{fmtMoney(it.total_ttc)}</div>
                         </div>
                       ))}
+                      {(o.items ?? []).length === 0 && (
+                        <PortalEmpty icon="ti-package" text="لا توجد بنود في هذا الطلب" />
+                      )}
                       {o.notes && <div className="portal-order-notes">ملاحظات: {o.notes}</div>}
+                      {o.status === 'pending' && (
+                        <div className="portal-order-actions">
+                          <button className="portal-btn portal-btn--sm" type="button" onClick={() => startEdit(o)}>
+                            <i className="ti ti-pencil" /> تعديل الطلب
+                          </button>
+                          <button
+                            className="portal-btn portal-btn--sm portal-btn--danger"
+                            type="button"
+                            disabled={cancelOrder.isPending}
+                            onClick={() => handleCancel(o)}
+                          >
+                            <i className="ti ti-basket-x" /> إلغاء الطلب
+                          </button>
+                        </div>
+                      )}
+                      {o.status === 'processing' && (
+                        <div className="portal-order-notes">الطلب قيد التجهيز — لا يمكن تعديله أو إلغاؤه من طرفكم</div>
+                      )}
+                      {o.status === 'completed' && (
+                        <div className="portal-order-notes portal-order-notes--ok">تمت معالجة الطلب وتحويله إلى فاتورة</div>
+                      )}
+                      {o.status === 'cancelled' && (
+                        <div className="portal-order-notes portal-order-notes--warn">تم إلغاء هذا الطلب</div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -377,6 +498,7 @@ export default function PortalOrdersPage() {
       </div>
 
       {toast && <div className="portal-toast"><i className="ti ti-circle-check" /> {toast}</div>}
+      <ConfirmDialog {...confirmDialogProps} />
     </section>
   );
 }

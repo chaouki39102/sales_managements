@@ -77,6 +77,7 @@ const TRULY_PUBLIC: readonly string[] = [
   '/admin',
   '/wilayas',
   '/communes',
+  '/health',
 ];
 
 const isPublicPath = (url: string): boolean => {

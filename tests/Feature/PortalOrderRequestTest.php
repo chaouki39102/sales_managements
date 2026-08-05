@@ -84,7 +84,7 @@ beforeEach(function () {
             'ref' => $ref, 'barcode' => null,
             'tva_id' => $tvaId, 'unit_id' => $unitId,
             'purchase_price_ht' => $purchase, 'current_cost_price' => 0,
-            'manages_stock' => true, 'allow_negative_stock' => false,
+            'manages_stock' => true, 'allow_negative_stock' => true,
             'min_stock_alert' => 0, 'active' => true,
             'created_at' => $now, 'updated_at' => $now,
         ]);
@@ -156,6 +156,8 @@ it('customer submits an order and server recomputes prices (client prices ignore
         // المرجع = رقم مستند أمر الزبون (CMD) — الغلاف أصبح مبنيّاً على المستند
         ->and($data['reference'])->toMatch('/^CMD-\d{4}-\d{6}$/')
         ->and(count($data['lines']))->toBe(2)
+        // الواجهات الأمامية تقرأ «items» بينما الاختبارات القديمة تقرأ «lines»
+        ->and(count($data['items']))->toBe(2)
         ->and($data['document']['document_type'])->toBe('CMD');
 
     // السعر الذي خزنه الخادم هو سعر المنتج وليس 1000 المزوّر
@@ -208,4 +210,70 @@ it('admin can list company orders and change status', function () {
     test()->getJson('/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders?status=pending')
         ->assertOk()
         ->assertJsonPath('data.meta.total', 0);
+});
+
+it('customer can cancel a pending order', function () {
+    $created = test()->withToken(test()->token)->postJson(
+        '/api/v1/'.TEST_COMPANY_SLUG.'/portal/orders',
+        ['items' => [['product_id' => test()->productA, 'quantity' => 1]]]
+    )->assertStatus(201)->json('data');
+
+    test()->withToken(test()->token)
+        ->postJson('/api/v1/'.TEST_COMPANY_SLUG.'/portal/orders/'.$created['id'].'/cancel')
+        ->assertOk()
+        ->assertJsonPath('data.status', 'cancelled')
+        ->assertJsonPath('data.status_label', 'ملغى');
+});
+
+it('customer cannot cancel an order once processing started', function () {
+    $created = test()->withToken(test()->token)->postJson(
+        '/api/v1/'.TEST_COMPANY_SLUG.'/portal/orders',
+        ['items' => [['product_id' => test()->productA, 'quantity' => 1]]]
+    )->assertStatus(201)->json('data');
+
+    actingAsAuthenticatedTenantUser();
+    test()->patchJson('/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$created['id'], ['status' => 'processing'])
+        ->assertOk();
+
+    // الزبون لم يعد يستطيع الإلغاء بعد أن بدأت الإدارة التجهيز
+    test()->withToken(test()->token)
+        ->postJson('/api/v1/'.TEST_COMPANY_SLUG.'/portal/orders/'.$created['id'].'/cancel')
+        ->assertStatus(422);
+});
+
+it('admin can convert a processing order into an FV invoice (completes the pipeline)', function () {
+    $created = test()->withToken(test()->token)->postJson(
+        '/api/v1/'.TEST_COMPANY_SLUG.'/portal/orders',
+        ['items' => [['product_id' => test()->productA, 'quantity' => 2]]]
+    )->assertStatus(201)->json('data');
+
+    actingAsAuthenticatedTenantUser();
+
+    // إدارة: التجهيز
+    test()->patchJson('/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$created['id'], ['status' => 'processing'])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'processing');
+
+    // إدارة: التحويل إلى فاتورة
+    $res = test()->postJson('/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$created['id'].'/convert', ['target' => 'FV'])
+        ->assertOk()
+        ->json('data');
+
+    // الصافي = TTC + الطابع الجبائي (الحد الأدنى 5 دج)
+    $ttc    = round(2 * 120 * 1.09, 2);
+    $stamp  = max(5, min(round($ttc * 0.01, 2), 2500));
+
+    expect($res['sale']['document_number'])->toMatch('/^FV-\d{4}-\d{6}$/')
+        ->and((float) $res['sale']['net_to_pay'])->toBe(round($ttc + $stamp, 2))
+        ->and($res['sale']['document_type'])->toBe('FV')
+        ->and($res['order']['status'])->toBe('completed')
+        ->and($res['order']['status_label'])->toBe('مكتمل');
+
+    // الطلب أصبح مكتملاً ولا يمكن تغييره بعد الآن
+    test()->getJson('/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$created['id'])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'completed');
+
+    test()->patchJson('/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$created['id'], ['status' => 'pending'])
+        ->assertStatus(409);
 });

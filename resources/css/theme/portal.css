@@ -1806,6 +1806,7 @@ html.dark .portal-login-box {
 }
 .portal-cart-x:hover { background: var(--red); color: #fff; }
 .portal-cart-foot { padding: 14px 22px 20px; border-top: 1px solid var(--b1); display: flex; flex-direction: column; gap: 12px; }
+.portal-cart-foot-actions { display: flex; gap: 10px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
 .portal-cart-totals {
   display: flex;
   flex-direction: column;
@@ -1860,6 +1861,14 @@ html.dark .portal-login-box {
   font-weight: 600;
   padding: 8px 2px 12px;
   white-space: pre-wrap;
+}
+.portal-order-notes--ok  { color: var(--g, #16a34a); }
+.portal-order-notes--warn { color: var(--red); }
+.portal-order-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0 12px;
 }
 
 @media (max-width: 640px) {

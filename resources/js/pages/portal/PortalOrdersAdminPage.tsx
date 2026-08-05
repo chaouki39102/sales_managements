@@ -78,6 +78,21 @@ export default function PortalOrdersAdminPage() {
     );
   };
 
+  const startProcessing = () => {
+    if (!detailId) return;
+    updateStatus.mutate(
+      { id: detailId, status: 'processing' },
+      {
+        onSuccess: () => {
+          setNextStatus('processing');
+          notify.success('تم بدء تجهيز الطلب');
+          qc.invalidateQueries({ queryKey: ['portal-orders'] });
+        },
+        onError: (e: Error) => notify.error(e.message || 'تعذر تحديث الحالة'),
+      },
+    );
+  };
+
   const handleConvert = async () => {
     if (!detailId) return;
     const ok = await confirm(
@@ -90,6 +105,7 @@ export default function PortalOrdersAdminPage() {
       {
         onSuccess: (res) => {
           setConvertResult(res.sale);
+          setNextStatus('completed');
           notify.success(`تم التحويل — الفاتورة ${res.sale.document_number}`);
           qc.invalidateQueries({ queryKey: ['portal-orders'] });
         },
@@ -208,6 +224,22 @@ export default function PortalOrdersAdminPage() {
         footer={
           <>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              {detail.data?.status === 'pending' && (
+                <button
+                  onClick={startProcessing}
+                  disabled={updateStatus.isPending}
+                  style={{
+                    padding: '8px 14px', borderRadius: 'var(--r2)',
+                    background: 'var(--em)', color: '#fff', border: 'none',
+                    cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                    fontFamily: 'Tajawal, sans-serif', opacity: updateStatus.isPending ? 0.6 : 1,
+                  }}
+                >
+                  {updateStatus.isPending
+                    ? <><i className="ti ti-loader animate-spin" /> جاري الحفظ...</>
+                    : <><i className="ti ti-package-import" /> بدء التجهيز</>}
+                </button>
+              )}
               <button
                 onClick={handleConvert}
                 disabled={

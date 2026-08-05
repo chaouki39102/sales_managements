@@ -208,8 +208,11 @@ class PortalOrderService
         if ($current === PortalOrder::STATUS_COMPLETED) {
             throw new BusinessRuleException('لا يمكن تغيير حالة طلب مكتمل.', 409);
         }
-        if ($changedBy === PortalOrder::CHANGED_BY_CUSTOMER && $status !== PortalOrder::STATUS_CANCELLED) {
-            throw new BusinessRuleException('الزبون يستطيع إلغاء الطلب فقط.', 422);
+        if (
+            $changedBy === PortalOrder::CHANGED_BY_CUSTOMER &&
+            ($status !== PortalOrder::STATUS_CANCELLED || $current !== PortalOrder::STATUS_PENDING)
+        ) {
+            throw new BusinessRuleException('الزبون يستطيع إلغاء الطلب فقط أثناء حالة «قيد الانتظار».', 422);
         }
 
         DB::transaction(function () use ($order, $status, $changedBy, $changedByName, $note) {
@@ -292,7 +295,9 @@ class PortalOrderService
                 'net_to_pay'      => (float) $doc->net_to_pay,
                 'warehouse_id'    => $doc->warehouse_id,
             ] : null,
-            'lines' => ($doc?->lines ?? collect())->map(fn($l) => [
+            // يُرسَل بالاسمان معاً للتوافق مع الواجهتين: الواجهات الأمامية تقرأ
+            // «items»، والاختبارات القديمة تقرأ «lines».
+            'lines' => $items = ($doc?->lines ?? collect())->map(fn($l) => [
                 'line_id'          => $l->id,
                 'product_id'       => $l->product_id,
                 'product_name'     => $l->product?->name ?? $l->description,
@@ -308,6 +313,7 @@ class PortalOrderService
                 'total_tva'        => (float) $l->total_tva,
                 'total_ttc'        => (float) $l->total_ttc,
             ])->values()->all(),
+            'items' => $items,
             'histories' => ($order->histories ?? collect())->map(fn($h) => [
                 'id'          => $h->id,
                 'status'      => $h->status,

@@ -112,6 +112,7 @@ const NAV_GROUPS = [
       { name: 'التنبيهات الذكية', href: 'alerts',                icon: 'ti-alert-triangle' },
       { name: 'سجل التدقيق',     href: 'audit-log',               icon: 'ti-history'      },
       { name: 'الملف الشخصي',    href: 'profile',                 icon: 'ti-user-circle'  },
+      { name: 'حالة النظام',     href: '/status',                icon: 'ti-server-2'     },
       { name: 'الإعداد الأولي',  href: '/onboarding',            icon: 'ti-rocket'       },
     ],
   },

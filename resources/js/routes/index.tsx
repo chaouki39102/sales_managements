@@ -14,6 +14,7 @@ const AdminLayout     = lazy(() => import('@/components/layouts/AdminLayout'));
 const LoginPage      = lazy(() => import('@/pages/auth/LoginPage'));
 const RegisterPage   = lazy(() => import('@/pages/auth/RegisterPage'));
 const OnboardingPage = lazy(() => import('@/pages/onboarding/OnboardingPage'));
+const ConnectionStatusPage = lazy(() => import('@/pages/status/ConnectionStatusPage'));
 
 // â”€â”€ Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'));
@@ -203,6 +204,14 @@ export function AppRoutes() {
         <Route path="/login"    element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
+        {/* Connection Status Portal — بوابة حالة الاتصال (تفتح عند /) */}
+        {/* الصفحة الافتتاحية: تعرض حالة الخادم + قاعدة البيانات + الجلسة، ثم
+            توجّه تلقائياً إلى لوحة التحكم (جلسة مفتوحة) أو إلى /login
+            (لا جلسة) عندما يكون الاتصال سليماً. عند انقطاع الاتصال تبقى
+            هنا وتعرض التشخيص وحلول المشكلة. */}
+        <Route path="/"       element={<Navigate to="/status" replace />} />
+        <Route path="/status" element={<ConnectionStatusPage />} />
+
         {/* â‘، Onboarding */}
         <Route
           path="/onboarding"
@@ -235,8 +244,6 @@ export function AppRoutes() {
             </RequireCompany>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
-
           {/* Dashboard */}
           <Route path="dashboard" element={<DashboardPage />} />
 

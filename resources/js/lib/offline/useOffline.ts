@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getPendingOpsCount } from './db';
+import client from '@/lib/api/core/client';
 
 export function useOnlineStatus(): boolean {
   const [online, setOnline] = useState(() =>
@@ -44,7 +45,6 @@ export function useSync(): { syncing: boolean; sync: () => Promise<void> } {
     try {
       const { getPendingOps, removePendingOp } = await import('./db');
       const ops = await getPendingOps();
-      const { default: client } = await import('@/lib/api/core/client');
 
       for (const op of ops) {
         try {

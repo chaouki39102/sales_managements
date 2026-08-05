@@ -60,6 +60,13 @@ export default defineConfig({
                 // is handled by react-router and never hits the SW.
                 navigateFallback: null,
                 runtimeCaching: [
+                    // Health/status probe: ALWAYS live — a diagnostic page must
+                    // reflect reality, never a stale cached response. This must
+                    // sit BEFORE the generic /api/v1/ rule (first match wins).
+                    {
+                        urlPattern: /\/api\/v1\/health/,
+                        handler: 'NetworkOnly',
+                    },
                     // API: network-first, fall back to cached response for 1 day
                     {
                         urlPattern: /\/api\/v1\//,

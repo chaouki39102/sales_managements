@@ -53,6 +53,7 @@ use App\Http\Controllers\Api\V1\PdfExportController;
 use App\Http\Controllers\Api\V1\Portal\PortalAuthController;
 use App\Http\Controllers\Api\V1\Portal\PortalController;
 use App\Http\Controllers\Api\V1\Portal\PortalAccessController;
+use App\Http\Controllers\Api\V1\HealthController;
 
 
 // Tenant Lookup Controllers
@@ -136,6 +137,13 @@ Route::prefix('v1')->group(function () {
     // يقيّد بأسماء نطاقات خارجية معروفة فقط (انظر ImageProxyController).
     Route::get('/image-proxy', [\App\Http\Controllers\Api\V1\ImageProxyController::class, 'proxy'])
         ->middleware('throttle:120,60');
+
+    // ═══════════════════════════════════════════
+    // ①-c HEALTH — فحص اتصال النظام (بدون مصادقة)
+    // ═══════════════════════════════════════════
+    // يُستعمل من صفحة حالة الاتصال (/status) قبل تسجيل الدخول لمعرفة
+    // هل الخادم و قاعدة البيانات متصلتان وما هي تفاصيل البيئة.
+    Route::get('/health', [HealthController::class, 'check']);
 
     // ═══════════════════════════════════════════
     // ①-b CUSTOMER PORTAL (بوابة الزبائن) — لكل مؤسسة

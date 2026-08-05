@@ -284,6 +284,10 @@ export const portalApi = {
     }),
   createOrder: (items: { product_id: number; quantity: number }[], notes?: string) =>
     portalPost<PortalOrder>('/portal/orders', { items, notes: notes || undefined }),
+  updateOrder: (id: number, items: { product_id: number; quantity: number }[], notes?: string) =>
+    portalPut<PortalOrder>(`/portal/orders/${id}`, { items, notes: notes || undefined }),
+  cancelOrder: (id: number) =>
+    portalPost<PortalOrder>(`/portal/orders/${id}/cancel`),
 };
 
 export function isPortalAuthenticated(): boolean {
