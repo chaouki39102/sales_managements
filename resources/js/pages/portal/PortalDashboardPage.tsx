@@ -3,12 +3,22 @@
 // ════════════════════════════════════════════════════════════════════════════
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { portalApi } from '@/lib/api/portal/portal';
+import { portalApi, type PortalOrderStatus } from '@/lib/api/portal/portal';
 import {
   fmtMoney, fmtDate,
   StatusBadge, AnimatedCounter, ProgressBar, CreditBar,
   PortalLoading, PortalError,
 } from './portalUtils';
+
+const ORDER_STATUS_CLS: Record<PortalOrderStatus, string> = {
+  preparing: 'badge--y',
+  confirmed: 'badge--b',
+  processed: 'badge--purple',
+  shipped:   'badge--z',
+  delivered: 'badge--g',
+  returned:  'badge--r',
+  cancelled: 'badge--gray',
+};
 
 export default function PortalDashboardPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -22,12 +32,17 @@ export default function PortalDashboardPage() {
   if (isLoading) return <PortalLoading />;
   if (isError || !data) return <PortalError message={error instanceof Error ? error.message : 'تعذر تحميل البيانات'} />;
 
-  const { balance, company, party, month, unpaid_total, recent_documents, recent_payments } = data;
+  const { balance, company, party, month, unpaid_total, recent_documents, recent_payments, orders, recent_orders } = data;
   const sign = balance.signed_balance;
   const paidDocs = recent_documents.filter(d => d.remaining_amount <= 0);
   const unpaidDocs = recent_documents.filter(d => d.remaining_amount > 0);
   const creditLimit = party.credit_limit || 0;
   const creditUsed = Math.abs(sign);
+  const openOrders =
+    (orders?.preparing ?? 0) +
+    (orders?.confirmed ?? 0) +
+    (orders?.processed ?? 0) +
+    (orders?.shipped ?? 0);
 
   return (
     <>
@@ -93,6 +108,17 @@ export default function PortalDashboardPage() {
             </div>
           </div>
         </div>
+
+        <div className="portal-kpi portal-kpi--orders">
+          <div className="portal-kpi-ic portal-kpi-ic--orders"><i className="ti ti-building-store" /></div>
+          <div>
+            <div className="portal-kpi-lb">طلبات السلع</div>
+            <div className="portal-kpi-v"><AnimatedCounter value={orders?.total ?? 0} /></div>
+            <div className="portal-kpi-s" style={{ color: openOrders > 0 ? 'var(--gold)' : 'var(--t4)' }}>
+              {openOrders > 0 ? `${openOrders} طلب قيد المعالجة` : 'لا توجد طلبات قيد المعالجة'}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ─── شريط الائتمان + مقياس الرصيد ─── */}
@@ -108,6 +134,10 @@ export default function PortalDashboardPage() {
 
       {/* ─── أزرار الإجراءات السريعة ─── */}
       <div className="portal-actions" style={{ marginBottom: 20 }}>
+        <Link to={`${base}/orders`} className="portal-action portal-action--em">
+          <i className="ti ti-building-store" />
+          اطلب سلعة
+        </Link>
         <Link to={`${base}/documents`} className="portal-action">
           <i className="ti ti-file-text" />
           استعرض المستندات
@@ -217,6 +247,52 @@ export default function PortalDashboardPage() {
           </div>
         </section>
       </div>
+
+      {/* ─── أحدث طلبات السلع ─── */}
+      <section className="portal-card" style={{ marginTop: 16 }}>
+        <div className="portal-card-hd">
+          <h3><i className="ti ti-clipboard-list" /> أحدث طلبات السلع</h3>
+          <Link to={`${base}/orders`} className="portal-card-link">
+            عرض الكل <i className="ti ti-chevron-left" style={{ fontSize: 10 }} />
+          </Link>
+        </div>
+        <div className="portal-card-bd" style={{ padding: 0 }}>
+          {!recent_orders || recent_orders.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 28, color: 'var(--t4)', fontSize: 12.5 }}>
+              <i className="ti ti-clipboard-off" style={{ fontSize: 32, opacity: .15, display: 'block', marginBottom: 10 }} />
+              لا توجد طلبات سلع بعد
+              <div style={{ marginTop: 12 }}>
+                <Link to={`${base}/orders`} className="portal-btn portal-btn--em portal-btn--sm">
+                  <i className="ti ti-plus" /> اطلب سلعة الآن
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="portal-table-wrap">
+              <table className="portal-table">
+                <thead>
+                  <tr>
+                    <th>المرجع</th><th>التاريخ</th><th>المنتجات</th><th>الحالة</th><th>المبلغ (TTC)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recent_orders.map((o) => (
+                    <tr key={o.id}>
+                      <td className="num">{o.reference}</td>
+                      <td style={{ fontSize: 11.5 }}>{fmtDate(o.requested_at || o.created_at)}</td>
+                      <td>{o.items_count} صنف</td>
+                      <td>
+                        <span className={`badge ${ORDER_STATUS_CLS[o.status]}`}>{o.status_label}</span>
+                      </td>
+                      <td className="num">{fmtMoney(o.total_ttc)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* ─── ملخص سريع ─── */}
       <div className="portal-card" style={{ marginTop: 16 }}>

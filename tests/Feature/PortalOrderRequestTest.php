@@ -152,7 +152,7 @@ it('customer submits an order and server recomputes prices (client prices ignore
     expect((float) $data['total_ht'])->toBe(300.0)
         ->and((float) $data['total_tva'])->toBe(27.0)
         ->and((float) $data['total_ttc'])->toBe(327.0)
-        ->and($data['status'])->toBe('pending')
+        ->and($data['status'])->toBe('preparing')
         // المرجع = رقم مستند أمر الزبون (CMD) — الغلاف أصبح مبنيّاً على المستند
         ->and($data['reference'])->toMatch('/^CMD-\d{4}-\d{6}$/')
         ->and(count($data['lines']))->toBe(2)
@@ -193,19 +193,85 @@ it('admin can list company orders and change status', function () {
     expect((float) $order['total_ttc'])->toBe(round(5 * 120 * 1.09, 2))
         ->and($order['party']['name'])->toBe('زبون البوابة');
 
-    // إدارة: تغيير الحالة إلى قيد التجهيز
+    // إدارة: تغيير الحالة إلى تم المعالجة
     test()->patchJson('/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$order['id'], [
-        'status' => 'processing',
+        'status' => 'processed',
     ])->assertOk()
-        ->assertJsonPath('data.status', 'processing')
-        ->assertJsonPath('data.status_label', 'قيد التجهيز');
+        ->assertJsonPath('data.status', 'processed')
+        ->assertJsonPath('data.status_label', 'تم المعالجة');
 
     // فلترة بالحالة
-    test()->getJson('/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders?status=processing')
+    test()->getJson('/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders?status=processed')
         ->assertOk()
         ->assertJsonPath('data.meta.total', 1);
 
-    test()->getJson('/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders?status=pending')
+    test()->getJson('/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders?status=preparing')
         ->assertOk()
         ->assertJsonPath('data.meta.total', 0);
+});
+
+it('customer confirms his order (preparing → confirmed) then loses all further actions', function () {
+    $url = '/api/v1/'.TEST_COMPANY_SLUG.'/portal/orders';
+    $created = test()->withToken(test()->token)->postJson(
+        $url,
+        ['items' => [['product_id' => test()->productA, 'quantity' => 2]]]
+    )->assertStatus(201)->json('data');
+
+    expect($created['status'])->toBe('preparing');
+
+    // تأكيد الطلب من الزبون (الخطوة الاحترافية): قيد الاعداد → مؤكد
+    test()->withToken(test()->token)->postJson($url.'/'.$created['id'].'/validate')
+        ->assertOk()
+        ->assertJsonPath('data.status', 'confirmed');
+
+    // بعد التأكيد لا يملك الزبون أي تصرف آخر: لا إلغاء ولا تعديل
+    test()->withToken(test()->token)->postJson($url.'/'.$created['id'].'/cancel')
+        ->assertStatus(422);
+
+    test()->withToken(test()->token)->patchJson($url.'/'.$created['id'], [
+        'items' => [['product_id' => test()->productB, 'quantity' => 1]],
+    ])->assertStatus(409);
+
+    // الحالة بقيت مؤكدة
+    portalOrderAuthGet($url.'/'.$created['id'])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'confirmed');
+});
+
+it('admin convert is rejected before confirm and lines editing is closed after shipped', function () {
+    $url = '/api/v1/'.TEST_COMPANY_SLUG.'/portal/orders';
+    $created = test()->withToken(test()->token)->postJson(
+        $url,
+        ['items' => [['product_id' => test()->productA, 'quantity' => 3]]]
+    )->assertStatus(201)->json('data');
+
+    actingAsAuthenticatedTenantUser();
+    $adminOrderUrl = '/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$created['id'];
+
+    // ملخص المراحل قبل أي تغيير
+    test()->getJson('/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/summary')
+        ->assertOk()
+        ->assertJsonPath('data.total', 1)
+        ->assertJsonPath('data.preparing', 1)
+        ->assertJsonPath('data.confirmed', 0);
+
+    // لا تحويل قبل تأكيد الطلب
+    test()->postJson($adminOrderUrl.'/convert', ['target' => 'FV'])
+        ->assertStatus(409)
+        ->assertJsonPath('message', 'يجب تأكيد الطلب أولاً (من الزبون أو من المسؤول) قبل تحويله إلى فاتورة.');
+
+    // خط الأنابيب: قيد الاعداد → مؤكد → الشحن
+    test()->patchJson($adminOrderUrl, ['status' => 'confirmed'])->assertOk();
+    test()->patchJson($adminOrderUrl, ['status' => 'shipped'])->assertOk();
+
+    // بعد الشحن يغلق تحرير الأسطر (الواجهة والخدمة معاً)
+    test()->patchJson($adminOrderUrl.'/lines', [
+        'lines' => [['line_id' => $created['lines'][0]['line_id'], 'quantity' => 1]],
+    ])->assertStatus(409);
+
+    // ملخص المراحل بعد الوصول إلى الشحن
+    test()->getJson('/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/summary')
+        ->assertOk()
+        ->assertJsonPath('data.preparing', 0)
+        ->assertJsonPath('data.shipped', 1);
 });

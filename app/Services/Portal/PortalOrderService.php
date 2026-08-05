@@ -80,7 +80,7 @@ class PortalOrderService
                 'party_id'               => $partyId,
                 'commercial_document_id' => $doc->id,
                 'reference'              => $doc->document_number,
-                'status'                 => PortalOrder::STATUS_PENDING,
+                'status'                 => PortalOrder::STATUS_PREPARING,
                 'notes'                  => $data['notes'] ?? null,
                 'total_ht'               => $doc->total_ht,
                 'total_tva'              => $doc->total_tva,
@@ -88,7 +88,7 @@ class PortalOrderService
                 'requested_at'           => now(),
             ]);
 
-            $this->recordHistory($order, PortalOrder::STATUS_PENDING, PortalOrder::CHANGED_BY_CUSTOMER);
+            $this->recordHistory($order, PortalOrder::STATUS_PREPARING, PortalOrder::CHANGED_BY_CUSTOMER);
 
             return $order;
         });
@@ -133,6 +133,141 @@ class PortalOrderService
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // تحرير أسطر الطلب من قبل المسؤول (إضافة/حذف/تعديل كميات)
+    //
+    // عقد الاستبدال الكامل: الواجهة الإدارية ترسل مجموعة الأسطر المطلوبة —
+    //   { line_id, quantity }            تعديل كمية سطر موجود (أو حذفه إذا quantity=0)
+    //   { product_id, quantity, packaging_id? }  سطر جديد (تسعير خادم صرف)
+    // ثم يُعاد بناء المستند عبر تحديث الإجماليات القياسي. التحقق من المخزون
+    // غير حاجز هنا — التحويل نفسه (createStockMovements) هو البوابة الحاسمة.
+    // ═══════════════════════════════════════════════════════════════════
+
+    public function adminReplaceLines(PortalOrder $order, array $payloadLines): PortalOrder
+    {
+        // مرحلة التحليل: يبقى التحرير متاحاً في «قيد الاعداد»/«مؤكد»/«تم المعالجة»
+        // فقط. بمجرد «الشحن» يغلق التحرير — بعدها لا يعدل إلا بالتحويل/الإرجاع.
+        if (in_array($order->status, [
+            PortalOrder::STATUS_SHIPPED,
+            PortalOrder::STATUS_DELIVERED,
+            PortalOrder::STATUS_RETURNED,
+            PortalOrder::STATUS_CANCELLED,
+        ], true)) {
+            throw new BusinessRuleException('لا يمكن تعديل أسطر طلب تم شحنه أو تسليمه أو إرجاعه أو إلغاؤه.', 409);
+        }
+
+        $doc = $order->document ?? throw new ModelNotFoundException('المستند المرتبط بالطلب غير موجود');
+        $doc->loadMissing(['lines.product']);
+
+        $existing    = $doc->lines->keyBy('id');
+        $rebuilt     = [];
+        $newEntries  = [];
+
+        foreach ($payloadLines as $i => $entry) {
+            $lineId = (int) ($entry['line_id'] ?? 0);
+            $qty    = (float) ($entry['quantity'] ?? 0);
+
+            if ($qty < 0) {
+                throw new BusinessRuleException('الكمية في السطر ' . ($i + 1) . ' يجب أن تكون موجبة أو صفراً.', 422);
+            }
+
+            if ($lineId) {
+                $line = $existing->get($lineId);
+                if (!$line) {
+                    throw new BusinessRuleException('السطر ذو المعرف ' . $lineId . ' غير موجود في الطلب.', 422);
+                }
+                if ($qty == 0) {
+                    continue; // حذف السطر
+                }
+
+                // إعادة بناء عقد الوحدة Phase 51 للسطر القائم: unit_price_ht = سعر
+                // الوحدة + pack_qty = عامل التعبئة المجمّد. الخادم يضرب في pack_qty.
+                $packQty = (float) ($line->packaging_units_snapshot ?? 1);
+                if ($packQty <= 0) {
+                    $packQty = 1;
+                }
+                $perUnit = (float) $line->unit_price_ht / $packQty;
+
+                $rebuiltEntry = [
+                    'product_id'    => (int) $line->product_id,
+                    'quantity'      => $qty,
+                    'unit_price_ht' => round($perUnit, 4),
+                    'tva_rate'      => (float) $line->tva_rate,
+                    'description'   => $line->description ?? $line->product?->name,
+                ];
+                if ($line->packaging_id) {
+                    $rebuiltEntry['packaging_id'] = (int) $line->packaging_id;
+                    $rebuiltEntry['pack_qty']     = $packQty;
+                }
+                $rebuilt[] = $rebuiltEntry;
+            } else {
+                // سطر جديد — تسعير الخادم فقط (product_id + quantity + packaging_id)
+                $newEntries[] = $entry;
+            }
+        }
+
+        $targetLines = array_merge($rebuilt, $this->resolveLines($newEntries));
+
+        if (empty($targetLines)) {
+            throw new BusinessRuleException('الطلب لا يمكن أن يبقى فارغاً — أضف منتجاً واحداً على الأقل.', 422);
+        }
+
+        // update() يعيد بناء الأسطر ويحدّث الإجماليات (CMD لا يحرّك مخزوناً
+        // لأن affects_stock_direction = 0 — لا آثار مالية عند التحرير).
+        $this->documents->update($doc, ['lines' => $targetLines]);
+
+        $doc->refresh();
+        $order->forceFill([
+            'total_ht'  => $doc->total_ht,
+            'total_tva' => $doc->total_tva,
+            'total_ttc' => $doc->total_ttc,
+        ])->save();
+
+        $this->recordHistory(
+            $order,
+            $order->status,
+            PortalOrder::CHANGED_BY_ADMIN,
+            auth()->user()?->name,
+            'تعديل أسطر الطلب من قبل المسؤول'
+        );
+
+        return $this->loadDetail($order);
+    }
+
+    /**
+     * تقرير توفر المخزون لكل سطر (أداة المسؤول قبل التحويل).
+     * القيمة null تعني أن المنتج لا يدير مخزوناً.
+     */
+    public function stockAvailabilityForOrder(PortalOrder $order): array
+    {
+        $doc = $order->document;
+        if (!$doc) {
+            return [];
+        }
+
+        $warehouseId = (int) ($doc->warehouse_id ?? 0);
+        $rows        = app(\App\Services\InventoryStockService::class)
+            ->getStockAt(now()->toDateString(), $warehouseId ?: null);
+        $stockById   = collect($rows)->keyBy('id');
+
+        return ($doc->lines ?? collect())->map(function ($l) use ($stockById) {
+            $available = $stockById->get((int) $l->product_id);
+            $stockQty  = $available ? (float) $available['current_stock'] : null;
+            $manages   = (bool) ($l->product?->manages_stock ?? $available['manages_stock'] ?? false);
+            $baseQty   = ($l->packaging_id && $l->packaging_units_snapshot)
+                ? round((float) $l->quantity * (float) $l->packaging_units_snapshot, 4)
+                : (float) $l->quantity;
+
+            return [
+                'line_id'    => $l->id,
+                'product_id' => (int) $l->product_id,
+                'available'  => $manages ? $stockQty : null,
+                'required'   => $baseQty,
+                'sufficient' => $manages ? $baseQty <= $stockQty : null,
+            ];
+        })->values()->all();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // قائمة الطلبات (زبون معيّن أو الكل، مع فلتر حالة)
     // ═══════════════════════════════════════════════════════════════════
 
@@ -166,6 +301,29 @@ class PortalOrderService
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // ملخص الطلبات حسب الحالة (خط أنابيب لوحة الإدارة)
+    // ═══════════════════════════════════════════════════════════════════
+
+    public function summary(): array
+    {
+        $companyId = $this->companyContext->get();
+
+        $counts = PortalOrder::query()
+            ->where('company_id', $companyId)
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        $result = ['total' => 0];
+        foreach (PortalOrder::STATUSES as $status) {
+            $result[$status]   = (int) ($counts[$status] ?? 0);
+            $result['total']  += $result[$status];
+        }
+
+        return $result;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // تفاصيل طلب (مع الأسطر + الحالات)
     // ═══════════════════════════════════════════════════════════════════
 
@@ -195,21 +353,30 @@ class PortalOrderService
 
         $current = $order->status;
 
-        // قواعد الانتقال:
-        //  - الزبون يستطيع إلغاء طلب قيد الانتظار فقط.
-        //  - المسؤول يمكنه أي انتقال، لكن لا رجوع بعد الإلغاء/الاكتمال.
+        // قواعد الانتقال لدورة طلب السلعة (الطريقة الاحترافية):
+        //  - لا خروج من الحالات النهائية: مرتجع / ملغى.
+        //  - من «تم التسليم» لا يُقبل إلا الانتقال إلى «مرتجع» (إرجاع بعد التسليم).
+        //  - الزبون يستطيع تأكيد طلبه (preparing → confirmed) أو إلغاءه،
+        //    وما دام الطلب «قيد الاعداد» فقط. بعد التأكيد لا يعود للزبون أي تصرف.
         if ($status === $current) {
             return $order;
         }
 
-        if ($current === PortalOrder::STATUS_CANCELLED) {
-            throw new BusinessRuleException('لا يمكن تغيير حالة طلب ملغى.', 409);
+        if (in_array($current, PortalOrder::TERMINAL_STATUSES, true)) {
+            throw new BusinessRuleException('لا يمكن تغيير حالة طلب مرتجع أو ملغى.', 409);
         }
-        if ($current === PortalOrder::STATUS_COMPLETED) {
-            throw new BusinessRuleException('لا يمكن تغيير حالة طلب مكتمل.', 409);
+        if ($current === PortalOrder::STATUS_DELIVERED && $status !== PortalOrder::STATUS_RETURNED) {
+            throw new BusinessRuleException('لا يمكن تغيير حالة طلب تم تسليمه إلا إلى «مرتجع».', 409);
         }
-        if ($changedBy === PortalOrder::CHANGED_BY_CUSTOMER && $status !== PortalOrder::STATUS_CANCELLED) {
-            throw new BusinessRuleException('الزبون يستطيع إلغاء الطلب فقط.', 422);
+        if ($changedBy === PortalOrder::CHANGED_BY_CUSTOMER) {
+            $isCustomerConfirm = $status === PortalOrder::STATUS_CONFIRMED
+                && $current === PortalOrder::STATUS_PREPARING;
+            $isCustomerCancel  = $status === PortalOrder::STATUS_CANCELLED
+                && $current === PortalOrder::STATUS_PREPARING;
+
+            if (!$isCustomerConfirm && !$isCustomerCancel) {
+                throw new BusinessRuleException('الزبون يستطيع تأكيد الطلب أو إلغاءه فقط، وما دام قيد الاعداد.', 422);
+            }
         }
 
         DB::transaction(function () use ($order, $status, $changedBy, $changedByName, $note) {
@@ -227,8 +394,18 @@ class PortalOrderService
 
     public function convertToSale(PortalOrder $order, string $targetCode = 'FV'): CommercialDocument
     {
-        if ($order->status === PortalOrder::STATUS_CANCELLED) {
-            throw new BusinessRuleException('لا يمكن تحويل طلب ملغى إلى فاتورة.', 409);
+        // الطريقة الاحترافية: لا تحويل إلا بعد تأكيد الطلب (preparing → confirmed)
+        // ومروره بمرحلة التحليل (تم المعالجة / الشحن). «قيد الاعداد» يعني أن
+        // الزبون لم يثبّت الطلب بعد — لا يجوز فوترته قبل موافقته.
+        if ($order->status === PortalOrder::STATUS_PREPARING) {
+            throw new BusinessRuleException('يجب تأكيد الطلب أولاً (من الزبون أو من المسؤول) قبل تحويله إلى فاتورة.', 409);
+        }
+        if (in_array($order->status, [
+            PortalOrder::STATUS_DELIVERED,
+            PortalOrder::STATUS_RETURNED,
+            PortalOrder::STATUS_CANCELLED,
+        ], true)) {
+            throw new BusinessRuleException('لا يمكن تحويل طلب تم تسليمه أو إرجاعه أو إلغاؤه إلى فاتورة.', 409);
         }
 
         $doc = $order->document ?? throw new ModelNotFoundException('المستند المرتبط بالطلب غير موجود');
@@ -245,7 +422,7 @@ class PortalOrderService
 
         $this->changeStatus(
             $order,
-            PortalOrder::STATUS_COMPLETED,
+            PortalOrder::STATUS_DELIVERED,
             PortalOrder::CHANGED_BY_ADMIN,
             auth()->user()?->name,
             "تم تحويل الطلب إلى فاتورة {$sale->document_number}"
@@ -394,8 +571,8 @@ class PortalOrderService
 
     private function assertEditable(PortalOrder $order): void
     {
-        if ($order->status !== PortalOrder::STATUS_PENDING) {
-            throw new BusinessRuleException('لا يمكن تعديل الطلب إلا وهو قيد الانتظار.', 409);
+        if ($order->status !== PortalOrder::STATUS_PREPARING) {
+            throw new BusinessRuleException('لا يمكن تعديل الطلب إلا وهو قيد الاعداد.', 409);
         }
     }
 

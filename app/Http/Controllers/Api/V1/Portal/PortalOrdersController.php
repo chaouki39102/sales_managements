@@ -58,6 +58,20 @@ class PortalOrdersController extends BaseApiController
         }
     }
 
+    public function summary(Request $request): JsonResponse
+    {
+        try {
+            $this->authorizeAction('update_company');
+
+            return $this->successResponse(
+                $this->orders->summary(),
+                'تم جلب ملخص الطلبات بنجاح'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'portal_orders.admin_summary');
+        }
+    }
+
     public function show($id): JsonResponse
     {
         try {
@@ -66,9 +80,47 @@ class PortalOrdersController extends BaseApiController
 
             $order = PortalOrder::query()->findOrFail($resolvedId);
 
-            return $this->successResponse($this->orders->toArray($this->orders->loadDetail($order)), 'تم جلب تفاصيل الطلب بنجاح');
+            $order = $this->orders->loadDetail($order);
+
+            return $this->successResponse(
+                array_merge(
+                    $this->orders->toArray($order),
+                    ['stock' => $this->orders->stockAvailabilityForOrder($order)],
+                ),
+                'تم جلب تفاصيل الطلب بنجاح'
+            );
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal_orders.admin_show');
+        }
+    }
+
+    public function updateLines(Request $request, $id): JsonResponse
+    {
+        try {
+            $this->authorizeAction('update_company');
+            $resolvedId = $this->extractId($id);
+
+            $order = PortalOrder::query()->findOrFail($resolvedId);
+
+            $validated = $request->validate([
+                'lines'                => ['required', 'array', 'min:1'],
+                'lines.*.line_id'      => ['nullable', 'integer'],
+                'lines.*.product_id'   => ['nullable', 'integer'],
+                'lines.*.quantity'     => ['required', 'numeric'],
+                'lines.*.packaging_id' => ['nullable', 'integer'],
+            ]);
+
+            $order = $this->orders->adminReplaceLines($order, $validated['lines']);
+
+            return $this->successResponse(
+                array_merge(
+                    $this->orders->toArray($order),
+                    ['stock' => $this->orders->stockAvailabilityForOrder($order)],
+                ),
+                'تم تحديث أسطر الطلب بنجاح'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'portal_orders.admin_update_lines');
         }
     }
 
