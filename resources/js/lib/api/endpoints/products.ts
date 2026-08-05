@@ -242,6 +242,27 @@ export function useVariantSearch(
 }
 
 /**
+ * بحث المنتجات — (اسم/مرجع) لشاشات إضافة منتج
+ * يعتمد على /products (searchableFields: name/ref/barcode/description)
+ * مُفعَّل فقط عند query.length >= 2
+ */
+export function useProductSearch(
+  query: string,
+  params?: Omit<ProductListParams, 'search'>,
+) {
+  const slug    = useActiveSlug();
+  const enabled = !!slug && query.trim().length >= 2;
+
+  return useQuery({
+    queryKey:        [slug, 'products', 'search', query.trim(), params],
+    queryFn:         () => productsApi.list({ search: query.trim(), ...params }),
+    enabled,
+    staleTime:       30_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
  * بحث بالباركود — ماسح ضوئي
  */
 export function useVariantByBarcode(barcode: string | null) {

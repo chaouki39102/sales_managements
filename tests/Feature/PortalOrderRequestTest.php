@@ -174,7 +174,7 @@ it('customer submits an order and server recomputes prices (client prices ignore
         ->assertJsonPath('data.reference', $data['reference']);
 });
 
-it('admin can list company orders and change status', function () {
+it('admin can list company orders and drive status step by step', function () {
     // زبون ينشئ طلباً
     $created = test()->withToken(test()->token)->postJson(
         '/api/v1/'.TEST_COMPANY_SLUG.'/portal/orders',
@@ -191,14 +191,29 @@ it('admin can list company orders and change status', function () {
     expect($adminList)->toHaveCount(1);
     $order = $adminList[0];
     expect((float) $order['total_ttc'])->toBe(round(5 * 120 * 1.09, 2))
-        ->and($order['party']['name'])->toBe('زبون البوابة');
+        ->and($order['party']['name'])->toBe('زبون البوابة')
+        // الواجهة ترى الخطوات التالية المسموحة فقط (لا اختيار حر للحالات)
+        ->and($order['allowed_next'])->toBe(['confirmed', 'cancelled']);
 
-    // إدارة: تغيير الحالة إلى تم المعالجة
-    test()->patchJson('/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$order['id'], [
-        'status' => 'processed',
-    ])->assertOk()
+    $adminUrl = '/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$order['id'];
+
+    // لا قفز للأمام: قيد الاعداد → تم المعالجة مرفوض من الخادم
+    test()->patchJson($adminUrl, ['status' => 'processed'])
+        ->assertStatus(409)
+        ->assertJsonPath('message', 'لا يمكن الانتقال من «قيد الاعداد» إلى «تم المعالجة» مباشرة — الطلب يسير خطوة واحدة في كل مرة. الخطوة التالية المسموحة: مؤكد أو ملغى.');
+
+    // الخطوة الأولى: قيد الاعداد → مؤكد
+    test()->patchJson($adminUrl, ['status' => 'confirmed'])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'confirmed')
+        ->assertJsonPath('data.status_label', 'مؤكد')
+        ->assertJsonPath('data.allowed_next', ['processed']);
+
+    // الخطوة الثانية: مؤكد → تم المعالجة
+    test()->patchJson($adminUrl, ['status' => 'processed'])
+        ->assertOk()
         ->assertJsonPath('data.status', 'processed')
-        ->assertJsonPath('data.status_label', 'تم المعالجة');
+        ->assertJsonPath('data.allowed_next', ['shipped']);
 
     // فلترة بالحالة
     test()->getJson('/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders?status=processed')
@@ -260,8 +275,10 @@ it('admin convert is rejected before confirm and lines editing is closed after s
         ->assertStatus(409)
         ->assertJsonPath('message', 'يجب تأكيد الطلب أولاً (من الزبون أو من المسؤول) قبل تحويله إلى فاتورة.');
 
-    // خط الأنابيب: قيد الاعداد → مؤكد → الشحن
+    // خط الأنابيب الصارم — خطوة واحدة في كل مرة:
+    // قيد الاعداد → مؤكد → تم المعالجة → الشحن
     test()->patchJson($adminOrderUrl, ['status' => 'confirmed'])->assertOk();
+    test()->patchJson($adminOrderUrl, ['status' => 'processed'])->assertOk();
     test()->patchJson($adminOrderUrl, ['status' => 'shipped'])->assertOk();
 
     // بعد الشحن يغلق تحرير الأسطر (الواجهة والخدمة معاً)
@@ -274,4 +291,61 @@ it('admin convert is rejected before confirm and lines editing is closed after s
         ->assertOk()
         ->assertJsonPath('data.preparing', 0)
         ->assertJsonPath('data.shipped', 1);
+});
+
+it('admin cannot skip or roll back status (delivered → confirmed rejected)', function () {
+    $created = test()->withToken(test()->token)->postJson(
+        '/api/v1/'.TEST_COMPANY_SLUG.'/portal/orders',
+        ['items' => [['product_id' => test()->productA, 'quantity' => 2]]]
+    )->assertStatus(201)->json('data');
+
+    actingAsAuthenticatedTenantUser();
+    $adminOrderUrl = '/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$created['id'];
+
+    // السير بالطلب حتى تم التسليم (خطوة خطوة)
+    test()->patchJson($adminOrderUrl, ['status' => 'confirmed'])->assertOk();
+    test()->patchJson($adminOrderUrl, ['status' => 'processed'])->assertOk();
+    test()->patchJson($adminOrderUrl, ['status' => 'shipped'])->assertOk();
+    test()->patchJson($adminOrderUrl, ['status' => 'delivered'])->assertOk()
+        ->assertJsonPath('data.allowed_next', ['returned']);
+
+    // رجوع مرفوض: تم التسليم → مؤكد
+    test()->patchJson($adminOrderUrl, ['status' => 'confirmed'])
+        ->assertStatus(409);
+
+    // من تم التسليم لا يمكن الذهاب إلا إلى مرتجع
+    test()->patchJson($adminOrderUrl, ['status' => 'returned'])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'returned')
+        ->assertJsonPath('data.allowed_next', []);
+
+    // حالة نهائية: لا خروج من مرتجع إطلاقاً
+    test()->patchJson($adminOrderUrl, ['status' => 'confirmed'])
+        ->assertStatus(409)
+        ->assertJsonPath('message', 'لا يمكن تغيير حالة طلب مرتجع أو ملغى.');
+});
+
+it('stock availability is scoped to the order warehouse and fiscal year', function () {
+    $created = test()->withToken(test()->token)->postJson(
+        '/api/v1/'.TEST_COMPANY_SLUG.'/portal/orders',
+        ['items' => [['product_id' => test()->productA, 'quantity' => 2]]]
+    )->assertStatus(201)->json('data');
+
+    actingAsAuthenticatedTenantUser();
+
+    // تفاصيل المسؤول تتضمن تقرير المخزون لكل سطر (مستودع الطلب + الكل)
+    $detail = test()->getJson('/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$created['id'])
+        ->assertOk()
+        ->json('data');
+
+    expect($detail['stock'])->toHaveCount(1);
+    $lineA = collect($detail['stock'])->firstWhere('product_id', test()->productA);
+
+    // منتج يدير مخزوناً بدون حركات → المتاح صفر (لا null) وفي نفس نطاق المستند
+    // (الواجهة تستقبل أرقاماً — القيم الصفرية تصل int بعد فك تشفير JSON)
+    expect($lineA['available'])->toBe(0)
+        ->and($lineA['available_all'])->toBe(0)
+        ->and($lineA['required'])->toBe(2)
+        ->and($lineA['sufficient'])->toBe(false)
+        ->and($lineA['warehouse_id'])->not->toBeNull();
 });

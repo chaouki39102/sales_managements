@@ -11,6 +11,7 @@ import {
 } from './portalUtils';
 
 const ORDER_STATUS_CLS: Record<PortalOrderStatus, string> = {
+  pending:   'badge--gray',
   preparing: 'badge--y',
   confirmed: 'badge--b',
   processed: 'badge--purple',
@@ -18,6 +19,7 @@ const ORDER_STATUS_CLS: Record<PortalOrderStatus, string> = {
   delivered: 'badge--g',
   returned:  'badge--r',
   cancelled: 'badge--gray',
+  completed: 'badge--g',
 };
 
 export default function PortalDashboardPage() {

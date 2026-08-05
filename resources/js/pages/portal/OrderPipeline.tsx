@@ -26,12 +26,14 @@ interface OrderPipelineProps {
 }
 
 export default function OrderPipeline({ status, counts, summary = false, onStepClick }: OrderPipelineProps) {
-  const isReturned  = status === 'returned';
-  const isCancelled = status === 'cancelled';
+  const isReturned   = status === 'returned';
+  const isCancelled  = status === 'cancelled';
+  const isCompleted  = status === 'completed';
   const idx = PORTAL_ORDER_PIPELINE.findIndex((s) => s.value === status);
 
-  // الخطوة الرئيسية الحالية: مرتجع = استوفى كامل المسار، ملغى = توقف عند قيد الاعداد.
-  const mainIdx = isReturned ? PORTAL_ORDER_PIPELINE.length - 1 : isCancelled ? 0 : idx;
+  // الخطوة الرئيسية الحالية: مرتجع = استوفى كامل المسار، ملغى = توقف عند قيد الاعداد،
+  // مكتمل (قيمة قديمة من التحويل) = استوفى كامل المسار بدون فرع.
+  const mainIdx = isCompleted ? PORTAL_ORDER_PIPELINE.length : isReturned ? PORTAL_ORDER_PIPELINE.length - 1 : isCancelled ? 0 : idx;
   const branch = isReturned || isCancelled ? status : null;
 
   const stateOf = (i: number): string => {

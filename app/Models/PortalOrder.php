@@ -93,7 +93,13 @@ class PortalOrder extends Model
             : array_search($status, self::PIPELINE, true);
     }
 
+    // 'pending' = حالة قديمة من نسخة سابقة من التطبيق (كانت هي الحالة الابتدائية
+    // قبل إدخال «قيد الاعداد»). لا تُستخدم للطلبات الجديدة إطلاقاً، لكن بقيت صفوف
+    // قديمة في قاعدة البيانات — نمنحها نفس التسمية لتُعرض بالعربية في السجل.
+    public const LEGACY_PENDING = 'pending';
+
     public const STATUS_LABELS = [
+        self::LEGACY_PENDING  => 'قيد الاعداد',
         self::STATUS_PREPARING => 'قيد الاعداد',
         self::STATUS_CONFIRMED => 'مؤكد',
         self::STATUS_PROCESSED => 'تم المعالجة',

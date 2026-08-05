@@ -492,6 +492,7 @@ export interface Product extends BaseModel {
   // Computed accessors (backend-generated)
   current_stock?:            number;
   is_low_stock?:             boolean;
+  default_selling_price_ht?: number;
   // Relations
   family?:       Family;
   brand?:        Brand;

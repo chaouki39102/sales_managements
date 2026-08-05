@@ -4,8 +4,12 @@ namespace App\Http\Controllers\Api\V1\Portal;
 
 use App\Core\Http\Controllers\BaseApiController;
 use App\Models\PortalOrder;
+use App\Models\PriceLevel;
 use App\Models\Product;
 use App\Models\ProductPackaging;
+use App\Models\QuantityDiscount;
+use App\Models\Setting;
+use App\Services\CompanyContextService;
 use App\Services\InventoryStockService;
 use App\Services\Portal\PortalOrderService;
 use Illuminate\Http\JsonResponse;
@@ -38,6 +42,37 @@ class PortalOrderController extends BaseApiController
         parent::__construct();
     }
 
+    /**
+     * مستوى السعر الافتراضي الفعلي للمؤسسة (الإعداد، أو مستوى is_default).
+     * يُحلّ مرة واحدة لكل طلب، ويطابق مستوى السعر الذي يعتمد عليه محرك
+     * الطلبات في applicableDiscount عند إنشاء الطلب.
+     */
+    private ?int $resolvedDefaultPriceLevelId = null;
+
+    private function defaultPriceLevelId(): ?int
+    {
+        if ($this->resolvedDefaultPriceLevelId !== null) {
+            return $this->resolvedDefaultPriceLevelId;
+        }
+
+        $companyId = app(CompanyContextService::class)->get();
+        $id        = null;
+
+        if ($companyId) {
+            $fromSetting = Setting::getSetting('default_price_level_id', null, $companyId);
+            if ($fromSetting) {
+                $id = (int) $fromSetting;
+            }
+            $id ??= PriceLevel::where('company_id', $companyId)
+                ->where('is_default', true)
+                ->value('id');
+        }
+
+        $this->resolvedDefaultPriceLevelId = $id !== null ? (int) $id : null;
+
+        return $this->resolvedDefaultPriceLevelId;
+    }
+
     public function catalog(Request $request): JsonResponse
     {
         try {
@@ -45,7 +80,7 @@ class PortalOrderController extends BaseApiController
             $perPage = min((int) $request->input('per_page', 24), 100);
 
             $query = Product::query()
-                ->with(['tva', 'unit', 'prices', 'packagings'])
+                ->with(['tva', 'unit', 'prices', 'packagings', 'quantityDiscounts'])
                 ->where('active', true)
                 ->when($search !== '', fn($q) => $q->where(fn($w) => $w
                     ->where('name', 'like', "%{$search}%")
@@ -90,6 +125,26 @@ class PortalOrderController extends BaseApiController
                             'display_order'   => (int) $pk->display_order,
                             'pack_price_ht'   => round((float) $p->default_selling_price_ht * (float) $pk->quantity, 4),
                         ])
+                        ->values()
+                        ->all(),
+                    // خصومات الكميات المفعّلة لمستوى السعر الافتراضي للمؤسسة —
+                    // نفس المستوى الذي يحاسب به محرك الطلبات (applicableDiscount)
+                    // عند الإنشاء، حتى تعرض البوابة ما سيُطبق فعلاً.
+                    'manages_quantity_discounts' => (bool) $p->manages_quantity_discounts,
+                    'discounts' => $p->quantityDiscounts
+                        ->filter(fn(QuantityDiscount $d) => (bool) $d->active && !(bool) $d->is_blocked)
+                        ->filter(fn(QuantityDiscount $d) => $this->defaultPriceLevelId()
+                            ? ((int) $d->price_level_id === (int) $this->defaultPriceLevelId())
+                            : true)
+                        ->map(fn(QuantityDiscount $d) => [
+                            'id'                  => $d->id,
+                            'price_level_id'      => $d->price_level_id !== null ? (int) $d->price_level_id : null,
+                            'min_qty'             => (float) $d->min_qty,
+                            'max_qty'             => $d->max_qty !== null ? (float) $d->max_qty : null,
+                            'discount_percentage' => $d->discount_percentage !== null ? (float) $d->discount_percentage : null,
+                            'discount_amount'     => $d->discount_amount !== null ? (float) $d->discount_amount : null,
+                        ])
+                        ->sortBy('min_qty')
                         ->values()
                         ->all(),
                 ];

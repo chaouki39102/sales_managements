@@ -4,7 +4,9 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { portalApi, type PortalCatalogItem, type PortalOrderStatus, type PortalOrder } from '@/lib/api/portal/portal';
+import { portalApi, type PortalCatalogItem, type PortalCatalogPackaging, type PortalCatalogDiscount, type PortalOrderStatus, type PortalOrder } from '@/lib/api/portal/portal';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { useConfirm } from '@/hooks/useConfirm';
 import OrderPipeline from './OrderPipeline';
 import {
   fmtMoney, fmtMoneySigned, fmtDate, Pager,
@@ -12,6 +14,7 @@ import {
 } from './portalUtils';
 
 const STATUS_STYLE: Record<PortalOrderStatus, string> = {
+  pending:   'badge--gray',
   preparing: 'badge--y',
   confirmed: 'badge--b',
   processed: 'badge--purple',
@@ -19,6 +22,7 @@ const STATUS_STYLE: Record<PortalOrderStatus, string> = {
   delivered: 'badge--g',
   returned:  'badge--r',
   cancelled: 'badge--gray',
+  completed: 'badge--g',
 };
 
 const STATUS_TABS: { key: PortalOrderStatus | ''; label: string }[] = [
@@ -67,6 +71,19 @@ export default function PortalOrdersPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [confirmCancelId, setConfirmCancelId] = useState<number | null>(null);
   const [confirmValidateId, setConfirmValidateId] = useState<number | null>(null);
+
+  const { confirm, confirmDialogProps } = useConfirm();
+
+  const handleRemoveItem = async (key: string, name: string) => {
+    const ok = await confirm(`إزالة «${name}» من سلة الطلب؟`, {
+      title: 'إزالة من السلة',
+      confirmText: 'إزالة',
+      cancelText: 'إلغاء',
+      variant: 'danger',
+      icon: 'ti-trash',
+    });
+    if (ok) updateCartQty(key, 0);
+  };
 
   const debouncedSearch = useDebounce(search, 350);
 
@@ -161,6 +178,78 @@ export default function PortalOrdersPage() {
     return 1;
   };
 
+  // الوحدة الافتراضية للمنتج — تُعرض دائماً (symbol ← name ← «وحدة»).
+  const unitOf = (product: PortalCatalogItem): string =>
+    product.unit ? (product.unit.symbol || product.unit.name || 'وحدة') : 'وحدة';
+
+  // وحدة العرض حسب التعبئة المختارة: التعبئة لها اسمها الخاص (مثل «كوليسة»)،
+  // وإلا تُعرض الوحدة الأساسية للمنتج.
+  const unitLabelFor = (product: PortalCatalogItem, packagingId: number | null): string => {
+    if (packagingId) {
+      const pk = product.packagings?.find((x) => x.id === packagingId);
+      if (pk && (pk.label || pk.code)) return pk.label || (pk.code as string) || '';
+    }
+    return unitOf(product);
+  };
+
+  // التعبئة الافتراضية — تعكس تماماً Product::defaultPackaging() في الخادم:
+  // is_default أولاً، وإلا أصغر كمية. الخادم يطبّقها تلقائياً عند إرسال طلب
+  // دون packaging_id، لذلك يجب أن تُعرض مسبقاً في الكتالوج ليُطابق السعر المعروض.
+  const defaultPackagingFor = (product: PortalCatalogItem): PortalCatalogPackaging | null => {
+    if (!product.packagings?.length) return null;
+    return (
+      product.packagings.find((x) => x.is_default) ??
+      product.packagings.reduce((a, b) => (b.quantity < a.quantity ? b : a))
+    );
+  };
+
+  // شريحة الخصم المطبَّقة لكمية معينة — تعكس تماماً applicableDiscount في الخادم:
+  // الشريحة النشطة ذات min_qty الأعلى التي تقع الكمية ضمن نطاقها (بالوحدات الأساسية).
+  const discountTierFor = (product: PortalCatalogItem, baseQty: number): PortalCatalogDiscount | null => {
+    if (!product.manages_quantity_discounts || !product.discounts?.length || baseQty <= 0) return null;
+    let best: PortalCatalogDiscount | null = null;
+    for (const d of product.discounts) {
+      if (baseQty < d.min_qty) continue;
+      if (d.max_qty !== null && d.max_qty !== undefined && baseQty > d.max_qty) continue;
+      if (!best || d.min_qty > best.min_qty) best = d;
+    }
+    return best;
+  };
+
+  // حساب السطر الكامل (الوحدة × الكمية × الخصم) بنفس معادلات الخادم:
+  //   خصم نسبة   = gross × pct%
+  //   خصم مبلغ   = discount_amount × baseQty
+  // الخادم يطبّق الشريحة تلقائياً عند إنشاء الطلب (createDocumentLines).
+  const lineCalc = (product: PortalCatalogItem, packagingId: number | null, quantity: number) => {
+    const unitPrice = unitPriceFor(product, packagingId);
+    const factor    = packFactorFor(product, packagingId);
+    const qty       = Math.max(0, Number(quantity) || 0);
+    const baseQty   = qty * factor;
+    const gross     = unitPrice * qty;
+    const tier      = discountTierFor(product, baseQty);
+    let discount    = 0;
+    if (tier) {
+      if (tier.discount_amount !== null && tier.discount_amount > 0) {
+        discount = tier.discount_amount * baseQty;
+      } else if (tier.discount_percentage !== null && tier.discount_percentage > 0) {
+        discount = gross * (tier.discount_percentage / 100);
+      }
+    }
+    const ht  = Math.max(0, gross - discount);
+    const tva = ht * (product.tva_rate / 100);
+    return { unitPrice, factor, baseQty, gross, discount, tier, ht, tva, ttc: ht + tva };
+  };
+
+  const discountLabel = (d: PortalCatalogDiscount): string =>
+    d.discount_amount !== null && d.discount_amount > 0
+      ? `خصم ${fmtMoney(d.discount_amount)} دج/وحدة`
+      : `خصم ${d.discount_percentage}%`;
+
+  const tierHint = (d: PortalCatalogDiscount): string => {
+    const to = d.max_qty !== null && d.max_qty !== undefined ? d.max_qty : null;
+    return to !== null && to > d.min_qty ? `${d.min_qty}–${to}` : `من ${d.min_qty}`;
+  };
+
   const cartEntries = useMemo(() => {
     return Object.entries(cart).map(([key, entry]) => {
       const product = byId.get(entry.product_id);
@@ -171,15 +260,15 @@ export default function PortalOrdersPage() {
 
   const totals = cartEntries.reduce(
     (acc, { product, entry }) => {
-      const price = unitPriceFor(product, entry.packaging_id);
-      const ht = price * entry.quantity;
-      const tva = ht * (product.tva_rate / 100);
-      acc.ht += ht;
-      acc.tva += tva;
-      acc.ttc += ht + tva;
+      const c = lineCalc(product, entry.packaging_id, entry.quantity);
+      acc.gross    += c.gross;
+      acc.discount += c.discount;
+      acc.ht       += c.ht;
+      acc.tva      += c.tva;
+      acc.ttc      += c.ttc;
       return acc;
     },
-    { ht: 0, tva: 0, ttc: 0 },
+    { gross: 0, discount: 0, ht: 0, tva: 0, ttc: 0 },
   );
 
   const setItemQty = (productId: number, quantity: number) => {
@@ -221,7 +310,7 @@ export default function PortalOrdersPage() {
   };
 
   const startEdit = (order: PortalOrder) => {
-    const items = order.items ?? [];
+    const items = order.lines ?? [];
     if (items.length === 0) return;
     const nextCart: Record<string, CartEntry> = {};
     const nextQty: Record<number, number> = {};
@@ -307,10 +396,12 @@ export default function PortalOrdersPage() {
           <>
             <div className="portal-catalog">
               {catalogQuery.data.data.map((p) => {
-                const selectedPack = pkg[p.id] ?? null;
-                const price = unitPriceFor(p, selectedPack);
+                const defaultPack = defaultPackagingFor(p);
+                const selectedPack =
+                  pkg[p.id] !== undefined ? pkg[p.id] : (defaultPack?.id ?? null);
                 const factor = packFactorFor(p, selectedPack);
                 const q = qty[p.id] ?? 1;
+                const cl = lineCalc(p, selectedPack, q);
                 const inCart = !!cart[cartKey(p.id, selectedPack)];
                 return (
                   <div key={p.id} className={`portal-prod${inCart ? ' on' : ''}`}>
@@ -318,16 +409,44 @@ export default function PortalOrdersPage() {
                       <div className="portal-prod-name">{p.name}</div>
                       {p.ref && <div className="portal-prod-ref">{p.ref}</div>}
                     </div>
-                    <div className="portal-prod-price">{fmtMoney(price)}</div>
+                    <div className="portal-prod-price">
+                      {cl.discount > 0 && cl.tier ? (
+                        <>
+                          <span className="portal-prod-price-old">{fmtMoney(cl.unitPrice)}</span>
+                          <span className="portal-prod-price-now">
+                            {fmtMoney(cl.unitPrice - cl.discount / Math.max(1, q))}
+                          </span>
+                        </>
+                      ) : (
+                        <span>{fmtMoney(cl.unitPrice)}</span>
+                      )}
+                      <span className="portal-prod-unit">{unitLabelFor(p, selectedPack)}</span>
+                      {cl.discount > 0 && cl.tier ? (
+                        <span className="portal-disc-tag">
+                          <i className="ti ti-discount-2" /> {discountLabel(cl.tier)}
+                        </span>
+                      ) : null}
+                    </div>
                     <div className="portal-prod-meta">
-                      {p.unit ? p.unit.symbol : ''}
-                      {p.tva_rate > 0 ? ` • TVA ${p.tva_rate}%` : ''}
+                      {p.tva_rate > 0 ? `TVA ${p.tva_rate}%` : ''}
                       {p.manages_stock && p.current_stock !== null && (
                         <span className={p.current_stock > 0 ? 'portal-prod-stock' : 'portal-prod-stock out'}>
                           {p.current_stock > 0 ? `المخزون: ${p.current_stock}` : 'نفد المخزون'}
                         </span>
                       )}
                     </div>
+                    {p.discounts.length > 0 && (
+                      <div className="portal-prod-discs">
+                        {p.discounts.map((d) => {
+                          const active = cl.tier?.id === d.id;
+                          return (
+                            <span key={d.id} className={`portal-disc-chip${active ? ' on' : ''}`}>
+                              <i className="ti ti-discount-2" /> {discountLabel(d)} {tierHint(d)}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
                     {p.has_packaging && p.packagings.length > 0 && (
                       <select
                         className="portal-prod-pkg"
@@ -337,7 +456,7 @@ export default function PortalOrdersPage() {
                           setPkg((prev) => ({ ...prev, [p.id]: val === '' ? null : Number(val) }));
                         }}
                       >
-                        <option value="">{p.unit ? `وحدة (${p.unit.symbol})` : 'وحدة واحدة'}</option>
+                        <option value="">وحدة ({unitOf(p)})</option>
                         {p.packagings.map((pk) => (
                           <option key={pk.id} value={pk.id}>
                             {pk.label || pk.code || `×${pk.quantity}`} — {fmtMoney(pk.pack_price_ht)}
@@ -365,16 +484,16 @@ export default function PortalOrdersPage() {
                         </button>
                       </div>
                       <button
-                        className={`portal-btn portal-btn--sm ${inCart ? 'portal-btn--added' : ''}`}
+                        className={`portal-btn portal-btn--em ${inCart ? 'portal-btn--added' : ''}`}
                         onClick={() => addToCart(p.id, q, selectedPack)}
                         type="button"
                       >
-                        {inCart ? <><i className="ti ti-check" /> في السلة</> : <><i className="ti ti-plus" /> أضف</>}
+                        {inCart ? <><i className="ti ti-check" /> في السلة</> : <><i className="ti ti-plus" /> أضف إلى السلة</>}
                       </button>
                     </div>
                     {factor > 1 && (
                       <div className="portal-prod-packinfo">
-                        {q} {selectedPack ? `×${factor}` : ''} = {q * factor} {p.unit ? p.unit.symbol : 'وحدة'}
+                        {q} {selectedPack ? `×${factor}` : ''} = {q * factor} {unitOf(p)}
                       </div>
                     )}
                   </div>
@@ -405,23 +524,28 @@ export default function PortalOrdersPage() {
         </div>
 
         {cartEntries.length === 0 ? (
-          <PortalEmpty icon="ti-basket" text={editingId ? 'هذا الطلب لا يحتوي على أسطر' : 'لم تضف أي منتج بعد'} />
+          <PortalEmpty icon="ti-basket" text={editingId ? 'هذا الطلب لا يحتوي على منتجات' : 'لم تضف أي منتج بعد'} />
         ) : (
           <>
             <div className="portal-cart">
               {cartEntries.map(({ key, product, entry }) => {
-                const price = unitPriceFor(product, entry.packaging_id);
-                const ht = price * entry.quantity;
+                const cl = lineCalc(product, entry.packaging_id, entry.quantity);
                 return (
                   <div key={key} className="portal-cart-item">
                     <div className="portal-cart-info">
                       <div className="portal-prod-name">{product.name}</div>
                       <div className="portal-prod-ref">
-                        {fmtMoney(price)}
-                        {entry.packaging_id ? ` ×${packFactorFor(product, entry.packaging_id)}` : ''}
-                        {product.unit ? `/${product.unit.symbol}` : ''}
+                        {fmtMoney(cl.unitPrice)}
+                        {cl.factor > 1 ? ` ×${cl.factor}` : ''}
+                        {`/${unitLabelFor(product, entry.packaging_id)}`}
                         {product.tva_rate > 0 ? ` • TVA ${product.tva_rate}%` : ''}
                       </div>
+                      {cl.discount > 0 && cl.tier && (
+                        <div className="portal-cart-disc">
+                          <i className="ti ti-discount-2" />
+                          خصم {discountLabel(cl.tier)} <span>-{fmtMoney(cl.discount)}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="portal-prod-qty">
                       <button type="button" onClick={() => updateCartQty(key, entry.quantity - 1)} disabled={entry.quantity <= 1}>
@@ -437,8 +561,8 @@ export default function PortalOrdersPage() {
                         <i className="ti ti-plus" />
                       </button>
                     </div>
-                    <div className="portal-cart-total">{fmtMoney(ht)}</div>
-                    <button className="portal-cart-x" type="button" onClick={() => updateCartQty(key, 0)} title="إزالة">
+                    <div className="portal-cart-total">{fmtMoney(cl.ttc)}</div>
+                    <button className="portal-cart-x" type="button" onClick={() => handleRemoveItem(key, product.name)} title="إزالة">
                       <i className="ti ti-x" />
                     </button>
                   </div>
@@ -456,7 +580,13 @@ export default function PortalOrdersPage() {
                 style={{ resize: 'vertical' }}
               />
               <div className="portal-cart-totals">
-                <div className="portal-cart-total-row"><span>المجموع HT</span><b>{fmtMoney(totals.ht)}</b></div>
+                <div className="portal-cart-total-row"><span>المجموع قبل الخصم</span><b>{fmtMoney(totals.gross)}</b></div>
+                {totals.discount > 0 && (
+                  <div className="portal-cart-total-row portal-cart-total-row--disc">
+                    <span><i className="ti ti-discount-2" /> الخصم</span><b>-{fmtMoney(totals.discount)}</b>
+                  </div>
+                )}
+                <div className="portal-cart-total-row"><span>المجموع بعد الخصم (HT)</span><b>{fmtMoney(totals.ht)}</b></div>
                 <div className="portal-cart-total-row"><span>TVA</span><b>{fmtMoney(totals.tva)}</b></div>
                 <div className="portal-cart-total-row portal-cart-total-row--final">
                   <span>المجموع TTC</span><b>{fmtMoney(totals.ttc)}</b>
@@ -531,7 +661,7 @@ export default function PortalOrdersPage() {
                     type="button"
                     onClick={() => setSubmitted(submitted === o.id ? null : o.id)}
                   >
-                    <div>
+                    <div className="portal-order-info">
                       <div className="portal-order-ref">{o.reference}</div>
                       <div className="portal-prod-ref">{fmtDate(o.requested_at || o.created_at)} • {o.items_count} صنف</div>
                     </div>
@@ -544,23 +674,38 @@ export default function PortalOrdersPage() {
                   {submitted === o.id && (
                     <div className="portal-order-detail">
                       <OrderPipeline status={o.status} />
-                      {(o.items ?? []).map((it) => {
+                      {(o.lines ?? []).map((it) => {
                         const factor = it.pack_qty > 1 ? it.pack_qty : 1;
                         return (
-                          <div key={`${it.product_id}-${it.packaging_id ?? 0}`} className="portal-cart-item">
+                          <div key={`${it.product_id}-${it.packaging_id ?? 0}`} className="portal-cart-item portal-cart-item--ro">
                             <div className="portal-cart-info">
                               <div className="portal-prod-name">{it.product_name}</div>
                               <div className="portal-prod-ref">
                                 {fmtMoney(it.unit_price_ht)}
                                 {factor > 1 ? ` ×${factor}` : ''}
-                                {it.unit_name ? `/${it.unit_name}` : ''}
+                                {`/${it.unit_name || 'وحدة'}`}
                                 {it.tva_rate > 0 ? ` • TVA ${it.tva_rate}%` : ''} • ×{it.quantity}
                               </div>
+                              {it.discount_percentage > 0 || it.total_discount_amount > 0 ? (
+                                <div className="portal-cart-disc">
+                                  <i className="ti ti-discount-2" />
+                                  خصم {it.discount_percentage > 0 ? `${it.discount_percentage}%` : ''}
+                                  {it.total_discount_amount > 0 ? (
+                                    <span>-{fmtMoney(it.total_discount_amount)}</span>
+                                  ) : null}
+                                </div>
+                              ) : null}
                             </div>
                             <div className="portal-cart-total">{fmtMoney(it.total_ttc)}</div>
                           </div>
                         );
                       })}
+                      {o.total_discount > 0 && (
+                        <div className="portal-order-disc">
+                          <i className="ti ti-discount-2" />
+                          إجمالي الخصم في الطلب: <b>-{fmtMoney(o.total_discount)}</b>
+                        </div>
+                      )}
                       {o.notes && <div className="portal-order-notes">ملاحظات: {o.notes}</div>}
 
                       {(o.status === 'preparing') && (
@@ -633,6 +778,7 @@ export default function PortalOrdersPage() {
       </div>
 
       {toast && <div className="portal-toast"><i className="ti ti-circle-check" /> {toast}</div>}
+      <ConfirmDialog {...confirmDialogProps} />
     </section>
   );
 }

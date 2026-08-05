@@ -30,6 +30,7 @@ const NAV_GROUPS = [
       { name: 'وصل التسليم',           href: 'documents/BL',  icon: 'ti-truck'                  },
       { name: 'طلبيات الزبائن',        href: 'documents/BCC', icon: 'ti-clipboard-list'         },
       { name: 'أمر زبون',              href: 'documents/CMD', icon: 'ti-basket'                 },
+      { name: 'طلبات البوابة',         href: 'portal-orders', icon: 'ti-clipboard-list'         },
       { name: 'فاتورة شكلية',          href: 'documents/DEV', icon: 'ti-file-check'             },
       { name: 'مرتجعات البيع',         href: 'documents/AV',  icon: 'ti-corner-up-left'         },
     ],
@@ -61,7 +62,6 @@ const NAV_GROUPS = [
       { name: 'الزبائن',   href: 'clients',   icon: 'ti-users'        },
       { name: 'الموردون',  href: 'suppliers', icon: 'ti-truck'        },
       { name: 'الديون',    href: 'debts',     icon: 'ti-receipt'      },
-      { name: 'طلبات البوابة', href: 'portal-orders', icon: 'ti-clipboard-list' },
     ],
   },
   {

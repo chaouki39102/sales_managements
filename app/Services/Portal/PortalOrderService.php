@@ -32,6 +32,38 @@ use Illuminate\Support\Facades\DB;
  */
 class PortalOrderService
 {
+    // ═══════════════════════════════════════════════════════════════════
+    // مصفوفة الانتقالات الصارمة — خطوة واحدة إلى الأمام في كل مرة.
+    //
+    // القاعدة: لا قفز للأمام أبداً (مثل قيد الاعداد → تم المعالجة) ولا رجوع
+    // إلى الوراء (مثل تم التسليم → مؤكد). كل حالة لها مجموعة الانتقالات
+    // التالية الوحيدة المسموحة، والخادم يرفض أي شيء خارجها بخطأ 409.
+    // التحويل إلى فاتورة هو الاستثناء الوحيد: من مؤكد/تم المعالجة/الشحن
+    // يقفز مباشرة إلى «تم التسليم» (يُنفَّذ داخل convertToSale، خارج المصفوفة).
+    // ═══════════════════════════════════════════════════════════════════
+    public const ALLOWED_ADMIN_TRANSITIONS = [
+        PortalOrder::STATUS_PREPARING => [PortalOrder::STATUS_CONFIRMED, PortalOrder::STATUS_CANCELLED],
+        PortalOrder::LEGACY_PENDING   => [PortalOrder::STATUS_CONFIRMED, PortalOrder::STATUS_CANCELLED],
+        PortalOrder::STATUS_CONFIRMED => [PortalOrder::STATUS_PROCESSED],
+        PortalOrder::STATUS_PROCESSED => [PortalOrder::STATUS_SHIPPED],
+        PortalOrder::STATUS_SHIPPED   => [PortalOrder::STATUS_DELIVERED],
+        PortalOrder::STATUS_DELIVERED => [PortalOrder::STATUS_RETURNED],
+        PortalOrder::STATUS_RETURNED  => [],
+        PortalOrder::STATUS_CANCELLED => [],
+    ];
+
+    /** الزبون: تأكيد أو إلغاء فقط، وما دام «قيد الاعداد». */
+    public const ALLOWED_CUSTOMER_TRANSITIONS = [
+        PortalOrder::STATUS_PREPARING => [PortalOrder::STATUS_CONFIRMED, PortalOrder::STATUS_CANCELLED],
+        PortalOrder::LEGACY_PENDING   => [PortalOrder::STATUS_CONFIRMED, PortalOrder::STATUS_CANCELLED],
+        PortalOrder::STATUS_CONFIRMED => [],
+        PortalOrder::STATUS_PROCESSED => [],
+        PortalOrder::STATUS_SHIPPED   => [],
+        PortalOrder::STATUS_DELIVERED => [],
+        PortalOrder::STATUS_RETURNED  => [],
+        PortalOrder::STATUS_CANCELLED => [],
+    ];
+
     public function __construct(
         private CommercialDocumentService $documents,
         private DocumentConversionService $converter,
@@ -152,7 +184,7 @@ class PortalOrderService
             PortalOrder::STATUS_RETURNED,
             PortalOrder::STATUS_CANCELLED,
         ], true)) {
-            throw new BusinessRuleException('لا يمكن تعديل أسطر طلب تم شحنه أو تسليمه أو إرجاعه أو إلغاؤه.', 409);
+            throw new BusinessRuleException('لا يمكن تعديل منتجات طلب تم شحنه أو تسليمه أو إرجاعه أو إلغاؤه.', 409);
         }
 
         $doc = $order->document ?? throw new ModelNotFoundException('المستند المرتبط بالطلب غير موجود');
@@ -179,20 +211,33 @@ class PortalOrderService
                     continue; // حذف السطر
                 }
 
-                // إعادة بناء عقد الوحدة Phase 51 للسطر القائم: unit_price_ht = سعر
-                // الوحدة + pack_qty = عامل التعبئة المجمّد. الخادم يضرب في pack_qty.
+                // عقد الوحدة Phase 51: unit_price_ht = سعر الوحدة و pack_qty =
+                // عامل التعبئة المجمّد. الخادم يضرب في pack_qty — المسؤول يعدّل
+                // سعر الوحدة (أو سعر التعبئة ÷ عامل التعبئة).
                 $packQty = (float) ($line->packaging_units_snapshot ?? 1);
                 if ($packQty <= 0) {
                     $packQty = 1;
                 }
-                $perUnit = (float) $line->unit_price_ht / $packQty;
+
+                $hasPrice    = array_key_exists('unit_price_ht', $entry) && $entry['unit_price_ht'] !== null;
+                $hasDiscount = array_key_exists('discount_percentage', $entry) && $entry['discount_percentage'] !== null;
+
+                // المسؤول يملك سعر التعديل الكامل: عند غياب unit_price_ht نحافظ
+                // على سعر السطر المخزّن. نسبة TVA تبقى كما خُزِّنت (قد تكون 0
+                // لزبون معفى جبائياً — لا نعيد اشتقاقها من المنتج الحيّ).
+                $perUnit = $hasPrice
+                    ? (float) $entry['unit_price_ht']
+                    : round((float) $line->unit_price_ht / $packQty, 4);
 
                 $rebuiltEntry = [
-                    'product_id'    => (int) $line->product_id,
-                    'quantity'      => $qty,
-                    'unit_price_ht' => round($perUnit, 4),
-                    'tva_rate'      => (float) $line->tva_rate,
-                    'description'   => $line->description ?? $line->product?->name,
+                    'product_id'          => (int) $line->product_id,
+                    'quantity'            => $qty,
+                    'unit_price_ht'       => round($perUnit, 4),
+                    'tva_rate'            => (float) $line->tva_rate,
+                    'discount_percentage' => $hasDiscount
+                        ? (float) $entry['discount_percentage']
+                        : (float) ($line->discount_percentage ?? 0),
+                    'description'         => $line->description ?? $line->product?->name,
                 ];
                 if ($line->packaging_id) {
                     $rebuiltEntry['packaging_id'] = (int) $line->packaging_id;
@@ -200,12 +245,25 @@ class PortalOrderService
                 }
                 $rebuilt[] = $rebuiltEntry;
             } else {
-                // سطر جديد — تسعير الخادم فقط (product_id + quantity + packaging_id)
+                // سطر جديد — تسعير الخادم فقط (product_id + quantity)، مع إمكانية
+                // تعديل السعر/الخصم من المسؤول بعد التسعير.
                 $newEntries[] = $entry;
             }
         }
 
-        $targetLines = array_merge($rebuilt, $this->resolveLines($newEntries));
+        // تطبيق تعديلات السعر/الخصم المسموح بها على الأسطر الجديدة (بعد تسعير الخادم).
+        $resolvedNew = $this->resolveLines($newEntries);
+        foreach ($resolvedNew as $k => $rl) {
+            $entry = $newEntries[$k] ?? [];
+            if (array_key_exists('unit_price_ht', $entry) && $entry['unit_price_ht'] !== null) {
+                $resolvedNew[$k]['unit_price_ht'] = round((float) $entry['unit_price_ht'], 4);
+            }
+            if (array_key_exists('discount_percentage', $entry) && $entry['discount_percentage'] !== null) {
+                $resolvedNew[$k]['discount_percentage'] = (float) $entry['discount_percentage'];
+            }
+        }
+
+        $targetLines = array_merge($rebuilt, $resolvedNew);
 
         if (empty($targetLines)) {
             throw new BusinessRuleException('الطلب لا يمكن أن يبقى فارغاً — أضف منتجاً واحداً على الأقل.', 422);
@@ -227,7 +285,7 @@ class PortalOrderService
             $order->status,
             PortalOrder::CHANGED_BY_ADMIN,
             auth()->user()?->name,
-            'تعديل أسطر الطلب من قبل المسؤول'
+            'تعديل منتجات الطلب من قبل المسؤول'
         );
 
         return $this->loadDetail($order);
@@ -235,7 +293,16 @@ class PortalOrderService
 
     /**
      * تقرير توفر المخزون لكل سطر (أداة المسؤول قبل التحويل).
-     * القيمة null تعني أن المنتج لا يدير مخزوناً.
+     *
+     * النطاق كامل مثل أي مستند تجاري: المؤسسة (CompanyScope تلقائي عبر
+     * InventoryStockService) + السنة المالية لمستند الطلب + مستودع الطلب.
+     * تُحسب الأرقام عبر InventoryStockService::getStockAt — نفس مصدر
+     * المخزون الذي تستخدمه صفحات المخزون والتقارير (رصيد افتتاحي + حركات
+     * موثّقة حتى التاريخ، مستثنى المحذوف).
+     *
+     * available      = المخزون في مستودع الطلب نفسه
+     * available_all  = المخزون الإجمالي في كل المستودعات (قرار النقل)
+     * null تعني أن المنتج لا يدير مخزوناً.
      */
     public function stockAvailabilityForOrder(PortalOrder $order): array
     {
@@ -244,25 +311,37 @@ class PortalOrderService
             return [];
         }
 
-        $warehouseId = (int) ($doc->warehouse_id ?? 0);
-        $rows        = app(\App\Services\InventoryStockService::class)
-            ->getStockAt(now()->toDateString(), $warehouseId ?: null);
-        $stockById   = collect($rows)->keyBy('id');
+        $fiscalYearId = (int) ($doc->fiscal_year_id ?? 0) ?: null;
+        $warehouseId  = (int) ($doc->warehouse_id ?? 0) ?: null;
+        $date         = now()->toDateString();
+        $stock        = app(\App\Services\InventoryStockService::class);
 
-        return ($doc->lines ?? collect())->map(function ($l) use ($stockById) {
-            $available = $stockById->get((int) $l->product_id);
-            $stockQty  = $available ? (float) $available['current_stock'] : null;
-            $manages   = (bool) ($l->product?->manages_stock ?? $available['manages_stock'] ?? false);
+        $inOrderWarehouse = $warehouseId
+            ? collect($stock->getStockAt($date, $warehouseId, null, $fiscalYearId))->keyBy('id')
+            : collect();
+        $allWarehouses = collect($stock->getStockAt($date, null, null, $fiscalYearId))->keyBy('id');
+
+        return ($doc->lines ?? collect())->map(function ($l) use ($inOrderWarehouse, $allWarehouses, $warehouseId) {
+            $productId = (int) $l->product_id;
+            $rowInWh   = $inOrderWarehouse->get($productId);
+            $rowAll    = $allWarehouses->get($productId);
+            $manages   = (bool) ($l->product?->manages_stock ?? $rowAll['manages_stock'] ?? false);
             $baseQty   = ($l->packaging_id && $l->packaging_units_snapshot)
                 ? round((float) $l->quantity * (float) $l->packaging_units_snapshot, 4)
                 : (float) $l->quantity;
 
+            $available    = $manages ? (float) ($rowInWh['current_stock'] ?? 0) : null;
+            $availableAll = $manages ? (float) ($rowAll['current_stock'] ?? 0) : null;
+
             return [
-                'line_id'    => $l->id,
-                'product_id' => (int) $l->product_id,
-                'available'  => $manages ? $stockQty : null,
-                'required'   => $baseQty,
-                'sufficient' => $manages ? $baseQty <= $stockQty : null,
+                'line_id'        => $l->id,
+                'product_id'     => $productId,
+                'warehouse_id'   => $warehouseId,
+                'available'      => $available,
+                'available_all'  => $availableAll,
+                'required'       => $baseQty,
+                'sufficient'     => $manages ? $baseQty <= $available : null,
+                'sufficient_all' => $manages ? $baseQty <= $availableAll : null,
             ];
         })->values()->all();
     }
@@ -285,6 +364,20 @@ class PortalOrderService
 
         if ($status !== '' && in_array($status, PortalOrder::STATUSES, true)) {
             $query->where('status', $status);
+        }
+
+        // نطاق التاريخ (فلترة على تاريخ طلب المستند المرتبط — العمود الظاهر في الجدول).
+        $fromDate = trim((string) request()->input('from_date', ''));
+        $toDate   = trim((string) request()->input('to_date', ''));
+        if ($fromDate !== '' || $toDate !== '') {
+            $query->whereHas('document', function ($q) use ($fromDate, $toDate) {
+                if ($fromDate !== '') {
+                    $q->whereDate('document_date', '>=', $fromDate);
+                }
+                if ($toDate !== '') {
+                    $q->whereDate('document_date', '<=', $toDate);
+                }
+            });
         }
 
         $search = trim((string) request()->input('search', ''));
@@ -320,6 +413,12 @@ class PortalOrderService
             $result['total']  += $result[$status];
         }
 
+        // الطلبات القديمة العالقة بحالة pending (قبل إدخال «قيد الاعداد»)
+        // تُعد ضمن الإجمالي ويُكشف عنها في لوحة الإدارة.
+        $legacyPending = (int) ($counts[PortalOrder::LEGACY_PENDING] ?? 0);
+        $result[PortalOrder::LEGACY_PENDING] = $legacyPending;
+        $result['total'] += $legacyPending;
+
         return $result;
     }
 
@@ -353,38 +452,70 @@ class PortalOrderService
 
         $current = $order->status;
 
-        // قواعد الانتقال لدورة طلب السلعة (الطريقة الاحترافية):
-        //  - لا خروج من الحالات النهائية: مرتجع / ملغى.
-        //  - من «تم التسليم» لا يُقبل إلا الانتقال إلى «مرتجع» (إرجاع بعد التسليم).
-        //  - الزبون يستطيع تأكيد طلبه (preparing → confirmed) أو إلغاءه،
-        //    وما دام الطلب «قيد الاعداد» فقط. بعد التأكيد لا يعود للزبون أي تصرف.
         if ($status === $current) {
             return $order;
         }
 
+        // لا خروج من الحالات النهائية (مرتجع/ملغى).
         if (in_array($current, PortalOrder::TERMINAL_STATUSES, true)) {
             throw new BusinessRuleException('لا يمكن تغيير حالة طلب مرتجع أو ملغى.', 409);
         }
-        if ($current === PortalOrder::STATUS_DELIVERED && $status !== PortalOrder::STATUS_RETURNED) {
-            throw new BusinessRuleException('لا يمكن تغيير حالة طلب تم تسليمه إلا إلى «مرتجع».', 409);
-        }
-        if ($changedBy === PortalOrder::CHANGED_BY_CUSTOMER) {
-            $isCustomerConfirm = $status === PortalOrder::STATUS_CONFIRMED
-                && $current === PortalOrder::STATUS_PREPARING;
-            $isCustomerCancel  = $status === PortalOrder::STATUS_CANCELLED
-                && $current === PortalOrder::STATUS_PREPARING;
 
-            if (!$isCustomerConfirm && !$isCustomerCancel) {
-                throw new BusinessRuleException('الزبون يستطيع تأكيد الطلب أو إلغاءه فقط، وما دام قيد الاعداد.', 422);
+        $allowed = $this->allowedNextByStatus($current, $changedBy);
+
+        if (!in_array($status, $allowed, true)) {
+            if ($changedBy === PortalOrder::CHANGED_BY_CUSTOMER) {
+                throw new BusinessRuleException(
+                    'الزبون يستطيع تأكيد الطلب أو إلغاءه فقط، وما دام قيد الاعداد.',
+                    422
+                );
             }
+
+            $labels = array_map(fn($s) => PortalOrder::statusLabelFor($s), $allowed);
+            $message = 'لا يمكن الانتقال من «' . PortalOrder::statusLabelFor($current)
+                . '» إلى «' . PortalOrder::statusLabelFor($status) . '» مباشرة —'
+                . ' الطلب يسير خطوة واحدة في كل مرة.';
+            if (!empty($labels)) {
+                $message .= ' الخطوة التالية المسموحة: ' . implode(' أو ', $labels) . '.';
+            }
+
+            throw new BusinessRuleException($message, 409);
         }
 
+        $this->forceSetStatus($order, $status, $changedBy, $changedByName, $note);
+
+        return $order->load('histories');
+    }
+
+    /**
+     * الحالات التالية المسموحة للانتقال إليها من حالة معينة (المصفوفة الصارمة).
+     * تُعرض للواجهة في allowed_next لتخفي كل الانتقالات غير القانونية.
+     */
+    public function allowedNextByStatus(string $status, string $changedBy = PortalOrder::CHANGED_BY_ADMIN): array
+    {
+        $matrix = $changedBy === PortalOrder::CHANGED_BY_CUSTOMER
+            ? self::ALLOWED_CUSTOMER_TRANSITIONS
+            : self::ALLOWED_ADMIN_TRANSITIONS;
+
+        return $matrix[$status] ?? [];
+    }
+
+    /**
+     * كتابة الحالة + تسجيل السجل في معاملة واحدة.
+     * الاستخدام: changeStatus (بعد التحقق من المصفوفة) و convertToSale
+     * (التحويل هو القفزة القانونية الوحيدة إلى «تم التسليم»).
+     */
+    private function forceSetStatus(
+        PortalOrder $order,
+        string $status,
+        string $changedBy,
+        ?string $changedByName = null,
+        ?string $note = null,
+    ): void {
         DB::transaction(function () use ($order, $status, $changedBy, $changedByName, $note) {
             $order->forceFill(['status' => $status])->save();
             $this->recordHistory($order, $status, $changedBy, $changedByName, $note);
         });
-
-        return $order->load('histories');
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -397,7 +528,8 @@ class PortalOrderService
         // الطريقة الاحترافية: لا تحويل إلا بعد تأكيد الطلب (preparing → confirmed)
         // ومروره بمرحلة التحليل (تم المعالجة / الشحن). «قيد الاعداد» يعني أن
         // الزبون لم يثبّت الطلب بعد — لا يجوز فوترته قبل موافقته.
-        if ($order->status === PortalOrder::STATUS_PREPARING) {
+        if ($order->status === PortalOrder::STATUS_PREPARING
+            || $order->status === PortalOrder::LEGACY_PENDING) {
             throw new BusinessRuleException('يجب تأكيد الطلب أولاً (من الزبون أو من المسؤول) قبل تحويله إلى فاتورة.', 409);
         }
         if (in_array($order->status, [
@@ -420,7 +552,9 @@ class PortalOrderService
 
         $sale = $this->converter->convert($doc, $targetCode);
 
-        $this->changeStatus(
+        // التحويل هو القفزة القانونية الوحيدة إلى «تم التسليم» من
+        // مؤكد/تم المعالجة/الشحن — يُنفَّذ خارج المصفوفة الصارمة.
+        $this->forceSetStatus(
             $order,
             PortalOrder::STATUS_DELIVERED,
             PortalOrder::CHANGED_BY_ADMIN,
@@ -437,7 +571,7 @@ class PortalOrderService
 
     public function toArray(PortalOrder $order): array
     {
-        $order->loadMissing(['party', 'document.documentType', 'document.lines.product', 'histories']);
+        $order->loadMissing(['party', 'document.documentType', 'document.lines.product.tva', 'document.lines.product.unit', 'histories']);
 
         $doc = $order->document;
 
@@ -446,19 +580,22 @@ class PortalOrderService
             'reference'        => $order->reference,
             'status'           => $order->status,
             'status_label'     => $order->status_label,
+            'allowed_next'     => $this->allowedNextByStatus($order->status),
             'notes'            => $order->notes,
             'total_ht'         => (float) $order->total_ht,
             'total_tva'        => (float) $order->total_tva,
             'total_ttc'        => (float) $order->total_ttc,
+            'total_discount'   => (float) ($doc?->total_discount ?? 0),
             'items_count'      => $doc?->lines?->count() ?? 0,
             'requested_at'     => $order->requested_at?->toISOString(),
             'created_at'       => $order->created_at?->toISOString(),
             'updated_at'       => $order->updated_at?->toISOString(),
             'party'            => $order->party ? [
-                'id'    => $order->party->id,
-                'name'  => $order->party->name,
-                'code'  => $order->party->code,
-                'phone' => $order->party->phone,
+                'id'             => $order->party->id,
+                'name'           => $order->party->name,
+                'code'           => $order->party->code,
+                'phone'          => $order->party->phone,
+                'is_tva_exempt'  => (bool) $order->party->is_tva_exempt,
             ] : null,
             'document' => $doc ? [
                 'id'              => $doc->id,
@@ -470,20 +607,27 @@ class PortalOrderService
                 'warehouse_id'    => $doc->warehouse_id,
             ] : null,
             'lines' => ($doc?->lines ?? collect())->map(fn($l) => [
-                'line_id'          => $l->id,
-                'product_id'       => $l->product_id,
-                'product_name'     => $l->product?->name ?? $l->description,
-                'product_ref'      => $l->product?->ref ?? null,
-                'unit'             => $l->product?->unit?->abbreviation,
-                'unit_name'        => $l->product?->unit?->abbreviation,
-                'quantity'         => (float) $l->quantity,
-                'unit_price_ht'    => (float) $l->unit_price_ht,
-                'packaging_id'     => $l->packaging_id,
-                'pack_qty'         => (float) ($l->packaging_units_snapshot ?? 1),
-                'tva_rate'         => (float) $l->tva_rate,
-                'total_ht'         => (float) $l->total_ht,
-                'total_tva'        => (float) $l->total_tva,
-                'total_ttc'        => (float) $l->total_ttc,
+                'line_id'              => $l->id,
+                'product_id'           => $l->product_id,
+                'product_name'         => $l->product?->name ?? $l->description,
+                'product_ref'          => $l->product?->ref ?? null,
+                'unit'                 => $l->product?->unit?->symbol ?? $l->product?->unit?->name,
+                'unit_name'            => $l->product?->unit?->symbol ?? $l->product?->unit?->name,
+                'quantity'             => (float) $l->quantity,
+                'unit_price_ht'        => (float) $l->unit_price_ht,
+                'packaging_id'         => $l->packaging_id,
+                'pack_qty'             => (float) ($l->packaging_units_snapshot ?? 1),
+                'tva_rate'             => (float) $l->tva_rate,
+                'discount_percentage'  => (float) ($l->discount_percentage ?? 0),
+                'total_discount_amount'=> (float) ($l->total_discount_amount ?? 0),
+                'total_ht'             => (float) $l->total_ht,
+                'total_tva'            => (float) $l->total_tva,
+                'total_ttc'            => (float) $l->total_ttc,
+                // النسبة الاسمية للمنتج (من جدول TVA) مقابل النسبة المخزّنة على
+                // السطر. قد تختلف: زبون معفى جبائياً → السطر يخزّن 0 بينما المنتج
+                // له نسبة حقيقية (مثال: قهوة بونال 250غ = 19%). نعرضها مع شارة
+                // «معفى» ولا نعدّل بها الحسابات.
+                'tva_rate_live'        => (float) ($l->product?->tva?->rate ?? $l->tva_rate),
             ])->values()->all(),
             'histories' => ($order->histories ?? collect())->map(fn($h) => [
                 'id'          => $h->id,

@@ -17,17 +17,25 @@ export interface PortalAdminOrderItem {
   quantity:      number;
   packaging_id:  number | null;
   pack_qty:      number;
+  discount_percentage:  number;
+  total_discount_amount: number;
   total_ht:      number;
   total_tva:     number;
   total_ttc:     number;
+  // النسبة الاسمية للمنتج (TVA) مقابل النسبة المخزّنة على السطر (قد تختلف
+  // لزبون معفى جبائياً — نعرضها مع شارة «معفى» ولا نعدّل بها الحسابات).
+  tva_rate_live: number;
 }
 
 export interface PortalAdminStockInfo {
-  line_id:    number;
-  product_id: number;
-  available:  number | null;
-  required:   number;
-  sufficient: boolean | null;
+  line_id:        number;
+  product_id:     number;
+  warehouse_id:   number | null;
+  available:      number | null;
+  available_all:  number | null;
+  required:       number;
+  sufficient:     boolean | null;
+  sufficient_all: boolean | null;
 }
 
 export interface PortalAdminOrder {
@@ -35,15 +43,17 @@ export interface PortalAdminOrder {
   reference:    string;
   status:       PortalOrderStatus;
   status_label: string;
+  allowed_next: PortalOrderStatus[];
   notes:        string | null;
   total_ht:     number;
   total_tva:    number;
   total_ttc:    number;
+  total_discount: number;
   items_count:  number;
   requested_at: string | null;
   created_at:   string | null;
-  party:        { id: number; name: string; code: string | null } | null;
-  items?:       PortalAdminOrderItem[];
+  party:        { id: number; name: string; code: string | null; phone: string | null; is_tva_exempt: boolean } | null;
+  lines?:       PortalAdminOrderItem[];
   stock?:       PortalAdminStockInfo[];
   document?:    {
     id:              number;
@@ -56,7 +66,7 @@ export interface PortalAdminOrder {
   } | null;
   histories?:   {
     id:             number;
-    status:         PortalOrderStatus;
+    status:         string;
     status_label:   string;
     changed_by:     string;
     changed_by_name: string | null;
@@ -70,6 +80,9 @@ export interface PortalAdminOrderLineInput {
   product_id?:   number;
   quantity:      number;
   packaging_id?: number;
+  // المسؤول يملك تعديل السعر والخصم
+  unit_price_ht?: number;
+  discount_percentage?: number;
 }
 
 export interface PortalAdminOrderFilters {
@@ -77,6 +90,8 @@ export interface PortalAdminOrderFilters {
   per_page?: number;
   status?: PortalOrderStatus | '';
   search?: string;
+  from_date?: string;
+  to_date?: string;
 }
 
 export interface PortalAdminOrderListMeta {
@@ -95,6 +110,8 @@ export const portalOrdersApi = {
         per_page: filters.per_page ?? 15,
         status: filters.status || undefined,
         search: filters.search || undefined,
+        from_date: filters.from_date || undefined,
+        to_date: filters.to_date || undefined,
       },
     ),
   summary: () =>
@@ -128,7 +145,7 @@ export const PORTAL_ORDER_PIPELINE: { value: PortalOrderStatus; label: string; i
   { value: 'confirmed', label: 'مؤكد',         icon: 'ti-circle-check' },
   { value: 'processed', label: 'تم المعالجة',  icon: 'ti-settings' },
   { value: 'shipped',   label: 'الشحن',        icon: 'ti-truck' },
-  { value: 'delivered', label: 'تم التسليم',   icon: 'ti-package-arrived' },
+  { value: 'delivered', label: 'تم التسليم',   icon: 'ti-package-import' },
 ];
 
 export interface PortalOrdersSummary {
@@ -140,6 +157,7 @@ export interface PortalOrdersSummary {
   delivered: number;
   returned:  number;
   cancelled: number;
+  pending?:  number;
 }
 
 export function usePortalOrdersSummary() {

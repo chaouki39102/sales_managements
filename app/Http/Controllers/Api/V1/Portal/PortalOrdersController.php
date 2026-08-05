@@ -103,11 +103,14 @@ class PortalOrdersController extends BaseApiController
             $order = PortalOrder::query()->findOrFail($resolvedId);
 
             $validated = $request->validate([
-                'lines'                => ['required', 'array', 'min:1'],
-                'lines.*.line_id'      => ['nullable', 'integer'],
-                'lines.*.product_id'   => ['nullable', 'integer'],
-                'lines.*.quantity'     => ['required', 'numeric'],
-                'lines.*.packaging_id' => ['nullable', 'integer'],
+                'lines'                    => ['required', 'array', 'min:1'],
+                'lines.*.line_id'          => ['nullable', 'integer'],
+                'lines.*.product_id'       => ['nullable', 'integer'],
+                'lines.*.quantity'         => ['required', 'numeric'],
+                'lines.*.packaging_id'     => ['nullable', 'integer'],
+                // المسؤول يملك تعديل السعر والخصم (وحدة HT + نسبة %)
+                'lines.*.unit_price_ht'    => ['nullable', 'numeric', 'min:0'],
+                'lines.*.discount_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
             ]);
 
             $order = $this->orders->adminReplaceLines($order, $validated['lines']);
@@ -117,7 +120,7 @@ class PortalOrdersController extends BaseApiController
                     $this->orders->toArray($order),
                     ['stock' => $this->orders->stockAvailabilityForOrder($order)],
                 ),
-                'تم تحديث أسطر الطلب بنجاح'
+                'تم تحديث منتجات الطلب بنجاح'
             );
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal_orders.admin_update_lines');
@@ -133,7 +136,7 @@ class PortalOrdersController extends BaseApiController
             $order = PortalOrder::query()->findOrFail($resolvedId);
 
             $validated = $request->validate([
-                'status' => ['required', 'string', 'in:' . implode(',', PortalOrder::STATUSES)],
+                'status' => ['required', 'string', 'in:' . implode(',', array_merge(PortalOrder::STATUSES, [PortalOrder::LEGACY_PENDING]))],
                 'notes'  => ['nullable', 'string', 'max:1000'],
             ]);
 

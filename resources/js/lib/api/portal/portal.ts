@@ -179,13 +179,15 @@ export interface PortalProfile {
 // ─── طلبات السلع (وصل طلب سلعة) ────────────────────────────────────────────────
 // حالات خاصة بطلبات الزبائن: قيد الاعداد → مؤكد → تم المعالجة → الشحن → تم التسليم → مرتجع (+ ملغى)
 export type PortalOrderStatus =
+  | 'pending'
   | 'preparing'
   | 'confirmed'
   | 'processed'
   | 'shipped'
   | 'delivered'
   | 'returned'
-  | 'cancelled';
+  | 'cancelled'
+  | 'completed';
 
 export interface PortalCatalogPackaging {
   id:            number;
@@ -196,6 +198,15 @@ export interface PortalCatalogPackaging {
   is_default:    boolean;
   display_order: number;
   pack_price_ht: number;
+}
+
+export interface PortalCatalogDiscount {
+  id:                  number;
+  price_level_id:      number | null;
+  min_qty:             number;
+  max_qty:             number | null;
+  discount_percentage: number | null;
+  discount_amount:     number | null;
 }
 
 export interface PortalCatalogItem {
@@ -210,6 +221,8 @@ export interface PortalCatalogItem {
   current_stock: number | null;
   has_packaging: boolean;
   packagings:    PortalCatalogPackaging[];
+  manages_quantity_discounts: boolean;
+  discounts:     PortalCatalogDiscount[];
 }
 
 export interface PortalOrderItem {
@@ -222,6 +235,8 @@ export interface PortalOrderItem {
   quantity:      number;
   packaging_id:  number | null;
   pack_qty:      number;
+  discount_percentage:   number;
+  total_discount_amount: number;
   total_ht:      number;
   total_tva:     number;
   total_ttc:     number;
@@ -247,10 +262,11 @@ export interface PortalOrder {
   total_ht:     number;
   total_tva:    number;
   total_ttc:    number;
+  total_discount: number;
   items_count:  number;
   requested_at: string | null;
   created_at:   string | null;
-  items?:       PortalOrderItem[];
+  lines?:       PortalOrderItem[];
   party?:       { id: number; name: string; code: string | null } | null;
   document?:    {
     id:              number;
