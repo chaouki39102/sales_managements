@@ -1848,6 +1848,20 @@ html.dark .portal-login-box {
 }
 .portal-prod-stock { color: #059669; }
 .portal-prod-stock.out { color: var(--red); }
+.portal-prod-exempt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(5, 150, 105, .12);
+  border: 1px solid rgba(5, 150, 105, .35);
+  color: #059669;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.portal-prod-exempt i { font-size: 11px; }
 .portal-prod-foot {
   display: flex;
   flex-direction: column;
@@ -2260,7 +2274,20 @@ html.dark .portal-login-box {
 }
 
 /* ── شريط الأدوات ── */
-.poa-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.poa-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+  padding: 12px 14px;
+  margin: 2px 0 4px;
+  background: var(--bg1, #fff);
+  border: 1px solid var(--b2, #eef2f7);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(15, 23, 42, .04));
+}
+body.dark .poa-bar {
+  background: var(--bg3, #1e293b);
+  border-color: var(--b2, #334155);
+}
 .poa-bar-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1 1 auto; min-width: 0; }
 .poa-bar-side { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
 .poa-search { position: relative; }
@@ -2479,3 +2506,37 @@ body.dark .poa-date input::-webkit-calendar-picker-indicator { opacity: .85; }
   .poa-proc-row { flex-wrap: wrap; }
   .poa-proc-row .poa-bar { order: 5; flex-basis: 100%; }
 }
+
+
+/* ── نافذة تحويل الطلب إلى فاتورة (FV/POS + دفعة اختيارية) ── */
+.poa-cv-t {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--b3, #e2e8f0); background: var(--bg2, #f5f7fb);
+  color: var(--t1, #1e293b); font-family: inherit; cursor: pointer;
+  text-align: right; transition: border-color .15s, box-shadow .15s, background .15s;
+}
+.poa-cv-t i { font-size: 18px; margin-bottom: 4px; color: var(--t4, #94a3b8); }
+.poa-cv-t b { font-size: 13px; font-weight: 800; }
+.poa-cv-t span { font-size: 10.5px; font-weight: 600; color: var(--t4, #94a3b8); }
+.poa-cv-t:hover { border-color: color-mix(in srgb, var(--em, #2563eb) 55%, transparent); }
+.poa-cv-t.on {
+  border-color: var(--em, #2563eb);
+  background: color-mix(in srgb, var(--em, #2563eb) 10%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--em, #2563eb) 12%, transparent);
+}
+.poa-cv-t.on i { color: var(--em, #2563eb); }
+
+
+/* ── نافذة التحويل: ملخص الإجماليات + الدفعة (التحويل مرة واحدة فقط) ── */
+.poa-cv-sum { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; background: var(--bg2, #f5f7fb); border: 1px solid var(--b3, #e2e8f0); border-radius: 12px; padding: 10px 12px; }
+.poa-cv-sum > div { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--t4, #94a3b8); }
+.poa-cv-sum > div i { color: var(--em, #2563eb); }
+.poa-cv-sum b { color: var(--t1, #1e293b); font-weight: 800; margin-inline-start: auto; }
+.poa-cv-sum .poa-cv-total { grid-column: 1 / -1; border-top: 1px dashed var(--b3, #e2e8f0); padding-top: 8px; margin-top: 2px; color: var(--em, #2563eb); }
+.poa-cv-sum .poa-cv-total b { color: var(--em, #2563eb); font-size: 15px; }
+.poa-cv-full { display: inline-flex; align-items: center; gap: 6px; border: 1px dashed var(--em, #2563eb); color: var(--em, #2563eb); background: transparent; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: background .15s; }
+.poa-cv-full:hover { background: color-mix(in srgb, var(--em, #2563eb) 10%, transparent); }
+.poa-cv-rem { flex: 1; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--t4, #94a3b8); min-width: 0; }
+.poa-cv-rem.ok { color: var(--g, #16a34a); }
+.poa-cv-rem.over { color: var(--r, #dc2626); }
