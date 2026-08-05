@@ -1934,3 +1934,99 @@ html.dark .portal-login-box {
   .portal-body { padding: 0; max-width: 100%; }
   .portal-card { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
 }
+
+/* ─── خط أنابيب طلبات البوابة (OrderPipeline) ───────────────────────────── */
+.opipe {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 4px 14px;
+  direction: rtl;
+}
+.opipe-step {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  cursor: default;
+}
+.opipe-step[role="button"] { cursor: pointer; }
+.opipe-node {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg2, #f5f7fb);
+  border: 2px solid var(--b3, #e2e8f0);
+  color: var(--t4, #94a3b8);
+  font-size: 14px;
+  transition: all .2s;
+  z-index: 1;
+}
+.opipe-step.done .opipe-node {
+  background: var(--g, #16a34a);
+  border-color: var(--g, #16a34a);
+  color: #fff;
+}
+.opipe-step.now .opipe-node {
+  background: var(--em, #2563eb);
+  border-color: var(--em, #2563eb);
+  color: #fff;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--em, #2563eb) 18%, transparent);
+  animation: opipe-pulse 1.8s ease-in-out infinite;
+}
+.opipe-step.sum .opipe-node {
+  background: var(--bg1, #fff);
+  border-color: var(--b3, #e2e8f0);
+  color: var(--t3, #64748b);
+}
+.opipe-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--t4, #94a3b8);
+  white-space: nowrap;
+}
+.opipe-step.done .opipe-label { color: var(--g, #16a34a); }
+.opipe-step.now .opipe-label { color: var(--em, #2563eb); }
+.opipe-step.sum .opipe-label { color: var(--t3, #64748b); }
+.opipe-count {
+  min-width: 18px; height: 17px;
+  padding: 0 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 99px;
+  background: var(--bg2, #f5f7fb);
+  border: 1px solid var(--b3, #e2e8f0);
+  color: var(--t4, #94a3b8);
+  font-size: 10px; font-weight: 800;
+}
+.opipe-count.has { background: var(--em, #2563eb); border-color: var(--em, #2563eb); color: #fff; }
+.opipe-link {
+  flex: 1 1 0;
+  min-width: 10px;
+  height: 2px;
+  margin-top: 14px;
+  background: var(--b3, #e2e8f0);
+  border-radius: 2px;
+}
+.opipe-link.done { background: var(--g, #16a34a); }
+.opipe-branch {
+  align-self: center;
+  display: inline-flex; align-items: center; gap: 4px;
+  margin: 0 6px;
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 11px; font-weight: 800;
+  white-space: nowrap;
+}
+.opipe-branch.cancelled { background: #fee2e2; color: #dc2626; }
+.opipe-branch.returned  { background: #fef3c7; color: #b45309; }
+.opipe-branch--passive  { background: var(--bg2, #f5f7fb); color: var(--t4, #94a3b8); border: 1px dashed var(--b3, #e2e8f0); }
+.opipe-branch-count { font-size: 11px; }
+.opipe--summary { gap: 6px; }
+.opipe--summary .opipe-step { flex: 1 1 0; }
+
+@keyframes opipe-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--em, #2563eb) 18%, transparent); }
+  50%      { box-shadow: 0 0 0 8px color-mix(in srgb, var(--em, #2563eb) 6%, transparent); }
+}

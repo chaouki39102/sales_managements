@@ -92,6 +92,28 @@ class PortalController extends BaseApiController
                 ->selectRaw('COALESCE(SUM(cd.remaining_amount), 0) as total')
                 ->value('total') ?? 0;
 
+            $recentOrders = $this->ordersQuery($partyId)
+                ->limit(5)
+                ->get()
+                ->map(fn ($o) => $this->orderRow($o))
+                ->values();
+
+            $ordersStats = (clone $this->ordersQuery($partyId))
+                ->selectRaw('status, COUNT(*) as c')
+                ->groupBy('status')
+                ->pluck('c', 'status');
+
+            $ordersSummary = [
+                'total'      => (int) ($ordersStats->sum() ?? 0),
+                'preparing'  => (int) ($ordersStats['preparing'] ?? 0),
+                'confirmed'  => (int) ($ordersStats['confirmed'] ?? 0),
+                'processed'  => (int) ($ordersStats['processed'] ?? 0),
+                'shipped'    => (int) ($ordersStats['shipped'] ?? 0),
+                'delivered'  => (int) ($ordersStats['delivered'] ?? 0),
+                'returned'   => (int) ($ordersStats['returned'] ?? 0),
+                'cancelled'  => (int) ($ordersStats['cancelled'] ?? 0),
+            ];
+
             return $this->successResponse([
                 'balance'          => $balance,
                 'party'            => $this->partyRow($party),
@@ -100,6 +122,8 @@ class PortalController extends BaseApiController
                 'unpaid_total'     => round((float) $unpaidTotal, 2),
                 'recent_documents' => $recentDocuments,
                 'recent_payments'  => $recentPayments,
+                'orders'           => $ordersSummary,
+                'recent_orders'    => $recentOrders,
             ], 'تم جلب بيانات اللوحة بنجاح');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal.dashboard');
@@ -467,6 +491,40 @@ class PortalController extends BaseApiController
             'reference'     => $p->reference,
             'notes'         => $p->notes,
             'direction'     => $p->direction,
+        ];
+    }
+
+    protected function ordersQuery(int $partyId)
+    {
+        return \App\Models\PortalOrder::query()
+            ->where('company_id', (int) $this->context->get())
+            ->where('party_id', $partyId)
+            ->with(['document.documentType'])
+            ->orderByDesc('requested_at')
+            ->orderByDesc('id');
+    }
+
+    protected function orderRow($o): array
+    {
+        $doc = $o->document;
+        return [
+            'id'           => (int) $o->id,
+            'reference'    => $o->reference,
+            'status'       => $o->status,
+            'status_label' => $o->status_label,
+            'total_ht'     => (float) $o->total_ht,
+            'total_tva'    => (float) $o->total_tva,
+            'total_ttc'    => (float) $o->total_ttc,
+            'items_count'  => $doc?->lines?->count() ?? 0,
+            'requested_at' => $o->requested_at?->toISOString(),
+            'created_at'   => $o->created_at?->toISOString(),
+            'document'     => $doc ? [
+                'id'              => (int) $doc->id,
+                'document_number' => $doc->document_number,
+                'document_date'   => $doc->document_date?->format('Y-m-d'),
+                'document_type'   => $doc->documentType?->code,
+                'type_name'       => $doc->documentType?->name,
+            ] : null,
         ];
     }
 

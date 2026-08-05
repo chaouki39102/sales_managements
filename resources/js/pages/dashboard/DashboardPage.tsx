@@ -9,6 +9,8 @@ import AlertBar     from '@/components/ui/AlertBar';
 import Button       from '@/components/ui/Button';
 import ProgressBar  from '@/components/ui/ProgressBar';
 import SimpleTable  from '@/components/ui/SimpleTable';
+import { usePortalOrders, usePortalOrdersSummary, PORTAL_ORDER_STATUSES, type PortalAdminOrder } from '@/lib/api/endpoints/portalOrders';
+import OrderPipeline from '@/pages/portal/OrderPipeline';
 
 // ── Types ─────────────────────────────────────
 interface Invoice {
@@ -124,6 +126,30 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [chartMode, setChartMode] = useState<'weekly' | 'monthly'>('weekly');
 
+  // ── Portal orders (live) ─────────────────────
+  const recentOrders = usePortalOrders({ page: 1, per_page: 5 });
+  const ordersSummary = usePortalOrdersSummary();
+  const recent = recentOrders.data?.data ?? [];
+  const summary = ordersSummary.data;
+  const openCount =
+    (summary?.preparing ?? 0) +
+    (summary?.confirmed ?? 0) +
+    (summary?.processed ?? 0) +
+    (summary?.shipped ?? 0);
+  const totalOrders = summary?.total ?? recentOrders.data?.meta?.total ?? 0;
+  const summaryCounts = summary
+    ? {
+        preparing: summary.preparing,
+        confirmed: summary.confirmed,
+        processed: summary.processed,
+        shipped:   summary.shipped,
+        delivered: summary.delivered,
+        returned:  summary.returned,
+        cancelled: summary.cancelled,
+      }
+    : undefined;
+  const fmt = (n: number) => n.toLocaleString('fr-DZ');
+
   return (
     <div className="page on" id="p-dashboard">
 
@@ -177,7 +203,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── KPI Row 2 ── */}
-      <div className="kpis mb-5">
+      <div className="kpis mb-5" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
         <KpiCard
           variant="purple" icon="ti-trending-up"
           label="مبيعات الشهر" value="1,248,400" unit="دج"
@@ -210,7 +236,34 @@ export default function DashboardPage() {
           sub="3 زبائن متأخرون"
           onClick={() => navigate('/dashboard/debts')}
         />
+        <KpiCard
+          variant="gold" icon="ti-clipboard-list"
+          label="طلبات البوابة" value={fmt(totalOrders)}
+          trend={openCount > 0 ? `${fmt(openCount)} مفتوحة` : 'لا طلبات مفتوحة'}
+          trendDir={openCount > 0 ? 'up' : 'neutral'}
+          sub="طلبات سلع الزبائن عبر البوابة"
+          onClick={() => navigate('/portal-orders')}
+        />
       </div>
+
+      {/* ── خط أنابيب طلبات البوابة (نظرة شاملة) ── */}
+      <Card style={{ marginBottom: 16 }} padding={12}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 2 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--t1)' }}>
+            <i className="ti ti-stack-2" style={{ marginLeft: 5, color: 'var(--gold)' }} />
+            خط أنابيب طلبات البوابة
+          </div>
+          <Button size="xs" onClick={() => navigate('/portal-orders')}>
+            إدارة الطلبات
+          </Button>
+        </div>
+        <OrderPipeline
+          status="preparing"
+          summary={!!summary}
+          counts={summaryCounts}
+          onStepClick={() => navigate('/portal-orders')}
+        />
+      </Card>
 
       {/* ── Charts Row ── */}
       <div className="g65 mb-5">
@@ -301,9 +354,49 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* ── أحدث طلبات البوابة ── */}
+      <Card
+        style={{ marginBottom: 16 }}
+        title={
+          <>
+            <span className="ic ic-sm" style={{ color: 'var(--gold)' }}>
+              <i className="ti ti-clipboard-list"/>
+            </span>
+            أحدث طلبات البوابة
+          </>
+        }
+        actions={
+          <Button size="xs" onClick={() => navigate('/portal-orders')}>
+            إدارة الطلبات
+          </Button>
+        }
+      >
+        <SimpleTable
+          columns={[
+            { key: 'reference', label: 'المرجع' },
+            { key: 'party', label: 'الزبون', render: (_v, row) => (row.party as { name: string } | null)?.name ?? '—' },
+            { key: 'status', label: 'الحالة', render: (v) => {
+              const s = v as PortalAdminOrder['status'];
+              const cfg = PORTAL_ORDER_STATUSES.find((x) => x.value === s);
+              return <span className={`badge ${cfg?.cls ?? 'badge--t4'}`}>{cfg?.label ?? s}</span>;
+            }},
+            { key: 'items_count', label: 'الأصناف', render: (v) => <span className="m">{String(v)}</span> },
+            { key: 'total_ttc', label: 'المبلغ (TTC)', render: (v) => <span className="e">{fmt(Number(v))} دج</span> },
+            { key: 'requested_at', label: 'التاريخ', render: (v) => {
+              const d = v ? new Date(String(v)) : null;
+              return <span className="text-xs text-t4">{d ? d.toLocaleDateString('fr-DZ') : '—'}</span>;
+            }},
+          ]}
+          data={recent as unknown as Record<string, unknown>[]}
+          rowKey="id"
+        />
+        {recent.length === 0 && !recentOrders.isLoading && (
+          <div className="text-sm text-t4 text-center py-3">لا توجد طلبات سلع بعد</div>
+        )}
+      </Card>
+
       {/* ── Bottom Row ── */}
       <div className="g73">
-
         {/* Recent invoices table */}
         <Card
           title={

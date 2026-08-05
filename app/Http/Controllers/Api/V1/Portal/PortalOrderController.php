@@ -18,9 +18,10 @@ use Illuminate\Http\Request;
  *   GET  /{company}/portal/orders           → قائمة طلبات الزبون
  *   GET  /{company}/portal/orders/catalog   → كتالوج المنتجات (سعر + مخزون + تعبئة)
  *   POST /{company}/portal/orders           → إنشاء طلب جديد
- *   PUT/PATCH /{company}/portal/orders/{id} → تعديل الطلب (فقط حالة «قيد الانتظار»)
+ *   PUT/PATCH /{company}/portal/orders/{id} → تعديل الطلب (فقط حالة «قيد الاعداد»)
  *   GET  /{company}/portal/orders/{id}      → تفاصيل طلب + سجل الحالة
- *   POST /{company}/portal/orders/{id}/cancel → إلغاء طلب قيد الانتظار
+ *   POST /{company}/portal/orders/{id}/validate → تأكيد الطلب من الزبون (قيد الاعداد → مؤكد)
+ *   POST /{company}/portal/orders/{id}/cancel → إلغاء طلب قيد الاعداد
  *
  * القاعدة: كل منطق الطلب في PortalOrderService (معزول عن CommercialDocumentService).
  * الأسعار تُحسب في الخادم من جدول المنتجات — الزبون يرسل product_id + quantity + packaging_id فقط.
@@ -191,6 +192,29 @@ class PortalOrderController extends BaseApiController
             return $this->successResponse($this->orders->toArray($order), 'تم إلغاء الطلب');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal_orders.cancel');
+        }
+    }
+
+    public function validateOrder(Request $request): JsonResponse
+    {
+        try {
+            $portal  = $request->input('_portal_user');
+            $partyId = (int) ($portal->party_id ?? 0);
+            $order   = $this->findOwnOrder($partyId);
+
+            // الطريقة الاحترافية: الزبون يثبّت طلبه بنفسه (قيد الاعداد → مؤكد).
+            // بعد التأكيد يدخل الطلب مرحلة تحليل المسؤول ولا يعود للزبون تصرف.
+            $order = $this->orders->changeStatus(
+                $order,
+                PortalOrder::STATUS_CONFIRMED,
+                PortalOrder::CHANGED_BY_CUSTOMER,
+                $portal->name ?? null,
+                'تأكيد الطلب من الزبون',
+            );
+
+            return $this->successResponse($this->orders->toArray($order), 'تم تأكيد الطلب بنجاح');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'portal_orders.validate');
         }
     }
 

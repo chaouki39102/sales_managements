@@ -165,6 +165,8 @@ export interface PortalDashboard {
   unpaid_total:     number;
   recent_documents: PortalDocument[];
   recent_payments:  PortalPayment[];
+  orders:           PortalOrdersSummary;
+  recent_orders:    PortalOrder[];
 }
 
 export interface PortalProfile {
@@ -175,7 +177,26 @@ export interface PortalProfile {
 }
 
 // ─── طلبات السلع (وصل طلب سلعة) ────────────────────────────────────────────────
-export type PortalOrderStatus = 'pending' | 'processing' | 'completed' | 'cancelled';
+// حالات خاصة بطلبات الزبائن: قيد الاعداد → مؤكد → تم المعالجة → الشحن → تم التسليم → مرتجع (+ ملغى)
+export type PortalOrderStatus =
+  | 'preparing'
+  | 'confirmed'
+  | 'processed'
+  | 'shipped'
+  | 'delivered'
+  | 'returned'
+  | 'cancelled';
+
+export interface PortalCatalogPackaging {
+  id:            number;
+  code:          string | null;
+  label:         string | null;
+  quantity:      number;
+  barcode:       string | null;
+  is_default:    boolean;
+  display_order: number;
+  pack_price_ht: number;
+}
 
 export interface PortalCatalogItem {
   id:            number;
@@ -187,6 +208,8 @@ export interface PortalCatalogItem {
   unit:          { name: string; symbol: string } | null;
   manages_stock: boolean;
   current_stock: number | null;
+  has_packaging: boolean;
+  packagings:    PortalCatalogPackaging[];
 }
 
 export interface PortalOrderItem {
@@ -197,9 +220,22 @@ export interface PortalOrderItem {
   unit_price_ht: number;
   tva_rate:      number;
   quantity:      number;
+  packaging_id:  number | null;
+  pack_qty:      number;
   total_ht:      number;
   total_tva:     number;
   total_ttc:     number;
+}
+
+export interface PortalOrdersSummary {
+  total:     number;
+  preparing: number;
+  confirmed: number;
+  processed: number;
+  shipped:   number;
+  delivered: number;
+  returned:  number;
+  cancelled: number;
 }
 
 export interface PortalOrder {
@@ -216,6 +252,13 @@ export interface PortalOrder {
   created_at:   string | null;
   items?:       PortalOrderItem[];
   party?:       { id: number; name: string; code: string | null } | null;
+  document?:    {
+    id:              number;
+    document_number: string;
+    document_date:   string | null;
+    document_type:   string | null;
+    type_name:       string | null;
+  } | null;
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -282,13 +325,23 @@ export const portalApi = {
       per_page: filters.per_page ?? 10,
       status: filters.status || undefined,
     }),
-  createOrder: (items: { product_id: number; quantity: number }[], notes?: string) =>
+  orderDetail: (id: number) =>
+    portalGet<PortalOrder>(`/portal/orders/${id}`),
+  createOrder: (items: PortalOrderLineInput[], notes?: string) =>
     portalPost<PortalOrder>('/portal/orders', { items, notes: notes || undefined }),
-  updateOrder: (id: number, items: { product_id: number; quantity: number }[], notes?: string) =>
+  updateOrder: (id: number, items: PortalOrderLineInput[], notes?: string) =>
     portalPut<PortalOrder>(`/portal/orders/${id}`, { items, notes: notes || undefined }),
+  validateOrder: (id: number) =>
+    portalPost<PortalOrder>(`/portal/orders/${id}/validate`),
   cancelOrder: (id: number) =>
     portalPost<PortalOrder>(`/portal/orders/${id}/cancel`),
 };
+
+export interface PortalOrderLineInput {
+  product_id:   number;
+  quantity:     number;
+  packaging_id?: number | null;
+}
 
 export function isPortalAuthenticated(): boolean {
   return !!portalTokenStorage.get();

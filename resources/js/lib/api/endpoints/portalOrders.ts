@@ -7,6 +7,7 @@ import { useActiveSlug } from '../../store/appStore';
 import type { PortalOrderStatus } from '../portal/portal';
 
 export interface PortalAdminOrderItem {
+  line_id:       number;
   product_id:    number;
   product_name:  string;
   product_ref:   string | null;
@@ -14,9 +15,19 @@ export interface PortalAdminOrderItem {
   unit_price_ht: number;
   tva_rate:      number;
   quantity:      number;
+  packaging_id:  number | null;
+  pack_qty:      number;
   total_ht:      number;
   total_tva:     number;
   total_ttc:     number;
+}
+
+export interface PortalAdminStockInfo {
+  line_id:    number;
+  product_id: number;
+  available:  number | null;
+  required:   number;
+  sufficient: boolean | null;
 }
 
 export interface PortalAdminOrder {
@@ -33,6 +44,32 @@ export interface PortalAdminOrder {
   created_at:   string | null;
   party:        { id: number; name: string; code: string | null } | null;
   items?:       PortalAdminOrderItem[];
+  stock?:       PortalAdminStockInfo[];
+  document?:    {
+    id:              number;
+    document_number: string;
+    document_date:   string | null;
+    document_type:   string | null;
+    type_name:       string | null;
+    net_to_pay:      number;
+    warehouse_id:    number | null;
+  } | null;
+  histories?:   {
+    id:             number;
+    status:         PortalOrderStatus;
+    status_label:   string;
+    changed_by:     string;
+    changed_by_name: string | null;
+    note:           string | null;
+    created_at:     string | null;
+  }[];
+}
+
+export interface PortalAdminOrderLineInput {
+  line_id?:      number;
+  product_id?:   number;
+  quantity:      number;
+  packaging_id?: number;
 }
 
 export interface PortalAdminOrderFilters {
@@ -60,10 +97,14 @@ export const portalOrdersApi = {
         search: filters.search || undefined,
       },
     ),
+  summary: () =>
+    apiGet<PortalOrdersSummary>('/portal-orders/summary'),
   detail: (id: number) =>
     apiGet<PortalAdminOrder>(`/portal-orders/${id}`),
   updateStatus: (id: number, data: { status: PortalOrderStatus; notes?: string }) =>
     apiPatch<PortalAdminOrder>(`/portal-orders/${id}`, data),
+  updateLines: (id: number, lines: PortalAdminOrderLineInput[]) =>
+    apiPatch<PortalAdminOrder>(`/portal-orders/${id}/lines`, { lines }),
   convert: (id: number, target = 'FV') =>
     apiPost<{ order: PortalAdminOrder; sale: { id: number; document_number: string; document_type: string | null; net_to_pay: number; total_ttc: number; document_date: string | null } }>(
       `/portal-orders/${id}/convert`,
@@ -72,11 +113,44 @@ export const portalOrdersApi = {
 } as const;
 
 export const PORTAL_ORDER_STATUSES: { value: PortalOrderStatus; label: string; cls: string }[] = [
-  { value: 'pending',    label: 'قيد الانتظار', cls: 'badge--y' },
-  { value: 'processing', label: 'قيد التجهيز',  cls: 'badge--b' },
-  { value: 'completed',  label: 'مكتمل',        cls: 'badge--g' },
-  { value: 'cancelled',  label: 'ملغي',         cls: 'badge--r' },
+  { value: 'preparing', label: 'قيد الاعداد',  cls: 'badge--y' },
+  { value: 'confirmed', label: 'مؤكد',         cls: 'badge--b' },
+  { value: 'processed', label: 'تم المعالجة',  cls: 'badge--purple' },
+  { value: 'shipped',   label: 'الشحن',        cls: 'badge--z' },
+  { value: 'delivered', label: 'تم التسليم',   cls: 'badge--g' },
+  { value: 'returned',  label: 'مرتجع',        cls: 'badge--r' },
+  { value: 'cancelled', label: 'ملغي',         cls: 'badge--gray' },
 ];
+
+// المسار الرئيسي لخط الأنابيب (الطريقة الاحترافية) — ترتيب الخطوات في العرض.
+export const PORTAL_ORDER_PIPELINE: { value: PortalOrderStatus; label: string; icon: string }[] = [
+  { value: 'preparing', label: 'قيد الاعداد',  icon: 'ti-pencil' },
+  { value: 'confirmed', label: 'مؤكد',         icon: 'ti-circle-check' },
+  { value: 'processed', label: 'تم المعالجة',  icon: 'ti-settings' },
+  { value: 'shipped',   label: 'الشحن',        icon: 'ti-truck' },
+  { value: 'delivered', label: 'تم التسليم',   icon: 'ti-package-arrived' },
+];
+
+export interface PortalOrdersSummary {
+  total:     number;
+  preparing: number;
+  confirmed: number;
+  processed: number;
+  shipped:   number;
+  delivered: number;
+  returned:  number;
+  cancelled: number;
+}
+
+export function usePortalOrdersSummary() {
+  const slug = useActiveSlug();
+  return useQuery({
+    queryKey: ['portal-orders', slug, 'summary'],
+    queryFn: () => portalOrdersApi.summary(),
+    enabled: !!slug,
+    placeholderData: (prev) => prev,
+  });
+}
 
 export function usePortalOrders(filters: PortalAdminOrderFilters) {
   const slug = useActiveSlug();
@@ -106,6 +180,20 @@ export function usePortalOrderStatusUpdate() {
     onSuccess: () => {
       if (!slug) return;
       qc.invalidateQueries({ queryKey: ['portal-orders', slug] });
+    },
+  });
+}
+
+export function usePortalOrderLinesUpdate() {
+  const slug = useActiveSlug();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, lines }: { id: number; lines: PortalAdminOrderLineInput[] }) =>
+      portalOrdersApi.updateLines(id, lines),
+    onSuccess: (data, vars) => {
+      if (!slug) return;
+      qc.invalidateQueries({ queryKey: ['portal-orders', slug] });
+      qc.setQueryData(['portal-orders', slug, 'detail', vars.id], data);
     },
   });
 }
