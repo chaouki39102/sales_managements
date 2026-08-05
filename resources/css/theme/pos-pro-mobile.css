@@ -1,0 +1,288 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   POS Pro Mobile — معاينة الهاتف (real phone order page)
+   Ported from pos-pro-mobile-live.html v5. All classes namespaced .ppm-*
+   so they never collide with desktop pos.css / pos-pro.css (.pcard, .line,
+   .sheet, .fab, .badge, ...). Theme tokens only — no hardcoded colors.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.ppm-screen {
+  width: 100%;
+  height: 100dvh;
+  background: var(--bg1);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top, 0px);
+  overflow: hidden;
+  font-family: 'Tajawal', system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.ppm-screen button { font-family: inherit; border: none; background: none; cursor: pointer; color: inherit; }
+.ppm-screen input  { font-family: inherit; }
+
+.ppm-mono { font-family: ui-monospace, 'Cascadia Mono', 'Consolas', 'Segoe UI Mono', monospace; direction: ltr; }
+
+/* ─── Swatches (product thumbnails) ─────────────────────────────────────── */
+.ppm-sw {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 44px; height: 44px; border-radius: var(--r2);
+  box-shadow: inset 0 0 0 1px rgba(13, 27, 42, .05);
+  font-weight: 800; font-size: 15px;
+}
+.ppm-sw-gold   { background: var(--goldb);   color: var(--gold);   }
+.ppm-sw-blue   { background: var(--blueb);   color: var(--blue);   }
+.ppm-sw-orange { background: var(--orb);     color: var(--orange); }
+.ppm-sw-purple { background: var(--purb);    color: var(--purple); }
+.ppm-sw-teal   { background: var(--tealb);   color: var(--teal);   }
+.ppm-sw-indigo { background: var(--indigob); color: var(--indigo); }
+.ppm-avatar-init {
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 800; flex-shrink: 0;
+}
+
+/* ─── App bar ───────────────────────────────────────────────────────────── */
+.ppm-appbar {
+  height: 56px; flex-shrink: 0; display: flex; align-items: center;
+  justify-content: space-between; padding: 0 14px; gap: 8px;
+}
+.ppm-customer-chip {
+  display: flex; align-items: center; gap: 9px; padding: 5px 12px 5px 5px;
+  border-radius: 999px; background: var(--bg2); box-shadow: var(--shadow);
+  flex-shrink: 1; min-width: 0; flex: 1; max-width: 230px; text-align: right;
+}
+.ppm-customer-chip .ppm-av {
+  width: 32px; height: 32px; border-radius: 50%; font-size: 11px;
+  box-shadow: 0 0 0 2px var(--bg2), 0 0 0 3px var(--embo);
+}
+.ppm-customer-chip .ppm-av.placeholder { background: var(--bg4) !important; color: var(--t4) !important; box-shadow: 0 0 0 2px var(--bg2), 0 0 0 3px var(--b2); }
+.ppm-customer-chip .ppm-txt { min-width: 0; text-align: right; }
+.ppm-customer-chip .ppm-txt .ppm-name { font-size: 12px; font-weight: 800; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ppm-customer-chip .ppm-txt .ppm-bal { font-size: 10.5px; font-weight: 700; color: var(--em); font-family: ui-monospace, 'Consolas', monospace; direction: ltr; display: inline-block; }
+.ppm-customer-chip .ppm-txt .ppm-bal.debtor { color: var(--red); }
+.ppm-customer-chip .ppm-txt .ppm-cta { font-size: 11.5px; font-weight: 700; color: var(--t3); }
+.ppm-appbar-btn {
+  width: 38px; height: 38px; border-radius: 50%; background: var(--bg2);
+  box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center;
+  color: var(--t3); flex-shrink: 0; position: relative;
+}
+.ppm-appbar-btn .ti { font-size: 19px; }
+.ppm-badge {
+  position: absolute; top: -3px; left: -3px; min-width: 16px; height: 16px; padding: 0 3px;
+  border-radius: 999px; background: var(--gold); color: #fff; font-size: 9px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.ppm-session-strip {
+  display: flex; align-items: center; gap: 6px; padding: 0 18px 8px; flex-shrink: 0;
+  font-size: 10px; font-weight: 700; color: var(--t4);
+  font-family: ui-monospace, 'Consolas', monospace; letter-spacing: .3px;
+}
+.ppm-session-strip .ppm-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--em); box-shadow: 0 0 0 3px var(--embo); flex-shrink: 0; }
+.ppm-session-strip .ppm-debug-btn {
+  margin-inline-start: auto; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--bg3); color: var(--t4); font-size: 11px;
+  display: flex; align-items: center; justify-content: center; opacity: .6;
+}
+
+/* ─── Total card ────────────────────────────────────────────────────────── */
+.ppm-total-card { margin: 2px 14px 10px; padding: 14px 18px; border-radius: var(--r3); background: var(--bg2); box-shadow: var(--shadow2); flex-shrink: 0; position: relative; overflow: hidden; }
+.ppm-total-card::before { content: ''; position: absolute; top: 0; right: 0; left: 0; height: 3px; background: var(--grad-em); }
+.ppm-total-top { display: flex; align-items: flex-end; justify-content: space-between; }
+.ppm-total-top .ppm-l { font-size: 11px; font-weight: 800; color: var(--t4); letter-spacing: .4px; }
+.ppm-total-top .ppm-val { font-family: ui-monospace, 'Consolas', monospace; font-weight: 800; font-size: 30px; color: var(--em); direction: ltr; letter-spacing: -1px; line-height: 1; }
+.ppm-total-top .ppm-unit { font-size: 12px; font-weight: 700; color: var(--t3); margin-inline-start: 4px; }
+.ppm-total-chips { display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
+.ppm-tchip { font-size: 10px; font-weight: 700; padding: 4px 9px; border-radius: 999px; background: var(--bg3); color: var(--t3); font-family: ui-monospace, 'Consolas', monospace; direction: ltr; }
+.ppm-tchip.disc { background: var(--redb); color: var(--red); }
+
+/* ─── Quick actions strip ───────────────────────────────────────────────── */
+.ppm-qa-strip { display: flex; gap: 8px; padding: 0 14px 12px; flex-shrink: 0; }
+.ppm-qa-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 9px 4px; border-radius: var(--r2); background: var(--bg2); box-shadow: var(--shadow); color: var(--t3); font-size: 10px; font-weight: 700; }
+.ppm-qa-btn .ti { font-size: 16px; }
+.ppm-qa-btn:active { color: var(--em); }
+
+/* ─── Cart header / scroll ──────────────────────────────────────────────── */
+.ppm-cart-hd { display: flex; align-items: center; justify-content: space-between; padding: 0 18px 8px; flex-shrink: 0; }
+.ppm-cart-hd h1 { font-size: 11.5px; font-weight: 800; color: var(--t3); letter-spacing: .6px; text-transform: uppercase; }
+.ppm-cart-hd .ppm-count { font-size: 11px; font-weight: 700; color: var(--t4); font-family: ui-monospace, 'Consolas', monospace; }
+.ppm-cart-scroll { flex: 1; overflow-y: auto; padding: 0 14px 150px; scrollbar-width: thin; }
+.ppm-cart-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 60px 20px; color: var(--t4); text-align: center; }
+.ppm-cart-empty .ti { font-size: 36px; opacity: .55; }
+.ppm-cart-empty .ppm-t { font-size: 13px; font-weight: 700; color: var(--t3); }
+.ppm-cart-empty .ppm-s { font-size: 11px; }
+
+/* ─── Cart rows (swipe to delete) ───────────────────────────────────────── */
+.ppm-swipe-row { position: relative; border-radius: var(--r2); overflow: hidden; margin-bottom: 9px; }
+.ppm-swipe-bg { position: absolute; inset: 0; background: var(--red); display: flex; align-items: center; padding-inline-start: 22px; justify-content: flex-start; }
+.ppm-swipe-bg .ti { color: #fff; font-size: 18px; }
+.ppm-line { position: relative; background: var(--bg2); box-shadow: var(--shadow); border-radius: var(--r2); padding: 12px 14px; display: flex; align-items: center; gap: 12px; transition: transform .2s, background .3s; touch-action: pan-y; }
+.ppm-line.ppm-just-added { animation: ppmJustAdded .9s ease-out; }
+@keyframes ppmJustAdded { 0% { background: var(--emb); } 100% { background: var(--bg2); } }
+.ppm-line-photo { width: 48px; height: 48px; border-radius: var(--r2); overflow: hidden; flex-shrink: 0; }
+.ppm-line-photo img { width: 100%; height: 100%; object-fit: cover; }
+.ppm-line-info { flex: 1; min-width: 0; }
+.ppm-line-name { font-size: 13.5px; font-weight: 700; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ppm-line-sub { font-size: 10.5px; color: var(--t4); margin-top: 2px; font-family: ui-monospace, 'Consolas', monospace; direction: ltr; text-align: right; }
+.ppm-qty { display: flex; align-items: center; background: var(--bg3); border-radius: 999px; flex-shrink: 0; }
+.ppm-qty button { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: var(--t3); font-size: 16px; font-weight: 600; }
+.ppm-qty button:active { color: var(--em); }
+.ppm-qty .ppm-val { width: 22px; text-align: center; font-size: 12.5px; font-weight: 800; color: var(--t1); font-family: ui-monospace, 'Consolas', monospace; }
+.ppm-line-total { flex-shrink: 0; min-width: 64px; text-align: left; font-family: ui-monospace, 'Consolas', monospace; font-weight: 800; font-size: 14px; color: var(--t1); direction: ltr; }
+.ppm-swipe-hint { text-align: center; font-size: 10px; color: var(--t4); padding: 2px 0 10px; }
+
+/* ─── Bottom bar ────────────────────────────────────────────────────────── */
+.ppm-bottombar {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 35;
+  display: flex; align-items: stretch; gap: 8px;
+  padding: 12px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, rgba(240, 244, 250, .55), rgba(240, 244, 250, .85) 40%);
+  backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border-top: 1px solid rgba(255, 255, 255, .6);
+}
+.ppm-bb-new { width: 54px; min-height: 54px; flex-shrink: 0; border-radius: var(--r2); background: rgba(255, 255, 255, .7); box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center; color: var(--t3); }
+.ppm-bb-new .ti { font-size: 20px; }
+.ppm-bb-quick { flex-shrink: 0; width: 88px; min-height: 54px; border-radius: var(--r2); background: rgba(184, 125, 10, .14); border: 1.5px solid var(--goldbo); color: var(--gold); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 10.5px; font-weight: 800; }
+.ppm-bb-quick .ti { font-size: 16px; }
+.ppm-bb-pay { flex: 1; min-height: 54px; border-radius: var(--r2); background: var(--grad-em); color: #fff; display: flex; align-items: center; justify-content: center; gap: 9px; font-size: 15px; font-weight: 900; box-shadow: 0 10px 24px rgba(10, 138, 92, .4); }
+.ppm-bb-pay .ti { font-size: 18px; }
+.ppm-bb-pay .ppm-amt { font-family: ui-monospace, 'Consolas', monospace; font-size: 14px; font-weight: 700; opacity: .95; direction: ltr; }
+
+.ppm-fab { position: absolute; right: 18px; bottom: 128px; width: 54px; height: 54px; border-radius: 50%; background: var(--grad-em); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 28px rgba(10, 138, 92, .45); z-index: 34; }
+.ppm-fab .ti { font-size: 23px; }
+
+/* ─── Sheets ────────────────────────────────────────────────────────────── */
+.ppm-backdrop { position: absolute; inset: 0; background: rgba(13, 27, 42, .45); z-index: 50; opacity: 0; visibility: hidden; transition: .25s; }
+.ppm-backdrop.show { opacity: 1; visibility: visible; }
+.ppm-sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 51; background: var(--bg1);
+  border-radius: 22px 22px 0 0; box-shadow: 0 -10px 40px rgba(13, 27, 42, .2);
+  transform: translateY(100%); transition: transform .28s cubic-bezier(.32, .72, 0, 1);
+  max-height: 86%; display: flex; flex-direction: column;
+}
+.ppm-sheet.show { transform: translateY(0); }
+.ppm-sheet-handle { width: 36px; height: 4px; border-radius: 3px; background: var(--b3); margin: 10px auto 6px; flex-shrink: 0; }
+.ppm-sheet-hd { display: flex; align-items: center; justify-content: space-between; padding: 6px 18px 10px; flex-shrink: 0; }
+.ppm-sheet-hd h2 { font-size: 14px; font-weight: 800; color: var(--t1); }
+.ppm-sheet-close { width: 30px; height: 30px; border-radius: 50%; background: var(--bg2); box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center; color: var(--t3); }
+.ppm-sheet-close .ti { font-size: 15px; }
+
+/* ─── Product sheet ─────────────────────────────────────────────────────── */
+.ppm-freq-scroll { display: flex; gap: 10px; padding: 0 18px 12px; overflow-x: auto; flex-shrink: 0; scrollbar-width: none; }
+.ppm-freq-item { flex-shrink: 0; width: 58px; text-align: center; }
+.ppm-freq-item .ppm-sw { width: 52px; height: 52px; border-radius: 50%; margin: 0 auto 4px; box-shadow: var(--shadow); }
+.ppm-freq-item .ppm-n { font-size: 9.5px; font-weight: 700; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ppm-cat-scroll { display: flex; gap: 8px; padding: 0 18px 12px; overflow-x: auto; flex-shrink: 0; scrollbar-width: none; }
+.ppm-cat-chip { flex-shrink: 0; padding: 7px 14px; border-radius: 999px; background: var(--bg2); box-shadow: var(--shadow); font-size: 11.5px; font-weight: 700; color: var(--t3); }
+.ppm-cat-chip.on { background: var(--em); color: #fff; box-shadow: 0 4px 14px rgba(10, 138, 92, .35); }
+.ppm-psearch { margin: 0 18px 12px; display: flex; align-items: center; gap: 9px; background: var(--bg2); box-shadow: var(--shadow); border-radius: var(--r2); padding: 10px 14px; flex-shrink: 0; }
+.ppm-psearch .ti { color: var(--t4); font-size: 16px; }
+.ppm-psearch input { flex: 1; border: none; outline: none; background: transparent; color: var(--t1); font-size: 13px; direction: rtl; }
+.ppm-pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; overflow-y: auto; padding: 0 18px 22px; scrollbar-width: thin; align-content: start; }
+.ppm-pcard { background: var(--bg2); border-radius: var(--r2); box-shadow: var(--shadow); overflow: hidden; text-align: right; transition: transform .1s; position: relative; }
+.ppm-pcard:active { transform: scale(.97); }
+.ppm-pcard.ppm-is-out { opacity: .55; }
+.ppm-pcard.ppm-is-out:active { transform: none; }
+.ppm-stock-badge { position: absolute; top: 6px; left: 6px; font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: 999px; z-index: 2; }
+.ppm-stock-badge.low { background: var(--goldb); color: var(--gold); box-shadow: 0 0 0 1px var(--goldbo); }
+.ppm-stock-badge.out { background: var(--redb); color: var(--red); box-shadow: 0 0 0 1px var(--redbo); }
+.ppm-pcard .ppm-sw { width: 100%; height: 82px; border-radius: 0; font-size: 26px; }
+.ppm-pc-body { padding: 8px 10px 10px; }
+.ppm-pc-name { font-size: 12px; font-weight: 700; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ppm-pc-row { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+.ppm-pc-price { font-size: 12.5px; font-weight: 800; color: var(--em); font-family: ui-monospace, 'Consolas', monospace; }
+.ppm-pc-add { width: 22px; height: 22px; border-radius: 50%; background: var(--emb); color: var(--em); display: flex; align-items: center; justify-content: center; }
+.ppm-pc-add .ti { font-size: 13px; }
+
+/* ─── Customer sheet (view) ─────────────────────────────────────────────── */
+.ppm-csheet-body { padding: 8px 24px 26px; text-align: center; overflow-y: auto; scrollbar-width: thin; }
+.ppm-c-avatar { width: 90px; height: 90px; border-radius: 50%; margin: 6px auto 12px; font-size: 28px; box-shadow: 0 0 0 4px var(--bg2), 0 0 0 7px var(--embo); }
+.ppm-c-avatar.debtor { box-shadow: 0 0 0 4px var(--bg2), 0 0 0 7px var(--redbo); }
+.ppm-c-name { font-size: 16px; font-weight: 800; color: var(--t1); }
+.ppm-c-phone { font-size: 11.5px; color: var(--t4); margin-top: 2px; font-family: ui-monospace, 'Consolas', monospace; direction: ltr; }
+.ppm-c-balance { margin: 16px 0 12px; padding: 14px; border-radius: var(--r3); background: var(--bg2); box-shadow: var(--shadow); }
+.ppm-c-balance .ppm-l { font-size: 10.5px; color: var(--t4); font-weight: 700; }
+.ppm-c-balance .ppm-v { font-size: 24px; font-weight: 800; color: var(--em); font-family: ui-monospace, 'Consolas', monospace; direction: ltr; margin-top: 2px; }
+.ppm-c-balance .ppm-v.debtor { color: var(--red); }
+.ppm-c-stats { display: flex; gap: 8px; }
+.ppm-c-stat { flex: 1; padding: 10px 6px; border-radius: var(--r2); background: var(--bg2); box-shadow: var(--shadow); }
+.ppm-c-stat .ppm-v { font-size: 15px; font-weight: 800; color: var(--t1); font-family: ui-monospace, 'Consolas', monospace; }
+.ppm-c-stat .ppm-l { font-size: 9.5px; color: var(--t4); font-weight: 700; margin-top: 2px; }
+.ppm-c-actions { display: flex; gap: 8px; margin-top: 16px; }
+.ppm-c-actions button { flex: 1; padding: 12px; border-radius: var(--r2); background: var(--bg2); box-shadow: var(--shadow); color: var(--t2); font-size: 12px; font-weight: 700; }
+.ppm-c-actions button.ppm-danger { color: var(--red); }
+.ppm-c-actions button.ppm-clear { color: var(--t4); }
+
+/* ─── Customer sheet (search) ───────────────────────────────────────────── */
+.ppm-csearch { margin: 0 18px 10px; display: flex; align-items: center; gap: 9px; background: var(--bg2); box-shadow: var(--shadow); border-radius: var(--r2); padding: 10px 14px; flex-shrink: 0; }
+.ppm-csearch .ti { color: var(--t4); font-size: 16px; }
+.ppm-csearch input { flex: 1; border: none; outline: none; background: transparent; color: var(--t1); font-size: 13px; direction: rtl; }
+.ppm-clist { overflow-y: auto; padding: 0 18px 22px; scrollbar-width: thin; }
+.ppm-crow { display: flex; align-items: center; gap: 12px; padding: 10px 8px; border-radius: var(--r2); width: 100%; }
+.ppm-crow:active { background: var(--bg3); }
+.ppm-crow .ppm-av { width: 42px; height: 42px; border-radius: 50%; font-size: 13px; box-shadow: var(--shadow); }
+.ppm-crow .ppm-info { flex: 1; min-width: 0; text-align: right; }
+.ppm-crow .ppm-info .ppm-n { font-size: 13px; font-weight: 700; color: var(--t1); }
+.ppm-crow .ppm-info .ppm-p { font-size: 10.5px; color: var(--t4); font-family: ui-monospace, 'Consolas', monospace; direction: ltr; }
+.ppm-crow .ppm-bal { font-size: 12px; font-weight: 800; color: var(--em); font-family: ui-monospace, 'Consolas', monospace; direction: ltr; flex-shrink: 0; }
+.ppm-crow .ppm-bal.debtor { color: var(--red); }
+
+/* ─── Discount sheet ────────────────────────────────────────────────────── */
+.ppm-disc-body { padding: 6px 18px 26px; overflow-y: auto; scrollbar-width: thin; }
+.ppm-disc-toggle { display: flex; gap: 8px; margin-bottom: 16px; }
+.ppm-disc-toggle button { flex: 1; padding: 10px; border-radius: var(--r2); background: var(--bg2); box-shadow: var(--shadow); font-size: 12.5px; font-weight: 700; color: var(--t3); }
+.ppm-disc-toggle button.on { background: var(--em); color: #fff; box-shadow: 0 4px 14px rgba(10, 138, 92, .35); }
+.ppm-disc-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+.ppm-disc-presets button { padding: 12px 4px; border-radius: var(--r2); background: var(--bg2); box-shadow: var(--shadow); font-size: 13px; font-weight: 800; color: var(--t1); font-family: ui-monospace, 'Consolas', monospace; }
+.ppm-disc-custom { display: flex; align-items: center; gap: 10px; background: var(--bg2); box-shadow: var(--shadow); border-radius: var(--r2); padding: 10px 14px; margin-bottom: 16px; }
+.ppm-disc-custom .ti { color: var(--t4); font-size: 16px; }
+.ppm-disc-custom input { flex: 1; border: none; outline: none; background: transparent; font-size: 16px; font-weight: 800; color: var(--t1); font-family: ui-monospace, 'Consolas', monospace; direction: ltr; }
+.ppm-disc-apply { width: 100%; padding: 14px; border-radius: var(--r2); background: var(--grad-em); color: #fff; font-size: 13.5px; font-weight: 800; box-shadow: 0 10px 24px rgba(10, 138, 92, .35); }
+
+/* ─── Held sales sheet ──────────────────────────────────────────────────── */
+.ppm-held-body { padding: 0 18px 22px; overflow-y: auto; scrollbar-width: thin; }
+.ppm-held-empty { text-align: center; padding: 30px 10px; color: var(--t4); font-size: 12.5px; }
+.ppm-held-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: var(--r2); background: var(--bg2); box-shadow: var(--shadow); margin-bottom: 10px; }
+.ppm-held-row .ppm-info .ppm-n { font-size: 12.5px; font-weight: 700; color: var(--t1); }
+.ppm-held-row .ppm-info .ppm-s { font-size: 10.5px; color: var(--t4); font-family: ui-monospace, 'Consolas', monospace; margin-top: 2px; direction: ltr; }
+.ppm-held-row button { padding: 8px 14px; border-radius: var(--r1); background: var(--emb); color: var(--em); font-size: 11.5px; font-weight: 800; }
+
+/* ─── Snackbar (undo) ───────────────────────────────────────────────────── */
+.ppm-snackbar { position: absolute; left: 16px; right: 16px; bottom: 20px; z-index: 70; background: var(--t1); color: #fff; border-radius: var(--r2); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: var(--shadow3); transform: translateY(120%); transition: transform .25s; font-size: 12.5px; font-weight: 700; }
+.ppm-snackbar.show { transform: translateY(0); }
+.ppm-snackbar button { color: var(--em3); font-weight: 800; font-size: 12.5px; flex-shrink: 0; }
+
+/* ─── Pay success overlay ───────────────────────────────────────────────── */
+.ppm-pay-success { position: absolute; inset: 0; z-index: 90; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: rgba(240, 244, 250, .7); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); opacity: 0; visibility: hidden; transition: opacity .2s, visibility .2s; }
+.ppm-pay-success.show { opacity: 1; visibility: visible; }
+.ppm-ps-circle { width: 96px; height: 96px; border-radius: 50%; background: var(--grad-em); display: flex; align-items: center; justify-content: center; box-shadow: 0 20px 50px rgba(10, 138, 92, .4); transform: scale(0); transition: transform .35s cubic-bezier(.34, 1.56, .64, 1); }
+.ppm-pay-success.show .ppm-ps-circle { transform: scale(1); }
+.ppm-ps-circle .ti { font-size: 46px; color: #fff; }
+.ppm-ps-title { font-size: 16px; font-weight: 800; color: var(--t1); opacity: 0; transform: translateY(6px); transition: opacity .3s ease .25s, transform .3s ease .25s; }
+.ppm-pay-success.show .ppm-ps-title { opacity: 1; transform: translateY(0); }
+.ppm-ps-amt { font-family: ui-monospace, 'Consolas', monospace; font-size: 26px; font-weight: 800; color: var(--em); direction: ltr; opacity: 0; transition: opacity .3s ease .32s; }
+.ppm-pay-success.show .ppm-ps-amt { opacity: 1; }
+.ppm-ps-circle.fail { background: linear-gradient(160deg, #e0645a, #c23b3b); box-shadow: 0 20px 50px rgba(212, 43, 43, .35); }
+.ppm-ps-title.fail { color: var(--red); }
+
+/* ─── Offline banner ────────────────────────────────────────────────────── */
+.ppm-offline-banner { position: absolute; top: 0; left: 0; right: 0; z-index: 95; background: var(--t1); color: #fff; font-size: 11px; font-weight: 700; text-align: center; padding: 8px; transform: translateY(-100%); transition: transform .25s; }
+.ppm-offline-banner.show { transform: translateY(0); }
+
+/* ─── Session expired overlay ───────────────────────────────────────────── */
+.ppm-session-lock { position: absolute; inset: 0; z-index: 96; background: rgba(13, 27, 42, .92); backdrop-filter: blur(4px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 0 30px; opacity: 0; visibility: hidden; transition: .2s; }
+.ppm-session-lock.show { opacity: 1; visibility: visible; }
+.ppm-session-lock .ppm-lock-ic { width: 56px; height: 56px; border-radius: 50%; background: rgba(255, 255, 255, .08); display: flex; align-items: center; justify-content: center; }
+.ppm-session-lock .ppm-lock-ic .ti { font-size: 26px; color: #fff; }
+.ppm-session-lock h3 { color: #fff; font-size: 15px; font-weight: 800; }
+.ppm-session-lock p { color: rgba(255, 255, 255, .6); font-size: 12px; line-height: 1.6; }
+.ppm-session-lock button { margin-top: 6px; padding: 11px 28px; border-radius: 999px; background: var(--grad-em); color: #fff; font-size: 13px; font-weight: 800; }
+
+/* ─── Accessibility ─────────────────────────────────────────────────────── */
+.ppm-screen button:focus-visible, .ppm-screen input:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+
+/* Dark theme overrides for the frosted bottom bar */
+[data-theme='dark'] .ppm-bottombar { background: linear-gradient(180deg, rgba(20, 26, 36, .55), rgba(20, 26, 36, .85) 40%); border-top: 1px solid rgba(255, 255, 255, .06); }
+[data-theme='dark'] .ppm-bb-new { background: rgba(35, 42, 55, .7); }
+[data-theme='dark'] .ppm-pay-success { background: rgba(20, 26, 36, .7); }
