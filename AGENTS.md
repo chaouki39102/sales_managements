@@ -7,6 +7,27 @@
 ## Date
 2026-08-05
 
+### Phase 60 follow-up 2 — Static, Server-Independent Diagnostic Page (status.html) (Aug 5)
+
+**Request**: "make the health page static — it must NEVER show `ERR_CONNECTION_REFUSED` / 'Ce site est inaccessible' when the dev servers are stopped" (the user closed the two CMD windows running the servers → browser hit a dead port). Design constraint restated by the user: **servers are dev-only, not permanent**. When port 8000 (or both) is down, a diagnostic page must STILL render and must not depend on any server.
+
+**Solution — `status.html` at the project ROOT** (`D:\xampp\htdocs\sales-management\status.html`), fully self-contained (inline CSS+JS, no build step, no server, no Laravel):
+- Works from **`file://` by double-click** AND from **`http://localhost:8777`** (the helper now serves it at `GET /` — its former inline HTML control page was DELETED to avoid a duplicate; `server-helper/router.php` now has a 10-line `serve_landing()` that `readfile()`s `status.html`).
+- Talks to the helper via plain `fetch` (`http://127.0.0.1:8777/api/status` / `api/start` / `api/stop` / `api/restart`). The helper already sends `Access-Control-Allow-Origin: *` — verified in a real Chromium browser that a `file://` page CAN call it (CORS works from the `null` origin).
+- UI: RTL Arabic, dark theme matching the SPA; ✅/⚠️ banner with the `problem` detail; start/stop/restart/refresh buttons gated by `actions.can_*`; per-check cards with `fix` hints; a dedicated 🚨 **helper-down card** (shown when 8777 is unreachable) with 3 numbered recovery steps (run `start-server.bat`, or the `php -S 0.0.0.0:8777 server-helper\router.php` command, then click تحديث); a reconciliation warning when the helper says the server is up but `/api/v1/health` is unreachable; "فتح التطبيق" link to `http://127.0.0.1:8000`; 5s auto-poll.
+- Start button launches the app on 8000 via the helper's detached `start_server()` (the same non-blocking `popen('start … php artisan serve …')` — no inherited console handles, so it stays fully hidden).
+
+**Verification (Playwright Chromium, real browser)**:
+- `file://` open with helper UP → page renders (static), CORS fetch works, banner "الخادم يعمل — كل شيء جاهز · PID … · ok · 13.17.0", 8 check cards, start disabled, **zero console errors**.
+- `file://` open with helper KILLED → page still renders, shows the 🚨 helper-down card with `start-server.bat` + `8777` hints, banner shows "لا يمكن الوصول إلى المساعد (8777) — Failed to fetch" (only console noise is the expected `ERR_CONNECTION_REFUSED` from the failed fetch — harmless). Restart helper via the Startup VBS → `/api/ping` 200.
+
+**Key architectural rules**:
+- A diagnostic page that must survive "everything is off" can NEVER be served by the app or the helper alone — it must be a **standalone static file** loadable from `file://` (double-click) so the browser renders it with zero servers running. Serve it from the helper at `/` as a convenience; the `file://` path is the guarantee.
+- CORS from `file://` (origin `null`) works here because the helper sets `Access-Control-Allow-Origin: *`. Never switch it to a specific origin or the double-click path breaks.
+- The static page duplicates NO SPA logic and imports nothing from the build — its JS is the same tiny poll/act/render loop as the old inline page, so the helper remains a plain-PHP zero-dependency server.
+- The helper-down card is a first-class state, not an error path: when 8777 is unreachable NOTHING can start the app (the helper is the only process with `start_server`), so the page must tell the user exactly how to relaunch it (`start-server.bat`) instead of just failing silently.
+- Keep the helper and app servers hidden at all times (Startup VBS `sh.Run cmd, 0, False`); the user closes visible CMD windows. A `MainWindowHandle=0` check is the ground-truth that nothing is visibly running.
+
 ### Phase 59 — Connection Status Portal (شاشة حالة الاتصال) + Empty-Page Circular-Chunk Crash Fix (Aug 5)
 
 **Request (continuing)**: when opening the app, redirect to a connection-status page (done in a prior session: `/` → `/status`), and FIX the empty white page caused by `client-*.js:1 Uncaught TypeError: Cannot read properties of undefined (reading 'create')`.

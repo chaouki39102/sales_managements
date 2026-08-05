@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>تشخيص حالة الخادم — بيزنس بلاس</title>
+<style>
+  :root{
+    --navy:#1F3864; --navy2:#27436f; --em:#10b981; --em2:#0d9668;
+    --red:#ef4444; --orange:#f59e0b; --bg:#0f1524; --bg2:#182033; --bg3:#1e2942;
+    --t1:#f1f5f9; --t2:#cbd5e1; --t3:#94a3b8; --b:rgba(255,255,255,.09);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui,'Segoe UI',Tahoma,Arial,sans-serif}
+  body{background:var(--bg);color:var(--t1);min-height:100vh;padding:28px}
+  .wrap{max-width:860px;margin:0 auto}
+  header{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+  .logo{width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,var(--em),#0ea5e9);
+    display:flex;align-items:center;justify-content:center;font-weight:900;font-size:20px;color:#fff;
+    box-shadow:0 8px 24px rgba(16,185,129,.35)}
+  h1{font-size:19px}.sub{color:var(--t3);font-size:12px;margin-top:2px}
+  .banner{display:flex;align-items:center;gap:12px;border-radius:14px;padding:16px 18px;margin-bottom:14px}
+  .banner.ok{background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.35)}
+  .banner.bad{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4)}
+  .banner.pend{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35)}
+  .banner .ico{font-size:26px}
+  .banner .t{font-size:15px;font-weight:800}
+  .banner .d{font-size:12px;color:var(--t3);margin-top:2px;line-height:1.6}
+  .reconcil{display:flex;align-items:center;gap:12px;border-radius:14px;padding:14px 16px;margin-bottom:14px;
+    background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4)}
+  .reconcil .t{font-size:13px;font-weight:800;color:var(--orange)}
+  .reconcil .d{font-size:12px;color:var(--t3);margin-top:2px;line-height:1.6}
+  .btnrow{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;align-items:center}
+  button,.openapp{border:none;cursor:pointer;border-radius:10px;padding:12px 20px;font-size:14px;font-weight:800;
+    font-family:inherit;display:inline-flex;align-items:center;gap:8px;transition:.15s;text-decoration:none}
+  .b-start{background:var(--em);color:#04281d;box-shadow:0 8px 20px rgba(16,185,129,.3)}
+  .b-start:hover{background:var(--em2)}
+  .b-stop{background:var(--red);color:#fff}.b-stop:hover{filter:brightness(1.1)}
+  .b-restart{background:var(--navy2);color:#fff}.b-restart:hover{background:var(--navy)}
+  .openapp{background:linear-gradient(135deg,#0ea5e9,#2563eb);color:#fff;margin-right:auto}
+  .openapp:hover{filter:brightness(1.08)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-bottom:22px}
+  .card{background:var(--bg2);border:1px solid var(--b);border-radius:12px;padding:14px}
+  .card .hd{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .dot.on{background:var(--em);box-shadow:0 0 0 4px rgba(16,185,129,.18)}
+  .dot.off{background:var(--red);box-shadow:0 0 0 4px rgba(239,68,68,.18)}
+  .card .nm{font-size:13px;font-weight:700;color:var(--t2)}
+  .card .dt{font-size:12px;color:var(--t3);line-height:1.6;direction:ltr;text-align:right}
+  .card .fix{font-size:11px;color:var(--orange);margin-top:6px;line-height:1.5}
+  .helperdown{border-radius:14px;padding:18px;margin-bottom:22px;background:rgba(239,68,68,.1);
+    border:1px solid rgba(239,68,68,.4)}
+  .helperdown h3{font-size:14px;font-weight:800;margin-bottom:10px}
+  .helperdown ol{margin:0 18px 0 0;font-size:12.5px;color:var(--t2);line-height:2}
+  .helperdown code{background:var(--bg3);padding:2px 7px;border-radius:5px;direction:ltr;font-size:11px}
+  .foot{color:var(--t3);font-size:11px;text-align:center;line-height:1.8}
+  .foot code{background:var(--bg3);padding:2px 6px;border-radius:5px;direction:ltr}
+  .msg{font-size:12px;color:var(--t3);min-height:18px;margin-bottom:8px}
+  .spin{animation:sp 1s linear infinite;display:inline-block}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">ب</div>
+    <div>
+      <h1>تشخيص حالة الخادم</h1>
+      <div class="sub">صفحة ثابتة — تعمل بدون أي خادم (افتحها بالنقر المزدوج أو من <code>http://localhost:8777</code>)</div>
+    </div>
+  </header>
+
+  <div id="banner" class="banner pend"><span class="ico">⏳</span>
+    <div><div class="t">جارٍ الفحص…</div><div class="d">نفحص الخادم وقاعدة البيانات والإعدادات</div></div>
+  </div>
+
+  <div id="reconcil" class="reconcil hidden">
+    <span class="ico" style="font-size:22px">⚠️</span>
+    <div>
+      <div class="t">الخادم يعمل (حسب المساعد) لكن /health لا يستجيب من المتصفح</div>
+      <div class="d">قد تكون الصفحة محجوبة أو خدمة العمل غير محدّثة — حدّث الصفحة ثم أعد المحاولة.</div>
+    </div>
+  </div>
+
+  <div class="btnrow">
+    <button id="bStart" class="b-start" onclick="act('start')">▶ تشغيل السيرفر</button>
+    <button id="bStop"  class="b-stop"  onclick="act('stop')">⏹ إيقاف السيرفر</button>
+    <button id="bRestart" class="b-restart" onclick="act('restart')">🔄 إعادة تشغيل</button>
+    <button id="bRefresh" class="b-restart" onclick="refresh()">🔁 تحديث</button>
+    <a id="bOpenApp" class="openapp" href="http://127.0.0.1:8000" target="_blank">🚀 فتح التطبيق</a>
+  </div>
+  <div id="msg" class="msg"></div>
+
+  <div id="grid" class="grid"></div>
+
+  <div id="helperdown" class="helperdown hidden">
+    <h3>🚨 المساعد (8777) غير متاح — لا يمكن فحص الخادم أو تشغيله من هنا</h3>
+    <ol>
+      <li>شغّل كل شيء بنقرة واحدة: انقر نقراً مزدوجاً على <code>start-server.bat</code> في جذر المشروع.</li>
+      <li>أو شغّل المساعد يدوياً في نافذة أوامر:<br/><code>php -S 0.0.0.0:8777 server-helper\router.php</code></li>
+      <li>ثم أعِد فتح هذه الصفحة — ستعمل أزرار التشغيل فوراً.</li>
+    </ol>
+    <p style="font-size:12px;color:var(--t3)">هذه الصفحة نفسها تظهر دائماً حتى بدون أي خادم — إنها ملف ثابت <code>status.html</code>.</p>
+  </div>
+
+  <div class="foot">
+    هذه الصفحة مستقلة تماماً عن خادم التطبيق ولا تحتاج إلى أي خادم لفتحها.<br/>
+    تطبيقك: <code>http://localhost:8000</code> · صفحة الحالة: <code>http://localhost:8777</code> · الملف: <code>status.html</code>
+  </div>
+</div>
+
+<script>
+const HOST = location.hostname || '127.0.0.1';
+const HELPER = 'http://' + HOST + ':8777';
+const APP    = 'http://' + HOST + ':8000';
+const $ = s => document.querySelector(s);
+let busy = false;
+
+$('#bOpenApp').href = APP;
+
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+async function refresh(){
+  if (busy) return;
+  try{
+    const r = await fetch(HELPER + '/api/status', {cache:'no-store'});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    $('#helperdown').classList.add('hidden');
+    render(d);
+  }catch(e){
+    $('#helperdown').classList.remove('hidden');
+    $('#grid').innerHTML = '';
+    const b = $('#banner');
+    b.className = 'banner bad';
+    b.innerHTML = '<span class="ico">🚨</span><div><div class="t">لا يمكن الوصول إلى المساعد (8777)</div>' +
+      '<div class="d">' + esc(e.message) + ' — اتبع التعليمات أدناه لتشغيله، ثم اضغط «تحديث».</div></div>';
+    $('#bStart').disabled = true;
+    $('#bStop').disabled  = true;
+    $('#bRestart').disabled = true;
+  }
+}
+
+function render(d){
+  const up = d.server && d.server.up;
+  const health = (d.server && d.server.health) || null;
+  const b = $('#banner');
+  if (up){
+    b.className = 'banner ok';
+    b.innerHTML = '<span class="ico">✅</span><div><div class="t">الخادم يعمل — كل شيء جاهز</div>' +
+      '<div class="d">التطبيق متاح على المنفذ ' + esc(d.app.port) + (d.server.pid ? ' · PID ' + d.server.pid : '') +
+      (health ? ' · ' + esc(health.status) + ' · ' + esc(health.laravel_version || '') : '') + '</div></div>';
+  } else {
+    b.className = 'banner bad';
+    b.innerHTML = '<span class="ico">⚠️</span><div><div class="t">الخادم متوقف — اضغط «تشغيل السيرفر»</div>' +
+      '<div class="d">' + esc(d.problem ? d.problem.name + ': ' + d.problem.detail : '') + '</div></div>';
+  }
+  // المساعد يرى الخادم يعمل لكن لا توجد استجابة health
+  $('#reconcil').classList.toggle('hidden', !(up && !health));
+
+  $('#bStart').disabled = !!up;
+  $('#bStop').disabled  = !up;
+  $('#bRestart').disabled = !up;
+
+  const cards = (d.checks||[]).map(c =>
+    '<div class="card"><div class="hd"><span class="dot ' + (c.ok?'on':'off') + '"></span>' +
+    '<span class="nm">' + esc(c.name) + '</span></div>' +
+    '<div class="dt">' + esc(c.detail) + '</div>' +
+    (c.fix?'<div class="fix">الحل: ' + esc(c.fix) + '</div>':'') +
+    '</div>').join('');
+  $('#grid').innerHTML = cards;
+}
+
+async function act(a){
+  if (busy) return;
+  busy = true;
+  $('#msg').textContent = a==='start' ? 'جارٍ تشغيل السيرفر…' : a==='stop' ? 'جارٍ إيقاف السيرفر…' : 'جارٍ إعادة التشغيل…';
+  try{
+    const r = await fetch(HELPER + '/api/' + a, {method:'POST', cache:'no-store'});
+    const d = await r.json();
+    $('#msg').textContent = (d.message || 'تم') + (d.up !== undefined ? (d.up ? ' · الخادم يعمل ✓' : ' · الخادم متوقف') : '');
+    await new Promise(r2=>setTimeout(r2,800));
+    await refresh();
+  }catch(e){ $('#msg').textContent = 'خطأ: ' + e.message; }
+  busy = false;
+}
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>
