@@ -5,7 +5,27 @@
 - **When reading how API data is returned**, ALWAYS check `extractData()` in `resources/js/lib/api/core/client.ts` — it is the single standard bridge between backend and frontend. Never assume the raw HTTP response shape reaches consumers directly.
 
 ## Date
-2026-08-05
+2026-08-06
+
+### Phase 65 — POS Pro Mobile Phone Page: Full-Screen Order UI at /pos/pro/mobile + Fiscal-Year Cache Self-Heal (Aug 6)
+
+**Request**: turn the mobile mockup (`pos-pro-mobile-live.html`, معاينة الهاتف v5) into a real, working phone order page — a full-screen mobile POS that shares the desktop POS Pro's cart and payment/print pipeline. Followed the `POS_PRO_MOBILE_TODO.md` task checklist (15 tasks), committing + pushing after each completed task.
+
+**Blocker fixed first — fiscal-year writes frozen by a stale cache (`0dc1974`)**. `belongsToFiscalYear::loadClosedYears()` cached the closed-years list with a 24h TTL AND had a static-var early return, so once it resolved once it never re-read the DB within the process lifetime. When FY1 was open and the closure service had earlier marked it, the cached state claimed FY1 was closed → opening a POS session (which must belong to an open fiscal year) silently failed. Fix: cache::forget on the key + **5-minute TTL** (from 24h) + **dropped the static early-return**. Rule: any query whose result changes through normal app writes must not hold a static/process-lifetime snapshot; TTL caching is for read-heavy stable lookups only.
+
+**Architecture — one cart store, two screens**. `resources/js/pos-pro/POSProMobilePage.tsx` (new, ~1500 lines, committed `dc9afea`) is a **full-screen phone layout** (no DashboardLayout) at `/pos/pro/mobile`, registered as a standalone route under `RequireCompany` in `routes/index.tsx` (`2692e75`). It reuses the **same `usePosProCart` zustand store as desktop POS Pro** (shared persist key `pos-pro-cart`) — cart items, held carts, client, invoice discount, `documentId` (Phase 46 POST/PUT SSOT) are one state: add on desktop → present on mobile and vice-versa. The page also reuses `usePOSAggregatedLookups`, `useCurrentPosSession`/`useOpenSession`/`useIncrementSession`, `usePOSSettings` + `checkDiscountAllowed`, `useCashClient`, `ProfessionalPaymentModal` (shared component, desktop parity), `ProfessionalReceipt`, and the print pipeline.
+
+**UI** (CSS `resources/css/theme/pos-pro-mobile.css`, `.ppm-*` namespaced, imported in `app.css`): appbar (back → `/pos/pro`, live session number + open-session guard via `OpenSessionModal`, held-cart count badge), session strip, total card (TTC big + HT/TVA/fiscal-stamp/discount chips), cart list (image, name, unit/pack select, qty steppers, price, line discount popover with PIN gate, swipe-to-delete + undo snackbar), FAB + bottom bar (جديد/إمساك, صندوق, دفع), product sheet (search + family chips + 2-col grid + out-of-stock guards via `productToVariant`/`isVariantOutOfStock`), customer sheet (search + select + current-customer preview with real balance), discount sheet (%/amount presets + custom + PIN gate via `useConfirm`/`ConfirmDialog` with `{...confirmDialogProps}`), held sheet (list + resume), payment modal, success overlay, direct print.
+
+**Key architectural rules**:
+- The mobile page is a **shell over existing services, not a fork**: it must reuse the desktop cart store, payment modal, and print pipeline — the only new pieces are the layout/CSS, the sheets, and the wiring. Duplicating cart logic would create two sources of truth for money.
+- **Direct print** uses `printReceiptDirect({html, paperWidth, copies})` — the option type is `{html, paperWidth, copies?, printerName?, onDone?, onError?}`, there is NO `template`/`company`/`snapshot` field; build the HTML first via `renderPreviewToHtml` (+ `DocumentDataBuilder.fromPOSSnapshot` + `mapCompany`) and pass only the HTML. Thermal (WebUSB) goes through `printThermalViaWebUSBFromTemplate` which accepts the template + data snapshot directly.
+- **Cart lines carry no stock**: `CartItem` has no `current_stock` (that lives on lookups variants/products) — stock badges/out-of-stock guards belong in the product sheet only (`variantsWithStock`), never assumed on a cart row.
+- **Selected customer is a slim object**: lookups `customers` are `{id, name, code, nif, commercial_name, party_type_id}` — NO `phone`/`is_tva_exempt`. Cast to `Party` for display and read the real balance from `/party-balances/{id}` (the balance SSOT, Phase 42 rule).
+- A mobile POS must gate on the **open-session state** (`useCurrentPosSession`) exactly like desktop — the payment modal and prints require a live session number.
+- Direct URL routes for phone screens must be **standalone** (own `RequireCompany` + `Suspense`), not nested under `DashboardLayout` — the mockup is a phone viewport with no sidebar/topbar.
+
+**Verification** (Task 14, `48acfc2`): `npx tsc --noEmit` clean · `npm test` 222/222 · `npm run build` 0 errors, 212 precache entries · `public/sw.js` == `public/build/sw.js` (**SW MATCH** — refreshed root SW in the commit since `public/build/` is untracked while root `public/sw.js` is tracked) · mobile chunk `POSProMobilePage-*.js` 32 KB. Commits: `ce6328c` (Tasks 1–2 CSS + checklist), `0dc1974` (fiscal fix), `dc9afea` (Tasks 3–12 page), `2692e75` (route), `48acfc2` (verify + SW). All pushed to `origin/main`.
 
 ### Phase 64 — Portal Phone Layout: Top Nav De-dup + FAB Hidden in Customer Portal + Workbox Transient-500 Diagnosis (Aug 5)
 

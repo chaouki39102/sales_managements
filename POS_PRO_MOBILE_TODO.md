@@ -21,7 +21,7 @@
 - [x] **12. Payment + post-sale** — PUT/POST via cart-store `documentId`, receipt/print (`ProfessionalReceipt`), success overlay, cart reset.
 - [x] **13. Route** — register `/pos/pro/mobile` (standalone full-screen, `RequireCompany`) in `routes/index.tsx`.
 - [x] **14. Verification** — `npx tsc --noEmit`, `npm test`, `npm run build`, SW MATCH (`Get-FileHash public/sw.js` vs `public/build/sw.js`).
-- [ ] **15. Docs** — record Phase 65 in `AGENTS.md`.
+- [x] **15. Docs** — record Phase 65 in `AGENTS.md`.
 
 ## Progress
 
@@ -32,7 +32,7 @@
 | 3–12 | done | `POSProMobilePage.tsx` written as one file, `tsc` + tests green; committed+pushed |
 | 13 | done | standalone full-screen route (`/pos/pro/mobile`, `RequireCompany`, no DashboardLayout) committed+pushed |
 | 14 | done | `tsc` clean · 222/222 tests · build 0 errors (212 precache) · SW MATCH · mobile chunk 32 KB |
-| 15 | pending | docs → AGENTS.md Phase 65 |
+| 15 | done | AGENTS.md Phase 65 recorded |
 
 ## Commits
 
