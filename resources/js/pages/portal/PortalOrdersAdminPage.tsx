@@ -146,6 +146,16 @@ interface DraftLine {
   // unit_price_ht يُرسل كسعر وحدة والخادم يضرب في pack_qty).
   unit_price_ht: number;
   discount_percentage: number;
+  // خصم مبلغ ثابت من طبقة كميات (لكل وحدة قاعدة) — يُستخرج من السطر المخزّن
+  // حتى تبقى المعاينة صحيحة أثناء التحرير، ويحتفظ به الخادم عند الحفظ ما لم
+  // يعدّل المسؤول النسبة.
+  fixedDiscPerUnit: number;
+  // هل لمس المسؤول الحقل فعلياً؟ عند عدم اللمس لا يُرسل السعر/الخصم في الحفظ:
+  //  - عدم إرسال unit_price_ht يحفظ سعر السطر المخزّن حرفياً (يمنع انحراف
+  //    round(storedPack/12,4)×12 للسعر المعبّأ)
+  //  - عدم إرسال discount_percentage يحفظ خصم المبلغ الثابت المخزّن.
+  priceTouched: boolean;
+  discountTouched: boolean;
   // نسبة TVA المخزّنة على السطر (0 لزبون معفى جبائياً) + النسبة الاسمية للمنتج.
   tva_rate:      number;
   tva_rate_live: number;
@@ -274,6 +284,13 @@ export default function PortalOrdersAdminPage() {
       key: st, label: STATUS_META[st].label, icon: STATUS_META[st].icon,
       color: STATUS_META[st].color, count: s?.[st] ?? 0,
     }));
+    // legacy pending: طلبات قديمة غير مهاجَرة (تظهر فقط إن وُجدت)
+    if ((s?.pending ?? 0) > 0) {
+      base.push({
+        key: 'pending', label: STATUS_META.pending.label, icon: STATUS_META.pending.icon,
+        color: STATUS_META.pending.color, count: s?.pending ?? 0,
+      });
+    }
     return base;
   }, [summaryQuery.data]);
 
@@ -335,6 +352,15 @@ export default function PortalOrdersAdminPage() {
     if (!order) return;
     setDraft((order.lines ?? []).map((it: PortalAdminOrderItem) => {
       const packQty = it.pack_qty > 0 ? it.pack_qty : 1;
+      const storedPct = it.discount_percentage ?? 0;
+      const fixedTotal = it.total_discount_amount ?? 0;
+      // خط بخُصم مبلغ ثابت (نسبة 0% مع خصم إجمالي > 0): نستخرج خصم الوحدة
+      // الثابت (لكل وحدة قاعدة) لإعادة حساب المعاينة أثناء التحرير، وليُحمّله
+      // الخادم عند الحفظ ما لم يعدّل المسؤول النسبة (خصم% وثابت حصريان).
+      const fixedPerUnit =
+        storedPct <= 0 && fixedTotal > 0.004
+          ? fixedTotal / Math.max(1, it.quantity * packQty)
+          : 0;
       return {
         line_id:       it.line_id,
         product_id:    it.product_id,
@@ -347,7 +373,10 @@ export default function PortalOrdersAdminPage() {
         // القيمة المخزّنة unit_price_ht هي سعر التعبئة — نعرض ونحرّر سعر الوحدة
         // (المخزّن ÷ عامل التعبئة) كما يفرض عقد Phase 51.
         unit_price_ht: Math.round((it.unit_price_ht / packQty) * 10000) / 10000,
-        discount_percentage: it.discount_percentage ?? 0,
+        discount_percentage: storedPct,
+        fixedDiscPerUnit: fixedPerUnit,
+        priceTouched: false,
+        discountTouched: false,
         tva_rate:      it.tva_rate ?? 0,
         tva_rate_live: it.tva_rate_live ?? it.tva_rate ?? 0,
       };
@@ -368,6 +397,10 @@ export default function PortalOrdersAdminPage() {
       pack_qty:     pack?.quantity ?? 1,
       unit_price_ht: p.default_selling_price_ht ?? 0,
       discount_percentage: 0,
+      fixedDiscPerUnit: 0,
+      // سطر جديد: يُرسل السعر والخصم دائماً (لا قيمة مخزّنة نحافظ عليها).
+      priceTouched: true,
+      discountTouched: true,
       // زبون معفى → الخادم يُخزّن 0 (TaxRuleService) — نعكس ذلك في المعاينة.
       tva_rate:      order?.party?.is_tva_exempt ? 0 : (p.tva?.rate ?? 0),
       tva_rate_live: p.tva?.rate ?? 0,
@@ -384,12 +417,19 @@ export default function PortalOrdersAdminPage() {
         const base = l.line_id !== null
           ? { line_id: l.line_id, quantity: Math.max(0, l.quantity) }
           : { product_id: l.product_id, quantity: Math.max(1, l.quantity) };
-        // نُرسل سعر الوحدة والخصم فقط عند التعديل الفعلي حتى لا نمس أسعار الخادم
-        // في المرة الأولى (الواجهة تحمل القيم المخزّنة مطابقة، فلن يتغير شيء).
+        // نُرسل سعر الوحدة والخصم فقط عند التعديل الفعلي (أو لسطر جديد):
+        //  - عدم إرسال unit_price_ht يحافظ على سعر السطر المخزّن حرفياً
+        //    (يمنع انحراف round(storedPack/12,4)×12 للسعر المعبّأ)
+        //  - عدم إرسال discount_percentage يحافظ على خصم المبلغ الثابت
+        //    (discount_amount_per_unit) المخزّن من طبقة الكميات.
         return {
           ...base,
-          unit_price_ht: Math.round((l.unit_price_ht ?? 0) * 10000) / 10000,
-          discount_percentage: l.discount_percentage ?? 0,
+          ...(l.priceTouched
+            ? { unit_price_ht: Math.round((l.unit_price_ht ?? 0) * 10000) / 10000 }
+            : {}),
+          ...(l.discountTouched
+            ? { discount_percentage: l.discount_percentage ?? 0 }
+            : {}),
         };
       });
     if (payload.length === 0) {
@@ -410,15 +450,23 @@ export default function PortalOrdersAdminPage() {
   };
 
   // إجماليات حيّة أثناء التحرير (تعكس تعديلات الكمية/السعر/الخصم) — نفس صيغة
-  // CommercialDocumentService (قاعدة × سعر وحدة × خصم % ثم TVA على HT).
+  // CommercialDocumentLineObserver: خصم مبلغ ثابت (لكل وحدة قاعدة × كمية القاعدة)
+  // أو نسبة مئوية، ثم TVA على HT.
   const draftTotals = useMemo(() => {
     let ht = 0, tva = 0, disc = 0;
     for (const l of draft) {
       const qty = Math.max(0, l.quantity);
       const baseQty = qty * (l.pack_qty > 0 ? l.pack_qty : 1);
       const gross = baseQty * (l.unit_price_ht ?? 0);
-      const d = Math.min(100, Math.max(0, l.discount_percentage ?? 0));
-      const discAmt = gross * (d / 100);
+      // المسار الفعّال: خصم مبلغ ثابت (لم يلمس المسؤول النسبة) → لكل وحدة قاعدة؛
+      // وإلا نسبة مئوية. يطابق المسار الذي يطبقه الخادم عند الحفظ.
+      let discAmt: number;
+      if (!l.discountTouched && l.fixedDiscPerUnit > 0) {
+        discAmt = l.fixedDiscPerUnit * baseQty;
+      } else {
+        const d = Math.min(100, Math.max(0, l.discount_percentage ?? 0));
+        discAmt = gross * (d / 100);
+      }
       const lineHt = gross - discAmt;
       ht += lineHt;
       disc += discAmt;
@@ -942,8 +990,18 @@ export default function PortalOrdersAdminPage() {
                       const baseQty = Math.max(0, l.quantity) * (l.pack_qty > 0 ? l.pack_qty : 1);
                       const gross = baseQty * (l.unit_price_ht ?? 0);
                       const dPct = Math.min(100, Math.max(0, l.discount_percentage ?? 0));
-                      const lineHt = gross * (1 - dPct / 100);
+                      // نفس المسار الذي يطبقه الخادم: خصم مبلغ ثابت ما لم يلمس
+                      // المسؤول النسبة، وإلا نسبة مئوية.
+                      const isFixed = !l.discountTouched && l.fixedDiscPerUnit > 0;
+                      const discAmt = isFixed
+                        ? l.fixedDiscPerUnit * baseQty
+                        : gross * (dPct / 100);
+                      const lineHt = gross - discAmt;
                       const lineTtc = lineHt * (1 + (l.tva_rate ?? 0) / 100);
+                      // نسبة مئوية فعّالة للعرض في حقل الخصم (خط ثابت غير ملموس).
+                      const effectivePct = isFixed
+                        ? Math.min(100, (l.fixedDiscPerUnit / Math.max(0.0001, l.unit_price_ht ?? 0)) * 100)
+                        : dPct;
                       const setField = (patch: Partial<DraftLine>) =>
                         setDraft((d) => d.map((x, xi) => (xi === i ? { ...x, ...patch } : x)));
                       return (
@@ -977,7 +1035,10 @@ export default function PortalOrdersAdminPage() {
                               value={l.unit_price_ht ?? 0}
                               onChange={(e) => {
                                 const v = Number(e.target.value);
-                                setField({ unit_price_ht: Number.isFinite(v) && v >= 0 ? v : 0 });
+                                setField({
+                                  unit_price_ht: Number.isFinite(v) && v >= 0 ? v : 0,
+                                  priceTouched: true,
+                                });
                               }}
                               className="poa-alloc poa-price"
                             />
@@ -988,13 +1049,24 @@ export default function PortalOrdersAdminPage() {
                               min={0}
                               max={100}
                               step="any"
-                              value={l.discount_percentage ?? 0}
+                              value={isFixed ? effectivePct : l.discount_percentage ?? 0}
                               onChange={(e) => {
                                 const v = Number(e.target.value);
-                                setField({ discount_percentage: Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : 0 });
+                                setField({
+                                  discount_percentage: Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : 0,
+                                  discountTouched: true,
+                                });
                               }}
                               className="poa-alloc poa-disc"
                             />
+                            {isFixed && (
+                              <div
+                                className="poa-fixed-disc"
+                                title={`خصم مبلغ ثابت من طبقة الكميات (${fmt(l.fixedDiscPerUnit * baseQty)} دج) — كتابة نسبة تحوّله إلى خصم %`}
+                              >
+                                <i className="ti ti-lock" /> ثابت {fmt(l.fixedDiscPerUnit * baseQty)} دج
+                              </div>
+                            )}
                           </td>
                           <td className="poa-tac">
                             <span className="poa-bold">

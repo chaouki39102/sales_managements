@@ -544,3 +544,41 @@ it('admin convert guards: invalid target 422 and cancelled/returned orders 409',
     test()->postJson($adminUrl3.'/convert', ['target' => 'FV'])
         ->assertStatus(409);
 });
+
+it('allowed_next is audience-scoped, notes-only update keeps lines, legacy pending rejected as target', function () {
+    $url = '/api/v1/'.TEST_COMPANY_SLUG.'/portal/orders';
+    $created = test()->withToken(test()->token)->postJson(
+        $url,
+        ['items' => [['product_id' => test()->productA, 'quantity' => 2]], 'notes' => 'ملاحظة أولى']
+    )->assertStatus(201)->json('data');
+
+    // 1) الزبون يرى خطواته فقط: قيد الاعداد → [مؤكد، ملغى] (نفس الإدارة هنا)
+    expect($created['allowed_next'])->toBe(['confirmed', 'cancelled']);
+
+    // 2) تحديث ملاحظات فقط (بدون items) — الأسطر تبقى كما هي
+    $updated = test()->withToken(test()->token)->patchJson($url.'/'.$created['id'], [
+        'notes' => 'تم تغيير الملاحظة فقط',
+    ])->assertOk()->json('data');
+    expect($updated['notes'])->toBe('تم تغيير الملاحظة فقط')
+        ->and(count($updated['lines']))->toBe(1)
+        ->and((float) $updated['lines'][0]['quantity'])->toBe(2.0);
+
+    // المسؤول يؤكد الطلب
+    actingAsAuthenticatedTenantUser();
+    $adminUrl = '/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$created['id'];
+    test()->patchJson($adminUrl, ['status' => 'confirmed'])
+        ->assertOk()
+        ->assertJsonPath('data.allowed_next', ['processed']);
+
+    // 3) الزبون لا يرى انتقالات الإدارة بعد التأكيد (لا processed على الإطلاق)
+    portalOrderAuthGet($url.'/'.$created['id'])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'confirmed')
+        ->assertJsonPath('data.allowed_next', []);
+
+    // 4) الإدارة لا يمكنها استهداف الحالة القديمة pending كهدف
+    // (portalOrderAuthGet أعاد البيرير توكن الزبون — نعود لجلسة الإدارة)
+    actingAsAuthenticatedTenantUser();
+    test()->patchJson($adminUrl, ['status' => 'pending'])
+        ->assertStatus(422);
+});

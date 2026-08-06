@@ -226,21 +226,34 @@ class PortalOrderService
                 $hasDiscount = array_key_exists('discount_percentage', $entry) && $entry['discount_percentage'] !== null;
 
                 // المسؤول يملك سعر التعديل الكامل: عند غياب unit_price_ht نحافظ
-                // على سعر السطر المخزّن. نسبة TVA تبقى كما خُزِّنت (قد تكون 0
-                // لزبون معفى جبائياً — لا نعيد اشتقاقها من المنتج الحيّ).
+                // على سعر السطر المخزّن حرفياً. نسبة TVA تبقى كما خُزِّنت (قد
+                // تكون 0 لزبون معفى جبائياً — لا نعيد اشتقاقها من المنتج الحيّ).
+                // ملاحظة الدقة: لا نقرّب سعر الوحدة إلى 4 هنا عند غياب التعديل،
+                // لأن createDocumentLines سيعيد الضرب في pack_qty بـ
+                // round(perUnit × packQty, 4) = السعر المخزّن نفسه تماماً.
+                // تقريب سعر الوحدة أولاً (round(storedPack/pack,4) × pack) قد
+                // ينحرف عن القيمة المخزّنة للكميات غير القابلة للقسمة.
                 $perUnit = $hasPrice
                     ? (float) $entry['unit_price_ht']
-                    : round((float) $line->unit_price_ht / $packQty, 4);
+                    : (float) $line->unit_price_ht / $packQty;
+
+                // خصم المبلغ الثابت (من طبقة كميات) يُحمَّل عند غياب تعديل
+                // المسؤول حتى لا يُمحى بإعادة البناء على منتج لا يدير طبقات
+                // (خصم% وخصم مبلغ ثابت حصريان — تعديل % يلغي الثابت).
+                $storedFixedDisc = (float) ($line->discount_amount_per_unit ?? 0) > 0
+                    ? (float) $line->discount_amount_per_unit
+                    : null;
 
                 $rebuiltEntry = [
-                    'product_id'          => (int) $line->product_id,
-                    'quantity'            => $qty,
-                    'unit_price_ht'       => round($perUnit, 4),
-                    'tva_rate'            => (float) $line->tva_rate,
-                    'discount_percentage' => $hasDiscount
+                    'product_id'             => (int) $line->product_id,
+                    'quantity'               => $qty,
+                    'unit_price_ht'          => $hasPrice ? round($perUnit, 4) : $perUnit,
+                    'tva_rate'               => (float) $line->tva_rate,
+                    'discount_percentage'    => $hasDiscount
                         ? (float) $entry['discount_percentage']
                         : (float) ($line->discount_percentage ?? 0),
-                    'description'         => $line->description ?? $line->product?->name,
+                    'discount_amount_per_unit' => $hasDiscount ? null : $storedFixedDisc,
+                    'description'            => $line->description ?? $line->product?->name,
                 ];
                 if ($line->packaging_id) {
                     $rebuiltEntry['packaging_id'] = (int) $line->packaging_id;
@@ -598,7 +611,7 @@ class PortalOrderService
     // تمثيل JSON (توحيد شكل الرد)
     // ═══════════════════════════════════════════════════════════════════
 
-    public function toArray(PortalOrder $order): array
+    public function toArray(PortalOrder $order, string $viewer = PortalOrder::CHANGED_BY_ADMIN): array
     {
         $order->loadMissing(['party', 'document.documentType', 'document.lines.product.tva', 'document.lines.product.unit', 'histories']);
 
@@ -609,7 +622,9 @@ class PortalOrderService
             'reference'        => $order->reference,
             'status'           => $order->status,
             'status_label'     => $order->status_label,
-            'allowed_next'     => $this->allowedNextByStatus($order->status),
+            // السماحيات حسب الجمهور: الزبون يرى فقط تأكيد/إلغاء (وقيد الاعداد)
+            // ولا يرى أبداً انتقالات الإدارة (مثل delivered → returned).
+            'allowed_next'     => $this->allowedNextByStatus($order->status, $viewer),
             'is_converted'     => $order->is_converted,
             'sale_document_id' => $order->sale_document_id ? (int) $order->sale_document_id : null,
             'notes'            => $order->notes,

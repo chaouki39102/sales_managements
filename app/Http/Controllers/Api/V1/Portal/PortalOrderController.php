@@ -192,7 +192,7 @@ class PortalOrderController extends BaseApiController
             );
 
             $payload = [
-                'data' => collect($rows->items())->map(fn(PortalOrder $o) => $this->orders->toArray($o))->all(),
+                'data' => collect($rows->items())->map(fn(PortalOrder $o) => $this->orders->toArray($o, PortalOrder::CHANGED_BY_CUSTOMER))->all(),
                 'meta' => [
                     'current_page' => $rows->currentPage(),
                     'last_page'    => $rows->lastPage(),
@@ -219,7 +219,7 @@ class PortalOrderController extends BaseApiController
                 'notes' => $validated['notes'] ?? null,
             ], $partyId);
 
-            return $this->successResponse($this->orders->toArray($order), 'تم إرسال طلب السلعة بنجاح', 201);
+            return $this->successResponse($this->orders->toArray($order, PortalOrder::CHANGED_BY_CUSTOMER), 'تم إرسال طلب السلعة بنجاح', 201);
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal_orders.store');
         }
@@ -231,14 +231,17 @@ class PortalOrderController extends BaseApiController
             $portal    = $request->input('_portal_user');
             $partyId   = (int) ($portal->party_id ?? 0);
             $order     = $this->findOwnOrder($partyId);
-            $validated = $this->validatePayload($request);
+            $validated = $this->validatePayload($request, false);
 
-            $order = $this->orders->update($order, [
-                'lines' => $validated['items'],
-                'notes' => $validated['notes'] ?? null,
-            ]);
+            // notes-only: لا توجد items → لا تُمس الأسطر (التحديث مخصص للملاحظات)
+            $payload = ['notes' => $validated['notes'] ?? null];
+            if (array_key_exists('items', $validated)) {
+                $payload['lines'] = $validated['items'];
+            }
 
-            return $this->successResponse($this->orders->toArray($order), 'تم تعديل طلب السلعة بنجاح');
+            $order = $this->orders->update($order, $payload);
+
+            return $this->successResponse($this->orders->toArray($order, PortalOrder::CHANGED_BY_CUSTOMER), 'تم تعديل طلب السلعة بنجاح');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal_orders.update');
         }
@@ -259,7 +262,7 @@ class PortalOrderController extends BaseApiController
                 'إلغاء الطلب من الزبون',
             );
 
-            return $this->successResponse($this->orders->toArray($order), 'تم إلغاء الطلب');
+            return $this->successResponse($this->orders->toArray($order, PortalOrder::CHANGED_BY_CUSTOMER), 'تم إلغاء الطلب');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal_orders.cancel');
         }
@@ -282,7 +285,7 @@ class PortalOrderController extends BaseApiController
                 'تأكيد الطلب من الزبون',
             );
 
-            return $this->successResponse($this->orders->toArray($order), 'تم تأكيد الطلب بنجاح');
+            return $this->successResponse($this->orders->toArray($order, PortalOrder::CHANGED_BY_CUSTOMER), 'تم تأكيد الطلب بنجاح');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal_orders.validate');
         }
@@ -294,7 +297,7 @@ class PortalOrderController extends BaseApiController
             $partyId = (int) ($request->input('_portal_user')->party_id ?? 0);
             $order   = $this->findOwnOrder($partyId);
 
-            return $this->successResponse($this->orders->toArray($order), 'تم جلب تفاصيل الطلب بنجاح');
+            return $this->successResponse($this->orders->toArray($order, PortalOrder::CHANGED_BY_CUSTOMER), 'تم جلب تفاصيل الطلب بنجاح');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal_orders.show');
         }
@@ -315,19 +318,20 @@ class PortalOrderController extends BaseApiController
         return $order;
     }
 
-    protected function validatePayload(Request $request): array
+    protected function validatePayload(Request $request, bool $requireItems = true): array
     {
         $validated = $request->validate([
-            'items'                => ['required', 'array', 'min:1'],
-            'items.*.product_id'   => ['required', 'integer'],
+            // items اختياري فقط في مسار التعديل (تحديث ملاحظات بدون لمس الأسطر)
+            'items'                => $requireItems ? ['required', 'array', 'min:1'] : ['sometimes', 'array', 'min:1'],
+            'items.*.product_id'   => ['required_with:items', 'integer'],
             'items.*.packaging_id' => ['nullable', 'integer'],
-            'items.*.quantity'     => ['required', 'numeric', 'min:0.01'],
+            'items.*.quantity'     => ['required_with:items', 'numeric', 'min:0.01'],
             'notes'                => ['nullable', 'string', 'max:1000'],
         ]);
 
         // تجميع السطور المكررة للمنتج (نفس التعبئة) في سطر واحد
         $grouped = [];
-        foreach ($validated['items'] as $entry) {
+        foreach (($validated['items'] ?? []) as $entry) {
             $key = (int) $entry['product_id'] . ':' . (int) ($entry['packaging_id'] ?? 0);
             $grouped[$key] = [
                 'product_id'   => (int) $entry['product_id'],
@@ -338,10 +342,14 @@ class PortalOrderController extends BaseApiController
             ];
         }
 
-        return [
-            'items' => array_values($grouped),
-            'notes' => $validated['notes'] ?? null,
-        ];
+        // المفتاح items حاضر فقط إن أرسله الزبون فعلاً (store: إلزامي،
+        // update: غيابه = تحديث ملاحظات فقط بلا لمس الأسطر)
+        $result = ['notes' => $validated['notes'] ?? null];
+        if (array_key_exists('items', $validated)) {
+            $result['items'] = array_values($grouped);
+        }
+
+        return $result;
     }
 
     protected function getService(): mixed
