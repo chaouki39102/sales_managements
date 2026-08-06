@@ -9,6 +9,7 @@ use App\Models\FiscalYear;
 use App\Models\PortalOrder;
 use App\Models\PortalOrderStatusHistory;
 use App\Models\DocumentType;
+use App\Models\Party;
 use App\Models\Setting;
 use App\Models\Warehouse;
 use App\Services\CommercialDocumentService;
@@ -113,6 +114,11 @@ class PortalOrderService
             $order = PortalOrder::create([
                 'company_id'             => $companyId,
                 'party_id'               => $partyId,
+                // حقول الزبون العام (الطلب العام بدون حساب): تُربط بحقول الطلب
+                // نفسه — يبقى party_id على زبون الصندوق المشترك (Client Cash).
+                'customer_name'          => $data['customer_name'] ?? null,
+                'customer_phone'         => $data['customer_phone'] ?? null,
+                'customer_address'       => $data['customer_address'] ?? null,
                 'commercial_document_id' => $doc->id,
                 'reference'              => $doc->document_number,
                 'status'                 => PortalOrder::STATUS_PREPARING,
@@ -415,7 +421,39 @@ class PortalOrderService
             });
         }
 
-        $query->orderByDesc('id');
+        // ── الفرز من الخادم (sort_by/sort_dir) — أعمدة القائمة الأساسية.
+        // عمودا «الزبون» (اسم الـ Party) و«المنتجات» (عدّاد أسطر المستند) ليسا
+        // أعمدة مباشرة على portal_orders: يُفرز كل منهما بحقل فرعي (subquery)
+        // بدل join حتى تبقى العلاقات المسبقة التحميل سليمة ولا يحدث تصادم أعمدة.
+        $sortableColumns = ['reference', 'requested_at', 'status', 'total_ht', 'total_tva', 'total_ttc', 'created_at'];
+        $sortBy  = trim((string) request()->input('sort_by', ''));
+        $sortDir = strtolower(trim((string) request()->input('sort_dir', 'asc'))) === 'asc' ? 'asc' : 'desc';
+
+        if ($sortBy === 'party') {
+            // الزبون الفعلي: اسم حساب البوابة (party.name) أو اسم الزائر
+            // (customer_name) للطلبات العامة — فرز موحد بالتعرف COALESCE.
+            $query->orderBy(
+                DB::raw(
+                    "COALESCE((SELECT p.name FROM parties p WHERE p.id = portal_orders.party_id), portal_orders.customer_name)"
+                ),
+                $sortDir,
+            );
+            $query->orderByDesc('id');
+        } elseif ($sortBy === 'items_count') {
+            $query->orderBy(
+                DB::table('commercial_document_lines')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('commercial_document_lines.commercial_document_id', 'portal_orders.commercial_document_id'),
+                $sortDir,
+            );
+            $query->orderByDesc('id');
+        } elseif (in_array($sortBy, $sortableColumns, true)) {
+            $query->orderBy($sortBy, $sortDir);
+            // استقرار ترقيم الصفحات: تعادل القيم يُحسم بالمعرّف تنازلياً دائماً.
+            $query->orderByDesc('id');
+        } else {
+            $query->orderByDesc('id');
+        }
 
         return $query->paginate(min(max($perPage, 1), 100));
     }
@@ -628,6 +666,9 @@ class PortalOrderService
             'is_converted'     => $order->is_converted,
             'sale_document_id' => $order->sale_document_id ? (int) $order->sale_document_id : null,
             'notes'            => $order->notes,
+            'customer_name'    => $order->customer_name,
+            'customer_phone'   => $order->customer_phone,
+            'customer_address' => $order->customer_address,
             'total_ht'         => (float) $order->total_ht,
             'total_tva'        => (float) $order->total_tva,
             'total_ttc'        => (float) $order->total_ttc,
@@ -764,6 +805,47 @@ class PortalOrderService
         if ($order->status !== PortalOrder::STATUS_PREPARING) {
             throw new BusinessRuleException('لا يمكن تعديل الطلب إلا وهو قيد الاعداد.', 409);
         }
+    }
+
+    /**
+     * معرف زبون الصندوق الافتراضي (Client Cash) لمؤسسة ما — يُنشأ عند الحاجة.
+     *
+     * الطلبات العامة (بدون حساب بوابة) لا تعرف زبوناً حقيقياً: تُربط بزبون
+     * الصندوق وتبقى بيانات الزبون الحقيقية في customer_name/phone/address
+     * على الطلب نفسه. هذا مرآة دقيقة لـ CommercialDocumentService::resolveCashPartyId
+     * لضمان نفس السلوك في كل مكان (البيع المباشر + الطلب العام).
+     */
+    public function resolveCashPartyId(int $companyId): int
+    {
+        $party = Party::where('company_id', $companyId)
+            ->where('slug', 'client-cash')
+            ->first();
+
+        if ($party) {
+            return $party->id;
+        }
+
+        $clientTypeId = DB::table('party_types')
+            ->where('company_id', $companyId)
+            ->where('name', 'client')
+            ->value('id')
+            ?? DB::table('party_types')
+                ->where('company_id', $companyId)
+                ->value('id');
+
+        $party = Party::create([
+            'company_id'        => $companyId,
+            'party_type_id'     => $clientTypeId,
+            'code'              => 'CC000',
+            'name'              => 'Client Cash',
+            'slug'              => 'client-cash',
+            'is_tva_exempt'     => true,
+            'is_taxable'        => false,
+            'is_final_consumer' => true,
+            'active'            => true,
+        ]);
+
+        return $party->id;
     }
 
     /**

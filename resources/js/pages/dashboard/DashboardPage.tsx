@@ -11,6 +11,7 @@ import ProgressBar  from '@/components/ui/ProgressBar';
 import SimpleTable  from '@/components/ui/SimpleTable';
 import { usePortalOrders, usePortalOrdersSummary, PORTAL_ORDER_STATUSES, type PortalAdminOrder } from '@/lib/api/endpoints/portalOrders';
 import OrderPipeline from '@/pages/portal/OrderPipeline';
+import { useActiveCompany } from '@/lib/store/appStore';
 
 // ── Types ─────────────────────────────────────
 interface Invoice {
@@ -125,6 +126,20 @@ const DONUT_LEGEND = [
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [chartMode, setChartMode] = useState<'weekly' | 'monthly'>('weekly');
+  const company = useActiveCompany();
+  const slug = company?.slug ?? '';
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const copyPublicOrderLink = () => {
+    const url = `${window.location.origin}/portal/${slug}/order`;
+    const done = () => { setLinkCopied(true); window.setTimeout(() => setLinkCopied(false), 2000); };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(done).catch(done);
+    } else {
+      window.prompt('رابط صفحة الطلب العام:', url);
+      done();
+    }
+  };
 
   // ── Portal orders (live) ─────────────────────
   const recentOrders = usePortalOrders({ page: 1, per_page: 5 });
@@ -253,9 +268,16 @@ export default function DashboardPage() {
             <i className="ti ti-stack-2" style={{ marginLeft: 5, color: 'var(--gold)' }} />
             خط أنابيب طلبات البوابة
           </div>
-          <Button size="xs" onClick={() => navigate('/portal-orders')}>
-            إدارة الطلبات
-          </Button>
+          <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
+            {slug && (
+              <Button size="xs" variant="outline" icon={<i className="ti ti-link" />} onClick={copyPublicOrderLink}>
+                {linkCopied ? 'تم نسخ الرابط ✓' : 'رابط الطلب العام'}
+              </Button>
+            )}
+            <Button size="xs" onClick={() => navigate('/portal-orders')}>
+              إدارة الطلبات
+            </Button>
+          </div>
         </div>
         <OrderPipeline
           status="preparing"

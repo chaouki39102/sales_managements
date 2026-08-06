@@ -210,6 +210,8 @@ export default function PortalOrdersAdminPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [sortBy, setSortBy] = useState('');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [detailId, setDetailId] = useState<number | null>(null);
   const [convertResult, setConvertResult] = useState<PortalOrderConvertResult['sale'] | null>(null);
 
@@ -235,7 +237,11 @@ export default function PortalOrdersAdminPage() {
 
   const perPage = 15;
 
-  const { data, isLoading } = usePortalOrders({ page, per_page: perPage, status, search: debouncedSearch, from_date: fromDate || undefined, to_date: toDate || undefined });
+  const { data, isLoading } = usePortalOrders({
+    page, per_page: perPage, status, search: debouncedSearch,
+    from_date: fromDate || undefined, to_date: toDate || undefined,
+    sort_by: sortBy || undefined, sort_dir: sortBy ? sortDir : undefined,
+  });
   const summaryQuery = usePortalOrdersSummary();
   const detail = usePortalOrderDetail(detailId);
   const updateStatus = usePortalOrderStatusUpdate();
@@ -302,6 +308,13 @@ export default function PortalOrdersAdminPage() {
     setDebouncedSearch('');
     setFromDate('');
     setToDate('');
+    setPage(1);
+  };
+
+  // ── فرز الخادم (عبر رؤوس الجدول القابلة للنقر) ───────────────────────────
+  const handleSort = (key: string, dir: 'asc' | 'desc') => {
+    setSortBy(key);
+    setSortDir(dir);
     setPage(1);
   };
 
@@ -715,6 +728,10 @@ export default function PortalOrdersAdminPage() {
             )}
           </div>
           <div className="poa-bar-side">
+            <span className="poa-sort-hint">
+              <i className="ti ti-arrows-sort" />
+              انقر على رأس العمود للترتيب
+            </span>
             <span className="poa-hint">
               <i className="ti ti-clipboard-list" />
               {meta?.total ?? 0} طلب · يعرض {from}–{to}
@@ -728,44 +745,60 @@ export default function PortalOrdersAdminPage() {
 
         {/* ── الجدول ───────────────────────────────────────────────────── */}
         <SimpleTable
+          className="poa-table"
           isLoading={isLoading}
           emptyText="لا توجد طلبات مطابقة"
           rowKey="id"
           onRowClick={(row) => openDetail(row as PortalAdminOrder)}
+          rowClassName={(row) => (!!(row as PortalAdminOrder).customer_name ? 'poa-tr-guest' : '')}
+          sortBy={sortBy}
+          sortDir={sortDir}
+          onSort={handleSort}
           columns={[
             {
-              key: 'reference', label: 'المرجع', align: 'center',
+              key: 'reference', label: 'المرجع', align: 'center', sortable: true,
               render: (v) => <b className="poa-mono">{v as string}</b>,
             },
             {
-              key: 'requested_at', label: 'التاريخ', align: 'center',
+              key: 'requested_at', label: 'التاريخ', align: 'center', sortable: true,
               render: (v) => <span className="poa-cell-date">{fmtDate(v as string)}</span>,
             },
             {
               key: 'party', label: 'الزبون',
               render: (_v, row) => {
-                const p = (row as PortalAdminOrder).party;
+                const o = row as PortalAdminOrder;
+                const p = o.party;
+                const guest = !!o.customer_name;
+                const name = guest ? o.customer_name : (p?.name ?? '—');
+                const sub = guest
+                  ? (o.customer_phone || 'بدون هاتف')
+                  : (p?.code ?? '');
                 return (
-                  <div className="poa-cust">
-                    <span className="poa-avatar">{initialsOf(p?.name)}</span>
+                  <div className={`poa-cust ${guest ? 'poa-cust--guest' : ''}`}>
+                    <span className="poa-avatar">{initialsOf(name)}</span>
                     <span className="poa-cust-meta">
-                      <span className="poa-cust-name">{p?.name ?? '—'}</span>
-                      <span className="poa-cust-sub">{p?.code ?? ''}</span>
+                      <span className="poa-cust-name">{name}</span>
+                      <span className="poa-cust-sub">{sub}</span>
                     </span>
+                    {guest && (
+                      <span className="poa-guest-chip" title="طلب عام — زائر غير مسجّل في البوابة">
+                        <i className="ti ti-user-off" /> زائر
+                      </span>
+                    )}
                   </div>
                 );
               },
             },
             {
-              key: 'items_count', label: 'المنتجات', align: 'center',
+              key: 'items_count', label: 'المنتجات', align: 'center', sortable: true,
               render: (v) => <span className="poa-cell-num">{v as number}</span>,
             },
             {
-              key: 'total_ttc', label: 'المجموع TTC', align: 'end',
+              key: 'total_ttc', label: 'المجموع TTC', align: 'end', sortable: true,
               render: (v) => <b>{fmt(Number(v))} <span className="poa-ttc-unit">دج</span></b>,
             },
             {
-              key: 'status', label: 'الحالة', align: 'center',
+              key: 'status', label: 'الحالة', align: 'center', sortable: true,
               render: (_v, row) => {
                 const st = (row as PortalAdminOrder).status;
                 return <Badge variant={stMeta(st).badge} noDot>{stMeta(st).label}</Badge>;
@@ -817,9 +850,10 @@ export default function PortalOrdersAdminPage() {
         title="تفاصيل طلب"
         subtitle={order?.reference}
         size="lg"
+        className="poa-modal"
         footerLeft={!editing && canEdit && (
           <Button variant="outline" size="sm" icon={<i className="ti ti-edit" />} onClick={startEditing}>
-            تحرير المنتجات
+            تحرير الطلب
           </Button>
         )}
         footer={
@@ -870,9 +904,11 @@ export default function PortalOrdersAdminPage() {
             {/* ── الزبون ─────────────────────────────────────────────── */}
             <div className="poa-sec">
               <div className="poa-cust-card">
-                <span className="poa-avatar">{initialsOf(order.party?.name)}</span>
+                <span className="poa-avatar">{initialsOf(order.customer_name || order.party?.name)}</span>
                 <span className="poa-cust-card-info">
-                  <span className="poa-cust-card-name">{order.party?.name ?? '—'}</span>
+                  <span className="poa-cust-card-name">
+                    {order.customer_name || order.party?.name || '—'}
+                  </span>
                   <span className="poa-cust-card-sub">
                     أمر زبون {order.document?.document_number ?? ''} · أُرسل في {fmtDate(order.requested_at)}
                   </span>
@@ -881,17 +917,54 @@ export default function PortalOrdersAdminPage() {
                   {order.status_label}
                 </Badge>
               </div>
-              <div className="poa-chip-row">
-                {order.party?.code && (
-                  <span className="poa-chip"><i className="ti ti-barcode" /> {order.party.code}</span>
-                )}
-                {order.party?.phone && (
-                  <span className="poa-chip"><i className="ti ti-phone" /> {order.party.phone}</span>
-                )}
-                {order.document?.document_date && (
-                  <span className="poa-chip"><i className="ti ti-calendar" /> بتاريخ {order.document.document_date}</span>
-                )}
-              </div>
+
+              {!!order.customer_name && (
+                <div className="poa-guest-banner">
+                  <i className="ti ti-user-off" />
+                  <div>
+                    <b>زائر — غير مسجّل في البوابة</b>
+                    <span>أرسل الطلب بدون حساب وبدون تسجيل دخول — لا يظهر في لائحة زبائنك ولا يملك كشف حساب.</span>
+                  </div>
+                </div>
+              )}
+
+              {!!order.customer_name ? (
+                <div className="poa-cust-details">
+                  <div className="poa-cust-detail">
+                    <i className="ti ti-user" />
+                    <div>
+                      <span>الاسم الكامل</span>
+                      <b>{order.customer_name}</b>
+                    </div>
+                  </div>
+                  <div className="poa-cust-detail">
+                    <i className="ti ti-phone" />
+                    <div>
+                      <span>رقم الهاتف</span>
+                      <b>{order.customer_phone || 'غير متوفر'}</b>
+                    </div>
+                  </div>
+                  <div className="poa-cust-detail">
+                    <i className="ti ti-map-pin" />
+                    <div>
+                      <span>العنوان</span>
+                      <b>{order.customer_address || 'غير متوفر'}</b>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="poa-chip-row">
+                  {order.party?.code && (
+                    <span className="poa-chip"><i className="ti ti-barcode" /> {order.party.code}</span>
+                  )}
+                  {order.party?.phone && (
+                    <span className="poa-chip"><i className="ti ti-phone" /> {order.party.phone}</span>
+                  )}
+                  {order.document?.document_date && (
+                    <span className="poa-chip"><i className="ti ti-calendar" /> بتاريخ {order.document.document_date}</span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* ── المسار ──────────────────────────────────────────────── */}
@@ -970,6 +1043,7 @@ export default function PortalOrdersAdminPage() {
                   </span>
                 </div>
 
+                <div className="poa-edit-wrap">
                 <table className="poa-edit-tbl">
                   <thead>
                     <tr>
@@ -1109,6 +1183,7 @@ export default function PortalOrdersAdminPage() {
                     )}
                   </tbody>
                 </table>
+                </div>
 
                 {/* إضافة منتج */}
                 <div className="poa-addbox">
@@ -1252,6 +1327,7 @@ export default function PortalOrdersAdminPage() {
         title="معالجة الطلب"
         subtitle={order?.reference ? `توزيع الكميات على المخزون — ${order.reference}` : undefined}
         size="lg"
+        className="poa-modal"
         footer={
           <>
             <Button variant="secondary" onClick={() => setWizardOpen(false)} disabled={linesMut.isPending}>
@@ -1363,6 +1439,7 @@ export default function PortalOrdersAdminPage() {
         title="تحويل الطلب إلى فاتورة"
         subtitle={order?.reference ? `إنشاء مستند البيع — ${order.reference}` : undefined}
         size="sm"
+        className="poa-modal"
         footer={
           <>
             <Button variant="secondary" onClick={() => setConvertOpen(false)} disabled={convert.isPending}>

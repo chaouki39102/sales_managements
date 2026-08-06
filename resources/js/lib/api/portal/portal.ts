@@ -260,6 +260,9 @@ export interface PortalOrder {
   status:       PortalOrderStatus;
   status_label: string;
   notes:        string | null;
+  customer_name:    string | null;
+  customer_phone:   string | null;
+  customer_address: string | null;
   total_ht:     number;
   total_tva:    number;
   total_ttc:    number;
@@ -346,6 +349,20 @@ export const portalApi = {
     portalGet<PortalOrder>(`/portal/orders/${id}`),
   createOrder: (items: PortalOrderLineInput[], notes?: string) =>
     portalPost<PortalOrder>('/portal/orders', { items, notes: notes || undefined }),
+  // إنشاء طلب عام (بدون حساب بوابة): يرسل بيانات الزبون الأساسية — يربطه
+  // الخادم بزبون الصندوق (Client Cash) ويخزّن customer_* على الطلب نفسه.
+  createPublicOrder: (items: PortalOrderLineInput[], customer: {
+    customer_name: string;
+    customer_phone: string;
+    customer_address?: string | null;
+  }, notes?: string) =>
+    portalPost<PortalOrder>('/portal/orders', {
+      items,
+      notes: notes || undefined,
+      customer_name:    customer.customer_name,
+      customer_phone:   customer.customer_phone,
+      customer_address: customer.customer_address ?? null,
+    }),
   updateOrder: (id: number, items: PortalOrderLineInput[], notes?: string) =>
     portalPut<PortalOrder>(`/portal/orders/${id}`, { items, notes: notes || undefined }),
   validateOrder: (id: number) =>
