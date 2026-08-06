@@ -23,6 +23,7 @@
 .ppm-screen input  { font-family: inherit; }
 
 .ppm-mono { font-family: ui-monospace, 'Cascadia Mono', 'Consolas', 'Segoe UI Mono', monospace; direction: ltr; }
+.ppm-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--em); flex-shrink: 0; }
 
 /* ─── Swatches (product thumbnails) ─────────────────────────────────────── */
 .ppm-sw {
@@ -73,6 +74,12 @@
   border-radius: 999px; background: var(--gold); color: #fff; font-size: 9px; font-weight: 800;
   display: flex; align-items: center; justify-content: center;
 }
+.ppm-appbar-title {
+  flex: 1; min-width: 0; text-align: center;
+  display: flex; flex-direction: column; align-items: center; line-height: 1.2;
+}
+.ppm-appbar-title strong { font-size: 13px; font-weight: 800; color: var(--t1); }
+.ppm-appbar-title span { font-size: 9.5px; font-weight: 700; color: var(--t4); font-family: ui-monospace, 'Consolas', monospace; letter-spacing: .3px; }
 
 .ppm-session-strip {
   display: flex; align-items: center; gap: 6px; padding: 0 18px 8px; flex-shrink: 0;
@@ -117,7 +124,7 @@
 .ppm-swipe-row { position: relative; border-radius: var(--r2); overflow: hidden; margin-bottom: 9px; }
 .ppm-swipe-bg { position: absolute; inset: 0; background: var(--red); display: flex; align-items: center; padding-inline-start: 22px; justify-content: flex-start; }
 .ppm-swipe-bg .ti { color: #fff; font-size: 18px; }
-.ppm-line { position: relative; background: var(--bg2); box-shadow: var(--shadow); border-radius: var(--r2); padding: 12px 14px; display: flex; align-items: center; gap: 12px; transition: transform .2s, background .3s; touch-action: pan-y; }
+.ppm-line { position: relative; background: var(--bg2); box-shadow: var(--shadow); border-radius: var(--r2); padding: 12px 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; transition: transform .2s, background .3s; touch-action: pan-y; }
 .ppm-line.ppm-just-added { animation: ppmJustAdded .9s ease-out; }
 @keyframes ppmJustAdded { 0% { background: var(--emb); } 100% { background: var(--bg2); } }
 .ppm-line-photo { width: 48px; height: 48px; border-radius: var(--r2); overflow: hidden; flex-shrink: 0; }
@@ -130,6 +137,32 @@
 .ppm-qty button:active { color: var(--em); }
 .ppm-qty .ppm-val { width: 22px; text-align: center; font-size: 12.5px; font-weight: 800; color: var(--t1); font-family: ui-monospace, 'Consolas', monospace; }
 .ppm-line-total { flex-shrink: 0; min-width: 64px; text-align: left; font-family: ui-monospace, 'Consolas', monospace; font-weight: 800; font-size: 14px; color: var(--t1); direction: ltr; }
+.ppm-line-body { display: flex; align-items: center; gap: 12px; flex: 1 1 100%; min-width: 0; }
+.ppm-line-price { display: block; margin-top: 2px; font-size: 10.5px; font-weight: 700; color: var(--t3); }
+.ppm-line-ctrls { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.ppm-line-disc {
+  position: relative; width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  background: var(--bg3); color: var(--t3);
+  display: flex; align-items: center; justify-content: center;
+}
+.ppm-line-disc:active { color: var(--em); }
+.ppm-line-disc .ppm-dot { position: absolute; top: 3px; left: 3px; width: 6px; height: 6px; background: var(--red); box-shadow: 0 0 0 2px var(--redbo); }
+.ppm-line-discpop {
+  margin-top: 2px; padding: 12px; border-radius: var(--r2); background: var(--bg3);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.ppm-line-discpop-row { display: flex; gap: 8px; }
+.ppm-line-discpop-row input {
+  flex: 1; min-width: 0; border: 1px solid var(--b2); border-radius: var(--r1);
+  background: var(--bg2); color: var(--t1); padding: 9px 12px; font-size: 13px;
+  font-family: ui-monospace, 'Consolas', monospace; direction: ltr; text-align: center;
+}
+.ppm-line-discpop-row input:focus { outline: 2px solid var(--embo); }
+.ppm-line-discpop-row button {
+  padding: 0 18px; border-radius: var(--r1); background: var(--grad-em); color: #fff;
+  font-size: 12px; font-weight: 800;
+}
+.ppm-line-discpop .danger { color: var(--red); font-size: 11.5px; font-weight: 700; padding: 2px; align-self: flex-start; }
 .ppm-swipe-hint { text-align: center; font-size: 10px; color: var(--t4); padding: 2px 0 10px; }
 
 /* ─── Bottom bar ────────────────────────────────────────────────────────── */
@@ -197,8 +230,19 @@
 
 /* ─── Customer sheet (view) ─────────────────────────────────────────────── */
 .ppm-csheet-body { padding: 8px 24px 26px; text-align: center; overflow-y: auto; scrollbar-width: thin; }
-.ppm-c-avatar { width: 90px; height: 90px; border-radius: 50%; margin: 6px auto 12px; font-size: 28px; box-shadow: 0 0 0 4px var(--bg2), 0 0 0 7px var(--embo); }
-.ppm-c-avatar.debtor { box-shadow: 0 0 0 4px var(--bg2), 0 0 0 7px var(--redbo); }
+.ppm-c-avatar {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  margin: 6px auto 12px;
+}
+.ppm-c-avatar-ic {
+  width: 74px; height: 74px; border-radius: 50%; margin-bottom: 4px;
+  background: var(--emb); color: var(--em);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 0 4px var(--bg2), 0 0 0 7px var(--embo);
+}
+.ppm-c-avatar-ic .ti { font-size: 34px; }
+.ppm-c-avatar.debtor .ppm-c-avatar-ic { background: var(--redb); color: var(--red); box-shadow: 0 0 0 4px var(--bg2), 0 0 0 7px var(--redbo); }
+.ppm-c-info { display: flex; flex-direction: column; align-items: center; }
 .ppm-c-name { font-size: 16px; font-weight: 800; color: var(--t1); }
 .ppm-c-phone { font-size: 11.5px; color: var(--t4); margin-top: 2px; font-family: ui-monospace, 'Consolas', monospace; direction: ltr; }
 .ppm-c-balance { margin: 16px 0 12px; padding: 14px; border-radius: var(--r3); background: var(--bg2); box-shadow: var(--shadow); }
@@ -240,6 +284,26 @@
 .ppm-disc-custom input { flex: 1; border: none; outline: none; background: transparent; font-size: 16px; font-weight: 800; color: var(--t1); font-family: ui-monospace, 'Consolas', monospace; direction: ltr; }
 .ppm-disc-apply { width: 100%; padding: 14px; border-radius: var(--r2); background: var(--grad-em); color: #fff; font-size: 13.5px; font-weight: 800; box-shadow: 0 10px 24px rgba(10, 138, 92, .35); }
 
+/* ─── PIN modal (manager-gated discounts) ────────────────────────────────── */
+.ppm-pin-card {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(86vw, 320px); padding: 22px; border-radius: var(--r3);
+  background: var(--bg2); box-shadow: var(--shadow3); text-align: center;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.ppm-pin-card h3 { font-size: 15px; font-weight: 800; color: var(--t1); }
+.ppm-pin-card p { font-size: 12px; color: var(--t4); line-height: 1.6; }
+.ppm-pin-card input {
+  width: 100%; padding: 12px; border: 1px solid var(--b2); border-radius: var(--r2);
+  background: var(--bg3); color: var(--t1); font-size: 20px; text-align: center;
+  letter-spacing: 8px; font-family: ui-monospace, 'Consolas', monospace; direction: ltr;
+}
+.ppm-pin-card input:focus { outline: 2px solid var(--embo); }
+.ppm-pin-card button {
+  padding: 12px; border-radius: var(--r2); background: var(--grad-em); color: #fff;
+  font-size: 13px; font-weight: 800;
+}
+
 /* ─── Held sales sheet ──────────────────────────────────────────────────── */
 .ppm-held-body { padding: 0 18px 22px; overflow-y: auto; scrollbar-width: thin; }
 .ppm-held-empty { text-align: center; padding: 30px 10px; color: var(--t4); font-size: 12.5px; }
@@ -263,6 +327,8 @@
 .ppm-pay-success.show .ppm-ps-title { opacity: 1; transform: translateY(0); }
 .ppm-ps-amt { font-family: ui-monospace, 'Consolas', monospace; font-size: 26px; font-weight: 800; color: var(--em); direction: ltr; opacity: 0; transition: opacity .3s ease .32s; }
 .ppm-pay-success.show .ppm-ps-amt { opacity: 1; }
+.ppm-ps-ref { font-size: 11px; font-weight: 700; color: var(--t3); opacity: 0; transform: translateY(4px); transition: opacity .3s ease .4s, transform .3s ease .4s; font-family: ui-monospace, 'Consolas', monospace; }
+.ppm-pay-success.show .ppm-ps-ref { opacity: 1; transform: translateY(0); }
 .ppm-ps-circle.fail { background: linear-gradient(160deg, #e0645a, #c23b3b); box-shadow: 0 20px 50px rgba(212, 43, 43, .35); }
 .ppm-ps-title.fail { color: var(--red); }
 
