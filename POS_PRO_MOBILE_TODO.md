@@ -1,5 +1,7 @@
 # POS Pro Mobile — Task Checklist
 
+> **Status: ✅ COMPLETE (Aug 6)** — all 15 tasks done, verified, committed, and pushed to `origin/main`.
+
 > **Goal**: Integrate `pos-pro-mobile-live.html` (mockup v5) as a real mobile order page at
 > `/pos/pro/mobile` in `resources/js/pos-pro/POSProMobilePage.tsx` — full-screen phone layout
 > (bottom bar, FAB, sheets) reusing `usePosProCart`, `ProfessionalPaymentModal`, and the
@@ -36,5 +38,14 @@
 
 ## Commits
 
-Each completed task is committed + pushed individually (`git add` only the files belonging to
-that task; the unrelated dirty portal/service files in the worktree are left untouched).
+Each completed task was committed + pushed individually to `origin/main` (`git add` only the
+files belonging to that task; unrelated dirty portal/service files were left untouched):
+
+| Commit | Contents |
+|--------|----------|
+| `ce6328c` | Tasks 1–2 — mobile CSS (`pos-pro-mobile.css` + `app.css` import) + checklist |
+| `0dc1974` | Blocker — fiscal-year closed-years cache self-heal (stale 24h/static lock → clear + 5min TTL) |
+| `dc9afea` | Tasks 3–12 — `POSProMobilePage.tsx` full phone order page |
+| `2692e75` | Task 13 — standalone full-screen route `/pos/pro/mobile` (`RequireCompany`) |
+| `48acfc2` | Task 14 — verify (`tsc`/tests/build/SW MATCH) + refresh root `public/sw.js` precache |
+| `c5cf9f7` | Task 15 — AGENTS.md Phase 65 + checklist completion |
