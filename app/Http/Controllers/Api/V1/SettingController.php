@@ -182,6 +182,10 @@ class SettingController extends BaseApiController
             // inventory (expansion)
             'allow_negative_stock_on_sale', 'auto_create_lot_on_purchase',
 
+            // portal — بوابة الزبائن (اطلب سلعة)
+            'portal_enabled', 'portal_allow_guest_orders',
+            'portal_allow_registered_orders', 'portal_min_order_amount',
+
             // general
             'app_name', 'app_logo', 'app_color', 'theme_mode', 'language',
             'timezone', 'date_format', 'time_format',

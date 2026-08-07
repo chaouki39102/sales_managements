@@ -76,6 +76,13 @@ class PortalOrderController extends BaseApiController
     public function catalog(Request $request): JsonResponse
     {
         try {
+            // البوابة الرئيسية: عند تعطيل طلبات السلعة يُرفض عرض الكتالوج أيضاً.
+            $this->assertOrdersEnabled();
+
+            // الزائر (بدون توكن) يحتاج إذن الزوار للاطلاع على الكتالوج.
+            if (!$request->bearerToken()) {
+                $this->assertGuestOrdersAllowed();
+            }
             // نقطة بيع واحدة للجميع: المستخدم المعتمد (Bearer portal token) يحصل
             // على كتالوجه بحالته الجبائية ومستوى سعره الشخصي، والزائر بدون توكن
             // يحصل على كتالوج المؤسسة الافتراضي. `optionalPortalUser` يحل الزبون
@@ -106,7 +113,15 @@ class PortalOrderController extends BaseApiController
     public function store(Request $request): JsonResponse
     {
         try {
-            $portal    = $this->optionalPortalUser($request);
+            $portal = $this->optionalPortalUser($request);
+
+            // البوابات: معطل كلياً → ممنوع؛ زائر → يتطلب إذن الزوار؛ معتمد →
+            // يتطلب إذن أصحاب الحسابات.
+            $this->assertOrdersEnabled();
+            $portal
+                ? $this->assertRegisteredOrdersAllowed()
+                : $this->assertGuestOrdersAllowed();
+
             $validated = $this->validatePayload($request);
 
             $payload = [
@@ -151,6 +166,10 @@ class PortalOrderController extends BaseApiController
     public function track(Request $request): JsonResponse
     {
         try {
+            // التتبع ميزة الزوار — يتطلب تفعيل البوابة وإذن الزوار.
+            $this->assertOrdersEnabled();
+            $this->assertGuestOrdersAllowed();
+
             $validated = $request->validate([
                 'phone'     => ['required', 'string', 'max:40'],
                 'reference' => ['nullable', 'string', 'max:255'],
@@ -304,6 +323,9 @@ class PortalOrderController extends BaseApiController
     public function index(Request $request): JsonResponse
     {
         try {
+            $this->assertOrdersEnabled();
+            $this->assertRegisteredOrdersAllowed();
+
             $partyId = (int) ($request->input('_portal_user')->party_id ?? 0);
             $rows    = $this->orders->paginate(
                 $partyId,
@@ -330,6 +352,9 @@ class PortalOrderController extends BaseApiController
     public function update(Request $request, $id): JsonResponse
     {
         try {
+            $this->assertOrdersEnabled();
+            $this->assertRegisteredOrdersAllowed();
+
             $portal    = $request->input('_portal_user');
             $partyId   = (int) ($portal->party_id ?? 0);
             $order     = $this->findOwnOrder($partyId);
@@ -352,6 +377,9 @@ class PortalOrderController extends BaseApiController
     public function cancel(Request $request): JsonResponse
     {
         try {
+            $this->assertOrdersEnabled();
+            $this->assertRegisteredOrdersAllowed();
+
             $portal  = $request->input('_portal_user');
             $partyId = (int) ($portal->party_id ?? 0);
             $order   = $this->findOwnOrder($partyId);
@@ -373,6 +401,9 @@ class PortalOrderController extends BaseApiController
     public function validateOrder(Request $request): JsonResponse
     {
         try {
+            $this->assertOrdersEnabled();
+            $this->assertRegisteredOrdersAllowed();
+
             $portal  = $request->input('_portal_user');
             $partyId = (int) ($portal->party_id ?? 0);
             $order   = $this->findOwnOrder($partyId);
@@ -396,6 +427,9 @@ class PortalOrderController extends BaseApiController
     public function showOrder(Request $request): JsonResponse
     {
         try {
+            $this->assertOrdersEnabled();
+            $this->assertRegisteredOrdersAllowed();
+
             $partyId = (int) ($request->input('_portal_user')->party_id ?? 0);
             $order   = $this->findOwnOrder($partyId);
 
@@ -406,6 +440,50 @@ class PortalOrderController extends BaseApiController
     }
 
     // ───────────────────────────── helpers ─────────────────────────────
+
+    /**
+     * قراءة إعداد من إعدادات بوابة الزبائن (company أو global) — نفس
+     * البوابة التي تستعملها SettingsSeeder/SettingService.
+     */
+    private function portalSetting(string $key, mixed $default = null): mixed
+    {
+        $companyId = app(CompanyContextService::class)->get();
+
+        return Setting::getSetting($key, $default, $companyId);
+    }
+
+    /**
+     * بوابة الإعداد الرئيسي portal_enabled — عند تعطيلها تُرفض كل مسارات
+     * طلبات السلعة (الكتالوج + الطلبات) برسالة واضحة (409).
+     */
+    private function assertOrdersEnabled(): void
+    {
+        if (!$this->portalSetting('portal_enabled', true)) {
+            throw new \App\Core\Exceptions\BusinessRuleException('بوابة طلبات السلع معطلة حالياً من طرف الإدارة.', 409);
+        }
+    }
+
+    /**
+     * بوابة الزوار — عند تعطيل إرسال الطلبات من الزوار (بدون حساب) يُسمح
+     * فقط لأصحاب حسابات البوابة.
+     */
+    private function assertGuestOrdersAllowed(): void
+    {
+        if (!$this->portalSetting('portal_allow_guest_orders', true)) {
+            throw new \App\Core\Exceptions\BusinessRuleException('إرسال الطلبات متاح للزبائن المسجلين فقط — سجّل دخولك إلى البوابة أولاً.', 409);
+        }
+    }
+
+    /**
+     * بوابة أصحاب الحسابات — عند تعطيل طلبات المسجلين لا يمكن إنشاء أو
+     * تعديل أو تأكيد أي طلب من الزبون (الإدارة تبقى قادرة على إدارة الطلبات).
+     */
+    private function assertRegisteredOrdersAllowed(): void
+    {
+        if (!$this->portalSetting('portal_allow_registered_orders', true)) {
+            throw new \App\Core\Exceptions\BusinessRuleException('إرسال الطلبات من الزبائن المسجلين معطل حالياً من طرف الإدارة.', 409);
+        }
+    }
 
     protected function findOwnOrder(int $partyId): PortalOrder
     {

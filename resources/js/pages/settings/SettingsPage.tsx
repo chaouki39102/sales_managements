@@ -75,6 +75,7 @@ const TABS = [
     { id: "fiscal", label: "المالية والضرائب", icon: "ti-calculator" },
     { id: "inventory", label: "المخزون", icon: "ti-box" },
     { id: "alerts", label: "الإشعارات", icon: "ti-bell" },
+    { id: "portal", label: "بوابة الزبائن", icon: "ti-world" },
     { id: "documents", label: "المستندات", icon: "ti-file-text" },
     { id: "conversions", label: "خريطة التحويل", icon: "ti-transfer" },
     { id: "users", label: "المستخدمون", icon: "ti-users" },
@@ -1202,6 +1203,12 @@ export default function SettingsPage() {
                     <AlertsTab
                         onDirty={() => markTabDirty("alerts")}
                         onClean={() => markTabClean("alerts")}
+                    />
+                )}
+                {tab === "portal" && (
+                    <PortalTab
+                        onDirty={() => markTabDirty("portal")}
+                        onClean={() => markTabClean("portal")}
                     />
                 )}
                 {tab === "documents" && (
@@ -4511,6 +4518,163 @@ function AlertsTab({
                         }}
                     />
                 </div>
+            </div>
+        </div>
+    );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ⑤bis PortalTab — إعدادات بوابة الزبائن (اطلب سلعة)
+// ════════════════════════════════════════════════════════════════════════════
+function PortalTab({
+    onDirty,
+    onClean,
+}: {
+    onDirty?: () => void;
+    onClean?: () => void;
+}) {
+    const qc = useQueryClient();
+    const slug = useActiveSlug() ?? "";
+    const { isDirty, markDirty, markClean } = useDirtyState();
+
+    const { data: rawSettings = [] } = useSettingsByGroup("portal");
+    const gs = makeGs(rawSettings);
+    const { mutateAsync: saveSettings, isPending: saving } =
+        useUpdateSettings();
+
+    const [portalEnabled, setPortalEnabled] = useState(true);
+    const [allowGuest, setAllowGuest] = useState(true);
+    const [allowRegistered, setAllowRegistered] = useState(true);
+    const [minOrderAmount, setMinOrderAmount] = useState("0");
+
+    useEffect(() => {
+        if (!rawSettings.length) return;
+        setPortalEnabled(gs<boolean>("portal_enabled", true));
+        setAllowGuest(gs<boolean>("portal_allow_guest_orders", true));
+        setAllowRegistered(gs<boolean>("portal_allow_registered_orders", true));
+        setMinOrderAmount(str(gs("portal_min_order_amount", 0)));
+    }, [rawSettings]);
+
+    const doSave = async () => {
+        const payload: Record<string, unknown> = {
+            portal_enabled: portalEnabled,
+            portal_allow_guest_orders: allowGuest,
+            portal_allow_registered_orders: allowRegistered,
+            portal_min_order_amount: Number(minOrderAmount) || 0,
+        };
+        await saveSettings(payload);
+        qc.invalidateQueries({
+            queryKey: [...tenantKeys.settings.current(slug), "portal"],
+        });
+        markClean();
+        onClean?.();
+    };
+
+    const tr = (
+        label: string,
+        hint: string | undefined,
+        checked: boolean,
+        setter: (v: boolean) => void,
+    ) => (
+        <ToggleRow
+            label={label}
+            hint={hint}
+            checked={checked}
+            onChange={(v) => {
+                setter(v);
+                markDirty();
+                onDirty?.();
+            }}
+        />
+    );
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <Card>
+                <SecHead
+                    icon="ti-world"
+                    label="بوابة الزبائن (اطلب سلعة)"
+                    color="var(--em)"
+                    sub="تحكم في كتالوج «اطلب سلعة» وإرسال الطلبات من بوابة الزبائن"
+                />
+                <div
+                    style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                >
+                    {tr(
+                        "تفعيل بوابة الزبائن",
+                        "إيقاف البوابة يمنع عرض الكتالوج وإرسال الطلبات من الزبائن",
+                        portalEnabled,
+                        setPortalEnabled,
+                    )}
+                    {portalEnabled && (
+                        <>
+                            {tr(
+                                "السماح للزوار بإرسال الطلبات",
+                                "الزائر بدون حساب يرسل اسمه وهاتفه مباشرة",
+                                allowGuest,
+                                setAllowGuest,
+                            )}
+                            {tr(
+                                "السماح لأصحاب الحسابات بإرسال الطلبات",
+                                "زبون لديه حساب بوابة معتمد",
+                                allowRegistered,
+                                setAllowRegistered,
+                            )}
+                        </>
+                    )}
+                </div>
+            </Card>
+
+            {portalEnabled && (
+                <Card>
+                    <SecHead
+                        icon="ti-adjustments-horizontal"
+                        label="شروط الطلب"
+                        color="var(--blue)"
+                    />
+                    <div
+                        style={{ display: "flex", alignItems: "center", gap: 10 }}
+                    >
+                        <span style={{ fontSize: 13, color: "var(--t2)" }}>
+                            الحد الأدنى لقيمة الطلب (دج) — 0 يعني بدون حد
+                        </span>
+                        <input
+                            type="number"
+                            value={minOrderAmount}
+                            onChange={(e) => {
+                                setMinOrderAmount(e.target.value);
+                                markDirty();
+                                onDirty?.();
+                            }}
+                            style={{
+                                width: 110,
+                                fontFamily: "monospace",
+                                textAlign: "center",
+                            }}
+                            min={0}
+                            step={100}
+                        />
+                    </div>
+                </Card>
+            )}
+
+            <div
+                style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                }}
+            >
+                <SettingsLastModified group="portal" />
+                <SaveButton
+                    onClick={doSave}
+                    loading={saving}
+                    isDirty={isDirty}
+                    onClean={() => {
+                        markClean();
+                        onClean?.();
+                    }}
+                />
             </div>
         </div>
     );

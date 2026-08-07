@@ -42,7 +42,7 @@ class SettingService extends BaseService
         $companyId = $this->getCurrentCompanyId();
 
         // مسح cache groups المعروفة
-        foreach (['invoice', 'fiscal', 'inventory', 'alerts', 'general', 'company'] as $group) {
+        foreach (['invoice', 'fiscal', 'inventory', 'alerts', 'documents', 'general', 'company', 'portal'] as $group) {
             Cache::forget("settings:{$companyId}:{$group}");
         }
 
@@ -355,6 +355,7 @@ class SettingService extends BaseService
             'default_val' => 'inventory',
             'low_stock_d' => 'inventory',
             'auto_adj'    => 'inventory',
+            'portal_'  => 'portal',
             'alert_'   => 'alerts',
             'notif_'   => 'alerts',
             'email_not' => 'alerts',

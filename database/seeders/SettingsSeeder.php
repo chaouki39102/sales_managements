@@ -433,6 +433,46 @@ class SettingsSeeder extends Seeder
             ],
 
             // ══════════════════════════════════════════
+            // group: portal — بوابة الزبائن (اطلب سلعة)
+            // ══════════════════════════════════════════
+            'portal_enabled' => [
+                'value'         => true,
+                'group'         => 'portal',
+                'type'          => 'boolean',
+                'description'   => 'تفعيل بوابة الزبائن (كتالوج «اطلب سلعة» وإرسال الطلبات)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 100,
+            ],
+            'portal_allow_guest_orders' => [
+                'value'         => true,
+                'group'         => 'portal',
+                'type'          => 'boolean',
+                'description'   => 'السماح للزوار (بدون حساب بوابة) بالاطلاع على الكتالوج وإرسال الطلبات',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 101,
+            ],
+            'portal_allow_registered_orders' => [
+                'value'         => true,
+                'group'         => 'portal',
+                'type'          => 'boolean',
+                'description'   => 'السماح للزبائن أصحاب حسابات البوابة بإرسال الطلبات',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 102,
+            ],
+            'portal_min_order_amount' => [
+                'value'         => 0,
+                'group'         => 'portal',
+                'type'          => 'float',
+                'description'   => 'الحد الأدنى لمبلغ الطلب (دج) — 0 يعني بدون حد',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 103,
+            ],
+
+            // ══════════════════════════════════════════
             // group: documents — إعدادات المستندات الافتراضية
             // ══════════════════════════════════════════
             'default_warehouse_id' => [

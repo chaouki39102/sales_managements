@@ -97,20 +97,33 @@ class PortalOrderService
             throw new BusinessRuleException('الطلب فارغ — أضف منتجاً واحداً على الأقل.', 422);
         }
 
-        $doc = $this->documents->create([
-            'document_type_id' => $type->id,
-            'party_id'         => $partyId,
-            'warehouse_id'     => $this->resolveWarehouseId($companyId),
-            'fiscal_year_id'   => $this->currentFiscalYearId($companyId),
-            'document_date'    => $data['document_date'] ?? now()->toDateString(),
-            'due_date'         => $data['due_date'] ?? null,
-            'notes'            => $data['notes'] ?? null,
-            'internal_notes'   => 'طلب بوابة زبائن',
-            'user_id'          => $this->resolveSystemUserId($companyId),
-            'lines'            => $lines,
-        ]);
+        // معاملة واحدة خارجية: أي throw بعد إنشاء المستند (مثل تجاوز الحد
+        // الأدنى) يتراجع عن المستند بالكامل عبر savepoints المتداخلة.
+        return DB::transaction(function () use ($type, $lines, $partyId, $companyId, $data) {
+            $doc = $this->documents->create([
+                'document_type_id' => $type->id,
+                'party_id'         => $partyId,
+                'warehouse_id'     => $this->resolveWarehouseId($companyId),
+                'fiscal_year_id'   => $this->currentFiscalYearId($companyId),
+                'document_date'    => $data['document_date'] ?? now()->toDateString(),
+                'due_date'         => $data['due_date'] ?? null,
+                'notes'            => $data['notes'] ?? null,
+                'internal_notes'   => 'طلب بوابة زبائن',
+                'user_id'          => $this->resolveSystemUserId($companyId),
+                'lines'            => $lines,
+            ]);
 
-        $order = DB::transaction(function () use ($doc, $partyId, $companyId, $data) {
+            // الحد الأدنى لمبلغ الطلب (إعداد portal_min_order_amount) —
+            // يُطبق على الإجمالي الفعلي المحسوب من الخادم (total_ttc).
+            $minAmount = (float) \App\Models\Setting::getSetting('portal_min_order_amount', 0, $companyId);
+            if ($minAmount > 0 && (float) $doc->total_ttc < $minAmount) {
+                throw new BusinessRuleException(
+                    'الحد الأدنى لقيمة الطلب هو ' . number_format($minAmount, 2, '.', '')
+                    . ' دج — قيمة طلبك الحالية ' . number_format((float) $doc->total_ttc, 2, '.', '') . ' دج.',
+                    422
+                );
+            }
+
             $order = PortalOrder::create([
                 'company_id'             => $companyId,
                 'party_id'               => $partyId,
@@ -132,9 +145,7 @@ class PortalOrderService
             $this->recordHistory($order, PortalOrder::STATUS_PREPARING, PortalOrder::CHANGED_BY_CUSTOMER);
 
             return $order;
-        });
-
-        return $order->load('document.lines.product', 'party');
+        })->load('document.lines.product', 'party');
     }
 
     // ═══════════════════════════════════════════════════════════════════

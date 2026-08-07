@@ -141,7 +141,7 @@ class Setting extends Model
         // لا يمكن مسح كل keys بدون قائمة — نستخدم cache prefix
         // الحل الأفضل: استخدام Redis tags أو store قائمة الـ keys
         // للـ file/database driver نكتفي بـ forget لكل key معروف
-        $knownGroups = ['invoice', 'fiscal', 'inventory', 'alerts', 'general'];
+        $knownGroups = ['invoice', 'fiscal', 'inventory', 'alerts', 'documents', 'general', 'portal'];
 
         foreach ($knownGroups as $group) {
             Cache::forget("settings:{$companyId}:{$group}");
