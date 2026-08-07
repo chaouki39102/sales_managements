@@ -53,6 +53,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [checkoutStep, setCheckoutStep] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
 
   // قفل تمرير الصفحة خلف درج السلة عندما يكون مفتوحاً (نفس سلوك Modal المشترك).
   useEffect(() => {
@@ -75,6 +76,18 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
       icon: 'ti-trash',
     });
     if (ok) updateCartQty(key, 0);
+  };
+
+  const handleClearCart = async () => {
+    if (cartEntries.length === 0) return;
+    const ok = await confirm('إفراغ سلة الطلب من كل المنتجات؟', {
+      title: 'إفراغ السلة',
+      confirmText: 'إفراغ',
+      cancelText: 'إلغاء',
+      variant: 'danger',
+      icon: 'ti-trash',
+    });
+    if (ok) setCart({});
   };
 
   const debouncedSearch = useDebounce(search, 350);
@@ -232,7 +245,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
 
   const discountLabel = (d: PortalCatalogDiscount): string =>
     d.discount_amount !== null && d.discount_amount > 0
-      ? `خصم ${fmtMoney(d.discount_amount)} دج/وحدة`
+      ? `خصم ${d.discount_amount} دج/وحدة`
       : `خصم ${d.discount_percentage}%`;
 
   // زبون معفى جبائياً (من back-office: is_tva_exempt) — المحرك يخزّن tva_rate=0
@@ -662,9 +675,33 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                   <span className="portal-drawer-count">{cartEntries.length}</span>
                 )}
               </h3>
-              <button className="portal-drawer-x" type="button" onClick={() => setDrawerOpen(false)} aria-label="إغلاق السلة">
-                <i className="ti ti-x" />
-              </button>
+              {!checkoutStep && (
+                <span className="portal-drawer-actions">
+                  {!isPublic && (
+                    <button
+                      className={`portal-drawer-act${noteOpen ? ' is-on' : ''}`}
+                      type="button"
+                      title={noteOpen ? 'إخفاء الملاحظة' : 'إضافة ملاحظة'}
+                      onClick={() => setNoteOpen((v) => !v)}
+                    >
+                      <i className="ti ti-note" />
+                    </button>
+                  )}
+                  {cartEntries.length > 0 && (
+                    <button
+                      className="portal-drawer-act portal-drawer-act--del"
+                      type="button"
+                      title="إفراغ السلة"
+                      onClick={() => handleClearCart()}
+                    >
+                      <i className="ti ti-trash" />
+                    </button>
+                  )}
+                  <button className="portal-drawer-x" type="button" onClick={() => setDrawerOpen(false)} aria-label="إغلاق السلة">
+                    <i className="ti ti-x" />
+                  </button>
+                </span>
+              )}
             </div>
 
             {checkoutStep ? (
@@ -759,6 +796,22 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
               </div>
             ) : (
               <>
+                {!isPublic && (
+                  <div className={`portal-cart-note${noteOpen ? ' is-open' : ''}`}>
+                    <div className="portal-cart-note-hd" onClick={() => setNoteOpen((v) => !v)} role="button" aria-expanded={noteOpen}>
+                      <i className="ti ti-note" />
+                      <span>ملاحظة الطلب</span>
+                      <i className="ti ti-chevron-down portal-cart-note-caret" />
+                    </div>
+                    <textarea
+                      className="portal-form-input"
+                      placeholder="اكتب ملاحظتك هنا... (سيتم إرسالها مع الطلب)"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      rows={2}
+                    />
+                  </div>
+                )}
                 <div className="portal-cart-scroll">
                   {cartEntries.length === 0 ? (
                     <PortalEmpty icon="ti-basket" text={editingId ? 'هذا الطلب لا يحتوي على منتجات' : 'لم تضف أي منتج بعد'} />
@@ -786,7 +839,8 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                               {cl.discount > 0 && cl.tier && (
                                 <div className="portal-cart-disc">
                                   <i className="ti ti-discount-2" />
-                                  خصم {discountLabel(cl.tier)} <span>-{fmtMoney(cl.discount)}</span>
+                                  <span className="portal-cart-disc-txt">{discountLabel(cl.tier)}</span>
+                                  <span>-{fmtMoney(cl.discount)}</span>
                                 </div>
                               )}
                             </div>
@@ -816,9 +870,27 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                 </div>
 
                 <div className="portal-drawer-foot">
-                  <div className="portal-checkout-total">
-                    <span>المجموع (TTC)</span>
-                    <b>{fmtMoney(totals.ttc)}</b>
+                  <div className="portal-cart-totals">
+                    <div className="portal-cart-total-row">
+                      <span>المجموع HT</span>
+                      <b>{fmtMoney(totals.ht)}</b>
+                    </div>
+                    {totals.discount > 0.004 && (
+                      <div className="portal-cart-total-row portal-cart-total-row--disc">
+                        <span>الخصم</span>
+                        <b>-{fmtMoney(totals.discount)}</b>
+                      </div>
+                    )}
+                    {totals.tva > 0.004 && (
+                      <div className="portal-cart-total-row">
+                        <span>TVA</span>
+                        <b>{fmtMoney(totals.tva)}</b>
+                      </div>
+                    )}
+                    <div className="portal-cart-total-row portal-cart-total-row--final">
+                      <span>المجموع (TTC)</span>
+                      <b>{fmtMoney(totals.ttc)}</b>
+                    </div>
                   </div>
                   <button
                     className="portal-btn portal-btn--em portal-btn--block"
