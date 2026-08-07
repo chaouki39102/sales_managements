@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // pages/portal/PortalOrdersPage.tsx — وصل طلب سلعة (كتالوج + سلة + طلباتي)
 // ════════════════════════════════════════════════════════════════════════════
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { portalApi, type PortalCatalogItem, type PortalCatalogPackaging, type PortalCatalogDiscount, type PortalOrderStatus, type PortalOrder } from '@/lib/api/portal/portal';
@@ -78,6 +78,9 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
   const [editingId, setEditingId] = useState<number | null>(null);
 
   const { confirm, confirmDialogProps } = useConfirm();
+
+  const cartPanelRef = useRef<HTMLElement | null>(null);
+  const scrollToCart = () => cartPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const handleRemoveItem = async (key: string, name: string) => {
     const ok = await confirm(`إزالة «${name}» من سلة الطلب؟`, {
@@ -412,9 +415,11 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
   const pendingSubmit = createOrder.isPending || updateOrder.isPending;
 
   return (
-    <section>
-      {/* ─── كتالوج المنتجات ─── */}
-      <div className="portal-card">
+    <section className={cartEntries.length > 0 ? 'portal-order-has-cart' : undefined}>
+      <div className="portal-order-layout">
+        <div className="portal-order-main">
+          {/* ─── كتالوج المنتجات ─── */}
+          <div className="portal-card">
         <div className="portal-card-hd">
           <h3><i className="ti ti-building-store" /> اطلب سلعة</h3>
           <span className="portal-hd-count">
@@ -582,9 +587,9 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
         )}
       </div>
 
-      {/* ─── تأكيد إرسال الطلب العام ─── */}
-      {isPublic && submitted && createOrder.data && (
-        <div className="portal-card portal-mt-22">
+          {/* ─── تأكيد إرسال الطلب العام ─── */}
+          {isPublic && submitted && createOrder.data && (
+            <div className="portal-card portal-mt-16">
           <div className="portal-submit-ok">
             <i className="ti ti-circle-check" />
             <b>تم إرسال طلبك بنجاح</b>
@@ -599,16 +604,19 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
               {createOrder.data.notes ? <> — ملاحظتك مسجّلة: «{createOrder.data.notes}»</> : null}
             </div>
           </div>
+          </div>
+        )}
         </div>
-      )}
 
-      {/* ─── سلة الطلب ─── */}
-      <div className="portal-card portal-mt-22">
+        <aside className="portal-order-aside" ref={cartPanelRef}>
+          {/* ─── سلة الطلب ─── */}
+          <div className="portal-card portal-cart-panel">
         <div className="portal-card-hd">
           <h3><i className="ti ti-basket" /> {editingId ? 'تعديل الطلب' : 'سلة الطلب'}</h3>
           <span className="portal-hd-count">{cartEntries.length} صنف</span>
         </div>
 
+        <div className="portal-cart-scroll">
         {cartEntries.length === 0 ? (
           <PortalEmpty icon="ti-basket" text={editingId ? 'هذا الطلب لا يحتوي على منتجات' : 'لم تضف أي منتج بعد'} />
         ) : (
@@ -655,6 +663,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
               })}
             </div>
         )}
+        </div>
 
         {(isPublic || cartEntries.length > 0) && (
           <div className="portal-cart-foot">
@@ -740,7 +749,18 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
               </div>
           </div>
         )}
+        </div>
+        </aside>
       </div>
+
+      {cartEntries.length > 0 && (
+        <button className="portal-mobile-cart-bar" onClick={scrollToCart} type="button">
+          <i className="ti ti-basket" />
+          <span>{cartEntries.length} صنف</span>
+          <b>{fmtMoney(totals.ttc)}</b>
+          <span className="portal-mobile-cart-bar-go"><i className="ti ti-eye" /> عرض السلة</span>
+        </button>
+      )}
 
       {/* ─── طلباتي ─── */}
       {!isPublic && (

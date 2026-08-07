@@ -2991,6 +2991,51 @@ body.dark .poa-date input::-webkit-calendar-picker-indicator { opacity: .85; }
   .portal-track-form { grid-template-columns: 1fr; }
 }
 
+/* ═══ تخطيط «اطلب سلعة»: كتالوج + سلة جانبية ثابتة (أفضل من Odoo/SAP) ═══ */
+.portal-order-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 18px;
+  align-items: start;
+}
+.portal-order-main { min-width: 0; }
+.portal-order-aside { min-width: 0; position: sticky; top: 16px; }
+.portal-cart-panel {
+  display: flex; flex-direction: column;
+  max-height: calc(100vh - 32px);
+}
+.portal-cart-scroll {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  scrollbar-width: thin;
+}
+.portal-cart-scroll::-webkit-scrollbar { width: 5px; }
+.portal-cart-scroll::-webkit-scrollbar-thumb { background: var(--b3, #e2e8f0); border-radius: 99px; }
+.portal-mobile-cart-bar {
+  display: none; align-items: center; gap: 10px;
+  position: fixed; bottom: 12px; inset-inline: 12px; z-index: 60;
+  margin-inline: auto; max-width: 420px;
+  padding: 10px 14px; border: 0; cursor: pointer;
+  color: #fff; background: linear-gradient(135deg, var(--em, #1f3864), #16304f);
+  border-radius: 14px; box-shadow: 0 12px 30px rgba(15, 23, 42, .28);
+  font-family: inherit; text-align: start;
+}
+.portal-mobile-cart-bar i.ti-basket { font-size: 20px; }
+.portal-mobile-cart-bar b { margin-inline-start: auto; font-size: 15px; }
+.portal-mobile-cart-bar-go {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; font-weight: 700; padding: 5px 10px;
+  background: rgba(255, 255, 255, .16); border-radius: 9px;
+}
+@media (max-width: 980px) {
+  .portal-order-layout { grid-template-columns: 1fr; }
+  .portal-order-aside { position: static; }
+  .portal-cart-panel { max-height: none; }
+  .portal-cart-scroll { overflow: visible; flex: none; }
+  .portal-mobile-cart-bar { display: flex; }
+  .portal-order-has-cart { padding-bottom: 92px; }
+  .portal-public:has(.portal-order-has-cart) .portal-public-ft { margin-bottom: 92px; }
+}
+
 /* ═══ طلب عام (زائر غير مسجّل — Client Cash) ═══ */
 .poa-guest-chip {
   display: inline-flex; align-items: center; gap: 4px; flex: none;
