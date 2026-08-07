@@ -3057,6 +3057,11 @@ body.dark .poa-date input::-webkit-calendar-picker-indicator { opacity: .85; }
   padding: 14px 18px;
   display: flex; flex-direction: column; gap: 12px;
 }
+.portal-cart-scroll {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: 4px 18px 12px;
+}
+.portal-cart-scroll .portal-cart { padding-inline: 0; }
 .portal-drawer-foot {
   padding: 14px 18px 18px; border-top: 1px solid var(--b1);
   background: var(--bg1, #fff); display: flex; flex-direction: column; gap: 12px;
