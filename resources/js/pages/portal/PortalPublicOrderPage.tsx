@@ -74,6 +74,25 @@ export default function PortalPublicOrderPage() {
       </header>
 
       <main className="portal-public-body">
+        <section className="portal-store-hero">
+          <div className="portal-store-hero-in">
+            <div className="portal-store-hero-badge">
+              <i className="ti ti-store" /> المتجر الرسمي
+            </div>
+            <h1>{company?.name}</h1>
+            <p>
+              تصفّح منتجاتنا، أضف ما يعجبك إلى السلة وأرسل طلبك مباشرة — نتولى الباقي وتبقى على اطلاع بحالة طلبك.
+            </p>
+            <div className="portal-store-hero-chips">
+              <span><i className="ti ti-truck-delivery" /> توصيل سريع</span>
+              <span><i className="ti ti-tag" /> أسعار كتالوج موثوقة</span>
+              <span><i className="ti ti-shield-check" /> تتبع طلبك برقم هاتفك</span>
+            </div>
+          </div>
+          <div className="portal-store-hero-art">
+            <i className="ti ti-basket" />
+          </div>
+        </section>
         <PortalOrdersPage mode="public" />
       </main>
 

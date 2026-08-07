@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // pages/portal/PortalOrdersPage.tsx — وصل طلب سلعة (كتالوج + سلة + طلباتي)
 // ════════════════════════════════════════════════════════════════════════════
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { portalApi, type PortalCatalogItem, type PortalCatalogPackaging, type PortalCatalogDiscount, type PortalOrderStatus, type PortalOrder } from '@/lib/api/portal/portal';
@@ -76,11 +76,10 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
   const [toast, setToast] = useState('');
   const [submitted, setSubmitted] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [checkoutStep, setCheckoutStep] = useState(false);
 
   const { confirm, confirmDialogProps } = useConfirm();
-
-  const cartPanelRef = useRef<HTMLElement | null>(null);
-  const scrollToCart = () => cartPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const handleRemoveItem = async (key: string, name: string) => {
     const ok = await confirm(`إزالة «${name}» من سلة الطلب؟`, {
@@ -158,6 +157,8 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
       setEditingId(null);
       setSubmitted(order.id);
       setPage(1);
+      setDrawerOpen(false);
+      setCheckoutStep(false);
       qc.invalidateQueries({ queryKey: ['portal', slug, 'orders', 'list'] });
       showToast('تم إرسال طلب السلعة بنجاح');
     },
@@ -171,6 +172,8 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
       resetCart();
       setEditingId(null);
       setSubmitted(order.id);
+      setDrawerOpen(false);
+      setCheckoutStep(false);
       qc.invalidateQueries({ queryKey: ['portal', slug, 'orders', 'list'] });
       showToast('تم تحديث طلب السلعة بنجاح');
     },
@@ -372,6 +375,8 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
     setNotes(order.notes ?? '');
     setEditingId(order.id);
     setSubmitted(null);
+    setCheckoutStep(false);
+    setDrawerOpen(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -416,19 +421,15 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
 
   return (
     <section className={cartEntries.length > 0 ? 'portal-order-has-cart' : undefined}>
-      <div className="portal-order-layout">
-        <div className="portal-order-main">
+      <div className="portal-order-main">
           {/* ─── كتالوج المنتجات ─── */}
-          <div className="portal-card">
-        <div className="portal-card-hd">
-          <h3><i className="ti ti-building-store" /> اطلب سلعة</h3>
-          <span className="portal-hd-count">
-            {catalogQuery.data ? `${catalogQuery.data.meta.total} منتج` : ''}
-          </span>
-        </div>
-
-        <div className="portal-toolbar">
-          <div className="portal-search">
+          <div className="portal-store">
+        <div className="portal-store-hd">
+          <div className="portal-store-hd-t">
+            <h2><i className="ti ti-building-store" /> كتالوج المنتجات</h2>
+            <p>{catalogQuery.data ? `${catalogQuery.data.meta.total} منتج متوفر` : 'تصفّح المنتجات واختر ما يناسبك'}</p>
+          </div>
+          <div className="portal-search portal-search--lg">
             <i className="ti ti-search" />
             <input
               type="text"
@@ -465,86 +466,88 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                 const cartQty = inCart ? cart[key].quantity : q;
                 return (
                   <div key={p.id} className={`portal-prod${inCart ? ' on' : ''}`}>
-                    <div className="portal-prod-hd">
-                      <div className="portal-prod-name">{p.name}</div>
-                      {p.ref && <div className="portal-prod-ref">{p.ref}</div>}
-                    </div>
-                    <div className="portal-prod-price">
-                      {cl.discount > 0 && cl.tier ? (
-                        <>
-                          <span className="portal-prod-price-old">{fmtMoney(cl.unitPrice)}</span>
-                          <span className="portal-prod-price-now">
-                            {fmtMoney(cl.unitPrice - cl.discount / Math.max(1, q))}
-                          </span>
-                        </>
+                    <div className="portal-prod-img">
+                      {p.image ? (
+                        <img src={p.image} alt={p.name} loading="lazy" />
                       ) : (
-                        <span>{fmtMoney(cl.unitPrice)}</span>
+                        <div className="portal-prod-img-fb"><i className="ti ti-package" /></div>
                       )}
-                      <span className="portal-prod-unit">{unitLabelFor(p, selectedPack)}</span>
                       {cl.discount > 0 && cl.tier ? (
-                        <span className="portal-disc-tag">
-                          <i className="ti ti-discount-2" /> {discountLabel(cl.tier)}
+                        <span className="portal-prod-badge">
+                          <i className="ti ti-discount-2" />
+                          {cl.tier.discount_percentage !== null && cl.tier.discount_percentage > 0
+                            ? `-${cl.tier.discount_percentage}%`
+                            : discountLabel(cl.tier)}
                         </span>
                       ) : null}
-                    </div>
-                    <div className="portal-prod-quick">
-                      {inCart ? (
-                        <div className="portal-prod-qty">
+                      <div className="portal-prod-add">
+                        {inCart ? (
+                          <div className="portal-prod-qty">
+                            <button
+                              type="button"
+                              onClick={() => addToCart(p.id, cartQty - 1, selectedPack)}
+                              disabled={cartQty <= 1}
+                              aria-label="تقليل الكمية"
+                            >
+                              <i className="ti ti-minus" />
+                            </button>
+                            <input value={cartQty} readOnly tabIndex={-1} aria-label="الكمية" />
+                            <button
+                              type="button"
+                              onClick={() => addToCart(p.id, cartQty + 1, selectedPack)}
+                              aria-label="زيادة الكمية"
+                            >
+                              <i className="ti ti-plus" />
+                            </button>
+                          </div>
+                        ) : (
                           <button
+                            className="portal-prod-fab"
                             type="button"
-                            onClick={() => addToCart(p.id, cartQty - 1, selectedPack)}
-                            disabled={cartQty <= 1}
-                            aria-label="تقليل الكمية"
-                          >
-                            <i className="ti ti-minus" />
-                          </button>
-                          <input value={cartQty} readOnly tabIndex={-1} aria-label="الكمية" />
-                          <button
-                            type="button"
-                            onClick={() => addToCart(p.id, cartQty + 1, selectedPack)}
-                            aria-label="زيادة الكمية"
+                            onClick={() => addToCart(p.id, q, selectedPack)}
+                            aria-label="أضف إلى السلة"
                           >
                             <i className="ti ti-plus" />
                           </button>
-                        </div>
-                      ) : (
-                        <button
-                          className="portal-prod-quick-btn"
-                          type="button"
-                          onClick={() => addToCart(p.id, q, selectedPack)}
-                          aria-label="أضف إلى السلة"
-                        >
-                          <i className="ti ti-plus" />
-                          <span className="portal-prod-quick-txt">أضف</span>
-                        </button>
-                      )}
-                    </div>
-                    <div className="portal-prod-meta">
-                      {partyIsTvaExempt ? (
-                        <span className="portal-prod-exempt">
-                          <i className="ti ti-shield-check" /> معفى من TVA
-                        </span>
-                      ) : (
-                        p.tva_rate > 0 ? `TVA ${p.tva_rate}%` : ''
-                      )}
-                      {p.manages_stock && p.current_stock !== null && (
-                        <span className={p.current_stock > 0 ? 'portal-prod-stock' : 'portal-prod-stock out'}>
-                          {p.current_stock > 0 ? `المخزون: ${p.current_stock}` : 'نفد المخزون'}
-                        </span>
-                      )}
-                    </div>
-                    {p.discounts.length > 0 && (
-                      <div className="portal-prod-discs">
-                        {p.discounts.map((d) => {
-                          const active = cl.tier?.id === d.id;
-                          return (
-                            <span key={d.id} className={`portal-disc-chip${active ? ' on' : ''}`}>
-                              <i className="ti ti-discount-2" /> {discountLabel(d)} {tierHint(d)}
-                            </span>
-                          );
-                        })}
+                        )}
                       </div>
-                    )}
+                    </div>
+
+                    <div className="portal-prod-body">
+                      <div className="portal-prod-name">{p.name}</div>
+                      {p.ref && <div className="portal-prod-ref">{p.ref}</div>}
+
+                      <div className="portal-prod-foot">
+                        <div className="portal-prod-price">
+                          {cl.discount > 0 && cl.tier ? (
+                            <>
+                              <span className="portal-prod-price-now">
+                                {fmtMoney(cl.unitPrice - cl.discount / Math.max(1, q))}
+                              </span>
+                              <span className="portal-prod-price-old">{fmtMoney(cl.unitPrice)}</span>
+                            </>
+                          ) : (
+                            <span className="portal-prod-price-now">{fmtMoney(cl.unitPrice)}</span>
+                          )}
+                          <span className="portal-prod-unit">{unitLabelFor(p, selectedPack)}</span>
+                        </div>
+                        <div className="portal-prod-meta">
+                          {partyIsTvaExempt ? (
+                            <span className="portal-prod-exempt">
+                              <i className="ti ti-shield-check" /> معفى من TVA
+                            </span>
+                          ) : p.tva_rate > 0 ? (
+                            <span className="portal-prod-tva">TVA {p.tva_rate}%</span>
+                          ) : null}
+                          {p.manages_stock && p.current_stock !== null && (
+                            <span className={p.current_stock > 0 ? 'portal-prod-stock' : 'portal-prod-stock out'}>
+                              {p.current_stock > 0 ? `المخزون: ${p.current_stock}` : 'نفد المخزون'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
                     {p.has_packaging && p.packagings.length > 0 && (
                       <select
                         className="portal-prod-pkg"
@@ -565,6 +568,18 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                     {factor > 1 && (
                       <div className="portal-prod-packinfo">
                         {cartQty} {selectedPack ? `×${factor}` : ''} = {cartQty * factor} {unitOf(p)}
+                      </div>
+                    )}
+                    {p.discounts.length > 0 && (
+                      <div className="portal-prod-discs">
+                        {p.discounts.map((d) => {
+                          const active = cl.tier?.id === d.id;
+                          return (
+                            <span key={d.id} className={`portal-disc-chip${active ? ' on' : ''}`}>
+                              <i className="ti ti-discount-2" /> {discountLabel(d)} {tierHint(d)}
+                            </span>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -608,157 +623,201 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
         )}
         </div>
 
-        <aside className="portal-order-aside" ref={cartPanelRef}>
-          {/* ─── سلة الطلب ─── */}
-          <div className="portal-card portal-cart-panel">
-        <div className="portal-card-hd">
-          <h3><i className="ti ti-basket" /> {editingId ? 'تعديل الطلب' : 'سلة الطلب'}</h3>
-          <span className="portal-hd-count">{cartEntries.length} صنف</span>
-        </div>
-
-        <div className="portal-cart-scroll">
-        {cartEntries.length === 0 ? (
-          <PortalEmpty icon="ti-basket" text={editingId ? 'هذا الطلب لا يحتوي على منتجات' : 'لم تضف أي منتج بعد'} />
-        ) : (
-          <div className="portal-cart">
-            {cartEntries.map(({ key, product, entry }) => {
-                const cl = lineCalc(product, entry.packaging_id, entry.quantity);
-                return (
-                  <div key={key} className="portal-cart-item">
-                    <div className="portal-cart-info">
-                      <div className="portal-prod-name">{product.name}</div>
-                      <div className="portal-prod-ref">
-                        {fmtMoney(cl.unitPrice)}
-                        {cl.factor > 1 ? ` ×${cl.factor}` : ''}
-                        {`/${unitLabelFor(product, entry.packaging_id)}`}
-                        {partyIsTvaExempt ? ' • معفى من TVA' : product.tva_rate > 0 ? ` • TVA ${product.tva_rate}%` : ''}
-                      </div>
-                      {cl.discount > 0 && cl.tier && (
-                        <div className="portal-cart-disc">
-                          <i className="ti ti-discount-2" />
-                          خصم {discountLabel(cl.tier)} <span>-{fmtMoney(cl.discount)}</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="portal-prod-qty">
-                      <button type="button" onClick={() => updateCartQty(key, entry.quantity - 1)} disabled={entry.quantity <= 1}>
-                        <i className="ti ti-minus" />
-                      </button>
-                      <input
-                        type="number"
-                        min={1}
-                        value={entry.quantity}
-                        onChange={(e) => updateCartQty(key, Number(e.target.value))}
-                      />
-                      <button type="button" onClick={() => updateCartQty(key, entry.quantity + 1)}>
-                        <i className="ti ti-plus" />
-                      </button>
-                    </div>
-                    <div className="portal-cart-total">{fmtMoney(cl.ttc)}</div>
-                    <button className="portal-cart-x" type="button" onClick={() => handleRemoveItem(key, product.name)} title="إزالة">
-                      <i className="ti ti-x" />
-                    </button>
-                  </div>
-                );
-              })}
+      {/* ─── سلة الطلب — درج جانبي منزلق كتصاميم المتاجر ─── */}
+      {drawerOpen && (
+        <div className="portal-drawer">
+          <div className="portal-drawer-backdrop" onClick={() => setDrawerOpen(false)} />
+          <aside className="portal-cart-drawer" role="dialog" aria-modal="true" aria-label="سلة الطلب">
+            <div className="portal-drawer-hd">
+              <h3>
+                <i className={checkoutStep ? 'ti ti-shopping-cart-check' : 'ti ti-basket'} />
+                {checkoutStep
+                  ? (editingId ? 'حفظ التعديلات' : 'إتمام الطلب')
+                  : (editingId ? 'تعديل الطلب' : 'سلة الطلب')}
+                {!checkoutStep && cartEntries.length > 0 && (
+                  <span className="portal-drawer-count">{cartEntries.length}</span>
+                )}
+              </h3>
+              <button className="portal-drawer-x" type="button" onClick={() => setDrawerOpen(false)} aria-label="إغلاق السلة">
+                <i className="ti ti-x" />
+              </button>
             </div>
-        )}
-        </div>
 
-        {(isPublic || cartEntries.length > 0) && (
-          <div className="portal-cart-foot">
-            {isPublic && (
-                <div className="portal-customer-fields">
-                  <div className="portal-customer-field">
-                    <input
-                      className="portal-form-input"
-                      placeholder="الاسم الكامل *"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                    />
-                  </div>
-                  <div className="portal-customer-field">
-                    <input
-                      className="portal-form-input"
-                      placeholder="رقم الهاتف *"
-                      dir="ltr"
-                      inputMode="tel"
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                    />
-                  </div>
-                  <div className="portal-customer-field">
-                    <input
-                      className="portal-form-input"
-                      placeholder="العنوان (اختياري)"
-                      value={customerAddress}
-                      onChange={(e) => setCustomerAddress(e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
-              {cartEntries.length > 0 && (
-                <>
-              <textarea
-                className="portal-form-input"
-                placeholder="ملاحظات (اختياري): مثلاً تاريخ التسليم المفضل..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={2}
-              />
-              <div className="portal-cart-totals">
-                <div className="portal-cart-total-row"><span>المجموع قبل الخصم</span><b>{fmtMoney(totals.gross)}</b></div>
-                {totals.discount > 0 && (
-                  <div className="portal-cart-total-row portal-cart-total-row--disc">
-                    <span><i className="ti ti-discount-2" /> الخصم</span><b>-{fmtMoney(totals.discount)}</b>
+            {checkoutStep ? (
+              <div className="portal-drawer-body">
+                {/* الخطوة التالية: بيانات الزبون + الملاحظات */}
+                {isPublic && (
+                  <div className="portal-customer-fields">
+                    <div className="portal-customer-field">
+                      <input
+                        className="portal-form-input"
+                        placeholder="الاسم الكامل *"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                      />
+                    </div>
+                    <div className="portal-customer-field">
+                      <input
+                        className="portal-form-input"
+                        placeholder="رقم الهاتف *"
+                        dir="ltr"
+                        inputMode="tel"
+                        value={customerPhone}
+                        onChange={(e) => setCustomerPhone(e.target.value)}
+                      />
+                    </div>
+                    <div className="portal-customer-field">
+                      <input
+                        className="portal-form-input"
+                        placeholder="العنوان (اختياري)"
+                        value={customerAddress}
+                        onChange={(e) => setCustomerAddress(e.target.value)}
+                      />
+                    </div>
                   </div>
                 )}
-                <div className="portal-cart-total-row"><span>المجموع بعد الخصم (HT)</span><b>{fmtMoney(totals.ht)}</b></div>
-                <div className="portal-cart-total-row"><span>TVA</span><b>{fmtMoney(totals.tva)}</b></div>
-                <div className="portal-cart-total-row portal-cart-total-row--final">
-                  <span>المجموع TTC</span><b>{fmtMoney(totals.ttc)}</b>
+                <textarea
+                  className="portal-form-input"
+                  placeholder="ملاحظات (اختياري): مثلاً تاريخ التسليم المفضل..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                />
+                <div className="portal-checkout-review">
+                  {cartEntries.map(({ key, product, entry }) => {
+                    const cl = lineCalc(product, entry.packaging_id, entry.quantity);
+                    return (
+                      <div key={key} className="portal-cart-item portal-cart-item--ro">
+                        <div className="portal-cart-thumb">
+                          {product.image ? (
+                            <img src={product.image} alt="" loading="lazy" />
+                          ) : (
+                            <i className="ti ti-package" />
+                          )}
+                        </div>
+                        <div className="portal-cart-info">
+                          <div className="portal-prod-name">{product.name}</div>
+                          <div className="portal-prod-ref">
+                            {entry.quantity} × {fmtMoney(cl.unitPrice)}
+                            {cl.factor > 1 ? ` ×${cl.factor}` : ''}
+                            {`/${unitLabelFor(product, entry.packaging_id)}`}
+                          </div>
+                        </div>
+                        <div className="portal-cart-total">{fmtMoney(cl.ttc)}</div>
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-                </>
-              )}
-              <div className="portal-cart-actions">
-                {editingId && (
+                <div className="portal-cart-actions">
                   <button
                     className="portal-btn portal-btn--ghost"
                     disabled={pendingSubmit}
-                    onClick={() => { resetCart(); setEditingId(null); }}
+                    onClick={() => setCheckoutStep(false)}
                     type="button"
                   >
-                    <i className="ti ti-x" /> إلغاء التعديل
+                    <i className="ti ti-arrow-right" /> رجوع إلى السلة
                   </button>
-                )}
-                <button
-                  className="portal-btn portal-btn--em"
-                  disabled={pendingSubmit || cartEntries.length === 0}
-                  onClick={submitCart}
-                  type="button"
-                >
-                  {pendingSubmit ? (
-                    <><i className="ti ti-loader animate-spin" /> جاري الحفظ...</>
-                  ) : editingId ? (
-                    <><i className="ti ti-device-floppy" /> حفظ التعديلات</>
-                  ) : (
-                    <><i className="ti ti-send" /> إرسال الطلب</>
-                  )}
-                </button>
+                  <button
+                    className="portal-btn portal-btn--em"
+                    disabled={pendingSubmit || cartEntries.length === 0}
+                    onClick={submitCart}
+                    type="button"
+                  >
+                    {pendingSubmit ? (
+                      <><i className="ti ti-loader animate-spin" /> جاري الحفظ...</>
+                    ) : editingId ? (
+                      <><i className="ti ti-device-floppy" /> حفظ التعديلات</>
+                    ) : (
+                      <><i className="ti ti-send" /> إرسال الطلب</>
+                    )}
+                  </button>
+                </div>
               </div>
-          </div>
-        )}
+            ) : (
+              <>
+                <div className="portal-cart-scroll">
+                  {cartEntries.length === 0 ? (
+                    <PortalEmpty icon="ti-basket" text={editingId ? 'هذا الطلب لا يحتوي على منتجات' : 'لم تضف أي منتج بعد'} />
+                  ) : (
+                    <div className="portal-cart">
+                      {cartEntries.map(({ key, product, entry }) => {
+                        const cl = lineCalc(product, entry.packaging_id, entry.quantity);
+                        return (
+                          <div key={key} className="portal-cart-item">
+                            <div className="portal-cart-thumb">
+                              {product.image ? (
+                                <img src={product.image} alt="" loading="lazy" />
+                              ) : (
+                                <i className="ti ti-package" />
+                              )}
+                            </div>
+                            <div className="portal-cart-info">
+                              <div className="portal-prod-name">{product.name}</div>
+                              <div className="portal-prod-ref">
+                                {fmtMoney(cl.unitPrice)}
+                                {cl.factor > 1 ? ` ×${cl.factor}` : ''}
+                                {`/${unitLabelFor(product, entry.packaging_id)}`}
+                                {partyIsTvaExempt ? ' • معفى من TVA' : product.tva_rate > 0 ? ` • TVA ${product.tva_rate}%` : ''}
+                              </div>
+                              {cl.discount > 0 && cl.tier && (
+                                <div className="portal-cart-disc">
+                                  <i className="ti ti-discount-2" />
+                                  خصم {discountLabel(cl.tier)} <span>-{fmtMoney(cl.discount)}</span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="portal-prod-qty">
+                              <button type="button" onClick={() => updateCartQty(key, entry.quantity - 1)} disabled={entry.quantity <= 1}>
+                                <i className="ti ti-minus" />
+                              </button>
+                              <input
+                                type="number"
+                                min={1}
+                                value={entry.quantity}
+                                onChange={(e) => updateCartQty(key, Number(e.target.value))}
+                              />
+                              <button type="button" onClick={() => updateCartQty(key, entry.quantity + 1)}>
+                                <i className="ti ti-plus" />
+                              </button>
+                            </div>
+                            <div className="portal-cart-total">{fmtMoney(cl.ttc)}</div>
+                            <button className="portal-cart-x" type="button" onClick={() => handleRemoveItem(key, product.name)} title="إزالة">
+                              <i className="ti ti-x" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="portal-drawer-foot">
+                  <div className="portal-checkout-total">
+                    <span>المجموع (TTC)</span>
+                    <b>{fmtMoney(totals.ttc)}</b>
+                  </div>
+                  <button
+                    className="portal-btn portal-btn--em portal-btn--block"
+                    type="button"
+                    disabled={cartEntries.length === 0}
+                    onClick={() => setCheckoutStep(true)}
+                  >
+                    <i className="ti ti-shopping-cart-check" />
+                    {editingId ? 'متابعة الحفظ' : 'إتمام الطلب'}
+                  </button>
+                </div>
+              </>
+            )}
+          </aside>
         </div>
-        </aside>
-      </div>
+      )}
 
       {cartEntries.length > 0 && (
-        <button className="portal-mobile-cart-bar" onClick={scrollToCart} type="button">
+        <button className="portal-mobile-cart-bar" onClick={() => { setCheckoutStep(false); setDrawerOpen(true); }} type="button">
           <i className="ti ti-basket" />
           <span>{cartEntries.length} صنف</span>
           <b>{fmtMoney(totals.ttc)}</b>
-          <span className="portal-mobile-cart-bar-go"><i className="ti ti-eye" /> عرض السلة</span>
+          <span className="portal-mobile-cart-bar-go"><i className="ti ti-shopping-cart" /> عرض السلة</span>
         </button>
       )}
 

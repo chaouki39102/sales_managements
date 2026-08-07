@@ -214,6 +214,7 @@ export interface PortalCatalogItem {
   name:          string;
   ref:           string | null;
   barcode:       string | null;
+  image:         string | null;
   unit_price_ht: number;
   tva_rate:      number;
   unit:          { name: string; symbol: string } | null;

@@ -151,7 +151,8 @@ it('customer can list catalog products with server-side price and stock', functi
     $a = $rows->firstWhere('id', test()->productA);
     expect((float) $a['unit_price_ht'])->toBe(120.0)
         ->and((float) $a['tva_rate'])->toBe(9.0)
-        ->and($a['unit']['symbol'])->toBe('U');
+        ->and($a['unit']['symbol'])->toBe('U')
+        ->and(array_key_exists('image', $a))->toBeTrue();
 });
 
 it('customer submits an order and server recomputes prices (client prices ignored)', function () {
