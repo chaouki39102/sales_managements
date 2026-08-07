@@ -185,6 +185,7 @@ class SettingController extends BaseApiController
             // portal — بوابة الزبائن (اطلب سلعة)
             'portal_enabled', 'portal_allow_guest_orders',
             'portal_allow_registered_orders', 'portal_min_order_amount',
+            'portal_max_order_amount', 'portal_order_confirmation_message',
 
             // general
             'app_name', 'app_logo', 'app_color', 'theme_mode', 'language',

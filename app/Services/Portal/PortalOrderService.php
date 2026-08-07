@@ -124,6 +124,17 @@ class PortalOrderService
                 );
             }
 
+            // الحد الأقصى لمبلغ الطلب (إعداد portal_max_order_amount) — يُطبق
+            // بنفس المعاملة: أي تجاوز يُرفض الطلب ويتراجع المستند.
+            $maxAmount = (float) \App\Models\Setting::getSetting('portal_max_order_amount', 0, $companyId);
+            if ($maxAmount > 0 && (float) $doc->total_ttc > $maxAmount) {
+                throw new BusinessRuleException(
+                    'الحد الأقصى لقيمة الطلب هو ' . number_format($maxAmount, 2, '.', '')
+                    . ' دج — قيمة طلبك الحالية ' . number_format((float) $doc->total_ttc, 2, '.', '') . ' دج.',
+                    422
+                );
+            }
+
             $order = PortalOrder::create([
                 'company_id'             => $companyId,
                 'party_id'               => $partyId,

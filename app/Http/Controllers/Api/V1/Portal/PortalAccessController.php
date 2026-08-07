@@ -35,6 +35,12 @@ class PortalAccessController extends BaseApiController
                 'is_active'  => $request->boolean('is_active', true),
             ]);
 
+            // تفعيل طلبات السلع على الزبون (portal_orders_enabled) —
+            // عند الإنشاء: يعتمد على القيمة المُرسلة أو القيمة الافتراضية (true).
+            if ($request->has('portal_orders_enabled')) {
+                $party->update(['portal_orders_enabled' => $request->boolean('portal_orders_enabled')]);
+            }
+
             return $this->successResponse($this->payload($portal), 'تم إنشاء حساب البوابة بنجاح', 201);
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal_access.store');
@@ -66,6 +72,7 @@ class PortalAccessController extends BaseApiController
                 'email'     => ['sometimes', 'string', 'email', 'max:191'],
                 'password'  => ['nullable', 'string', 'min:8'],
                 'is_active' => ['sometimes', 'boolean'],
+                'portal_orders_enabled' => ['sometimes', 'boolean'],
             ]);
 
             $data = [
@@ -90,6 +97,14 @@ class PortalAccessController extends BaseApiController
             }
 
             $portal->update($data);
+
+            // مزامنة علامة الزبون portal_orders_enabled عند إرسالها صراحةً.
+            if (array_key_exists('portal_orders_enabled', $validated)) {
+                $party = $portal->party;
+                if ($party) {
+                    $party->update(['portal_orders_enabled' => (bool) $validated['portal_orders_enabled']]);
+                }
+            }
 
             return $this->successResponse($this->payload($portal), 'تم تحديث حساب البوابة بنجاح');
         } catch (\Throwable $e) {
@@ -146,6 +161,7 @@ class PortalAccessController extends BaseApiController
             'name'       => $portal->name,
             'email'      => $portal->email,
             'is_active'  => (bool) $portal->is_active,
+            'party_orders_enabled' => (bool) ($portal->party?->portal_orders_enabled ?? true),
             'last_login_at' => optional($portal->last_login_at)->toISOString(),
             'created_at' => optional($portal->created_at)->toISOString(),
             'updated_at' => optional($portal->updated_at)->toISOString(),

@@ -12,6 +12,7 @@ export interface PortalAccessAccount {
   name:          string;
   email:         string;
   is_active:     boolean;
+  party_orders_enabled: boolean;
   last_login_at: string | null;
   created_at:    string | null;
   updated_at:    string | null;
@@ -23,6 +24,7 @@ export interface PortalAccessPayload {
   email:      string;
   password:   string;
   is_active?: boolean;
+  portal_orders_enabled?: boolean;
 }
 
 export interface PortalAccessUpdate {
@@ -30,6 +32,7 @@ export interface PortalAccessUpdate {
   email?:     string;
   password?:  string;
   is_active?: boolean;
+  portal_orders_enabled?: boolean;
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────

@@ -164,6 +164,11 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/info', [PortalController::class, 'companyInfo']);
 
+        // إعدادات البوابة العامة (بدون مصادقة): حالة التفعيل + حدود الطلب +
+        // رسالة التأكيد — تعكس أذونات حامل التوكن (أو الزائر) عبر
+        // optionalPortalUser، تُستهلك لتوجيه واجهة المتجر قبل أي طلب.
+        Route::get('/config', [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'config']);
+
         // ── طلبات السلع: نقطة البيع العامة (بدون حساب بوابة) ──
         // الكتالوج + الإنشاء يخدمان الزبون المعتمد والزائر معاً:
         //   - معتمد (Bearer portal token): كتالوجه بحالته الجبائية + مستوى

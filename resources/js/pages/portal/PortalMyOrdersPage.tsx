@@ -46,6 +46,22 @@ export default function PortalMyOrdersPage() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<PortalOrderStatus | ''>('');
   const [submitted, setSubmitted] = useState<number | null>(null);
+  const [toast, setToast] = useState('');
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3600);
+  };
+
+  // إعدادات البوابة — تُخبرنا إذا كان إرسال الطلبات معطلاً على حساب الزبون
+  // (portal_orders_enabled أو إيقاف إداري) لنعرض لافتة بدل أن يرفض الخادم كل إجراء.
+  const configQuery = useQuery({
+    queryKey: ['portal', slug, 'config'],
+    queryFn: () => portalApi.config(),
+    staleTime: 60_000,
+  });
+  const cfg = configQuery.data;
+  const canOrder = cfg?.can_order ?? true;
 
   const { confirm, confirmDialogProps } = useConfirm();
 
@@ -88,6 +104,7 @@ export default function PortalMyOrdersPage() {
       setSubmitted(order.id);
       qc.invalidateQueries({ queryKey: ['portal', slug, 'orders', 'list'] });
     },
+    onError: (err: Error) => showToast(err.message || 'تعذر إلغاء الطلب'),
   });
 
   // تأكيد الطلب من الزبون (قيد الاعداد → مؤكد) — بعد التأكيد يدخل الطلب
@@ -98,6 +115,7 @@ export default function PortalMyOrdersPage() {
       setSubmitted(order.id);
       qc.invalidateQueries({ queryKey: ['portal', slug, 'orders', 'list'] });
     },
+    onError: (err: Error) => showToast(err.message || 'تعذر تأكيد الطلب'),
   });
 
   const orders = ordersQuery.data?.data ?? [];
@@ -113,6 +131,18 @@ export default function PortalMyOrdersPage() {
 
   return (
     <section className="portal-myorders">
+      {cfg && !canOrder && (
+        <div className="portal-blocked-banner">
+          <i className={cfg.enabled ? 'ti ti-user-off' : 'ti ti-basket-off'} />
+          <span>
+            {cfg.enabled
+              ? (cfg.authenticated
+                  ? 'إرسال الطلبات معطل حالياً على حسابك — يمكنك متابعة طلباتك الحالية فقط.'
+                  : 'إرسال الطلبات من الزوار معطل حالياً.')
+              : 'إرسال الطلبات معطل حالياً من طرف المؤسسة — يمكنك متابعة طلباتك الحالية فقط.'}
+          </span>
+        </div>
+      )}
       <div className="portal-card portal-mt-22">
         <div className="portal-card-hd">
           <h3><i className="ti ti-clipboard-list" /> طلباتي</h3>
@@ -203,7 +233,7 @@ export default function PortalMyOrdersPage() {
                             className="portal-btn portal-btn--sm portal-btn--em"
                             onClick={() => handleValidateOrder(o)}
                             type="button"
-                            disabled={validateOrder.isPending}
+                            disabled={validateOrder.isPending || !canOrder}
                           >
                             <i className="ti ti-circle-check" /> تأكيد الطلب
                           </button>
@@ -211,6 +241,7 @@ export default function PortalMyOrdersPage() {
                             className="portal-btn portal-btn--sm"
                             onClick={() => startEdit(o)}
                             type="button"
+                            disabled={!canOrder}
                           >
                             <i className="ti ti-edit" /> تعديل
                           </button>
@@ -218,7 +249,7 @@ export default function PortalMyOrdersPage() {
                             className="portal-btn portal-btn--sm portal-btn--danger"
                             onClick={() => handleCancelOrder(o)}
                             type="button"
-                            disabled={cancelOrder.isPending}
+                            disabled={cancelOrder.isPending || !canOrder}
                           >
                             <i className="ti ti-x" /> إلغاء الطلب
                           </button>
@@ -244,6 +275,7 @@ export default function PortalMyOrdersPage() {
       </div>
 
       <ConfirmDialog {...confirmDialogProps} />
+      {toast && <div className="portal-toast"><i className="ti ti-circle-x" /> {toast}</div>}
     </section>
   );
 }

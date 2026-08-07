@@ -15,7 +15,7 @@ export default function PortalLayout() {
   const setPortalUser = usePortalStore((s) => s.setPortalUser);
 
   const base = `/portal/${slug}`;
-  const NAV_ITEMS = [
+  const ALL_NAV_ITEMS = [
     { to: base, label: 'الرئيسية', icon: 'ti-layout-dashboard', end: true },
     { to: `${base}/documents`, label: 'المستندات', icon: 'ti-file-text', end: false },
     { to: `${base}/myorders`, label: 'طلباتي', icon: 'ti-clipboard-list', end: false },
@@ -24,6 +24,18 @@ export default function PortalLayout() {
     { to: `${base}/statement`, label: 'كشف الحساب', icon: 'ti-report-money', end: false },
     { to: `${base}/profile`, label: 'الملف الشخصي', icon: 'ti-user-circle', end: false },
   ];
+
+  // عندما تُعطّل الإدارة البوابة كاملةً، يختفي «اطلب سلعة» من شريط التنقل —
+  // «طلباتي» يبقى للمتابعة فقط (متجر الطلب يعرض لافتة التعطيل لو دُخل إليه مباشرة).
+  const storeEnabledQuery = useQuery({
+    queryKey: ['portal', slug, 'config'],
+    queryFn: () => portalApi.config(),
+    staleTime: 60_000,
+    retry: false,
+  });
+  const NAV_ITEMS = (storeEnabledQuery.data?.enabled === false)
+    ? ALL_NAV_ITEMS.filter((i) => !i.to.endsWith('/orders'))
+    : ALL_NAV_ITEMS;
 
   useQuery({
     queryKey: ['portal', slug, 'me'],

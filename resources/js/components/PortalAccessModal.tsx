@@ -28,6 +28,7 @@ export default function PortalAccessModal({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const [partyOrdersEnabled, setPartyOrdersEnabled] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -43,12 +44,14 @@ export default function PortalAccessModal({
       setName(account.name);
       setEmail(account.email);
       setIsActive(account.is_active);
+      setPartyOrdersEnabled(account.party_orders_enabled);
       setPassword('');
     } else {
       setName(partyName ?? '');
       setEmail(partyEmail ?? '');
       setPassword('');
       setIsActive(true);
+      setPartyOrdersEnabled(true);
     }
   }, [open, account, partyName, partyEmail]);
 
@@ -65,10 +68,11 @@ export default function PortalAccessModal({
     setBusy(true);
     try {
       if (editing) {
-        const data: { name: string; email: string; password?: string; is_active: boolean } = {
+        const data: { name: string; email: string; password?: string; is_active: boolean; portal_orders_enabled: boolean } = {
           name: name.trim(),
           email: email.trim(),
           is_active: isActive,
+          portal_orders_enabled: partyOrdersEnabled,
         };
         if (password) data.password = password;
         await mutations.update.mutateAsync({ id: account.id, data, partyId });
@@ -79,6 +83,7 @@ export default function PortalAccessModal({
           email: email.trim(),
           password,
           is_active: isActive,
+          portal_orders_enabled: partyOrdersEnabled,
         });
       }
       await refetch();
@@ -204,6 +209,25 @@ export default function PortalAccessModal({
               />
               <span style={{ fontSize: 12.5, color: 'var(--t2)' }}>
                 {isActive ? 'مفعّل — يمكن للزبون تسجيل الدخول' : 'معطّل — لا يمكن للزبون تسجيل الدخول'}
+              </span>
+            </div>
+          </div>
+
+          <div className="fg">
+            <label>إرسال الطلبات (اطلب سلعة)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span
+                className={`sw ${partyOrdersEnabled ? 'on' : ''}`}
+                onClick={() => setPartyOrdersEnabled((v) => !v)}
+                role="switch"
+                aria-checked={partyOrdersEnabled}
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPartyOrdersEnabled((v) => !v); } }}
+              />
+              <span style={{ fontSize: 12.5, color: 'var(--t2)' }}>
+                {partyOrdersEnabled
+                  ? 'مفعّل — يمكن لهذا الزبون إرسال الطلبات'
+                  : 'معطّل — هذا الزبون لا يستطيع إرسال الطلبات'}
               </span>
             </div>
           </div>

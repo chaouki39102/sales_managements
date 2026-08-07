@@ -90,6 +90,20 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
     placeholderData: keepPreviousData,
   });
 
+  // إعدادات البوابة العامة — تُستخدم لتوجيه الواجهة قبل أي إرسال:
+  //   - can_order: هل يستطيع الزائر/المسجّل الحالي إرسال الطلبات فعلاً؟
+  //   - min/max: تحقق مسبق على العميل قبل أن يرفض الخادم (409/422)
+  //   - رسالة التأكيد المخصصة بعد إرسال ناجح
+  const configQuery = useQuery({
+    queryKey: ['portal', slug, 'config'],
+    queryFn: () => portalApi.config(),
+    staleTime: 60_000,
+  });
+
+  const cfg = configQuery.data;
+  const canOrder = cfg?.can_order ?? true;
+  const confirmationMessage = (cfg?.order_confirmation_message ?? '').trim();
+
   const createOrder = useMutation({
     mutationFn: ({ items, note }: { items: { product_id: number; quantity: number; packaging_id?: number | null }[]; note?: string }) =>
       isPublic
@@ -111,7 +125,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
       setDrawerOpen(false);
       setCheckoutStep(false);
       qc.invalidateQueries({ queryKey: ['portal', slug, 'orders', 'list'] });
-      showToast('تم إرسال طلب السلعة بنجاح');
+      showToast(confirmationMessage || 'تم إرسال طلب السلعة بنجاح');
     },
     onError: (err: Error) => showToast(err.message || 'تعذر إرسال الطلب'),
   });
@@ -126,7 +140,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
       setDrawerOpen(false);
       setCheckoutStep(false);
       qc.invalidateQueries({ queryKey: ['portal', slug, 'orders', 'list'] });
-      showToast('تم تحديث طلب السلعة بنجاح');
+      showToast(confirmationMessage || 'تم تحديث طلب السلعة بنجاح');
     },
     onError: (err: Error) => showToast(err.message || 'تعذر تحديث الطلب'),
   });
@@ -335,6 +349,20 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
       showToast('السلة فارغة — أضف منتجاً أولاً');
       return;
     }
+    // تحقق مسبق قبل إرسال الطلب — نفس الأذونات/الحدود التي يطبّقها الخادم:
+    // حتى لو تجاوزتها، يرفض الخادم برسالة واضحة (لا نفقد السلة).
+    if (!canOrder) {
+      showToast(cfg?.enabled ? 'إرسال الطلبات معطل حالياً' : 'إرسال الطلبات معطل حالياً من طرف المؤسسة');
+      return;
+    }
+    if (cfg?.min_order_amount && cfg.min_order_amount > 0 && totals.ttc < cfg.min_order_amount) {
+      showToast(`قيمة الطلب أقل من الحد الأدنى المسموح به (${fmtMoney(cfg.min_order_amount)} دج).`);
+      return;
+    }
+    if (cfg?.max_order_amount && cfg.max_order_amount > 0 && totals.ttc > cfg.max_order_amount) {
+      showToast(`تجاوزت قيمة الطلب الحد الأقصى المسموح به (${fmtMoney(cfg.max_order_amount)} دج).`);
+      return;
+    }
     // الطلب العام: الاسم + الهاتف إلزاميان (الخادم يرفض بدونهما أيضاً)
     if (isPublic) {
       if (!customerName.trim()) {
@@ -384,6 +412,19 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
             )}
           </div>
         </div>
+
+        {cfg && !canOrder && (
+          <div className="portal-blocked-banner">
+            <i className={cfg.enabled ? 'ti ti-user-off' : 'ti ti-basket-off'} />
+            <span>
+              {cfg.enabled
+                ? (cfg.authenticated
+                    ? 'إرسال الطلبات معطل حالياً على حسابك — تواصل مع المؤسسة لتفعيله.'
+                    : 'إرسال الطلبات من الزوار معطل حالياً.')
+                : 'إرسال الطلبات معطل حالياً من طرف المؤسسة.'}
+            </span>
+          </div>
+        )}
 
         {catalogQuery.isLoading ? (
           <PortalLoading text="جاري تحميل الكتالوج..." />
@@ -464,9 +505,10 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                           </div>
                         ) : (
                           <button
-                            className="portal-prod-fab"
+                            className={`portal-prod-fab${!canOrder ? ' portal-prod-fab--off' : ''}`}
                             type="button"
                             onClick={() => addToCart(p.id, q, selectedPack)}
+                            disabled={!canOrder}
                             aria-label="أضف إلى السلة"
                           >
                             <i className="ti ti-plus" />
@@ -591,6 +633,9 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
               رقم طلبك:{' '}
               <span className="portal-submit-ref">{createOrder.data.reference}</span>
             </div>
+            {confirmationMessage && (
+              <div className="portal-submit-msg">{confirmationMessage}</div>
+            )}
             <OrderPipeline status={createOrder.data.status} />
             <div className="portal-submit-hint">
               يمكنك متابعة حالة طلبك لاحقاً من صفحة{' '}
@@ -778,7 +823,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                   <button
                     className="portal-btn portal-btn--em portal-btn--block"
                     type="button"
-                    disabled={cartEntries.length === 0}
+                    disabled={cartEntries.length === 0 || !canOrder}
                     onClick={() => setCheckoutStep(true)}
                   >
                     <i className="ti ti-shopping-cart-check" />

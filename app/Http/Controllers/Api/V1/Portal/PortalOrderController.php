@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Portal;
 
 use App\Core\Http\Controllers\BaseApiController;
 use App\Models\PortalOrder;
+use App\Models\PortalUser;
 use App\Models\PriceLevel;
 use App\Models\Product;
 use App\Models\ProductPackaging;
@@ -89,6 +90,9 @@ class PortalOrderController extends BaseApiController
             // إن وُجد توكن صالح دون أن يُلزم المسار بمصادقة portal.auth.
             $portal = $this->optionalPortalUser($request);
             $party  = $portal?->party;
+            if ($portal) {
+                $this->assertRegisteredOrdersAllowed($portal);
+            }
             $partyIsTvaExempt = (bool) ($party?->is_tva_exempt ?? false);
 
             // نفس مستوى السعر الذي يحاسب به محرك الطلبات (createDocumentLines):
@@ -119,7 +123,7 @@ class PortalOrderController extends BaseApiController
             // يتطلب إذن أصحاب الحسابات.
             $this->assertOrdersEnabled();
             $portal
-                ? $this->assertRegisteredOrdersAllowed()
+                ? $this->assertRegisteredOrdersAllowed($portal)
                 : $this->assertGuestOrdersAllowed();
 
             $validated = $this->validatePayload($request);
@@ -206,7 +210,7 @@ class PortalOrderController extends BaseApiController
      * لكن دون رفض الطلب عند غياب التوكن: يعيد null للزائر. يُستعمل فقط في
      * مسارات الطلبات العامة (الكتالوج + الإنشاء) التي تخدم المعتمد والزائر معاً.
      */
-    private function optionalPortalUser(Request $request): ?\App\Models\PortalUser
+    private function optionalPortalUser(Request $request): ?PortalUser
     {
         $token = $request->bearerToken();
         if (!$token) {
@@ -220,7 +224,7 @@ class PortalOrderController extends BaseApiController
 
         $tokenable = $accessToken->tokenable;
 
-        return $tokenable instanceof \App\Models\PortalUser && $tokenable->is_active
+        return $tokenable instanceof PortalUser && $tokenable->is_active
             ? $tokenable
             : null;
     }
@@ -323,8 +327,9 @@ class PortalOrderController extends BaseApiController
     public function index(Request $request): JsonResponse
     {
         try {
+            // عرض سجل الطلبات يبقى متاحاً للزبون حتى لو أُوقفت إرسال الطلبات
+            // (القراءة فقط) — البوابة الرئيسية portal_enabled فقط تمنعه.
             $this->assertOrdersEnabled();
-            $this->assertRegisteredOrdersAllowed();
 
             $partyId = (int) ($request->input('_portal_user')->party_id ?? 0);
             $rows    = $this->orders->paginate(
@@ -353,10 +358,10 @@ class PortalOrderController extends BaseApiController
     {
         try {
             $this->assertOrdersEnabled();
-            $this->assertRegisteredOrdersAllowed();
 
-            $portal    = $request->input('_portal_user');
-            $partyId   = (int) ($portal->party_id ?? 0);
+            $portal  = $request->input('_portal_user');
+            $this->assertRegisteredOrdersAllowed($portal);
+            $partyId = (int) ($portal->party_id ?? 0);
             $order     = $this->findOwnOrder($partyId);
             $validated = $this->validatePayload($request, false);
 
@@ -378,9 +383,9 @@ class PortalOrderController extends BaseApiController
     {
         try {
             $this->assertOrdersEnabled();
-            $this->assertRegisteredOrdersAllowed();
 
             $portal  = $request->input('_portal_user');
+            $this->assertRegisteredOrdersAllowed($portal);
             $partyId = (int) ($portal->party_id ?? 0);
             $order   = $this->findOwnOrder($partyId);
 
@@ -402,9 +407,9 @@ class PortalOrderController extends BaseApiController
     {
         try {
             $this->assertOrdersEnabled();
-            $this->assertRegisteredOrdersAllowed();
 
             $portal  = $request->input('_portal_user');
+            $this->assertRegisteredOrdersAllowed($portal);
             $partyId = (int) ($portal->party_id ?? 0);
             $order   = $this->findOwnOrder($partyId);
 
@@ -427,8 +432,9 @@ class PortalOrderController extends BaseApiController
     public function showOrder(Request $request): JsonResponse
     {
         try {
+            // القراءة (تفاصيل الطلب) متاحة دائماً للزبون — ليست فعلاً
+            // يُقيَّد عند إيقاف إرسال الطلبات (فقط البوابة الرئيسية تمنعها).
             $this->assertOrdersEnabled();
-            $this->assertRegisteredOrdersAllowed();
 
             $partyId = (int) ($request->input('_portal_user')->party_id ?? 0);
             $order   = $this->findOwnOrder($partyId);
@@ -477,11 +483,57 @@ class PortalOrderController extends BaseApiController
     /**
      * بوابة أصحاب الحسابات — عند تعطيل طلبات المسجلين لا يمكن إنشاء أو
      * تعديل أو تأكيد أي طلب من الزبون (الإدارة تبقى قادرة على إدارة الطلبات).
+     * كما تُطبَّق علامة الزبون الفردية portal_orders_enabled: حتى لو كانت
+     * البوابة الإدارية مفعّلة، زبونٌ محدد بعلامة معطلة لا يستطيع الإرسال.
      */
-    private function assertRegisteredOrdersAllowed(): void
+    private function assertRegisteredOrdersAllowed(?PortalUser $portal = null): void
     {
         if (!$this->portalSetting('portal_allow_registered_orders', true)) {
             throw new \App\Core\Exceptions\BusinessRuleException('إرسال الطلبات من الزبائن المسجلين معطل حالياً من طرف الإدارة.', 409);
+        }
+
+        $party = $portal?->party;
+        if ($party && !(bool) $party->portal_orders_enabled) {
+            throw new \App\Core\Exceptions\BusinessRuleException('إرسال الطلبات معطل على حسابك الحالي — تواصل مع المؤسسة لتفعيله.', 409);
+        }
+    }
+
+    /**
+     * نقطة الإعدادات العامة للبوابة (بدون مصادقة) — تُقرأ من الإعدادات
+     * وتعكس الأذونات الفعلية لحامل التوكن (أو الزائر):
+     *   - enabled:      البوابة الإدارية portal_enabled
+     *   - can_order:    هل يستطيع الزائر/المسجّل الحالي إرسال الطلبات فعلاً؟
+     * يستهلكها المتجر للتحكم في الواجهة (بندرة عند التعطيل، منع الإرسال،
+     * رسالة التأكيد المخصصة، وحدود المبلغ للتحقق المسبق على العميل).
+     */
+    public function config(Request $request): JsonResponse
+    {
+        try {
+            $portal   = $this->optionalPortalUser($request);
+            $party    = $portal?->party;
+
+            $enabled          = (bool) $this->portalSetting('portal_enabled', true);
+            $allowGuest       = (bool) $this->portalSetting('portal_allow_guest_orders', true);
+            $allowRegistered  = (bool) $this->portalSetting('portal_allow_registered_orders', true);
+
+            $partyEnabled = $party ? (bool) $party->portal_orders_enabled : null;
+            $canOrder = $enabled && ($portal
+                ? ($allowRegistered && $partyEnabled)
+                : $allowGuest);
+
+            return $this->successResponse([
+                'enabled'                    => $enabled,
+                'allow_guest_orders'         => $allowGuest,
+                'allow_registered_orders'    => $allowRegistered,
+                'min_order_amount'           => (float) $this->portalSetting('portal_min_order_amount', 0),
+                'max_order_amount'           => (float) $this->portalSetting('portal_max_order_amount', 0),
+                'order_confirmation_message' => (string) $this->portalSetting('portal_order_confirmation_message', ''),
+                'authenticated'              => $portal !== null,
+                'party_orders_enabled'       => $partyEnabled,
+                'can_order'                  => (bool) $canOrder,
+            ], 'تم جلب إعدادات البوابة بنجاح');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'portal_orders.config');
         }
     }
 

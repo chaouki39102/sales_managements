@@ -471,6 +471,24 @@ class SettingsSeeder extends Seeder
                 'is_editable'   => true,
                 'display_order' => 103,
             ],
+            'portal_max_order_amount' => [
+                'value'         => 0,
+                'group'         => 'portal',
+                'type'          => 'float',
+                'description'   => 'الحد الأقصى لمبلغ الطلب (دج) — 0 يعني بدون حد',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 104,
+            ],
+            'portal_order_confirmation_message' => [
+                'value'         => '',
+                'group'         => 'portal',
+                'type'          => 'string',
+                'description'   => 'رسالة التأكيد المعروضة للزبون بعد إرسال الطلب (تُظهر الرسالة الافتراضية إن تُركت فارغة)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 105,
+            ],
 
             // ══════════════════════════════════════════
             // group: documents — إعدادات المستندات الافتراضية

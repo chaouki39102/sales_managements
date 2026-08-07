@@ -37,6 +37,7 @@ export interface PortalParty {
   credit_limit:      number;
   credit_days:       number | null;
   allow_credit_sale: boolean;
+  portal_orders_enabled: boolean;
   is_tva_exempt:     boolean;
   is_taxable:        boolean;
   tax_option:        string | null;
@@ -283,6 +284,26 @@ export interface PortalOrder {
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────
+export interface PortalOrderFilters {
+  page?: number;
+  per_page?: number;
+  status?: PortalOrderStatus;
+}
+
+// إعدادات البوابة العامة — تُجلب بدون مصادقة وتُستخدم لتوجيه واجهة المتجر
+// (تعطيل المتجر، منع الإرسال، رسالة التأكيد، وحدود المبلغ).
+export interface PortalConfig {
+  enabled:                    boolean;
+  allow_guest_orders:         boolean;
+  allow_registered_orders:    boolean;
+  min_order_amount:           number;
+  max_order_amount:           number;
+  order_confirmation_message: string;
+  authenticated:              boolean;
+  party_orders_enabled:       boolean | null;
+  can_order:                  boolean;
+}
+
 export interface PortalDocFilters {
   page?: number;
   per_page?: number;
@@ -305,6 +326,7 @@ export const portalApi = {
   login:    (email: string, password: string) =>
     portalPost<PortalLoginResponse>('/portal/auth/login', { email, password }),
   company:  ()    => portalGet<PortalCompany>('/portal/info'),
+  config:   ()    => portalGet<PortalConfig>('/portal/config'),
   me:       ()    => portalGet<PortalUser>('/portal/auth/me'),
   logout:   ()    => portalPost<void>('/portal/auth/logout'),
   dashboard:()    => portalGet<PortalDashboard>('/portal/dashboard'),

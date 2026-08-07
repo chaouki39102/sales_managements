@@ -4546,6 +4546,8 @@ function PortalTab({
     const [allowGuest, setAllowGuest] = useState(true);
     const [allowRegistered, setAllowRegistered] = useState(true);
     const [minOrderAmount, setMinOrderAmount] = useState("0");
+    const [maxOrderAmount, setMaxOrderAmount] = useState("0");
+    const [confirmationMessage, setConfirmationMessage] = useState("");
 
     useEffect(() => {
         if (!rawSettings.length) return;
@@ -4553,6 +4555,8 @@ function PortalTab({
         setAllowGuest(gs<boolean>("portal_allow_guest_orders", true));
         setAllowRegistered(gs<boolean>("portal_allow_registered_orders", true));
         setMinOrderAmount(str(gs("portal_min_order_amount", 0)));
+        setMaxOrderAmount(str(gs("portal_max_order_amount", 0)));
+        setConfirmationMessage(str(gs("portal_order_confirmation_message", "")));
     }, [rawSettings]);
 
     const doSave = async () => {
@@ -4561,6 +4565,8 @@ function PortalTab({
             portal_allow_guest_orders: allowGuest,
             portal_allow_registered_orders: allowRegistered,
             portal_min_order_amount: Number(minOrderAmount) || 0,
+            portal_max_order_amount: Number(maxOrderAmount) || 0,
+            portal_order_confirmation_message: confirmationMessage,
         };
         await saveSettings(payload);
         qc.invalidateQueries({
@@ -4633,28 +4639,100 @@ function PortalTab({
                         color="var(--blue)"
                     />
                     <div
-                        style={{ display: "flex", alignItems: "center", gap: 10 }}
+                        style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 12,
+                        }}
                     >
-                        <span style={{ fontSize: 13, color: "var(--t2)" }}>
-                            الحد الأدنى لقيمة الطلب (دج) — 0 يعني بدون حد
-                        </span>
-                        <input
-                            type="number"
-                            value={minOrderAmount}
-                            onChange={(e) => {
-                                setMinOrderAmount(e.target.value);
-                                markDirty();
-                                onDirty?.();
-                            }}
+                        <div
                             style={{
-                                width: 110,
-                                fontFamily: "monospace",
-                                textAlign: "center",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
                             }}
-                            min={0}
-                            step={100}
-                        />
+                        >
+                            <span style={{ fontSize: 13, color: "var(--t2)" }}>
+                                الحد الأدنى لقيمة الطلب (دج) — 0 يعني بدون حد
+                            </span>
+                            <input
+                                type="number"
+                                value={minOrderAmount}
+                                onChange={(e) => {
+                                    setMinOrderAmount(e.target.value);
+                                    markDirty();
+                                    onDirty?.();
+                                }}
+                                style={{
+                                    width: 110,
+                                    fontFamily: "monospace",
+                                    textAlign: "center",
+                                }}
+                                min={0}
+                                step={100}
+                            />
+                        </div>
+                        <div
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
+                            }}
+                        >
+                            <span style={{ fontSize: 13, color: "var(--t2)" }}>
+                                الحد الأقصى لقيمة الطلب (دج) — 0 يعني بدون حد
+                            </span>
+                            <input
+                                type="number"
+                                value={maxOrderAmount}
+                                onChange={(e) => {
+                                    setMaxOrderAmount(e.target.value);
+                                    markDirty();
+                                    onDirty?.();
+                                }}
+                                style={{
+                                    width: 110,
+                                    fontFamily: "monospace",
+                                    textAlign: "center",
+                                }}
+                                min={0}
+                                step={100}
+                            />
+                        </div>
                     </div>
+                </Card>
+            )}
+
+            {portalEnabled && (
+                <Card>
+                    <SecHead
+                        icon="ti-message-circle-check"
+                        label="رسالة تأكيد الطلب"
+                        color="var(--green)"
+                        sub="تُعرض للزبون بعد إرسال الطلب — إن تُركت فارغة تظهر الرسالة الافتراضية"
+                    />
+                    <textarea
+                        value={confirmationMessage}
+                        onChange={(e) => {
+                            setConfirmationMessage(e.target.value);
+                            markDirty();
+                            onDirty?.();
+                        }}
+                        placeholder="مثال: شكراً لطلبك! سنتصل بك خلال 24 ساعة لتأكيد التسليم."
+                        rows={3}
+                        style={{
+                            width: "100%",
+                            padding: "10px 12px",
+                            fontFamily: "inherit",
+                            fontSize: 13,
+                            lineHeight: 1.7,
+                            color: "var(--t1)",
+                            background: "var(--bg1)",
+                            border: "1px solid var(--b2)",
+                            borderRadius: 10,
+                            resize: "vertical",
+                        }}
+                    />
                 </Card>
             )}
 
