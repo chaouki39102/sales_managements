@@ -128,6 +128,7 @@ const PortalPaymentsPage     = lazy(() => import('@/pages/portal/PortalPaymentsP
 const PortalStatementPage    = lazy(() => import('@/pages/portal/PortalStatementPage'));
 const PortalProfilePage      = lazy(() => import('@/pages/portal/PortalProfilePage'));
 const PortalOrdersPage       = lazy(() => import('@/pages/portal/PortalOrdersPage'));
+const PortalMyOrdersPage     = lazy(() => import('@/pages/portal/PortalMyOrdersPage'));
 const PortalPublicOrderPage  = lazy(() => import('@/pages/portal/PortalPublicOrderPage'));
 const PortalTrackOrderPage   = lazy(() => import('@/pages/portal/PortalTrackOrderPage'));
 const PortalOrdersAdminPage  = lazy(() => import('@/pages/portal/PortalOrdersAdminPage'));
@@ -405,6 +406,7 @@ export function AppRoutes() {
           <Route path="statement" element={<PortalStatementPage />} />
           <Route path="profile" element={<PortalProfilePage />} />
           <Route path="orders" element={<PortalOrdersPage />} />
+          <Route path="myorders" element={<PortalMyOrdersPage />} />
         </Route>
         {/* POS Pro Mobile — شاشة هاتف كاملة (خارج لوحة التحكم) */}
         <Route

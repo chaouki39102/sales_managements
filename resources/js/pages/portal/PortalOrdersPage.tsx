@@ -1,40 +1,17 @@
 // ════════════════════════════════════════════════════════════════════════════
 // pages/portal/PortalOrdersPage.tsx — وصل طلب سلعة (كتالوج + سلة + طلباتي)
 // ════════════════════════════════════════════════════════════════════════════
-import { useMemo, useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useMemo, useState, useEffect, useRef } from 'react';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { portalApi, type PortalCatalogItem, type PortalCatalogPackaging, type PortalCatalogDiscount, type PortalOrderStatus, type PortalOrder } from '@/lib/api/portal/portal';
+import { portalApi, type PortalCatalogItem, type PortalCatalogPackaging, type PortalCatalogDiscount, type PortalOrder } from '@/lib/api/portal/portal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useConfirm } from '@/hooks/useConfirm';
 import OrderPipeline from './OrderPipeline';
 import {
-  fmtMoney, fmtMoneySigned, fmtDate, Pager,
+  fmtMoney, Pager,
   PortalLoading, PortalError, PortalEmpty,
 } from './portalUtils';
-
-const STATUS_STYLE: Record<PortalOrderStatus, string> = {
-  pending:   'badge--gray',
-  preparing: 'badge--y',
-  confirmed: 'badge--b',
-  processed: 'badge--purple',
-  shipped:   'badge--z',
-  delivered: 'badge--g',
-  returned:  'badge--r',
-  cancelled: 'badge--gray',
-  completed: 'badge--g',
-};
-
-const STATUS_TABS: { key: PortalOrderStatus | ''; label: string }[] = [
-  { key: '', label: 'الكل' },
-  { key: 'preparing', label: 'قيد الاعداد' },
-  { key: 'confirmed', label: 'مؤكد' },
-  { key: 'processed', label: 'تم المعالجة' },
-  { key: 'shipped',   label: 'الشحن' },
-  { key: 'delivered', label: 'تم التسليم' },
-  { key: 'returned',  label: 'مرتجع' },
-  { key: 'cancelled', label: 'ملغى' },
-];
 
 function useDebounce<T>(value: T, ms: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -70,8 +47,6 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
-  const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<PortalOrderStatus | ''>('');
   const [catalogPage, setCatalogPage] = useState(1);
   const [toast, setToast] = useState('');
   const [submitted, setSubmitted] = useState<number | null>(null);
@@ -102,33 +77,6 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
     if (ok) updateCartQty(key, 0);
   };
 
-  // تأكيد الطلب من الزبون — نافذة واضحة لا تحتاج إعادة النقر خلال مهلة زمنية.
-  const handleValidateOrder = async (o: PortalOrder) => {
-    const ok = await confirm(
-      `تأكيد الطلب «${o.reference}»؟\nبعد التأكيد يدخل الطلب مرحلة تحليل المسؤول ولا يمكنك التعديل عليه.`,
-      {
-        title: 'تأكيد الطلب',
-        confirmText: 'تأكيد الطلب',
-        cancelText: 'تراجع',
-        variant: 'warning',
-        icon: 'ti-circle-check',
-      },
-    );
-    if (ok) validateOrder.mutate(o.id);
-  };
-
-  // إلغاء الطلب — نافذة تأكيد صريحة بدل أسلوب النقرتين المتلاشي.
-  const handleCancelOrder = async (o: PortalOrder) => {
-    const ok = await confirm(`إلغاء الطلب «${o.reference}»؟`, {
-      title: 'إلغاء الطلب',
-      confirmText: 'إلغاء الطلب',
-      cancelText: 'تراجع',
-      variant: 'danger',
-      icon: 'ti-x',
-    });
-    if (ok) cancelOrder.mutate(o.id);
-  };
-
   const debouncedSearch = useDebounce(search, 350);
 
   const showToast = (msg: string) => {
@@ -140,13 +88,6 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
     queryKey: ['portal', slug, 'orders', 'catalog', debouncedSearch, catalogPage],
     queryFn: () => portalApi.catalog({ page: catalogPage, per_page: 24, search: debouncedSearch || undefined }),
     placeholderData: keepPreviousData,
-  });
-
-  const ordersQuery = useQuery({
-    queryKey: ['portal', slug, 'orders', 'list', page, statusFilter],
-    queryFn: () => portalApi.orders({ page, per_page: 10, status: statusFilter || undefined }),
-    placeholderData: keepPreviousData,
-    enabled: !isPublic,
   });
 
   const createOrder = useMutation({
@@ -166,7 +107,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
       resetCart();
       setEditingId(null);
       setSubmitted(order.id);
-      setPage(1);
+      setCatalogPage(1);
       setDrawerOpen(false);
       setCheckoutStep(false);
       qc.invalidateQueries({ queryKey: ['portal', slug, 'orders', 'list'] });
@@ -188,28 +129,6 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
       showToast('تم تحديث طلب السلعة بنجاح');
     },
     onError: (err: Error) => showToast(err.message || 'تعذر تحديث الطلب'),
-  });
-
-  const cancelOrder = useMutation({
-    mutationFn: (id: number) => portalApi.cancelOrder(id),
-    onSuccess: (order) => {
-      setSubmitted(order.id);
-      qc.invalidateQueries({ queryKey: ['portal', slug, 'orders', 'list'] });
-      showToast('تم إلغاء الطلب');
-    },
-    onError: (err: Error) => showToast(err.message || 'تعذر إلغاء الطلب'),
-  });
-
-  // تأكيد الطلب من الزبون (قيد الاعداد → مؤكد) — الطريقة الاحترافية:
-  // بعد التأكيد يدخل الطلب مرحلة تحليل المسؤول ولا يعود للزبون تصرف.
-  const validateOrder = useMutation({
-    mutationFn: (id: number) => portalApi.validateOrder(id),
-    onSuccess: (order) => {
-      setSubmitted(order.id);
-      qc.invalidateQueries({ queryKey: ['portal', slug, 'orders', 'list'] });
-      showToast('تم تأكيد طلبك — أصبح في انتظار تحليل المسؤول');
-    },
-    onError: (err: Error) => showToast(err.message || 'تعذر تأكيد الطلب'),
   });
 
   const byId = useMemo(() => {
@@ -390,6 +309,22 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const location = useLocation();
+  const navigate = useNavigate();
+  const appliedEditRef = useRef<number | null>(null);
+  // القدوم من صفحة «طلباتي» (تعديل): يُحمّل الطلب في السلة ويفتح الدرج ثم يمسح
+  // حالة التنقل حتى لا يعيد فتحه عند العودة أو تحديث الصفحة.
+  useEffect(() => {
+    const st = location.state as { editOrder?: PortalOrder } | null;
+    const editOrder = st?.editOrder;
+    if (editOrder && appliedEditRef.current !== editOrder.id) {
+      appliedEditRef.current = editOrder.id;
+      startEdit(editOrder);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
+
   const submitCart = () => {
     const items = Object.values(cart).map((e) => ({
       product_id: e.product_id,
@@ -417,11 +352,6 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
       createOrder.mutate({ items, note: notes.trim() || undefined });
     }
   };
-
-  const orders = ordersQuery.data?.data ?? [];
-  const meta = ordersQuery.data?.meta;
-  const from = meta ? meta.per_page * (meta.current_page - 1) + 1 : 0;
-  const to = meta ? Math.min(meta.per_page * meta.current_page, meta.total) : 0;
 
   const catalogMeta = catalogQuery.data?.meta;
   const catalogFrom = catalogMeta ? catalogMeta.per_page * (catalogMeta.current_page - 1) + 1 : 0;
@@ -870,139 +800,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
         </button>
       )}
 
-      {/* ─── طلباتي ─── */}
-      {!isPublic && (
-      <div className="portal-card portal-mt-22">
-        <div className="portal-card-hd">
-          <h3><i className="ti ti-clipboard-list" /> طلباتي</h3>
-          <span className="portal-hd-count">{meta?.total ?? 0} طلب</span>
-        </div>
-
-        <div className="portal-toolbar portal-toolbar--tight">
-          <div className="portal-filters" role="tablist" aria-label="تصفية حسب الحالة">
-            {STATUS_TABS.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                className={`portal-tab${statusFilter === tab.key ? ' on' : ''}`}
-                onClick={() => { setStatusFilter(tab.key); setPage(1); }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {ordersQuery.isLoading ? (
-          <PortalLoading text="جاري تحميل طلباتك..." />
-        ) : ordersQuery.isError || !ordersQuery.data ? (
-          <PortalError message="تعذر تحميل الطلبات" />
-        ) : orders.length === 0 ? (
-          <PortalEmpty icon="ti-clipboard-list" text="لا توجد طلبات بهذه الحالة" />
-        ) : (
-          <>
-            <div className="portal-order-list">
-              {orders.map((o) => (
-                <div key={o.id} className="portal-order">
-                  <button
-                    className="portal-order-hd"
-                    type="button"
-                    onClick={() => setSubmitted(submitted === o.id ? null : o.id)}
-                  >
-                    <div className="portal-order-info">
-                      <div className="portal-order-ref">{o.reference}</div>
-                      <div className="portal-prod-ref">{fmtDate(o.requested_at || o.created_at)} • {o.items_count} صنف</div>
-                    </div>
-                    <div className="portal-order-side">
-                      <span className={`badge ${STATUS_STYLE[o.status]}`}>{o.status_label}</span>
-                      <span className="portal-order-amt">{fmtMoneySigned(o.total_ttc)}</span>
-                      <i className={`ti ti-chevron-${submitted === o.id ? 'up' : 'down'}`} />
-                    </div>
-                  </button>
-                  {submitted === o.id && (
-                    <div className="portal-order-detail">
-                      <OrderPipeline status={o.status} />
-                      {(o.lines ?? []).map((it) => {
-                        const factor = it.pack_qty > 1 ? it.pack_qty : 1;
-                        return (
-                          <div key={`${it.product_id}-${it.packaging_id ?? 0}`} className="portal-cart-item portal-cart-item--ro">
-                            <div className="portal-cart-info">
-                              <div className="portal-prod-name">{it.product_name}</div>
-                              <div className="portal-prod-ref">
-                                {fmtMoney(it.unit_price_ht)}
-                                {factor > 1 ? ` ×${factor}` : ''}
-                                {`/${it.unit_name || 'وحدة'}`}
-                                {it.tva_rate > 0 ? ` • TVA ${it.tva_rate}%` : ''} • ×{it.quantity}
-                              </div>
-                              {it.discount_percentage > 0 || it.total_discount_amount > 0 ? (
-                                <div className="portal-cart-disc">
-                                  <i className="ti ti-discount-2" />
-                                  خصم {it.discount_percentage > 0 ? `${it.discount_percentage}%` : ''}
-                                  {it.total_discount_amount > 0 ? (
-                                    <span>-{fmtMoney(it.total_discount_amount)}</span>
-                                  ) : null}
-                                </div>
-                              ) : null}
-                            </div>
-                            <div className="portal-cart-total">{fmtMoney(it.total_ttc)}</div>
-                          </div>
-                        );
-                      })}
-                      {o.total_discount > 0 && (
-                        <div className="portal-order-disc">
-                          <i className="ti ti-discount-2" />
-                          إجمالي الخصم في الطلب: <b>-{fmtMoney(o.total_discount)}</b>
-                        </div>
-                      )}
-                      {o.notes && <div className="portal-order-notes">ملاحظات: {o.notes}</div>}
-
-                      {(o.status === 'preparing') && (
-                        <div className="portal-order-actions">
-                          <button
-                            className="portal-btn portal-btn--sm portal-btn--em"
-                            onClick={() => handleValidateOrder(o)}
-                            type="button"
-                            disabled={validateOrder.isPending}
-                          >
-                            <i className="ti ti-circle-check" /> تأكيد الطلب
-                          </button>
-                          <button
-                            className="portal-btn portal-btn--sm"
-                            onClick={() => startEdit(o)}
-                            type="button"
-                            disabled={pendingSubmit}
-                          >
-                            <i className="ti ti-edit" /> تعديل
-                          </button>
-                          <button
-                            className="portal-btn portal-btn--sm portal-btn--danger"
-                            onClick={() => handleCancelOrder(o)}
-                            type="button"
-                            disabled={cancelOrder.isPending}
-                          >
-                            <i className="ti ti-x" /> إلغاء الطلب
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-            {meta && meta.last_page > 1 && (
-              <Pager
-                page={meta.current_page}
-                lastPage={meta.last_page}
-                total={meta.total}
-                from={from}
-                to={to}
-                onChange={setPage}
-              />
-            )}
-          </>
-        )}
-      </div>
-      )}
+      {/* ─── نهاية قسم الطلبات — انتقل إلى صفحة طلباتي المستقلة PortalMyOrdersPage ─── */}
 
       {toast && <div className="portal-toast"><i className="ti ti-circle-check" /> {toast}</div>}
       <ConfirmDialog {...confirmDialogProps} />

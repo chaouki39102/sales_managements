@@ -18,6 +18,7 @@ export default function PortalLayout() {
   const NAV_ITEMS = [
     { to: base, label: 'الرئيسية', icon: 'ti-layout-dashboard', end: true },
     { to: `${base}/documents`, label: 'المستندات', icon: 'ti-file-text', end: false },
+    { to: `${base}/myorders`, label: 'طلباتي', icon: 'ti-clipboard-list', end: false },
     { to: `${base}/orders`, label: 'اطلب سلعة', icon: 'ti-building-store', end: false },
     { to: `${base}/payments`, label: 'الدفعات', icon: 'ti-wallet', end: false },
     { to: `${base}/statement`, label: 'كشف الحساب', icon: 'ti-report-money', end: false },
