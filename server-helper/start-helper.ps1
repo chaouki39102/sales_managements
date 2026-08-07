@@ -23,3 +23,12 @@ if (-not $SkipApp -and -not (PortUp 8000)) {
     Start-Process -FilePath $php -ArgumentList 'artisan','serve','--host=0.0.0.0','--port=8000' `
         -WorkingDirectory $root -WindowStyle Hidden
 }
+
+# Persistent auto-repair watchdog: keeps the helper (8777) alive and auto-restarts
+# the app (8000) whenever it dies, so ERR_CONNECTION_REFUSED heals itself.
+# Spawned unconditionally (hidden); watchdog.ps1's named mutex makes a second
+# instance exit immediately, so this is safe on every boot/manual re-run.
+$watchdogScript = Join-Path $root 'watchdog.ps1'
+Start-Process -FilePath 'powershell' `
+    -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', "`"$watchdogScript`"" `
+    -WorkingDirectory $root -WindowStyle Hidden
