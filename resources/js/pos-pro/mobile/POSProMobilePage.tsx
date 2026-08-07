@@ -22,6 +22,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
+
 import { usePOSAggregatedLookups } from '@/lib/api/endpoints/lookups';
 import { productsApi } from '@/lib/api/endpoints/products';
 import { apiGet } from '@/lib/api/core/client';
@@ -59,6 +60,7 @@ import type {
   Product, ProductVariant, CartItem, CartTotals, PaymentMode, ProductPackaging, Party,
 } from '@/types';
 import type { PaginatedResponse } from '@/lib/api/core/types';
+
 
 // ── مودالات مشتركة (lazy — نفس نهج POSPage / POSProPage) ───────────────────
 const OpenSessionModal = React.lazy(() => import('@/pos/components/OpenSessionModal'));
