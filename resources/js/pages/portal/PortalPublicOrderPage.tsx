@@ -57,11 +57,18 @@ export default function PortalPublicOrderPage() {
                 <div className="portal-public-sub">اطلب سلعك مباشرة — سعر الكتالوج ونفس الفواتير</div>
               </div>
             </div>
-            {slug && (
-              <Link className="portal-public-login" to={`/portal/${slug}/login`}>
-                <i className="ti ti-login" /> تسجيل الدخول
-              </Link>
-            )}
+            <div className="portal-public-nav">
+              {slug && (
+                <Link className="portal-public-login" to={`/portal/${slug}/track`}>
+                  <i className="ti ti-truck-delivery" /> تتبع طلبك
+                </Link>
+              )}
+              {slug && (
+                <Link className="portal-public-login" to={`/portal/${slug}/login`}>
+                  <i className="ti ti-login" /> تسجيل الدخول
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </header>

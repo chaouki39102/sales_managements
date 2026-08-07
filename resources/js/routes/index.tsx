@@ -129,6 +129,7 @@ const PortalStatementPage    = lazy(() => import('@/pages/portal/PortalStatement
 const PortalProfilePage      = lazy(() => import('@/pages/portal/PortalProfilePage'));
 const PortalOrdersPage       = lazy(() => import('@/pages/portal/PortalOrdersPage'));
 const PortalPublicOrderPage  = lazy(() => import('@/pages/portal/PortalPublicOrderPage'));
+const PortalTrackOrderPage   = lazy(() => import('@/pages/portal/PortalTrackOrderPage'));
 const PortalOrdersAdminPage  = lazy(() => import('@/pages/portal/PortalOrdersAdminPage'));
 
 // â”€â”€ Admin Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -384,6 +385,8 @@ export function AppRoutes() {
         <Route path="/portal/:slug/login" element={<PortalLoginPage />} />
         {/* صفحة الطلب العام — بدون حساب، بدون حراسة auth */}
         <Route path="/portal/:slug/order" element={<PortalPublicOrderPage />} />
+        {/* تتبع طلبات الزائر برقم الهاتف — بدون حساب */}
+        <Route path="/portal/:slug/track" element={<PortalTrackOrderPage />} />
 
         <Route
           path="/portal/:slug"

@@ -142,6 +142,47 @@ class PortalOrderController extends BaseApiController
     }
 
     /**
+     * تتبع طلب من الزائر (بدون حساب) — نقطة عامة كالكتالوج والإنشاء:
+     * يبحث في طلبات المؤسسة عن الطلبات العامة (customer_name غير فارغ) التي
+     * سُجِّلت برقم الهاتف المطلوب ويعيدها بحالتها الحالية. القاعدة الأمنية:
+     * لا تُعاد أبداً طلبات أصحاب حسابات البوابة (customer_name = null) — فقط
+     * طلبات الزوار المجهولة التي تتطابق مع الرقم المُرسل.
+     */
+    public function track(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'phone'     => ['required', 'string', 'max:40'],
+                'reference' => ['nullable', 'string', 'max:255'],
+            ]);
+
+            $companyId = (int) app(CompanyContextService::class)->get();
+            $phone     = trim($validated['phone']);
+            $reference = trim((string) ($validated['reference'] ?? ''));
+
+            $query = PortalOrder::query()
+                ->with(['document.documentType', 'document.lines.product.tva', 'document.lines.product.unit', 'histories'])
+                ->where('company_id', $companyId)
+                ->whereNotNull('customer_name')
+                ->where('customer_phone', $phone)
+                ->orderByDesc('id');
+
+            if ($reference !== '') {
+                $query->where('reference', 'like', "%{$reference}%");
+            }
+
+            $rows = $query->limit(20)->get();
+
+            return $this->successResponse(
+                $rows->map(fn(PortalOrder $o) => $this->orders->toArray($o, PortalOrder::CHANGED_BY_CUSTOMER))->values()->all(),
+                'تم جلب طلباتك بنجاح'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'portal_orders.track');
+        }
+    }
+
+    /**
      * حل زبون بوابة "اختياري" — نفس منطق PortalAuthenticate::resolvePortalUser
      * لكن دون رفض الطلب عند غياب التوكن: يعيد null للزائر. يُستعمل فقط في
      * مسارات الطلبات العامة (الكتالوج + الإنشاء) التي تخدم المعتمد والزائر معاً.

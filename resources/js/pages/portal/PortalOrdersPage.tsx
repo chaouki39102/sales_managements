@@ -2,7 +2,7 @@
 // pages/portal/PortalOrdersPage.tsx — وصل طلب سلعة (كتالوج + سلة + طلباتي)
 // ════════════════════════════════════════════════════════════════════════════
 import { useMemo, useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { portalApi, type PortalCatalogItem, type PortalCatalogPackaging, type PortalCatalogDiscount, type PortalOrderStatus, type PortalOrder } from '@/lib/api/portal/portal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -581,6 +581,26 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
           </>
         )}
       </div>
+
+      {/* ─── تأكيد إرسال الطلب العام ─── */}
+      {isPublic && submitted && createOrder.data && (
+        <div className="portal-card portal-mt-22">
+          <div className="portal-submit-ok">
+            <i className="ti ti-circle-check" />
+            <b>تم إرسال طلبك بنجاح</b>
+            <div>
+              رقم طلبك:{' '}
+              <span className="portal-submit-ref">{createOrder.data.reference}</span>
+            </div>
+            <OrderPipeline status={createOrder.data.status} />
+            <div className="portal-submit-hint">
+              يمكنك متابعة حالة طلبك لاحقاً من صفحة{' '}
+              <Link to={`/portal/${slug}/track`}>تتبع طلبك</Link> برقم هاتفك
+              {createOrder.data.notes ? <> — ملاحظتك مسجّلة: «{createOrder.data.notes}»</> : null}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── سلة الطلب ─── */}
       <div className="portal-card portal-mt-22">

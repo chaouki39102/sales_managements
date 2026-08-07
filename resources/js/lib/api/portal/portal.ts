@@ -365,6 +365,12 @@ export const portalApi = {
     }),
   updateOrder: (id: number, items: PortalOrderLineInput[], notes?: string) =>
     portalPut<PortalOrder>(`/portal/orders/${id}`, { items, notes: notes || undefined }),
+  // تتبع طلبات الزائر برقم الهاتف (بدون حساب) — يُرجع طلباته العامة فقط.
+  trackOrder: (phone: string, reference?: string) =>
+    portalPost<PortalOrder[]>('/portal/orders/track', {
+      phone,
+      reference: reference?.trim() || undefined,
+    }),
   validateOrder: (id: number) =>
     portalPost<PortalOrder>(`/portal/orders/${id}/validate`),
   cancelOrder: (id: number) =>

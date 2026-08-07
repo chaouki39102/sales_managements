@@ -2963,6 +2963,34 @@ body.dark .poa-date input::-webkit-calendar-picker-indicator { opacity: .85; }
   .portal-public-name { font-size: 14.5px; }
 }
 
+/* صفحة تتبع الطلب العام (زائر) */
+.portal-public-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.portal-track-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }
+.portal-track-form .portal-cart-actions { margin: 0; }
+.portal-track-hint {
+  margin-top: 12px; padding: 10px 12px; font-size: 12px; line-height: 1.7;
+  color: var(--t3, #64748b); background: var(--bg2, #f8fafc);
+  border: 1px dashed var(--b3, #e2e8f0); border-radius: var(--r2, 10px);
+}
+.portal-submit-ok {
+  margin-top: 16px; padding: 18px; text-align: center; color: var(--t1, #0f172a);
+  background: linear-gradient(180deg, #f0fdf4, #ecfdf5);
+  border: 1px solid #bbf7d0; border-radius: 14px;
+}
+.portal-submit-ok > i { font-size: 34px; color: #16a34a; display: block; margin-bottom: 6px; }
+.portal-submit-ok b { font-size: 16px; display: block; margin-bottom: 4px; }
+.portal-submit-ref {
+  display: inline-block; margin-block: 4px 8px; padding: 3px 10px;
+  font-family: Consolas, monospace; font-size: 13px; color: #166534;
+  background: #dcfce7; border-radius: 8px;
+}
+.portal-submit-hint { font-size: 12px; color: var(--t3, #64748b); margin-top: 6px; }
+.portal-submit-hint a { color: var(--em, #1f3864); font-weight: 700; text-decoration: none; }
+.portal-submit-hint a:hover { text-decoration: underline; }
+@media (max-width: 640px) {
+  .portal-track-form { grid-template-columns: 1fr; }
+}
+
 /* ═══ طلب عام (زائر غير مسجّل — Client Cash) ═══ */
 .poa-guest-chip {
   display: inline-flex; align-items: center; gap: 4px; flex: none;

@@ -176,6 +176,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/orders/catalog', [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'catalog']);
         Route::post('/orders', [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'store'])
             ->middleware('throttle:20,1');
+        // تتبع طلب الزائر برقم هاتفه — بدون حساب، يُرجع طلباته العامة فقط.
+        Route::post('/orders/track', [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'track'])
+            ->middleware('throttle:10,1');
 
         Route::middleware('portal.auth')->group(function () {
             Route::get('/auth/me',      [PortalAuthController::class, 'me']);
