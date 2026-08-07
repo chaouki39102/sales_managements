@@ -76,109 +76,187 @@ class PortalOrderController extends BaseApiController
     public function catalog(Request $request): JsonResponse
     {
         try {
-            $search  = trim((string) $request->input('search'));
-            $perPage = min(max((int) $request->input('per_page', 24), 1), 100);
-
-            // زبون البوابة المعتمد — نحتاج حالته الجبائية ومستوى السعر الشخصي
-            // لنعرض بالضبط ما سيحاسَب عليه الطلب (لا نعرض TVA لزبون معفى،
-            // ولا خصومات مستوى لا يطبّقها محرك الطلبات).
-            $portal = $request->input('_portal_user');
+            // نقطة بيع واحدة للجميع: المستخدم المعتمد (Bearer portal token) يحصل
+            // على كتالوجه بحالته الجبائية ومستوى سعره الشخصي، والزائر بدون توكن
+            // يحصل على كتالوج المؤسسة الافتراضي. `optionalPortalUser` يحل الزبون
+            // إن وُجد توكن صالح دون أن يُلزم المسار بمصادقة portal.auth.
+            $portal = $this->optionalPortalUser($request);
             $party  = $portal?->party;
             $partyIsTvaExempt = (bool) ($party?->is_tva_exempt ?? false);
 
             // نفس مستوى السعر الذي يحاسب به محرك الطلبات (createDocumentLines):
-            // مستوى الزبون إن وُجد، وإلا المستوى الافتراضي للمؤسسة. تُصفّى
-            // خصومات الكميات بهذا المستوى حتى يطابق الكتالوج التحصيل الفعلي.
+            // مستوى الزبون إن وُجد، وإلا المستوى الافتراضي للمؤسسة.
             $priceLevelId = $party?->default_price_level_id
                 ? (int) $party->default_price_level_id
                 : $this->defaultPriceLevelId();
 
-            $query = Product::query()
-                ->with(['tva', 'unit', 'prices', 'packagings', 'quantityDiscounts'])
-                ->where('active', true)
-                ->when($search !== '', fn($q) => $q->where(fn($w) => $w
-                    ->where('name', 'like', "%{$search}%")
-                    ->orWhere('ref', 'like', "%{$search}%")
-                    ->orWhere('barcode', 'like', "%{$search}%")
-                ))
-                ->orderBy('name');
-
-            $rows = $query->paginate($perPage);
-
-            $stockRows = $this->stockService->getStockAt(now()->toDateString());
-            $stockMap  = [];
-            foreach ($stockRows as $row) {
-                $stockMap[(int) $row['id']] = $row['current_stock'];
-            }
-
-            $items = collect($rows->items())->map(function (Product $p) use ($stockMap, $partyIsTvaExempt, $priceLevelId) {
-                return [
-                    'id'            => $p->id,
-                    'name'          => $p->name,
-                    'ref'           => $p->ref,
-                    'barcode'       => $p->barcode,
-                    'unit_price_ht' => round($p->default_selling_price_ht, 4),
-                    'tva_rate'      => (float) ($p->tva?->rate ?? 0),
-                    'unit'          => $p->unit
-                        ? ['name' => $p->unit->name, 'symbol' => $p->unit->symbol]
-                        : null,
-                    'manages_stock' => (bool) $p->manages_stock,
-                    'current_stock' => $p->manages_stock
-                        ? ($stockMap[$p->id] ?? null)
-                        : null,
-                    'has_packaging' => $p->packagings->isNotEmpty(),
-                    'packagings'    => $p->packagings
-                        ->filter(fn(ProductPackaging $pk) => (bool) $pk->active)
-                        ->map(fn(ProductPackaging $pk) => [
-                            'id'              => $pk->id,
-                            'code'            => $pk->code,
-                            'label'           => $pk->label,
-                            'quantity'        => (float) $pk->quantity,
-                            'barcode'         => $pk->barcode,
-                            'is_default'      => (bool) $pk->is_default,
-                            'display_order'   => (int) $pk->display_order,
-                            'pack_price_ht'   => round((float) $p->default_selling_price_ht * (float) $pk->quantity, 4),
-                        ])
-                        ->values()
-                        ->all(),
-                    // خصومات الكميات المفعّلة لمستوى السعر الذي يحاسب به محرك
-                    // الطلبات (applicableDiscount) عند الإنشاء — مستوى الزبون
-                    // الشخصي إن وُجد، وإلا المستوى الافتراضي للمؤسسة.
-                    'manages_quantity_discounts' => (bool) $p->manages_quantity_discounts,
-                    'party_is_tva_exempt' => $partyIsTvaExempt,
-                    'discounts' => $p->quantityDiscounts
-                        ->filter(fn(QuantityDiscount $d) => (bool) $d->active && !(bool) $d->is_blocked)
-                        ->filter(fn(QuantityDiscount $d) => $priceLevelId
-                            ? ((int) $d->price_level_id === (int) $priceLevelId)
-                            : true)
-                        ->map(fn(QuantityDiscount $d) => [
-                            'id'                  => $d->id,
-                            'price_level_id'      => $d->price_level_id !== null ? (int) $d->price_level_id : null,
-                            'min_qty'             => (float) $d->min_qty,
-                            'max_qty'             => $d->max_qty !== null ? (float) $d->max_qty : null,
-                            'discount_percentage' => $d->discount_percentage !== null ? (float) $d->discount_percentage : null,
-                            'discount_amount'     => $d->discount_amount !== null ? (float) $d->discount_amount : null,
-                        ])
-                        ->sortBy('min_qty')
-                        ->values()
-                        ->all(),
-                ];
-            })->values();
-
-            $payload = [
-                'data' => $items->all(),
-                'meta' => [
-                    'current_page' => $rows->currentPage(),
-                    'last_page'    => $rows->lastPage(),
-                    'per_page'     => $rows->perPage(),
-                    'total'        => $rows->total(),
-                ],
-            ];
-
-            return $this->successResponse($payload, 'تم جلب كتالوج المنتجات بنجاح');
+            return $this->catalogPayload($request, $partyIsTvaExempt, $priceLevelId, 'تم جلب كتالوج المنتجات بنجاح');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal_orders.catalog');
         }
+    }
+
+    /**
+     * إنشاء طلب — نقطة واحدة للجميع:
+     *   - مستخدم بوابة معتمد: يُربط الطلب بزبونه (السلوك الأصلي دون تغيير).
+     *   - زائر (بدون توكن): يرسل customer_name + customer_phone (+ عنوان
+     *     اختياري) ويُربط الطلب بزبون الصندوق الافتراضي (Client Cash) —
+     *     بيانات الزبون الحقيقية تبقى على الطلب نفسه (customer_*).
+     */
+    public function store(Request $request): JsonResponse
+    {
+        try {
+            $portal    = $this->optionalPortalUser($request);
+            $validated = $this->validatePayload($request);
+
+            $payload = [
+                'lines' => $validated['items'],
+                'notes' => $validated['notes'] ?? null,
+            ];
+
+            if ($portal) {
+                $partyId = (int) $portal->party_id;
+            } else {
+                $companyId = (int) app(CompanyContextService::class)->get();
+                $customerName  = trim((string) $request->input('customer_name', ''));
+                $customerPhone = trim((string) $request->input('customer_phone', ''));
+                if ($customerName === '' || $customerPhone === '') {
+                    return $this->errorResponse('الاسم ورقم الهاتف مطلوبان لإرسال طلب السلعة.', 422);
+                }
+
+                $payload['customer_name']    = $customerName;
+                $payload['customer_phone']   = $customerPhone;
+                $payload['customer_address'] = $request->filled('customer_address')
+                    ? trim((string) $request->input('customer_address'))
+                    : null;
+
+                $partyId = $this->orders->resolveCashPartyId($companyId);
+            }
+
+            $order = $this->orders->create($payload, $partyId);
+
+            return $this->successResponse($this->orders->toArray($order, PortalOrder::CHANGED_BY_CUSTOMER), 'تم إرسال طلب السلعة بنجاح', 201);
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'portal_orders.store');
+        }
+    }
+
+    /**
+     * حل زبون بوابة "اختياري" — نفس منطق PortalAuthenticate::resolvePortalUser
+     * لكن دون رفض الطلب عند غياب التوكن: يعيد null للزائر. يُستعمل فقط في
+     * مسارات الطلبات العامة (الكتالوج + الإنشاء) التي تخدم المعتمد والزائر معاً.
+     */
+    private function optionalPortalUser(Request $request): ?\App\Models\PortalUser
+    {
+        $token = $request->bearerToken();
+        if (!$token) {
+            return null;
+        }
+
+        $accessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
+        if (!$accessToken) {
+            return null;
+        }
+
+        $tokenable = $accessToken->tokenable;
+
+        return $tokenable instanceof \App\Models\PortalUser && $tokenable->is_active
+            ? $tokenable
+            : null;
+    }
+
+    /**
+     * بناء حمولة الكتالوج المشتركة (المعرَّف والعمومي) — نفس المنتجات والأسعار
+     * والمخزون؛ الاختلاف الوحيد هو حالة الزبون الجبائية ومستوى السعر.
+     */
+    private function catalogPayload(Request $request, bool $partyIsTvaExempt, ?int $priceLevelId, string $message): JsonResponse
+    {
+        $search  = trim((string) $request->input('search'));
+        $perPage = min(max((int) $request->input('per_page', 24), 1), 100);
+
+        $query = Product::query()
+            ->with(['tva', 'unit', 'prices', 'packagings', 'quantityDiscounts'])
+            ->where('active', true)
+            ->when($search !== '', fn($q) => $q->where(fn($w) => $w
+                ->where('name', 'like', "%{$search}%")
+                ->orWhere('ref', 'like', "%{$search}%")
+                ->orWhere('barcode', 'like', "%{$search}%")
+            ))
+            ->orderBy('name');
+
+        $rows = $query->paginate($perPage);
+
+        $stockRows = $this->stockService->getStockAt(now()->toDateString());
+        $stockMap  = [];
+        foreach ($stockRows as $row) {
+            $stockMap[(int) $row['id']] = $row['current_stock'];
+        }
+
+        $items = collect($rows->items())->map(function (Product $p) use ($stockMap, $partyIsTvaExempt, $priceLevelId) {
+            return [
+                'id'            => $p->id,
+                'name'          => $p->name,
+                'ref'           => $p->ref,
+                'barcode'       => $p->barcode,
+                'unit_price_ht' => round($p->default_selling_price_ht, 4),
+                'tva_rate'      => (float) ($p->tva?->rate ?? 0),
+                'unit'          => $p->unit
+                    ? ['name' => $p->unit->name, 'symbol' => $p->unit->symbol]
+                    : null,
+                'manages_stock' => (bool) $p->manages_stock,
+                'current_stock' => $p->manages_stock
+                    ? ($stockMap[$p->id] ?? null)
+                    : null,
+                'has_packaging' => $p->packagings->isNotEmpty(),
+                'packagings'    => $p->packagings
+                    ->filter(fn(ProductPackaging $pk) => (bool) $pk->active)
+                    ->map(fn(ProductPackaging $pk) => [
+                        'id'              => $pk->id,
+                        'code'            => $pk->code,
+                        'label'           => $pk->label,
+                        'quantity'        => (float) $pk->quantity,
+                        'barcode'         => $pk->barcode,
+                        'is_default'      => (bool) $pk->is_default,
+                        'display_order'   => (int) $pk->display_order,
+                        'pack_price_ht'   => round((float) $p->default_selling_price_ht * (float) $pk->quantity, 4),
+                    ])
+                    ->values()
+                    ->all(),
+                // خصومات الكميات المفعّلة لمستوى السعر الذي يحاسب به محرك
+                // الطلبات (applicableDiscount) عند الإنشاء — مستوى الزبون
+                // الشخصي إن وُجد، وإلا المستوى الافتراضي للمؤسسة.
+                'manages_quantity_discounts' => (bool) $p->manages_quantity_discounts,
+                'party_is_tva_exempt' => $partyIsTvaExempt,
+                'discounts' => $p->quantityDiscounts
+                    ->filter(fn(QuantityDiscount $d) => (bool) $d->active && !(bool) $d->is_blocked)
+                    ->filter(fn(QuantityDiscount $d) => $priceLevelId
+                        ? ((int) $d->price_level_id === (int) $priceLevelId)
+                        : true)
+                    ->map(fn(QuantityDiscount $d) => [
+                        'id'                  => $d->id,
+                        'price_level_id'      => $d->price_level_id !== null ? (int) $d->price_level_id : null,
+                        'min_qty'             => (float) $d->min_qty,
+                        'max_qty'             => $d->max_qty !== null ? (float) $d->max_qty : null,
+                        'discount_percentage' => $d->discount_percentage !== null ? (float) $d->discount_percentage : null,
+                        'discount_amount'     => $d->discount_amount !== null ? (float) $d->discount_amount : null,
+                    ])
+                    ->sortBy('min_qty')
+                    ->values()
+                    ->all(),
+            ];
+        })->values();
+
+        $payload = [
+            'data' => $items->all(),
+            'meta' => [
+                'current_page' => $rows->currentPage(),
+                'last_page'    => $rows->lastPage(),
+                'per_page'     => $rows->perPage(),
+                'total'        => $rows->total(),
+            ],
+        ];
+
+        return $this->successResponse($payload, $message);
     }
 
     public function index(Request $request): JsonResponse
@@ -192,7 +270,7 @@ class PortalOrderController extends BaseApiController
             );
 
             $payload = [
-                'data' => collect($rows->items())->map(fn(PortalOrder $o) => $this->orders->toArray($o))->all(),
+                'data' => collect($rows->items())->map(fn(PortalOrder $o) => $this->orders->toArray($o, PortalOrder::CHANGED_BY_CUSTOMER))->all(),
                 'meta' => [
                     'current_page' => $rows->currentPage(),
                     'last_page'    => $rows->lastPage(),
@@ -207,38 +285,23 @@ class PortalOrderController extends BaseApiController
         }
     }
 
-    public function store(Request $request): JsonResponse
-    {
-        try {
-            $portal    = $request->input('_portal_user');
-            $partyId   = (int) ($portal->party_id ?? 0);
-            $validated = $this->validatePayload($request);
-
-            $order = $this->orders->create([
-                'lines' => $validated['items'],
-                'notes' => $validated['notes'] ?? null,
-            ], $partyId);
-
-            return $this->successResponse($this->orders->toArray($order), 'تم إرسال طلب السلعة بنجاح', 201);
-        } catch (\Throwable $e) {
-            return $this->handleError($e, 'portal_orders.store');
-        }
-    }
-
     public function update(Request $request, $id): JsonResponse
     {
         try {
             $portal    = $request->input('_portal_user');
             $partyId   = (int) ($portal->party_id ?? 0);
             $order     = $this->findOwnOrder($partyId);
-            $validated = $this->validatePayload($request);
+            $validated = $this->validatePayload($request, false);
 
-            $order = $this->orders->update($order, [
-                'lines' => $validated['items'],
-                'notes' => $validated['notes'] ?? null,
-            ]);
+            // notes-only: لا توجد items → لا تُمس الأسطر (التحديث مخصص للملاحظات)
+            $payload = ['notes' => $validated['notes'] ?? null];
+            if (array_key_exists('items', $validated)) {
+                $payload['lines'] = $validated['items'];
+            }
 
-            return $this->successResponse($this->orders->toArray($order), 'تم تعديل طلب السلعة بنجاح');
+            $order = $this->orders->update($order, $payload);
+
+            return $this->successResponse($this->orders->toArray($order, PortalOrder::CHANGED_BY_CUSTOMER), 'تم تعديل طلب السلعة بنجاح');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal_orders.update');
         }
@@ -259,7 +322,7 @@ class PortalOrderController extends BaseApiController
                 'إلغاء الطلب من الزبون',
             );
 
-            return $this->successResponse($this->orders->toArray($order), 'تم إلغاء الطلب');
+            return $this->successResponse($this->orders->toArray($order, PortalOrder::CHANGED_BY_CUSTOMER), 'تم إلغاء الطلب');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal_orders.cancel');
         }
@@ -282,7 +345,7 @@ class PortalOrderController extends BaseApiController
                 'تأكيد الطلب من الزبون',
             );
 
-            return $this->successResponse($this->orders->toArray($order), 'تم تأكيد الطلب بنجاح');
+            return $this->successResponse($this->orders->toArray($order, PortalOrder::CHANGED_BY_CUSTOMER), 'تم تأكيد الطلب بنجاح');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal_orders.validate');
         }
@@ -294,7 +357,7 @@ class PortalOrderController extends BaseApiController
             $partyId = (int) ($request->input('_portal_user')->party_id ?? 0);
             $order   = $this->findOwnOrder($partyId);
 
-            return $this->successResponse($this->orders->toArray($order), 'تم جلب تفاصيل الطلب بنجاح');
+            return $this->successResponse($this->orders->toArray($order, PortalOrder::CHANGED_BY_CUSTOMER), 'تم جلب تفاصيل الطلب بنجاح');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal_orders.show');
         }
@@ -315,19 +378,20 @@ class PortalOrderController extends BaseApiController
         return $order;
     }
 
-    protected function validatePayload(Request $request): array
+    protected function validatePayload(Request $request, bool $requireItems = true): array
     {
         $validated = $request->validate([
-            'items'                => ['required', 'array', 'min:1'],
-            'items.*.product_id'   => ['required', 'integer'],
+            // items اختياري فقط في مسار التعديل (تحديث ملاحظات بدون لمس الأسطر)
+            'items'                => $requireItems ? ['required', 'array', 'min:1'] : ['sometimes', 'array', 'min:1'],
+            'items.*.product_id'   => ['required_with:items', 'integer'],
             'items.*.packaging_id' => ['nullable', 'integer'],
-            'items.*.quantity'     => ['required', 'numeric', 'min:0.01'],
+            'items.*.quantity'     => ['required_with:items', 'numeric', 'min:0.01'],
             'notes'                => ['nullable', 'string', 'max:1000'],
         ]);
 
         // تجميع السطور المكررة للمنتج (نفس التعبئة) في سطر واحد
         $grouped = [];
-        foreach ($validated['items'] as $entry) {
+        foreach (($validated['items'] ?? []) as $entry) {
             $key = (int) $entry['product_id'] . ':' . (int) ($entry['packaging_id'] ?? 0);
             $grouped[$key] = [
                 'product_id'   => (int) $entry['product_id'],
@@ -338,10 +402,14 @@ class PortalOrderController extends BaseApiController
             ];
         }
 
-        return [
-            'items' => array_values($grouped),
-            'notes' => $validated['notes'] ?? null,
-        ];
+        // المفتاح items حاضر فقط إن أرسله الزبون فعلاً (store: إلزامي،
+        // update: غيابه = تحديث ملاحظات فقط بلا لمس الأسطر)
+        $result = ['notes' => $validated['notes'] ?? null];
+        if (array_key_exists('items', $validated)) {
+            $result['items'] = array_values($grouped);
+        }
+
+        return $result;
     }
 
     protected function getService(): mixed

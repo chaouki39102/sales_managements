@@ -57,6 +57,10 @@ export interface PortalAdminOrder {
   requested_at: string | null;
   created_at:   string | null;
   party:        { id: number; name: string; code: string | null; phone: string | null; is_tva_exempt: boolean } | null;
+  // الطلبات العامة (زائر بدون حساب) — بيانات الزبون الحقيقية على الطلب نفسه
+  customer_name:    string | null;
+  customer_phone:   string | null;
+  customer_address: string | null;
   lines?:       PortalAdminOrderItem[];
   stock?:       PortalAdminStockInfo[];
   document?:    {
@@ -96,6 +100,9 @@ export interface PortalAdminOrderFilters {
   search?: string;
   from_date?: string;
   to_date?: string;
+  // فرز الخادم (القائمة الأساسية): المرجع/التاريخ/الزبون/المنتجات/المجموع/الحالة
+  sort_by?: string;
+  sort_dir?: 'asc' | 'desc';
 }
 
 /** دفعة اختيارية تُسجَّل مع تحويل الطلب إلى فاتورة (FV/POS). */
@@ -131,6 +138,8 @@ export const portalOrdersApi = {
         search: filters.search || undefined,
         from_date: filters.from_date || undefined,
         to_date: filters.to_date || undefined,
+        sort_by: filters.sort_by || undefined,
+        sort_dir: filters.sort_dir || undefined,
       },
     ),
   summary: () =>

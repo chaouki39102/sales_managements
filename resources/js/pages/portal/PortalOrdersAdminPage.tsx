@@ -146,6 +146,16 @@ interface DraftLine {
   // unit_price_ht يُرسل كسعر وحدة والخادم يضرب في pack_qty).
   unit_price_ht: number;
   discount_percentage: number;
+  // خصم مبلغ ثابت من طبقة كميات (لكل وحدة قاعدة) — يُستخرج من السطر المخزّن
+  // حتى تبقى المعاينة صحيحة أثناء التحرير، ويحتفظ به الخادم عند الحفظ ما لم
+  // يعدّل المسؤول النسبة.
+  fixedDiscPerUnit: number;
+  // هل لمس المسؤول الحقل فعلياً؟ عند عدم اللمس لا يُرسل السعر/الخصم في الحفظ:
+  //  - عدم إرسال unit_price_ht يحفظ سعر السطر المخزّن حرفياً (يمنع انحراف
+  //    round(storedPack/12,4)×12 للسعر المعبّأ)
+  //  - عدم إرسال discount_percentage يحفظ خصم المبلغ الثابت المخزّن.
+  priceTouched: boolean;
+  discountTouched: boolean;
   // نسبة TVA المخزّنة على السطر (0 لزبون معفى جبائياً) + النسبة الاسمية للمنتج.
   tva_rate:      number;
   tva_rate_live: number;
@@ -200,6 +210,8 @@ export default function PortalOrdersAdminPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [sortBy, setSortBy] = useState('');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [detailId, setDetailId] = useState<number | null>(null);
   const [convertResult, setConvertResult] = useState<PortalOrderConvertResult['sale'] | null>(null);
 
@@ -225,7 +237,11 @@ export default function PortalOrdersAdminPage() {
 
   const perPage = 15;
 
-  const { data, isLoading } = usePortalOrders({ page, per_page: perPage, status, search: debouncedSearch, from_date: fromDate || undefined, to_date: toDate || undefined });
+  const { data, isLoading } = usePortalOrders({
+    page, per_page: perPage, status, search: debouncedSearch,
+    from_date: fromDate || undefined, to_date: toDate || undefined,
+    sort_by: sortBy || undefined, sort_dir: sortBy ? sortDir : undefined,
+  });
   const summaryQuery = usePortalOrdersSummary();
   const detail = usePortalOrderDetail(detailId);
   const updateStatus = usePortalOrderStatusUpdate();
@@ -274,6 +290,13 @@ export default function PortalOrdersAdminPage() {
       key: st, label: STATUS_META[st].label, icon: STATUS_META[st].icon,
       color: STATUS_META[st].color, count: s?.[st] ?? 0,
     }));
+    // legacy pending: طلبات قديمة غير مهاجَرة (تظهر فقط إن وُجدت)
+    if ((s?.pending ?? 0) > 0) {
+      base.push({
+        key: 'pending', label: STATUS_META.pending.label, icon: STATUS_META.pending.icon,
+        color: STATUS_META.pending.color, count: s?.pending ?? 0,
+      });
+    }
     return base;
   }, [summaryQuery.data]);
 
@@ -285,6 +308,13 @@ export default function PortalOrdersAdminPage() {
     setDebouncedSearch('');
     setFromDate('');
     setToDate('');
+    setPage(1);
+  };
+
+  // ── فرز الخادم (عبر رؤوس الجدول القابلة للنقر) ───────────────────────────
+  const handleSort = (key: string, dir: 'asc' | 'desc') => {
+    setSortBy(key);
+    setSortDir(dir);
     setPage(1);
   };
 
@@ -335,6 +365,15 @@ export default function PortalOrdersAdminPage() {
     if (!order) return;
     setDraft((order.lines ?? []).map((it: PortalAdminOrderItem) => {
       const packQty = it.pack_qty > 0 ? it.pack_qty : 1;
+      const storedPct = it.discount_percentage ?? 0;
+      const fixedTotal = it.total_discount_amount ?? 0;
+      // خط بخُصم مبلغ ثابت (نسبة 0% مع خصم إجمالي > 0): نستخرج خصم الوحدة
+      // الثابت (لكل وحدة قاعدة) لإعادة حساب المعاينة أثناء التحرير، وليُحمّله
+      // الخادم عند الحفظ ما لم يعدّل المسؤول النسبة (خصم% وثابت حصريان).
+      const fixedPerUnit =
+        storedPct <= 0 && fixedTotal > 0.004
+          ? fixedTotal / Math.max(1, it.quantity * packQty)
+          : 0;
       return {
         line_id:       it.line_id,
         product_id:    it.product_id,
@@ -347,7 +386,10 @@ export default function PortalOrdersAdminPage() {
         // القيمة المخزّنة unit_price_ht هي سعر التعبئة — نعرض ونحرّر سعر الوحدة
         // (المخزّن ÷ عامل التعبئة) كما يفرض عقد Phase 51.
         unit_price_ht: Math.round((it.unit_price_ht / packQty) * 10000) / 10000,
-        discount_percentage: it.discount_percentage ?? 0,
+        discount_percentage: storedPct,
+        fixedDiscPerUnit: fixedPerUnit,
+        priceTouched: false,
+        discountTouched: false,
         tva_rate:      it.tva_rate ?? 0,
         tva_rate_live: it.tva_rate_live ?? it.tva_rate ?? 0,
       };
@@ -368,6 +410,10 @@ export default function PortalOrdersAdminPage() {
       pack_qty:     pack?.quantity ?? 1,
       unit_price_ht: p.default_selling_price_ht ?? 0,
       discount_percentage: 0,
+      fixedDiscPerUnit: 0,
+      // سطر جديد: يُرسل السعر والخصم دائماً (لا قيمة مخزّنة نحافظ عليها).
+      priceTouched: true,
+      discountTouched: true,
       // زبون معفى → الخادم يُخزّن 0 (TaxRuleService) — نعكس ذلك في المعاينة.
       tva_rate:      order?.party?.is_tva_exempt ? 0 : (p.tva?.rate ?? 0),
       tva_rate_live: p.tva?.rate ?? 0,
@@ -384,12 +430,19 @@ export default function PortalOrdersAdminPage() {
         const base = l.line_id !== null
           ? { line_id: l.line_id, quantity: Math.max(0, l.quantity) }
           : { product_id: l.product_id, quantity: Math.max(1, l.quantity) };
-        // نُرسل سعر الوحدة والخصم فقط عند التعديل الفعلي حتى لا نمس أسعار الخادم
-        // في المرة الأولى (الواجهة تحمل القيم المخزّنة مطابقة، فلن يتغير شيء).
+        // نُرسل سعر الوحدة والخصم فقط عند التعديل الفعلي (أو لسطر جديد):
+        //  - عدم إرسال unit_price_ht يحافظ على سعر السطر المخزّن حرفياً
+        //    (يمنع انحراف round(storedPack/12,4)×12 للسعر المعبّأ)
+        //  - عدم إرسال discount_percentage يحافظ على خصم المبلغ الثابت
+        //    (discount_amount_per_unit) المخزّن من طبقة الكميات.
         return {
           ...base,
-          unit_price_ht: Math.round((l.unit_price_ht ?? 0) * 10000) / 10000,
-          discount_percentage: l.discount_percentage ?? 0,
+          ...(l.priceTouched
+            ? { unit_price_ht: Math.round((l.unit_price_ht ?? 0) * 10000) / 10000 }
+            : {}),
+          ...(l.discountTouched
+            ? { discount_percentage: l.discount_percentage ?? 0 }
+            : {}),
         };
       });
     if (payload.length === 0) {
@@ -410,15 +463,23 @@ export default function PortalOrdersAdminPage() {
   };
 
   // إجماليات حيّة أثناء التحرير (تعكس تعديلات الكمية/السعر/الخصم) — نفس صيغة
-  // CommercialDocumentService (قاعدة × سعر وحدة × خصم % ثم TVA على HT).
+  // CommercialDocumentLineObserver: خصم مبلغ ثابت (لكل وحدة قاعدة × كمية القاعدة)
+  // أو نسبة مئوية، ثم TVA على HT.
   const draftTotals = useMemo(() => {
     let ht = 0, tva = 0, disc = 0;
     for (const l of draft) {
       const qty = Math.max(0, l.quantity);
       const baseQty = qty * (l.pack_qty > 0 ? l.pack_qty : 1);
       const gross = baseQty * (l.unit_price_ht ?? 0);
-      const d = Math.min(100, Math.max(0, l.discount_percentage ?? 0));
-      const discAmt = gross * (d / 100);
+      // المسار الفعّال: خصم مبلغ ثابت (لم يلمس المسؤول النسبة) → لكل وحدة قاعدة؛
+      // وإلا نسبة مئوية. يطابق المسار الذي يطبقه الخادم عند الحفظ.
+      let discAmt: number;
+      if (!l.discountTouched && l.fixedDiscPerUnit > 0) {
+        discAmt = l.fixedDiscPerUnit * baseQty;
+      } else {
+        const d = Math.min(100, Math.max(0, l.discount_percentage ?? 0));
+        discAmt = gross * (d / 100);
+      }
       const lineHt = gross - discAmt;
       ht += lineHt;
       disc += discAmt;
@@ -667,6 +728,10 @@ export default function PortalOrdersAdminPage() {
             )}
           </div>
           <div className="poa-bar-side">
+            <span className="poa-sort-hint">
+              <i className="ti ti-arrows-sort" />
+              انقر على رأس العمود للترتيب
+            </span>
             <span className="poa-hint">
               <i className="ti ti-clipboard-list" />
               {meta?.total ?? 0} طلب · يعرض {from}–{to}
@@ -680,44 +745,60 @@ export default function PortalOrdersAdminPage() {
 
         {/* ── الجدول ───────────────────────────────────────────────────── */}
         <SimpleTable
+          className="poa-table"
           isLoading={isLoading}
           emptyText="لا توجد طلبات مطابقة"
           rowKey="id"
           onRowClick={(row) => openDetail(row as PortalAdminOrder)}
+          rowClassName={(row) => (!!(row as PortalAdminOrder).customer_name ? 'poa-tr-guest' : '')}
+          sortBy={sortBy}
+          sortDir={sortDir}
+          onSort={handleSort}
           columns={[
             {
-              key: 'reference', label: 'المرجع', align: 'center',
+              key: 'reference', label: 'المرجع', align: 'center', sortable: true,
               render: (v) => <b className="poa-mono">{v as string}</b>,
             },
             {
-              key: 'requested_at', label: 'التاريخ', align: 'center',
+              key: 'requested_at', label: 'التاريخ', align: 'center', sortable: true,
               render: (v) => <span className="poa-cell-date">{fmtDate(v as string)}</span>,
             },
             {
               key: 'party', label: 'الزبون',
               render: (_v, row) => {
-                const p = (row as PortalAdminOrder).party;
+                const o = row as PortalAdminOrder;
+                const p = o.party;
+                const guest = !!o.customer_name;
+                const name = guest ? o.customer_name : (p?.name ?? '—');
+                const sub = guest
+                  ? (o.customer_phone || 'بدون هاتف')
+                  : (p?.code ?? '');
                 return (
-                  <div className="poa-cust">
-                    <span className="poa-avatar">{initialsOf(p?.name)}</span>
+                  <div className={`poa-cust ${guest ? 'poa-cust--guest' : ''}`}>
+                    <span className="poa-avatar">{initialsOf(name)}</span>
                     <span className="poa-cust-meta">
-                      <span className="poa-cust-name">{p?.name ?? '—'}</span>
-                      <span className="poa-cust-sub">{p?.code ?? ''}</span>
+                      <span className="poa-cust-name">{name}</span>
+                      <span className="poa-cust-sub">{sub}</span>
                     </span>
+                    {guest && (
+                      <span className="poa-guest-chip" title="طلب عام — زائر غير مسجّل في البوابة">
+                        <i className="ti ti-user-off" /> زائر
+                      </span>
+                    )}
                   </div>
                 );
               },
             },
             {
-              key: 'items_count', label: 'المنتجات', align: 'center',
+              key: 'items_count', label: 'المنتجات', align: 'center', sortable: true,
               render: (v) => <span className="poa-cell-num">{v as number}</span>,
             },
             {
-              key: 'total_ttc', label: 'المجموع TTC', align: 'end',
+              key: 'total_ttc', label: 'المجموع TTC', align: 'end', sortable: true,
               render: (v) => <b>{fmt(Number(v))} <span className="poa-ttc-unit">دج</span></b>,
             },
             {
-              key: 'status', label: 'الحالة', align: 'center',
+              key: 'status', label: 'الحالة', align: 'center', sortable: true,
               render: (_v, row) => {
                 const st = (row as PortalAdminOrder).status;
                 return <Badge variant={stMeta(st).badge} noDot>{stMeta(st).label}</Badge>;
@@ -769,9 +850,10 @@ export default function PortalOrdersAdminPage() {
         title="تفاصيل طلب"
         subtitle={order?.reference}
         size="lg"
+        className="poa-modal"
         footerLeft={!editing && canEdit && (
           <Button variant="outline" size="sm" icon={<i className="ti ti-edit" />} onClick={startEditing}>
-            تحرير المنتجات
+            تحرير الطلب
           </Button>
         )}
         footer={
@@ -822,9 +904,11 @@ export default function PortalOrdersAdminPage() {
             {/* ── الزبون ─────────────────────────────────────────────── */}
             <div className="poa-sec">
               <div className="poa-cust-card">
-                <span className="poa-avatar">{initialsOf(order.party?.name)}</span>
+                <span className="poa-avatar">{initialsOf(order.customer_name || order.party?.name)}</span>
                 <span className="poa-cust-card-info">
-                  <span className="poa-cust-card-name">{order.party?.name ?? '—'}</span>
+                  <span className="poa-cust-card-name">
+                    {order.customer_name || order.party?.name || '—'}
+                  </span>
                   <span className="poa-cust-card-sub">
                     أمر زبون {order.document?.document_number ?? ''} · أُرسل في {fmtDate(order.requested_at)}
                   </span>
@@ -833,17 +917,54 @@ export default function PortalOrdersAdminPage() {
                   {order.status_label}
                 </Badge>
               </div>
-              <div className="poa-chip-row">
-                {order.party?.code && (
-                  <span className="poa-chip"><i className="ti ti-barcode" /> {order.party.code}</span>
-                )}
-                {order.party?.phone && (
-                  <span className="poa-chip"><i className="ti ti-phone" /> {order.party.phone}</span>
-                )}
-                {order.document?.document_date && (
-                  <span className="poa-chip"><i className="ti ti-calendar" /> بتاريخ {order.document.document_date}</span>
-                )}
-              </div>
+
+              {!!order.customer_name && (
+                <div className="poa-guest-banner">
+                  <i className="ti ti-user-off" />
+                  <div>
+                    <b>زائر — غير مسجّل في البوابة</b>
+                    <span>أرسل الطلب بدون حساب وبدون تسجيل دخول — لا يظهر في لائحة زبائنك ولا يملك كشف حساب.</span>
+                  </div>
+                </div>
+              )}
+
+              {!!order.customer_name ? (
+                <div className="poa-cust-details">
+                  <div className="poa-cust-detail">
+                    <i className="ti ti-user" />
+                    <div>
+                      <span>الاسم الكامل</span>
+                      <b>{order.customer_name}</b>
+                    </div>
+                  </div>
+                  <div className="poa-cust-detail">
+                    <i className="ti ti-phone" />
+                    <div>
+                      <span>رقم الهاتف</span>
+                      <b>{order.customer_phone || 'غير متوفر'}</b>
+                    </div>
+                  </div>
+                  <div className="poa-cust-detail">
+                    <i className="ti ti-map-pin" />
+                    <div>
+                      <span>العنوان</span>
+                      <b>{order.customer_address || 'غير متوفر'}</b>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="poa-chip-row">
+                  {order.party?.code && (
+                    <span className="poa-chip"><i className="ti ti-barcode" /> {order.party.code}</span>
+                  )}
+                  {order.party?.phone && (
+                    <span className="poa-chip"><i className="ti ti-phone" /> {order.party.phone}</span>
+                  )}
+                  {order.document?.document_date && (
+                    <span className="poa-chip"><i className="ti ti-calendar" /> بتاريخ {order.document.document_date}</span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* ── المسار ──────────────────────────────────────────────── */}
@@ -922,6 +1043,7 @@ export default function PortalOrdersAdminPage() {
                   </span>
                 </div>
 
+                <div className="poa-edit-wrap">
                 <table className="poa-edit-tbl">
                   <thead>
                     <tr>
@@ -942,8 +1064,18 @@ export default function PortalOrdersAdminPage() {
                       const baseQty = Math.max(0, l.quantity) * (l.pack_qty > 0 ? l.pack_qty : 1);
                       const gross = baseQty * (l.unit_price_ht ?? 0);
                       const dPct = Math.min(100, Math.max(0, l.discount_percentage ?? 0));
-                      const lineHt = gross * (1 - dPct / 100);
+                      // نفس المسار الذي يطبقه الخادم: خصم مبلغ ثابت ما لم يلمس
+                      // المسؤول النسبة، وإلا نسبة مئوية.
+                      const isFixed = !l.discountTouched && l.fixedDiscPerUnit > 0;
+                      const discAmt = isFixed
+                        ? l.fixedDiscPerUnit * baseQty
+                        : gross * (dPct / 100);
+                      const lineHt = gross - discAmt;
                       const lineTtc = lineHt * (1 + (l.tva_rate ?? 0) / 100);
+                      // نسبة مئوية فعّالة للعرض في حقل الخصم (خط ثابت غير ملموس).
+                      const effectivePct = isFixed
+                        ? Math.min(100, (l.fixedDiscPerUnit / Math.max(0.0001, l.unit_price_ht ?? 0)) * 100)
+                        : dPct;
                       const setField = (patch: Partial<DraftLine>) =>
                         setDraft((d) => d.map((x, xi) => (xi === i ? { ...x, ...patch } : x)));
                       return (
@@ -977,7 +1109,10 @@ export default function PortalOrdersAdminPage() {
                               value={l.unit_price_ht ?? 0}
                               onChange={(e) => {
                                 const v = Number(e.target.value);
-                                setField({ unit_price_ht: Number.isFinite(v) && v >= 0 ? v : 0 });
+                                setField({
+                                  unit_price_ht: Number.isFinite(v) && v >= 0 ? v : 0,
+                                  priceTouched: true,
+                                });
                               }}
                               className="poa-alloc poa-price"
                             />
@@ -988,13 +1123,24 @@ export default function PortalOrdersAdminPage() {
                               min={0}
                               max={100}
                               step="any"
-                              value={l.discount_percentage ?? 0}
+                              value={isFixed ? effectivePct : l.discount_percentage ?? 0}
                               onChange={(e) => {
                                 const v = Number(e.target.value);
-                                setField({ discount_percentage: Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : 0 });
+                                setField({
+                                  discount_percentage: Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : 0,
+                                  discountTouched: true,
+                                });
                               }}
                               className="poa-alloc poa-disc"
                             />
+                            {isFixed && (
+                              <div
+                                className="poa-fixed-disc"
+                                title={`خصم مبلغ ثابت من طبقة الكميات (${fmt(l.fixedDiscPerUnit * baseQty)} دج) — كتابة نسبة تحوّله إلى خصم %`}
+                              >
+                                <i className="ti ti-lock" /> ثابت {fmt(l.fixedDiscPerUnit * baseQty)} دج
+                              </div>
+                            )}
                           </td>
                           <td className="poa-tac">
                             <span className="poa-bold">
@@ -1037,6 +1183,7 @@ export default function PortalOrdersAdminPage() {
                     )}
                   </tbody>
                 </table>
+                </div>
 
                 {/* إضافة منتج */}
                 <div className="poa-addbox">
@@ -1180,6 +1327,7 @@ export default function PortalOrdersAdminPage() {
         title="معالجة الطلب"
         subtitle={order?.reference ? `توزيع الكميات على المخزون — ${order.reference}` : undefined}
         size="lg"
+        className="poa-modal"
         footer={
           <>
             <Button variant="secondary" onClick={() => setWizardOpen(false)} disabled={linesMut.isPending}>
@@ -1291,6 +1439,7 @@ export default function PortalOrdersAdminPage() {
         title="تحويل الطلب إلى فاتورة"
         subtitle={order?.reference ? `إنشاء مستند البيع — ${order.reference}` : undefined}
         size="sm"
+        className="poa-modal"
         footer={
           <>
             <Button variant="secondary" onClick={() => setConvertOpen(false)} disabled={convert.isPending}>

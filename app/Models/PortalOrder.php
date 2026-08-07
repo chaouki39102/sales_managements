@@ -26,6 +26,9 @@ class PortalOrder extends Model
     protected $fillable = [
         'company_id',
         'party_id',
+        'customer_name',
+        'customer_phone',
+        'customer_address',
         'user_id',
         'commercial_document_id',
         'sale_document_id',

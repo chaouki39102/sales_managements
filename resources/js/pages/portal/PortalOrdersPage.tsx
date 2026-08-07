@@ -54,23 +54,28 @@ interface CartEntry {
 const cartKey = (productId: number, packagingId: number | null) =>
   `${productId}:${packagingId ?? 0}`;
 
-export default function PortalOrdersPage() {
+export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' | 'public' } = {}) {
   const { slug } = useParams<{ slug: string }>();
   const qc = useQueryClient();
+
+  // وضع الطلب العام (بدون حساب بوابة): يُعرض الكتالوج + السلة فقط، مع حقول
+  // بيانات الزبون (الاسم/الهاتف/العنوان) بدل «طلباتي» وبدل قائمة الطلبات.
+  const isPublic = mode === 'public';
 
   const [search, setSearch] = useState('');
   const [qty, setQty] = useState<Record<number, number>>({});
   const [pkg, setPkg] = useState<Record<number, number | null>>({});
   const [cart, setCart] = useState<Record<string, CartEntry>>({});
   const [notes, setNotes] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<PortalOrderStatus | ''>('');
   const [catalogPage, setCatalogPage] = useState(1);
   const [toast, setToast] = useState('');
   const [submitted, setSubmitted] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [confirmCancelId, setConfirmCancelId] = useState<number | null>(null);
-  const [confirmValidateId, setConfirmValidateId] = useState<number | null>(null);
 
   const { confirm, confirmDialogProps } = useConfirm();
 
@@ -83,6 +88,33 @@ export default function PortalOrdersPage() {
       icon: 'ti-trash',
     });
     if (ok) updateCartQty(key, 0);
+  };
+
+  // تأكيد الطلب من الزبون — نافذة واضحة لا تحتاج إعادة النقر خلال مهلة زمنية.
+  const handleValidateOrder = async (o: PortalOrder) => {
+    const ok = await confirm(
+      `تأكيد الطلب «${o.reference}»؟\nبعد التأكيد يدخل الطلب مرحلة تحليل المسؤول ولا يمكنك التعديل عليه.`,
+      {
+        title: 'تأكيد الطلب',
+        confirmText: 'تأكيد الطلب',
+        cancelText: 'تراجع',
+        variant: 'warning',
+        icon: 'ti-circle-check',
+      },
+    );
+    if (ok) validateOrder.mutate(o.id);
+  };
+
+  // إلغاء الطلب — نافذة تأكيد صريحة بدل أسلوب النقرتين المتلاشي.
+  const handleCancelOrder = async (o: PortalOrder) => {
+    const ok = await confirm(`إلغاء الطلب «${o.reference}»؟`, {
+      title: 'إلغاء الطلب',
+      confirmText: 'إلغاء الطلب',
+      cancelText: 'تراجع',
+      variant: 'danger',
+      icon: 'ti-x',
+    });
+    if (ok) cancelOrder.mutate(o.id);
   };
 
   const debouncedSearch = useDebounce(search, 350);
@@ -102,11 +134,22 @@ export default function PortalOrdersPage() {
     queryKey: ['portal', slug, 'orders', 'list', page, statusFilter],
     queryFn: () => portalApi.orders({ page, per_page: 10, status: statusFilter || undefined }),
     placeholderData: keepPreviousData,
+    enabled: !isPublic,
   });
 
   const createOrder = useMutation({
     mutationFn: ({ items, note }: { items: { product_id: number; quantity: number; packaging_id?: number | null }[]; note?: string }) =>
-      portalApi.createOrder(items, note),
+      isPublic
+        ? portalApi.createPublicOrder(
+            items,
+            {
+              customer_name:    customerName.trim(),
+              customer_phone:   customerPhone.trim(),
+              customer_address: customerAddress.trim() || null,
+            },
+            note,
+          )
+        : portalApi.createOrder(items, note),
     onSuccess: (order) => {
       resetCart();
       setEditingId(null);
@@ -134,7 +177,6 @@ export default function PortalOrdersPage() {
   const cancelOrder = useMutation({
     mutationFn: (id: number) => portalApi.cancelOrder(id),
     onSuccess: (order) => {
-      setConfirmCancelId(null);
       setSubmitted(order.id);
       qc.invalidateQueries({ queryKey: ['portal', slug, 'orders', 'list'] });
       showToast('تم إلغاء الطلب');
@@ -147,7 +189,6 @@ export default function PortalOrdersPage() {
   const validateOrder = useMutation({
     mutationFn: (id: number) => portalApi.validateOrder(id),
     onSuccess: (order) => {
-      setConfirmValidateId(null);
       setSubmitted(order.id);
       qc.invalidateQueries({ queryKey: ['portal', slug, 'orders', 'list'] });
       showToast('تم تأكيد طلبك — أصبح في انتظار تحليل المسؤول');
@@ -276,10 +317,6 @@ export default function PortalOrdersPage() {
     { gross: 0, discount: 0, ht: 0, tva: 0, ttc: 0 },
   );
 
-  const setItemQty = (productId: number, quantity: number) => {
-    setQty((prev) => ({ ...prev, [productId]: Math.max(0, quantity) }));
-  };
-
   const addToCart = (productId: number, quantity: number, packagingId: number | null) => {
     const n = Math.max(0, quantity);
     const key = cartKey(productId, packagingId);
@@ -345,6 +382,17 @@ export default function PortalOrdersPage() {
       showToast('السلة فارغة — أضف منتجاً أولاً');
       return;
     }
+    // الطلب العام: الاسم + الهاتف إلزاميان (الخادم يرفض بدونهما أيضاً)
+    if (isPublic) {
+      if (!customerName.trim()) {
+        showToast('اكتب اسمك لإرسال الطلب');
+        return;
+      }
+      if (!customerPhone.trim()) {
+        showToast('اكتب رقم هاتفك لإرسال الطلب');
+        return;
+      }
+    }
     if (editingId) {
       updateOrder.mutate({ id: editingId, items, note: notes.trim() || undefined });
     } else {
@@ -407,7 +455,9 @@ export default function PortalOrdersPage() {
                 const factor = packFactorFor(p, selectedPack);
                 const q = qty[p.id] ?? 1;
                 const cl = lineCalc(p, selectedPack, q);
-                const inCart = !!cart[cartKey(p.id, selectedPack)];
+                const key = cartKey(p.id, selectedPack);
+                const inCart = !!cart[key];
+                const cartQty = inCart ? cart[key].quantity : q;
                 return (
                   <div key={p.id} className={`portal-prod${inCart ? ' on' : ''}`}>
                     <div className="portal-prod-hd">
@@ -431,6 +481,38 @@ export default function PortalOrdersPage() {
                           <i className="ti ti-discount-2" /> {discountLabel(cl.tier)}
                         </span>
                       ) : null}
+                    </div>
+                    <div className="portal-prod-quick">
+                      {inCart ? (
+                        <div className="portal-prod-qty">
+                          <button
+                            type="button"
+                            onClick={() => addToCart(p.id, cartQty - 1, selectedPack)}
+                            disabled={cartQty <= 1}
+                            aria-label="تقليل الكمية"
+                          >
+                            <i className="ti ti-minus" />
+                          </button>
+                          <input value={cartQty} readOnly tabIndex={-1} aria-label="الكمية" />
+                          <button
+                            type="button"
+                            onClick={() => addToCart(p.id, cartQty + 1, selectedPack)}
+                            aria-label="زيادة الكمية"
+                          >
+                            <i className="ti ti-plus" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          className="portal-prod-quick-btn"
+                          type="button"
+                          onClick={() => addToCart(p.id, q, selectedPack)}
+                          aria-label="أضف إلى السلة"
+                        >
+                          <i className="ti ti-plus" />
+                          <span className="portal-prod-quick-txt">أضف</span>
+                        </button>
+                      )}
                     </div>
                     <div className="portal-prod-meta">
                       {partyIsTvaExempt ? (
@@ -475,36 +557,9 @@ export default function PortalOrdersPage() {
                         ))}
                       </select>
                     )}
-                    <div className="portal-prod-foot">
-                      <div className="portal-prod-qty">
-                        <button
-                          type="button"
-                          onClick={() => setItemQty(p.id, q - 1)}
-                          disabled={q <= 1}
-                        >
-                          <i className="ti ti-minus" />
-                        </button>
-                        <input
-                          type="number"
-                          min={1}
-                          value={q}
-                          onChange={(e) => setItemQty(p.id, Number(e.target.value))}
-                        />
-                        <button type="button" onClick={() => setItemQty(p.id, q + 1)}>
-                          <i className="ti ti-plus" />
-                        </button>
-                      </div>
-                      <button
-                        className={`portal-btn portal-btn--em ${inCart ? 'portal-btn--added' : ''}`}
-                        onClick={() => addToCart(p.id, q, selectedPack)}
-                        type="button"
-                      >
-                        {inCart ? <><i className="ti ti-check" /> في السلة</> : <><i className="ti ti-plus" /> أضف إلى السلة</>}
-                      </button>
-                    </div>
                     {factor > 1 && (
                       <div className="portal-prod-packinfo">
-                        {q} {selectedPack ? `×${factor}` : ''} = {q * factor} {unitOf(p)}
+                        {cartQty} {selectedPack ? `×${factor}` : ''} = {cartQty * factor} {unitOf(p)}
                       </div>
                     )}
                   </div>
@@ -537,9 +592,8 @@ export default function PortalOrdersPage() {
         {cartEntries.length === 0 ? (
           <PortalEmpty icon="ti-basket" text={editingId ? 'هذا الطلب لا يحتوي على منتجات' : 'لم تضف أي منتج بعد'} />
         ) : (
-          <>
-            <div className="portal-cart">
-              {cartEntries.map(({ key, product, entry }) => {
+          <div className="portal-cart">
+            {cartEntries.map(({ key, product, entry }) => {
                 const cl = lineCalc(product, entry.packaging_id, entry.quantity);
                 return (
                   <div key={key} className="portal-cart-item">
@@ -580,8 +634,42 @@ export default function PortalOrdersPage() {
                 );
               })}
             </div>
+        )}
 
-            <div className="portal-cart-foot">
+        {(isPublic || cartEntries.length > 0) && (
+          <div className="portal-cart-foot">
+            {isPublic && (
+                <div className="portal-customer-fields">
+                  <div className="portal-customer-field">
+                    <input
+                      className="portal-form-input"
+                      placeholder="الاسم الكامل *"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                    />
+                  </div>
+                  <div className="portal-customer-field">
+                    <input
+                      className="portal-form-input"
+                      placeholder="رقم الهاتف *"
+                      dir="ltr"
+                      inputMode="tel"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                    />
+                  </div>
+                  <div className="portal-customer-field">
+                    <input
+                      className="portal-form-input"
+                      placeholder="العنوان (اختياري)"
+                      value={customerAddress}
+                      onChange={(e) => setCustomerAddress(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+              {cartEntries.length > 0 && (
+                <>
               <textarea
                 className="portal-form-input"
                 placeholder="ملاحظات (اختياري): مثلاً تاريخ التسليم المفضل..."
@@ -602,6 +690,8 @@ export default function PortalOrdersPage() {
                   <span>المجموع TTC</span><b>{fmtMoney(totals.ttc)}</b>
                 </div>
               </div>
+                </>
+              )}
               <div className="portal-cart-actions">
                 {editingId && (
                   <button
@@ -628,12 +718,12 @@ export default function PortalOrdersPage() {
                   )}
                 </button>
               </div>
-            </div>
-          </>
+          </div>
         )}
       </div>
 
       {/* ─── طلباتي ─── */}
+      {!isPublic && (
       <div className="portal-card portal-mt-22">
         <div className="portal-card-hd">
           <h3><i className="ti ti-clipboard-list" /> طلباتي</h3>
@@ -721,23 +811,12 @@ export default function PortalOrdersPage() {
                       {(o.status === 'preparing') && (
                         <div className="portal-order-actions">
                           <button
-                            className={`portal-btn portal-btn--sm portal-btn--em${confirmValidateId === o.id ? ' on' : ''}`}
-                            onClick={() => {
-                              if (confirmValidateId === o.id) {
-                                validateOrder.mutate(o.id);
-                              } else {
-                                setConfirmValidateId(o.id);
-                                setTimeout(() => setConfirmValidateId((c) => (c === o.id ? null : c)), 3000);
-                              }
-                            }}
+                            className="portal-btn portal-btn--sm portal-btn--em"
+                            onClick={() => handleValidateOrder(o)}
                             type="button"
                             disabled={validateOrder.isPending}
                           >
-                            {confirmValidateId === o.id ? (
-                              <><i className="ti ti-alert-triangle" /> تأكيد الطلب؟</>
-                            ) : (
-                              <><i className="ti ti-circle-check" /> تأكيد الطلب</>
-                            )}
+                            <i className="ti ti-circle-check" /> تأكيد الطلب
                           </button>
                           <button
                             className="portal-btn portal-btn--sm"
@@ -748,23 +827,12 @@ export default function PortalOrdersPage() {
                             <i className="ti ti-edit" /> تعديل
                           </button>
                           <button
-                            className={`portal-btn portal-btn--sm portal-btn--danger${confirmCancelId === o.id ? ' on' : ''}`}
-                            onClick={() => {
-                              if (confirmCancelId === o.id) {
-                                cancelOrder.mutate(o.id);
-                              } else {
-                                setConfirmCancelId(o.id);
-                                setTimeout(() => setConfirmCancelId((c) => (c === o.id ? null : c)), 3000);
-                              }
-                            }}
+                            className="portal-btn portal-btn--sm portal-btn--danger"
+                            onClick={() => handleCancelOrder(o)}
                             type="button"
                             disabled={cancelOrder.isPending}
                           >
-                            {confirmCancelId === o.id ? (
-                              <><i className="ti ti-alert-triangle" /> تأكيد الإلغاء؟</>
-                            ) : (
-                              <><i className="ti ti-x" /> إلغاء الطلب</>
-                            )}
+                            <i className="ti ti-x" /> إلغاء الطلب
                           </button>
                         </div>
                       )}
@@ -786,6 +854,7 @@ export default function PortalOrdersPage() {
           </>
         )}
       </div>
+      )}
 
       {toast && <div className="portal-toast"><i className="ti ti-circle-check" /> {toast}</div>}
       <ConfirmDialog {...confirmDialogProps} />

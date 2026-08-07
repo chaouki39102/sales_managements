@@ -13,6 +13,7 @@ interface ModalProps {
   resizable?: boolean;
   storageKey?: string;
   closeOnBackdrop?: boolean;
+  className?: string;
 }
 
 const sizeMap = { sm: 'modal-sm', md: '', lg: 'modal-lg', xl: 'modal-xl' };
@@ -61,7 +62,7 @@ export default function Modal({
   open, onClose, title, subtitle,
   size = 'md', footer, footerLeft, children,
   resizable = true, storageKey,
-  closeOnBackdrop = true,
+  closeOnBackdrop = true, className,
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
@@ -139,7 +140,7 @@ export default function Modal({
     >
       <div
         ref={modalRef}
-        className={`modal ${sizeMap[size]}`}
+        className={`modal ${sizeMap[size]}${className ? ` ${className}` : ''}`}
         onClick={(e) => e.stopPropagation()}
         style={resizableStyle}
       >

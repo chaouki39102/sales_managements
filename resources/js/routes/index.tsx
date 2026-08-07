@@ -128,6 +128,7 @@ const PortalPaymentsPage     = lazy(() => import('@/pages/portal/PortalPaymentsP
 const PortalStatementPage    = lazy(() => import('@/pages/portal/PortalStatementPage'));
 const PortalProfilePage      = lazy(() => import('@/pages/portal/PortalProfilePage'));
 const PortalOrdersPage       = lazy(() => import('@/pages/portal/PortalOrdersPage'));
+const PortalPublicOrderPage  = lazy(() => import('@/pages/portal/PortalPublicOrderPage'));
 const PortalOrdersAdminPage  = lazy(() => import('@/pages/portal/PortalOrdersAdminPage'));
 
 // â”€â”€ Admin Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -381,6 +382,8 @@ export function AppRoutes() {
 
         {/* â‘¤ Customer Portal (بوابة الزبائن) — لكل مؤسسة على حدة /portal/:slug */}
         <Route path="/portal/:slug/login" element={<PortalLoginPage />} />
+        {/* صفحة الطلب العام — بدون حساب، بدون حراسة auth */}
+        <Route path="/portal/:slug/order" element={<PortalPublicOrderPage />} />
 
         <Route
           path="/portal/:slug"

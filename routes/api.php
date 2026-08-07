@@ -164,6 +164,19 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/info', [PortalController::class, 'companyInfo']);
 
+        // ── طلبات السلع: نقطة البيع العامة (بدون حساب بوابة) ──
+        // الكتالوج + الإنشاء يخدمان الزبون المعتمد والزائر معاً:
+        //   - معتمد (Bearer portal token): كتالوجه بحالته الجبائية + مستوى
+        //     سعره الشخصي، ويُربط الطلب بزبونه (السلوك الأصلي).
+        //   - زائر: كتالوج المؤسسة الافتراضي، والطلب يرسل customer_name/
+        //     customer_phone ويُربط بزبون الصندوق (Client Cash).
+        // لذلك هذان المساران خارج portal.auth (يُحل الزبون داخل المتحكم عبر
+        // optionalPortalUser) — أما بقية مسارات الطلبات الخاصة بالزبون فتبقى
+        // خلف المصادقة. `throttle` يمنع إغراق إنشاء الطلبات من الزوار.
+        Route::get('/orders/catalog', [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'catalog']);
+        Route::post('/orders', [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'store'])
+            ->middleware('throttle:20,1');
+
         Route::middleware('portal.auth')->group(function () {
             Route::get('/auth/me',      [PortalAuthController::class, 'me']);
             Route::post('/auth/logout', [PortalAuthController::class, 'logout']);
@@ -178,10 +191,8 @@ Route::prefix('v1')->group(function () {
             Route::put('/profile',          [PortalController::class, 'updateProfile']);
             Route::put('/profile/password', [PortalController::class, 'updatePassword']);
 
-            // ── طلبات السلع (وصل طلب سلعة) — كتالوج + الطلبات الخاصة بالزبون ──
-            Route::get('/orders/catalog',     [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'catalog']);
+            // ── طلبات السلع (وصل طلب سلعة) — طلبات الزبون الخاصة فقط ──
             Route::get('/orders',             [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'index']);
-            Route::post('/orders',            [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'store']);
             Route::get('/orders/{id}',        [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'showOrder']);
             Route::put('/orders/{id}',        [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'update']);
             Route::patch('/orders/{id}',      [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'update']);

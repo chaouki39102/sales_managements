@@ -111,6 +111,12 @@ body:not(.dark) .kpi.ko{background:linear-gradient(150deg,#fff 60%,#fff7ed);}
 /* ═══ TABLE ═══ */
 .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .tw-sr{font-weight:800;background:var(--bg2);}
+
+/* ── رؤوس قابلة للفرز (SimpleTable sortable) ── */
+.tw-th-sort{display:inline-flex;align-items:center;gap:6px;}
+.tw-th-sort-ic{font-size:13px;opacity:.35;transition:opacity .15s,color .15s;line-height:1;}
+th:hover .tw-th-sort-ic{opacity:.8;}
+.tw-th-sort-ic.on{opacity:1;color:var(--em);}
 table{width:100%;border-collapse:collapse;}
 thead th{
   padding:10px 13px;

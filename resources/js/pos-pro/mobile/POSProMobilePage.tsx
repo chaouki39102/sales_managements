@@ -287,6 +287,17 @@ export default function POSProMobilePage() {
     onSuccess: () => void;
   } | null>(null);
 
+  const prodSearchRef = useRef<HTMLInputElement>(null);
+  const custSearchRef = useRef<HTMLInputElement>(null);
+
+  // تركيز حقل البحث فقط عند فتح الـ Sheet (وليس عند التحميل): `autoFocus` على
+  // عنصر داخل sheet مغلق يدفع المتصفح إلى تمرير حاوية .ppm-screen المخفية
+  // (overflow:hidden) نحو العنصر → ينزاح التصميم كله للأعلى ويُقتطع.
+  useEffect(() => {
+    if (sheet === 'products') prodSearchRef.current?.focus();
+    else if (sheet === 'customer') custSearchRef.current?.focus();
+  }, [sheet]);
+
   const receiptSnapshotRef = useRef<POSSaleSnapshot | null>(null);
   const mountedRef = useRef(true);
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
@@ -943,7 +954,7 @@ export default function POSProMobilePage() {
         <div className="ppm-psearch">
           <i className="ti ti-search" />
           <input
-            autoFocus
+            ref={prodSearchRef}
             placeholder="بحث باسم / مرجع / باركود…"
             value={prodSearch}
             onChange={(e) => setProdSearch(e.target.value)}
@@ -1016,7 +1027,7 @@ export default function POSProMobilePage() {
         <div className="ppm-csearch">
           <i className="ti ti-search" />
           <input
-            autoFocus
+            ref={custSearchRef}
             placeholder="بحث بالاسم / الرمز / الهاتف…"
             value={custSearch}
             onChange={(e) => setCustSearch(e.target.value)}

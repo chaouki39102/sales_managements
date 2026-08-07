@@ -16,6 +16,10 @@ export interface SimpleColumn {
   render?: (value: unknown, row: any, columnKey: string) => React.ReactNode;
   /** Click handler on the column header */
   onHeaderClick?: () => void;
+  /** Make this header clickable for sorting (with onSort + sortBy/sortDir on the table) */
+  sortable?: boolean;
+  /** Sort key reported to onSort — defaults to this column's key */
+  sortKey?: string;
 }
 
 interface SimpleTableProps {
@@ -39,6 +43,12 @@ interface SimpleTableProps {
   expandable?: (row: any) => boolean;
   /** Renders the expanded detail row content (shown under the expanded row) */
   renderExpanded?: (row: any) => React.ReactNode;
+  /** Currently active sort key ('' = default server order) */
+  sortBy?: string;
+  /** Direction of the active sort */
+  sortDir?: 'asc' | 'desc';
+  /** Called when a sortable header is clicked — (sortKey, nextDir) */
+  onSort?: (sortKey: string, dir: 'asc' | 'desc') => void;
 }
 
 export default function SimpleTable({
@@ -53,6 +63,9 @@ export default function SimpleTable({
   skeletonRows = 5,
   expandable,
   renderExpanded,
+  sortBy = '',
+  sortDir = 'asc',
+  onSort,
 }: SimpleTableProps) {
   const getKey = useMemo(() => {
     if (typeof rowKey === 'function') return rowKey;
@@ -62,8 +75,32 @@ export default function SimpleTable({
   const thStyle = (c: SimpleColumn): React.CSSProperties | undefined => {
     const s: React.CSSProperties = {};
     if (c.align) s.textAlign = c.align;
-    if (c.onHeaderClick) { s.cursor = 'pointer'; s.userSelect = 'none'; }
+    if (c.onHeaderClick || (c.sortable && onSort)) { s.cursor = 'pointer'; s.userSelect = 'none'; }
     return Object.keys(s).length ? s : undefined;
+  };
+
+  const handleHeaderClick = (c: SimpleColumn) => {
+    if (!c.sortable || !onSort) { c.onHeaderClick?.(); return; }
+    const key = c.sortKey ?? c.key;
+    onSort(key, sortBy === key ? (sortDir === 'asc' ? 'desc' : 'asc') : 'asc');
+  };
+
+  const renderHeaderLabel = (c: SimpleColumn) => {
+    if (!c.sortable || !onSort) return c.label;
+    const key = c.sortKey ?? c.key;
+    const active = sortBy === key;
+    const icon = active
+      ? sortDir === 'asc' ? 'ti-sort-ascending' : 'ti-sort-descending'
+      : 'ti-chevrons-up-down';
+    return (
+      <span className="tw-th-sort">
+        <span>{c.label}</span>
+        <i
+          className={`ti ${icon} tw-th-sort-ic${active ? ' on' : ''}`}
+          aria-hidden="true"
+        />
+      </span>
+    );
   };
 
   const hasExpand = !!(expandable && renderExpanded);
@@ -118,7 +155,9 @@ export default function SimpleTable({
     <thead>
       <tr>
         {headColumns.map(c => (
-          <th key={c.key} className={c.className} onClick={c.onHeaderClick} style={thStyle(c)}>{c.label}</th>
+          <th key={c.key} className={c.className} onClick={() => handleHeaderClick(c)} style={thStyle(c)}>
+            {renderHeaderLabel(c)}
+          </th>
         ))}
       </tr>
     </thead>

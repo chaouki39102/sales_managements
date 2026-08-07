@@ -32,7 +32,6 @@ import '../css/theme/utilities.css';
 import '../css/theme/pos.css';
 import '../css/theme/pos-search-enhanced.css';
 import '../css/theme/portal.css';
-import '../css/theme/pos-pro-mobile.css';
 
 // ربط Zustand بالـ interceptor — مرة واحدة عند تحميل الـ module
 connectSlugToInterceptor(() => appActions.getActiveSlug());

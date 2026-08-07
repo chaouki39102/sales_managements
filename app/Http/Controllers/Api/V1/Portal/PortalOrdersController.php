@@ -136,7 +136,8 @@ class PortalOrdersController extends BaseApiController
             $order = PortalOrder::query()->findOrFail($resolvedId);
 
             $validated = $request->validate([
-                'status' => ['required', 'string', 'in:' . implode(',', array_merge(PortalOrder::STATUSES, [PortalOrder::LEGACY_PENDING]))],
+                // legacy pending غير مقبول كهدف (إداري): يمكن وراثته كأصل قديم فقط
+                'status' => ['required', 'string', 'in:' . implode(',', PortalOrder::STATUSES)],
                 'notes'  => ['nullable', 'string', 'max:1000'],
             ]);
 
