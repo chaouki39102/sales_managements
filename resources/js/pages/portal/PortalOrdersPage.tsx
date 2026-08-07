@@ -117,6 +117,21 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
   const canOrder = cfg?.can_order ?? true;
   const confirmationMessage = (cfg?.order_confirmation_message ?? '').trim();
 
+  // إعدادات عرض الكتالوج — تتحكم في ما يظهر للزبون (تُقرأ من /portal/config
+  // ويديرها المسؤول في تبويب الإعدادات «إعدادات عرض الكتالوج»).
+  const showStock = cfg?.show_stock ?? true;
+  const showPrice = cfg?.show_price ?? true;
+  const showRef = cfg?.show_ref ?? true;
+  const showUnit = cfg?.show_unit ?? true;
+  const showPackaging = cfg?.show_packaging ?? true;
+  const allowChangePackaging = cfg?.allow_change_packaging ?? true;
+  const showDiscounts = cfg?.show_discounts ?? true;
+  const showTva = cfg?.show_tva ?? true;
+  const showSearch = cfg?.show_search ?? true;
+  const hideOutOfStock = cfg?.hide_out_of_stock ?? false;
+  const showIncartBadge = cfg?.show_incart_badge ?? true;
+  const showNotes = cfg?.show_notes ?? true;
+
   const createOrder = useMutation({
     mutationFn: ({ items, note }: { items: { product_id: number; quantity: number; packaging_id?: number | null }[]; note?: string }) =>
       isPublic
@@ -163,6 +178,17 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
     (catalogQuery.data?.data ?? []).forEach((p) => m.set(p.id, p));
     return m;
   }, [catalogQuery.data]);
+
+  // قائمة البطاقات المعروضة — عند تفعيل «إخفاء المنتجات النافدة» تُستبعد
+  // المنتجات غير المتوفرة من العرض (يبقى byId كاملاً لتعمل السلة على أي
+  // منتج أُضيف قبل نفاده).
+  const visibleItems = useMemo(() => {
+    const items = catalogQuery.data?.data ?? [];
+    if (!hideOutOfStock) return items;
+    return items.filter(
+      (p) => !(p.manages_stock && p.current_stock !== null && p.current_stock <= 0),
+    );
+  }, [catalogQuery.data, hideOutOfStock]);
 
   // السعر الفعلي لوحدة الطلب (وحدة أساسية أو تعبئة مختارة)
   const unitPriceFor = (product: PortalCatalogItem, packagingId: number | null): number => {
@@ -364,17 +390,21 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
     }
     // تحقق مسبق قبل إرسال الطلب — نفس الأذونات/الحدود التي يطبّقها الخادم:
     // حتى لو تجاوزتها، يرفض الخادم برسالة واضحة (لا نفقد السلة).
+    // عند إخفاء الأسعار لا يمكن التحقق من المبالغ مسبقاً (لا تُعرض للزبون)
+    // لذلك نترك التحقق من الحدود للخادم الذي يبقى المرجع الوحيد.
     if (!canOrder) {
       showToast(cfg?.enabled ? 'إرسال الطلبات معطل حالياً' : 'إرسال الطلبات معطل حالياً من طرف المؤسسة');
       return;
     }
-    if (cfg?.min_order_amount && cfg.min_order_amount > 0 && totals.ttc < cfg.min_order_amount) {
-      showToast(`قيمة الطلب أقل من الحد الأدنى المسموح به (${fmtMoney(cfg.min_order_amount)} دج).`);
-      return;
-    }
-    if (cfg?.max_order_amount && cfg.max_order_amount > 0 && totals.ttc > cfg.max_order_amount) {
-      showToast(`تجاوزت قيمة الطلب الحد الأقصى المسموح به (${fmtMoney(cfg.max_order_amount)} دج).`);
-      return;
+    if (showPrice) {
+      if (cfg?.min_order_amount && cfg.min_order_amount > 0 && totals.ttc < cfg.min_order_amount) {
+        showToast(`قيمة الطلب أقل من الحد الأدنى المسموح به (${fmtMoney(cfg.min_order_amount)} دج).`);
+        return;
+      }
+      if (cfg?.max_order_amount && cfg.max_order_amount > 0 && totals.ttc > cfg.max_order_amount) {
+        showToast(`تجاوزت قيمة الطلب الحد الأقصى المسموح به (${fmtMoney(cfg.max_order_amount)} دج).`);
+        return;
+      }
     }
     // الطلب العام: الاسم + الهاتف إلزاميان (الخادم يرفض بدونهما أيضاً)
     if (isPublic) {
@@ -410,20 +440,22 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
             <h2><i className="ti ti-building-store" /> كتالوج المنتجات</h2>
             <p>{catalogQuery.data ? `${catalogQuery.data.meta.total} منتج متوفر` : 'تصفّح المنتجات واختر ما يناسبك'}</p>
           </div>
-          <div className="portal-search portal-search--lg">
-            <i className="ti ti-search" />
-            <input
-              type="text"
-              placeholder="ابحث عن منتج بالاسم أو المرجع..."
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setCatalogPage(1); }}
-            />
-            {search && (
-              <button className="portal-search-x" onClick={() => { setSearch(''); setCatalogPage(1); }} type="button">
-                <i className="ti ti-x" />
-              </button>
-            )}
-          </div>
+          {showSearch && (
+            <div className="portal-search portal-search--lg">
+              <i className="ti ti-search" />
+              <input
+                type="text"
+                placeholder="ابحث عن منتج بالاسم أو المرجع..."
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setCatalogPage(1); }}
+              />
+              {search && (
+                <button className="portal-search-x" onClick={() => { setSearch(''); setCatalogPage(1); }} type="button">
+                  <i className="ti ti-x" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {cfg && !canOrder && (
@@ -443,15 +475,19 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
           <PortalLoading text="جاري تحميل الكتالوج..." />
         ) : catalogQuery.isError || !catalogQuery.data ? (
           <PortalError message="تعذر تحميل كتالوج المنتجات" />
-        ) : catalogQuery.data.data.length === 0 ? (
+        ) : catalogQuery.data.data.length === 0 || visibleItems.length === 0 ? (
           <PortalEmpty icon="ti-package" text={search ? 'لا توجد منتجات مطابقة' : 'لا توجد منتجات'} />
         ) : (
           <>
             <div className="portal-catalog">
-              {catalogQuery.data.data.map((p) => {
+              {visibleItems.map((p) => {
                 const defaultPack = defaultPackagingFor(p);
+                // عند إخفاء التعبئة (أو منع تغييرها) تُجبر التعبئة الافتراضية فقط
+                const canSwitchPack = showPackaging && allowChangePackaging;
                 const selectedPack =
-                  pkg[p.id] !== undefined ? pkg[p.id] : (defaultPack?.id ?? null);
+                  canSwitchPack && pkg[p.id] !== undefined
+                    ? pkg[p.id]
+                    : (defaultPack?.id ?? null);
                 const factor = packFactorFor(p, selectedPack);
                 const q = qty[p.id] ?? 1;
                 const cl = lineCalc(p, selectedPack, q);
@@ -469,7 +505,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                       ) : (
                         <div className="portal-prod-img-fb"><i className="ti ti-package" /></div>
                       )}
-                      {cl.discount > 0 && cl.tier ? (
+                      {showDiscounts && cl.discount > 0 && cl.tier ? (
                         <span className="portal-prod-badge">
                           <i className="ti ti-discount-2" />
                           {cl.tier.discount_percentage !== null && cl.tier.discount_percentage > 0
@@ -477,7 +513,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                             : discountLabel(cl.tier)}
                         </span>
                       ) : null}
-                      {inCart && (
+                      {showIncartBadge && inCart && (
                         <span className="portal-prod-incart">
                           <i className="ti ti-check" /> في السلة
                         </span>
@@ -533,36 +569,43 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
 
                     <div className="portal-prod-body">
                       <div className="portal-prod-name">{p.name}</div>
-                      {p.ref && <div className="portal-prod-ref">{p.ref}</div>}
+                      {showRef && p.ref && <div className="portal-prod-ref">{p.ref}</div>}
 
                       <div className="portal-prod-foot">
-                        <div className="portal-prod-price">
-                          {cl.discount > 0 && cl.tier ? (
-                            <>
-                              <span className="portal-prod-price-now">
-                                {fmtMoney(cl.unitPrice - cl.discount / Math.max(1, q))}
-                              </span>
-                              <span className="portal-prod-price-old">{fmtMoney(cl.unitPrice)}</span>
-                            </>
-                          ) : (
-                            <span className="portal-prod-price-now">{fmtMoney(cl.unitPrice)}</span>
-                          )}
-                          <span className="portal-prod-unit">{unitLabelFor(p, selectedPack)}</span>
-                        </div>
-                        {cl.discount > 0 && cl.tier && (
+                        {showPrice ? (
+                          <div className="portal-prod-price">
+                            {cl.discount > 0 && cl.tier ? (
+                              <>
+                                <span className="portal-prod-price-now">
+                                  {fmtMoney(cl.unitPrice - cl.discount / Math.max(1, q))}
+                                </span>
+                                <span className="portal-prod-price-old">{fmtMoney(cl.unitPrice)}</span>
+                              </>
+                            ) : (
+                              <span className="portal-prod-price-now">{fmtMoney(cl.unitPrice)}</span>
+                            )}
+                            {showUnit && <span className="portal-prod-unit">{unitLabelFor(p, selectedPack)}</span>}
+                          </div>
+                        ) : (
+                          <div className="portal-prod-price">
+                            {showUnit && <span className="portal-prod-unit">{unitLabelFor(p, selectedPack)}</span>}
+                          </div>
+                        )}
+                        {showDiscounts && showPrice && cl.discount > 0 && cl.tier && (
                           <span className="portal-prod-save">
                             <i className="ti ti-discount-2" /> وفّر {fmtMoney(cl.discount)}
                           </span>
                         )}
                         <div className="portal-prod-meta">
-                          {partyIsTvaExempt ? (
-                            <span className="portal-prod-exempt">
-                              <i className="ti ti-shield-check" /> معفى من TVA
-                            </span>
-                          ) : p.tva_rate > 0 ? (
-                            <span className="portal-prod-tva">TVA {p.tva_rate}%</span>
-                          ) : null}
-                          {p.manages_stock && p.current_stock !== null && (
+                          {showTva &&
+                            (partyIsTvaExempt ? (
+                              <span className="portal-prod-exempt">
+                                <i className="ti ti-shield-check" /> معفى من TVA
+                              </span>
+                            ) : p.tva_rate > 0 ? (
+                              <span className="portal-prod-tva">TVA {p.tva_rate}%</span>
+                            ) : null)}
+                          {showStock && p.manages_stock && p.current_stock !== null && (
                             outOfStock ? (
                               <span className="portal-prod-stock out">
                                 <i className="ti ti-alert-circle" /> نفد المخزون
@@ -581,11 +624,11 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                       </div>
                     </div>
 
-                    {p.has_packaging && p.packagings.length > 0 && (
+                    {showPackaging && p.has_packaging && p.packagings.length > 0 && (
                       <select
                         className="portal-prod-pkg"
                         value={selectedPack ?? ''}
-                        disabled={outOfStock}
+                        disabled={outOfStock || !canSwitchPack}
                         onChange={(e) => {
                           const val = e.target.value;
                           setPkg((prev) => ({ ...prev, [p.id]: val === '' ? null : Number(val) }));
@@ -594,17 +637,18 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                         <option value="">وحدة ({unitOf(p)})</option>
                         {p.packagings.map((pk) => (
                           <option key={pk.id} value={pk.id}>
-                            {pk.label || pk.code || `×${pk.quantity}`} — {fmtMoney(pk.pack_price_ht)}
+                            {pk.label || pk.code || `×${pk.quantity}`}
+                            {showPrice ? ` — ${fmtMoney(pk.pack_price_ht)}` : ''}
                           </option>
                         ))}
                       </select>
                     )}
-                    {factor > 1 && !outOfStock && (
+                    {showPackaging && factor > 1 && !outOfStock && (
                       <div className="portal-prod-packinfo">
                         {cartQty} {selectedPack ? `×${factor}` : ''} = {cartQty * factor} {unitOf(p)}
                       </div>
                     )}
-                    {p.discounts.length > 0 && (
+                    {showDiscounts && p.discounts.length > 0 && (
                       <div className="portal-prod-discs">
                         {p.discounts.map((d) => {
                           const active = cl.tier?.id === d.id;
@@ -677,7 +721,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
               </h3>
               {!checkoutStep && (
                 <span className="portal-drawer-actions">
-                  {!isPublic && (
+                  {showNotes && !isPublic && (
                     <button
                       className={`portal-drawer-act${noteOpen ? ' is-on' : ''}`}
                       type="button"
@@ -737,13 +781,15 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                     </div>
                   </div>
                 )}
-                <textarea
-                  className="portal-form-input"
-                  placeholder="ملاحظات (اختياري): مثلاً تاريخ التسليم المفضل..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                />
+                {showNotes && (
+                  <textarea
+                    className="portal-form-input"
+                    placeholder="ملاحظات (اختياري): مثلاً تاريخ التسليم المفضل..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={2}
+                  />
+                )}
                 <div className="portal-checkout-review">
                   {cartEntries.map(({ key, product, entry }) => {
                     const cl = lineCalc(product, entry.packaging_id, entry.quantity);
@@ -759,12 +805,18 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                         <div className="portal-cart-info">
                           <div className="portal-prod-name">{product.name}</div>
                           <div className="portal-prod-ref">
-                            {entry.quantity} × {fmtMoney(cl.unitPrice)}
-                            {cl.factor > 1 ? ` ×${cl.factor}` : ''}
+                            {showPrice ? (
+                              <>
+                                {entry.quantity} × {fmtMoney(cl.unitPrice)}
+                                {cl.factor > 1 ? ` ×${cl.factor}` : ''}
+                              </>
+                            ) : (
+                              <>{entry.quantity}{cl.factor > 1 ? ` × ${cl.factor}` : ''}</>
+                            )}
                             {`/${unitLabelFor(product, entry.packaging_id)}`}
                           </div>
                         </div>
-                        <div className="portal-cart-total">{fmtMoney(cl.ttc)}</div>
+                        {showPrice && <div className="portal-cart-total">{fmtMoney(cl.ttc)}</div>}
                       </div>
                     );
                   })}
@@ -831,12 +883,21 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                             <div className="portal-cart-info">
                               <div className="portal-prod-name">{product.name}</div>
                               <div className="portal-prod-ref">
-                                {fmtMoney(cl.unitPrice)}
-                                {cl.factor > 1 ? ` ×${cl.factor}` : ''}
+                                {showPrice && (
+                                  <>
+                                    {fmtMoney(cl.unitPrice)}
+                                    {cl.factor > 1 ? ` ×${cl.factor}` : ''}
+                                  </>
+                                )}
                                 {`/${unitLabelFor(product, entry.packaging_id)}`}
-                                {partyIsTvaExempt ? ' • معفى من TVA' : product.tva_rate > 0 ? ` • TVA ${product.tva_rate}%` : ''}
+                                {showTva &&
+                                  (partyIsTvaExempt
+                                    ? ' • معفى من TVA'
+                                    : product.tva_rate > 0
+                                      ? ` • TVA ${product.tva_rate}%`
+                                      : '')}
                               </div>
-                              {cl.discount > 0 && cl.tier && (
+                              {showDiscounts && showPrice && cl.discount > 0 && cl.tier && (
                                 <div className="portal-cart-disc">
                                   <i className="ti ti-discount-2" />
                                   <span className="portal-cart-disc-txt">{discountLabel(cl.tier)}</span>
@@ -858,7 +919,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                                 <i className="ti ti-plus" />
                               </button>
                             </div>
-                            <div className="portal-cart-total">{fmtMoney(cl.ttc)}</div>
+                            <div className="portal-cart-total">{showPrice ? fmtMoney(cl.ttc) : ''}</div>
                             <button className="portal-cart-x" type="button" onClick={() => handleRemoveItem(key, product.name)} title="إزالة">
                               <i className="ti ti-x" />
                             </button>
@@ -870,28 +931,36 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                 </div>
 
                 <div className="portal-drawer-foot">
-                  <div className="portal-cart-totals">
-                    <div className="portal-cart-total-row">
-                      <span>المجموع HT</span>
-                      <b>{fmtMoney(totals.ht)}</b>
-                    </div>
-                    {totals.discount > 0.004 && (
-                      <div className="portal-cart-total-row portal-cart-total-row--disc">
-                        <span>الخصم</span>
-                        <b>-{fmtMoney(totals.discount)}</b>
-                      </div>
-                    )}
-                    {totals.tva > 0.004 && (
+                  {showPrice ? (
+                    <div className="portal-cart-totals">
                       <div className="portal-cart-total-row">
-                        <span>TVA</span>
-                        <b>{fmtMoney(totals.tva)}</b>
+                        <span>المجموع HT</span>
+                        <b>{fmtMoney(totals.ht)}</b>
                       </div>
-                    )}
-                    <div className="portal-cart-total-row portal-cart-total-row--final">
-                      <span>المجموع (TTC)</span>
-                      <b>{fmtMoney(totals.ttc)}</b>
+                      {totals.discount > 0.004 && (
+                        <div className="portal-cart-total-row portal-cart-total-row--disc">
+                          <span>الخصم</span>
+                          <b>-{fmtMoney(totals.discount)}</b>
+                        </div>
+                      )}
+                      {totals.tva > 0.004 && (
+                        <div className="portal-cart-total-row">
+                          <span>TVA</span>
+                          <b>{fmtMoney(totals.tva)}</b>
+                        </div>
+                      )}
+                      <div className="portal-cart-total-row portal-cart-total-row--final">
+                        <span>المجموع (TTC)</span>
+                        <b>{fmtMoney(totals.ttc)}</b>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="portal-cart-totals portal-cart-totals--muted">
+                      <div className="portal-cart-total-row">
+                        <span>سيُحدَّد مبلغ الطلب من طرف المؤسسة عند التأكيد.</span>
+                      </div>
+                    </div>
+                  )}
                   <button
                     className="portal-btn portal-btn--em portal-btn--block"
                     type="button"
@@ -912,7 +981,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
         <button className="portal-mobile-cart-bar" onClick={() => { setCheckoutStep(false); setDrawerOpen(true); }} type="button">
           <i className="ti ti-basket" />
           <span>{cartEntries.length} صنف</span>
-          <b>{fmtMoney(totals.ttc)}</b>
+          {showPrice && <b>{fmtMoney(totals.ttc)}</b>}
           <span className="portal-mobile-cart-bar-go"><i className="ti ti-shopping-cart" /> عرض السلة</span>
         </button>
       )}

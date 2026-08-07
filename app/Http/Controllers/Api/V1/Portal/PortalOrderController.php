@@ -531,6 +531,21 @@ class PortalOrderController extends BaseApiController
                 'authenticated'              => $portal !== null,
                 'party_orders_enabled'       => $partyEnabled,
                 'can_order'                  => (bool) $canOrder,
+
+                // إعدادات عرض الكتالوج — تُقرأ من الإعدادات وتتحكم في واجهة
+                // المتجر (إظهار/إخفاء السعر والمخزون والتعبئة والخصومات...).
+                'show_stock'                 => (bool) $this->portalSetting('portal_show_stock', true),
+                'show_price'                 => (bool) $this->portalSetting('portal_show_price', true),
+                'show_ref'                   => (bool) $this->portalSetting('portal_show_ref', true),
+                'show_unit'                  => (bool) $this->portalSetting('portal_show_unit', true),
+                'show_packaging'             => (bool) $this->portalSetting('portal_show_packaging', true),
+                'allow_change_packaging'     => (bool) $this->portalSetting('portal_allow_change_packaging', true),
+                'show_discounts'             => (bool) $this->portalSetting('portal_show_discounts', true),
+                'show_tva'                   => (bool) $this->portalSetting('portal_show_tva', true),
+                'show_search'                => (bool) $this->portalSetting('portal_show_search', true),
+                'hide_out_of_stock'          => (bool) $this->portalSetting('portal_hide_out_of_stock', false),
+                'show_incart_badge'          => (bool) $this->portalSetting('portal_show_incart_badge', true),
+                'show_notes'                 => (bool) $this->portalSetting('portal_show_notes', true),
             ], 'تم جلب إعدادات البوابة بنجاح');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal_orders.config');

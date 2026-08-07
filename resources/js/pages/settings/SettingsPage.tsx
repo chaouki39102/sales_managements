@@ -4548,6 +4548,18 @@ function PortalTab({
     const [minOrderAmount, setMinOrderAmount] = useState("0");
     const [maxOrderAmount, setMaxOrderAmount] = useState("0");
     const [confirmationMessage, setConfirmationMessage] = useState("");
+    const [showStock, setShowStock] = useState(true);
+    const [showPrice, setShowPrice] = useState(true);
+    const [showRef, setShowRef] = useState(true);
+    const [showUnit, setShowUnit] = useState(true);
+    const [showPackaging, setShowPackaging] = useState(true);
+    const [allowChangePackaging, setAllowChangePackaging] = useState(true);
+    const [showDiscounts, setShowDiscounts] = useState(true);
+    const [showTva, setShowTva] = useState(true);
+    const [showSearch, setShowSearch] = useState(true);
+    const [hideOutOfStock, setHideOutOfStock] = useState(false);
+    const [showIncartBadge, setShowIncartBadge] = useState(true);
+    const [showNotes, setShowNotes] = useState(true);
 
     useEffect(() => {
         if (!rawSettings.length) return;
@@ -4557,6 +4569,18 @@ function PortalTab({
         setMinOrderAmount(str(gs("portal_min_order_amount", 0)));
         setMaxOrderAmount(str(gs("portal_max_order_amount", 0)));
         setConfirmationMessage(str(gs("portal_order_confirmation_message", "")));
+        setShowStock(gs<boolean>("portal_show_stock", true));
+        setShowPrice(gs<boolean>("portal_show_price", true));
+        setShowRef(gs<boolean>("portal_show_ref", true));
+        setShowUnit(gs<boolean>("portal_show_unit", true));
+        setShowPackaging(gs<boolean>("portal_show_packaging", true));
+        setAllowChangePackaging(gs<boolean>("portal_allow_change_packaging", true));
+        setShowDiscounts(gs<boolean>("portal_show_discounts", true));
+        setShowTva(gs<boolean>("portal_show_tva", true));
+        setShowSearch(gs<boolean>("portal_show_search", true));
+        setHideOutOfStock(gs<boolean>("portal_hide_out_of_stock", false));
+        setShowIncartBadge(gs<boolean>("portal_show_incart_badge", true));
+        setShowNotes(gs<boolean>("portal_show_notes", true));
     }, [rawSettings]);
 
     const doSave = async () => {
@@ -4567,6 +4591,18 @@ function PortalTab({
             portal_min_order_amount: Number(minOrderAmount) || 0,
             portal_max_order_amount: Number(maxOrderAmount) || 0,
             portal_order_confirmation_message: confirmationMessage,
+            portal_show_stock: showStock,
+            portal_show_price: showPrice,
+            portal_show_ref: showRef,
+            portal_show_unit: showUnit,
+            portal_show_packaging: showPackaging,
+            portal_allow_change_packaging: allowChangePackaging,
+            portal_show_discounts: showDiscounts,
+            portal_show_tva: showTva,
+            portal_show_search: showSearch,
+            portal_hide_out_of_stock: hideOutOfStock,
+            portal_show_incart_badge: showIncartBadge,
+            portal_show_notes: showNotes,
         };
         await saveSettings(payload);
         qc.invalidateQueries({
@@ -4733,6 +4769,93 @@ function PortalTab({
                             resize: "vertical",
                         }}
                     />
+                </Card>
+            )}
+
+            {portalEnabled && (
+                <Card>
+                    <SecHead
+                        icon="ti-layout-grid"
+                        label="إعدادات عرض الكتالوج"
+                        color="var(--gold)"
+                        sub="تحكم في ما يظهر للزبون على بطاقات «اطلب سلعة» وفي سلة الطلب"
+                    />
+                    <div
+                        style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                    >
+                        {tr(
+                            "إظهار حالة المخزون",
+                            "نفد المخزون / متوفر / كمية محدودة على بطاقات الكتالوج",
+                            showStock,
+                            setShowStock,
+                        )}
+                        {tr(
+                            "إظهار السعر",
+                            "إخفاء السعر يخفي كل المبالغ (البطاقة والسلة والمجموع) — يُحتسب السعر من الخادم عند التأكيد",
+                            showPrice,
+                            setShowPrice,
+                        )}
+                        {tr(
+                            "إظهار مرجع المنتج",
+                            "إظهار ref بجانب اسم المنتج",
+                            showRef,
+                            setShowRef,
+                        )}
+                        {tr(
+                            "إظهار وحدة القياس",
+                            "إظهار الوحدة (قطعة، كغ...) بجانب السعر",
+                            showUnit,
+                            setShowUnit,
+                        )}
+                        {tr(
+                            "إظهار قائمة التعبئة",
+                            "إظهار اختيار التعبئة (كوليسة، كرتونة...) للزبون",
+                            showPackaging,
+                            setShowPackaging,
+                        )}
+                        {tr(
+                            "السماح بتغيير التعبئة",
+                            "عند إيقافها تبقى التعبئة الافتراضية فقط ولا يستطيع الزبون تبديلها",
+                            allowChangePackaging,
+                            setAllowChangePackaging,
+                        )}
+                        {tr(
+                            "إظهار شرائح خصم الكميات",
+                            "شرائح الخصم تبقى تُطبَّق في الخادم دائماً — هذا يتحكم في إظهارها فقط",
+                            showDiscounts,
+                            setShowDiscounts,
+                        )}
+                        {tr(
+                            "إظهار TVA",
+                            "نسبة TVA أو شارة الإعفاء على البطاقات",
+                            showTva,
+                            setShowTva,
+                        )}
+                        {tr(
+                            "إظهار البحث",
+                            "حقل البحث عن منتج في الكتالوج",
+                            showSearch,
+                            setShowSearch,
+                        )}
+                        {tr(
+                            "إخفاء المنتجات النافدة",
+                            "إخفاء المنتجات غير المتوفرة نهائياً من كتالوج الزبائن",
+                            hideOutOfStock,
+                            setHideOutOfStock,
+                        )}
+                        {tr(
+                            "إظهار شارة «في السلة»",
+                            "علامة المنتجات المضافة إلى سلة الطلب",
+                            showIncartBadge,
+                            setShowIncartBadge,
+                        )}
+                        {tr(
+                            "السماح بملاحظة الطلب",
+                            "السماح للزبون بإضافة ملاحظة مع الطلب",
+                            showNotes,
+                            setShowNotes,
+                        )}
+                    </div>
                 </Card>
             )}
 

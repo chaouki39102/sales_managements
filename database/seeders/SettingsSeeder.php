@@ -491,6 +491,120 @@ class SettingsSeeder extends Seeder
             ],
 
             // ══════════════════════════════════════════
+            // group: portal — إعدادات عرض الكتالوج (بوابة الزبائن)
+            // كلها مفعّلة افتراضياً (مثل السلوك الحالي) باستثناء
+            // portal_hide_out_of_stock التي تُفعَّل يدوياً من الإدارة.
+            // ══════════════════════════════════════════
+            'portal_show_stock' => [
+                'value'         => true,
+                'group'         => 'portal',
+                'type'          => 'boolean',
+                'description'   => 'إظهار حالة المخزون على بطاقات الكتالوج (نفد / متوفر / كمية محدودة)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 106,
+            ],
+            'portal_show_price' => [
+                'value'         => true,
+                'group'         => 'portal',
+                'type'          => 'boolean',
+                'description'   => 'إظهار الأسعار على بطاقات الكتالوج وفي السلة (عند إخفائها لا يُعرض أي مبلغ للزبون ويُحتسب السعر من الخادم)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 107,
+            ],
+            'portal_show_ref' => [
+                'value'         => true,
+                'group'         => 'portal',
+                'type'          => 'boolean',
+                'description'   => 'إظهار مرجع المنتج (ref) على بطاقات الكتالوج',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 108,
+            ],
+            'portal_show_unit' => [
+                'value'         => true,
+                'group'         => 'portal',
+                'type'          => 'boolean',
+                'description'   => 'إظهار وحدة القياس بجانب السعر على بطاقات الكتالوج',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 109,
+            ],
+            'portal_show_packaging' => [
+                'value'         => true,
+                'group'         => 'portal',
+                'type'          => 'boolean',
+                'description'   => 'إظهار قائمة التعبئات (كوليسة، كرتونة...) للزبون على بطاقات الكتالوج',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 110,
+            ],
+            'portal_allow_change_packaging' => [
+                'value'         => true,
+                'group'         => 'portal',
+                'type'          => 'boolean',
+                'description'   => 'السماح للزبون بتغيير التعبئة — عند إيقافها تُستخدم التعبئة الافتراضية فقط (المعروضة) ولا يمكن تبديلها',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 111,
+            ],
+            'portal_show_discounts' => [
+                'value'         => true,
+                'group'         => 'portal',
+                'type'          => 'boolean',
+                'description'   => 'إظهار شرائح خصم الكميات على بطاقات الكتالوج وفي السلة (الخصم يُطبَّق في الخادم دائماً)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 112,
+            ],
+            'portal_show_tva' => [
+                'value'         => true,
+                'group'         => 'portal',
+                'type'          => 'boolean',
+                'description'   => 'إظهار نسبة TVA (أو شارة الإعفاء) على بطاقات الكتالوج',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 113,
+            ],
+            'portal_show_search' => [
+                'value'         => true,
+                'group'         => 'portal',
+                'type'          => 'boolean',
+                'description'   => 'إظهار حقل البحث عن منتج في الكتالوج',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 114,
+            ],
+            'portal_hide_out_of_stock' => [
+                'value'         => false,
+                'group'         => 'portal',
+                'type'          => 'boolean',
+                'description'   => 'إخفاء المنتجات النافدة من المخزون نهائياً من كتالوج الزبائن',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 115,
+            ],
+            'portal_show_incart_badge' => [
+                'value'         => true,
+                'group'         => 'portal',
+                'type'          => 'boolean',
+                'description'   => 'إظهار شارة «في السلة» على المنتجات المضافة إلى سلة الطلب',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 116,
+            ],
+            'portal_show_notes' => [
+                'value'         => true,
+                'group'         => 'portal',
+                'type'          => 'boolean',
+                'description'   => 'السماح للزبون بإضافة ملاحظة مع الطلب',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 117,
+            ],
+
+            // ══════════════════════════════════════════
             // group: documents — إعدادات المستندات الافتراضية
             // ══════════════════════════════════════════
             'default_warehouse_id' => [

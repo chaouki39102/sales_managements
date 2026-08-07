@@ -2050,6 +2050,12 @@ html.dark .portal-login-box {
   font-weight: 800;
 }
 .portal-cart-total-row--final b { color: var(--em); font-size: 16px; }
+.portal-cart-totals--muted .portal-cart-total-row {
+  color: var(--t3);
+  font-size: 12.5px;
+  font-weight: 600;
+  justify-content: flex-start;
+}
 
 /* ─── قائمة طلباتي ─── */
 .portal-order-list { padding: 6px 22px 14px; }

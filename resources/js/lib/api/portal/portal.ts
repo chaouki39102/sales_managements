@@ -291,7 +291,8 @@ export interface PortalOrderFilters {
 }
 
 // إعدادات البوابة العامة — تُجلب بدون مصادقة وتُستخدم لتوجيه واجهة المتجر
-// (تعطيل المتجر، منع الإرسال، رسالة التأكيد، وحدود المبلغ).
+// (تعطيل المتجر، منع الإرسال، رسالة التأكيد، وحدود المبلغ) وإعدادات عرض
+// الكتالوج (إظهار/إخفاء السعر والمخزون والتعبئة والخصومات...).
 export interface PortalConfig {
   enabled:                    boolean;
   allow_guest_orders:         boolean;
@@ -302,6 +303,18 @@ export interface PortalConfig {
   authenticated:              boolean;
   party_orders_enabled:       boolean | null;
   can_order:                  boolean;
+  show_stock:                 boolean;
+  show_price:                 boolean;
+  show_ref:                   boolean;
+  show_unit:                  boolean;
+  show_packaging:             boolean;
+  allow_change_packaging:     boolean;
+  show_discounts:             boolean;
+  show_tva:                   boolean;
+  show_search:                boolean;
+  hide_out_of_stock:          boolean;
+  show_incart_badge:          boolean;
+  show_notes:                 boolean;
 }
 
 export interface PortalDocFilters {

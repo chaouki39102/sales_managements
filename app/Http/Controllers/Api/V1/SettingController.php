@@ -187,6 +187,14 @@ class SettingController extends BaseApiController
             'portal_allow_registered_orders', 'portal_min_order_amount',
             'portal_max_order_amount', 'portal_order_confirmation_message',
 
+            // portal — إعدادات عرض الكتالوج
+            'portal_show_stock', 'portal_show_price', 'portal_show_ref',
+            'portal_show_unit', 'portal_show_packaging',
+            'portal_allow_change_packaging', 'portal_show_discounts',
+            'portal_show_tva', 'portal_show_search',
+            'portal_hide_out_of_stock', 'portal_show_incart_badge',
+            'portal_show_notes',
+
             // general
             'app_name', 'app_logo', 'app_color', 'theme_mode', 'language',
             'timezone', 'date_format', 'time_format',
