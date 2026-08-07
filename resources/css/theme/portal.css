@@ -3482,6 +3482,7 @@ body.dark .poa-sort-hint { color: var(--t5, #64748b); }
 /* صورة المنتج */
 .portal-prod-img {
   position: relative;
+  width: 100%;
   aspect-ratio: 4 / 3;
   background: linear-gradient(180deg, var(--bg3), var(--bg2));
   display: flex; align-items: center; justify-content: center;
@@ -3728,4 +3729,28 @@ body.dark .poa-sort-hint { color: var(--t5, #64748b); }
 }
 @media (max-width: 380px) {
   .portal-catalog { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── إصلاح بطاقة الكتالوج على الهاتف ──
+   تحييد قواعد التصميم القديم (block 2079) التي كانت تهدف لبطاقة قديمة:
+   flex-wrap:wrap + align-items:center على .portal-prod تجعل كل محتوى
+   البطاقة الجديدة (الاسم، السعر، الخصم، عداد الكمية...) ينهار في شريط
+   ضيق فوق أيقونة «لا صورة». هذا البلوك يأتي بعد كل القواعد الأساسية
+   فيربح التعادل ويستعيد التمدد العمودي الصحيح. */
+@media (max-width: 640px) {
+  .portal-prod {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 0;
+    padding: 0;
+  }
+  .portal-prod-body { width: 100%; }
+  .portal-prod-meta,
+  .portal-prod-discs,
+  .portal-prod-pkg,
+  .portal-prod-packinfo {
+    flex: none;
+    order: 0;
+  }
 }
