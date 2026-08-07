@@ -25,6 +25,32 @@ $ROOT   = dirname(__DIR__);   // D:\xampp\htdocs\sales-management
 $METHOD = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $PATH   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 
+// Watchdog state must survive across requests: the PHP built-in server
+// re-includes the router script on EVERY request, so process globals/statics
+// are reset each time (verified empirically). Persist to a state file instead.
+$STATE_FILE = __DIR__ . DIRECTORY_SEPARATOR . '.watchdog-state.json';
+
+function state_read(): array {
+    global $STATE_FILE;
+    if (is_file($STATE_FILE)) {
+        $raw = @file_get_contents($STATE_FILE);
+        $s   = $raw ? json_decode($raw, true) : null;
+        if (is_array($s)) {
+            return [
+                'manual_stop_until' => (int)($s['manual_stop_until'] ?? 0),
+                'auto_attempt_at'   => (float)($s['auto_attempt_at'] ?? 0),
+                'auto_failures'     => (int)($s['auto_failures'] ?? 0),
+            ];
+        }
+    }
+    return ['manual_stop_until' => 0, 'auto_attempt_at' => 0.0, 'auto_failures' => 0];
+}
+
+function state_write(array $s): void {
+    global $STATE_FILE;
+    @file_put_contents($STATE_FILE, json_encode($s), LOCK_EX);
+}
+
 /* ──────────────────────────────── CORS ──────────────────────────────── */
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
@@ -144,6 +170,51 @@ function start_server(string $root): array {
     return ['ok' => false, 'message' => 'تعذر تشغيل الخادم خلال المهلة (راجع start-server.bat).', 'up' => false];
 }
 
+/**
+ * Watchdog: auto-start the app server when it is down and the environment is
+ * sane. Called on /api/status and on the landing page so opening either of
+ * them brings the app up without a manual click.
+ *
+ * Rules:
+ *  - Never fights an explicit "stop" (manual_stop_until cooldown).
+ *  - Rate-limits attempts (default 20s; 60s after consecutive failures).
+ *  - Only runs when php extensions + APP_KEY are present (it would fail anyway).
+ *  - Returns the attempt info so the UI can show "جارٍ التشغيل التلقائي".
+ */
+function maybe_auto_start(string $root): array {
+    if (port_has_listener(APP_PORT)) return ['auto' => false];
+
+    $state = state_read();
+    if (time() < $state['manual_stop_until']) {
+        return ['auto' => false, 'blocked' => 'manual-stop'];
+    }
+
+    $cooldown = $state['auto_failures'] > 0 ? 60 : 20;
+    $now = microtime(true);
+    if ($now - $state['auto_attempt_at'] < $cooldown) {
+        return ['auto' => false, 'cooldown' => true];
+    }
+    $state['auto_attempt_at'] = $now;
+    state_write($state);
+
+    [$missing] = extensions_ok();
+    $envKey = '';
+    $envFile = $root . DIRECTORY_SEPARATOR . '.env';
+    if (is_file($envFile)) {
+        $envContent = @file_get_contents($envFile) ?: '';
+        if (preg_match('/^APP_KEY=(.+)$/m', $envContent, $m)) $envKey = trim($m[1]);
+    }
+    if (!empty($missing) || $envKey === '') {
+        return ['auto' => false, 'blocked' => $envKey === '' ? 'env' : 'extensions'];
+    }
+
+    $res = start_server($root);
+    $state = state_read();   // re-read: cooldown may have been updated elsewhere
+    $state['auto_failures'] = $res['ok'] ? 0 : ($state['auto_failures'] + 1);
+    state_write($state);
+    return ['auto' => true, 'ok' => $res['ok'], 'message' => $res['message']];
+}
+
 function stop_server(): array {
     $pid = pid_on_port(APP_PORT);
     if ($pid === null) {
@@ -151,7 +222,13 @@ function stop_server(): array {
     }
     shell('taskkill /F /T /PID ' . $pid);
     usleep(500_000);
-    return ['ok' => !port_has_listener(APP_PORT), 'message' => 'تم إيقاف الخادم (PID ' . $pid . ').', 'up' => port_has_listener(APP_PORT)];
+    // Explicit stops suppress the auto-start watchdog for 5 minutes so the user
+    // can keep the server down without the page fighting them (persisted to the
+    // state file — in-process globals do not survive between requests).
+    $state = state_read();
+    $state['manual_stop_until'] = time() + 300;
+    state_write($state);
+    return ['ok' => !port_has_listener(APP_PORT), 'message' => 'تم إيقاف الخادم (PID ' . $pid . ') — لن يُشغَّل تلقائياً لمدة 5 دقائق.', 'up' => port_has_listener(APP_PORT)];
 }
 
 function build_diagnostic(string $root): array {
@@ -264,11 +341,29 @@ if ($PATH === '/api/ping' && $METHOD === 'GET') {
 }
 
 if ($PATH === '/api/status' && $METHOD === 'GET') {
-    json_out(build_diagnostic($ROOT));
+    $diag = build_diagnostic($ROOT);
+    // Auto-start watchdog: bring the app up automatically when it is down.
+    if (!$diag['server']['up']) {
+        $auto = maybe_auto_start($ROOT);
+        if (!empty($auto['auto']) && !empty($auto['ok'])) {
+            $diag = build_diagnostic($ROOT);   // re-diagnose now that it started
+        }
+        $diag['auto_start'] = $auto;
+    } else {
+        $diag['auto_start'] = ['auto' => false];
+    }
+    json_out($diag);
 }
 
 if ($PATH === '/api/start' && $METHOD === 'POST') {
-    json_out(array_merge(['diagnostic' => null], start_server($ROOT)));
+    $res = start_server($ROOT);
+    if ($res['ok']) {
+        $state = state_read();
+        $state['manual_stop_until'] = 0;   // explicit start = user opted back into auto-start
+        $state['auto_failures']     = 0;
+        state_write($state);
+    }
+    json_out(array_merge(['diagnostic' => null], $res));
 }
 
 if ($PATH === '/api/stop' && $METHOD === 'POST') {
@@ -281,6 +376,7 @@ if ($PATH === '/api/restart' && $METHOD === 'POST') {
 }
 
 if ($PATH === '/' && $METHOD === 'GET') {
+    maybe_auto_start($ROOT);   // opening the helper page also auto-starts the app
     serve_landing($ROOT);
     exit;
 }

@@ -23,6 +23,7 @@
 /tools
 /vendor
 _ide_helper.php
+/server-helper/.watchdog-state.json
 Homestead.json
 Homestead.yaml
 Thumbs.db

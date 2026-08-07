@@ -114,8 +114,9 @@
 const HOST = location.hostname || '127.0.0.1';
 const HELPER = 'http://' + HOST + ':8777';
 const APP    = 'http://' + HOST + ':8000';
-const $ = s => document.querySelector(s);
+  const $ = s => document.querySelector(s);
 let busy = false;
+let startingUp = false;
 
 $('#bOpenApp').href = APP;
 
@@ -129,6 +130,11 @@ async function refresh(){
     const d = await r.json();
     $('#helperdown').classList.add('hidden');
     render(d);
+    // The helper auto-started the app: show a pending state until it is healthy.
+    if (d.auto_start && d.auto_start.auto && !d.server.up){
+      $('#msg').textContent = '⚠️ الخادم متوقف — جارٍ تشغيله تلقائياً…';
+      $('#bStart').disabled = true;
+    }
   }catch(e){
     $('#helperdown').classList.remove('hidden');
     $('#grid').innerHTML = '';
@@ -145,15 +151,20 @@ async function refresh(){
 function render(d){
   const up = d.server && d.server.up;
   const health = (d.server && d.server.health) || null;
+  const auto = d.auto_start || null;
   const b = $('#banner');
   if (up){
     b.className = 'banner ok';
     b.innerHTML = '<span class="ico">✅</span><div><div class="t">الخادم يعمل — كل شيء جاهز</div>' +
       '<div class="d">التطبيق متاح على المنفذ ' + esc(d.app.port) + (d.server.pid ? ' · PID ' + d.server.pid : '') +
       (health ? ' · ' + esc(health.status) + ' · ' + esc(health.laravel_version || '') : '') + '</div></div>';
+    if (auto && auto.auto && auto.ok){
+      $('#msg').textContent = '🔄 تم تشغيل الخادم تلقائياً ✓';
+    }
   } else {
-    b.className = 'banner bad';
-    b.innerHTML = '<span class="ico">⚠️</span><div><div class="t">الخادم متوقف — اضغط «تشغيل السيرفر»</div>' +
+    const autoNote = (auto && auto.auto) ? ' — جارٍ تشغيله تلقائياً…' : ' — اضغط «تشغيل السيرفر» أو انتظر قليلاً (التشغيل التلقائي مفعّل)';
+    b.className = 'banner ' + (auto && auto.auto ? 'pend' : 'bad');
+    b.innerHTML = '<span class="ico">' + (auto && auto.auto ? '⏳' : '⚠️') + '</span><div><div class="t">الخادم متوقف' + autoNote + '</div>' +
       '<div class="d">' + esc(d.problem ? d.problem.name + ': ' + d.problem.detail : '') + '</div></div>';
   }
   // المساعد يرى الخادم يعمل لكن لا توجد استجابة health
