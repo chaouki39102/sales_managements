@@ -48,6 +48,7 @@ class CommercialDocumentResource extends JsonResource
             'source_document_id'           => $this->source_document_id,
             'cancellation_of_document_id'  => $this->cancellation_of_document_id,
             'qr_code_data'                 => $this->qr_code_data,
+            'qrcode_content'               => $this->fiscal_qr_data,
             'is_exported_to_accounting'    => $this->is_exported_to_accounting,
             'exported_at'                  => $this->exported_at,
             'created_by'                   => $this->created_by,

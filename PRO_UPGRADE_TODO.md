@@ -30,7 +30,7 @@
 > Backend doc service is `app/Services/CommercialDocumentService.php` (`beforeCreate` generates
 > `document_number`; `recalculateTotals`; `TaxRuleService` handles TVA/exemption).
 
-- [ ] **1.1 Backend QR payload builder** — `app/Services/FiscalInvoiceQrService.php`: build the
+- [x] **1.1 Backend QR payload builder** — `app/Services/FiscalInvoiceQrService.php`: build the
       QR data string from the document (seller NIF/name, buyer NIF, invoice number, date,
       total HT, TVA, total TTC). Follow the **official DGI QR specification** (Decree 21-98 /
       current e-invoicing rules) — VERIFY field order/separators against the official spec
@@ -145,7 +145,7 @@
 
 | Upgrade | Status | Notes |
 |---------|--------|-------|
-| 1. Fiscal QR + PDF | not started | — |
+| 1. Fiscal QR + PDF | in progress (1.1) | FiscalInvoiceQrService built; official DGI spec NOT published → documented v1 JSON schema |
 | 2. Backup + restore | not started | — |
 | 3. Portal online payment | not started | — |
 | 4. 2FA + permissions | not started | — |
@@ -159,4 +159,5 @@ files belonging to that task; leave unrelated dirty files untouched):
 | Commit | Contents |
 |--------|----------|
 | *(TODO file creation)* | `PRO_UPGRADE_TODO.md` + AGENTS.md mention |
+| *(1.1)* | `app/Services/FiscalInvoiceQrService.php` (payload builder + svgBase64), `QRCodeService` delegates to it, `CommercialDocument::fiscal_qr_data` accessor, resource `qrcode_content`, `tests/Feature/FiscalInvoiceQrServiceTest.php` |
 | ... | ... |

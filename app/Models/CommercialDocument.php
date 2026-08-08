@@ -288,6 +288,16 @@ class CommercialDocument extends Model
         return $this->hasOne(PortalOrder::class, 'commercial_document_id');
     }
 
+    /**
+     * Canonical fiscal QR payload (see app/Services/FiscalInvoiceQrService.php).
+     * Computed on demand — the same string is what the /documents/{id}/qrcode
+     * endpoint and the print templates encode into the QR matrix.
+     */
+    public function getFiscalQrDataAttribute(): string
+    {
+        return app(\App\Services\FiscalInvoiceQrService::class)->dataString($this);
+    }
+
     public function isFullyPaid(): bool
     {
         return $this->remaining_amount <= 0;
