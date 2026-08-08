@@ -17,6 +17,13 @@
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 
+# Machine-specific settings (shared with share-public-order.ps1). If the
+# config file is missing, the standard Tailscale install path is used.
+$TailscaleCli = 'C:\Program Files\Tailscale\tailscale.exe'
+$AppPort = 8000
+$configPath = Join-Path (Split-Path -Parent $root) 'share-public-order.config.ps1'
+if (Test-Path -LiteralPath $configPath) { . $configPath }
+
 # Single-instance guard (named mutex - auto-released by the OS if we die).
 $mutex = New-Object System.Threading.Mutex($false, 'ERP_SalesManagement_Watchdog_Mutex')
 if (-not $mutex.WaitOne(0)) { exit 0 }
@@ -53,15 +60,15 @@ while ($true) {
         # 3. Keep the public order page reachable: if the app server is up but
         #    Tailscale Funnel is off, re-enable it. Idempotent + throttled to
         #    once a minute so the tailscale CLI is not spawned every 15s.
-        if (PortUp 8000) {
+        if (PortUp $AppPort) {
             $script:funnelTick++
             if ($script:funnelTick -ge 4) {
                 $script:funnelTick = 0
-                if (Test-Path -LiteralPath 'C:\Program Files\Tailscale\tailscale.exe') {
+                if (Test-Path -LiteralPath $TailscaleCli) {
                     try {
-                        $fs = & 'C:\Program Files\Tailscale\tailscale.exe' funnel status 2>&1 | Out-String
+                        $fs = & $TailscaleCli funnel status 2>&1 | Out-String
                         if ($fs -notmatch 'Funnel on') {
-                            & 'C:\Program Files\Tailscale\tailscale.exe' funnel --bg 8000 2>&1 | Out-Null
+                            & $TailscaleCli funnel --bg $AppPort 2>&1 | Out-Null
                         }
                     } catch {
                         # tailscale busy - next minute will retry

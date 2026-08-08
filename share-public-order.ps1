@@ -13,23 +13,28 @@ $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $Root
 
-$Tailscale = 'C:\Program Files\Tailscale\tailscale.exe'
-$ServerPort = 8000
+# Machine-specific settings. On a NEW PC copy
+# share-public-order.config.example.ps1 -> share-public-order.config.ps1
+# and fill in that PC's values; the scripts load it automatically below.
+$TailscaleCli = 'C:\Program Files\Tailscale\tailscale.exe'
+$AppPort = 8000
+$configPath = Join-Path $Root 'share-public-order.config.ps1'
+if (Test-Path -LiteralPath $configPath) { . $configPath }
 
 function Test-Port([int]$Port) {
     return [bool](Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
 }
 
 function Ensure-Server {
-    if (Test-Port $ServerPort) { return }
-    Write-Host "Starting Laravel server on port $ServerPort..." -ForegroundColor Yellow
+    if (Test-Port $AppPort) { return }
+    Write-Host "Starting Laravel server on port $AppPort..." -ForegroundColor Yellow
     $php = (Get-Command php -ErrorAction Stop).Source
-    Start-Process -FilePath $php -ArgumentList @('artisan','serve','--host=0.0.0.0','--port=8000') `
+    Start-Process -FilePath $php -ArgumentList @('artisan','serve','--host=0.0.0.0',"--port=$AppPort") `
         -WorkingDirectory $Root -WindowStyle Hidden
     $deadline = (Get-Date).AddSeconds(60)
-    while (-not (Test-Port $ServerPort)) {
+    while (-not (Test-Port $AppPort)) {
         if ((Get-Date) -gt $deadline) {
-            Write-Host "The server did not start on port $ServerPort." -ForegroundColor Red
+            Write-Host "The server did not start on port $AppPort." -ForegroundColor Red
             exit 1
         }
         Start-Sleep -Milliseconds 500
@@ -38,13 +43,13 @@ function Ensure-Server {
 }
 
 function Get-FunnelUrl {
-    $out = & $Tailscale funnel status 2>&1 | Out-String
+    $out = & $TailscaleCli funnel status 2>&1 | Out-String
     if ($out -match 'https://[a-zA-Z0-9\-\.]+\.ts\.net') { return $matches[0] }
     return $null
 }
 
 function Ensure-Funnel {
-    if (-not (Test-Path -LiteralPath $Tailscale)) {
+    if (-not (Test-Path -LiteralPath $TailscaleCli)) {
         Write-Host 'Tailscale not found. Install it from https://tailscale.com/download and sign in, then run this again.' -ForegroundColor Red
         exit 1
     }
@@ -52,8 +57,8 @@ function Ensure-Funnel {
         Write-Host 'Tailscale Funnel is already active.' -ForegroundColor Green
         return
     }
-    Write-Host 'Enabling Tailscale Funnel on port 8000...' -ForegroundColor Yellow
-    & $Tailscale funnel --bg 8000 | Out-Null
+    Write-Host "Enabling Tailscale Funnel on port $AppPort..." -ForegroundColor Yellow
+    & $TailscaleCli funnel --bg $AppPort | Out-Null
     $deadline = (Get-Date).AddSeconds(60)
     while (-not (Get-FunnelUrl)) {
         if ((Get-Date) -gt $deadline) {

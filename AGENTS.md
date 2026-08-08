@@ -5,7 +5,35 @@
 - **When reading how API data is returned**, ALWAYS check `extractData()` in `resources/js/lib/api/core/client.ts` — it is the single standard bridge between backend and frontend. Never assume the raw HTTP response shape reaches consumers directly.
 
 ## Date
-2026-08-07
+2026-08-08
+
+### Phase 67 — Public Order Page over the Internet: Tailscale Funnel (permanent URL) + Machine-Specific Config Template (Aug 8)
+
+**Request**: "so I use this conf on this PC; I'll push and pull on another PC — what we need: add modal conf, when I pull on the other PC I'll find these files to fill them with the other PC's Tailscale conf; add all this in AGENTS.md and add a file to explain this." Outcome: the customer order page (`/portal/{company-slug}/order`) is now reachable by the public internet via **Tailscale Funnel** — a permanent `https://<machine>.<tailnet>.ts.net` URL with valid TLS, no domain, no router port-forward. This REPLACED the cloudflared quick-tunnel scripts (random `trycloudflare.com` URL per run).
+
+**Why Funnel (vs the abandoned paths)**: user has no domain → named-tunnel/cloudflared route was dead; DuckDNS + Caddy + router port-forward was chosen, then dropped because (a) `caddy-dns/duckdns` has no prebuilt Windows binary (only stock Caddy v2.11.4 + HTTP-01, needing open 80/443), and (b) the user already had Tailscale installed. Funnel needs none of that: tailscaled terminates TLS and proxies the public URL to `127.0.0.1:8000`.
+
+**Setup on THIS PC (the reference machine)**:
+- `tailscale funnel --bg 8000` → `https://desktop-h8shjo5.taila9b3bd.ts.net/` → `proxy http://127.0.0.1:8000`. Note the tailnet suffix is `taila9b3bd` (owner shows as `sarlalibayoudh@` in `tailscale status`, but the real tailnet name — the one that appears in the hostname — is `taila9b3bd`; always read the actual hostname from `tailscale funnel status`, never assume the owner string is the tailnet).
+- **Public verification, all through the tunnel (HTTPS 200 / valid TLS)**: `/` → 200 HTML · `/portal/el-houda-emballage-6a71b1b47555f/order` → 200 HTML · `/api/v1/{slug}/portal/orders/catalog?per_page=2` → 200 JSON · `/api/v1/{slug}/portal/info` → `{name: EL-HOUDA EMBALLAGE}` · guest order `POST /api/v1/{slug}/portal/orders` with empty payload → **422** Arabic validation envelope (endpoint reachable + wired, no DB write).
+- Funnel config persists in tailscaled state → survives reboots.
+
+**Machine-config pattern (the "modal conf" the user asked for)**:
+- `share-public-order.config.example.ps1` (**committed** template): `$TailscaleCli` (default `C:\Program Files\Tailscale\tailscale.exe`), `$AppPort` (8000), `$PublicHostname` (informational; find via `tailscale status` → `https://<machine>.<tailnet>.ts.net`).
+- `share-public-order.config.ps1` (**gitignored**, added `/share-public-order.config.ps1` to `.gitignore`): each PC's private copy, filled in locally. Both `share-public-order.ps1` AND `server-helper/watchdog.ps1` dot-source it when present (`if (Test-Path ...) { . $configPath }`), falling back to defaults otherwise.
+- **Cross-PC workflow** (what the user does): `git pull` on the other PC → finds the `.example` template + `SHARE_PUBLIC_ORDER.md` guide → copies to the real config → fills in that PC's Tailscale CLI path + hostname → installs/signs in Tailscale there → runs `share-public-order.bat` → gets ITS OWN permanent URL. Each PC has its own hostname — never reuse another PC's URL.
+
+**`share-public-order.ps1` / `.bat` rewritten** (Funnel-based): ensure server on 8000 → `Get-FunnelUrl` (regex `https://[a-zA-Z0-9\-\.]+\.ts\.net` — MUST accept the 3-level hostname `<machine>.<tailnet>.ts.net`; a naive `[a-z0-9\-]+\.ts\.net` silently fails because of the middle `.tailnet` label) → if off, `funnel --bg $AppPort` → print PUBLIC URL + per-company order links (company slugs fetched dynamically via `php artisan tinker --execute="echo \App\Models\Company::...->toJson();"`).
+
+**`server-helper/watchdog.ps1` gained a funnel guard** (block 3, throttled to every 4th cycle = once a minute): if the app port is up and `tailscale funnel status` output lacks `Funnel on`, re-run `funnel --bg $AppPort` (idempotent). This is the always-on self-heal: after a reboot or tunnel drop the public page comes back within ~60s with no human action.
+
+**Key architectural rules**:
+- Funnel is the ONLY internet-sharing path that needs no domain/port-forward. A machine config template must be committed (`*.config.example.ps1`) while the real file is gitignored — the real config is machine-specific and would clobber the other PC's settings on pull.
+- A public-exposure script must be **idempotent and self-detecting**: never re-enable an already-active funnel (check `funnel status` first) and never assume the tunnel URL — read it from `funnel status`.
+- The tunnel's hostname must be parsed with a regex that matches 3-level FQDNs (`machine.tailnet.ts.net`), not just 2-level ones.
+- Watchdog guards must be throttled (spawning the tailscale CLI every 15s is wasteful) and gated on the app server actually being up (no point keeping a funnel alive for a dead backend).
+
+**Verification**: share script tested end-to-end (detects active funnel, prints `https://desktop-h8shjo5.taila9b3bd.ts.net` + both company links); watchdog relaunched (PID 12628, mutex-single-instance); public HTTPS smoke above all green. Commits: `4bb0116` (Funnel switch), then the config-template + guide commit. All pushed to `origin/main`.
 
 ### Phase 66 — Portal Order Limits + Per-Party Toggle + Confirmation Message + Mobile Catalog Card Collapse Fix (Aug 7)
 
