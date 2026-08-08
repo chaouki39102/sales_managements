@@ -1037,3 +1037,12 @@ body.dark .al-p{background:var(--purb);border-color:var(--purbo);color:var(--pur
 @keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .matrix-cell{transition:background .12s, border-color .12s;}
 .matrix-cell:hover{background:color-mix(in srgb, var(--em) 10%, transparent);border-color:color-mix(in srgb, var(--em) 40%, transparent);}
+
+/* ═══ زر الإنشاء العائم (GlobalDocumentFAB) — يرتفع فوق شريط التنقل السفلي ═══
+   .doc-fab-root موضَّع بـ bottom فقط هنا (الـ position/left/zIndex في inline).
+   على الهاتف شريط #mob-nav (ارتفاع var(--mb)) يغطي الجزء السفلي — نرفع الزر
+   فوقه بدل أن يختفي خلفه. */
+.doc-fab-root { bottom: 24px; }
+@media (max-width: 768px) {
+  .doc-fab-root { bottom: calc(var(--mb, 64px) + 14px); }
+}

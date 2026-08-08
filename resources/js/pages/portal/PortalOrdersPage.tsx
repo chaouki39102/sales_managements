@@ -57,11 +57,19 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
   const [noteOpen, setNoteOpen] = useState(false);
   // نافذة تفاصيل المنتج — تُفتح عند النقر على بطاقة الكتالوج (صورة + خصم + تعبئة + كل المعلومات)
   const [infoProductId, setInfoProductId] = useState<number | null>(null);
+  // معاينة الصورة بملء الشاشة (Lightbox) — تُفتح بالنقر على صورة النافذة
+  const [pimZoom, setPimZoom] = useState(false);
 
-  // قفل تمرير الصفحة خلف نافذة تفاصيل المنتج + إغلاقها بمفتاح Escape.
+  // قفل تمرير الصفحة خلف النافذة/الـ Lightbox + إغلاقها بمفتاح Escape
+  // (يُغلق الـ Lightbox أولاً ثم نافذة التفاصيل ثم درج السلة).
   useEffect(() => {
-    if (infoProductId === null) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setInfoProductId(null); };
+    if (infoProductId === null && !pimZoom && !drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (pimZoom) setPimZoom(false);
+      else if (infoProductId !== null) setInfoProductId(null);
+      else setDrawerOpen(false);
+    };
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', onKey);
@@ -69,17 +77,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
       document.body.style.overflow = prev;
       window.removeEventListener('keydown', onKey);
     };
-  }, [infoProductId]);
-
-  // قفل تمرير الصفحة خلف درج السلة عندما يكون مفتوحاً (نفس سلوك Modal المشترك).
-  useEffect(() => {
-    if (!drawerOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [drawerOpen]);
+  }, [infoProductId, pimZoom, drawerOpen]);
 
   const { confirm, confirmDialogProps } = useConfirm();
 
@@ -169,6 +167,15 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
       setDrawerOpen(false);
       setCheckoutStep(false);
       qc.invalidateQueries({ queryKey: ['portal', slug, 'orders', 'list'] });
+      if (isPublic) {
+        // الزائر ليس لديه حساب — ننقله فوراً لصفحة التتبع مع رقم هاتفه ومرجع
+        // الطلب مملوءين مسبقاً (ويعمل البحث تلقائياً هناك).
+        navigate(`/portal/${slug}/track`, {
+          state: { phone: customerPhone.trim(), reference: order.reference },
+          replace: true,
+        });
+        return;
+      }
       showToast(confirmationMessage || 'تم إرسال طلب السلعة بنجاح');
     },
     onError: (err: Error) => showToast(err.message || 'تعذر إرسال الطلب'),
@@ -586,7 +593,17 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                             >
                               <i className="ti ti-minus" />
                             </button>
-                            <input value={cartQty} readOnly tabIndex={-1} aria-label="الكمية" />
+                            <input
+                              type="number"
+                              min={1}
+                              value={cartQty}
+                              onChange={(e) => {
+                                const n = Math.max(1, Math.floor(Number(e.target.value) || 1));
+                                updateCartQty(key, n);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label="الكمية"
+                            />
                             <button
                               type="button"
                               onClick={() => addToCart(p.id, cartQty + 1, selectedPack)}
@@ -763,7 +780,16 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
 
               <div className={`portal-pim-gallery${outOfStock ? ' oos' : ''}`}>
                 {p.image ? (
-                  <img src={proxyImage(p.image, 600) ?? p.image} alt={p.name} loading="lazy" />
+                  <button
+                    type="button"
+                    className="portal-pim-gallery-img"
+                    onClick={() => setPimZoom(true)}
+                    aria-label={`تكبير صورة ${p.name}`}
+                    title="اضغط لعرض الصورة بملء الشاشة"
+                  >
+                    <img src={proxyImage(p.image, 600) ?? p.image} alt={p.name} loading="lazy" />
+                    <span className="portal-pim-gallery-zoom"><i className="ti ti-zoom-in" /></span>
+                  </button>
                 ) : (
                   <div className="portal-prod-img-fb"><i className="ti ti-package" /></div>
                 )}
@@ -897,7 +923,17 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                       >
                         <i className="ti ti-minus" />
                       </button>
-                      <input value={step} readOnly tabIndex={-1} aria-label="الكمية" />
+                      <input
+                        type="number"
+                        min={1}
+                        value={step}
+                        onChange={(e) => {
+                          const n = Math.max(1, Math.floor(Number(e.target.value) || 1));
+                          if (inCart) updateCartQty(key, n);
+                          else setQty((prev) => ({ ...prev, [p.id]: n }));
+                        }}
+                        aria-label="الكمية"
+                      />
                       <button
                         type="button"
                         onClick={() => addToCart(p.id, step + 1, selectedPack)}
@@ -936,6 +972,35 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                 )}
               </div>
             </div>
+          </div>
+        );
+      })()}
+
+      {/* ─── Lightbox — صورة المنتج بملء الشاشة ─── */}
+      {pimZoom && infoProductId !== null && byId.has(infoProductId) && (() => {
+        const p = byId.get(infoProductId)!;
+        return (
+          <div className="portal-pim-lb" role="dialog" aria-modal="true" aria-label={`معاينة صورة ${p.name}`}>
+            <div className="portal-pim-lb-backdrop" onClick={() => setPimZoom(false)} />
+            <button className="portal-pim-lb-x" type="button" onClick={() => setPimZoom(false)} aria-label="إغلاق المعاينة">
+              <i className="ti ti-x" />
+            </button>
+            <figure className="portal-pim-lb-fig">
+              {p.image ? (
+                <img src={proxyImage(p.image, 1400) ?? p.image} alt={p.name} />
+              ) : (
+                <div className="portal-prod-img-fb"><i className="ti ti-package" /></div>
+              )}
+              <figcaption className="portal-pim-lb-cap">
+                <b>{p.name}</b>
+                {showPrice && (
+                  <span>
+                    {fmtMoney(unitPriceFor(p, pkg[p.id] ?? null))}
+                    {showUnit && `/${unitLabelFor(p, pkg[p.id] ?? null)}`}
+                  </span>
+                )}
+              </figcaption>
+            </figure>
           </div>
         );
       })()}
@@ -1140,6 +1205,15 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                                   <span>-{fmtMoney(cl.discount)}</span>
                                 </div>
                               )}
+                              {showPrice && (
+                                <div className="portal-cart-line">
+                                  <span>
+                                    {entry.quantity} × {fmtMoney(cl.unitPrice)}
+                                    {cl.factor > 1 ? ` ×${cl.factor}` : ''}
+                                  </span>
+                                  <b>= {fmtMoney(cl.ttc)}</b>
+                                </div>
+                              )}
                             </div>
                             <div className="portal-prod-qty">
                               <button type="button" onClick={() => updateCartQty(key, entry.quantity - 1)} disabled={entry.quantity <= 1}>
@@ -1149,7 +1223,11 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                                 type="number"
                                 min={1}
                                 value={entry.quantity}
-                                onChange={(e) => updateCartQty(key, Number(e.target.value))}
+                                onChange={(e) => {
+                                  const n = Math.floor(Number(e.target.value));
+                                  if (!Number.isFinite(n) || n < 1) return;
+                                  updateCartQty(key, n);
+                                }}
                               />
                               <button type="button" onClick={() => updateCartQty(key, entry.quantity + 1)}>
                                 <i className="ti ti-plus" />

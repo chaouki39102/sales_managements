@@ -119,13 +119,23 @@ export function GlobalDocumentFAB() {
 
   const isDocEditor = /^\/documents\/[^/]+\/(new|[^/]+\/edit)$/.test(location.pathname);
   const isPortal = location.pathname.startsWith('/portal');
-  if (isDocEditor || isPortal) return null;
+  // الزر خاص بتطبيق الشركة (لوحات التحكم) فقط — لا يظهر في صفحات الدخول
+  // والتسجيل وحالة الاتصال والإعداد الأولي ومنطقة الأدمن.
+  const isNonTenant =
+    location.pathname === '/login' ||
+    location.pathname === '/register' ||
+    location.pathname === '/status' ||
+    location.pathname === '/' ||
+    location.pathname === '/onboarding' ||
+    location.pathname.startsWith('/admin');
+  if (isDocEditor || isPortal || isNonTenant) return null;
 
   return (
     <div
       ref={wrapperRef}
+      className="doc-fab-root"
       style={{
-        position: 'fixed', bottom: 24, left: 24, zIndex: 900,
+        position: 'fixed', left: 24, zIndex: 900,
         display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8,
       }}
     >

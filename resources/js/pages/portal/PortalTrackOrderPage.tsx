@@ -4,8 +4,8 @@
 // الزائر الذي أرسل طلباً برقم هاتفه (من صفحة الطلب العام) يتابع حالة طلبه هنا:
 // يكتب رقم الهاتف الذي استعمله (+ اختياري: مرجع الطلب) ويرى طلباته العامة
 // بحالتها الحالية وخط الأنابيب. لا توجد أي جلسة أو حساب — بحث آمن بالرقم فقط.
-import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useParams, useLocation, Link } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { portalApi, type PortalOrder, type PortalOrderStatus } from '@/lib/api/portal/portal';
 import OrderPipeline from './OrderPipeline';
@@ -34,14 +34,31 @@ export default function PortalTrackOrderPage() {
   const [searched, setSearched] = useState(false);
   const [toast, setToast] = useState('');
   const [results, setResults] = useState<PortalOrder[]>([]);
+  const location = useLocation();
+  const autoRan = useRef(false);
 
   const companyQuery = useQuery({
     queryKey: ['portal', slug, 'info'],
     queryFn: () => portalApi.company(),
   });
 
+  // عند القدوم من صفحة الطلب (بعد إرسال طلب) نملأ رقم الهاتف + مرجع الطلب
+  // تلقائياً وننفّذ البحث فوراً — الزائر يرى طلبه مباشرة دون إعادة كتابة البيانات.
+  useEffect(() => {
+    const st = (location.state ?? null) as { phone?: string; reference?: string } | null;
+    const prefilledPhone = st?.phone?.trim();
+    if (autoRan.current || !prefilledPhone) return;
+    autoRan.current = true;
+    const prefilledRef = st?.reference?.trim() ?? '';
+    setPhone(prefilledPhone);
+    setReference(prefilledRef);
+    trackMutation.mutate({ phone: prefilledPhone, reference: prefilledRef });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
+
   const trackMutation = useMutation({
-    mutationFn: () => portalApi.trackOrder(phone, reference),
+    mutationFn: ({ phone: p, reference: r }: { phone: string; reference?: string }) =>
+      portalApi.trackOrder(p, r),
     onSuccess: (orders) => {
       setResults(orders);
       setSearched(true);
@@ -62,7 +79,7 @@ export default function PortalTrackOrderPage() {
       setTimeout(() => setToast(''), 3200);
       return;
     }
-    trackMutation.mutate();
+    trackMutation.mutate({ phone: phone.trim(), reference: reference.trim() });
   };
 
   return (

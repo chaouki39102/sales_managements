@@ -2649,10 +2649,10 @@ body.dark .poa-date input::-webkit-calendar-picker-indicator { opacity: .85; }
 }
 .poa-alloc:focus { border-color: var(--em, #2563eb); box-shadow: 0 0 0 3px color-mix(in srgb, var(--em, #2563eb) 14%, transparent); }
 .poa-alloc.bad { border-color: var(--red, #dc2626); box-shadow: 0 0 0 3px color-mix(in srgb, var(--red, #dc2626) 12%, transparent); }
-.poa-bar { flex: 1; min-width: 56px; height: 7px; border-radius: 99px; background: var(--bg2, #f5f7fb); overflow: hidden; border: 1px solid var(--b1, #f1f5f9); }
-.poa-bar > span { display: block; height: 100%; border-radius: 99px; background: var(--em, #2563eb); transition: width .3s ease; }
-.poa-bar.ok > span { background: var(--g, #16a34a); }
-.poa-bar.bad > span { background: var(--red, #dc2626); }
+.poa-proc-row .poa-bar { flex: 1; min-width: 56px; height: 7px; border-radius: 99px; background: var(--bg2, #f5f7fb); overflow: hidden; border: 1px solid var(--b1, #f1f5f9); }
+.poa-proc-row .poa-bar > span { display: block; height: 100%; border-radius: 99px; background: var(--em, #2563eb); transition: width .3s ease; }
+.poa-proc-row .poa-bar.ok > span { background: var(--g, #16a34a); }
+.poa-proc-row .poa-bar.bad > span { background: var(--red, #dc2626); }
 .poa-proc-stock { display: flex; flex-direction: column; gap: 2px; font-size: 10.5px; font-weight: 700; color: var(--t4, #94a3b8); min-width: 128px; }
 .poa-proc-stock b { color: var(--t1, #1e293b); }
 .poa-proc-stock .ok { color: var(--g, #16a34a); }
@@ -4136,4 +4136,199 @@ html.dark .portal-pim-x { background: rgba(20,22,28,.85); }
   .portal-pim-gallery { min-height: 40dvh; max-height: 46dvh; }
   .portal-pim-info { max-height: none; padding: 18px 16px 20px; }
   .portal-pim-x { top: 10px; inset-inline-end: 10px; }
+}
+
+/* ─── تكبير صورة المنتج (زر المعرض + Lightbox بملء الشاشة) ─── */
+.portal-pim-gallery-img {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: zoom-in;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.portal-pim-gallery-img img {
+  width: 100%; height: 100%; object-fit: cover;
+  transition: transform .35s ease;
+}
+.portal-pim-gallery-img:hover img { transform: scale(1.045); }
+.portal-pim-gallery-zoom {
+  position: absolute;
+  top: 10px; inset-inline-start: 10px;
+  z-index: 1;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(15,23,42,.55);
+  color: #fff;
+  font-size: 12px; font-weight: 800;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: all .2s ease;
+}
+.portal-pim-gallery-img:hover .portal-pim-gallery-zoom,
+.portal-pim-gallery-img:focus-visible .portal-pim-gallery-zoom {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Lightbox — طبقة معاينة كاملة الشاشة فوق كل شيء */
+.portal-pim-lb {
+  position: fixed; inset: 0; z-index: 2400;
+  display: flex; align-items: center; justify-content: center;
+}
+.portal-pim-lb-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(2,6,23,.88);
+  backdrop-filter: blur(3px);
+  animation: portal-fade .18s ease;
+}
+.portal-pim-lb-fig {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  max-width: min(92vw, 1100px);
+  max-height: 90dvh;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 18px;
+  animation: portal-zoom-in .22s ease;
+}
+.portal-pim-lb-fig img {
+  max-width: 100%;
+  max-height: 78dvh;
+  object-fit: contain;
+  border-radius: 14px;
+  box-shadow: 0 24px 70px rgba(0,0,0,.55);
+  background: #fff;
+}
+.portal-pim-lb-cap {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center;
+  color: #fff; font-size: 13px;
+  text-align: center;
+}
+.portal-pim-lb-cap b { font-size: 15px; font-weight: 900; }
+.portal-pim-lb-cap span {
+  color: #86efac; font-weight: 800;
+  background: rgba(10,138,92,.18);
+  border: 1px solid rgba(10,138,92,.35);
+  padding: 3px 10px; border-radius: 20px;
+}
+.portal-pim-lb-x {
+  position: absolute;
+  top: 14px; inset-inline-end: 14px;
+  z-index: 2;
+  width: 42px; height: 42px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 12px;
+  background: rgba(255,255,255,.12);
+  color: #fff; font-size: 20px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.portal-pim-lb-x:hover { background: rgba(239,68,68,.75); transform: scale(1.06); }
+
+@keyframes portal-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes portal-zoom-in { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
+
+/* ─── سطر الحساب في السلة (الكمية × السعر = المجموع) ─── */
+.portal-cart-line {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  font-size: 11.5px; font-weight: 700;
+  color: var(--t3);
+  margin-top: 3px;
+}
+.portal-cart-line span {
+  background: var(--bg3);
+  border: 1px solid var(--b1);
+  border-radius: 8px;
+  padding: 2px 8px;
+}
+.portal-cart-line b { color: var(--t1); font-weight: 900; }
+
+/* تركيز وضوح مدخلات الكمية القابلة للكتابة */
+.portal-prod-qty input:focus-visible {
+  outline: 2px solid var(--em);
+  outline-offset: -1px;
+  background: var(--emb);
+}
+
+/* ────────────────────────────────────────────────
+   تحسين صفوف سلة الطلب — بطاقات غنية (مثل POS Pro)
+   يأتي في نهاية الملف ليتفوق على القواعد الأساسية.
+   ──────────────────────────────────────────────── */
+.portal-cart-item {
+  position: relative;
+  padding: 10px 10px;
+  border-radius: 14px;
+  border-bottom: 1px solid transparent;
+}
+.portal-cart-item + .portal-cart-item { border-bottom: 1px solid var(--b1); }
+.portal-cart-item:hover { background: color-mix(in srgb, var(--em) 6%, var(--bg1)); }
+.portal-cart-item .portal-cart-thumb {
+  border-radius: 12px;
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--bg3), var(--bg2));
+  box-shadow: 0 3px 10px rgba(15, 23, 42, .08);
+}
+.portal-cart-item .portal-cart-info { gap: 3px; }
+.portal-cart-item .portal-prod-name { font-size: 13.5px; }
+.portal-cart-item .portal-prod-ref { margin-top: 1px; }
+
+/* شارة الخصم — شريحة خضراء واضحة */
+.portal-cart-item .portal-cart-disc {
+  align-self: flex-start;
+  margin-top: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--em) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--em) 30%, transparent);
+}
+.portal-cart-item .portal-cart-disc i { display: none; }
+
+/* سطر الحساب — شريحة ملونة */
+.portal-cart-line { margin-top: 5px; }
+.portal-cart-line span {
+  background: color-mix(in srgb, var(--em) 7%, transparent);
+  border-color: transparent;
+  color: var(--t2);
+}
+.portal-cart-line b { color: var(--em); }
+
+/* عدّاد الكمية — حبة دائرية */
+.portal-cart-item .portal-prod-qty {
+  border-radius: 999px;
+  background: var(--bg2);
+  border-color: var(--b1);
+}
+.portal-cart-item .portal-prod-qty button { width: 30px; height: 30px; }
+.portal-cart-item .portal-prod-qty input { width: 40px; height: 30px; }
+
+/* المجموع — لون المؤسسة وأبرز */
+.portal-cart-item .portal-cart-total {
+  font-size: 13.5px;
+  color: var(--em);
+}
+
+/* زر الإزالة — دائرة ناعمة دائماً ظاهرة (لمس أولاً) */
+.portal-cart-item .portal-cart-x {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--b2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--t4);
+}
+.portal-cart-item .portal-cart-x:hover { background: var(--red); border-color: var(--red); color: #fff; }
+
+/* الشاشات الضيقة: الصف يبقى مريحاً مع البطاقة */
+@media (max-width: 640px) {
+  .portal-cart-item { padding: 10px 6px; }
+  .portal-cart-item .portal-prod-qty button { width: 28px; }
+  .portal-cart-item .portal-prod-qty input { width: 36px; }
 }
