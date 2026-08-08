@@ -66,8 +66,11 @@ Your public URL is:
 https://<your-machine-name>.<your-tailnet>.ts.net
 ```
 
-> Example from this PC: machine `desktop-h8shjo5`, tailnet `taila9b3bd` →
-> `https://desktop-h8shjo5.taila9b3bd.ts.net`
+> Example from THIS PC: machine `desktop-h8shjo5`, tailnet `tailc6ab98` →
+> `https://desktop-h8shjo5.tailc6ab98.ts.net`
+>
+> The OTHER PC uses its own tailnet (`taila9b3bd`) — each machine/account has
+> its own `<machine>.<tailnet>.ts.net`; never reuse this PC's URL there.
 
 ### 3. Create the machine config (fill in this PC's values)
 
@@ -99,11 +102,11 @@ Double-click `share-public-order.bat` (or run the `.ps1`). It will:
 
 ```
 >>> PUBLIC URL (permanent, HTTPS) <<<
-https://desktop-h8shjo5.taila9b3bd.ts.net
+https://desktop-h8shjo5.tailc6ab98.ts.net
 
 Customer order links (send these to your customers):
-    [EL-HOUDA EMBALLAGE]  https://desktop-h8shjo5.taila9b3bd.ts.net/portal/el-houda-emballage-6a71b1b47555f/order
-    [SPA CEVITAL]  https://desktop-h8shjo5.taila9b3bd.ts.net/portal/cevital/order
+    [EL-HOUDA EMBALLAGE]  https://desktop-h8shjo5.tailc6ab98.ts.net/portal/el-houda-emballage-6a5e589dc1cfe/order
+    [<COMPANY 2 NAME>]    https://desktop-h8shjo5.tailc6ab98.ts.net/portal/<company-2-slug>/order
 ```
 
 ### 5. Send the order links to your customers

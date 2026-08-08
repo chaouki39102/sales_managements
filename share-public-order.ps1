@@ -58,7 +58,7 @@ function Ensure-Funnel {
         return
     }
     Write-Host "Enabling Tailscale Funnel on port $AppPort..." -ForegroundColor Yellow
-    & $TailscaleCli funnel --bg $AppPort | Out-Null
+    & $TailscaleCli funnel --bg --yes $AppPort | Out-Null
     $deadline = (Get-Date).AddSeconds(60)
     while (-not (Get-FunnelUrl)) {
         if ((Get-Date) -gt $deadline) {

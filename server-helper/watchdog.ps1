@@ -68,7 +68,7 @@ while ($true) {
                     try {
                         $fs = & $TailscaleCli funnel status 2>&1 | Out-String
                         if ($fs -notmatch 'Funnel on') {
-                            & $TailscaleCli funnel --bg $AppPort 2>&1 | Out-Null
+                            & $TailscaleCli funnel --bg --yes $AppPort 2>&1 | Out-Null
                         }
                     } catch {
                         # tailscale busy - next minute will retry
