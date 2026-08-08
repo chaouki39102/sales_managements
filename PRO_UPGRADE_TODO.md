@@ -1,6 +1,6 @@
 # PRO Upgrade — Task Checklist
 
-> **Status: 📝 CREATED (Aug 8) — nothing implemented yet.** Pick up on any PC:
+> **Status: 🚧 IN PROGRESS (Aug 8) — upgrade 1 tasks 1.1–1.2 done.** Pick up on any PC:
 > `git pull`, open this file, and work task-by-task. Commit + push after EACH task.
 
 > **Goal**: take the sales-management ERP (Laravel + React POS, Algerian market) from a
@@ -35,11 +35,12 @@
       total HT, TVA, total TTC). Follow the **official DGI QR specification** (Decree 21-98 /
       current e-invoicing rules) — VERIFY field order/separators against the official spec
       before hardcoding. Add `qrcode_content` (or the fields) to the document API `toArray`.
-- [ ] **1.2 QR rendering** — reuse the existing barcode infrastructure
-      (`resources/js/lib/barcodeRenderer.ts`) or add a QR encoder (e.g. `qrcode`/`uqrcode`)
-      that matches the thermal 80mm print (the ESC/POS QR command already exists in
-      `EscPosBuilder`). Render the QR in BOTH `UniversalPreview` (page/invoice) and the
-      ESC/POS path.
+- [x] **1.2 QR rendering** — added the `qrcode` npm lib (dynamic-imported, code-split) and a
+      `FiscalQR` component; `UniversalPreview` footer (thermal/A4/A5) now renders a real QR
+      `<img>` — the fiscal `qrcode_content` payload takes priority when present, legacy
+      `qr_content` selection otherwise. `ESCPOSRenderer` encodes the fiscal payload (fallback
+      doc number) via the existing `EscPosBuilder.qrCode()` (GS ( k Model 2). `qrcode_content`
+      threaded through `DocumentInfo.qrcodeContent` + `DocumentDataBuilder.buildDocInfo`.
 - [ ] **1.3 Print-template setting** — add `show_qr_code` (and QR size/position) to
       `SettingsRegistry.ts` + the items/footer sections; default on for FV.
 - [ ] **1.4 Official PDF export** — server-side or client-side PDF of the invoice including the
@@ -145,7 +146,7 @@
 
 | Upgrade | Status | Notes |
 |---------|--------|-------|
-| 1. Fiscal QR + PDF | in progress (1.1) | FiscalInvoiceQrService built; official DGI spec NOT published → documented v1 JSON schema |
+| 1. Fiscal QR + PDF | in progress (1.3) | 1.1 FiscalInvoiceQrService + `qrcode_content` API; 1.2 real QR in preview + ESC/POS (qrcode lib); official DGI spec NOT published → documented v1 JSON schema |
 | 2. Backup + restore | not started | — |
 | 3. Portal online payment | not started | — |
 | 4. 2FA + permissions | not started | — |
@@ -160,4 +161,5 @@ files belonging to that task; leave unrelated dirty files untouched):
 |--------|----------|
 | *(TODO file creation)* | `PRO_UPGRADE_TODO.md` + AGENTS.md mention |
 | *(1.1)* | `app/Services/FiscalInvoiceQrService.php` (payload builder + svgBase64), `QRCodeService` delegates to it, `CommercialDocument::fiscal_qr_data` accessor, resource `qrcode_content`, `tests/Feature/FiscalInvoiceQrServiceTest.php` |
+| *(1.2)* | `qrcode` + `@types/qrcode` npm deps, `components/preview/FiscalQR.tsx`, `FooterSection.tsx` real QR (fiscal payload priority), `ESCPOSRenderer` fiscal QR, `DocumentInfo.qrcodeContent` + `DocumentDataBuilder`, `__tests__/fiscalqr.pw.spec.ts` |
 | ... | ... |
