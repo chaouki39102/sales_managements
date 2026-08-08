@@ -21,6 +21,8 @@
 /storage/pail
 /test-results
 /tools
+/cloudflared*.exe
+/config.yml
 /vendor
 _ide_helper.php
 /server-helper/.watchdog-state.json
