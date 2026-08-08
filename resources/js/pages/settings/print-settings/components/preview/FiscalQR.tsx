@@ -38,7 +38,10 @@ export default function FiscalQR({ content, size }: Props) {
 
   if (!src) {
     return (
-      <div style={{ width: size, height: size, background: '#f5f5f5', border: '1px dashed #ccc' }} />
+      <div
+        data-qr-content={content}
+        style={{ width: size, height: size, background: '#f5f5f5', border: '1px dashed #ccc' }}
+      />
     );
   }
 

@@ -8,6 +8,7 @@ import { resolveTemplate } from '@/pages/settings/print-settings/runtime/Templat
 import { stickerDims } from '@/pages/settings/print-settings/components/preview/stickerDims';
 import UniversalPrintPipeline, { renderPipelineToPopup } from '@/pages/settings/print-settings/runtime/UniversalPrintPipeline';
 import StickerLabel from '@/pages/settings/print-settings/components/preview/StickerLabel';
+import { exportSourceToPdf } from '@/pages/settings/print-settings/runtime/exportPdf';
 
 // ─── ApiDocument ────────────────────────────────────────────────────────────
 // Minimal shape expected by DocumentDataBuilder.fromApiDocument().
@@ -80,6 +81,7 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
   }, [template, candidates, docTypeCode]);
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -104,6 +106,20 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
     renderPipelineToPopup(source as any, tpl, company);
   }, [tpl, source, company]);
 
+  const handlePdf = useCallback(async () => {
+    if (!tpl || !source || pdfBusy) return;
+    const num = overrideData?.doc?.number || document?.document_number || tpl.doc_type_code || 'document';
+    const safe = String(num).replace(/[/\\:*?"<>|]/g, '-');
+    setPdfBusy(true);
+    try {
+      await exportSourceToPdf({ source: source as any, template: tpl, company, filename: `${safe}.pdf` });
+    } catch (err) {
+      console.error('PDF export failed', err);
+    } finally {
+      setPdfBusy(false);
+    }
+  }, [tpl, source, company, overrideData, document, pdfBusy]);
+
   return (
     <Modal
       open={open}
@@ -124,6 +140,9 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
             </button>
           )}
           <button className="btn btn-secondary" onClick={onClose}>إلغاء</button>
+          <button className="btn btn-b" onClick={handlePdf} disabled={!tpl || !source || pdfBusy}>
+            <i className="ti ti-file-download" /> {pdfBusy ? 'جاري التصدير…' : 'PDF'}
+          </button>
           <button className="btn btn-p" onClick={handlePrint} disabled={!tpl || !source}>
             <i className="ti ti-printer" /> طباعة
           </button>

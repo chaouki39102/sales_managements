@@ -6,7 +6,7 @@ import type { PipelineSource } from './UniversalPrintPipeline';
 import type { PrintTemplate } from '@/pages/settings/print-settings/types';
 import type { CompanyData } from '@/pages/settings/print-settings/components/preview/shared';
 
-function buildData(source: PipelineSource, company: CompanyInfo | null): UniversalDocumentData {
+export function buildData(source: PipelineSource, company: CompanyInfo | null): UniversalDocumentData {
   switch (source.type) {
     case 'prebuilt':       return source.data;
     case 'api-document':   return DocumentDataBuilder.fromApiDocument(source.doc, company ?? {} as CompanyInfo, source.options);
