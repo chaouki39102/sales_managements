@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\TwoFactorAuthController;
 use App\Http\Controllers\Api\V1\CompanyController;
 use App\Http\Controllers\Api\V1\UserController;
 
@@ -111,6 +112,9 @@ Route::prefix('v1')->group(function () {
             ->middleware('throttle:5,15');
         Route::post('/login', [AuthController::class, 'login'])
             ->middleware('throttle:5,15');
+        // 🔐 الخطوة الثانية من تسجيل الدخول عند تفعيل 2FA (بدون توكن بعد)
+        Route::post('/two-factor/confirm', [TwoFactorAuthController::class, 'confirm'])
+            ->middleware('throttle:5,15');
 
         Route::middleware('auth:sanctum')->group(function () {
             Route::get('/me',               [AuthController::class, 'me']);
@@ -119,6 +123,14 @@ Route::prefix('v1')->group(function () {
             Route::post('/change-password', [AuthController::class, 'changePassword'])
                 ->middleware('throttle:3,60');
             Route::post('/logout',          [AuthController::class, 'logout']);
+
+            // 🔐 المصادقة الثنائية (2FA) — عمليات الإعداد والإدارة
+            Route::prefix('two-factor')->group(function () {
+                Route::get('/setup',            [TwoFactorAuthController::class, 'setup']);
+                Route::post('/enable',          [TwoFactorAuthController::class, 'enable']);
+                Route::post('/disable',         [TwoFactorAuthController::class, 'disable']);
+                Route::post('/recovery-codes',  [TwoFactorAuthController::class, 'recoveryCodes']);
+            });
 
             Route::prefix('profile')->group(function () {
                 Route::get('/',                   [UserController::class, 'profile']);

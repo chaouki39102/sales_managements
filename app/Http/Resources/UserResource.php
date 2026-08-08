@@ -28,6 +28,7 @@ class UserResource extends JsonResource
             'role_id'             => $this->role_id,
             'active'              => $this->active,
             'is_approved'         => $this->is_approved,
+            'two_factor_enabled'  => (bool) $this->two_factor_enabled,
             'last_login_at'       => $this->last_login_at,
             'last_login_ip'       => $this->last_login_ip,
             'register_ip'         => $this->register_ip,

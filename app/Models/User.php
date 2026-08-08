@@ -36,7 +36,7 @@ class User extends Authenticatable
         'register_ip', 'register_user_agent', 'active', 'is_approved', 'created_by', 'updated_by', 'deleted_by','password',
     ];
 
-    protected $hidden = ['password', 'remember_token', 'national_id'];
+    protected $hidden = ['password', 'remember_token', 'national_id', 'two_factor_secret', 'two_factor_recovery_codes'];
 
     protected $casts = [
         'email_verified_at' => 'datetime',
@@ -45,6 +45,10 @@ class User extends Authenticatable
         'last_login_at' => 'datetime',
         'active'            => 'boolean',
         'is_approved'       => 'boolean',
+        'two_factor_secret' => 'encrypted',
+        'two_factor_enabled' => 'boolean',
+        'two_factor_enabled_at' => 'datetime',
+        'two_factor_recovery_codes' => 'encrypted:array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',

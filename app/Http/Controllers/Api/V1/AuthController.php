@@ -9,6 +9,7 @@ use App\Http\Requests\Auth\ChangePasswordRequest;
 use App\Http\Resources\UserResource;
 use App\Services\AuthService;
 use App\Services\NotificationService;
+use App\Services\TwoFactorAuthService;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,6 +22,7 @@ class AuthController extends BaseApiController
     public function __construct(
         protected AuthService $authService,
         private NotificationService $notificationService,
+        protected TwoFactorAuthService $twoFactorService,
     ) {
         parent::__construct();
     }
@@ -46,6 +48,17 @@ class AuthController extends BaseApiController
         try {
             $user = $this->authService->login($request->email, $request->password);
             $user->load('roles');   // ✅ الأساس — بدونه الواجهة لا تعرف الدور
+
+            // 🔐 مصادقة ثنائية مفعلة → لا نُصدر توكن بعد، بل تحدي مؤقت
+            if ($user->two_factor_enabled) {
+                $challenge = $this->twoFactorService->issueChallenge($user);
+
+                return $this->successResponse([
+                    'two_factor_required' => true,
+                    'challenge_token'     => $challenge,
+                    'user'                => new UserResource($user),
+                ], 'أدخل رمز التحقق من تطبيق المصادقة');
+            }
 
             $this->notificationService->success('تسجيل دخول', "مرحباً {$user->name}");
 
