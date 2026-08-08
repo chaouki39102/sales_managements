@@ -4,14 +4,21 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
-    const { login } = useAuth();
+    const { login, confirmTwoFactor } = useAuth();
     const navigate = useNavigate();
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [challengeToken, setChallengeToken] = useState<string | null>(null);
+    const [code, setCode] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [showPass, setShowPass] = useState(false);
+
+    const goToApp = (user: { roles?: { name: string }[] }) => {
+        const isSuperAdmin = user?.roles?.some(r => r.name === 'super-admin') ?? false;
+        navigate(isSuperAdmin ? '/admin/dashboard' : '/onboarding', { replace: true });
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -29,9 +36,16 @@ export default function LoginPage() {
         setLoading(true);
 
         try {
-            const user = await login({ email, password });
-            const isSuperAdmin = user?.roles?.some((r: any) => r.name === 'super-admin') ?? false;
-            navigate(isSuperAdmin ? '/admin/dashboard' : '/onboarding', { replace: true });
+            const result = await login({ email, password });
+
+            // 🔐 مستخدم يملك 2FA → لا توكن بعد، نطلب رمز التحقق
+            if (result.two_factor_required) {
+                setChallengeToken(result.challenge_token);
+                setCode("");
+                return;
+            }
+
+            goToApp(result.user);
         } catch (err: any) {
             if (err.response) {
                 const msg =
@@ -44,6 +58,35 @@ export default function LoginPage() {
                 console.error(err);
             } else {
                 setError(err.message || "بيانات الدخول غير صحيحة");
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleConfirm = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!challengeToken) return;
+        if (code.trim().length < 6) {
+            setError("أدخل رمز التحقق المكوّن من 6 أرقام");
+            return;
+        }
+
+        setError("");
+        setLoading(true);
+
+        try {
+            const user = await confirmTwoFactor(challengeToken, code);
+            goToApp(user);
+        } catch (err: any) {
+            if (err.response) {
+                setError(err.response.data?.message || err.response.statusText);
+            } else if (err.request) {
+                setError("لا يمكن الاتصال بالخادم. تأكد من تشغيل الخادم.");
+                console.error(err);
+            } else {
+                setError(err.message || "رمز التحقق غير صحيح");
             }
         } finally {
             setLoading(false);
@@ -274,6 +317,69 @@ export default function LoginPage() {
                         </p>
                     </div>
 
+                    {challengeToken ? (
+                        <form onSubmit={handleConfirm} className="auth-2fa">
+                            <div className="auth-2fa-ic">
+                                <i className="ti ti-shield-lock" />
+                            </div>
+                            <h3 className="auth-2fa-title">رمز التحقق</h3>
+                            <p className="auth-2fa-tx">
+                                أدخل رمز التحقق المكوّن من 6 أرقام من تطبيق المصادقة
+                                (Google Authenticator أو ما شابهه) لإتمام تسجيل الدخول.
+                            </p>
+
+                            <div className="fg">
+                                <label className="req">رمز التحقق</label>
+                                <div className="inp-row">
+                                    <div className="inp-pre auth-2fa-pre">
+                                        <i className="ti ti-device-mobile" />
+                                    </div>
+                                    <input
+                                        type="text"
+                                        value={code}
+                                        onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                        placeholder="123456"
+                                        inputMode="numeric"
+                                        autoComplete="one-time-code"
+                                        autoFocus
+                                        className="auth-2fa-code-inp"
+                                    />
+                                </div>
+                            </div>
+
+                            {error && (
+                                <div className="al al-r auth-2fa-al">
+                                    <span className="ic ic-xs">
+                                        <i className="ti ti-alert-circle" />
+                                    </span>
+                                    <div className="auth-2fa-al-tx">{error}</div>
+                                </div>
+                            )}
+
+                            <button type="submit" className="auth-2fa-btn" disabled={loading}>
+                                {loading ? (
+                                    <>
+                                        <i className="ti ti-loader ti-spin" />
+                                        جاري التحقق...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="ti ti-shield-check" />
+                                        تأكيد الدخول
+                                    </>
+                                )}
+                            </button>
+
+                            <button
+                                type="button"
+                                className="auth-2fa-back"
+                                onClick={() => { setChallengeToken(null); setCode(""); setError(""); }}
+                            >
+                                <i className="ti ti-arrow-right" />
+                                الرجوع لتغيير بيانات الدخول
+                            </button>
+                        </form>
+                    ) : (
                     <form
                         onSubmit={handleSubmit}
                         style={{
@@ -443,6 +549,7 @@ export default function LoginPage() {
                             )}
                         </button>
                     </form>
+                    )}
 
                     <div
                         style={{

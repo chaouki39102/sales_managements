@@ -49,7 +49,28 @@ export interface ListParams {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 export interface LoginCredentials { email: string; password: string; }
-export interface AuthResponse     { user: User; token: string; }
+
+export interface AuthResponse {
+  user:       User;
+  token:      string;
+  token_type?: string;
+  // تمييز الاتحاد: غياب token مع two_factor_required:true = تحدّي 2FA
+  two_factor_required?: false;
+}
+
+export interface TwoFactorChallenge {
+  two_factor_required: true;
+  challenge_token:     string;
+  user:                User;
+}
+
+// login يمكن أن يُرجع إما التوكن مباشرة أو تحدّي 2FA (لا توكن بعد)
+export type LoginResult = AuthResponse | TwoFactorChallenge;
+
+export interface TwoFactorConfirmPayload { challenge_token: string; code: string; }
+export interface TwoFactorSetupResponse   { enabled: boolean; secret: string; qr_svg: string; otpauth_uri: string; }
+export interface TwoFactorEnableResponse  { enabled: boolean; recovery_codes: string[]; }
+export interface TwoFactorRecoveryResponse { recovery_codes: string[]; }
 
 export interface User extends BaseModel {
   name:        string;
@@ -60,6 +81,7 @@ export interface User extends BaseModel {
   active:      boolean;
   roles?:      Role[];
   permissions?: string[];
+  two_factor_enabled?: boolean;
 }
 
 // ─── Active Company (Zustand state only) ──────────────────────────────────────

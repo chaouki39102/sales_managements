@@ -488,3 +488,18 @@
     size: A4 landscape;
   }
 }
+
+/* ═══════════════ LOGIN — 2FA CODE STEP ═══════════════ */
+.auth-2fa{display:flex;flex-direction:column;gap:16px;}
+.auth-2fa-ic{width:56px;height:56px;border-radius:16px;background:var(--grad-em);display:flex;align-items:center;justify-content:center;margin:0 auto;color:#fff;font-size:26px;box-shadow:var(--emglow);}
+.auth-2fa-title{font-size:17px;font-weight:900;color:var(--t1);text-align:center;margin:0;}
+.auth-2fa-tx{font-size:12.5px;color:var(--t4);text-align:center;line-height:1.7;margin:0;}
+.auth-2fa-pre{display:flex;align-items:center;color:var(--t4);font-size:15px;padding:0 10px;border-left:1px solid var(--b3);}
+.auth-2fa-code-inp{text-align:center;letter-spacing:8px;font-size:20px;font-weight:800;direction:ltr;}
+.auth-2fa-code-inp::placeholder{letter-spacing:2px;font-weight:500;}
+.auth-2fa-btn{width:100%;padding:12px 20px;border-radius:var(--r2);border:none;background:var(--em);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:var(--emglow);transition:.2s;margin-top:4px;}
+.auth-2fa-btn:disabled{background:var(--bg4);color:var(--t4);cursor:not-allowed;box-shadow:none;}
+.auth-2fa-back{margin-top:4px;padding:8px;border:none;background:none;color:var(--t4);font-size:12.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'Tajawal',sans-serif;transition:.15s;}
+.auth-2fa-back:hover{color:var(--em);}
+.auth-2fa-al{border-radius:var(--r2);padding:10px 14px;}
+.auth-2fa-al-tx{font-size:13px;}

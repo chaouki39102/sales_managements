@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useEffect } from 'react';
-import { useCurrentUser, useLogin, useLogout } from '@/lib/api/endpoints/auth';
+import { useCurrentUser, useLogin, useLogout, useTwoFactorConfirm } from '@/lib/api/endpoints/auth';
 import { useActiveCompany, useAppStore } from '@/lib/store/appStore';
 import { getRememberPref, setSavedSession } from '@/lib/store/rememberMe';
-import type { User, ActiveCompany, LoginCredentials } from '@/lib/api/core/types';
+import type { User, ActiveCompany, LoginCredentials, LoginResult } from '@/lib/api/core/types';
 
 // ─── Context type ─────────────────────────────────────────────────────────────
 
@@ -12,7 +12,8 @@ interface AuthContextValue {
   isLoading:        boolean;
   isSuperAdmin:     boolean;
   activeCompany:    ActiveCompany | null;
-  login:            (creds: LoginCredentials) => Promise<User>;
+  login:            (creds: LoginCredentials) => Promise<LoginResult>;
+  confirmTwoFactor: (challengeToken: string, code: string) => Promise<User>;
   logout:           () => Promise<void>;
   setActiveCompany: (company: ActiveCompany) => void;
 }
@@ -40,9 +41,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginMutation  = useLogin();
   const logoutMutation = useLogout();
+  const confirm2FAMutation = useTwoFactorConfirm();
 
-  const login = async (creds: LoginCredentials): Promise<User> => {
-    const result = await loginMutation.mutateAsync(creds);
+  const login = async (creds: LoginCredentials): Promise<LoginResult> => {
+    return loginMutation.mutateAsync(creds);
+  };
+
+  const confirmTwoFactor = async (challengeToken: string, code: string): Promise<User> => {
+    const result = await confirm2FAMutation.mutateAsync({ challenge_token: challengeToken, code });
     return result.user;
   };
 
@@ -64,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isSuperAdmin,
       activeCompany,
       login,
+      confirmTwoFactor,
       logout,
       setActiveCompany,
     }}>
