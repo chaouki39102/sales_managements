@@ -262,7 +262,7 @@ class PortalOrderController extends BaseApiController
                 'name'          => $p->name,
                 'ref'           => $p->ref,
                 'barcode'       => $p->barcode,
-                'image'         => $p->default_image,
+                'image'         => $p->default_image ?? ($p->images[0] ?? null),
                 'unit_price_ht' => round($p->default_selling_price_ht, 4),
                 'tva_rate'      => (float) ($p->tva?->rate ?? 0),
                 'unit'          => $p->unit

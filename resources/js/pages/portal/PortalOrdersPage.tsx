@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { portalApi, type PortalCatalogItem, type PortalCatalogPackaging, type PortalCatalogDiscount, type PortalOrder } from '@/lib/api/portal/portal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useConfirm } from '@/hooks/useConfirm';
+import { proxyImage } from '@/lib/api/imageProxy';
 import OrderPipeline from './OrderPipeline';
 import {
   fmtMoney, Pager,
@@ -501,7 +502,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                   <div key={p.id} className={`portal-prod${inCart ? ' on' : ''}${outOfStock ? ' oos' : ''}`}>
                     <div className={`portal-prod-img${outOfStock ? ' oos' : ''}`}>
                       {p.image ? (
-                        <img src={p.image} alt={p.name} loading="lazy" />
+                        <img src={proxyImage(p.image) ?? p.image} alt={p.name} loading="lazy" />
                       ) : (
                         <div className="portal-prod-img-fb"><i className="ti ti-package" /></div>
                       )}
@@ -797,7 +798,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                       <div key={key} className="portal-cart-item portal-cart-item--ro">
                         <div className="portal-cart-thumb">
                           {product.image ? (
-                            <img src={product.image} alt="" loading="lazy" />
+                            <img src={proxyImage(product.image) ?? product.image} alt="" loading="lazy" />
                           ) : (
                             <i className="ti ti-package" />
                           )}
@@ -875,7 +876,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                           <div key={key} className="portal-cart-item">
                             <div className="portal-cart-thumb">
                               {product.image ? (
-                                <img src={product.image} alt="" loading="lazy" />
+                                <img src={proxyImage(product.image) ?? product.image} alt="" loading="lazy" />
                               ) : (
                                 <i className="ti ti-package" />
                               )}
