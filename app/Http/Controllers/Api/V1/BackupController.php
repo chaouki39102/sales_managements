@@ -48,7 +48,11 @@ class BackupController extends BaseApiController
     {
         try {
             $label = (string) $request->input('label', '');
-            $keep  = $request->has('keep') ? (int) $request->input('keep') : null;
+
+            // keep <= 0 (or absent/null) must fall back to the config default —
+            // passing 0 into BackupService would prune the whole archive.
+            $keep = $request->integer('keep', 0);
+            $keep = $keep > 0 ? $keep : null;
 
             $created = $this->backupService->backup($label !== '' ? $label : null, $keep);
 
@@ -64,6 +68,11 @@ class BackupController extends BaseApiController
     public function verify(Request $request, string $file): JsonResponse
     {
         try {
+            // Laravel's dispatcher splices the type-hinted Request to position 0,
+            // so route params fill positionally and $file actually receives the
+            // Company model — always resolve {file} from the route instead.
+            $file = (string) $this->resolveRouteId('file');
+
             return $this->successResponse(
                 $this->backupService->verify($file),
                 'النسخة الاحتياطية سليمة'
@@ -79,6 +88,7 @@ class BackupController extends BaseApiController
     public function download(Request $request, string $file)
     {
         try {
+            $file = (string) $this->resolveRouteId('file');
             $path = $this->backupService->resolveForDownload($file);
             return response()->download($path, basename($file));
         } catch (\Throwable $e) {
@@ -94,6 +104,7 @@ class BackupController extends BaseApiController
     public function doRestore(Request $request, string $file): JsonResponse
     {
         try {
+            $file      = (string) $this->resolveRouteId('file');
             $confirmed = (bool) $request->input('confirmed', false);
             $safety    = $this->backupService->restore($file, $confirmed);
 
@@ -114,7 +125,8 @@ class BackupController extends BaseApiController
     public function destroy($file): JsonResponse
     {
         try {
-            $this->backupService->delete((string) $file);
+            $file = (string) $this->resolveRouteId('file');
+            $this->backupService->delete($file);
             return $this->successResponse(null, 'تم حذف النسخة الاحتياطية بنجاح');
         } catch (\Throwable $e) {
             return $this->backupError($e);

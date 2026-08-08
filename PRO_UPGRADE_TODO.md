@@ -1,6 +1,7 @@
 # PRO Upgrade — Task Checklist
 
-> **Status: 🚧 IN PROGRESS (Aug 8) — upgrade 1 tasks 1.1–1.3 done.** Pick up on any PC:
+> **Status: 🚧 IN PROGRESS (Aug 8) — upgrade 1 done (1.1–1.5); upgrade 2 done (2.1–2.4),
+> working on 2.5 (E2E backup→restore test + restore guide).** Pick up on any PC:
 > `git pull`, open this file, and work task-by-task. Commit + push after EACH task.
 
 > **Goal**: take the sales-management ERP (Laravel + React POS, Algerian market) from a
@@ -73,14 +74,18 @@
 > **Context**: `composer.json` may already have backup tooling; check before adding.
 > DB is SQLite (`database/database.sqlite`) in dev, MySQL in prod (`.env DB_CONNECTION`).
 
-- [ ] **2.1 Backup command** — `php artisan app:backup` (Laravel scheduler): dump the active
+- [x] **2.1 Backup command** — `php artisan app:backup` (Laravel scheduler): dump the active
       connection (`sqlite` → file copy; `mysql` → `mysqldump`/query builder), gzip, optional
-      GPG encryption, timestamped filename, retention (keep N days), write to `storage/app/backups`.
-- [ ] **2.2 Schedule** — register in `routes/console.php` (daily, plus a weekly full).
-- [ ] **2.3 Restore command** — `php artisan app:restore --file=<name>`: verify hash, restore
-      with an explicit "current DB will be overwritten" confirm; refuse when the file is corrupt.
-- [ ] **2.4 UI** — a "النسخ الاحتياطي" section in Settings (list backups, create now, download,
-      restore, delete old). Use the existing settings page patterns.
+      AES-256-GCM encryption, timestamped filename, retention (keep N days), write to `storage/app/backups`.
+- [x] **2.2 Schedule** — `routes/console.php`: daily 03:00 (`app:backup`) + weekly Sunday 03:15
+      (`app:backup --weekly`), each keeping 7 backups. `php artisan schedule:run` is the single entry.
+- [x] **2.3 Restore command** — `php artisan app:restore --file=<name> --confirm`: verify the
+      `DZB1` magic + per-file sha256 checksum, ask for explicit confirmation, refuse corrupt files.
+- [x] **2.4 UI** — «النسخ الاحتياطي» tab in Settings (`BackupTab`): list backups (size/date/
+      driver/encrypted badges), create now (optional label), download, verify, restore (ConfirmModal
+      gate, auto-reload), delete old. Backend `BackupController` (index/store/verify/download/
+      restore/delete) under `{company}` + `can:update_company`; `apiDownload` blob helper +
+      `tenantKeys.backups` + `useBackups`/`useBackupMutations`.
 - [ ] **2.5 Test** — create → mutate data → restore → verify data returns. Document the exact
       restore procedure in `docs/reports/BACKUP_RESTORE_GUIDE.md`.
 
@@ -161,8 +166,8 @@
 
 | Upgrade | Status | Notes |
 |---------|--------|-------|
-| 1. Fiscal QR + PDF | in progress (1.3) | 1.1 FiscalInvoiceQrService + `qrcode_content` API; 1.2 real QR in preview + ESC/POS (qrcode lib); official DGI spec NOT published → documented v1 JSON schema |
-| 2. Backup + restore | not started | — |
+| 1. Fiscal QR + PDF | ✅ done (1.1–1.5) | DGI spec NOT published → documented versioned JSON v1 (`docs/reports/FISCAL_QR_SPEC.md`); scannability proven via jsqr round-trip |
+| 2. Backup + restore | in progress (2.5) | 2.1–2.4 done (command, schedule, restore, settings UI); 2.5 = E2E test + `BACKUP_RESTORE_GUIDE.md` |
 | 3. Portal online payment | not started | — |
 | 4. 2FA + permissions | not started | — |
 | 5. Offline-first POS | not started | — |
@@ -177,4 +182,8 @@ files belonging to that task; leave unrelated dirty files untouched):
 | *(TODO file creation)* | `PRO_UPGRADE_TODO.md` + AGENTS.md mention |
 | *(1.1)* | `app/Services/FiscalInvoiceQrService.php` (payload builder + svgBase64), `QRCodeService` delegates to it, `CommercialDocument::fiscal_qr_data` accessor, resource `qrcode_content`, `tests/Feature/FiscalInvoiceQrServiceTest.php` |
 | *(1.2)* | `qrcode` + `@types/qrcode` npm deps, `components/preview/FiscalQR.tsx`, `FooterSection.tsx` real QR (fiscal payload priority), `ESCPOSRenderer` fiscal QR, `DocumentInfo.qrcodeContent` + `DocumentDataBuilder`, `__tests__/fiscalqr.pw.spec.ts` |
-| ... | ... |
+| *(1.3–1.5)* | `show_qr_code`/`qr_code_size`/`qr_code_align` settings + seeder; `runtime/exportPdf.ts` (dompdf.js WASM) + `pdf-export.pw.spec.ts`; `docs/reports/FISCAL_QR_SPEC.md` + `fiscal-qr-scan.spec.ts` |
+| `a0f3136` *(2.1)* | `php artisan app:backup` — `app/Console/Commands/AppBackup.php` + `app/Services/BackupService.php` (sqlite copy / mysqldump, gzip, AES-256-GCM optional, retention, `DZB1` magic + sha256 sidecar) |
+| `b0fc9f7` *(2.2)* | `routes/console.php` — daily 03:00 + weekly Sunday 03:15, keep 7 |
+| `1938c34` *(2.3)* | `php artisan app:restore` — `app/Console/Commands/AppRestore.php` (verify magic+hash, confirm, refuse corrupt) |
+| `ad070e5` *(2.4)* | Settings «النسخ الاحتياطي» tab — `BackupController` (6 routes), `BackupService::resolveForDownload`, `apiDownload` blob helper, `tenantKeys.backups`, `endpoints/backups.ts`, `tabs/BackupTab.tsx`, TABS + SettingsPage mount |

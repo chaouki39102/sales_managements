@@ -592,28 +592,51 @@ class BackupService
 
     protected function prune(?int $keep): void
     {
-        $keep   = $keep ?? (int) ($this->config['retention_keep'] ?? 20);
+        $keep = (int) ($keep ?? $this->config['retention_keep'] ?? 20);
+
+        // A zero/negative cap must NEVER wipe the archive (it would delete the
+        // backup we just created) — floor it at 1 and fall back to the default.
+        if ($keep < 1) {
+            $keep = (int) ($this->config['retention_keep'] ?? 20);
+        }
+
         $maxAge = (int) ($this->config['retention_days'] ?? 14) * 86400;
 
+        // Snapshot of real backup files (skip .sha256 sidecars), newest first.
         $files = [];
         foreach (glob($this->dir.DIRECTORY_SEPARATOR.'backup-*') ?: [] as $path) {
             $name = basename($path);
-            if (!str_ends_with($name, '.sha256')) {
+            if (is_file($path) && !str_ends_with($name, '.sha256')) {
                 $files[] = $path;
             }
         }
 
         usort($files, fn ($a, $b) => filemtime($b) <=> filemtime($a));
 
+        // 1) Cap by count: keep the N most recent, delete the rest.
         foreach (array_slice($files, $keep) as $old) {
             @unlink($old);
             @unlink($old.'.sha256');
         }
 
-        foreach ($files as $path) {
-            if ($maxAge > 0 && (time() - (int) filemtime($path)) > $maxAge && count($files) > $keep) {
-                @unlink($path);
-                @unlink($path.'.sha256');
+        // 2) Cap by age: only when MORE than `keep` files still exist, drop the
+        //    ones older than retention_days. Re-glob so we never stat a file that
+        //    the count-cap already deleted (filemtime() on a missing path crashed
+        //    when keep=0 was passed in).
+        $survivors = [];
+        foreach (glob($this->dir.DIRECTORY_SEPARATOR.'backup-*') ?: [] as $path) {
+            $name = basename($path);
+            if (is_file($path) && !str_ends_with($name, '.sha256')) {
+                $survivors[] = $path;
+            }
+        }
+
+        if ($maxAge > 0 && count($survivors) > $keep) {
+            foreach ($survivors as $path) {
+                if ((time() - (int) filemtime($path)) > $maxAge) {
+                    @unlink($path);
+                    @unlink($path.'.sha256');
+                }
             }
         }
     }

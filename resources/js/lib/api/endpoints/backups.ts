@@ -52,7 +52,12 @@ const enc = (file: string) => encodeURIComponent(file);
 export const backupsApi = {
   list:     ()                              => apiGet<BackupFile[]>('/backups'),
   create:   (label?: string, keep?: number) =>
-    apiPost<BackupCreated>('/backups', { label: label || null, keep: keep ?? null }),
+    apiPost<BackupCreated>('/backups', {
+      label: label || null,
+      // Only send `keep` when the caller actually overrides retention — an
+      // explicit null would be cast to 0 server-side and prune every backup.
+      ...(typeof keep === 'number' && keep > 0 ? { keep } : {}),
+    }),
   verify:   (file: string)                  => apiPost<BackupVerify>(`/backups/${enc(file)}/verify`),
   download: (file: string)                  => apiDownload(`/backups/${enc(file)}/download`),
   restore:  (file: string, confirmed: boolean) =>
