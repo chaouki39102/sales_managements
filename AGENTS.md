@@ -7,6 +7,32 @@
 ## Date
 2026-08-08
 
+### Phase 68 — PWA Branding (green icons) + PRO Upgrade Roadmap (Aug 8)
+
+**Request (multiple steps, all committed+pushed)**: brand the PWA assets, fix the favicon to the main color, then create a TODO roadmap of "pro" upgrades the user will execute on another PC.
+
+**PWA branding** (`e63f553`, `bcbe71c`):
+- **Icons** — `public/favicon.ico` (32), `pwa-192x192.png`, `pwa-512x512.png`, `apple-touch-icon.png` (180) generated via `C:\Users\PC\AppData\Local\Temp\opencode\gen_icons.ps1` (System.Drawing): vertical gradient background **green `#0a8a5c` → `#077a50`** (the app's main `--em` color, NOT navy), white **POSDZ** wordmark (Arial Black, font `0.21×size`), white accent bar, gold `#d9a027` dot. The accent bar was changed emerald→white so it reads on the green background.
+- **Manifest** (`vite.config.js` VitePWA) — rebranded to POSDZ (name/short_name/description), `theme_color: '#0a8a5c'`, icons incl. a `maskable` 512 entry. `resources/views/app.blade.php` now links `/favicon.ico` + `/apple-touch-icon.png` and `theme-color` meta `#0a8a5c`.
+- **SW image-proxy CacheFirst rule** (in the `e63f553` commit) — `/\/api\/v1\/image-proxy/` → `CacheFirst`, cacheName `image-cache` (500 entries / 7 days), placed BEFORE the generic `/api\/v1\//` NetworkFirst rule (first match wins). Needed because `proxyImage()` URLs end in query params, never an image extension, so the extension-based image rule never matched and they fell into NetworkFirst.
+- **`PwaInstallBanner`** (`resources/js/components/global/PwaInstallBanner.tsx`) — self-controlled install banner: captures `beforeinstallprompt` (preventDefault, no auto-accept), install button calls `prompt()`, dismiss stores a 7-day `localStorage` suppression, auto-hides on `appinstalled`/standalone (`display-mode`). Mounted once in `App.tsx` next to `GlobalDocumentFAB`. CSS `.pwa-banner*` in `components.css` (fixed bottom, `z-index:1000`, raised above the portal mobile nav `calc(66px + safe-area)` on phones).
+
+**Verification** (both commits): `npx tsc --noEmit` clean · `npm test` 222/222 · `npm run build` 0 errors (216 precache) · SW MATCH · Playwright live: assets 200, banner renders on synthetic `beforeinstallprompt` with correct Arabic copy, dismiss persists across reload, zero console errors.
+
+**PRO upgrade roadmap** — user picked "all five" and will implement them on another PC:
+- `PRO_UPGRADE_TODO.md` (project root, same convention as `POS_PRO_MOBILE_TODO.md`) — 5 sections × 5 tasks each, cross-PC actionable, each task committed+pushed individually:
+  1. **Fiscal e-invoicing QR (BSC) + compliant PDF** — the recommended #1: Algerian DGI QR on FV/POS (Decree 21-98 / current spec — VERIFY fields before hardcoding), render in `UniversalPreview` + `EscPosBuilder` QR path, `show_qr_code` template setting, official PDF export, validate with the DGI validator.
+  2. **Automated backup + restore** — `php artisan app:backup`/`app:restore` (SQLite copy / mysqldump), gzip+encrypt, retention, scheduler in `routes/console.php`, Settings UI, tested restore.
+  3. **Portal online payment** — EDAHABIA/CIB/CTPay gateway (sandbox-first, setting-gated), backend intent endpoint, signed webhook → `PaymentSynchronizer` confirmed payment + status history, portal «الدفع الإلكتروني» UI, security tests (replay/signature/amount-from-server).
+  4. **2FA + granular permissions** — TOTP secrets + QR enrollment + backup codes, login gate before Sanctum token, roles (owner/manager/cashier/viewer) + permission matrix, admin UI, tests.
+  5. **Offline-first POS** — IndexedDB write queue (replay MUST PUT via `documentId`, Phase 46 rule), optimistic success on offline, sync-on-`online` with backoff + conflict surface (never silently drop), offline stock cache, Vitest for queue ordering.
+
+**Key architectural rules added this phase**:
+- PWA brand color is green `#0a8a5c` (`--em`), not navy; the theme-color (manifest + blade meta) and every brand icon must use it. `vite-plugin-pwa` does NOT precache `public/` favicon/pwa icons automatically unless listed — `includeAssets: ['favicon.ico', 'robots.txt']` only covers those two, so the app icons are still fetched normally (fine — they're tiny and static-cache covered).
+- Icon generation on Windows via PowerShell `[System.Drawing.Bitmap]`: `New-Object` cannot be nested inside .NET method-call expressions — bind brushes/pens to variables first and use `[Type]::new(...)`.
+- An install-banner must be self-controlled: `beforeinstallprompt.preventDefault()` + capture, invoke `prompt()` only on a user gesture, and `prompt()` is single-use (drop the reference after `userChoice`).
+- The SW image-proxy rule must precede the generic API rule; a CacheFirst `image-cache` with `cacheableResponse.statuses: [0,200]` handles offline-first images.
+
 ### Phase 67 — Public Order Page over the Internet: Tailscale Funnel (permanent URL) + Machine-Specific Config Template (Aug 8)
 
 **Request**: "so I use this conf on this PC; I'll push and pull on another PC — what we need: add modal conf, when I pull on the other PC I'll find these files to fill them with the other PC's Tailscale conf; add all this in AGENTS.md and add a file to explain this." Outcome: the customer order page (`/portal/{company-slug}/order`) is now reachable by the public internet via **Tailscale Funnel** — a permanent `https://<machine>.<tailnet>.ts.net` URL with valid TLS, no domain, no router port-forward. This REPLACED the cloudflared quick-tunnel scripts (random `trycloudflare.com` URL per run).
