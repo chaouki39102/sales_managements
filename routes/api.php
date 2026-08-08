@@ -690,6 +690,16 @@ Route::prefix('v1')->group(function () {
                 Route::patch('portal-orders/{id}',        [\App\Http\Controllers\Api\V1\Portal\PortalOrdersController::class, 'update']);
                 Route::patch('portal-orders/{id}/lines',  [\App\Http\Controllers\Api\V1\Portal\PortalOrdersController::class, 'updateLines']);
                 Route::post('portal-orders/{id}/convert', [\App\Http\Controllers\Api\V1\Portal\PortalOrdersController::class, 'convert']);
+
+                // ── النسخ الاحتياطي واستعادة قاعدة البيانات ────────────
+                Route::prefix('backups')->group(function () {
+                    Route::get('/',        [\App\Http\Controllers\Api\V1\BackupController::class, 'index']);
+                    Route::post('/',       [\App\Http\Controllers\Api\V1\BackupController::class, 'store']);
+                    Route::post('{file}/verify',    [\App\Http\Controllers\Api\V1\BackupController::class, 'verify']);
+                    Route::get('{file}/download',   [\App\Http\Controllers\Api\V1\BackupController::class, 'download']);
+                    Route::post('{file}/restore',   [\App\Http\Controllers\Api\V1\BackupController::class, 'doRestore']);
+                    Route::delete('{file}',         [\App\Http\Controllers\Api\V1\BackupController::class, 'destroy']);
+                });
             });
 
             // ── POS Sessions ──────────────────────────────────────

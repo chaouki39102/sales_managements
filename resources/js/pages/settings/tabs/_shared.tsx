@@ -32,6 +32,7 @@ export const TABS = [
     { id: "conversions", label: "خريطة التحويل", icon: "ti-transfer" },
     { id: "users", label: "المستخدمون", icon: "ti-users" },
     { id: "printers", label: "الطابعات", icon: "ti-printer" },
+    { id: "backup", label: "النسخ الاحتياطي", icon: "ti-database" },
     { id: "plan", label: "الخطة", icon: "ti-crown" },
 ] as const;
 export type TabId = (typeof TABS)[number]["id"];

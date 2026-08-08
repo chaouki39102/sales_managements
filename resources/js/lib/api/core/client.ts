@@ -306,4 +306,29 @@ export const apiUpload = <T>(url: string, fd: FormData, onProgress?: (p: number)
     onUploadProgress: e => { if (onProgress && e.total) onProgress(Math.round(e.loaded / e.total * 100)); },
   }).then(r => extractData<T>(r));
 
+// ─── apiDownload (binary download through the same interceptor/slug pipeline) ─
+// Returns a Blob; the caller builds an object URL and triggers the save.
+// Error bodies come back as Blobs (responseType: 'blob'), so re-parse their text
+// to keep the Arabic envelope message/status/errors on failures.
+export async function apiDownload(url: string, params?: Record<string, unknown>): Promise<Blob> {
+  try {
+    const r = await client.get<Blob>(url, { params, responseType: 'blob', timeout: 120_000 });
+    return r.data;
+  } catch (e) {
+    const ax = e as AxiosError;
+    const blob = ax.response?.data as Blob | undefined;
+    if (blob instanceof Blob) {
+      try {
+        const text = await blob.text();
+        const parsed = JSON.parse(text) as ApiErrorPayload;
+        throw makeError(ax.response?.status ?? 500, parsed);
+      } catch (inner) {
+        if (inner instanceof ApiError) throw inner;
+        throw makeError(ax.response?.status ?? 500, { message: 'تعذر تحميل الملف' });
+      }
+    }
+    throw e;
+  }
+}
+
 export default client;

@@ -37,6 +37,7 @@ import { DocumentsTab } from "./tabs/DocumentsTab";
 import { ConversionsTab } from "./tabs/ConversionsTab";
 import { UsersTab } from "./tabs/UsersTab";
 import { PrintersTab } from "./tabs/PrintersTab";
+import { BackupTab } from "./tabs/BackupTab";
 import { PlanTab } from "./tabs/PlanTab";
 
 export default function SettingsPage() {
@@ -209,6 +210,7 @@ export default function SettingsPage() {
                     />
                 )}
                 {tab === "plan" && <PlanTab />}
+                {tab === "backup" && <BackupTab />}
                 {tab === "printers" && (
                     <PrintersTab
                         onDirty={() => markTabDirty("printers")}

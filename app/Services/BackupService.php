@@ -174,6 +174,16 @@ class BackupService
         return $this->dir;
     }
 
+    /**
+     * Resolve a stored backup to its absolute path for streaming downloads.
+     *
+     * @throws RuntimeException when the file does not exist or is a checksum sidecar
+     */
+    public function resolveForDownload(string $file): string
+    {
+        return $this->resolve($file);
+    }
+
     public function driver(): string
     {
         return (string) (config('database.connections.'.config('database.default').'.driver') ?: 'sqlite');

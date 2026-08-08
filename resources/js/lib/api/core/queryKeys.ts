@@ -212,5 +212,11 @@ export const tenantKeys = {
         detail:  (slug: string, yearId: number, month?: number)  => [slug, 'ifu', yearId, month]                             as const,
         history: (slug: string, yearId: number)                  => [slug, 'ifu', yearId, 'history']                         as const,
     },
+
+    // ── Backups (النسخ الاحتياطي) ──────────────────────────────────────
+    backups: {
+        all:  (slug: string) => [slug, 'backups']                                                                           as const,
+        list: (slug: string) => [slug, 'backups', 'list']                                                                    as const,
+    },
 } as const;
 
