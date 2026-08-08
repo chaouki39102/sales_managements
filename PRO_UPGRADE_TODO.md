@@ -1,9 +1,8 @@
 # PRO Upgrade — Task Checklist
 
-> **Status: 🚧 IN PROGRESS (Aug 8) — upgrade 1 done (1.1–1.5); upgrade 2 done (2.1–2.4)
-> + API hardening (37123d1); working on 2.5 (E2E backup→restore test + restore guide).**
-> Pick up on any PC: `git pull`, open this file, and work task-by-task. Commit + push
-> after EACH task.
+> **Status: ✅ DONE (Aug 8) — upgrades 1 & 2 fully complete (1.1–1.5, 2.1–2.5);
+> upgrades 3–5 not started.** Pick up on any PC: `git pull`, open this file, and work
+> task-by-task. Commit + push after EACH task.
 
 > **Goal**: take the sales-management ERP (Laravel + React POS, Algerian market) from a
 > working system to a professional-grade product. Five upgrades, each self-contained.
@@ -94,8 +93,17 @@
       config default (never prunes the whole archive), `prune()` re-globs before the age-cap
       (no `filemtime()` on deleted files), client sends `keep` only when explicitly positive.
       Live-verified: verify 200, download 200 (gzip), delete 200; `vendor\bin\pest.bat` 58 passed.
-- [ ] **2.5 Test** — create → mutate data → restore → verify data returns. Document the exact
-      restore procedure in `docs/reports/BACKUP_RESTORE_GUIDE.md`.
+- [x] **2.5 Test** — E2E verified on the live dev DB (server running): baseline snapshot
+      (companies 1 · users 2 · products 983 · parties 12 · documents 326 · settings 134) →
+      `app:backup --label=e2e-restore-test` → INSERT sentinel company + rename company 1 →
+      `app:restore --file=… --yes` → **all counts identical**, company-1 name reverted,
+      sentinel gone, live server 200 on health/products. Restore auto-creates a `pre-restore`
+      safety backup + keeps `database.sqlite.before-restore-<ts>`. Test artifacts cleaned up.
+      Exact procedure documented in `docs/reports/BACKUP_RESTORE_GUIDE.md` (CLI + UI + scripted,
+      schedule, retention, encryption, troubleshooting, E2E table). NOTE: integrity-scan flags 15
+      pre-existing POS `total_discount` defects (pre-Phase-25 class) — present before the backup,
+      reproduced faithfully (proves exact round-trip), NOT restore-introduced; a Phase-52-style
+      repair is a possible future task.
 
 ## 3. Online Payment in the Customer Portal (EDAHABIA / CIB / CTPay)
 
@@ -175,7 +183,7 @@
 | Upgrade | Status | Notes |
 |---------|--------|-------|
 | 1. Fiscal QR + PDF | ✅ done (1.1–1.5) | DGI spec NOT published → documented versioned JSON v1 (`docs/reports/FISCAL_QR_SPEC.md`); scannability proven via jsqr round-trip |
-| 2. Backup + restore | in progress (2.5) | 2.1–2.4 done (command, schedule, restore, settings UI); 2.5 = E2E test + `BACKUP_RESTORE_GUIDE.md` |
+| 2. Backup + restore | ✅ done (2.1–2.5) | command + schedule + restore + settings UI + E2E verified (`docs/reports/BACKUP_RESTORE_GUIDE.md`); 15 pre-existing POS `total_discount` defects flagged (not restore-introduced) |
 | 3. Portal online payment | not started | — |
 | 4. 2FA + permissions | not started | — |
 | 5. Offline-first POS | not started | — |
@@ -197,3 +205,4 @@ files belonging to that task; leave unrelated dirty files untouched):
 | `ad070e5` *(2.4)* | Settings «النسخ الاحتياطي» tab — `BackupController` (6 routes), `BackupService::resolveForDownload`, `apiDownload` blob helper, `tenantKeys.backups`, `endpoints/backups.ts`, `tabs/BackupTab.tsx`, TABS + SettingsPage mount |
 | `37123d1` *(2.4b)* | Backup API hardening — `{file}` resolved from the route (dispatcher splice was feeding the Company model into it → 500s on verify/download/restore/delete); `keep` floor (prune never wipes the archive); `prune()` re-glob before age-cap; client sends `keep` only when > 0 |
 | `83e2606` | `public/sw.js` manifest refresh to match build (SW MATCH verified) |
+| *(2.5)* | E2E restore test (baseline → backup → mutate → restore → verify, all counts returned; live server 200) + `docs/reports/BACKUP_RESTORE_GUIDE.md`; test artifacts cleaned |
