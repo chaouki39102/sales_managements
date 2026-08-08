@@ -92,6 +92,8 @@ interface ApiDocument {
   document_date?:   string;
   due_date?:        string | null;
   notes?:           string | null;
+  /** Fiscal QR payload (backend FiscalInvoiceQrService) */
+  qrcode_content?:  string | null;
   document_type?: {
     code?: string;
     name?: string;
@@ -414,6 +416,7 @@ function buildDocInfo(doc: ApiDocument): DocumentInfo {
     typeName: doc.document_type?.name ?? undefined,
     status:   doc.document_status?.code ?? doc.document_status?.name ?? undefined,
     notes:    doc.notes ?? null,
+    qrcodeContent: doc.qrcode_content ?? null,
   };
 }
 

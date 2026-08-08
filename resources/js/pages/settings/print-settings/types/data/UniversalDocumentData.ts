@@ -34,6 +34,8 @@ export interface DocumentInfo {
   status?:      string;
   notes?:       string | null;
   reference?:   string | null;
+  /** Fiscal QR payload (backend `qrcode_content`, fiscal e-invoicing). Present on API documents; null/absent for pre-sale snapshots. */
+  qrcodeContent?: string | null;
 }
 
 export interface CompanyInfo {

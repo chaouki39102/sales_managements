@@ -1,6 +1,7 @@
 import type { PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
 import { Separator, borderStyle, align, fontFamily as _fontFamily } from './shared';
+import FiscalQR from './FiscalQR';
 
 function barcodeText(tpl: PrintTemplate, data: UniversalDocumentData): string {
   if (tpl.barcode_content === 'custom') return tpl.barcode_custom_text;
@@ -17,6 +18,30 @@ function qrDataText(tpl: PrintTemplate, data: UniversalDocumentData): string {
     parts.push(data.company?.name || '');
   }
   return parts.join(' | ');
+}
+
+/**
+ * Fiscal e-invoicing takes priority: real API documents carry the backend
+ * `qrcode_content` payload (FiscalInvoiceQrService) — always render that.
+ * Pre-sale snapshots / previews without a fiscal payload fall back to the
+ * legacy template `qr_content` selection.
+ */
+function qrContent(tpl: PrintTemplate, data: UniversalDocumentData): string {
+  if (data.doc.qrcodeContent) return data.doc.qrcodeContent;
+  return qrDataText(tpl, data);
+}
+
+function QRBlock(tpl: PrintTemplate, data: UniversalDocumentData, size: number, labelSize: number) {
+  return (
+    <div style={{ margin: '4px auto', width: size }}>
+      <FiscalQR content={qrContent(tpl, data)} size={size} />
+      {!data.doc.qrcodeContent && (
+        <div style={{ fontSize: labelSize, color: '#666', marginTop: 1, textAlign: 'center' }}>
+          {qrDataText(tpl, data)}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function renderThermalFooter(tpl: PrintTemplate, data: UniversalDocumentData) {
@@ -87,26 +112,7 @@ function renderThermalFooter(tpl: PrintTemplate, data: UniversalDocumentData) {
         </div>
       )}
 
-      {tpl.show_qr && (
-        <div style={{ margin: '4px auto', width: 48, height: 48 }}>
-          <svg viewBox="0 0 10 10" width={48} height={48}>
-            <rect x="0" y="0" width="3" height="3" fill="#111" />
-            <rect x="1" y="1" width="1" height="1" fill="#fff" />
-            <rect x="7" y="0" width="3" height="3" fill="#111" />
-            <rect x="8" y="1" width="1" height="1" fill="#fff" />
-            <rect x="0" y="7" width="3" height="3" fill="#111" />
-            <rect x="1" y="8" width="1" height="1" fill="#fff" />
-            <rect x="4" y="0" width="1" height="1" fill="#111" />
-            <rect x="4" y="2" width="2" height="1" fill="#111" />
-            <rect x="3" y="4" width="4" height="1" fill="#111" />
-            <rect x="5" y="6" width="2" height="3" fill="#111" />
-            <rect x="3" y="7" width="1" height="1" fill="#111" />
-          </svg>
-          <div style={{ fontSize: 7, color: '#666', marginTop: 1 }}>
-            {qrDataText(tpl, data)}
-          </div>
-        </div>
-      )}
+      {tpl.show_qr && QRBlock(tpl, data, 48, 7)}
 
       {(tpl.show_cashier_signature || tpl.show_client_signature) && (
         <div style={{
@@ -214,23 +220,13 @@ function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
       )}
 
       {tpl.show_qr && (
-        <div style={{ margin: '4px auto', width: 48, height: 48, textAlign: 'center' }}>
-          <svg viewBox="0 0 10 10" width={48} height={48}>
-            <rect x="0" y="0" width="3" height="3" fill="#111" />
-            <rect x="1" y="1" width="1" height="1" fill="#fff" />
-            <rect x="7" y="0" width="3" height="3" fill="#111" />
-            <rect x="8" y="1" width="1" height="1" fill="#fff" />
-            <rect x="0" y="7" width="3" height="3" fill="#111" />
-            <rect x="1" y="8" width="1" height="1" fill="#fff" />
-            <rect x="4" y="0" width="1" height="1" fill="#111" />
-            <rect x="4" y="2" width="2" height="1" fill="#111" />
-            <rect x="3" y="4" width="4" height="1" fill="#111" />
-            <rect x="5" y="6" width="2" height="3" fill="#111" />
-            <rect x="3" y="7" width="1" height="1" fill="#111" />
-          </svg>
-          <div style={{ fontSize: 7, color: '#666', marginTop: 1 }}>
-            {qrDataText(tpl, data)}
-          </div>
+        <div style={{ margin: '4px auto', textAlign: 'center' }}>
+          <FiscalQR content={qrContent(tpl, data)} size={48} />
+          {!data.doc.qrcodeContent && (
+            <div style={{ fontSize: 7, color: '#666', marginTop: 1 }}>
+              {qrDataText(tpl, data)}
+            </div>
+          )}
         </div>
       )}
 
@@ -334,26 +330,7 @@ function renderA5Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
         </div>
       )}
 
-      {tpl.show_qr && (
-        <div style={{ margin: '4px auto', width: 36, height: 36 }}>
-          <svg viewBox="0 0 10 10" width={36} height={36}>
-            <rect x="0" y="0" width="3" height="3" fill="#111" />
-            <rect x="1" y="1" width="1" height="1" fill="#fff" />
-            <rect x="7" y="0" width="3" height="3" fill="#111" />
-            <rect x="8" y="1" width="1" height="1" fill="#fff" />
-            <rect x="0" y="7" width="3" height="3" fill="#111" />
-            <rect x="1" y="8" width="1" height="1" fill="#fff" />
-            <rect x="4" y="0" width="1" height="1" fill="#111" />
-            <rect x="4" y="2" width="2" height="1" fill="#111" />
-            <rect x="3" y="4" width="4" height="1" fill="#111" />
-            <rect x="5" y="6" width="2" height="3" fill="#111" />
-            <rect x="3" y="7" width="1" height="1" fill="#111" />
-          </svg>
-          <div style={{ fontSize: 6, color: '#666', marginTop: 1 }}>
-            {qrDataText(tpl, data)}
-          </div>
-        </div>
-      )}
+      {tpl.show_qr && QRBlock(tpl, data, 36, 6)}
 
       {(tpl.show_cashier_signature || tpl.show_client_signature) && (
         <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 16 }}>

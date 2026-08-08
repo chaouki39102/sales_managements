@@ -350,9 +350,9 @@ export const escposRenderer: IRenderer<Uint8Array> = {
     buildThermalPayments(b, data, template);
     buildThermalBalance(b, data, template);
 
-    if (template.show_qr && docNumber) {
+    if (template.show_qr && (data.doc?.qrcodeContent ?? docNumber)) {
       b.lineFeed();
-      b.qrCode(docNumber, 4);
+      b.qrCode(data.doc?.qrcodeContent ?? docNumber!, 4);
     }
 
     buildThermalBarcode(b, data, template);
