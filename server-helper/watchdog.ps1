@@ -26,6 +26,7 @@ function PortUp([int]$port) {
 }
 
 $php = (Get-Command php -ErrorAction SilentlyContinue).Source
+$script:funnelTick = 0
 
 while ($true) {
     try {
@@ -46,6 +47,26 @@ while ($true) {
                 Invoke-WebRequest -Uri 'http://127.0.0.1:8777/api/status' -TimeoutSec 6 -UseBasicParsing | Out-Null
             } catch {
                 # helper busy/restarting - next cycle will retry
+            }
+        }
+
+        # 3. Keep the public order page reachable: if the app server is up but
+        #    Tailscale Funnel is off, re-enable it. Idempotent + throttled to
+        #    once a minute so the tailscale CLI is not spawned every 15s.
+        if (PortUp 8000) {
+            $script:funnelTick++
+            if ($script:funnelTick -ge 4) {
+                $script:funnelTick = 0
+                if (Test-Path -LiteralPath 'C:\Program Files\Tailscale\tailscale.exe') {
+                    try {
+                        $fs = & 'C:\Program Files\Tailscale\tailscale.exe' funnel status 2>&1 | Out-String
+                        if ($fs -notmatch 'Funnel on') {
+                            & 'C:\Program Files\Tailscale\tailscale.exe' funnel --bg 8000 2>&1 | Out-Null
+                        }
+                    } catch {
+                        # tailscale busy - next minute will retry
+                    }
+                }
             }
         }
     } catch {
