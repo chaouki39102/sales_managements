@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="#1F3864">
+    <meta name="theme-color" content="#0a8a5c">
     <title>{{ config('app.name', 'Sales Management System ') }}</title>
 
     <link rel="icon" href="/favicon.ico">

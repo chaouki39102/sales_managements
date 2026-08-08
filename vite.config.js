@@ -36,7 +36,7 @@ export default defineConfig({
                 name: 'POSDZ — نظام إدارة المبيعات',
                 short_name: 'POSDZ',
                 description: 'POSDZ — نظام إدارة المبيعات والبوابة الجزائري',
-                theme_color: '#1F3864',
+                theme_color: '#0a8a5c',
                 background_color: '#ffffff',
                 display: 'standalone',
                 start_url: '/',
