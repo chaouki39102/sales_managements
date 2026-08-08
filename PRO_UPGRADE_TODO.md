@@ -1,8 +1,9 @@
 # PRO Upgrade — Task Checklist
 
-> **Status: 🚧 IN PROGRESS (Aug 8) — upgrade 1 done (1.1–1.5); upgrade 2 done (2.1–2.4),
-> working on 2.5 (E2E backup→restore test + restore guide).** Pick up on any PC:
-> `git pull`, open this file, and work task-by-task. Commit + push after EACH task.
+> **Status: 🚧 IN PROGRESS (Aug 8) — upgrade 1 done (1.1–1.5); upgrade 2 done (2.1–2.4)
+> + API hardening (37123d1); working on 2.5 (E2E backup→restore test + restore guide).**
+> Pick up on any PC: `git pull`, open this file, and work task-by-task. Commit + push
+> after EACH task.
 
 > **Goal**: take the sales-management ERP (Laravel + React POS, Algerian market) from a
 > working system to a professional-grade product. Five upgrades, each self-contained.
@@ -86,6 +87,13 @@
       gate, auto-reload), delete old. Backend `BackupController` (index/store/verify/download/
       restore/delete) under `{company}` + `can:update_company`; `apiDownload` blob helper +
       `tenantKeys.backups` + `useBackups`/`useBackupMutations`.
+- [x] **2.4b API hardening** (`37123d1`) — fixed the Laravel dispatcher positional-splice bug:
+      type-hinted `Request` is spliced to position 0 in tenant routes, so the `{file}` param of
+      `verify`/`download`/`restore`/`delete` received the **Company model** → all four returned
+      500. Now resolve `{file}` via `resolveRouteId('file')`. Also: `keep <= 0` falls back to the
+      config default (never prunes the whole archive), `prune()` re-globs before the age-cap
+      (no `filemtime()` on deleted files), client sends `keep` only when explicitly positive.
+      Live-verified: verify 200, download 200 (gzip), delete 200; `vendor\bin\pest.bat` 58 passed.
 - [ ] **2.5 Test** — create → mutate data → restore → verify data returns. Document the exact
       restore procedure in `docs/reports/BACKUP_RESTORE_GUIDE.md`.
 
@@ -187,3 +195,5 @@ files belonging to that task; leave unrelated dirty files untouched):
 | `b0fc9f7` *(2.2)* | `routes/console.php` — daily 03:00 + weekly Sunday 03:15, keep 7 |
 | `1938c34` *(2.3)* | `php artisan app:restore` — `app/Console/Commands/AppRestore.php` (verify magic+hash, confirm, refuse corrupt) |
 | `ad070e5` *(2.4)* | Settings «النسخ الاحتياطي» tab — `BackupController` (6 routes), `BackupService::resolveForDownload`, `apiDownload` blob helper, `tenantKeys.backups`, `endpoints/backups.ts`, `tabs/BackupTab.tsx`, TABS + SettingsPage mount |
+| `37123d1` *(2.4b)* | Backup API hardening — `{file}` resolved from the route (dispatcher splice was feeding the Company model into it → 500s on verify/download/restore/delete); `keep` floor (prune never wipes the archive); `prune()` re-glob before age-cap; client sends `keep` only when > 0 |
+| `83e2606` | `public/sw.js` manifest refresh to match build (SW MATCH verified) |
