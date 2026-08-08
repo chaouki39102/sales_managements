@@ -48,9 +48,13 @@
       legacy `show_qr` — either enables the QR block). ESC/POS maps size (px→1–8 via /12 clamp)
       + align; `PrintFieldRegistry` `footer.qrCode`; seeder + template-library configs
       (`INVOICE_FOOTER.showQrCode=true`, others false). Default ON for FV.
-- [ ] **1.4 Official PDF export** — server-side or client-side PDF of the invoice including the
-      QR (e.g. `dompdf`/`pdfmake`, or the existing ExcelJS-style client export). Filename =
-      `{number}.pdf`. Add an export button on the invoice detail modal + POS receipt.
+- [x] **1.4 Official PDF export** — client-side PDF via the lazy `dompdf.js` chunk (WASM
+      inlined base64, no server service): `runtime/exportPdf.ts` renders the SSOT
+      `UniversalPreview` into an off-screen container, waits for fonts + the async fiscal QR
+      data URL, then `dompdf.downloadPDF(container, {format A4/A5, orientation, useCORS})`.
+      Filename = `{number}.pdf` (sanitized). Buttons on `TemplatePrintModal` (invoice detail
+      + single-doc «طباعة» action) and `ProfessionalReceipt` (POS receipt). E2E
+      `pdf-export.pw.spec.ts` downloads `FV-2026-000001.pdf` (%PDF- header).
 - [ ] **1.5 Validation** — verify a generated QR scans and validates with the official Algerian
       DGI validator app (or a known-good QR test vector). Document the chosen spec + a test
       QR string in `docs/reports/FISCAL_QR_SPEC.md`.
