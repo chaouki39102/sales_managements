@@ -499,9 +499,10 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
               {visibleItems.map((p) => {
                 const defaultPack = defaultPackagingFor(p);
                 // عند إخفاء التعبئة (أو منع تغييرها) تُجبر التعبئة الافتراضية فقط
+                // «وحدة» ليست خياراً للمنتجات ذات التعبئات — إن مُنعت مسبقاً تعود للتعبئة الافتراضية.
                 const canSwitchPack = showPackaging && allowChangePackaging;
                 const selectedPack =
-                  canSwitchPack && pkg[p.id] !== undefined
+                  canSwitchPack && pkg[p.id] != null
                     ? pkg[p.id]
                     : (defaultPack?.id ?? null);
                 const factor = packFactorFor(p, selectedPack);
@@ -535,6 +536,18 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                       >
                         <i className="ti ti-arrows-maximize" />
                       </button>
+                      {showDiscounts && p.discounts.length > 0 && (
+                        <div className="portal-prod-discs portal-prod-discs--ov">
+                          {p.discounts.map((d) => {
+                            const active = cl.tier?.id === d.id;
+                            return (
+                              <span key={d.id} className={`portal-disc-chip${active ? ' on' : ''}`}>
+                                <i className="ti ti-discount-2" /> {discountLabel(d)} {tierHint(d)}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
                       {showDiscounts && cl.discount > 0 && cl.tier ? (
                         <span className="portal-prod-badge">
                           <i className="ti ti-discount-2" />
@@ -665,7 +678,6 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                           setPkg((prev) => ({ ...prev, [p.id]: val === '' ? null : Number(val) }));
                         }}
                       >
-                        <option value="">وحدة ({unitOf(p)})</option>
                         {p.packagings.map((pk) => (
                           <option key={pk.id} value={pk.id}>
                             {pk.label || pk.code || `×${pk.quantity}`}
@@ -677,18 +689,6 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                     {showPackaging && factor > 1 && !outOfStock && (
                       <div className="portal-prod-packinfo">
                         {cartQty} {selectedPack ? `×${factor}` : ''} = {cartQty * factor} {unitOf(p)}
-                      </div>
-                    )}
-                    {showDiscounts && p.discounts.length > 0 && (
-                      <div className="portal-prod-discs">
-                        {p.discounts.map((d) => {
-                          const active = cl.tier?.id === d.id;
-                          return (
-                            <span key={d.id} className={`portal-disc-chip${active ? ' on' : ''}`}>
-                              <i className="ti ti-discount-2" /> {discountLabel(d)} {tierHint(d)}
-                            </span>
-                          );
-                        })}
                       </div>
                     )}
                   </div>
@@ -740,7 +740,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
         const p = byId.get(infoProductId)!;
         const canSwitchPack = showPackaging && allowChangePackaging;
         const selectedPack =
-          canSwitchPack && pkg[p.id] !== undefined
+          canSwitchPack && pkg[p.id] != null
             ? pkg[p.id]
             : (defaultPackagingFor(p)?.id ?? null);
         const factor = packFactorFor(p, selectedPack);
@@ -833,33 +833,38 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                   )}
                 </div>
 
-                {showPackaging && p.has_packaging && p.packagings.length > 0 && (
+                {showPackaging && (
                   <div className="portal-pim-sec">
-                    <div className="portal-pim-sec-t"><i className="ti ti-box" /> اختر التعبئة</div>
+                    <div className="portal-pim-sec-t">
+                      <i className="ti ti-box" /> {p.packagings.length > 0 ? 'اختر التعبئة' : 'التعبئة'}
+                    </div>
                     <div className="portal-pim-packs">
-                      <button
-                        type="button"
-                        className={`portal-pim-pack${selectedPack === null ? ' on' : ''}`}
-                        disabled={outOfStock || !canSwitchPack}
-                        onClick={() => setPkg((prev) => ({ ...prev, [p.id]: null }))}
-                      >
-                        <span className="portal-pim-pack-n">وحدة</span>
-                        <span className="portal-pim-pack-s">{unitOf(p)}</span>
-                        {showPrice && <span className="portal-pim-pack-p">{fmtMoney(p.unit_price_ht)}</span>}
-                      </button>
-                      {p.packagings.map((pk) => (
+                      {p.packagings.length === 0 ? (
                         <button
-                          key={pk.id}
                           type="button"
-                          className={`portal-pim-pack${selectedPack === pk.id ? ' on' : ''}`}
-                          disabled={outOfStock || !canSwitchPack}
-                          onClick={() => setPkg((prev) => ({ ...prev, [p.id]: pk.id }))}
+                          className={`portal-pim-pack${selectedPack === null ? ' on' : ''}`}
+                          disabled={outOfStock}
+                          onClick={() => setPkg((prev) => ({ ...prev, [p.id]: null }))}
                         >
-                          <span className="portal-pim-pack-n">{pk.label || pk.code || `×${pk.quantity}`}</span>
-                          <span className="portal-pim-pack-s">× {pk.quantity} {unitOf(p)}</span>
-                          {showPrice && <span className="portal-pim-pack-p">{fmtMoney(pk.pack_price_ht)}</span>}
+                          <span className="portal-pim-pack-n">وحدة</span>
+                          <span className="portal-pim-pack-s">{unitOf(p)}</span>
+                          {showPrice && <span className="portal-pim-pack-p">{fmtMoney(p.unit_price_ht)}</span>}
                         </button>
-                      ))}
+                      ) : (
+                        p.packagings.map((pk) => (
+                          <button
+                            key={pk.id}
+                            type="button"
+                            className={`portal-pim-pack${selectedPack === pk.id ? ' on' : ''}`}
+                            disabled={outOfStock || !canSwitchPack}
+                            onClick={() => setPkg((prev) => ({ ...prev, [p.id]: pk.id }))}
+                          >
+                            <span className="portal-pim-pack-n">{pk.label || pk.code || `×${pk.quantity}`}</span>
+                            <span className="portal-pim-pack-s">× {pk.quantity} {unitOf(p)}</span>
+                            {showPrice && <span className="portal-pim-pack-p">{fmtMoney(pk.pack_price_ht)}</span>}
+                          </button>
+                        ))
+                      )}
                     </div>
                   </div>
                 )}

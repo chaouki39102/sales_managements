@@ -1814,6 +1814,34 @@ html.dark .portal-login-box {
   background: var(--emb);
   border-color: rgba(10,138,92,.35);
 }
+
+/* شرائح الخصم فوق الصورة — لا تستهلك مساحة من البطاقة (جميع البطاقات متساوية الارتفاع) */
+.portal-prod-discs--ov {
+  position: absolute;
+  inset-inline-start: 8px;
+  bottom: 8px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  max-width: calc(100% - 20px);
+  pointer-events: none;
+}
+.portal-prod-discs--ov .portal-disc-chip {
+  background: rgba(255,255,255,.94);
+  border-color: color-mix(in srgb, var(--t4) 28%, transparent);
+  box-shadow: 0 3px 10px rgba(15,23,42,.14);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  font-size: 10px;
+}
+html.dark .portal-prod-discs--ov .portal-disc-chip { background: rgba(20,22,28,.9); }
+.portal-prod-discs--ov .portal-disc-chip.on {
+  color: var(--em);
+  background: var(--emb);
+  border-color: rgba(10,138,92,.5);
+}
 .portal-cart-disc {
   display: flex;
   align-items: center;
