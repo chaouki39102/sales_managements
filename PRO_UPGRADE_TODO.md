@@ -55,9 +55,15 @@
       Filename = `{number}.pdf` (sanitized). Buttons on `TemplatePrintModal` (invoice detail
       + single-doc «طباعة» action) and `ProfessionalReceipt` (POS receipt). E2E
       `pdf-export.pw.spec.ts` downloads `FV-2026-000001.pdf` (%PDF- header).
-- [ ] **1.5 Validation** — verify a generated QR scans and validates with the official Algerian
-      DGI validator app (or a known-good QR test vector). Document the chosen spec + a test
-      QR string in `docs/reports/FISCAL_QR_SPEC.md`.
+- [x] **1.5 Validation** — `docs/reports/FISCAL_QR_SPEC.md` documents the chosen spec
+      (versioned JSON v1 — the DGI has NOT published an official QR spec as of 2026-08-08)
+      + the known-good test vector (real doc FV-2026-000001, `dataString` output verbatim).
+      Scannability PROVEN with an independent decoder: `fiscal-qr-scan.spec.ts` encodes the
+      vector with the app's exact options (qrcode lib, EC level M) and decodes it back with
+      `jsqr` to the identical string, incl. an M-level damage-recovery test. Backend
+      `FiscalInvoiceQrServiceTest` covers buildData/round-trip/validateData/svgBase64. The
+      official DGI validator app is NOT RUN — DGI has not released one; re-check
+      https://e-invoicing.dz before any official-schema bump.
 
 ## 2. Automated Backup + Restore
 
