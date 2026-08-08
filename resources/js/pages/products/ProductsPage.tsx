@@ -18,6 +18,7 @@ const ImportWizardModal = React.lazy(() => import('@/pages/import/ImportWizardMo
 const TemplatePrintModal = React.lazy(() => import('@/pages/settings/print-settings/components/shared/TemplatePrintModal'));
 import { PRODUCT_IMPORT_CONFIG } from '@/pages/import/entityConfig';
 import { apiGet, apiPost } from '@/lib/api/core/client';
+import { proxyImage } from '@/lib/api/imageProxy';
 import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
 import { productsApi } from '@/lib/api/endpoints/products';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
@@ -66,6 +67,30 @@ const StockBadge = ({ qty, min = 0 }: { qty: number; min?: number }) => {
   if (qty <= 0)         return <span className="bx br no-dot" style={{ fontSize: 10 }}>نفذ</span>;
   if (min > 0 && qty <= min) return <span className="bx bg no-dot" style={{ fontSize: 10 }}>منخفض</span>;
   return <span className="bx be no-dot" style={{ fontSize: 10 }}>متوفر</span>;
+};
+
+const ProductThumb = ({ product }: { product: Product }) => {
+  const [failed, setFailed] = React.useState(false);
+  const raw = product.default_image ?? product.images?.[0] ?? null;
+  const src = proxyImage(raw, 120) ?? raw;
+  if (!src || failed) {
+    return (
+      <div style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+        background: product.active ? 'var(--emb)' : 'var(--bg3)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <i className="ti ti-package" style={{ fontSize: 16, color: product.active ? 'var(--em)' : 'var(--t4)' }} />
+      </div>
+    );
+  }
+  return (
+    <div style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0, overflow: 'hidden',
+      background: 'var(--bg3)', border: '1px solid var(--bd)',
+    }}>
+      <img src={src} alt={product.name} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        onError={() => setFailed(true)} />
+    </div>
+  );
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -271,12 +296,7 @@ export default function ProductsPage() {
     { key: 'name', label: 'المنتج', thStyle: { cursor: 'pointer', minWidth: 180 }, tdStyle: { minWidth: 180 }, sortable: true,
       render: (prod: any) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0,
-            background: prod.active ? 'var(--emb)' : 'var(--bg3)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <i className="ti ti-package" style={{ fontSize: 16, color: prod.active ? 'var(--em)' : 'var(--t4)' }} />
-          </div>
+          <ProductThumb product={prod} />
           <div style={{ minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 13 }}>{prod.name}</div>
             <div style={{ display: 'flex', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
