@@ -219,6 +219,9 @@ export function createMockTemplate(
     barcode_custom_text: '',
     show_qr: false,
     qr_content: 'doc-number',
+    show_qr_code: false,
+    qr_code_size: 48,
+    qr_code_align: 'center',
 
     show_cashier_signature: false,
     show_client_signature: false,

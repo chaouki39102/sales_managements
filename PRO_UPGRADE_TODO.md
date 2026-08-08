@@ -1,6 +1,6 @@
 # PRO Upgrade — Task Checklist
 
-> **Status: 🚧 IN PROGRESS (Aug 8) — upgrade 1 tasks 1.1–1.2 done.** Pick up on any PC:
+> **Status: 🚧 IN PROGRESS (Aug 8) — upgrade 1 tasks 1.1–1.3 done.** Pick up on any PC:
 > `git pull`, open this file, and work task-by-task. Commit + push after EACH task.
 
 > **Goal**: take the sales-management ERP (Laravel + React POS, Algerian market) from a
@@ -41,8 +41,13 @@
       `qr_content` selection otherwise. `ESCPOSRenderer` encodes the fiscal payload (fallback
       doc number) via the existing `EscPosBuilder.qrCode()` (GS ( k Model 2). `qrcode_content`
       threaded through `DocumentInfo.qrcodeContent` + `DocumentDataBuilder.buildDocInfo`.
-- [ ] **1.3 Print-template setting** — add `show_qr_code` (and QR size/position) to
-      `SettingsRegistry.ts` + the items/footer sections; default on for FV.
+- [x] **1.3 Print-template setting** — added `show_qr_code` (+ `qr_code_size` slider 24–160px,
+      `qr_code_align` pills) to `SettingsRegistry.ts` (`docDefaults: {FV: true}` backfilled by
+      `SettingsSerializer` before the generic default) + the footer sections (form toggle +
+      preview helper `qrActive()`/`qrSize()`/`qrAlignOf()`; the fiscal toggle supersedes the
+      legacy `show_qr` — either enables the QR block). ESC/POS maps size (px→1–8 via /12 clamp)
+      + align; `PrintFieldRegistry` `footer.qrCode`; seeder + template-library configs
+      (`INVOICE_FOOTER.showQrCode=true`, others false). Default ON for FV.
 - [ ] **1.4 Official PDF export** — server-side or client-side PDF of the invoice including the
       QR (e.g. `dompdf`/`pdfmake`, or the existing ExcelJS-style client export). Filename =
       `{number}.pdf`. Add an export button on the invoice detail modal + POS receipt.

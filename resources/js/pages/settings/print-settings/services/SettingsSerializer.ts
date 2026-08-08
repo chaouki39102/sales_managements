@@ -73,7 +73,8 @@ export function fromApiResponse(r: ApiResponse): PrintTemplate {
   }
   for (const [key, meta] of Object.entries(SETTINGS_REGISTRY)) {
     if (!(key in result)) {
-      result[key] = meta.defaultValue;
+      const docSpecific = meta.docDefaults ? (meta.docDefaults as Record<string, unknown>)[r.doc_type_code] : undefined;
+      result[key] = docSpecific !== undefined ? docSpecific : meta.defaultValue;
     }
   }
   return ensureLayoutFields(result as unknown as PrintTemplate);

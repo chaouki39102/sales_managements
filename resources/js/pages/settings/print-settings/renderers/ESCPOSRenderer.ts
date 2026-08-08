@@ -350,9 +350,16 @@ export const escposRenderer: IRenderer<Uint8Array> = {
     buildThermalPayments(b, data, template);
     buildThermalBalance(b, data, template);
 
-    if (template.show_qr && (data.doc?.qrcodeContent ?? docNumber)) {
+    const qrOn = Boolean(template.show_qr_code || template.show_qr);
+    if (qrOn && (data.doc?.qrcodeContent ?? docNumber)) {
       b.lineFeed();
-      b.qrCode(data.doc?.qrcodeContent ?? docNumber!, 4);
+      if (template.show_qr_code) {
+        const size = Math.max(1, Math.min(8, Math.round((Number(template.qr_code_size) || 48) / 12))) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+        const qrAlign = mapAlignToEscPos(template.qr_code_align);
+        b.qrCode(data.doc?.qrcodeContent ?? docNumber!, size, qrAlign);
+      } else {
+        b.qrCode(data.doc?.qrcodeContent ?? docNumber!, 4);
+      }
     }
 
     buildThermalBarcode(b, data, template);

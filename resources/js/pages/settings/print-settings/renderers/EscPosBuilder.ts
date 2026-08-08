@@ -94,13 +94,13 @@ export class EscPosBuilder {
   cut(): this { this.buf.push(GS, 0x56, 0x00); return this; }
   feedAndCut(): this { return this.lineFeed(4).cut(); }
 
-  qrCode(data: string, size: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 = 4): this {
+  qrCode(data: string, size: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 = 4, align: 0 | 1 | 2 = 1): this {
     const bytes = [...new TextEncoder().encode(data)];
     const len   = bytes.length + 3;
     const pL    = len & 0xFF;
     const pH    = (len >> 8) & 0xFF;
 
-    this.setAlign(1);
+    this.setAlign(align);
     this.buf.push(GS, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00);
     this.buf.push(GS, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, size);
     this.buf.push(GS, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x32);

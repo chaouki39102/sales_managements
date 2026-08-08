@@ -1,4 +1,4 @@
-import type { PrintTemplate } from '../../types';
+import type { AlignOption, PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
 import { Separator, borderStyle, align, fontFamily as _fontFamily } from './shared';
 import FiscalQR from './FiscalQR';
@@ -31,12 +31,26 @@ function qrContent(tpl: PrintTemplate, data: UniversalDocumentData): string {
   return qrDataText(tpl, data);
 }
 
-function QRBlock(tpl: PrintTemplate, data: UniversalDocumentData, size: number, labelSize: number) {
+/** The new fiscal toggle (show_qr_code) supersedes the legacy show_qr — either enables the QR block. */
+function qrActive(tpl: PrintTemplate): boolean {
+  return Boolean(tpl.show_qr_code || tpl.show_qr);
+}
+
+/** When the fiscal toggle is on the user controls size/position; legacy templates keep the paper default. */
+function qrSize(tpl: PrintTemplate, paperDefault: number): number {
+  return tpl.show_qr_code ? (Number(tpl.qr_code_size) || paperDefault) : paperDefault;
+}
+
+function qrAlignOf(tpl: PrintTemplate): AlignOption {
+  return tpl.show_qr_code ? (tpl.qr_code_align || 'center') : 'center';
+}
+
+function QRBlock(tpl: PrintTemplate, data: UniversalDocumentData, size: number, labelSize: number, qrAlign: AlignOption) {
   return (
-    <div style={{ margin: '4px auto', width: size }}>
+    <div style={{ margin: '4px 0', textAlign: align(qrAlign) }}>
       <FiscalQR content={qrContent(tpl, data)} size={size} />
       {!data.doc.qrcodeContent && (
-        <div style={{ fontSize: labelSize, color: '#666', marginTop: 1, textAlign: 'center' }}>
+        <div style={{ fontSize: labelSize, color: '#666', marginTop: 1 }}>
           {qrDataText(tpl, data)}
         </div>
       )}
@@ -48,7 +62,7 @@ function renderThermalFooter(tpl: PrintTemplate, data: UniversalDocumentData) {
   const hasContent =
     tpl.footer_line1 || tpl.footer_line2 || tpl.footer_line3 ||
     tpl.show_thank_you || tpl.show_returns_policy || tpl.footer_legal_text ||
-    tpl.show_barcode || tpl.show_qr ||
+    tpl.show_barcode || tpl.show_qr || tpl.show_qr_code ||
     tpl.show_cashier_signature || tpl.show_client_signature || tpl.show_stamp ||
     tpl.show_bank_details;
 
@@ -112,7 +126,7 @@ function renderThermalFooter(tpl: PrintTemplate, data: UniversalDocumentData) {
         </div>
       )}
 
-      {tpl.show_qr && QRBlock(tpl, data, 48, 7)}
+      {qrActive(tpl) && QRBlock(tpl, data, qrSize(tpl, 48), 7, qrAlignOf(tpl))}
 
       {(tpl.show_cashier_signature || tpl.show_client_signature) && (
         <div style={{
@@ -152,7 +166,7 @@ function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
   const hasContent =
     tpl.footer_line1 || tpl.footer_line2 || tpl.footer_line3 ||
     tpl.show_thank_you || tpl.show_returns_policy || tpl.footer_legal_text ||
-    tpl.show_barcode || tpl.show_qr ||
+    tpl.show_barcode || tpl.show_qr || tpl.show_qr_code ||
     tpl.show_bank_details ||
     tpl.show_cashier_signature || tpl.show_client_signature || tpl.show_stamp;
 
@@ -219,16 +233,7 @@ function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
         </div>
       )}
 
-      {tpl.show_qr && (
-        <div style={{ margin: '4px auto', textAlign: 'center' }}>
-          <FiscalQR content={qrContent(tpl, data)} size={48} />
-          {!data.doc.qrcodeContent && (
-            <div style={{ fontSize: 7, color: '#666', marginTop: 1 }}>
-              {qrDataText(tpl, data)}
-            </div>
-          )}
-        </div>
-      )}
+      {qrActive(tpl) && QRBlock(tpl, data, qrSize(tpl, 48), 7, qrAlignOf(tpl))}
 
       {(tpl.show_cashier_signature || tpl.show_client_signature) && (
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24, fontSize: tpl.base_font_size }}>
@@ -267,7 +272,7 @@ function renderA5Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
     tpl.footer_line1 || tpl.footer_line2 || tpl.footer_line3 ||
     tpl.show_thank_you || tpl.footer_legal_text ||
     tpl.show_cashier_signature || tpl.show_client_signature ||
-    tpl.show_barcode || tpl.show_qr ||
+    tpl.show_barcode || tpl.show_qr || tpl.show_qr_code ||
     tpl.show_bank_details;
 
   if (!hasContent) return null;
@@ -330,7 +335,7 @@ function renderA5Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
         </div>
       )}
 
-      {tpl.show_qr && QRBlock(tpl, data, 36, 6)}
+      {qrActive(tpl) && QRBlock(tpl, data, qrSize(tpl, 36), 6, qrAlignOf(tpl))}
 
       {(tpl.show_cashier_signature || tpl.show_client_signature) && (
         <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 16 }}>

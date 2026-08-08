@@ -134,6 +134,7 @@ export const PRINT_FIELDS: PrintFieldDefinition[] = [
   // ── Footer / Barcode / QR ────────────────────────────────────────────
   { id: 'footer.barcode',          label: 'الباركود',              group: 'barcode',  type: 'string',   sourcePath: 'doc.number',            settingKey: 'show_barcode',          align: 'center', visibleByDefault: true },
   { id: 'footer.qr',               label: 'رمز QR',               group: 'qr',       type: 'string',   sourcePath: 'doc.number',            settingKey: 'show_qr',               align: 'center', visibleByDefault: true },
+  { id: 'footer.qrCode',           label: 'رمز QR الجبائي',         group: 'qr',       type: 'string',   sourcePath: 'doc.qrcodeContent',     settingKey: 'show_qr_code',          align: 'center', visibleByDefault: true },
   { id: 'footer.thankYou',         label: 'الشكر',                 group: 'footer',   type: 'string',   sourcePath: '',                      settingKey: 'show_thank_you',        align: 'center', visibleByDefault: true },
   { id: 'footer.returnsPolicy',    label: 'سياسة الإرجاع',         group: 'footer',   type: 'string',   sourcePath: '',                      settingKey: 'show_returns_policy',   align: 'center', visibleByDefault: false },
   { id: 'footer.bankDetails',      label: 'البيانات البنكية',       group: 'footer',   type: 'string',   sourcePath: '',                      settingKey: 'show_bank_details',     align: 'center', visibleByDefault: false },

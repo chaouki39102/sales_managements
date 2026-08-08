@@ -20,6 +20,8 @@ export interface SettingMeta {
   step?: number;
   /** Canonical field ID from PrintFieldRegistry (show_* settings only) */
   field?: string;
+  /** Doc-type-specific defaults — applied by the serializer backfill BEFORE the generic defaultValue (e.g. show_qr_code ON for FV). */
+  docDefaults?: Partial<Record<DocTypeCode, unknown>>;
 }
 
 const ALL_DOCS: DocTypeCode[] = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV', 'DDP', 'BT', 'POS', 'RPT', 'STK'];
@@ -290,6 +292,9 @@ export const SETTINGS_REGISTRY: Record<string, SettingMeta> = {
   barcode_custom_text:  { key: 'barcode_custom_text', label: 'Barcode Custom Text', labelAr: 'نص الباركود المخصص', category: 'barcode', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'barcode_content' },
   show_qr:              { key: 'show_qr', label: 'Show QR Code', labelAr: 'إظهار رمز QR', category: 'qr', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'footer.qr' },
   qr_content:           { key: 'qr_content', label: 'QR Content', labelAr: 'محتوى QR', category: 'qr', component: 'pills', defaultValue: 'doc-number', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_qr', options: [{ v: 'doc-number', l: 'رقم المستند' }, { v: 'company-info', l: 'معلومات الشركة' }, { v: 'both', l: 'كلاهما' }] },
+  show_qr_code:         { key: 'show_qr_code', label: 'Fiscal QR (E-Invoice)', labelAr: 'رمز QR الجبائي (فاتورة إلكترونية)', category: 'qr', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'footer.qrCode', docDefaults: { FV: true } },
+  qr_code_size:         { key: 'qr_code_size', label: 'Fiscal QR Size', labelAr: 'حجم رمز QR', category: 'qr', component: 'slider', defaultValue: 48, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_qr_code', min: 24, max: 160, step: 4 },
+  qr_code_align:        { key: 'qr_code_align', label: 'Fiscal QR Position', labelAr: 'موضع رمز QR', category: 'qr', component: 'pills', defaultValue: 'center' as AlignOption, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_qr_code', options: ALIGN_OPTS },
 
   // ── Signatures ──
   show_cashier_signature: { key: 'show_cashier_signature', label: 'Cashier Signature', labelAr: 'توقيع الكاشير', category: 'signature', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'signature.cashier' },

@@ -183,7 +183,7 @@ export function buildTemplate(
           : DELIVERY_TOTALS;
 
   const footer = isSticker
-    ? { footerLine1: '', footerLine2: '', footerLine3: '', footerSeparator: 'none', showThankYou: false, thankYouText: '', thankYouSize: 12, thankYouColor: '#333333', showReturnsPolicy: false, returnsPolicyText: '', showBarcode: false, barcodeContent: '', barcodeCustomText: '', showQr: false, qrContent: '', showCashierSignature: false, showClientSignature: false, showStamp: false }
+    ? { footerLine1: '', footerLine2: '', footerLine3: '', footerSeparator: 'none', showThankYou: false, thankYouText: '', thankYouSize: 12, thankYouColor: '#333333', showReturnsPolicy: false, returnsPolicyText: '', showBarcode: false, barcodeContent: '', barcodeCustomText: '', showQr: false, qrContent: '', showQrCode: false, qrCodeSize: 48, qrCodeAlign: 'center', showCashierSignature: false, showClientSignature: false, showStamp: false }
     : isThermal
       ? POS_RECEIPT_80MM_FOOTER
       : isInvoice
@@ -406,6 +406,9 @@ export function buildTemplate(
     barcode_custom_text: '',
     show_qr: footer.showQr,
     qr_content: 'both',
+    show_qr_code: footer.showQrCode,
+    qr_code_size: footer.qrCodeSize,
+    qr_code_align: footer.qrCodeAlign,
 
     show_cashier_signature: footer.showCashierSignature,
     show_client_signature: footer.showClientSignature,

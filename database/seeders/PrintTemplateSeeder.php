@@ -135,6 +135,9 @@ class PrintTemplateSeeder extends Seeder
         'barcode_custom_text'      => '',
         'show_qr'                  => false,
         'qr_content'               => 'doc-number',
+        'show_qr_code'             => false,
+        'qr_code_size'             => 48,
+        'qr_code_align'            => 'center',
 
         'show_cashier_signature'   => false,
         'show_client_signature'    => false,
@@ -205,6 +208,7 @@ class PrintTemplateSeeder extends Seeder
             $config['title_text'] = $docCode === 'POS' ? 'إيصال بيع' : 'فاتورة بيع';
             $config['show_session'] = $docCode === 'POS';
             $config['show_fiscal_stamp'] = in_array($docCode, ['FV', 'BL', 'FA', 'BR', 'AV']);
+            $config['show_qr_code'] = $docCode === 'FV';
 
             PrintTemplate::create([
                 'company_id'    => $companyId,

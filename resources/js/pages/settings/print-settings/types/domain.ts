@@ -373,6 +373,9 @@ export interface PrintTemplate {
   barcode_custom_text:  string;
   show_qr:              boolean;
   qr_content:           'doc-number' | 'company-info' | 'both';
+  show_qr_code:         boolean;
+  qr_code_size:         number;
+  qr_code_align:        AlignOption;
 
   show_cashier_signature: boolean;
   show_client_signature:  boolean;

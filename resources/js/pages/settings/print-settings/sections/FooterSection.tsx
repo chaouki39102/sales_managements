@@ -105,6 +105,23 @@ export default function FooterSectionControls({ tpl, update }: Props) {
             </select>
           </div>
         )}
+
+        {sec('show_qr_code') && (
+          <div style={{ borderTop: '1px solid var(--b2)', margin: '6px 0', paddingTop: 6 }}>
+            <Toggle value={tpl.show_qr_code} onChange={v => update('show_qr_code', v)} label="رمز QR الجبائي (فاتورة إلكترونية)" />
+          </div>
+        )}
+        {sec('show_qr_code') && tpl.show_qr_code && (
+          <>
+            {sec('qr_code_size') && (
+              <SliderField label="حجم رمز QR" value={tpl.qr_code_size} min={24} max={160} unit="px"
+                onChange={v => update('qr_code_size', v)} />
+            )}
+            {sec('qr_code_align') && (
+              <AlignButtons label="موضع رمز QR" value={tpl.qr_code_align} onChange={v => update('qr_code_align', v)} />
+            )}
+          </>
+        )}
       </Section>
 
       <Section title="التواقيع والختم" icon="ti-signature">

@@ -77,6 +77,46 @@ describe('SettingsSerializer — fromApiResponse', () => {
     expect(result.template_version).toBe(TEMPLATE_VERSION);
   });
 
+  it('should default show_qr_code ON for FV and OFF for other doc types', () => {
+    const fv = fromApiResponse({
+      id: 1,
+      name: 'FV',
+      doc_type_code: 'FV',
+      paper_size: 'A4',
+      is_default: false,
+      is_active: true,
+      config: { title_text: 'FACTURE' },
+    } as any);
+
+    expect(fv.show_qr_code).toBe(true);
+    expect(fv.qr_code_size).toBe(48);
+    expect(fv.qr_code_align).toBe('center');
+
+    const pos = fromApiResponse({
+      id: 2,
+      name: 'POS',
+      doc_type_code: 'POS',
+      paper_size: '80mm',
+      is_default: false,
+      is_active: true,
+      config: {},
+    } as any);
+
+    expect(pos.show_qr_code).toBe(false);
+
+    const fromConfig = fromApiResponse({
+      id: 3,
+      name: 'FV',
+      doc_type_code: 'FV',
+      paper_size: '80mm',
+      is_default: false,
+      is_active: true,
+      config: { show_qr_code: false },
+    } as any);
+
+    expect(fromConfig.show_qr_code).toBe(false);
+  });
+
   it('should handle null config', () => {
     const result = fromApiResponse({
       id: 1,
