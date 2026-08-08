@@ -8,6 +8,21 @@ import {
 } from './db';
 import client from '@/lib/api/core/client';
 import { replayPendingOps, type SyncResult } from './syncEngine';
+import { isDataStale, subscribeDataStale } from './offlineAwareApi';
+
+/** True while the most recent GET was served from the offline cache (stale data). */
+export function useOfflineServed(): boolean {
+  const [stale, setStale] = useState(() => isDataStale());
+
+  useEffect(() => {
+    const update = () => setStale(isDataStale());
+    update();
+    const unsub = subscribeDataStale(update);
+    return unsub;
+  }, []);
+
+  return stale;
+}
 
 export function useOnlineStatus(): boolean {
   const [online, setOnline] = useState(() =>

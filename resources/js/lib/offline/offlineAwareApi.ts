@@ -12,6 +12,28 @@ import {
 const CACHEABLE_METHODS = new Set(['get']);
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
 
+// ── Stale-data signal ─────────────────────────────────────────────────────────
+// Consumers can't see the `_offline` flag (extractData strips the envelope), so we
+// keep a tiny reactive flag here: TRUE while the most recent GET was served from
+// the local cache (offline/stale), FALSE as soon as a real network response lands.
+// Components subscribe via `useOfflineServed()`.
+let stale = false;
+const staleListeners = new Set<() => void>();
+const emitStale = () => staleListeners.forEach(l => l());
+export function isDataStale(): boolean { return stale; }
+export function subscribeDataStale(cb: () => void): () => void {
+  staleListeners.add(cb);
+  return () => { staleListeners.delete(cb); };
+}
+
+// ── URL-aware cache TTL ────────────────────────────────────────────────────────
+// Stock-at is heavier and changes slowly — cache it 30 min so stock survives short
+// outages; everything else stays at 5 min. The badge stays honest: any offline GET
+// still marks data stale.
+export function cacheTtlForUrl(url: string): number {
+  return /\/inventory\/stock-at/.test(url) ? 30 * 60_000 : 5 * 60_000;
+}
+
 function cacheKeyFromUrl(url: string, params?: unknown): string {
   return `api:${url}:${JSON.stringify(params ?? {})}`;
 }
@@ -28,7 +50,11 @@ export function registerOfflineInterceptor(): void {
       const method = cfg.method?.toLowerCase() ?? '';
       if (CACHEABLE_METHODS.has(method) && response.status === 200) {
         const key = cacheKeyFromUrl(cfg.url ?? '', cfg.params);
-        await setCache(key, response.data, 5 * 60_000);
+        await setCache(key, response.data, cacheTtlForUrl(cfg.url ?? ''));
+      }
+      // a real network response means we're not stale anymore
+      if (CACHEABLE_METHODS.has(method)) {
+        if (stale) { stale = false; emitStale(); }
       }
       return response;
     },
@@ -82,6 +108,7 @@ export function registerOfflineInterceptor(): void {
       if (CACHEABLE_METHODS.has(method) && !navigator.onLine) {
         const key = cacheKeyFromUrl(cfg.url ?? '', cfg.params);
         const cached = await getCache(key);
+        if (!stale) { stale = true; emitStale(); }
         if (cached) {
           return Promise.resolve({
             data: cached,
