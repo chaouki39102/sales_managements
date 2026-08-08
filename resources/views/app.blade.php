@@ -8,8 +8,9 @@
     <meta name="theme-color" content="#1F3864">
     <title>{{ config('app.name', 'Sales Management System ') }}</title>
 
+    <link rel="icon" href="/favicon.ico">
     <link rel="manifest" href="/build/manifest.webmanifest">
-    <link rel="apple-touch-icon" href="/pwa-192x192.png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

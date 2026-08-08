@@ -1046,3 +1046,74 @@ body.dark .al-p{background:var(--purb);border-color:var(--purbo);color:var(--pur
 @media (max-width: 768px) {
   .doc-fab-root { bottom: calc(var(--mb, 64px) + 14px); }
 }
+
+/* ═══ لافتة تثبيت التطبيق (PWA install banner) ═══
+   لافتة عائمة أسفل الشاشة تظهر عند توفر beforeinstallprompt.
+   على الهاتف ترتفع فوق شريط التنقل السفلي للبوابة (portal-mobile-bar z-index:60). */
+.pwa-banner {
+  position: fixed;
+  inset-inline: 16px auto;
+  bottom: 16px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 460px;
+  padding: 12px 14px;
+  background: var(--bg2);
+  border: 1px solid var(--b2);
+  border-radius: var(--r3, 14px);
+  box-shadow: var(--shadow3, 0 12px 40px rgba(0,0,0,.12));
+  animation: pwaBannerIn .35s ease;
+  font-family: 'Tajawal', sans-serif;
+}
+@media (max-width: 640px) {
+  .pwa-banner {
+    inset-inline: 10px auto;
+    right: 10px;
+    left: 10px;
+    max-width: none;
+    bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+  }
+}
+@keyframes pwaBannerIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+
+.pwa-banner-ic {
+  flex-shrink: 0;
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #1F3864;
+  display: flex; align-items: center; justify-content: center;
+}
+.pwa-banner-ic img { width: 44px; height: 44px; display: block; }
+
+.pwa-banner-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pwa-banner-tx b { font-size: 13.5px; font-weight: 800; color: var(--t1); }
+.pwa-banner-tx span { font-size: 11.5px; color: var(--t3); }
+
+.pwa-banner-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.pwa-banner-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 10px;
+  background: var(--em, #0a8a5c);
+  color: #fff;
+  font-size: 12.5px; font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .15s, transform .1s;
+  box-shadow: 0 4px 16px rgba(10,138,92,.28);
+}
+.pwa-banner-btn:hover { background: var(--em2, #077a50); }
+.pwa-banner-btn:active { transform: scale(.97); }
+.pwa-banner-btn:disabled { opacity: .7; cursor: default; }
+.pwa-banner-x {
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; background: none; color: var(--t4);
+  cursor: pointer; border-radius: 8px; font-size: 16px;
+  transition: all .15s;
+}
+.pwa-banner-x:hover { background: var(--bg3); color: var(--t1); }

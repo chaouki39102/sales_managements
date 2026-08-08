@@ -20,6 +20,7 @@ import { FiscalYearProvider }        from '@/context/FiscalYearContext';
 import { PrintRuntimeAdapter }       from '@/pages/settings/print-settings/runtime';
 import { DocumentQuickCreateProvider } from '@/lib/store/documentQuickCreateStore';
 import { GlobalDocumentFAB }         from '@/components/global/GlobalDocumentFAB';
+import { PwaInstallBanner }          from '@/components/global/PwaInstallBanner';
 import { AppRoutes }                 from '@/routes/index';
 import NotificationContainer        from '@/components/notifications/NotificationContainer';
 
@@ -47,6 +48,7 @@ export default function App() {
                 <DocumentQuickCreateProvider>
                   <AppRoutes />
                   <GlobalDocumentFAB />
+                  <PwaInstallBanner />
                 </DocumentQuickCreateProvider>
                 <NotificationContainer />
               </PrintRuntimeAdapter>

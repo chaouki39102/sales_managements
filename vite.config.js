@@ -33,9 +33,9 @@ export default defineConfig({
             registerType: 'autoUpdate',
             includeAssets: ['favicon.ico', 'robots.txt'],
             manifest: {
-                name: 'ERP Sales Management',
-                short_name: 'ERP',
-                description: 'Système de gestion des ventes ERP Algérien',
+                name: 'POSDZ — نظام إدارة المبيعات',
+                short_name: 'POSDZ',
+                description: 'POSDZ — نظام إدارة المبيعات والبوابة الجزائري',
                 theme_color: '#1F3864',
                 background_color: '#ffffff',
                 display: 'standalone',
@@ -47,6 +47,7 @@ export default defineConfig({
                 icons: [
                     { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
                     { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+                    { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
                 ],
             },
             workbox: {
@@ -66,6 +67,27 @@ export default defineConfig({
                     {
                         urlPattern: /\/api\/v1\/health/,
                         handler: 'NetworkOnly',
+                    },
+                    // Product photos via image-proxy: the request URL is
+                    // /api/v1/image-proxy?url=...&w=... — it ends with query
+                    // params, NOT an image extension, so the extension-based
+                    // image rule below never matches it and it would fall into
+                    // the generic /api/v1/ NetworkFirst rule. Cache it CacheFirst
+                    // (same image-cache store) so the portal catalog / POS /
+                    // products show their photos instantly and offline.
+                    {
+                        urlPattern: /\/api\/v1\/image-proxy/,
+                        handler: 'CacheFirst',
+                        options: {
+                            cacheName: 'image-cache',
+                            expiration: {
+                                maxEntries: 500,
+                                maxAgeSeconds: 7 * 24 * 60 * 60,
+                            },
+                            cacheableResponse: {
+                                statuses: [0, 200],
+                            },
+                        },
                     },
                     // API: network-first, fall back to cached response for 1 day
                     {
