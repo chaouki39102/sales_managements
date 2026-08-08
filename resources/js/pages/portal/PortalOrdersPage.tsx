@@ -12,6 +12,7 @@ import OrderPipeline from './OrderPipeline';
 import {
   fmtMoney, Pager,
   PortalLoading, PortalError, PortalEmpty,
+  buildWhatsAppLink, waOrderMessage,
 } from './portalUtils';
 
 function useDebounce<T>(value: T, ms: number): T {
@@ -130,6 +131,15 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
   const cfg = configQuery.data;
   const canOrder = cfg?.can_order ?? true;
   const confirmationMessage = (cfg?.order_confirmation_message ?? '').trim();
+
+  // معلومات المؤسسة (للوضع العام فقط) — رقم الهاتف يُستخدم لزر «مراسلة عبر واتساب»
+  // في نافذة تأكيد إرسال الطلب، وتُجلب فقط بعد نجاح الإرسال لتجنب طلب زائد.
+  const companyQuery = useQuery({
+    queryKey: ['portal', slug, 'info'],
+    queryFn: () => portalApi.company(),
+    staleTime: 60_000,
+    enabled: isPublic && !!submitted,
+  });
 
   // إعدادات عرض الكتالوج — تتحكم في ما يظهر للزبون (تُقرأ من /portal/config
   // ويديرها المسؤول في تبويب الإعدادات «إعدادات عرض الكتالوج»).
@@ -742,6 +752,21 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
               <div className="portal-submit-msg">{confirmationMessage}</div>
             )}
             <OrderPipeline status={createOrder.data.status} />
+            {companyQuery.data?.phone && (() => {
+              const wa = buildWhatsAppLink(companyQuery.data?.phone, waOrderMessage(createOrder.data));
+              return wa ? (
+                <div className="portal-order-actions" style={{ justifyContent: 'center' }}>
+                  <a
+                    className="portal-btn portal-btn--sm portal-btn--wa"
+                    href={wa}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <i className="ti ti-brand-whatsapp" /> مراسلة عبر واتساب
+                  </a>
+                </div>
+              ) : null;
+            })()}
             <div className="portal-submit-hint">
               يمكنك متابعة حالة طلبك لاحقاً من صفحة{' '}
               <Link to={`/portal/${slug}/track`}>تتبع طلبك</Link> برقم هاتفك

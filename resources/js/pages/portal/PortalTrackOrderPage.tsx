@@ -12,6 +12,7 @@ import OrderPipeline from './OrderPipeline';
 import {
   fmtMoney, fmtMoneySigned, fmtDate,
   PortalEmpty,
+  buildWhatsAppLink, waOrderMessage,
 } from './portalUtils';
 
 const STATUS_STYLE: Record<PortalOrderStatus, string> = {
@@ -34,6 +35,7 @@ export default function PortalTrackOrderPage() {
   const [searched, setSearched] = useState(false);
   const [toast, setToast] = useState('');
   const [results, setResults] = useState<PortalOrder[]>([]);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   const location = useLocation();
   const autoRan = useRef(false);
 
@@ -168,9 +170,15 @@ export default function PortalTrackOrderPage() {
 
           {results.map((o) => {
             const factorOf = (it: { pack_qty: number | null }) => (it.pack_qty && it.pack_qty > 1 ? it.pack_qty : 1);
+            const expanded = expandedId === o.id;
             return (
               <div key={o.id} className="portal-order portal-mt-16">
-                <div className="portal-order-hd">
+                <button
+                  className="portal-order-hd"
+                  type="button"
+                  onClick={() => setExpandedId(expanded ? null : o.id)}
+                  aria-expanded={expanded}
+                >
                   <div className="portal-order-info">
                     <div className="portal-order-ref">{o.reference}</div>
                     <div className="portal-prod-ref">{fmtDate(o.requested_at || o.created_at)} • {o.items_count} صنف</div>
@@ -178,8 +186,10 @@ export default function PortalTrackOrderPage() {
                   <div className="portal-order-side">
                     <span className={`badge ${STATUS_STYLE[o.status]}`}>{o.status_label}</span>
                     <span className="portal-order-amt">{fmtMoneySigned(o.total_ttc)}</span>
+                    <i className={`ti ti-chevron-${expanded ? 'up' : 'down'}`} />
                   </div>
-                </div>
+                </button>
+                {expanded && (
                 <div className="portal-order-detail">
                   <OrderPipeline status={o.status} />
                   {(o.lines ?? []).map((it) => {
@@ -222,7 +232,23 @@ export default function PortalTrackOrderPage() {
                     </div>
                   </div>
                   {o.notes && <div className="portal-order-notes">ملاحظات: {o.notes}</div>}
+                  {companyQuery.data?.phone && (() => {
+                    const wa = buildWhatsAppLink(companyQuery.data?.phone, waOrderMessage(o));
+                    return wa ? (
+                      <div className="portal-order-actions">
+                        <a
+                          className="portal-btn portal-btn--sm portal-btn--wa"
+                          href={wa}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <i className="ti ti-brand-whatsapp" /> مراسلة عبر واتساب
+                        </a>
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
+                )}
               </div>
             );
           })}

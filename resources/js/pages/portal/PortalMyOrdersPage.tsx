@@ -13,6 +13,7 @@ import OrderPipeline from './OrderPipeline';
 import {
   fmtMoney, fmtMoneySigned, fmtDate, Pager,
   PortalLoading, PortalError, PortalEmpty,
+  buildWhatsAppLink, waOrderMessage,
 } from './portalUtils';
 
 const STATUS_STYLE: Record<PortalOrderStatus, string> = {
@@ -64,6 +65,14 @@ export default function PortalMyOrdersPage() {
   const canOrder = cfg?.can_order ?? true;
 
   const { confirm, confirmDialogProps } = useConfirm();
+
+  // معلومات المؤسسة — رقم الهاتف يُستخدم لزر «مراسلة عبر واتساب» في تفاصيل الطلب.
+  const companyQuery = useQuery({
+    queryKey: ['portal', slug, 'info'],
+    queryFn: () => portalApi.company(),
+    staleTime: 60_000,
+  });
+  const companyPhone = companyQuery.data?.phone ?? null;
 
   // تأكيد الطلب من الزبون — نافذة واضحة لا تحتاج إعادة النقر خلال مهلة زمنية.
   const handleValidateOrder = async (o: PortalOrder) => {
@@ -226,6 +235,24 @@ export default function PortalMyOrdersPage() {
                         </div>
                       )}
                       {o.notes && <div className="portal-order-notes">ملاحظات: {o.notes}</div>}
+
+                      {companyPhone && (
+                        (() => {
+                          const wa = buildWhatsAppLink(companyPhone, waOrderMessage(o));
+                          return wa ? (
+                            <div className="portal-order-actions">
+                              <a
+                                className="portal-btn portal-btn--sm portal-btn--wa"
+                                href={wa}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <i className="ti ti-brand-whatsapp" /> مراسلة عبر واتساب
+                              </a>
+                            </div>
+                          ) : null;
+                        })()
+                      )}
 
                       {o.status === 'preparing' && (
                         <div className="portal-order-actions">

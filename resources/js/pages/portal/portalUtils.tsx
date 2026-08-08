@@ -2,6 +2,7 @@
 // pages/portal/portalUtils.tsx — أدوات عرض مشتركة لصفحات البوابة
 // ════════════════════════════════════════════════════════════════════════════
 import { useEffect, useRef, useState } from 'react';
+import type { PortalOrder } from '@/lib/api/portal/portal';
 
 export function fmtMoney(n: number | null | undefined): string {
   const v = Number(n ?? 0);
@@ -285,4 +286,37 @@ export function PortalError({ message }: { message: string }) {
       {message}
     </div>
   );
+}
+
+// ─── واتساب ─────────────────────────────────────────────────────────────────
+// رقم الهاتف بصيغة دولية لأرقام wa.me: نزيل كل ما ليس رقماً، ثم أصفار 00 البادئة،
+// وإن بقي الرقم محلياً (يبدأ بـ 0) نضيف رمز الدولة الجزائري 213.
+export function normalizeWaPhone(phone: string | null | undefined): string {
+  let digits = (phone ?? '').replace(/[^\d]/g, '');
+  digits = digits.replace(/^00/, '');
+  if (digits.startsWith('0')) {
+    digits = '213' + digits.slice(1);
+  }
+  return digits;
+}
+
+// رابط محادثة واتساب برسالة جاهزة — يعيد null إن لم يكن هناك رقم صالح.
+export function buildWhatsAppLink(phone: string | null | undefined, text: string): string | null {
+  const n = normalizeWaPhone(phone);
+  if (!n) return null;
+  return `https://wa.me/${n}?text=${encodeURIComponent(text)}`;
+}
+
+// رسالة ملخصة لطلب (مرجع + حالة + تاريخ + عدد أصناف + مجموع + ملاحظات).
+export function waOrderMessage(order: PortalOrder): string {
+  const lines = [
+    'السلام عليكم، إليكم طلبي:',
+    `الطلب: ${order.reference}`,
+    `الحالة: ${order.status_label}`,
+    `التاريخ: ${fmtDate(order.requested_at || order.created_at)}`,
+    `عدد الأصناف: ${order.items_count}`,
+    `المجموع: ${fmtMoney(order.total_ttc)}`,
+  ];
+  if (order.notes) lines.push(`ملاحظات: ${order.notes}`);
+  return lines.join('\n');
 }
