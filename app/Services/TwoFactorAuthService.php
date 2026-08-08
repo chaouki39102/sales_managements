@@ -113,6 +113,9 @@ class TwoFactorAuthService
 
     /**
      * تفعيل 2FA بعد التحقق من الرمز الحالي.
+     *
+     * ملاحظة أمنية: تفعيل 2FA يُلغي فوراً كل التوكنات الحالية
+     * (جميع الجلسات) — فلا يبقى أي توكن صادر قبل التفعيل صالحاً.
      */
     public function enable(User $user, string $code): void
     {
@@ -128,6 +131,9 @@ class TwoFactorAuthService
             'two_factor_enabled'      => true,
             'two_factor_enabled_at'   => now(),
         ])->save();
+
+        // 🔐 يُلغي كل الجلسات السابقة — حتى الجلسة الحالية، فيُجبر على إعادة الدخول برمز 2FA
+        $user->tokens()->delete();
     }
 
     /**

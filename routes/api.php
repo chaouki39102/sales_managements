@@ -116,7 +116,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/two-factor/confirm', [TwoFactorAuthController::class, 'confirm'])
             ->middleware('throttle:5,15');
 
-        Route::middleware('auth:sanctum')->group(function () {
+        Route::middleware(['auth:sanctum', '2fa.verified'])->group(function () {
             Route::get('/me',               [AuthController::class, 'me']);
             Route::put('/update',           [AuthController::class, 'update']);
             // 🔒 تغيير كلمة المرور — 3 محاولات / ساعة
@@ -224,7 +224,7 @@ Route::prefix('v1')->group(function () {
     // ═══════════════════════════════════════════
     // ② USER COMPANIES
     // ═══════════════════════════════════════════
-    Route::middleware('auth:sanctum')->prefix('companies')->group(function () {
+    Route::middleware(['auth:sanctum', '2fa.verified'])->prefix('companies')->group(function () {
         Route::get('/current', [CompanyController::class, 'current']);
         Route::post('/switch', [CompanyController::class, 'switch']);
         Route::post('/{company}/avatar', [CompanyController::class, 'uploadAvatar']);
@@ -283,7 +283,7 @@ Route::prefix('v1')->group(function () {
     // ═══════════════════════════════════════════
     // ④ GLOBAL LOOKUPS (only wilayas, communes)
     // ═══════════════════════════════════════════
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', '2fa.verified'])->group(function () {
         Route::apiResource('wilayas',  WilayaController::class)->only(['index', 'show']);
         Route::apiResource('communes', CommuneController::class)->only(['index', 'show']);
         Route::get('communes/by-wilaya/{wilaya}', [CommuneController::class, 'byWilaya']);
@@ -292,7 +292,7 @@ Route::prefix('v1')->group(function () {
     // ═══════════════════════════════════════════
     // ⑤ TENANT RESOURCES
     // ═══════════════════════════════════════════
-    Route::middleware(['auth:sanctum', 'company'])
+    Route::middleware(['auth:sanctum', '2fa.verified', 'company'])
         ->prefix('{company}')
         ->group(function () {
 

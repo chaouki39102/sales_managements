@@ -32,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'company'        => \App\Http\Middleware\SetCompanyContext::class,
             'portal.company' => \App\Http\Middleware\SetPortalCompanyContext::class, // ← حل slug بوابة الزبائن (بدون عضوية)
             'api.auth'       => \App\Http\Middleware\ApiAuthenticate::class,   // ← اختياري مع sanctum
+            '2fa.verified'   => \App\Http\Middleware\EnsureTwoFactorVerified::class, // ← إلزامي: يرفض أي توكن صدر قبل تفعيل 2FA
             'super.admin'    => \App\Http\Middleware\SuperAdminOnly::class,    // ← جديد
             'portal.auth'    => \App\Http\Middleware\PortalAuthenticate::class, // ← بوابة الزبائن
         ]);
