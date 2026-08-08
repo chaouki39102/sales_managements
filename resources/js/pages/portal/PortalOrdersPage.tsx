@@ -1184,10 +1184,15 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                             <div className="portal-cart-info">
                               <div className="portal-prod-name">{product.name}</div>
                               <div className="portal-prod-ref">
-                                {showPrice && (
+                                {showPrice ? (
                                   <>
-                                    {fmtMoney(cl.unitPrice)}
+                                    {entry.quantity} × {fmtMoney(cl.unitPrice)}
                                     {cl.factor > 1 ? ` ×${cl.factor}` : ''}
+                                  </>
+                                ) : (
+                                  <>
+                                    {entry.quantity}
+                                    {cl.factor > 1 ? ` × ${cl.factor}` : ''}
                                   </>
                                 )}
                                 {`/${unitLabelFor(product, entry.packaging_id)}`}
@@ -1203,15 +1208,6 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                                   <i className="ti ti-discount-2" />
                                   <span className="portal-cart-disc-txt">{discountLabel(cl.tier)}</span>
                                   <span>-{fmtMoney(cl.discount)}</span>
-                                </div>
-                              )}
-                              {showPrice && (
-                                <div className="portal-cart-line">
-                                  <span>
-                                    {entry.quantity} × {fmtMoney(cl.unitPrice)}
-                                    {cl.factor > 1 ? ` ×${cl.factor}` : ''}
-                                  </span>
-                                  <b>= {fmtMoney(cl.ttc)}</b>
                                 </div>
                               )}
                             </div>

@@ -4259,64 +4259,58 @@ html.dark .portal-pim-x { background: rgba(20,22,28,.85); }
 }
 
 /* ────────────────────────────────────────────────
-   تحسين صفوف سلة الطلب — بطاقات غنية (مثل POS Pro)
-   يأتي في نهاية الملف ليتفوق على القواعد الأساسية.
+   صفوف سلة الطلب — على نمط صفوف «إتمام الطلب» (مضغوطة)
+   مقيّدة بدرج السلة (.portal-cart) فقط، فصفوف المراجعة
+   تبقى كما هي. يأتي في نهاية الملف ليتفوق على الأساسي.
    ──────────────────────────────────────────────── */
-.portal-cart-item {
-  position: relative;
-  padding: 10px 10px;
-  border-radius: 14px;
-  border-bottom: 1px solid transparent;
+.portal-cart .portal-cart-item {
+  padding: 9px 8px;
+  border-radius: 0;
+  border-bottom: 1px solid var(--b1);
 }
-.portal-cart-item + .portal-cart-item { border-bottom: 1px solid var(--b1); }
-.portal-cart-item:hover { background: color-mix(in srgb, var(--em) 6%, var(--bg1)); }
-.portal-cart-item .portal-cart-thumb {
-  border-radius: 12px;
-  border-color: transparent;
-  background: linear-gradient(135deg, var(--bg3), var(--bg2));
-  box-shadow: 0 3px 10px rgba(15, 23, 42, .08);
+.portal-cart .portal-cart-item:last-child { border-bottom: none; }
+.portal-cart .portal-cart-item .portal-cart-thumb {
+  width: 40px; height: 40px;
+  border-radius: 9px;
+  border-color: var(--b1);
+  background: var(--bg3);
+  box-shadow: none;
+  font-size: 17px;
 }
-.portal-cart-item .portal-cart-info { gap: 3px; }
-.portal-cart-item .portal-prod-name { font-size: 13.5px; }
-.portal-cart-item .portal-prod-ref { margin-top: 1px; }
+.portal-cart .portal-cart-item .portal-cart-info { gap: 2px; }
+.portal-cart .portal-cart-item .portal-prod-name { font-size: 13px; }
+.portal-cart .portal-cart-item .portal-prod-ref { margin-top: 0; }
 
-/* شارة الخصم — شريحة خضراء واضحة */
-.portal-cart-item .portal-cart-disc {
+/* شارة الخصم — شريحة خضراء صغيرة */
+.portal-cart .portal-cart-item .portal-cart-disc {
   align-self: flex-start;
-  margin-top: 5px;
-  padding: 3px 9px;
+  margin-top: 4px;
+  padding: 2px 8px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--em) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--em) 30%, transparent);
 }
-.portal-cart-item .portal-cart-disc i { display: none; }
+.portal-cart .portal-cart-item .portal-cart-disc i { display: none; }
 
-/* سطر الحساب — شريحة ملونة */
-.portal-cart-line { margin-top: 5px; }
-.portal-cart-line span {
-  background: color-mix(in srgb, var(--em) 7%, transparent);
-  border-color: transparent;
-  color: var(--t2);
-}
-.portal-cart-line b { color: var(--em); }
-
-/* عدّاد الكمية — حبة دائرية */
-.portal-cart-item .portal-prod-qty {
+/* عدّاد الكمية — حبة دائرية مضغوطة */
+.portal-cart .portal-cart-item .portal-prod-qty {
   border-radius: 999px;
   background: var(--bg2);
   border-color: var(--b1);
 }
-.portal-cart-item .portal-prod-qty button { width: 30px; height: 30px; }
-.portal-cart-item .portal-prod-qty input { width: 40px; height: 30px; }
+.portal-cart .portal-cart-item .portal-prod-qty button { width: 27px; height: 28px; }
+.portal-cart .portal-cart-item .portal-prod-qty input { width: 36px; height: 28px; }
 
-/* المجموع — لون المؤسسة وأبرز */
-.portal-cart-item .portal-cart-total {
-  font-size: 13.5px;
+/* المجموع — بلون المؤسسة على اليسار */
+.portal-cart .portal-cart-item .portal-cart-total {
+  min-width: 84px;
+  font-size: 13px;
   color: var(--em);
+  text-align: left;
 }
 
-/* زر الإزالة — دائرة ناعمة دائماً ظاهرة (لمس أولاً) */
-.portal-cart-item .portal-cart-x {
+/* زر الإزالة — دائرة ناعمة */
+.portal-cart .portal-cart-item .portal-cart-x {
   width: 26px;
   height: 26px;
   border: 1px solid var(--b2);
@@ -4324,11 +4318,11 @@ html.dark .portal-pim-x { background: rgba(20,22,28,.85); }
   background: transparent;
   color: var(--t4);
 }
-.portal-cart-item .portal-cart-x:hover { background: var(--red); border-color: var(--red); color: #fff; }
+.portal-cart .portal-cart-item .portal-cart-x:hover { background: var(--red); border-color: var(--red); color: #fff; }
 
-/* الشاشات الضيقة: الصف يبقى مريحاً مع البطاقة */
+/* الشاشات الضيقة: الصف يبقى مريحاً */
 @media (max-width: 640px) {
-  .portal-cart-item { padding: 10px 6px; }
-  .portal-cart-item .portal-prod-qty button { width: 28px; }
-  .portal-cart-item .portal-prod-qty input { width: 36px; }
+  .portal-cart .portal-cart-item { padding: 9px 4px; }
+  .portal-cart .portal-cart-item .portal-prod-qty button { width: 25px; }
+  .portal-cart .portal-cart-item .portal-prod-qty input { width: 32px; }
 }
