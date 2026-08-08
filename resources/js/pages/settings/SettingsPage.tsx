@@ -36,6 +36,7 @@ import { PortalTab } from "./tabs/PortalTab";
 import { DocumentsTab } from "./tabs/DocumentsTab";
 import { ConversionsTab } from "./tabs/ConversionsTab";
 import { UsersTab } from "./tabs/UsersTab";
+import { SecurityTab } from "./tabs/SecurityTab";
 import { PrintersTab } from "./tabs/PrintersTab";
 import { BackupTab } from "./tabs/BackupTab";
 import { PlanTab } from "./tabs/PlanTab";
@@ -203,6 +204,7 @@ export default function SettingsPage() {
                     />
                 )}
                 {tab === "users" && <UsersTab />}
+                {tab === "security" && <SecurityTab />}
                 {tab === "conversions" && (
                     <ConversionsTab
                         onDirty={() => markTabDirty("conversions")}
