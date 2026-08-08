@@ -2374,9 +2374,9 @@ html.dark .portal-prod-discs--ov .portal-disc-chip { background: rgba(20,22,28,.
 /* ═══════════════════════════════════════════════════════════════════
    PortalOrdersAdminPage — لوحة إدارة طلبات البوابة (شكل ERP حديث)
    ═══════════════════════════════════════════════════════════════════ */
-/* ═══ خلفية بيضاء لصفحة إدارة طلبات البوابة — نلغي حشوة .page-content
-   (16/18/28) بحاشية سالبة حتى يملأ الأبيض منطقة #main كاملة، ونعوّضها في
-   حشوة .poa نفسها فيبقى التباعد الداخلي مطابقاً للوضع السابق. ═══ */
+/* ═══ خلفية رمادية لصفحة إدارة طلبات البوابة — مثل بقية صفحات الإدارة:
+   نلغي حشوة .page-content (16/18/28) بحاشية سالبة حتى يملأ الرمادي منطقة
+   #main كاملة، ونعوّضها في حشوة .poa نفسها فيبقى التباعد الداخلي مطابقاً. ═══ */
 .poa {
   display: flex;
   flex-direction: column;
@@ -2384,11 +2384,11 @@ html.dark .portal-prod-discs--ov .portal-disc-chip { background: rgba(20,22,28,.
   padding: 20px 38px 76px;
   margin: -16px -18px -28px;
   min-height: 100%;
-  background: var(--bg2);
+  background: var(--bg1);
 }
-body.dark .poa { background: var(--bg2); }
-/* شريط #main السفلي (var(--mb) على الجوال) يبقى رمادياً — نجعله أبيضاً أيضاً */
-#main:has(.poa) { background: var(--bg2); }
+body.dark .poa { background: var(--bg1); }
+/* شريط #main السفلي يبقى رمادياً — مطابق لبقية الصفحات */
+#main:has(.poa) { background: var(--bg1); }
 
 /* ── شريط بطاقات KPI (عدادات الحالات) ── */
 .poa-kpis {
@@ -3214,8 +3214,8 @@ body.dark .poa-date input::-webkit-calendar-picker-indicator { opacity: .85; }
 .poa-kpi {
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--ac, var(--em)) 8%, var(--bg1, #fff)),
-    var(--bg1, #fff) 62%
+    color-mix(in srgb, var(--ac, var(--em)) 8%, var(--bg2)),
+    var(--bg2) 62%
   );
   border-color: color-mix(in srgb, var(--ac, var(--em)) 24%, var(--b2, #eef2f7));
   box-shadow: 0 1px 2px rgba(15, 23, 42, .05), 0 12px 28px -24px rgba(15, 23, 42, .35);
@@ -3238,8 +3238,8 @@ body.dark .poa-kpi {
 .poa-kpi.on {
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--ac, var(--em)) 18%, var(--bg1, #fff)),
-    color-mix(in srgb, var(--ac, var(--em)) 4%, var(--bg1, #fff))
+    color-mix(in srgb, var(--ac, var(--em)) 18%, var(--bg2)),
+    color-mix(in srgb, var(--ac, var(--em)) 4%, var(--bg2))
   );
 }
 body.dark .poa-kpi.on {
@@ -3255,7 +3255,7 @@ body.dark .poa-kpi.on {
 
 /* ── شريط الأدوات: تدرّج هادئ + ظل أعمق قليلاً ── */
 .poa-bar {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--em) 5%, var(--bg1, #fff)), var(--bg1, #fff) 62%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--em) 5%, var(--bg2)), var(--bg2) 62%);
   box-shadow: 0 1px 2px rgba(15, 23, 42, .05), 0 12px 28px -22px rgba(15, 23, 42, .3);
 }
 body.dark .poa-bar {
@@ -3264,7 +3264,7 @@ body.dark .poa-bar {
 
 /* ── أقسام نافذة التفاصيل: تدرّج + حواف أنعم ── */
 .poa-sec {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--em) 3.5%, var(--bg1, #fff)), var(--bg1, #fff) 55%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--em) 3.5%, var(--bg2)), var(--bg2) 55%);
   border-radius: 16px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
 }
@@ -3272,9 +3272,9 @@ body.dark .poa-sec {
   background: linear-gradient(180deg, color-mix(in srgb, var(--em) 11%, var(--bg3, #1e293b)), var(--bg3, #1e293b) 55%);
 }
 
-/* ── حاوية الجدول الرئيسي: بطاقة حديثة (الجدول المباشر لصفحة الإدارة) ── */
+/* ── حاوية الجدول الرئيسي: بطاقة بيضاء (الجدول المباشر لصفحة الإدارة) ── */
 .poa > .tw {
-  background: var(--bg1, #fff);
+  background: var(--bg2);
   border: 1px solid var(--b2, #eef2f7);
   border-radius: 16px;
   overflow: auto;
@@ -3284,7 +3284,7 @@ body.dark .poa > .tw { background: var(--bg3, #1e293b); border-color: var(--b2, 
 
 .poa table.poa-table { min-width: 780px; }
 .poa table.poa-table thead th {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--em) 8%, var(--bg1, #fff)), var(--bg3, #f5f7fb));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--em) 8%, var(--bg2)), var(--bg3, #f5f7fb));
   border-bottom: 1px solid var(--b2, #eef2f7);
   padding: 13px 16px;
 }
@@ -3342,12 +3342,12 @@ body.dark .poa-sort-hint { color: var(--t5, #64748b); }
   .poa table.poa-table td:first-child { position: sticky; right: 0; z-index: 2; box-shadow: -8px 0 12px -12px rgba(15, 23, 42, .35); }
   .poa table.poa-table td:last-child { position: sticky; left: 0; z-index: 2; box-shadow: 8px 0 12px -12px rgba(15, 23, 42, .35); }
   .poa table.poa-table td:first-child,
-  .poa table.poa-table td:last-child { background: var(--bg1, #fff); }
+  .poa table.poa-table td:last-child { background: var(--bg2); }
   body.dark .poa table.poa-table td:first-child,
   body.dark .poa table.poa-table td:last-child { background: var(--bg3, #1e293b); }
   .poa table.poa-table thead th:first-child,
   .poa table.poa-table thead th:last-child {
-    background: linear-gradient(180deg, color-mix(in srgb, var(--em) 8%, var(--bg1, #fff)), var(--bg3, #f5f7fb));
+    background: linear-gradient(180deg, color-mix(in srgb, var(--em) 8%, var(--bg2)), var(--bg3, #f5f7fb));
   }
   body.dark .poa table.poa-table thead th:first-child,
   body.dark .poa table.poa-table thead th:last-child {
@@ -3355,7 +3355,7 @@ body.dark .poa-sort-hint { color: var(--t5, #64748b); }
   }
   .poa table.poa-table tbody tr:hover td:first-child,
   .poa table.poa-table tbody tr:hover td:last-child {
-    background: color-mix(in srgb, var(--em) 5%, var(--bg1, #fff));
+    background: color-mix(in srgb, var(--em) 5%, var(--bg2));
   }
   body.dark .poa table.poa-table tbody tr:hover td:first-child,
   body.dark .poa table.poa-table tbody tr:hover td:last-child {
