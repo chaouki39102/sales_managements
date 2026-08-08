@@ -1,8 +1,9 @@
 # PRO Upgrade — Task Checklist
 
-> **Status: ✅ DONE (Aug 8) — upgrades 1 & 2 fully complete (1.1–1.5, 2.1–2.5);
-> upgrades 3–5 not started.** Pick up on any PC: `git pull`, open this file, and work
-> task-by-task. Commit + push after EACH task.
+> **Status: ⏸ PAUSED (Aug 8) — upgrades 1 & 2 fully complete (1.1–1.5, 2.1–2.5);
+> upgrade 5 (Offline-First POS) in progress: **5.1, 5.2, 5.3 done + pushed**;
+> upgrades 3–4 not started.** Resume on any PC: `git pull`, open this file, and continue
+> with task 5.4. Commit + push after EACH task.
 
 > **Goal**: take the sales-management ERP (Laravel + React POS, Algerian market) from a
 > working system to a professional-grade product. Five upgrades, each self-contained.
@@ -10,7 +11,7 @@
 ## Global verification (run after every task)
 
 - `npx tsc --noEmit` — clean
-- `npm test` — 222/222 pass
+- `npm test` — 244/244 pass (was 222; offline queue/math/sync suites added)
 - `npm run build` — 0 errors
 - **SW MATCH**: `(Get-FileHash public/sw.js -Algorithm SHA256).Hash` must equal
   `(Get-FileHash public/build/sw.js -Algorithm SHA256).Hash`
@@ -163,18 +164,63 @@
 > `useCartStore` (classic) / `usePosProCart` (Pro); "is this cart editing a document?" is the
 > store's `documentId` (Phase 46 — PUT vs POST decision).
 
-- [ ] **5.1 Write queue** — IndexedDB queue (`resources/js/lib/offline/`) recording document
-      creates/updates, payments, stock-changing ops with the FULL payload + `documentId`
-      (replay must PUT, not POST — Phase 46 rule).
-- [ ] **5.2 Offline interception** — route POS mutations through the queue when
-      `navigator.onLine === false`; return optimistic success (temp id) and render the sale.
-- [ ] **5.3 Sync engine** — on `online` event (and a manual button): replay queue in order,
+- [x] **5.1 Write queue** — IndexedDB queue (`resources/js/lib/offline/db.ts`) recording
+      document creates/updates, payments, stock-changing ops with the FULL payload +
+      `documentId` (replay must PUT, not POST — Phase 46 rule). `PendingOp`:
+      `{id, method, url, data, tempId?, targetId?, createdAt, status:'pending'|'failed',
+      retries, lastError?}`. `enqueueOp` stores method+url VERBATIM (replay never reinvents
+      the HTTP verb); FIFO replay order = auto-increment `id ASC`. Helpers: `getPendingOps`,
+      `getPendingOpsByStatus`, `getFailedOpsCount`, `updatePendingOp`, `markOpFailed`,
+      `clearPendingOps`, `invalidateCache(prefix)`, `extractTargetIdFromUrl`. Test:
+      `resources/js/lib/offline/__tests__/offline-queue.spec.ts` (6 tests, `fake-indexeddb`).
+- [x] **5.2 Offline interception** — `offlineAwareApi.ts` routes POS mutations through the
+      queue when `navigator.onLine === false` and returns a RICH optimistic success so the
+      sale completes offline: `{id: <temp>, document_number: 'OFFLINE-<n>', total_ht/tva/ttc,
+      net_to_pay, paid_amount, balance_data:{previous_balance:null,new_balance:null},
+      _offline:true}` (HTTP 202). GETs serve the 5-min IndexedDB cache (`_offline:true`);
+      cache miss → empty `[]`. Pure math extracted to `resources/js/lib/offline/queueMath.ts`
+      (`computeQueuedDocumentTotals` mirrors `CommercialDocumentService` line math: gross =
+      qty × unit_price_ht × pack_qty, fixed-amount discount per BASE unit, % on gross;
+      `nextTempId` = negative epoch-seconds × 1e6 − seq; `offlineDocNumber`; guards
+      `isOfflineQueuedResponse`/`isDocumentUrl`/`isDocumentPayload`). Both POS
+      `handleCompleteSale` flows already read `res.document_number`/`res.total_stamp` with
+      `??` fallbacks — resilient to the queued 202 shape. Test: `offline-math.spec.ts` (6).
+- [x] **5.3 Sync engine** — on `online` event (and a manual button): replay queue in order,
       resolve temp ids → real ids, retry with backoff, surface failures (conflict → mark for
-      review, never silently drop).
-- [ ] **5.4 Stock/availability offline** — cache lookups + stock-at (30s TTL already exists in
-      `InventoryStockService`) into IndexedDB; show a stale-data warning badge.
-- [ ] **5.5 UI + tests** — offline banner (exists in `OfflineIndicator.tsx`), pending-count
-      badge, sync-status screen; Vitest for the queue ordering + PUT-not-POST replay.
+      review, never silently drop). `resources/js/lib/offline/syncEngine.ts`:
+      `replayPendingOps(httpFn)` — FIFO replay, on success removes the op, tracks
+      `tempId→realId` (`response.data.data.id ?? response.data.id`) and calls
+      `resolveOpUrl(url, map)` which rewrites `/documents/-777` → `/documents/999` so a
+      follow-up edit after an offline create is replayed as **PUT to the real doc**, never a
+      second POST. `isPermanent` (4xx = surface-as-failed, never dropped) vs transient
+      (5xx/network = bump `retries`, back off). `MAX_RETRIES = 3` then → `failed` with
+      `lastError` (Arabic message from `errorMessage()`). Returns `SyncReport {replayed,
+      failed, remaining}`. `useOffline.ts`: `useSync` auto-syncs on the `online` event +
+      dispatches `offline:synced` CustomEvent; `retryFailedOps()` flips `failed` → `pending`
+      and re-replays; `useFailedOpsCount`/`useFailedOps` for the UI. Test:
+      `__tests__/sync-engine.spec.ts` (7 tests: FIFO, temp→real PUT rewrite, 4xx permanent,
+      retries cap, error classification, `resolveOpUrl`, failed→pending replay).
+- [ ] **5.4 Stock/availability offline** — cache lookups + stock-at into IndexedDB; show a
+      stale-data warning badge. **State**: GET caching already stores EVERY successful GET
+      (incl. `/stock-at` + POS lookups) for 5 min via the interceptor — the backend
+      `InventoryStockService` stock-at 30s TTL is a separate server-side cache. **Remaining**:
+      (1) propagate an "served from cache/offline" signal to consumers — the axios response
+      carries `_offline:true` but `extractData()` (`resources/js/lib/api/core/client.ts`)
+      strips it, so React Query never sees it; plan: module-level counter/setter in
+      `client.ts` (e.g. `markOfflineServed()`) + a subscription so `OfflineIndicator` /
+      POS pages can show "بيانات من ذاكرة محلية — قديمة" when stale/offline data is served;
+      (2) raise the stock-at cache TTL above 5 min (30+ min) so stock survives short
+      outages — keep the badge honest; (3) verify POS product card shows stock from the
+      cached payload offline. Do NOT reduce online freshness (network-first already).
+- [ ] **5.5 UI + tests** — offline banner (exists in `OfflineIndicator.tsx` at
+      `resources/js/components/OfflineIndicator.tsx`, mounted in `DashboardLayout.tsx:853`;
+      currently shows `syncing`/`sync` via `useSync` — new `useSync` is backward-compatible),
+      **pending-count badge** (`useFailedOpsCount`), **sync-status screen** + a «إعادة
+      المحاولة» (retry) button wired to `retryFailedOps()` for failed ops with their Arabic
+      `lastError`, offline POS smoke (classic `POSPage.tsx` + `POSProPage.tsx` complete-sale
+      flows already tolerate the queued 202 shape — verify visually), Vitest for queue
+      ordering + PUT-not-POST replay (already covered by 5.1–5.3 suites; add any UI-level
+      pure helpers if extracted).
 
 ---
 
@@ -186,7 +232,7 @@
 | 2. Backup + restore | ✅ done (2.1–2.5) | command + schedule + restore + settings UI + E2E verified (`docs/reports/BACKUP_RESTORE_GUIDE.md`); 15 pre-existing POS `total_discount` defects flagged (not restore-introduced) |
 | 3. Portal online payment | not started | — |
 | 4. 2FA + permissions | not started | — |
-| 5. Offline-first POS | not started | — |
+| 5. Offline-first POS | 🔄 in progress (5.1–5.3 done) | queue + rich offline interception + sync engine pushed; 5.4 (stock offline + stale badge) next, then 5.5 (UI + tests) |
 
 ## Commits
 
@@ -206,3 +252,7 @@ files belonging to that task; leave unrelated dirty files untouched):
 | `37123d1` *(2.4b)* | Backup API hardening — `{file}` resolved from the route (dispatcher splice was feeding the Company model into it → 500s on verify/download/restore/delete); `keep` floor (prune never wipes the archive); `prune()` re-glob before age-cap; client sends `keep` only when > 0 |
 | `83e2606` | `public/sw.js` manifest refresh to match build (SW MATCH verified) |
 | `fee7f14` *(2.5)* | E2E restore test (baseline → backup → mutate → restore → verify, all counts returned; live server 200) + `docs/reports/BACKUP_RESTORE_GUIDE.md`; test artifacts cleaned |
+| `8918c3a` *(5.1)* | Write queue — `resources/js/lib/offline/db.ts` (PendingOp tempId/targetId/status/retries/lastError, FIFO `id ASC`, verbatim method+url = PUT-not-POST, `invalidateCache`/`getPendingOpsByStatus`/`getFailedOpsCount`/`markOpFailed`/`clearPendingOps`) + `__tests__/offline-queue.spec.ts` (6, `fake-indexeddb@^6.2.5` devDep) |
+| `36cc51f` *(5.2)* | Rich offline interception — `offlineAwareApi.ts` queues mutations + returns 202 queued response (totals recomputed incl. pack×qty, `OFFLINE-<temp>` number, paid/net, balance nulls, `_offline`); 5-min GET cache (`_offline` flag, miss → `[]`); pure math → `queueMath.ts` (`computeQueuedDocumentTotals`/`nextTempId`/`offlineDocNumber`/guards) + `offline-math.spec.ts` (6) |
+| `dd4178a` *(5.3)* | Sync engine — `syncEngine.ts` (`replayPendingOps` FIFO + `tempId→realId` map + `resolveOpUrl` rewrite so follow-ups PUT the real doc, `isPermanent` 4xx vs transient 5xx/network, `MAX_RETRIES=3` → `failed`+`lastError`, `SyncReport`); `useOffline.ts` (`useSync` auto-sync on `online` + `offline:synced` event, `retryFailedOps`, `useFailedOpsCount`/`useFailedOps`) + `sync-engine.spec.ts` (7) |
+| *(5.4)* | stock/availability offline — propagate `_offline`-served signal to consumers (`client.ts` counter + subscription → OfflineIndicator/POS stale badge), raise stock-at cache TTL >5min, verify POS cards offline |
