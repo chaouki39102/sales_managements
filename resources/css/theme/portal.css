@@ -3882,3 +3882,230 @@ body.dark .poa-sort-hint { color: var(--t5, #64748b); }
   .portal-drawer-hd { flex-wrap: nowrap; }
   .portal-mobile-cart-bar-go { display: none; }
 }
+
+/* ═══════════════════════════════════════════════════
+   نافذة تفاصيل المنتج (Product Info Modal) — .portal-pim-*
+   ═══════════════════════════════════════════════════ */
+
+/* بطاقة الكتالوج قابلة للنقر لعرض التفاصيل + زر تكبير */
+.portal-prod--info { cursor: pointer; }
+.portal-prod--info:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
+.portal-prod-zoom {
+  position: absolute; top: 10px; inset-inline-end: 10px; z-index: 4;
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 999px;
+  background: rgba(255,255,255,.92);
+  color: var(--t2);
+  cursor: pointer; font-size: 14px;
+  box-shadow: 0 4px 12px rgba(15,23,42,.16);
+  opacity: 0; transform: translateY(-4px);
+  transition: all .2s cubic-bezier(.4,0,.2,1);
+}
+html.dark .portal-prod-zoom { background: rgba(20,22,28,.85); }
+.portal-prod--info:hover .portal-prod-zoom,
+.portal-prod-zoom:focus-visible { opacity: 1; transform: translateY(0); }
+.portal-prod-zoom:hover { color: var(--em); background: var(--emb); }
+.portal-prod.on .portal-prod-zoom { display: none; }
+
+/* ─── طبقة النافذة ─── */
+.portal-pim {
+  position: fixed; inset: 0; z-index: 120;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.portal-pim-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(15,23,42,.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: portalPimFade .25s ease;
+}
+@keyframes portalPimFade { from { opacity: 0; } to { opacity: 1; } }
+.portal-pim-card {
+  position: relative;
+  width: 100%; max-width: 780px;
+  max-height: min(88vh, 900px);
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  grid-template-rows: minmax(0, 1fr);
+  background: var(--bg2);
+  border: 1px solid var(--b2);
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 30px 80px rgba(15,23,42,.35);
+  animation: portalPimUp .32s cubic-bezier(.34,1.2,.5,1);
+}
+@keyframes portalPimUp {
+  from { opacity: 0; transform: translateY(26px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.portal-pim-x {
+  position: absolute; top: 12px; inset-inline-end: 12px; z-index: 6;
+  width: 34px; height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 999px;
+  background: rgba(255,255,255,.92);
+  color: var(--t2);
+  cursor: pointer; font-size: 17px;
+  box-shadow: 0 4px 14px rgba(15,23,42,.16);
+  transition: all .18s;
+}
+html.dark .portal-pim-x { background: rgba(20,22,28,.85); }
+.portal-pim-x:hover { color: #fff; background: var(--red); }
+
+/* ─── المعرض ─── */
+.portal-pim-gallery {
+  position: relative;
+  background: linear-gradient(180deg, var(--bg3), var(--bg2));
+  display: flex; align-items: center; justify-content: center;
+  min-height: 280px;
+  overflow: hidden;
+}
+.portal-pim-gallery img {
+  width: 100%; height: 100%; object-fit: cover;
+  display: block;
+}
+.portal-pim-gallery.oos img { filter: grayscale(.85) brightness(.72); }
+.portal-pim-oos {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  color: #fff; font-size: 14px; font-weight: 900;
+  background: rgba(15,23,42,.35);
+}
+.portal-pim-oos i { font-size: 28px; opacity: .9; }
+
+/* ─── المعلومات ─── */
+.portal-pim-info {
+  min-height: 0;
+  padding: 22px 22px 20px;
+  display: flex; flex-direction: column; gap: 14px;
+  overflow-y: auto;
+}
+.portal-pim-name { font-size: 19px; font-weight: 900; color: var(--t1); line-height: 1.35; }
+.portal-pim-ids { display: flex; flex-wrap: wrap; gap: 6px; }
+.portal-pim-ids span {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 700; color: var(--t3);
+  background: var(--bg3); border: 1px solid var(--b1);
+  border-radius: 8px; padding: 3px 9px;
+}
+.portal-pim-ids i { font-size: 12px; color: var(--em); }
+.portal-pim-price-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  padding: 12px 14px;
+  background: var(--emb);
+  border: 1px solid rgba(10,138,92,.2);
+  border-radius: 14px;
+}
+.portal-pim-price { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.portal-pim-price .portal-prod-price-now { font-size: 24px; }
+.portal-pim-price .portal-prod-price-old { font-size: 14px; }
+.portal-pim-price .portal-prod-unit { font-size: 11px; padding: 3px 9px; }
+.portal-pim-save {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 900; color: var(--red);
+  background: var(--redb); border-radius: 999px; padding: 4px 10px;
+  white-space: nowrap;
+}
+.portal-pim-save i { font-size: 13px; }
+.portal-pim-status { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.portal-pim-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 999px;
+  background: var(--bg3); border: 1px solid var(--b1);
+  color: var(--t3); font-size: 11px; font-weight: 800;
+}
+.portal-pim-chip i { font-size: 12px; color: var(--em); }
+.portal-pim-sec { display: flex; flex-direction: column; gap: 8px; }
+.portal-pim-sec-t {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 800; color: var(--t2);
+}
+.portal-pim-sec-t i { color: var(--em); font-size: 15px; }
+.portal-pim-packs { display: flex; flex-wrap: wrap; gap: 8px; }
+.portal-pim-pack {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  min-width: 108px; flex: 1 0 108px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--b2);
+  background: var(--bg1);
+  color: var(--t2);
+  cursor: pointer;
+  font-family: 'Tajawal', sans-serif;
+  text-align: start;
+  transition: all .18s;
+}
+.portal-pim-pack:hover:not(:disabled) { border-color: var(--em); }
+.portal-pim-pack.on {
+  border-color: var(--em);
+  background: var(--emb);
+  box-shadow: 0 0 0 3px rgba(10,138,92,.12);
+}
+.portal-pim-pack:disabled { opacity: .45; cursor: not-allowed; }
+.portal-pim-pack-n { font-size: 12.5px; font-weight: 800; color: var(--t1); }
+.portal-pim-pack-s { font-size: 10.5px; font-weight: 700; color: var(--t4); }
+.portal-pim-pack-p { font-size: 12px; font-weight: 900; color: var(--em); font-variant-numeric: tabular-nums; }
+.portal-pim-discs { display: flex; flex-wrap: wrap; gap: 6px; }
+.portal-pim-discs .portal-disc-chip { font-size: 11px; padding: 4px 11px; }
+.portal-pim-discs .portal-disc-chip b { color: var(--t4); font-weight: 800; }
+
+/* ─── الكمية + الإضافة ─── */
+.portal-pim-cta {
+  display: flex; flex-direction: column; gap: 10px;
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--b2);
+}
+.portal-pim-qtywrap { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.portal-pim-qty-lbl { font-size: 12px; font-weight: 800; color: var(--t3); }
+.portal-pim-qtywrap .portal-prod-qty { border-radius: 12px; padding: 3px; }
+.portal-pim-qtywrap .portal-prod-qty button { width: 32px; height: 34px; font-size: 15px; }
+.portal-pim-qtywrap .portal-prod-qty input { width: 46px; height: 34px; font-size: 14px; }
+.portal-pim-eq {
+  font-size: 11.5px; font-weight: 700; color: var(--t4);
+  background: var(--bg3); border: 1px dashed var(--b2);
+  border-radius: 8px; padding: 4px 10px;
+}
+.portal-pim-add {
+  min-height: 46px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  border: none; border-radius: 13px;
+  background: linear-gradient(135deg, #0b4d3a, #0a8a5c 55%, #0dbf84);
+  color: #fff;
+  font-size: 14.5px; font-weight: 800;
+  cursor: pointer;
+  font-family: 'Tajawal', sans-serif;
+  box-shadow: 0 10px 24px rgba(10,138,92,.32);
+  transition: all .2s;
+}
+.portal-pim-add:hover:not(:disabled) { filter: brightness(1.06); transform: translateY(-1px); }
+.portal-pim-add.in { background: linear-gradient(135deg, #065f46, #059669); }
+.portal-pim-add.off {
+  cursor: not-allowed; opacity: .6;
+  background: linear-gradient(135deg, #64748b, #94a3b8);
+  box-shadow: none;
+}
+.portal-pim-add i { font-size: 17px; }
+.portal-pim-note {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11.5px; font-weight: 700; color: var(--red);
+  background: var(--redb); border-radius: 10px; padding: 8px 12px;
+}
+.portal-pim-note i { font-size: 13px; }
+
+/* الهاتف: النافذة بملء الشاشة، المعرض فوق المعلومات */
+@media (max-width: 640px) {
+  .portal-pim { padding: 0; align-items: stretch; }
+  .portal-pim-card {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    max-height: 100dvh;
+    border-radius: 0;
+    border: none;
+  }
+  .portal-pim-gallery { min-height: 40dvh; max-height: 46dvh; }
+  .portal-pim-info { max-height: none; padding: 18px 16px 20px; }
+  .portal-pim-x { top: 10px; inset-inline-end: 10px; }
+}
