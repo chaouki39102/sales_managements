@@ -85,6 +85,39 @@ export function isDocumentUrl(url: string): boolean {
   return /(^|\/)documents(\/\d+)?(\?|$)/.test(String(url));
 }
 
+// ─── Network-failure classification (C.1) ─────────────────────────────────────
+// TRUE  = transport-level failure (no HTTP response): server unreachable, DNS,
+//         connection refused/reset, timeout. These are "offline" even when the
+//         browser reports navigator.onLine === true (flaky mobile links).
+// FALSE = the server answered (4xx/5xx — must surface), a user/signal abort
+//         (ERR_CANCELED), or a client config error (ERR_BAD_OPTION*).
+const NETWORK_FAILURE_CODES = new Set([
+  'ERR_NETWORK', 'ERR_INTERNET_DISCONNECTED', 'ERR_CONNECTION_REFUSED',
+  'ERR_CONNECTION_RESET', 'ERR_CONNECTION_CLOSED', 'ERR_NAME_NOT_RESOLVED',
+  'ERR_EMPTY_RESPONSE', 'ERR_ADDRESS_UNREACHABLE', 'ERR_HTTP2_PROTOCOL_ERROR',
+  'ENOTFOUND', 'ECONNREFUSED', 'ECONNRESET', 'ENETUNREACH', 'EHOSTUNREACH',
+  'ETIMEDOUT', 'EAI_AGAIN',
+]);
+
+const NON_NETWORK_CODES = new Set([
+  'ERR_CANCELED',           // user/signal abort — never queue a canceled op
+  'ERR_BAD_OPTION',         // client config errors — never queue
+  'ERR_BAD_OPTION_VALUE',
+  'ERR_BAD_REQUEST',
+]);
+
+export function isNetworkFailure(e: unknown): boolean {
+  if (!e || typeof e !== 'object') return false;
+  const err = e as { code?: unknown; response?: unknown; request?: unknown };
+  if (err.response) return false;                 // server answered → surface it
+  const code = typeof err.code === 'string' ? err.code : '';
+  if (NON_NETWORK_CODES.has(code)) return false;  // cancel/config → surface
+  if (NETWORK_FAILURE_CODES.has(code)) return true;
+  // No recognizable code: treat as a network failure only when a request was
+  // actually dispatched (err.request set) but produced no response.
+  return !!err.request;
+}
+
 export function isDocumentPayload(data: unknown): boolean {
   return !!(data && typeof data === 'object' && Array.isArray((data as { lines?: unknown }).lines));
 }
