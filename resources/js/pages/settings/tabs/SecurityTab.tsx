@@ -186,10 +186,17 @@ export function SecurityTab() {
             {!enabled && setup && (
                 <Card title="الخطوة 1: امسح رمز QR" titleIcon="ti-qrcode">
                     <div className="sec-enroll">
-                        <div
-                            className="sec-qr"
-                            dangerouslySetInnerHTML={{ __html: setup.qr_svg }}
-                        />
+                        <div className="sec-qr">
+                            {setup.qr_svg?.startsWith("data:image/") ? (
+                                <img src={setup.qr_svg} alt="رمز QR" />
+                            ) : (
+                                <div
+                                    dangerouslySetInnerHTML={{
+                                        __html: setup.qr_svg ?? "",
+                                    }}
+                                />
+                            )}
+                        </div>
                         <div className="sec-secret-box">
                             <div className="sec-secret-lbl">
                                 المفتاح السري (أدخله يدوياً إذا تعذّر المسح)

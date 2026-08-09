@@ -51,6 +51,11 @@ export function PortalTab({
     const [hideOutOfStock, setHideOutOfStock] = useState(false);
     const [showIncartBadge, setShowIncartBadge] = useState(true);
     const [showNotes, setShowNotes] = useState(true);
+    const [onlinePaymentEnabled, setOnlinePaymentEnabled] = useState(false);
+    const [onlinePaymentProvider, setOnlinePaymentProvider] = useState("mock");
+    const [onlinePaymentMode, setOnlinePaymentMode] = useState("sandbox");
+    const [onlinePaymentMerchantId, setOnlinePaymentMerchantId] = useState("");
+    const [onlinePaymentSecretKey, setOnlinePaymentSecretKey] = useState("");
 
     useEffect(() => {
         if (!rawSettings.length) return;
@@ -72,6 +77,11 @@ export function PortalTab({
         setHideOutOfStock(gs<boolean>("portal_hide_out_of_stock", false));
         setShowIncartBadge(gs<boolean>("portal_show_incart_badge", true));
         setShowNotes(gs<boolean>("portal_show_notes", true));
+        setOnlinePaymentEnabled(gs<boolean>("online_payment_enabled", false));
+        setOnlinePaymentProvider(str(gs("online_payment_provider", "mock")));
+        setOnlinePaymentMode(str(gs("online_payment_mode", "sandbox")));
+        setOnlinePaymentMerchantId(str(gs("online_payment_merchant_id", "")));
+        setOnlinePaymentSecretKey(str(gs("online_payment_secret_key", "")));
     }, [rawSettings]);
 
     const doSave = async () => {
@@ -94,6 +104,11 @@ export function PortalTab({
             portal_hide_out_of_stock: hideOutOfStock,
             portal_show_incart_badge: showIncartBadge,
             portal_show_notes: showNotes,
+            online_payment_enabled: onlinePaymentEnabled,
+            online_payment_provider: onlinePaymentProvider,
+            online_payment_mode: onlinePaymentMode,
+            online_payment_merchant_id: onlinePaymentMerchantId,
+            online_payment_secret_key: onlinePaymentSecretKey,
         };
         await saveSettings(payload);
         qc.invalidateQueries({
@@ -260,6 +275,176 @@ export function PortalTab({
                             resize: "vertical",
                         }}
                     />
+                </Card>
+            )}
+
+            {portalEnabled && (
+                <Card>
+                    <SecHead
+                        icon="ti-credit-card"
+                        label="الدفع الإلكتروني"
+                        color="var(--blue)"
+                        sub="تفعيل زر «الدفع الإلكتروني» في طلبات بوابة الزبائن عبر بوابة الدفع (وضع تجريبي mock حالياً)"
+                    />
+                    <div
+                        style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                    >
+                        {tr(
+                            "تفعيل الدفع الإلكتروني",
+                            "يظهر زر الدفع في «طلباتي» عند الزبون — الرصيد يُحدّث فقط بعد تأكيد الدفع",
+                            onlinePaymentEnabled,
+                            setOnlinePaymentEnabled,
+                        )}
+                        {onlinePaymentEnabled && (
+                            <>
+                                <div
+                                    style={{
+                                        display: "grid",
+                                        gridTemplateColumns: "1fr 1fr",
+                                        gap: 10,
+                                    }}
+                                >
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                        <label
+                                            style={{
+                                                fontSize: 12,
+                                                fontWeight: 600,
+                                                color: "var(--t2)",
+                                            }}
+                                        >
+                                            بوابة الدفع
+                                        </label>
+                                        <select
+                                            value={onlinePaymentProvider}
+                                            onChange={(e) => {
+                                                setOnlinePaymentProvider(e.target.value);
+                                                markDirty();
+                                                onDirty?.();
+                                            }}
+                                            style={{
+                                                padding: "8px 10px",
+                                                fontSize: 13,
+                                                borderRadius: 8,
+                                                border: "1px solid var(--b2)",
+                                                background: "var(--bg1)",
+                                                color: "var(--t1)",
+                                                fontFamily: "inherit",
+                                            }}
+                                        >
+                                            <option value="mock">
+                                                Mock Gateway (تجريبي)
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                        <label
+                                            style={{
+                                                fontSize: 12,
+                                                fontWeight: 600,
+                                                color: "var(--t2)",
+                                            }}
+                                        >
+                                            وضع التشغيل
+                                        </label>
+                                        <select
+                                            value={onlinePaymentMode}
+                                            onChange={(e) => {
+                                                setOnlinePaymentMode(e.target.value);
+                                                markDirty();
+                                                onDirty?.();
+                                            }}
+                                            style={{
+                                                padding: "8px 10px",
+                                                fontSize: 13,
+                                                borderRadius: 8,
+                                                border: "1px solid var(--b2)",
+                                                background: "var(--bg1)",
+                                                color: "var(--t1)",
+                                                fontFamily: "inherit",
+                                            }}
+                                        >
+                                            <option value="sandbox">
+                                                Sandbox (تجريبي)
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                    <label
+                                        style={{
+                                            fontSize: 12,
+                                            fontWeight: 600,
+                                            color: "var(--t2)",
+                                        }}
+                                    >
+                                        معرف التاجر (Merchant ID)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={onlinePaymentMerchantId}
+                                        onChange={(e) => {
+                                            setOnlinePaymentMerchantId(e.target.value);
+                                            markDirty();
+                                            onDirty?.();
+                                        }}
+                                        placeholder="يُستخدم عند تفعيل بوابة حقيقية"
+                                        style={{
+                                            padding: "8px 10px",
+                                            fontSize: 13,
+                                            borderRadius: 8,
+                                            border: "1px solid var(--b2)",
+                                            background: "var(--bg1)",
+                                            color: "var(--t1)",
+                                            fontFamily: "inherit",
+                                        }}
+                                    />
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                    <label
+                                        style={{
+                                            fontSize: 12,
+                                            fontWeight: 600,
+                                            color: "var(--t2)",
+                                        }}
+                                    >
+                                        المفتاح السري (Secret Key)
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={onlinePaymentSecretKey}
+                                        onChange={(e) => {
+                                            setOnlinePaymentSecretKey(e.target.value);
+                                            markDirty();
+                                            onDirty?.();
+                                        }}
+                                        placeholder="يُستخدم لتوقيع إشعارات الدفع"
+                                        style={{
+                                            padding: "8px 10px",
+                                            fontSize: 13,
+                                            borderRadius: 8,
+                                            border: "1px solid var(--b2)",
+                                            background: "var(--bg1)",
+                                            color: "var(--t1)",
+                                            fontFamily: "inherit",
+                                        }}
+                                    />
+                                </div>
+                                <p
+                                    style={{
+                                        fontSize: 12,
+                                        lineHeight: 1.6,
+                                        color: "var(--t3)",
+                                        margin: 0,
+                                    }}
+                                >
+                                    حالياً البوابة في وضع تجريبي (mock): زر الدفع يفتح
+                                    صفحة محاكاة تقبل التأكيد أو الإلغاء دون أموال حقيقية.
+                                    سيُستبدل الموفر الحقيقي (EDAHABIA / CIB / CTPay) لاحقاً
+                                    بملء معرف التاجر والمفتاح السري أعلاه.
+                                </p>
+                            </>
+                        )}
+                    </div>
                 </Card>
             )}
 
