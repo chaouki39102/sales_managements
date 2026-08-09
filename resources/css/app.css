@@ -22,6 +22,7 @@
 
 @import 'theme/notifications.css';
 @import 'theme/print-settings.css';
+@import 'theme/roles-matrix.css';
 
 /* ═══════════════ PRINT — صفحات التقارير ═══════════════ */
 @media print {

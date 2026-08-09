@@ -8,13 +8,13 @@
 // ③ صلاحيات المستخدم: قسم منفصل يعرض صلاحيات المستخدم الحالي
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { useState } from 'react';
+import React, { useState, Fragment, useMemo } from 'react';
 import PageHeader  from '@/components/ui/PageHeader';
 import Card        from '@/components/ui/Card';
 import Badge       from '@/components/ui/Badge';
 import AlertBar    from '@/components/ui/AlertBar';
 import EmptyState  from '@/components/ui/EmptyState';
-import { useRoles, useMyRolesAndPermissions } from '@/lib/api/endpoints/roles';
+import { useRoles, useMyRolesAndPermissions, usePermissionsGrouped } from '@/lib/api/endpoints/roles';
 import type { RoleWithPermissions, PermissionsGrouped } from '@/lib/api/endpoints/roles';
 import type { Permission } from '@/lib/api/core/types';
 
@@ -146,6 +146,94 @@ function MyPermissionsSection() {
   );
 }
 
+// ─── ترتيب الأدوار القياسي في المصفوفة ──────────────────────────────────────
+const STANDARD_ROLE_ORDER = ['owner', 'manager', 'cashier', 'viewer'];
+// دور مالك الشركة مقفول: يُمنح تلقائياً لمالك الشركة فقط (قاعدة في الباكاند)
+const LOCKED_ROLES = new Set(['owner']);
+
+// ─── مكوّن: مصفوفة صلاحيات الأدوار (عرض) ─────────────────────────────────────
+function RoleMatrix({ roles, grouped }: { roles: RoleWithPermissions[]; grouped: PermissionsGrouped }) {
+  const ordered = useMemo(() => {
+    const ranked = roles
+      .map((role, i) => {
+        const idx = STANDARD_ROLE_ORDER.indexOf(role.name);
+        return { role, rank: idx === -1 ? 99 : idx, i };
+      })
+      .sort((a, b) => a.rank - b.rank || a.i - b.i)
+      .map(r => r.role);
+    return ranked;
+  }, [roles]);
+
+  const entries = useMemo(() => Object.entries(grouped), [grouped]);
+
+  return (
+    <div className="rm-wrap">
+      <table className="rm-table">
+        <thead>
+          <tr>
+            <th className="rm-perm-col">الصلاحية</th>
+            {ordered.map(role => {
+              const locked = LOCKED_ROLES.has(role.name);
+              return (
+                <th key={role.id} className={`rm-role-hd${locked ? ' rm-role-hd--locked' : ''}`}>
+                  <div className="rm-role-name">
+                    {locked && <i className="ti ti-lock" />}
+                    <strong>{role.display_name || role.name}</strong>
+                    <span className="rm-role-count">{(role.permissions ?? []).length}</span>
+                  </div>
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {entries.length === 0 && (
+            <tr>
+              <td className="rm-empty" colSpan={ordered.length + 1}>لا توجد صلاحيات لعرضها</td>
+            </tr>
+          )}
+          {entries.map(([group, perms]) => (
+            <Fragment key={group}>
+              <tr className="rm-group">
+                <td colSpan={ordered.length + 1}>
+                  {group}
+                  <span>({perms.length})</span>
+                </td>
+              </tr>
+              {perms.map(p => {
+                const permId = Number(p.id);
+                return (
+                  <tr key={permId}>
+                    <td className="rm-perm">
+                      {p.display_name || p.name}
+                      <small>{p.name}</small>
+                    </td>
+                    {ordered.map(role => {
+                      const locked = LOCKED_ROLES.has(role.name);
+                      const has = (role.permissions ?? []).some(pp => Number(pp.id) === permId);
+                      return (
+                        <td key={role.id} className={`rm-cell${locked ? ' rm-cell--locked' : ''}`}>
+                          {locked ? (
+                            <i className="ti ti-lock" />
+                          ) : has ? (
+                            <i className="ti ti-check" style={{ color: 'var(--em)' }} />
+                          ) : (
+                            <i className="ti ti-minus" style={{ color: 'var(--t4)' }} />
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ─── مكوّن: بطاقة دور واحد ────────────────────────────────────────────────────
 function RoleCard({ role }: { role: RoleWithPermissions }) {
   const permissions = role.permissions ?? [];
@@ -263,6 +351,8 @@ function RoleCard({ role }: { role: RoleWithPermissions }) {
 // ─── الصفحة الرئيسية ──────────────────────────────────────────────────────────
 export default function RolesPage() {
   const { data: roles = [], isLoading, isError, refetch } = useRoles();
+  const { data: groupedPermissions } = usePermissionsGrouped();
+  const [view, setView] = useState<'cards' | 'matrix'>('cards');
 
   // ✅ إزالة التكرار — defensive (الباكاند يحله أصلاً)
   const uniqueRoles = React.useMemo(() => {
@@ -283,6 +373,18 @@ export default function RolesPage() {
 
       {/* صلاحيات المستخدم الحالي */}
       <MyPermissionsSection />
+
+      {/* مبدّل العرض */}
+      {!isLoading && uniqueRoles.length > 0 && (
+        <div className="rm-toggle">
+          <button className={view === 'cards' ? 'on' : ''} onClick={() => setView('cards')}>
+            <i className="ti ti-cards" /> البطاقات
+          </button>
+          <button className={view === 'matrix' ? 'on' : ''} onClick={() => setView('matrix')}>
+            <i className="ti ti-grid-3x3" /> المصفوفة
+          </button>
+        </div>
+      )}
 
       {/* تحميل */}
       {isLoading && (
@@ -319,8 +421,26 @@ export default function RolesPage() {
         />
       )}
 
+      {/* المصفوفة */}
+      {!isLoading && uniqueRoles.length > 0 && view === 'matrix' && (
+        <>
+          <div className="rm-matrix-info">
+            <i className="ti ti-shield-lock" />
+            <span>
+              مصفوفة صلاحيات الأدوار — <b>ملاحظة</b>: عمود «مالك الشركة» مقفول
+              ويُمنح تلقائياً لمالك الشركة فقط.
+            </span>
+          </div>
+          {groupedPermissions && Object.keys(groupedPermissions).length > 0 ? (
+            <RoleMatrix roles={uniqueRoles} grouped={groupedPermissions} />
+          ) : (
+            <div className="rm-empty">لا توجد صلاحيات لعرضها في المصفوفة</div>
+          )}
+        </>
+      )}
+
       {/* قائمة الأدوار */}
-      {!isLoading && uniqueRoles.length > 0 && (
+      {!isLoading && uniqueRoles.length > 0 && view === 'cards' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {uniqueRoles.map(role => (
             <RoleCard key={role.id} role={role} />

@@ -19,8 +19,8 @@ export const usersApi = {
   toggleActive:   (id: number)            => apiPost<User>(`/users/${id}/toggle-active`),
   changePassword: (id: number, password: string, confirmation: string) =>
     apiPost(`/users/${id}/change-password`, { password, password_confirmation: confirmation }),
-  assignRole:     (id: number, roleId: number) =>
-    apiPost<User>(`/users/${id}/assign-role`, { role_id: roleId }),
+  assignRole:     (id: number, role: string) =>
+    apiPost<User>(`/users/${id}/assign-role`, { role }),
 } as const;
 
 export const rolesApi = {
@@ -75,7 +75,7 @@ export function useUserMutations() {
     remove:         useMutation({ mutationFn: usersApi.delete,  onSuccess: inv }),
     toggleActive:   useMutation({ mutationFn: usersApi.toggleActive,  onSuccess: inv }),
     changePassword: useMutation({ mutationFn: ({ id, password, confirmation }: { id: number; password: string; confirmation: string }) => usersApi.changePassword(id, password, confirmation) }),
-    assignRole:     useMutation({ mutationFn: ({ id, roleId }: { id: number; roleId: number }) => usersApi.assignRole(id, roleId), onSuccess: inv }),
+    assignRole:     useMutation({ mutationFn: ({ id, role }: { id: number; role: string }) => usersApi.assignRole(id, role), onSuccess: inv }),
   };
 }
 

@@ -172,33 +172,75 @@ class UserController extends BaseApiController
     }
 
     public function assignRole(Request $request, $id): JsonResponse
-{
-    try {
-        $userId = $request->route('user') ?? $id;
-        $user   = $this->userService->findById($userId);
-        $this->authorizeAction('update', $user);
+    {
+        try {
+            $userId = $request->route('user') ?? $id;
+            $user   = $this->userService->findById($userId);
+            $this->authorizeAction('update', $user);
 
-        $companyId = app(\App\Services\CompanyContextService::class)->get();
+            $companyId = app(\App\Services\CompanyContextService::class)->get();
 
-        $data = $request->validate([
-            'role' => 'required|string|exists:roles,name',
-        ]);
+            $data = $request->validate([
+                'role'    => 'nullable|string|max:100',
+                'role_id' => 'nullable|integer',
+            ]);
 
-        app(\App\Services\CompanyRoleService::class)
-            ->assignRole($user, $data['role'], $companyId);
+            if (empty($data['role']) && empty($data['role_id'])) {
+                return $this->errorResponse('حدد الدور (role أو role_id)', 422);
+            }
 
-        $this->notificationService->info(
-            'تم تعيين دور للمستخدم',
-            "{$user->name} ← {$data['role']}",
-        );
-        return $this->successResponse(
-            new UserResource($user->load('roles')),
-            'تم تعيين الدور'
-        );
-    } catch (\Throwable $e) {
-        return $this->handleError($e, 'assignRole');
+            // تحويل role_id → اسم الدور (نطاق = الشركة الحالية فقط)
+            if (! empty($data['role_id'])) {
+                $role = \App\Models\Role::where('id', $data['role_id'])
+                    ->where('company_id', $companyId)
+                    ->where('guard_name', 'web')
+                    ->first();
+
+                if (! $role) {
+                    return $this->errorResponse('الدور المحدد غير موجود في هذه الشركة', 422);
+                }
+                $roleName = $role->name;
+            } else {
+                $roleName = $data['role'];
+
+                $exists = \App\Models\Role::where('name', $roleName)
+                    ->where('company_id', $companyId)
+                    ->where('guard_name', 'web')
+                    ->exists();
+
+                if (! $exists) {
+                    return $this->errorResponse('الدور المحدد غير موجود في هذه الشركة', 422);
+                }
+            }
+
+            // حماية دور المالك: يُمنح تلقائياً لمالك الشركة فقط، ولا يُنزع منه
+            $company        = \App\Models\Company::find($companyId);
+            $isCompanyOwner = $company && (int) $company->owner_id === (int) $user->id;
+
+            if ($roleName === 'owner' && ! $isCompanyOwner) {
+                return $this->errorResponse('دور «مالك الشركة» يُمنح تلقائياً لمالك الشركة فقط', 422);
+            }
+
+            if ($isCompanyOwner && $roleName !== 'owner') {
+                return $this->errorResponse('لا يمكن إزالة دور المالك عن مالك الشركة', 422);
+            }
+
+            app(\App\Services\CompanyRoleService::class)
+                ->replaceRole($user, $roleName, $companyId);
+
+            $this->notificationService->info(
+                'تم تعيين دور للمستخدم',
+                "{$user->name} ← {$roleName}",
+            );
+
+            return $this->successResponse(
+                new UserResource($user->load('roles')),
+                'تم تعيين الدور'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'assignRole');
+        }
     }
-}
 
     // ─── المحذوفات ──────────────────────────────────────────────────
 

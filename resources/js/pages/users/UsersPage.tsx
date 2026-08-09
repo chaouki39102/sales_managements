@@ -43,6 +43,7 @@ interface User {
     created_at: string;
     roles?: Role[];
     permissions?: Permission[];
+    two_factor_enabled?: boolean;
 }
 
 // ─── Helpers ────────────────────────────────────
@@ -1721,6 +1722,18 @@ export default function UsersPage() {
         },
     );
 
+    // تعيين دور المستخدم داخل الشركة
+    const assignRole = useTenantMutation(
+        ({ userId, role }: { userId: number; role: string }) =>
+            usersApi.assignRole(userId, role),
+        (slug) => tenantKeys.users.all(slug),
+        {
+            onSuccess: () => notify.success('تم تحديث الدور'),
+            onError: (err: any) =>
+                notify.error(err?.response?.data?.message ?? 'تعذر تحديث الدور'),
+        },
+    );
+
     // ─── Filtered users ────────────────────────────
     const filteredUsers = users.filter((u) => {
         if (filter === "active" && !u.active) return false;
@@ -2222,33 +2235,52 @@ export default function UsersPage() {
                                             )}
                                         </div>
 
-                                        {/* Role */}
+                                        {/* Role + 2FA */}
                                         <div
                                             style={{
                                                 display: "flex",
-                                                alignItems: "center",
+                                                flexDirection: "column",
+                                                gap: 4,
+                                                minWidth: 118,
                                             }}
+                                            onClick={(e) => e.stopPropagation()}
                                         >
-                                            {u.roles?.[0] ? (
-                                                <Badge
-                                                    color="var(--purple)"
-                                                    bg="var(--purb)"
-                                                >
-                                                    <i
-                                                        className="ti ti-shield-half"
-                                                        style={{ fontSize: 9 }}
-                                                    />
-                                                    {u.roles[0].display_name ??
-                                                        u.roles[0].name}
-                                                </Badge>
-                                            ) : (
-                                                <Badge
-                                                    color="var(--t4)"
-                                                    bg="var(--bg4)"
-                                                >
+                                            <select
+                                                className="usr-role-assign"
+                                                value={u.roles?.[0]?.name ?? ""}
+                                                disabled={assignRole.isPending}
+                                                title="تعيين دور المستخدم داخل الشركة"
+                                                onChange={(e) => {
+                                                    const rn = e.target.value;
+                                                    if (!rn) return;
+                                                    assignRole.mutate({
+                                                        userId: u.id,
+                                                        role: rn,
+                                                    });
+                                                }}
+                                            >
+                                                <option value="">
                                                     بدون دور
-                                                </Badge>
-                                            )}
+                                                </option>
+                                                {roles.map((r) => (
+                                                    <option
+                                                        key={r.id}
+                                                        value={r.name}
+                                                    >
+                                                        {r.display_name ??
+                                                            r.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {u.two_factor_enabled ? (
+                                                <span
+                                                    className="usr-2fa"
+                                                    title="المصادقة الثنائية مفعّلة"
+                                                >
+                                                    <i className="ti ti-shield-check" />
+                                                    2FA مفعّلة
+                                                </span>
+                                            ) : null}
                                         </div>
 
                                         {/* Last login */}

@@ -61,6 +61,32 @@ class CompanyRoleService
     }
 
     /**
+     * استبدال دور المستخدم داخل شركة بدور واحد فقط.
+     * يزيل كل أدوار الشركة ثم يعيّن الدور المحدد — المستخدم يملك دوراً واحداً للشركة.
+     * (أدوار الشركات الأخرى تُحتفظ بها دون تغيير)
+     */
+    public function replaceRole(User $user, string $roleName, int $companyId): Role
+    {
+        $role = Role::where('name', $roleName)
+            ->where('company_id', $companyId)
+            ->where('guard_name', 'web')
+            ->firstOrFail();
+
+        DB::transaction(function () use ($user, $companyId, $role) {
+            $companyRoleIds = Role::where('company_id', $companyId)
+                ->pluck('id')
+                ->all();
+
+            $user->roles()->detach($companyRoleIds);
+            $user->assignRole($role);
+        });
+
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+
+        return $role;
+    }
+
+    /**
      * إزالة دور مستخدم داخل شركة معيّنة.
      */
     public function removeRole(User $user, string $roleName, int $companyId): void

@@ -1,0 +1,269 @@
+/* ══════════════════════════════════════════════════════════════════
+   roles-matrix.css — مصفوفة الصلاحيات + تعيين دور المستخدم
+   (إعداد الأدوار والصلاحيات — Upgrade 4 / Task 4.4)
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─── مبدّل العرض (بطاقات / مصفوفة) ───────────────────────────────── */
+.rm-toggle {
+    display: inline-flex;
+    gap: 4px;
+    background: var(--bg3);
+    border: 1px solid var(--b1);
+    border-radius: 20px;
+    padding: 3px;
+    margin-bottom: 16px;
+}
+
+.rm-toggle button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    background: transparent;
+    color: var(--t3);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 18px;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+}
+
+.rm-toggle button i {
+    font-size: 14px;
+}
+
+.rm-toggle button.on {
+    background: var(--em);
+    color: #fff;
+}
+
+/* ─── شريط معلومات المصفوفة ──────────────────────────────────────── */
+.rm-matrix-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--t3);
+    background: var(--bg3);
+    border: 1px solid var(--b1);
+    border-radius: var(--r2);
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.rm-matrix-info .ti-shield-lock {
+    color: var(--gold);
+    font-size: 14px;
+}
+
+.rm-matrix-info .ti-alert-triangle {
+    color: var(--red);
+    font-size: 14px;
+}
+
+/* ─── حاوية المصفوفة (تمرير أفقي + عمودي) ────────────────────────── */
+.rm-wrap {
+    max-height: 70vh;
+    overflow: auto;
+    border: 1px solid var(--b1);
+    border-radius: var(--r2);
+    background: var(--bg2);
+}
+
+.rm-table {
+    border-collapse: collapse;
+    width: max-content;
+    min-width: 100%;
+    font-size: 12px;
+}
+
+.rm-table th,
+.rm-table td {
+    border-bottom: 1px solid var(--b1);
+    border-inline-end: 1px solid var(--b1);
+}
+
+.rm-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--bg3);
+}
+
+.rm-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* عمود أسماء الصلاحيات — لاصق في بداية الصف */
+.rm-perm-col,
+.rm-perm {
+    position: sticky;
+    inset-inline-start: 0;
+    background: var(--bg3);
+    z-index: 2;
+    min-width: 200px;
+    max-width: 260px;
+    white-space: nowrap;
+}
+
+.rm-perm-col {
+    text-align: start;
+    padding: 10px 12px;
+    font-weight: 800;
+    color: var(--t1);
+    z-index: 6;
+}
+
+.rm-perm {
+    padding: 5px 12px;
+    color: var(--t2);
+    font-weight: 600;
+}
+
+.rm-perm small {
+    display: block;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--t4);
+    font-family: monospace;
+    direction: ltr;
+    text-align: start;
+}
+
+/* ─── رأس عمود الدور ──────────────────────────────────────────────── */
+.rm-role-hd {
+    min-width: 108px;
+    padding: 8px 6px;
+    text-align: center;
+}
+
+.rm-role-hd .rm-role-name {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding-top: 4px;
+    border-top: 3px solid transparent;
+}
+
+.rm-role-hd .rm-role-name strong {
+    font-size: 11.5px;
+    color: var(--t1);
+    max-width: 96px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rm-role-hd .rm-role-count {
+    font-size: 10px;
+    color: var(--t4);
+    font-weight: 600;
+}
+
+/* عمود مالك الشركة — مقفول */
+.rm-role-hd--locked {
+    opacity: .8;
+}
+
+.rm-role-hd--locked .rm-role-name {
+    border-top-color: var(--gold);
+}
+
+.rm-role-hd--locked .ti-lock {
+    font-size: 11px;
+    color: var(--gold);
+}
+
+/* ─── صف رأس المجموعة ────────────────────────────────────────────── */
+.rm-group td {
+    background: var(--bg4);
+    font-weight: 800;
+    font-size: 11px;
+    color: var(--t2);
+    padding: 7px 12px;
+    position: sticky;
+    inset-inline-start: 0;
+}
+
+.rm-group td span {
+    color: var(--t4);
+    font-weight: 600;
+    font-size: 10px;
+    margin-inline-start: 6px;
+}
+
+/* ─── خلايا التفعيل ──────────────────────────────────────────────── */
+.rm-cell {
+    text-align: center;
+    padding: 4px 6px;
+}
+
+.rm-cell input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+    accent-color: var(--em);
+}
+
+.rm-cell--locked {
+    color: var(--t4);
+}
+
+.rm-cell--locked .ti-lock {
+    font-size: 12px;
+    opacity: .6;
+}
+
+.rm-cell--saving {
+    opacity: .5;
+    pointer-events: none;
+}
+
+/* ─── فارغة / تحميل ──────────────────────────────────────────────── */
+.rm-empty {
+    padding: 28px;
+    text-align: center;
+    color: var(--t4);
+    font-size: 12px;
+}
+
+/* ─── تعيين دور المستخدم (في UsersPage) ──────────────────────────── */
+.usr-role-assign {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--b1);
+    background: var(--bg2);
+    color: var(--t2);
+    cursor: pointer;
+    max-width: 132px;
+    min-width: 96px;
+}
+
+.usr-role-assign:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+/* شارة المصادقة الثنائية في صف المستخدم */
+.usr-2fa {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--em);
+    background: color-mix(in srgb, var(--em) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--em) 30%, transparent);
+    padding: 2px 8px;
+    border-radius: 20px;
+    width: fit-content;
+}
+
+.usr-2fa i {
+    font-size: 11px;
+}
