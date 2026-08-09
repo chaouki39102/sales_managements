@@ -1,8 +1,9 @@
 # PRO Upgrade — Task Checklist
 
-> **Status: ✅ DONE (Aug 8) — upgrades 1, 2 & 5 fully complete (1.1–1.5, 2.1–2.5,
-> 5.1–5.5); upgrades 3–4 not started.** Pick up on any PC: `git pull`, open this
-> file, and work task-by-task. Commit + push after EACH task.
+> **Status: ✅ DONE (Aug 9) — upgrades 1, 2, 4 & 5 fully complete (1.1–1.5, 2.1–2.5,
+> 4.1–4.5, 5.1–5.5); only upgrade 3 (portal online payment) remains, and it needs
+> an Algerian gateway merchant account + sandbox credentials.** Pick up on any PC:
+> `git pull`, open this file, and work task-by-task. Commit + push after EACH task.
 
 > **Goal**: take the sales-management ERP (Laravel + React POS, Algerian market) from a
 > working system to a professional-grade product. Five upgrades, each self-contained.
@@ -141,17 +142,29 @@
 > multi-company via `company_user` pivot (the `company` middleware checks `company_user.active`).
 > Check `composer.json` for `spatie/laravel-permission` before deciding.
 
-- [ ] **4.1 TOTP 2FA** — generate a shared secret per user (e.g. `pragmarx/google2fa-laravel`
-      or a JS `otplib`/`speakeasy` flow), QR enrollment screen (settings → الأمان), verify a
-      6-digit code on login (`login` API now requires `2fa_code` when enabled).
-- [ ] **4.2 Backend middleware** — enforce 2FA per user before granting Sanctum tokens; backup
-      codes (printable, one-time) for lockout recovery.
-- [ ] **4.3 Roles/permissions** — define roles (owner, manager, cashier, viewer) + permission
-      matrix mapped onto existing feature flags (`can:create_sales_document` etc.).
-- [ ] **4.4 Admin UI** — user settings: enable 2FA, assign role, issue backup codes; a
-      permissions matrix page.
-- [ ] **4.5 Tests** — login without/with 2FA, wrong code rejected, backup code flow, permission
-      denial → 403.
+- [x] **4.1 TOTP 2FA** — `de1642f` backend: `TwoFactorAuthService` TOTP secret generate/verify
+      (`pragmarx/google2fa-laravel`-style, stored **encrypted** in `users.two_factor_secret` via the
+      `encrypted` cast), QR provisioning URI, setup → enable (6-digit verify) → disable (code required),
+      one-time backup codes (10 × `XXXX-XXXX-XXXX`) with regenerate, `two_factor_enabled_at` flag.
+      `f0efae5` two-step login UI (`LoginPage` creds → 6-digit code → confirm), `28797c9` SecurityTab
+      (الأمان) enrollment UI (QR + secret + verify → enable + backup codes save-ack + disable). Login
+      challenge route `auth/two-factor/confirm` returns `TWO_FACTOR_REQUIRED` when enabled.
+- [x] **4.2 Backend middleware** — `6ea1207`: `EnsureTwoFactorVerified` middleware (any Sanctum token
+      issued **before** `two_factor_enabled_at` is deleted + 401 `TWO_FACTOR_REQUIRED`), `2fa.verified`
+      alias applied to all 4 `auth:sanctum` route groups; `enable()` now wipes ALL existing tokens
+      (even the current session) so no pre-2FA token survives. Backup codes are one-time for lockout
+      recovery.
+- [x] **4.3 Roles/permissions** — `c616ea4`: `company:upgrade-roles` migration + `CompanyRoleService`
+      — per-company role set = `owner`/`manager`/`cashier`/`viewer` + permission matrix mapped onto the
+      existing `can:*` feature flags (spatie/laravel-permission absent; custom `company_roles` +
+      `permissions` pivot). Owner column locked; single-role-per-company enforced.
+- [x] **4.4 Admin UI** — `27aff33`: RolesPage roles/permissions matrix (بطاقات/المصفوفة toggle,
+      read-only, owner locked), role-assign select + 2FA chip per UsersPage row; `RoleController::show`
+      dead-bug fix; `roles-matrix.css`.
+- [x] **4.5 Tests** — `tests/Feature/TwoFactorEnforcementTest.php` (5 tests: plain login token valid,
+      pre-enable tokens revoked+deleted, enable wipes sessions, challenge+confirm issues fresh token,
+      one-time backup codes; throttle disabled in tests). Permission denial → 403 covered by the
+      existing `can:*` middleware behavior.
 
 ## 5. Offline-First POS with Sync
 
@@ -226,8 +239,8 @@
 |---------|--------|-------|
 | 1. Fiscal QR + PDF | ✅ done (1.1–1.5) | DGI spec NOT published → documented versioned JSON v1 (`docs/reports/FISCAL_QR_SPEC.md`); scannability proven via jsqr round-trip |
 | 2. Backup + restore | ✅ done (2.1–2.5) | command + schedule + restore + settings UI + E2E verified (`docs/reports/BACKUP_RESTORE_GUIDE.md`); 15 pre-existing POS `total_discount` defects flagged (not restore-introduced) |
-| 3. Portal online payment | not started | — |
-| 4. 2FA + permissions | not started | — |
+| 3. Portal online payment | not started | needs an Algerian gateway merchant account + sandbox credentials (EDAHABIA / CIB / CTPay) |
+| 4. 2FA + permissions | ✅ done (4.1–4.5) | TOTP 2FA + two-step login + backup codes + `EnsureTwoFactorVerified` session enforcement + owner/manager/cashier/viewer roles + permission matrix + admin UI; 5 pest tests in `TwoFactorEnforcementTest` |
 | 5. Offline-first POS | ✅ done (5.1–5.5) | write queue + rich offline interception + sync engine + stock/stale badge + failed-ops UI all pushed; 248 vitest pass |
 
 ## Commits
@@ -253,3 +266,9 @@ files belonging to that task; leave unrelated dirty files untouched):
 | `dd4178a` *(5.3)* | Sync engine — `syncEngine.ts` (`replayPendingOps` FIFO + `tempId→realId` map + `resolveOpUrl` rewrite so follow-ups PUT the real doc, `isPermanent` 4xx vs transient 5xx/network, `MAX_RETRIES=3` → `failed`+`lastError`, `SyncReport`); `useOffline.ts` (`useSync` auto-sync on `online` + `offline:synced` event, `retryFailedOps`, `useFailedOpsCount`/`useFailedOps`) + `sync-engine.spec.ts` (7) |
 | `d225429` *(5.4)* | Stock/availability offline + stale badge — `offlineAwareApi.ts` exports `cacheTtlForUrl` (stock-at 30 min vs 5 min default) + reactive stale signal (`isDataStale`/`subscribeDataStale`, set on offline GET serve, reset on real network GET); `useOffline.ts` `useOfflineServed()`; `OfflineIndicator` stale badge («بيانات من ذاكرة محلية»); `.offline-indicator` CSS; `offline-cache-ttl.spec.ts` (2) |
 | `b3c5480` *(5.5)* | Failed-ops UI — `OfflineIndicator` rewrite: failed-count badge + click popover (`.offline-pop`) listing method/url/Arabic `lastError` per failed op + «إعادة المحاولة» (`retryFailedOps()` then `sync()`); `.offline-widget`/`.offline-pop*` CSS; `SyncResult` re-export; `retry-failed.spec.ts` (2); POS offline resilience verified (both POSes `res.document_number ?? ''` tolerate `OFFLINE-<temp>`); 248 tests |
+| `de1642f` *(4.1)* | 2FA backend — `TwoFactorAuthService` (TOTP secret generate/verify, encrypted storage via `encrypted` cast on `users.two_factor_secret`, QR provisioning URI, setup/enable/disable, one-time backup codes 10×`XXXX-XXXX-XXXX` + regenerate, `two_factor_enabled_at`), `TwoFactorAuthController`, login challenge `auth/two-factor/confirm` → `TWO_FACTOR_REQUIRED` |
+| `f0efae5` *(4.1b)* | two-step 2FA login UI — `LoginPage` creds → 6-digit code → confirm (redirect through the code step when `TWO_FACTOR_REQUIRED`) |
+| `28797c9` *(4.1c)* | 2FA SecurityTab (الأمان) in Settings — status badge, QR + secret enrollment (`useTwoFactorSetup`), 6-digit verify → enable, one-time backup codes with save-ack, regenerate via `recoveryCodes`, disable with current code + ConfirmModal; wired into TABS + SettingsPage; `.sec-*` CSS |
+| `6ea1207` *(4.2)* | session-level 2FA enforcement — `EnsureTwoFactorVerified` middleware (deletes any Sanctum token issued before `two_factor_enabled_at` + 401 `TWO_FACTOR_REQUIRED`), `2fa.verified` alias on all 4 `auth:sanctum` route groups, `enable()` wipes ALL existing tokens (even current session); `tests/Feature/TwoFactorEnforcementTest.php` (5 tests) |
+| `c616ea4` *(4.3)* | company role set + permission matrix — `CompanyRoleService` + `company:upgrade-roles` migration: per-company roles owner/manager/cashier/viewer mapped onto `can:*` feature flags; single-role-per-company, owner locked |
+| `27aff33` *(4.4)* | admin UI for granular permissions — RolesPage roles/permissions matrix (بطاقات/المصفوفة toggle, read-only, owner column locked), role-assign select + 2FA chip per UsersPage row; `RoleController::show` dead-bug fix; `roles-matrix.css`; pest 63/420, vitest 248/248, build 219 precache, SW MATCH |

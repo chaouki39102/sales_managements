@@ -35,7 +35,7 @@
 
 ### Phase 68 follow-up — PRO Upgrade 5 (Offline-First POS) Fully Complete (Aug 8)
 
-**Request**: complete the "Offline-First POS" upgrade (5.1–5.5 from `PRO_UPGRADE_TODO.md`) — IndexedDB write queue, optimistic offline success, sync-on-`online` with conflict surface, offline stock cache, Vitest. All 5 tasks committed+pushed individually (`8918c3a`, `36cc51f`, `dd4178a`, `d225429`, `b3c5480`). Vitest suite now **248/248** (up from 222; 5 offline suites). Upgrades 1–2 already done; 3–4 not started.
+**Request**: complete the "Offline-First POS" upgrade (5.1–5.5 from `PRO_UPGRADE_TODO.md`) — IndexedDB write queue, optimistic offline success, sync-on-`online` with conflict surface, offline stock cache, Vitest. All 5 tasks committed+pushed individually (`8918c3a`, `36cc51f`, `dd4178a`, `d225429`, `b3c5480`). Vitest suite now **248/248** (up from 222; 5 offline suites). Upgrades 1–2 and 4 already done; upgrade 3 (portal online payment, needs a gateway merchant account) is the only one remaining.
 
 **5.1 Write queue** (`resources/js/lib/offline/db.ts`): `PendingOp` `{id, tempId, targetId, method, url, data, createdAt, status, retries, lastError}`; FIFO by `id ASC`; **verbatim method+url** (Phase 46 rule: a follow-up PUT must stay PUT, never converted to POST on replay); `invalidateCache` (matches Cache Storage on url prefix), `getPendingOpsByStatus`, `getFailedOpsCount`, `markOpFailed` (increments retries + Arabic `lastError`), `clearPendingOps`. TTL 5 min.
 
