@@ -3,8 +3,8 @@
 // صفحة مستقلة عن متجر «اطلب سلعة»: تصفية بالحالة + تفاصيل + تأكيد/تعديل/إلغاء.
 // «تعديل» يعيد الزبون إلى متجر الطلب في وضع التعديل (drawer مفتوح).
 // ════════════════════════════════════════════════════════════════════════════
-import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { portalApi, type PortalOrderStatus, type PortalOrder } from '@/lib/api/portal/portal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -48,11 +48,34 @@ export default function PortalMyOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<PortalOrderStatus | ''>('');
   const [submitted, setSubmitted] = useState<number | null>(null);
   const [toast, setToast] = useState('');
+  const [toastKind, setToastKind] = useState<'ok' | 'err'>('ok');
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, kind: 'ok' | 'err' = 'ok') => {
+    setToastKind(kind);
     setToast(msg);
     setTimeout(() => setToast(''), 3600);
   };
+
+  // نتيجة العودة من صفحة الدفع (portalReturnUrl في الخادم):
+  // /portal/{slug}/myorders?order_id=..&pay_result=succeeded|cancelled|failed
+  const [searchParams, setSearchParams] = useSearchParams();
+  const payResult = searchParams.get('pay_result');
+
+  useEffect(() => {
+    if (!payResult) return;
+    if (payResult === 'succeeded') {
+      showToast('تم دفع الطلب بنجاح — ستقوم المؤسسة بتحويله إلى فاتورة.', 'ok');
+    } else if (payResult === 'cancelled') {
+      showToast('ألغيت عملية الدفع — يمكنك إعادة المحاولة في أي وقت.', 'ok');
+    } else {
+      showToast('تعذر إتمام الدفع — حاول مرة أخرى أو تواصل مع المؤسسة.', 'err');
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete('pay_result');
+    next.delete('order_id');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // إعدادات البوابة — تُخبرنا إذا كان إرسال الطلبات معطلاً على حساب الزبون
   // (portal_orders_enabled أو إيقاف إداري) لنعرض لافتة بدل أن يرفض الخادم كل إجراء.
@@ -113,7 +136,7 @@ export default function PortalMyOrdersPage() {
       setSubmitted(order.id);
       qc.invalidateQueries({ queryKey: ['portal', slug, 'orders', 'list'] });
     },
-    onError: (err: Error) => showToast(err.message || 'تعذر إلغاء الطلب'),
+    onError: (err: Error) => showToast(err.message || 'تعذر إلغاء الطلب', 'err'),
   });
 
   // تأكيد الطلب من الزبون (قيد الاعداد → مؤكد) — بعد التأكيد يدخل الطلب
@@ -124,8 +147,31 @@ export default function PortalMyOrdersPage() {
       setSubmitted(order.id);
       qc.invalidateQueries({ queryKey: ['portal', slug, 'orders', 'list'] });
     },
-    onError: (err: Error) => showToast(err.message || 'تعذر تأكيد الطلب'),
+    onError: (err: Error) => showToast(err.message || 'تعذر تأكيد الطلب', 'err'),
   });
+
+  // الدفع الإلكتروني — يُنشئ نية دفع واحدة لكل طلب (idempotent) ويفتح صفحة
+  // الدفع في تبويب جديد. المبلغ يُحسب في الخادم حصراً (total_ttc).
+  const payOrder = useMutation({
+    mutationFn: (id: number) => portalApi.payOrder(id),
+    onSuccess: (intent) => {
+      if (intent.payment_url) {
+        window.open(intent.payment_url, '_blank', 'noopener,noreferrer');
+      }
+      showToast('تم تجهيز صفحة الدفع — أكمل العملية في التبويب الجديد.', 'ok');
+      qc.invalidateQueries({ queryKey: ['portal', slug, 'orders', 'list'] });
+    },
+    onError: (err: Error) => showToast(err.message || 'تعذر بدء الدفع', 'err'),
+  });
+
+  // الطلب قابل للدفع الإلكتروني: تفعيل الإعداد في المؤسسة + ليس منتهياً
+  // (حالة الطلب أو نية الدفع) + لم يُحوَّل بعد إلى فاتورة. الخادم يبقى
+  // المرجع النهائي (يرفض 409 كل حالة غير صالحة).
+  const isPayable = (o: PortalOrder): boolean =>
+    cfg?.online_payment_enabled === true &&
+    !o.is_converted &&
+    o.payment_status !== 'succeeded' &&
+    !['cancelled', 'returned', 'completed'].includes(o.status);
 
   const orders = ordersQuery.data?.data ?? [];
   const meta = ordersQuery.data?.meta;
@@ -195,6 +241,14 @@ export default function PortalMyOrdersPage() {
                     </div>
                     <div className="portal-order-side">
                       <span className={`badge ${STATUS_STYLE[o.status]}`}>{o.status_label}</span>
+                      {o.payment_status === 'succeeded' && (
+                        <span
+                          className="badge badge--g"
+                          title={o.paid_at ? `مدفوع إلكترونياً — ${fmtDate(o.paid_at)}` : 'مدفوع إلكترونياً'}
+                        >
+                          <i className="ti ti-circle-check" /> مدفوع
+                        </span>
+                      )}
                       <span className="portal-order-amt">{fmtMoneySigned(o.total_ttc)}</span>
                       <i className={`ti ti-chevron-${submitted === o.id ? 'up' : 'down'}`} />
                     </div>
@@ -254,6 +308,25 @@ export default function PortalMyOrdersPage() {
                         })()
                       )}
 
+                      {isPayable(o) && (
+                        <div className="portal-order-actions">
+                          <button
+                            className="portal-btn portal-btn--sm portal-btn--em"
+                            onClick={() => payOrder.mutate(o.id)}
+                            type="button"
+                            disabled={payOrder.isPending}
+                          >
+                            <i className="ti ti-wallet" />
+                            {o.payment_status === 'pending' ? 'متابعة الدفع' : `الدفع الإلكتروني (${fmtMoney(o.total_ttc)})`}
+                          </button>
+                          {o.payment_status === 'pending' && (
+                            <span className="portal-prod-ref">
+                              يوجد طلب دفع معلق — تابع عبر نفس الرابط أو أنشئ جديداً.
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       {o.status === 'preparing' && (
                         <div className="portal-order-actions">
                           <button
@@ -302,7 +375,7 @@ export default function PortalMyOrdersPage() {
       </div>
 
       <ConfirmDialog {...confirmDialogProps} />
-      {toast && <div className="portal-toast"><i className="ti ti-circle-x" /> {toast}</div>}
+      {toast && <div className="portal-toast"><i className={`ti ${toastKind === 'ok' ? 'ti-circle-check' : 'ti-circle-x'}`} /> {toast}</div>}
     </section>
   );
 }

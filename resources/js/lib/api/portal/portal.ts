@@ -256,6 +256,19 @@ export interface PortalOrdersSummary {
   cancelled: number;
 }
 
+// حالة الدفع الإلكتروني للطلب (عمود payment_status على portal_orders).
+export type PortalPaymentStatus = 'pending' | 'succeeded' | 'failed' | 'cancelled' | null;
+
+// نية دفع واحدة لكل طلب — تُرجع من POST /portal/orders/{id}/pay.
+export interface PortalPayIntent {
+  order_id:          number;
+  order_reference:   string;
+  payment_intent_id: string;
+  payment_status:    PortalPaymentStatus;
+  amount:            number;
+  payment_url:       string;
+}
+
 export interface PortalOrder {
   id:           number;
   reference:    string;
@@ -270,8 +283,17 @@ export interface PortalOrder {
   total_ttc:    number;
   total_discount: number;
   items_count:  number;
+  is_converted: boolean;
+  sale_document_id: number | null;
   requested_at: string | null;
   created_at:   string | null;
+  // حالة الدفع الإلكتروني — تُظهر زر «ادفع الآن» أو شارة «مدفوع» في طلباتي.
+  payment_status:        PortalPaymentStatus;
+  payment_amount:        number;
+  payment_provider:      string | null;
+  payment_intent_id:     string | null;
+  payment_transaction_id: string | null;
+  paid_at:               string | null;
   lines?:       PortalOrderItem[];
   party?:       { id: number; name: string; code: string | null } | null;
   document?:    {
@@ -412,6 +434,10 @@ export const portalApi = {
     portalPost<PortalOrder>(`/portal/orders/${id}/validate`),
   cancelOrder: (id: number) =>
     portalPost<PortalOrder>(`/portal/orders/${id}/cancel`),
+  // بدء الدفع الإلكتروني للطلب — يُنشئ نية دفع واحدة (idempotent) ويعيد
+  // payment_url (صفحة البوابة/نموذج الدفع). المبلغ محسوب في الخادم حصراً.
+  payOrder: (id: number) =>
+    portalPost<PortalPayIntent>(`/portal/orders/${id}/pay`),
 };
 
 export interface PortalOrderLineInput {
