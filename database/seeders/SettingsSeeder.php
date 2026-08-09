@@ -605,6 +605,57 @@ class SettingsSeeder extends Seeder
             ],
 
             // ══════════════════════════════════════════
+            // group: portal — الدفع الإلكتروني (بوابة الزبائن)
+            // النموذج (mock) يعمل فوراً بلا حساب تاجر؛ استبداله بمزوّد حقيقي
+            // (edahabia/cib/ctpay) يتم بملء المفاتيح هنا فقط.
+            // ══════════════════════════════════════════
+            'online_payment_enabled' => [
+                'value'         => false,
+                'group'         => 'portal',
+                'type'          => 'boolean',
+                'description'   => 'تفعيل الدفع الإلكتروني في بوابة الزبائن (عند إيقافه لا تظهر أزرار الدفع ولا تُقبل نيات جديدة)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 118,
+            ],
+            'online_payment_provider' => [
+                'value'         => 'mock',
+                'group'         => 'portal',
+                'type'          => 'string',
+                'description'   => 'مزوّد الدفع الإلكتروني: mock (تجريبي، بلا حساب) | edahabia | cib | ctpay',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 119,
+            ],
+            'online_payment_mode' => [
+                'value'         => 'sandbox',
+                'group'         => 'portal',
+                'type'          => 'string',
+                'description'   => 'وضع التشغيل: sandbox (تجريبي) | live (إنتاجي)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 120,
+            ],
+            'online_payment_merchant_id' => [
+                'value'         => '',
+                'group'         => 'portal',
+                'type'          => 'string',
+                'description'   => 'معرّف التاجر لدى مزوّد الدفع',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 121,
+            ],
+            'online_payment_secret_key' => [
+                'value'         => '',
+                'group'         => 'portal',
+                'type'          => 'string',
+                'description'   => 'المفتاح السري للتوقيع/التحقق (لا يظهر في الواجهات العامة)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 122,
+            ],
+
+            // ══════════════════════════════════════════
             // group: documents — إعدادات المستندات الافتراضية
             // ══════════════════════════════════════════
             'default_warehouse_id' => [

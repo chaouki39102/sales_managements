@@ -546,6 +546,9 @@ class PortalOrderController extends BaseApiController
                 'hide_out_of_stock'          => (bool) $this->portalSetting('portal_hide_out_of_stock', false),
                 'show_incart_badge'          => (bool) $this->portalSetting('portal_show_incart_badge', true),
                 'show_notes'                 => (bool) $this->portalSetting('portal_show_notes', true),
+
+                // الدفع الإلكتروني — يُظهر زر الدفع في المتجر فقط عند التفعيل.
+                'online_payment_enabled'     => (bool) $this->portalSetting('online_payment_enabled', false),
             ], 'تم جلب إعدادات البوابة بنجاح');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal_orders.config');

@@ -24,6 +24,7 @@ class PaymentModeSeeder extends Seeder
             ['company_id' => $companyId, 'name' => 'تحويل بنكي',   'code' => 'VIR',   'treasury_account_id' => $bankAccountId, 'requires_reference' => true,  'is_cash' => false, 'active' => true, 'display_order' => 3, 'created_at' => now(), 'updated_at' => now()],
             ['company_id' => $companyId, 'name' => 'بطاقة بنكية',  'code' => 'CB',    'treasury_account_id' => $bankAccountId, 'requires_reference' => false, 'is_cash' => false, 'active' => true, 'display_order' => 4, 'created_at' => now(), 'updated_at' => now()],
             ['company_id' => $companyId, 'name' => 'دفع آجل',      'code' => 'CREDIT','treasury_account_id' => null,           'requires_reference' => false, 'is_cash' => false, 'active' => true, 'display_order' => 5, 'created_at' => now(), 'updated_at' => now()],
+            ['company_id' => $companyId, 'name' => 'دفع إلكتروني', 'code' => 'ONL',   'treasury_account_id' => $bankAccountId, 'requires_reference' => false, 'is_cash' => false, 'active' => true, 'display_order' => 6, 'created_at' => now(), 'updated_at' => now()],
         ]);
     }
 }

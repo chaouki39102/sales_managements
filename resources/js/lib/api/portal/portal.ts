@@ -315,6 +315,7 @@ export interface PortalConfig {
   hide_out_of_stock:          boolean;
   show_incart_badge:          boolean;
   show_notes:                 boolean;
+  online_payment_enabled:     boolean;
 }
 
 export interface PortalDocFilters {

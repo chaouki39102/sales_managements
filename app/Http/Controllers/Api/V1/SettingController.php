@@ -195,6 +195,11 @@ class SettingController extends BaseApiController
             'portal_hide_out_of_stock', 'portal_show_incart_badge',
             'portal_show_notes',
 
+            // portal — الدفع الإلكتروني
+            'online_payment_enabled', 'online_payment_provider',
+            'online_payment_mode', 'online_payment_merchant_id',
+            'online_payment_secret_key',
+
             // general
             'app_name', 'app_logo', 'app_color', 'theme_mode', 'language',
             'timezone', 'date_format', 'time_format',

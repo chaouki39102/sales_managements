@@ -39,6 +39,13 @@ class PortalOrder extends Model
         'total_tva',
         'total_ttc',
         'requested_at',
+        'payment_intent_id',
+        'payment_provider',
+        'payment_status',
+        'payment_amount',
+        'payment_transaction_id',
+        'paid_at',
+        'payment_details',
     ];
 
     protected $casts = [
@@ -46,6 +53,26 @@ class PortalOrder extends Model
         'total_tva' => 'float',
         'total_ttc' => 'float',
         'requested_at' => 'datetime',
+        'payment_amount' => 'float',
+        'paid_at' => 'datetime',
+        'payment_details' => 'array',
+    ];
+
+    // حالة الدفع الابتدائية — لم يُبدَ الدفع بعد.
+    public const PAYMENT_NONE = 'none';
+    // نية دفع أُنشئت وانتظرت قرار الزبون/المزوّد.
+    public const PAYMENT_PENDING = 'pending';
+    public const PAYMENT_SUCCEEDED = 'succeeded';
+    public const PAYMENT_FAILED = 'failed';
+    // ألغى الزبون/المزوّد النية (لا تُعد محاولة دفع).
+    public const PAYMENT_CANCELLED = 'cancelled';
+
+    public const PAYMENT_STATUSES = [
+        self::PAYMENT_NONE,
+        self::PAYMENT_PENDING,
+        self::PAYMENT_SUCCEEDED,
+        self::PAYMENT_FAILED,
+        self::PAYMENT_CANCELLED,
     ];
 
     // حالات خاصة بطلبات الزبائن فقط (دورة طلب السلعة):
