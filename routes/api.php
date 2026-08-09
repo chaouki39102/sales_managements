@@ -222,6 +222,7 @@ Route::prefix('v1')->group(function () {
             Route::patch('/orders/{id}',      [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'update']);
             Route::post('/orders/{id}/validate', [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'validateOrder']);
             Route::post('/orders/{id}/cancel',   [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'cancel']);
+            Route::post('/orders/{id}/pay',      [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'pay']);
         });
     });
 

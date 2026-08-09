@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Api\V1\Portal;
 
+use App\Core\Exceptions\BusinessRuleException;
 use App\Core\Http\Controllers\BaseApiController;
+use App\Models\Company;
 use App\Models\PortalOrder;
 use App\Models\PortalUser;
 use App\Models\PriceLevel;
@@ -12,6 +14,7 @@ use App\Models\QuantityDiscount;
 use App\Models\Setting;
 use App\Services\CompanyContextService;
 use App\Services\InventoryStockService;
+use App\Services\Payments\Gateway\PaymentGatewayFactory;
 use App\Services\Portal\PortalOrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,6 +30,7 @@ use Illuminate\Http\Request;
  *   GET  /{company}/portal/orders/{id}      → تفاصيل طلب + سجل الحالة
  *   POST /{company}/portal/orders/{id}/validate → تأكيد الطلب من الزبون (قيد الاعداد → مؤكد)
  *   POST /{company}/portal/orders/{id}/cancel → إلغاء طلب قيد الاعداد
+ *   POST /{company}/portal/orders/{id}/pay    → بدء الدفع الإلكتروني (نية دفع واحدة لكل طلب)
  *
  * القاعدة: كل منطق الطلب في PortalOrderService (معزول عن CommercialDocumentService).
  * الأسعار تُحسب في الخادم من جدول المنتجات — الزبون يرسل product_id + quantity + packaging_id فقط.
@@ -403,6 +407,98 @@ class PortalOrderController extends BaseApiController
         }
     }
 
+    /**
+     * بدء الدفع الإلكتروني لطلب الزبون — إنشاء نية دفع واحدة لكل طلب.
+     *
+     * القواعد:
+     *   - يتطلب تفعيل online_payment_enabled في إعدادات المؤسسة (409 إن كان معطلاً).
+     *   - الطلب يخص الزبون الحالي فقط (portal.auth + findOwnOrder).
+     *   - المبلغ يُحسب في الخادم حصراً (total_ttc) — لا يُثق بأي مبلغ من العميل.
+     *   - نية معلّقة = استدعاء واحد idempotent: يعيد نفس redirect_url دون بوابة ثانية.
+     *   - نية منجزة (succeeded) أو طلب منتهٍ/ملغى/محوّل = رفض 409.
+     */
+    public function pay(Request $request): JsonResponse
+    {
+        try {
+            $this->assertOrdersEnabled();
+            $this->assertOnlinePaymentEnabled();
+
+            $portal  = $request->input('_portal_user');
+            $partyId = (int) ($portal->party_id ?? 0);
+            $order   = $this->findOwnOrder($partyId);
+
+            if (in_array($order->status, PortalOrder::TERMINAL_STATUSES, true)) {
+                throw new BusinessRuleException('لا يمكن الدفع لطلب «' . $order->status_label . '».', 409);
+            }
+            if ($order->payment_status === PortalOrder::PAYMENT_SUCCEEDED) {
+                throw new BusinessRuleException('هذا الطلب مدفوع بالفعل.', 409);
+            }
+            if ($order->is_converted) {
+                throw new BusinessRuleException('تم تحويل هذا الطلب إلى فاتورة — لا يمكن دفع الطلب بعد التحويل.', 409);
+            }
+
+            // إعادة النية المعلّقة نفسها (idempotent) دون إنشاء بوابة جديدة —
+            // حتى لو أعاد الزبون ضغط «ادفع» يعود لنفس رابط الدفع.
+            if ($order->payment_status === PortalOrder::PAYMENT_PENDING && $order->payment_intent_id) {
+                $details = is_array($order->payment_details) ? $order->payment_details : [];
+
+                return $this->successResponse([
+                    'order_id'          => (int) $order->id,
+                    'order_reference'   => $order->reference,
+                    'payment_intent_id' => $order->payment_intent_id,
+                    'payment_status'    => $order->payment_status,
+                    'amount'            => (float) $order->payment_amount,
+                    'payment_url'       => (string) ($details['redirect_url'] ?? ''),
+                ], 'يوجد طلب دفع معلق بالفعل — تابع عبر رابط الدفع نفسه.');
+            }
+
+            $company   = $request->input('_portal_company');
+            $companyId = (int) app(CompanyContextService::class)->get();
+            $gateway   = PaymentGatewayFactory::resolve($companyId);
+
+            $amount = round((float) $order->total_ttc, 2);
+            if ($amount <= 0) {
+                throw new BusinessRuleException('المبلغ المطلوب دفعه غير صالح.', 422);
+            }
+
+            $intent = $gateway->createPayment([
+                'company_id'      => $companyId,
+                'order_id'        => (int) $order->id,
+                'order_reference' => $order->reference,
+                'amount'          => $amount,
+                'currency'        => 'DZD',
+                'customer_name'   => $order->party?->name ?? $order->customer_name,
+                'customer_phone'  => $order->party?->phone ?? $order->customer_phone,
+                'return_url'      => $this->portalReturnUrl($company, $order, 'succeeded'),
+                'cancel_url'      => $this->portalReturnUrl($company, $order, 'cancelled'),
+            ]);
+
+            $order->forceFill([
+                'payment_intent_id' => $intent['reference'],
+                'payment_provider'  => $gateway->name(),
+                'payment_status'    => PortalOrder::PAYMENT_PENDING,
+                'payment_amount'    => $amount,
+                'payment_details'   => [
+                    'redirect_url' => $intent['redirect_url'],
+                    'return_url'   => $this->portalReturnUrl($company, $order, 'succeeded'),
+                    'cancel_url'   => $this->portalReturnUrl($company, $order, 'cancelled'),
+                    'created_at'   => now()->toIso8601String(),
+                ],
+            ])->save();
+
+            return $this->successResponse([
+                'order_id'          => (int) $order->id,
+                'order_reference'   => $order->reference,
+                'payment_intent_id' => $intent['reference'],
+                'payment_status'    => $order->payment_status,
+                'amount'            => $amount,
+                'payment_url'       => $intent['redirect_url'],
+            ], 'تم إنشاء طلب الدفع بنجاح');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'portal_orders.pay');
+        }
+    }
+
     public function validateOrder(Request $request): JsonResponse
     {
         try {
@@ -496,6 +592,27 @@ class PortalOrderController extends BaseApiController
         if ($party && !(bool) $party->portal_orders_enabled) {
             throw new \App\Core\Exceptions\BusinessRuleException('إرسال الطلبات معطل على حسابك الحالي — تواصل مع المؤسسة لتفعيله.', 409);
         }
+    }
+
+    /**
+     * بوابة الدفع الإلكتروني — عند تعطيلها تُرفض أي محاولة بدء دفع (409).
+     */
+    private function assertOnlinePaymentEnabled(): void
+    {
+        if (!$this->portalSetting('online_payment_enabled', false)) {
+            throw new BusinessRuleException('الدفع الإلكتروني غير مفعّل حالياً لهذه المؤسسة.', 409);
+        }
+    }
+
+    /**
+     * رابط عودة الزبون بعد الدفع — صفحة «طلباتي» في البوابة مع نتيجة الدفع.
+     * يُخزَّن مع النية ويستعمله نموذج الدفع/البوابة لتوجيه المتصفح بعد الحالة.
+     */
+    private function portalReturnUrl(Company $company, PortalOrder $order, string $result): string
+    {
+        return url('/portal/' . $company->slug . '/myorders')
+            . '?order_id=' . $order->id
+            . '&pay_result=' . $result;
     }
 
     /**

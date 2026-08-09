@@ -699,6 +699,13 @@ class PortalOrderService
             'requested_at'     => $order->requested_at?->toISOString(),
             'created_at'       => $order->created_at?->toISOString(),
             'updated_at'       => $order->updated_at?->toISOString(),
+            // حالة الدفع الإلكتروني — تُظهر زر الدفع/شارة «مدفوع» في الواجهة.
+            'payment_status'        => $order->payment_status,
+            'payment_amount'        => (float) ($order->payment_amount ?? 0),
+            'payment_provider'      => $order->payment_provider,
+            'payment_intent_id'     => $order->payment_intent_id,
+            'payment_transaction_id'=> $order->payment_transaction_id,
+            'paid_at'               => $order->paid_at?->toISOString(),
             'party'            => $order->party ? [
                 'id'             => $order->party->id,
                 'name'           => $order->party->name,

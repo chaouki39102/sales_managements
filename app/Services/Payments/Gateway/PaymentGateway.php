@@ -48,6 +48,7 @@ interface PaymentGateway
      *   'customer_phone'   => string|null,
      *   'customer_email'   => string|null,
      *   'return_url'       => string,   // يعود إليها الزبون بعد الدفع (لا تطبيق فيها)
+     *   'cancel_url'       => string,   // يعود إليها الزبون عند الإلغاء (لا تطبيق فيها)
      * ]
      *
      * @return array{
