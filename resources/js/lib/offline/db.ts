@@ -1,17 +1,35 @@
 import { openDB, type IDBPDatabase } from 'idb';
 
 const DB_NAME = 'sales_management_offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
+
+/**
+ * Test hook: drop the cached connection (closing it) so a re-open — e.g. after
+ * seeding a legacy-version database — actually runs the upgrade migration
+ * again instead of reusing the already-open handle.
+ */
+export function resetOfflineDbForTests(): void {
+  void dbPromise?.then(db => db.close()).catch(() => {});
+  dbPromise = null;
+}
 
 function getDb(): Promise<IDBPDatabase> {
   if (!dbPromise) {
     dbPromise = openDB(DB_NAME, DB_VERSION, {
-      upgrade(db) {
+      upgrade(db, _oldVersion, _newVersion, transaction) {
+        // v2 migration: browsers that ran a pre-5.1 build have a v1 DB whose
+        // `pendingOps` store exists WITHOUT the `status` index (created only
+        // later). Because v1 never bumped DB_VERSION, `upgradeneeded` never
+        // fired for them, so getPendingOpsByStatus()/getFailedOpsCount() threw
+        // NotFoundError. The version bump + per-store index repair below adds
+        // any missing index in place without touching existing records.
         if (!db.objectStoreNames.contains('cache')) {
           const cacheStore = db.createObjectStore('cache', { keyPath: 'key' });
           cacheStore.createIndex('expiresAt', 'expiresAt');
+        } else if (!transaction.objectStore('cache').indexNames.contains('expiresAt')) {
+          transaction.objectStore('cache').createIndex('expiresAt', 'expiresAt');
         }
         if (!db.objectStoreNames.contains('pendingOps')) {
           const opsStore = db.createObjectStore('pendingOps', {
@@ -20,6 +38,14 @@ function getDb(): Promise<IDBPDatabase> {
           });
           opsStore.createIndex('createdAt', 'createdAt');
           opsStore.createIndex('status', 'status');
+        } else {
+          const opsStore = transaction.objectStore('pendingOps');
+          if (!opsStore.indexNames.contains('createdAt')) {
+            opsStore.createIndex('createdAt', 'createdAt');
+          }
+          if (!opsStore.indexNames.contains('status')) {
+            opsStore.createIndex('status', 'status');
+          }
         }
       },
     });
