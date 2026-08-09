@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Company;
 use App\Models\User;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -16,7 +17,7 @@ use Illuminate\Support\Facades\Log;
  * تُستدعى في:
  *  1. CompanyObserver::created()  ← تلقائياً عند إنشاء شركة جديدة
  *  2. RolesAndPermissionsSeeder   ← عند التهيئة الأولى للنظام
- *  3. Console command: php artisan company:seed-roles {company_id}
+ *  3. Console command: php artisan company:upgrade-roles {company_id} ← ترقية الشركات القائمة
  * ══════════════════════════════════════════════════════════════════
  */
 class CompanyRoleService
@@ -81,7 +82,7 @@ class CompanyRoleService
     public function getUserRole(User $user, int $companyId): ?Role
     {
         return $user->roles()
-            ->where('company_id', $companyId)
+            ->where('roles.company_id', $companyId)
             ->first();
     }
 
@@ -92,8 +93,75 @@ class CompanyRoleService
     {
         return $user->roles()
             ->where('name', $roleName)
-            ->where('company_id', $companyId)
+            ->where('roles.company_id', $companyId)
             ->exists();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // ترقية مجموعة الأدوار القديمة إلى المجموعة المعيارية
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * خريطة ترقية الأدوار القديمة → الأدوار المعيارية (owner/manager/cashier/viewer).
+     * تُستخدم في أمر company:upgrade-roles لتعديل بيانات الشركات الحالية.
+     */
+    public const LEGACY_ROLE_MIGRATION = [
+        'admin'       => 'owner',
+        'accountant'  => 'manager',
+        'salesperson' => 'cashier',
+        'warehouse'   => 'manager',
+    ];
+
+    /**
+     * ترقية شركة إلى مجموعة الأدوار المعيارية:
+     *  1. seedRoles يضمن وجود الأدوار الأربعة وصلاحياتها (idempotent).
+     *  2. كل مستخدم له دور قديم يُنقل إلى الدور الجديد المقابل له.
+     *  3. الأدوار القديمة تُحذف (حذف الدور يُزيل روابطه تلقائياً عبر FK cascade).
+     * آمنة للاستدعاء المتعدد (idempotent) — تُرجع عدد المستخدمين المنقولين لكل دور قديم.
+     */
+    public function migrateToStandardRoleSet(int $companyId): array
+    {
+        return DB::transaction(function () use ($companyId) {
+            $this->seedRoles($companyId);
+
+            // مالك الشركة يملك دور owner دائماً (حتى لو لم يكن له دور قديم)
+            $company = Company::find($companyId);
+            if ($company?->owner_id) {
+                $owner = User::find($company->owner_id);
+                if ($owner && ! $this->hasRole($owner, 'owner', $companyId)) {
+                    $this->assignRole($owner, 'owner', $companyId);
+                }
+            }
+
+            $migrated = [];
+            foreach (self::LEGACY_ROLE_MIGRATION as $legacy => $target) {
+                $legacyRole = Role::where('name', $legacy)
+                    ->where('company_id', $companyId)
+                    ->where('guard_name', 'web')
+                    ->first();
+
+                if (! $legacyRole) {
+                    $migrated[$legacy] = 0;
+                    continue;
+                }
+
+                $users = $legacyRole->users()->get();
+                foreach ($users as $user) {
+                    if (! $this->hasRole($user, $target, $companyId)) {
+                        $this->assignRole($user, $target, $companyId);
+                    }
+                }
+
+                $migrated[$legacy] = $users->count();
+                $legacyRole->delete();
+            }
+
+            app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+
+            Log::info("✅ [CompanyRoleService] تمت ترقية أدوار الشركة #{$companyId}", $migrated);
+
+            return $migrated;
+        });
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -150,8 +218,8 @@ class CompanyRoleService
     {
         return [
             [
-                'name'         => 'admin',
-                'display_name' => 'مدير الشركة',
+                'name'         => 'owner',
+                'display_name' => 'مالك الشركة',
                 'description'  => 'إدارة كاملة لجميع بيانات وموارد الشركة',
             ],
             [
@@ -160,19 +228,9 @@ class CompanyRoleService
                 'description'  => 'إدارة المبيعات والمشتريات والمخزون والتقارير',
             ],
             [
-                'name'         => 'accountant',
-                'display_name' => 'محاسب',
-                'description'  => 'إدارة المدفوعات والشيكات والمصروفات والتقارير المالية',
-            ],
-            [
-                'name'         => 'salesperson',
-                'display_name' => 'بائع',
-                'description'  => 'إنشاء مستندات البيع وإدارة الزبائن',
-            ],
-            [
-                'name'         => 'warehouse',
-                'display_name' => 'أمين المخزن',
-                'description'  => 'إدارة المخزون وحركاته',
+                'name'         => 'cashier',
+                'display_name' => 'أمين الصندوق',
+                'description'  => 'تشغيل نقطة البيع وإنشاء مستندات البيع وإدارة الزبائن',
             ],
             [
                 'name'         => 'viewer',
@@ -191,9 +249,9 @@ class CompanyRoleService
         return [
 
             // ══════════════════════════════════════════════════════
-            // مدير الشركة — صلاحيات كاملة على موارد الشركة
+            // مالك الشركة — صلاحيات كاملة على موارد الشركة
             // ══════════════════════════════════════════════════════
-            'admin' => [
+            'owner' => [
                 // المستخدمون
                 'view_any_user', 'view_user', 'create_user', 'update_user', 'delete_user',
                 'restore_user', 'force_delete_user', 'toggle_active_user',
@@ -319,50 +377,9 @@ class CompanyRoleService
             ],
 
             // ══════════════════════════════════════════════════════
-            // المحاسب — مالية وتقارير بدون تعديل بيانات تجارية
+            // أمين الصندوق — مبيعات وزبائن فقط
             // ══════════════════════════════════════════════════════
-            'accountant' => [
-                // الأطراف (قراءة)
-                'view_any_party', 'view_party',
-                // المنتجات (قراءة)
-                'view_any_product', 'view_product',
-                // المستودعات (قراءة)
-                'view_any_warehouse', 'view_warehouse',
-                // المستندات (تأكيد فقط)
-                'view_any_commercial_document', 'view_commercial_document',
-                'validate_commercial_document',
-                // المدفوعات (كاملة)
-                'view_any_payment', 'view_payment', 'create_payment',
-                'update_payment', 'delete_payment',
-                // الشيكات (كاملة)
-                'view_any_check', 'view_check', 'create_check', 'update_check',
-                'delete_check', 'manage_check_status',
-                // المصروفات (كاملة)
-                'view_any_expense', 'view_expense', 'create_expense',
-                'update_expense', 'delete_expense',
-                // الخزينة (إدارة)
-                'view_any_treasury_account', 'view_treasury_account',
-                'create_treasury_account', 'update_treasury_account',
-                // المخزون (قراءة)
-                'view_any_stock_movement', 'view_stock_movement', 'view_any_product_lot',
-                // التقارير
-                'view_sales_report', 'view_purchase_report', 'view_financial_report',
-                'view_party_report', 'view_dashboard',
-                // السنوات المالية (قراءة)
-                'view_any_fiscal_year',
-                // متفرقات
-                'manage_attachments', 'view_company',
-                // التنبيهات
-                'view_any_notification',
-                // جداول البحث (قراءة)
-                'view_any_currency', 'view_any_payment_mode', 'view_any_expense_category',
-                'view_any_exchange_rate', 'view_any_treasury_account_type',
-            ],
-
-            // ══════════════════════════════════════════════════════
-            // البائع — مبيعات وزبائن فقط
-            // ══════════════════════════════════════════════════════
-            'salesperson' => [
+            'cashier' => [
                 // الأطراف (إنشاء وتعديل)
                 'view_any_party', 'view_party', 'create_party', 'update_party',
                 // المنتجات (قراءة)
@@ -386,30 +403,6 @@ class CompanyRoleService
                 // جداول البحث (قراءة)
                 'view_any_price_level', 'view_any_payment_mode', 'view_any_tva',
                 'view_any_unit', 'view_any_family', 'view_any_brand',
-            ],
-
-            // ══════════════════════════════════════════════════════
-            // أمين المخزن — مخزون فقط
-            // ══════════════════════════════════════════════════════
-            'warehouse' => [
-                // المنتجات (قراءة)
-                'view_any_product', 'view_product',
-                // المستودعات (قراءة)
-                'view_any_warehouse', 'view_warehouse',
-                // المستندات (قراءة فقط)
-                'view_any_commercial_document', 'view_commercial_document',
-                // المخزون (كامل)
-                'view_any_stock_movement', 'view_stock_movement', 'create_stock_movement',
-                'view_any_product_lot', 'manage_product_lot',
-                // التقارير
-                'view_inventory_report', 'view_dashboard',
-                // متفرقات
-                'manage_attachments', 'view_company',
-                // التنبيهات
-                'view_any_notification',
-                // جداول البحث (قراءة)
-                'view_any_unit', 'view_any_family', 'view_any_brand',
-                'view_any_stock_movement_type', 'view_any_inventory_valuation_method',
             ],
 
             // ══════════════════════════════════════════════════════

@@ -256,12 +256,12 @@ class AdminSeedController extends Controller
         $owner = \App\Models\User::find($company->owner_id);
         if (!$owner) return;
 
-        $adminRole = \Spatie\Permission\Models\Role::where('name', 'admin')
+        $ownerRole = \Spatie\Permission\Models\Role::where('name', 'owner')
             ->where('company_id', $company->id)
             ->first();
 
-        if ($adminRole && !$owner->hasRole($adminRole)) {
-            $owner->assignRole($adminRole);
+        if ($ownerRole && !$owner->hasRole($ownerRole)) {
+            $owner->assignRole($ownerRole);
         }
     }
 }

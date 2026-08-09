@@ -146,7 +146,7 @@ class RoleController extends BaseApiController
             $this->authorizeAction('delete', $role);
 
             // ✅ لا نسمح بحذف الأدوار الأساسية
-            if (in_array($role->name, ['owner', 'admin', 'super-admin'], true)) {
+            if (in_array($role->name, ['owner', 'manager', 'cashier', 'viewer', 'super-admin'], true)) {
                 return $this->errorResponse(
                     'لا يمكن حذف الأدوار الأساسية للنظام',
                     409,

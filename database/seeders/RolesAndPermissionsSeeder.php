@@ -131,12 +131,12 @@ class RolesAndPermissionsSeeder extends Seeder
             }
         }
 
-        // مدير الشركة الأولى (اختياري — إذا وجد)
+        // مالك الشركة الأولى (اختياري — إذا وجد)
         $adminEmail = env('ADMIN_USER_EMAIL', 'admin.user@mail.com');
         $adminUser  = \App\Models\User::where('email', $adminEmail)->first();
         if ($adminUser) {
-            $this->roleService->assignRole($adminUser, 'admin', $companyId);
-            $this->command?->line('  ↳ admin: ' . $adminUser->email);
+            $this->roleService->assignRole($adminUser, 'owner', $companyId);
+            $this->command?->line('  ↳ owner: ' . $adminUser->email);
         }
     }
 

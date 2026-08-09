@@ -44,7 +44,7 @@ class RoleResource extends JsonResource
 
                 if ($roles->isEmpty()) {
                     // المالك قد يكون super-admin بدون company_id
-                    $superAdmin = $this->resource->roles()->whereNull('company_id')->get();
+                    $superAdmin = $this->resource->roles()->whereNull('roles.company_id')->get();
                     if ($superAdmin->isNotEmpty()) {
                         return RoleResource::collection($superAdmin);
                     }

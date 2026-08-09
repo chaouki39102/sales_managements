@@ -204,13 +204,13 @@ class CompanySeeder extends Seeder
             return;
         }
 
-        $adminRole = \Spatie\Permission\Models\Role::where('name', 'admin')
+        $ownerRole = \Spatie\Permission\Models\Role::where('name', 'owner')
             ->where('company_id', $companyId)
             ->first();
 
-        if ($adminRole && !$owner->hasRole($adminRole)) {
-            $owner->assignRole($adminRole);
-            $this->command?->line("  ↳ admin role ← {$owner->email}");
+        if ($ownerRole && !$owner->hasRole($ownerRole)) {
+            $owner->assignRole($ownerRole);
+            $this->command?->line("  ↳ owner role ← {$owner->email}");
         }
     }
 }

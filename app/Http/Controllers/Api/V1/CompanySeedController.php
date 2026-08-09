@@ -148,15 +148,15 @@ public function seedAll(Company $company): JsonResponse
         }
     }
 
-    // ✅ تعيين دور admin للمالك بعد اكتمال السيد
+    // ✅ تعيين دور owner للمالك بعد اكتمال السيد
     $owner = \App\Models\User::find($company->owner_id);
     if ($owner) {
-        $adminRole = \Spatie\Permission\Models\Role::where('name', 'admin')
+        $ownerRole = \Spatie\Permission\Models\Role::where('name', 'owner')
             ->where('company_id', $company->id)
             ->first();
 
-        if ($adminRole && !$owner->hasRole($adminRole)) {
-            $owner->assignRole($adminRole);
+        if ($ownerRole && !$owner->hasRole($ownerRole)) {
+            $owner->assignRole($ownerRole);
         }
 
         app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();

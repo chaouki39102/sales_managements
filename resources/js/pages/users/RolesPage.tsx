@@ -46,11 +46,8 @@ function groupPermissions(permissions: Permission[]): PermissionsGrouped {
 // ─── بادج اسم الدور ───────────────────────────────────────────────────────────
 const ROLE_BADGE_COLORS: Record<string, string> = {
   'owner':       'var(--gold)',
-  'admin':       'var(--em)',
   'manager':     'var(--blue)',
   'cashier':     'var(--purple)',
-  'salesperson': 'var(--teal)',
-  'warehouse':   'var(--orange, #f97316)',
   'viewer':      'var(--t3)',
 };
 

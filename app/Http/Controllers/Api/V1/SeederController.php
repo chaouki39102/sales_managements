@@ -51,11 +51,11 @@ class SeederController extends BaseApiController
     public function run(Request $request): JsonResponse
     {
         try {
-            // 1. التحقق من الصلاحية — super-admin أو admin الشركة فقط
+            // 1. التحقق من الصلاحية — super-admin أو owner الشركة فقط
             $user = auth()->user();
             if (
                 !$user->hasRole('super-admin') &&
-                !$user->hasRole('admin')
+                !$user->hasRole('owner')
             ) {
                 return $this->errorResponse('ليس لديك صلاحية تشغيل الـ Seeders', 403);
             }

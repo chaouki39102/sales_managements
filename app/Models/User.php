@@ -111,7 +111,7 @@ class User extends Authenticatable
         $this->update(['last_login_at' => now(), 'last_login_ip' => request()->ip()]);
     }
 
-    public function isAdmin(): bool { return $this->hasRole(self::ROLE_ADMIN); }
+    public function isAdmin(): bool { return $this->hasRole(self::COMPANY_ROLE_OWNER); }
     public function isSuperAdmin(): bool { return $this->hasRole(self::ROLE_SUPER_ADMIN); }
 
     public function hasAccessToCompany(int|Company $company): bool
