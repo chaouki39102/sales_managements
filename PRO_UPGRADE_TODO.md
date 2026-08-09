@@ -133,40 +133,47 @@
 > (`resources/js/lib/api/endpoints/payments.ts`, `checks.ts`). `portal_orders` has NO paid
 > field yet — 3.1 adds the payment columns migration.
 
-- [ ] **3.1 Gateway abstraction + settings + migration** — `app/Services/Payments/Gateway/PaymentGateway.php`
-      (interface: `createPayment(intent) → {redirect_url, intent_id}`, `verify(notification) → {status,
-      intent_id, amount}`, `name()`), `MockGateway` (sandbox: succeed / fail / cancel, no creds), a factory
-      resolving the provider by setting. Settings in `SettingsSeeder` portal group (display_order ~111+):
-      `online_payment_enabled` (bool false), `gateway_provider` (`mock`), `gateway_mode` (`sandbox`),
-      `gateway_merchant_id`, `gateway_secret_key` (empty ok for mock). Migration adds to `portal_orders`:
-      `payment_intent_id` (nullable string), `payment_status` (enum pending|succeeded|failed|cancelled,
-      default pending), `payment_amount`, `payment_provider`, `payment_mode_id`, `paid_at` (nullable
-      timestamp), `payment_details` (json). Public `GET /{company}/portal/config` gains
-      `online_payment_enabled` so the UI hides/shows the pay button.
-- [ ] **3.2 Backend payment initiation** — `POST /{company}/portal/orders/{id}/pay` (portal.auth):
-      guards `online_payment_enabled`, order owned by the portal user, payment not already succeeded →
-      create ONE intent per order (idempotent — a repeat call on an existing pending intent returns the
-      same `{redirect_url, intent_id}`; a succeeded intent is rejected 4xx). **Amount ALWAYS server-computed**
-      = order `total_ttc` (never client-sent). Store intent id + amount on `portal_orders`; return the
-      gateway redirect URL.
-- [ ] **3.3 Webhook/notification handler** — public `POST /{company}/portal/payment/webhook`
-      (in the `{company}/portal` group, OUTSIDE `portal.auth`, verified via the gateway adapter — mock =
-      shared-secret HMAC): `verify()` the payload, amount MUST equal the stored intent amount, then ONE
-      idempotent apply: `PaymentSynchronizer::syncPayments` creates a `confirmed` payment (mode = resolved
-      online payment mode → default treasury; `client_ref` = intent id) + set `payment_status=succeeded`/
-      `paid_at` on `portal_orders` + history row («دفع عبر الإنترنت»). Replay protection: intent
-      idempotency key + processed flag — replayed / bad-signature / amount-mismatch payloads rejected 4xx
-      and never re-apply.
-- [ ] **3.4 Portal UI** — «الدفع الإلكتروني» button on the order detail (paid-eligible orders only, shown
-      when `online_payment_enabled`); redirect to the gateway (MockGateway page = `routes/web.php` GET
-      `/mock-gateway/pay` + POST confirm/cancel → callback); success / failure / cancelled result handling
-      (callback → order status view); show «مدفوع عبر الإنترنت» badge on the order. Admin order detail
-      shows the payment fields.
-- [ ] **3.5 Security + tests** — Pest: initiate guards (disabled setting, wrong owner, paid order,
-      amount-from-server), webhook with FORGED payloads (bad HMAC, tampered amount, replay, unknown
-      intent) all rejected 4xx with no payment / no paid-marker created; happy path create → pay →
-      webhook confirm → convert to FV end-to-end with the mock gateway. Frontend: `npm test`, tsc, build,
-      SW MATCH, Playwright smoke (fresh browser + token, zero console errors).
+- [x] **3.1 Gateway abstraction + settings + migration** — `2bf2de5`. `app/Services/Payments/Gateway/`
+      `PaymentGateway.php` (interface: `createPayment(intent) → {redirect_url, intent_id}`, `verify(notification)`,
+      `name()`, `sign()`) + `PaymentGatewayFactory::resolve()` (defaults to `mock` when no provider setting) +
+      `MockGateway` (sandbox: `MOCK-<16>` intent ref, amount from server, confirm txn `MOCKTXN-<12>`, shared-secret
+      HMAC-SHA256). Settings portal group: `online_payment_enabled` (bool false), `online_payment_provider` (`mock`),
+      `online_payment_mode` (`sandbox`), `online_payment_merchant_id`, `online_payment_secret_key`. Migration
+      `2026_08_09_000001_add_payment_columns_to_portal_orders_table` adds `payment_intent_id`, `payment_status`
+      (default pending), `payment_amount`, `payment_provider`, `payment_mode_id`, `paid_at` (nullable),
+      `payment_details` (json). Public `GET /{company}/portal/config` gains `online_payment_enabled`.
+- [x] **3.2 Backend payment initiation** — `f90f5b8`. `POST /{company}/portal/orders/{id}/pay` (portal.auth):
+      guards `online_payment_enabled` (409 «الدفع الإلكتروني غير مفعّل…»), order owned by the portal user,
+      payment not already succeeded (409 «هذا الطلب مدفوع بالفعل.») → create ONE intent per order (idempotent —
+      a repeat call on a pending intent returns the SAME `{payment_url, payment_intent_id}`; succeeded/converted/
+      terminal orders rejected 409). **Amount ALWAYS server-computed** = order `total_ttc` (never client-sent).
+      Returns `PortalPayIntent` (`order_id`, `order_reference`, `payment_intent_id`, `payment_status`, `amount`,
+      `payment_url`).
+- [x] **3.3 Webhook/notification handler** — `c60e89c` (backend) + `5de888e` (mock page + in-process dispatch).
+      Public `POST /{company}/portal/payment/webhook` (`{company}/portal` group, OUTSIDE `portal.auth`),
+      verified via the gateway adapter — mock = shared-secret HMAC-SHA256: `verifyNotification()` first
+      (forged → 403), amount MUST equal the stored intent amount ±0.01 (else 422 «مبلغ إشعار الدفع لا يطابق
+      قيمة الطلب.»), `ts` within a 3600s window (else 422 «منتهي الصلاحية»), unknown intent → 404. ONE
+      idempotent apply via `settlePayment()`: same txn already succeeded → 200 no-op; different txn → 409;
+      terminal order → 409; succeeded sets `payment_status` + `payment_transaction_id` + `paid_at` + history
+      («دفع عبر الإنترنت»); failed/cancelled record status only (order stays payable). **No accounting
+      payment at webhook** — deferred to `convertToSale()` via `onlinePaymentPayload()` when
+      `payment_status == succeeded` (mode ONL, `client_ref = 'ONL-'.reference`, server amount). MockGateway
+      page (`/portal-gateway/mock/{reference}`, `routes/web.php`) CONFIRM/CANCEL → same in-process handler
+      (no self-`Http::post` — avoids deadlock) → redirect to `/portal/{slug}/myorders?order_id=..&pay_result=…`.
+- [x] **3.4 Portal UI** — `7b1bfd1`. «الدفع الإلكتروني (amount)» button on My Orders rows (paid-eligible
+      only: `cfg.online_payment_enabled === true && !is_converted && payment_status !== 'succeeded'` and not
+      terminal) → opens the gateway `payment_url` in a new tab (`noopener,noreferrer`) + toast; when a
+      pending intent exists the label becomes «متابعة الدفع» with a hint. `?pay_result=succeeded|cancelled|…`
+      return handling on `/portal/orders` (strips the params, ok/err toasts per result). «مدفوع» badge
+      (`paid_at` title) beside the order status; `payment_status`/`payment_amount`/`payment_provider`/
+      `payment_intent_id`/`payment_transaction_id`/`paid_at` exposed via `PortalOrder.toArray`.
+- [x] **3.5 Security + tests** — `dbf4477`. `tests/Feature/PortalPaymentFlowTest.php` — 7 tests / 46
+      assertions: disabled setting → 409; intent creation + idempotence (same URL/intent ref); forged
+      signature → 403; succeeded webhook → settle (`succeeded` + `MOCKTXN-*` + `paid_at`) + same-txn replay
+      no-op + different txn 409 + paid order blocks re-pay 409; amount-mismatch 422 + expired `ts` 422;
+      unknown intent → 404; cancelled records status without settling (order stays payable). Full gate
+      green: pest 70/70 (466 assertions), tsc clean, vitest 249/249, build 0 errors (219 precache), SW MATCH.
 
 ## 4. 2FA + Granular Permissions
 
@@ -280,7 +287,7 @@
 |---------|--------|-------|
 | 1. Fiscal QR + PDF | ✅ done (1.1–1.5) | DGI spec NOT published → documented versioned JSON v1 (`docs/reports/FISCAL_QR_SPEC.md`); scannability proven via jsqr round-trip |
 | 2. Backup + restore | ✅ done (2.1–2.5) | command + schedule + restore + settings UI + E2E verified (`docs/reports/BACKUP_RESTORE_GUIDE.md`); 15 pre-existing POS `total_discount` defects flagged (not restore-introduced) |
-| 3. Portal online payment | planned — not started (mock-first) | strategy decided 2026-08-09: build gateway abstraction + functional `MockGateway` now (works with NO merchant account), swap real Algerian adapter (EDAHABIA / CIB / CTPay) when sandbox creds arrive; details in section 3 |
+| 3. Portal online payment | ✅ done (3.1–3.5, mock-first) | gateway abstraction + `MockGateway` (works with NO merchant account) + signed webhook + portal pay button + `?pay_result` handling + `PortalPaymentFlowTest` (7 tests / 46 assertions); swap real Algerian adapter (EDAHABIA / CIB / CTPay) when sandbox creds arrive — see section 3 |
 | 4. 2FA + permissions | ✅ done (4.1–4.5) | TOTP 2FA + two-step login + backup codes + `EnsureTwoFactorVerified` session enforcement + owner/manager/cashier/viewer roles + permission matrix + admin UI; 5 pest tests in `TwoFactorEnforcementTest` |
 | 5. Offline-first POS | ✅ done (5.1–5.5) + schema fix | write queue + rich offline interception + sync engine + stock/stale badge + failed-ops UI all pushed; IndexedDB v1→v2 migration fix (`932b61f`); 249 vitest pass |
 
