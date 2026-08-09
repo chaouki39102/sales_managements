@@ -10,6 +10,7 @@ use App\Models\PortalOrder;
 use App\Models\PortalOrderStatusHistory;
 use App\Models\DocumentType;
 use App\Models\Party;
+use App\Models\PaymentMode;
 use App\Models\Setting;
 use App\Models\Warehouse;
 use App\Services\CommercialDocumentService;
@@ -646,8 +647,14 @@ class PortalOrderService
             // المعاملة — أي فشل لاحق يتراجع والطلب يبقى غير محوّل.
             $order->forceFill(['sale_document_id' => $sale->id])->save();
 
-            // دفعة اختيارية تُربط بالفاتورة مباشرة عبر المسار القياسي
-            // (PaymentSynchronizer) — نفس سلوك تعديل دفعات أي مستند.
+            // الدفع الإلكتروني المنجز يُسلَّم تلقائياً إلى الفاتورة عند التحويل:
+            // عندما لا يمرّر المسؤول دفعة يدوية، تُبنى دفعة «دفع إلكتروني» (ONL)
+            // من النية المنجزة (payment_status=succeeded) وتُربط بالفاتورة عبر
+            // PaymentSynchronizer — نفس سلوك تعديل دفعات أي مستند. الـ client_ref
+            // (ONL-{reference}) يمنع التكرار حتى عند إعادة تسليم نفس النية.
+            if (empty($payment)) {
+                $payment = $this->onlinePaymentPayload($order);
+            }
             if (!empty($payment)) {
                 $this->payments->syncPayments($sale, [$payment]);
             }
@@ -953,6 +960,98 @@ class PortalOrderService
         }
 
         return $lines;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // تسوية إشعار الدفع (webhook) — تحديث نية الطلب فقط.
+    //
+    // الحماية من إعادة اللعب (replay):
+    //   - التوقيع والمبلغ يُثبتان في المتحكم (verifyNotification + مبلغ من الخادم).
+    //   - هنا: الحالة النهائية (succeeded) لا تُعاد — إعادة إرسال بنفس العملية
+    //     تعيد الرد نفسه (idempotent) دون أي أثر ثانٍ، وإعادة إرسال بعملية
+    //     مختلفة تُرفض (409).
+    //   - النية المنتهية (مرتجع/ملغى) لا تُسوّى.
+    //
+    // لا تُنشأ الدفعة المحاسبية هنا — تُسلَّم إلى الفاتورة عند التحويل
+    // (convertToSale → onlinePaymentPayload → PaymentSynchronizer) حتى لا
+    // تتضاعف الدفعات (دفعة على أمر الزبون + دفعة على الفاتورة).
+    // ═══════════════════════════════════════════════════════════════════
+    public function settlePayment(PortalOrder $order, array $verified): PortalOrder
+    {
+        $status        = (string) ($verified['status'] ?? '');
+        $transactionId = $verified['transaction_id'] ?? null;
+
+        return DB::transaction(function () use ($order, $status, $transactionId) {
+            if ($order->payment_status === PortalOrder::PAYMENT_SUCCEEDED) {
+                if ($transactionId && $order->payment_transaction_id
+                    && (string) $transactionId !== (string) $order->payment_transaction_id) {
+                    throw new BusinessRuleException('تم تأكيد عملية دفع أخرى لهذا الطلب مسبقاً.', 409);
+                }
+
+                return $order;
+            }
+
+            if (in_array($order->status, PortalOrder::TERMINAL_STATUSES, true)) {
+                throw new BusinessRuleException(
+                    'لا يمكن تسوية دفع لطلب «' . $order->status_label . '».',
+                    409
+                );
+            }
+
+            if ($status === PortalOrder::PAYMENT_SUCCEEDED) {
+                $order->forceFill([
+                    'payment_status'         => PortalOrder::PAYMENT_SUCCEEDED,
+                    'payment_transaction_id' => $transactionId ? (string) $transactionId : $order->payment_transaction_id,
+                    'paid_at'                => now(),
+                ])->save();
+
+                $this->recordHistory(
+                    $order,
+                    $order->status,
+                    PortalOrder::CHANGED_BY_CUSTOMER,
+                    null,
+                    'تم تأكيد الدفع الإلكتروني'
+                        . ($transactionId ? ' (العملية ' . $transactionId . ')' : '')
+                        . ' — ' . number_format((float) $order->payment_amount, 2, '.', '') . ' دج.'
+                );
+            } elseif (in_array($status, [PortalOrder::PAYMENT_FAILED, PortalOrder::PAYMENT_CANCELLED], true)) {
+                $order->forceFill(['payment_status' => $status])->save();
+            }
+
+            return $order;
+        });
+    }
+
+    /**
+     * بناء دفعة «الدفع الإلكتروني» (ONL) من نية منجزة — تُسلَّم إلى
+     * convertToSale لترتبط بالفاتورة عبر PaymentSynchronizer عند التحويل.
+     *
+     * الـ client_ref (ONL-{reference}) يمنع التكرار: نفس المرجع لا يُنشئ
+     * دفعة ثانية أبداً حتى عند إعادة تسليم النية نفسها. تعيد [] عندما
+     * لا يوجد دفع إلكتروني منجز (payment_status !== succeeded).
+     */
+    private function onlinePaymentPayload(PortalOrder $order): array
+    {
+        if ($order->payment_status !== PortalOrder::PAYMENT_SUCCEEDED) {
+            return [];
+        }
+
+        $modeId = (int) PaymentMode::where('company_id', $order->company_id)
+            ->where('code', 'ONL')
+            ->value('id');
+
+        if (!$modeId) {
+            return [];
+        }
+
+        return [
+            'client_ref'      => 'ONL-' . $order->reference,
+            'payment_mode_id' => $modeId,
+            'amount'          => round((float) $order->payment_amount, 2),
+            'payment_date'    => $order->paid_at?->toDateString() ?? now()->toDateString(),
+            'reference'       => $order->payment_transaction_id ? (string) $order->payment_transaction_id : null,
+            'notes'           => 'دفع إلكتروني (' . ($order->payment_provider ?: 'ONL') . ') — ' . $order->reference,
+        ];
     }
 
     private function recordHistory(

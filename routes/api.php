@@ -201,6 +201,15 @@ Route::prefix('v1')->group(function () {
         Route::post('/orders/track', [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'track'])
             ->middleware('throttle:30,1');
 
+        // ── إشعار مزوّد الدفع الإلكتروني (webhook) — يعتمد على التوقيع فقط ──
+        // خارج portal.auth: البوابة (أو نموذج الدفع المحلي) تتصل مباشرة بهذا
+        // المسار، لا حامل توكن زبون البوابة. ضمن سياق المؤسسة (portal.company)
+        // حتى يُحل المزوّد حسب إعدادات المؤسسة (online_payment_provider).
+        // التحقق: توقيع HMAC → مبلغ من الخادم (يطابق النية) → نافذة زمنية →
+        // تطبيق idempotent (حماية إعادة اللعب) داخل settlePayment.
+        Route::post('/payment/webhook', \App\Http\Controllers\Api\V1\Portal\PortalPaymentWebhookController::class)
+            ->name('portal.payment.webhook');
+
         Route::middleware('portal.auth')->group(function () {
             Route::get('/auth/me',      [PortalAuthController::class, 'me']);
             Route::post('/auth/logout', [PortalAuthController::class, 'logout']);
