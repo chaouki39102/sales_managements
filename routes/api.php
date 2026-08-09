@@ -194,8 +194,12 @@ Route::prefix('v1')->group(function () {
         Route::post('/orders', [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'store'])
             ->middleware('throttle:20,1');
         // تتبع طلب الزائر برقم هاتفه — بدون حساب، يُرجع طلباته العامة فقط.
+        // حد مرتفع نسبياً: الزائر القادم من صفحة الطلب يبحث تلقائياً عند فتح
+        // الصفحة وقد يعيد فتحها/البحث عدة مرات أثناء انتظار معالجة طلبه —
+        // المسار للقراءة فقط (يُرجع 20 طلباً عاماً على الأكثر بمطابقة رقم
+        // الهاتف) فسقف 30/دقيقة يكفي ولا يفتح باب إغراق.
         Route::post('/orders/track', [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'track'])
-            ->middleware('throttle:10,1');
+            ->middleware('throttle:30,1');
 
         Route::middleware('portal.auth')->group(function () {
             Route::get('/auth/me',      [PortalAuthController::class, 'me']);
