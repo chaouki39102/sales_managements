@@ -3036,12 +3036,38 @@ body.dark .poa-date input::-webkit-calendar-picker-indicator { opacity: .85; }
   border: 1px dashed var(--b3, #e2e8f0); border-radius: var(--r2, 10px);
 }
 .portal-submit-ok {
-  margin-top: 16px; padding: 18px; text-align: center; color: var(--t1, #0f172a);
+  margin-top: 16px; padding: 26px 18px 20px; text-align: center; color: var(--t1, #0f172a);
   background: linear-gradient(180deg, #f0fdf4, #ecfdf5);
   border: 1px solid #bbf7d0; border-radius: 14px;
 }
 .portal-submit-ok > i { font-size: 34px; color: #16a34a; display: block; margin-bottom: 6px; }
 .portal-submit-ok b { font-size: 16px; display: block; margin-bottom: 4px; }
+
+/* ── دائرة النجاح المتحركة (تحل محل الأيقونة الثابتة) ── */
+.portal-celebrate-circle {
+  width: 76px; height: 76px; margin: 0 auto 14px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0a8a5c, #0dbf84);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 16px 40px rgba(10, 138, 92, .35);
+  animation: portal-celebrate-pop .45s cubic-bezier(.34, 1.56, .64, 1) backwards;
+}
+.portal-celebrate-circle svg {
+  width: 36px; height: 36px;
+  stroke: #fff; stroke-width: 2.6; fill: none;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.portal-celebrate-circle .pcc-check {
+  stroke-dasharray: 40; stroke-dashoffset: 40;
+  animation: portal-celebrate-draw .35s ease .25s forwards;
+}
+@keyframes portal-celebrate-pop {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+@keyframes portal-celebrate-draw {
+  to { stroke-dashoffset: 0; }
+}
 .portal-submit-ref {
   display: inline-block; margin-block: 4px 8px; padding: 3px 10px;
   font-family: Consolas, monospace; font-size: 13px; color: #166534;
@@ -3513,6 +3539,8 @@ body.dark .poa-sort-hint { color: var(--t5, #64748b); }
 
 /* ── بطاقة المنتج ── */
 .portal-prod {
+  --prod-accent: var(--em);
+  --prod-accent-bg: var(--emb);
   border: 1px solid var(--b1);
   border-radius: 18px;
   background: var(--bg1);
@@ -3524,6 +3552,12 @@ body.dark .poa-sort-hint { color: var(--t5, #64748b); }
   box-shadow: 0 2px 10px rgba(15, 23, 42, .04);
   transition: all .25s cubic-bezier(.4, 0, .2, 1);
   animation: portal-prod-in .4s cubic-bezier(.4, 0, .2, 1) backwards;
+  position: relative;
+}
+.portal-prod::before {
+  content: ''; position: absolute; top: 0; right: 0; left: 0; height: 3px; z-index: 4;
+  background: var(--prod-accent);
+  opacity: .85;
 }
 @keyframes portal-prod-in {
   from { opacity: 0; transform: translateY(10px); }
@@ -3532,12 +3566,12 @@ body.dark .poa-sort-hint { color: var(--t5, #64748b); }
 .portal-prod:hover {
   transform: translateY(-4px);
   box-shadow: 0 18px 34px rgba(15, 23, 42, .12);
-  border-color: color-mix(in srgb, var(--em) 55%, var(--b2));
+  border-color: color-mix(in srgb, var(--prod-accent) 55%, var(--b2));
 }
 .portal-prod.on {
-  border-color: var(--em);
+  border-color: var(--prod-accent);
   background: var(--bg1);
-  box-shadow: 0 10px 26px rgba(10, 138, 92, .16);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--prod-accent) 30%, transparent);
 }
 .portal-prod.oos { opacity: .92; }
 .portal-prod.oos:hover { border-color: var(--b2); box-shadow: 0 8px 20px rgba(15, 23, 42, .07); }
@@ -3547,7 +3581,7 @@ body.dark .poa-sort-hint { color: var(--t5, #64748b); }
   position: relative;
   width: 100%;
   aspect-ratio: 4 / 3;
-  background: linear-gradient(180deg, var(--bg3), var(--bg2));
+  background: linear-gradient(165deg, var(--prod-accent-bg), var(--bg2) 70%);
   display: flex; align-items: center; justify-content: center;
   overflow: hidden;
 }
@@ -3562,7 +3596,8 @@ body.dark .poa-sort-hint { color: var(--t5, #64748b); }
 .portal-prod-img-fb {
   display: flex; align-items: center; justify-content: center;
   width: 100%; height: 100%;
-  color: color-mix(in srgb, var(--t4) 70%, transparent);
+  color: var(--prod-accent);
+  opacity: .8;
   font-size: 44px;
 }
 
@@ -3760,9 +3795,9 @@ body.dark .poa-sort-hint { color: var(--t5, #64748b); }
   flex: none;
   width: 46px; height: 46px; border-radius: 11px;
   overflow: hidden;
-  background: var(--bg3);
+  background: var(--prod-accent-bg, var(--bg3));
   display: flex; align-items: center; justify-content: center;
-  color: var(--t4); font-size: 20px;
+  color: var(--prod-accent, var(--t4)); font-size: 20px;
   border: 1px solid var(--b1);
 }
 .portal-cart-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }

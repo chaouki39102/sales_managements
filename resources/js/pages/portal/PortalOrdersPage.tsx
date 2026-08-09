@@ -13,6 +13,7 @@ import {
   fmtMoney, Pager,
   PortalLoading, PortalError, PortalEmpty,
   buildWhatsAppLink, waOrderMessage,
+  accentStyleFor,
 } from './portalUtils';
 
 function useDebounce<T>(value: T, ms: number): T {
@@ -535,6 +536,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                   <div
                     key={p.id}
                     className={`portal-prod portal-prod--info${inCart ? ' on' : ''}${outOfStock ? ' oos' : ''}`}
+                    style={accentStyleFor(p.id)}
                     onClick={() => setInfoProductId(p.id)}
                     aria-label={`عرض تفاصيل ${p.name}`}
                   >
@@ -742,7 +744,9 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
           {isPublic && submitted && createOrder.data && (
             <div className="portal-card portal-mt-16">
           <div className="portal-submit-ok">
-            <i className="ti ti-circle-check" />
+            <div className="portal-celebrate-circle" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path className="pcc-check" d="M5 13l4 4L19 7" /></svg>
+            </div>
             <b>تم إرسال طلبك بنجاح</b>
             <div>
               رقم طلبك:{' '}
@@ -798,7 +802,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
         return (
           <div className="portal-pim" role="dialog" aria-modal="true" aria-label={`تفاصيل ${p.name}`}>
             <div className="portal-pim-backdrop" onClick={() => setInfoProductId(null)} />
-            <div className="portal-pim-card">
+            <div className="portal-pim-card" style={accentStyleFor(p.id)}>
               <button className="portal-pim-x" type="button" onClick={() => setInfoProductId(null)} aria-label="إغلاق تفاصيل المنتج">
                 <i className="ti ti-x" />
               </button>
@@ -1120,7 +1124,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                   {cartEntries.map(({ key, product, entry }) => {
                     const cl = lineCalc(product, entry.packaging_id, entry.quantity);
                     return (
-                      <div key={key} className="portal-cart-item portal-cart-item--ro">
+                      <div key={key} className="portal-cart-item portal-cart-item--ro" style={accentStyleFor(product.id)}>
                         <div className="portal-cart-thumb">
                           {product.image ? (
                             <img src={proxyImage(product.image) ?? product.image} alt="" loading="lazy" />
@@ -1198,7 +1202,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
                       {cartEntries.map(({ key, product, entry }) => {
                         const cl = lineCalc(product, entry.packaging_id, entry.quantity);
                         return (
-                          <div key={key} className="portal-cart-item">
+                          <div key={key} className="portal-cart-item" style={accentStyleFor(product.id)}>
                             <div className="portal-cart-thumb">
                               {product.image ? (
                                 <img src={proxyImage(product.image) ?? product.image} alt="" loading="lazy" />

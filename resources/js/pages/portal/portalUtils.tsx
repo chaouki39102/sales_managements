@@ -1,8 +1,31 @@
 // ════════════════════════════════════════════════════════════════════════════
 // pages/portal/portalUtils.tsx — أدوات عرض مشتركة لصفحات البوابة
 // ════════════════════════════════════════════════════════════════════════════
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { PortalOrder } from '@/lib/api/portal/portal';
+
+// ─── لون تمييز ثابت لكل منتج ────────────────────────────────────────────────
+// كل بطاقة منتج (وسطر السلة المطابق لها) تأخذ لوناً ثابتاً ومميزاً — مشتق من
+// رقم هوية المنتج نفسه (وليس عشوائياً)، لذلك نفس المنتج يبقى بنفس اللون في كل
+// مكان يظهر فيه (الكتالوج، السلة، المراجعة). الألوان من نظام التصميم نفسه.
+const ACCENT_VARS: readonly [string, string][] = [
+  ['--em', '--emb'],
+  ['--gold', '--goldb'],
+  ['--blue', '--blueb'],
+  ['--purple', '--purb'],
+  ['--teal', '--tealb'],
+  ['--orange', '--orb'],
+  ['--indigo', '--indigob'],
+];
+
+export function accentStyleFor(id: number | string): CSSProperties {
+  const n = typeof id === 'number' ? id : Array.from(String(id)).reduce((s, c) => s + c.charCodeAt(0), 0);
+  const [main, bg] = ACCENT_VARS[Math.abs(n) % ACCENT_VARS.length];
+  return {
+    ['--prod-accent' as string]: `var(${main})`,
+    ['--prod-accent-bg' as string]: `var(${bg})`,
+  } as CSSProperties;
+}
 
 export function fmtMoney(n: number | null | undefined): string {
   const v = Number(n ?? 0);
