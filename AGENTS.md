@@ -7,6 +7,24 @@
 ## Date
 2026-08-09
 
+### Phase 70 — Offline C.1 Checkpoint: Offline Interception Is DEAD CODE + Full B/C/D Task File (Aug 9)
+
+**Request**: "STOP … CREATE MD FILE WITH LIST OF TASKS I LL CLOSE ALL NOW … SO COMITT ALL AND PUSH … UPDATE AGENT.MD FILE INCLUDING THE FILE OF REMIANING TASKS" — paused the B/C/D roadmap (offline-first first) mid-C.1, committed the resume state, and documented everything.
+
+**Task file**: `C1_OFFLINE_FIX.md` (project root, committed `0cf18b2`) — the FULL actionable remaining-task list: C.1a–C.1d, C.2–C.5, B.1–B.5, D.1–D.5, with per-task file paths, exact behavior, verification steps, and commit conventions. `git pull` on any PC → open this file → work task-by-task → **commit + push after EACH task**.
+
+**The critical proven discovery (blocks C.1)**: the entire offline layer **never fires today** — write queue + cached-GET paths are dead. Root cause is **response-interceptor ordering** in axios 1.15.2: `client.ts` registers its response error interceptor at module-import time (line ~169) which converts EVERY network error into `ApiError(status 0)` with **no `.config`**; `offlineAwareApi.ts`'s interceptor registers later (`app.jsx:14` → `registerOfflineInterceptor()`) and starts with `if (!cfg) throw error`, so it receives a `.config`-less ApiError and rethrows. Axios runs response interceptors in **registration order** (`node_modules/axios/lib/core/Axios.js` lines 180→227). **Proof**: `resources/js/lib/offline/__tests__/probe-chain.spec.ts` (committed) reproduces the boot order and POSTs while offline → asserts 1 queued op, **fails with 0** (intentional proof; delete once the C.1d regression suite replaces it).
+
+**C.1 fix shape (NOT yet implemented)**: `client.ts` must offer a **pre-normalization hook** (`registerNetworkFailureHandler(fn)` invoked at the TOP of the error interceptor before ApiError mapping, only when `!error.response`; returns a synthetic `AxiosResponse` to claim a request or `undefined` to fall through). Then rework `offlineAwareApi.ts` to register through the hook and gate on `isNetworkFailure(error) || !navigator.onLine`.
+
+**Committed resume state** (`0cf18b2`, pushed): `queueMath.ts` `isNetworkFailure()` predicate (C.1a, code done — NETWORK/NON_NETWORK code sets + `!!err.request` fallback, tests NOT yet written), `probe-chain.spec.ts` (proof, failing by design), `C1_OFFLINE_FIX.md` (task file). Pending C.1 work: predicate unit cases in `offline-math.spec.ts`, the `client.ts` hook (C.1b), `offlineAwareApi.ts` rework (C.1c), regression suite `offline-interceptor.spec.ts` (C.1d), then verify + commit + push.
+
+**Key architectural rules**:
+- Axios response interceptors run in **registration order**; an early error-normalizing interceptor that strips `.config` silently kills every later interceptor that branches on it. A pre-normalization hook (raw AxiosError with `.config`/`.code`) is the only safe way to layer offline handling under the app's ApiError mapping.
+- `isNetworkFailure(error)` is the pure classifier: FALSE when `error.response` exists (4xx/5xx must surface), FALSE for `ERR_CANCELED`/config errors, TRUE for network-category codes, fallback `!!err.request`.
+- A synthetic 202/cached response must NOT re-enter the success interceptor's cache/stale-clear — guard on `_offline` in the success handler.
+- Any worktree state worth resuming across PC shutdowns goes into a root `.md` task file + a checkpoint commit; never rely on uncommitted work surviving.
+
 ### Phase 69 — Portal Online Payment (PRO Upgrade 3, mock-first): Full End-to-End Flow + Security Tests (Aug 9)
 
 **Request**: complete PRO Upgrade 3 — "Portal online payment" (`PRO_UPGRADE_TODO.md` section 3). No Algerian gateway merchant account exists, so the strategy is **mock-first**: a gateway abstraction + functional `MockGateway` shipped end-to-end today, with the real adapter (EDAHABIA / CIB e-payment / CTPay, SATIM-style) swapped in later. All 5 tasks committed+pushed individually: 3.1 `2bf2de5`, 3.2 `f90f5b8`, 3.3 `c60e89c` + `5de888e`, 3.4 `7b1bfd1`, 3.5 `dbf4477`.
