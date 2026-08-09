@@ -24,6 +24,7 @@
 /cloudflared*.exe
 /config.yml
 /share-public-order.config.ps1
+/PORTAL-FILES
 /vendor
 _ide_helper.php
 /server-helper/.watchdog-state.json
