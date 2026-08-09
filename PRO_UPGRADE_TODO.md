@@ -1,8 +1,10 @@
 # PRO Upgrade — Task Checklist
 
 > **Status: ✅ DONE (Aug 9) — upgrades 1, 2, 4 & 5 fully complete (1.1–1.5, 2.1–2.5,
-> 4.1–4.5, 5.1–5.5); only upgrade 3 (portal online payment) remains, and it needs
-> an Algerian gateway merchant account + sandbox credentials.** Pick up on any PC:
+> 4.1–4.5, 5.1–5.5) + offline schema fix (v1→v2, `932b61f`). Upgrade 3 (portal online
+> payment) is PLANNED but NOT started: the decided strategy is **mock-first** — build the
+> gateway abstraction + a functional `MockGateway` now (works with NO merchant account), then
+> swap in the real Algerian adapter when sandbox credentials arrive.** Pick up on any PC:
 > `git pull`, open this file, and work task-by-task. Commit + push after EACH task.
 
 > **Goal**: take the sales-management ERP (Laravel + React POS, Algerian market) from a
@@ -11,7 +13,7 @@
 ## Global verification (run after every task)
 
 - `npx tsc --noEmit` — clean
-- `npm test` — 248/248 pass (was 222; offline queue/math/sync/ttl/retry suites added)
+- `npm test` — 249/249 pass (was 222; offline queue/math/sync/ttl/retry suites added, +1 migration suite)
 - `npm run build` — 0 errors
 - **SW MATCH**: `(Get-FileHash public/sw.js -Algorithm SHA256).Hash` must equal
   `(Get-FileHash public/build/sw.js -Algorithm SHA256).Hash`
@@ -113,25 +115,58 @@
 > (`PortalOrderService::convertToSale`); payments are confirmed manually
 > (`PaymentSynchronizer`).
 >
+> **Strategy — mock-first (decided 2026-08-09)**: a real Algerian gateway needs a merchant
+> account + sandbox credentials we don't have yet, so build the FEATURE behind a **gateway
+> abstraction** now: a `PaymentGateway` interface + a functional **`MockGateway`** (sandbox,
+> no credentials, works today) so 3.1–3.5 ship end-to-end and are demoable; swap in the real
+> adapter (EDAHABIA / CIB e-payment / CTPay, SATIM-style) later when sandbox creds arrive.
+> Alternatives researched: Chargily Pay / DZBuild Slick-Pay (easy API) vs SATIM direct (heavy
+> certification). **Payment flow reuses `PaymentSynchronizer::syncPayments`** (client_ref
+> idempotency, treasury, PAY-YYYY-NNNNNN — the canonical payment lifecycle). A `paid` marker
+> on `portal_orders` is ORTHOGONAL to the order status (fulfillment stays
+> preparing→confirmed→…→delivered; payment is tracked via portal_orders fields + a confirmed
+> payment, NOT a new status).
+>
 > **Context**: portal API lives outside `{company}` (`routes/api.php`, `portalClient` axios
 > instance in `resources/js/lib/api/portal/`). Portal order lifecycle: `PortalOrderController`
 > (customer) + `PortalOrdersController` (admin, convert). Payment models/checks exist
-> (`resources/js/lib/api/endpoints/payments.ts`, `checks.ts`).
+> (`resources/js/lib/api/endpoints/payments.ts`, `checks.ts`). `portal_orders` has NO paid
+> field yet — 3.1 adds the payment columns migration.
 
-- [ ] **3.1 Gateway SDK** — integrate one Algerian gateway (EDAHABIA / CIB e-payment / CTPay).
-      Requires a merchant account + sandbox credentials; gate behind a setting
-      (`online_payment_enabled`, `gateway_mode=sandbox|live`).
-- [ ] **3.2 Backend payment initiation** — new endpoint (portal + admin) creating a payment
-      intent: order → amount TTC → gateway order page (redirect URL with `return` + `callback`).
-      Idempotency: one intent per order.
-- [ ] **3.3 Webhook/notification handler** — verify signature, mark order paid, create a
-      `confirmed` payment (reuse `PaymentSynchronizer`/`syncPayments`), update status →
-      paid, log in `portal_order_status_histories`.
-- [ ] **3.4 Portal UI** — «الدفع الإلكتروني» button on the order detail / checkout that opens
-      the gateway; success/failure result page; show "مدفوع عبر الإنترنت" on the order.
-- [ ] **3.5 Security + tests** — signature verification, replay protection (intent idempotency
-      key), amount must equal server-side total (never client-sent). Pest tests for
-      initiate/callback/verify with forged payloads rejected.
+- [ ] **3.1 Gateway abstraction + settings + migration** — `app/Services/Payments/Gateway/PaymentGateway.php`
+      (interface: `createPayment(intent) → {redirect_url, intent_id}`, `verify(notification) → {status,
+      intent_id, amount}`, `name()`), `MockGateway` (sandbox: succeed / fail / cancel, no creds), a factory
+      resolving the provider by setting. Settings in `SettingsSeeder` portal group (display_order ~111+):
+      `online_payment_enabled` (bool false), `gateway_provider` (`mock`), `gateway_mode` (`sandbox`),
+      `gateway_merchant_id`, `gateway_secret_key` (empty ok for mock). Migration adds to `portal_orders`:
+      `payment_intent_id` (nullable string), `payment_status` (enum pending|succeeded|failed|cancelled,
+      default pending), `payment_amount`, `payment_provider`, `payment_mode_id`, `paid_at` (nullable
+      timestamp), `payment_details` (json). Public `GET /{company}/portal/config` gains
+      `online_payment_enabled` so the UI hides/shows the pay button.
+- [ ] **3.2 Backend payment initiation** — `POST /{company}/portal/orders/{id}/pay` (portal.auth):
+      guards `online_payment_enabled`, order owned by the portal user, payment not already succeeded →
+      create ONE intent per order (idempotent — a repeat call on an existing pending intent returns the
+      same `{redirect_url, intent_id}`; a succeeded intent is rejected 4xx). **Amount ALWAYS server-computed**
+      = order `total_ttc` (never client-sent). Store intent id + amount on `portal_orders`; return the
+      gateway redirect URL.
+- [ ] **3.3 Webhook/notification handler** — public `POST /{company}/portal/payment/webhook`
+      (in the `{company}/portal` group, OUTSIDE `portal.auth`, verified via the gateway adapter — mock =
+      shared-secret HMAC): `verify()` the payload, amount MUST equal the stored intent amount, then ONE
+      idempotent apply: `PaymentSynchronizer::syncPayments` creates a `confirmed` payment (mode = resolved
+      online payment mode → default treasury; `client_ref` = intent id) + set `payment_status=succeeded`/
+      `paid_at` on `portal_orders` + history row («دفع عبر الإنترنت»). Replay protection: intent
+      idempotency key + processed flag — replayed / bad-signature / amount-mismatch payloads rejected 4xx
+      and never re-apply.
+- [ ] **3.4 Portal UI** — «الدفع الإلكتروني» button on the order detail (paid-eligible orders only, shown
+      when `online_payment_enabled`); redirect to the gateway (MockGateway page = `routes/web.php` GET
+      `/mock-gateway/pay` + POST confirm/cancel → callback); success / failure / cancelled result handling
+      (callback → order status view); show «مدفوع عبر الإنترنت» badge on the order. Admin order detail
+      shows the payment fields.
+- [ ] **3.5 Security + tests** — Pest: initiate guards (disabled setting, wrong owner, paid order,
+      amount-from-server), webhook with FORGED payloads (bad HMAC, tampered amount, replay, unknown
+      intent) all rejected 4xx with no payment / no paid-marker created; happy path create → pay →
+      webhook confirm → convert to FV end-to-end with the mock gateway. Frontend: `npm test`, tsc, build,
+      SW MATCH, Playwright smoke (fresh browser + token, zero console errors).
 
 ## 4. 2FA + Granular Permissions
 
@@ -185,6 +220,12 @@
       `getPendingOpsByStatus`, `getFailedOpsCount`, `updatePendingOp`, `markOpFailed`,
       `clearPendingOps`, `invalidateCache(prefix)`, `extractTargetIdFromUrl`. Test:
       `resources/js/lib/offline/__tests__/offline-queue.spec.ts` (6 tests, `fake-indexeddb`).
+      **Schema fix (`932b61f`)**: the `status` index added here was never migrated to existing
+      browsers (DB_VERSION stayed 1 → `upgradeneeded` never fired → `getPendingOpsByStatus`/
+      `getFailedOpsCount` crashed with `NotFoundError`). Now `DB_VERSION = 2` and `upgrade()`
+      REPAIRS existing stores in place (`store.indexNames.contains` guard + `createIndex` for
+      `status`, `createdAt`, `expiresAt`); test hook `resetOfflineDbForTests()`; regression
+      suite `__tests__/db-migration.spec.ts`.
 - [x] **5.2 Offline interception** — `offlineAwareApi.ts` routes POS mutations through the
       queue when `navigator.onLine === false` and returns a RICH optimistic success so the
       sale completes offline: `{id: <temp>, document_number: 'OFFLINE-<n>', total_ht/tva/ttc,
@@ -239,9 +280,9 @@
 |---------|--------|-------|
 | 1. Fiscal QR + PDF | ✅ done (1.1–1.5) | DGI spec NOT published → documented versioned JSON v1 (`docs/reports/FISCAL_QR_SPEC.md`); scannability proven via jsqr round-trip |
 | 2. Backup + restore | ✅ done (2.1–2.5) | command + schedule + restore + settings UI + E2E verified (`docs/reports/BACKUP_RESTORE_GUIDE.md`); 15 pre-existing POS `total_discount` defects flagged (not restore-introduced) |
-| 3. Portal online payment | not started | needs an Algerian gateway merchant account + sandbox credentials (EDAHABIA / CIB / CTPay) |
+| 3. Portal online payment | planned — not started (mock-first) | strategy decided 2026-08-09: build gateway abstraction + functional `MockGateway` now (works with NO merchant account), swap real Algerian adapter (EDAHABIA / CIB / CTPay) when sandbox creds arrive; details in section 3 |
 | 4. 2FA + permissions | ✅ done (4.1–4.5) | TOTP 2FA + two-step login + backup codes + `EnsureTwoFactorVerified` session enforcement + owner/manager/cashier/viewer roles + permission matrix + admin UI; 5 pest tests in `TwoFactorEnforcementTest` |
-| 5. Offline-first POS | ✅ done (5.1–5.5) | write queue + rich offline interception + sync engine + stock/stale badge + failed-ops UI all pushed; 248 vitest pass |
+| 5. Offline-first POS | ✅ done (5.1–5.5) + schema fix | write queue + rich offline interception + sync engine + stock/stale badge + failed-ops UI all pushed; IndexedDB v1→v2 migration fix (`932b61f`); 249 vitest pass |
 
 ## Commits
 
@@ -266,6 +307,8 @@ files belonging to that task; leave unrelated dirty files untouched):
 | `dd4178a` *(5.3)* | Sync engine — `syncEngine.ts` (`replayPendingOps` FIFO + `tempId→realId` map + `resolveOpUrl` rewrite so follow-ups PUT the real doc, `isPermanent` 4xx vs transient 5xx/network, `MAX_RETRIES=3` → `failed`+`lastError`, `SyncReport`); `useOffline.ts` (`useSync` auto-sync on `online` + `offline:synced` event, `retryFailedOps`, `useFailedOpsCount`/`useFailedOps`) + `sync-engine.spec.ts` (7) |
 | `d225429` *(5.4)* | Stock/availability offline + stale badge — `offlineAwareApi.ts` exports `cacheTtlForUrl` (stock-at 30 min vs 5 min default) + reactive stale signal (`isDataStale`/`subscribeDataStale`, set on offline GET serve, reset on real network GET); `useOffline.ts` `useOfflineServed()`; `OfflineIndicator` stale badge («بيانات من ذاكرة محلية»); `.offline-indicator` CSS; `offline-cache-ttl.spec.ts` (2) |
 | `b3c5480` *(5.5)* | Failed-ops UI — `OfflineIndicator` rewrite: failed-count badge + click popover (`.offline-pop`) listing method/url/Arabic `lastError` per failed op + «إعادة المحاولة» (`retryFailedOps()` then `sync()`); `.offline-widget`/`.offline-pop*` CSS; `SyncResult` re-export; `retry-failed.spec.ts` (2); POS offline resilience verified (both POSes `res.document_number ?? ''` tolerate `OFFLINE-<temp>`); 248 tests |
+| `932b61f` *(5.1 fix)* | Offline IndexedDB v1→v2 migration — `resources/js/lib/offline/db.ts` `DB_VERSION` 1→2 + `upgrade()` now REPAIRS existing stores in place (`store.indexNames.contains` guard + `createIndex` for `status`, `createdAt`, `expiresAt`; records survive), fixing the `NotFoundError: ... index was not found` crash (commit `8918c3a` added the `status` index + `getPendingOpsByStatus`/`getFailedOpsCount` consumers without bumping the version, so legacy v1 browsers never migrated); test hook `resetOfflineDbForTests()` (closes + nulls cached `dbPromise`); regression `__tests__/db-migration.spec.ts` (seeds legacy v1 schema, migrates, asserts status index works with legacy record intact); tsc clean, vitest 249/249, build 219 precache, SW MATCH |
+| `5c08dfd` *(docs)* | AGENTS.md Phase 68 follow-up — documents the v1→v2 migration bug, fix, and rules (any new IDB index/store MUST bump `DB_VERSION`; migrations repair existing stores; no `deleteDatabase` choreography needed under fake-indexeddb) |
 | `de1642f` *(4.1)* | 2FA backend — `TwoFactorAuthService` (TOTP secret generate/verify, encrypted storage via `encrypted` cast on `users.two_factor_secret`, QR provisioning URI, setup/enable/disable, one-time backup codes 10×`XXXX-XXXX-XXXX` + regenerate, `two_factor_enabled_at`), `TwoFactorAuthController`, login challenge `auth/two-factor/confirm` → `TWO_FACTOR_REQUIRED` |
 | `f0efae5` *(4.1b)* | two-step 2FA login UI — `LoginPage` creds → 6-digit code → confirm (redirect through the code step when `TWO_FACTOR_REQUIRED`) |
 | `28797c9` *(4.1c)* | 2FA SecurityTab (الأمان) in Settings — status badge, QR + secret enrollment (`useTwoFactorSetup`), 6-digit verify → enable, one-time backup codes with save-ack, regenerate via `recoveryCodes`, disable with current code + ConfirmModal; wired into TABS + SettingsPage; `.sec-*` CSS |
