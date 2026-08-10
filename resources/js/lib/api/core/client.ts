@@ -5,6 +5,7 @@ import axios, {
   type AxiosInstance,
   type AxiosError,
   type AxiosRequestConfig,
+  type AxiosResponse,
   type InternalAxiosRequestConfig,
 } from 'axios';
 
@@ -12,6 +13,22 @@ import axios, {
 let _getSlug: () => string | null = () => null;
 export function connectSlugToInterceptor(getter: () => string | null): void {
   _getSlug = getter;
+}
+
+// ─── Network-failure hook (C.1) ───────────────────────────────────────────────
+// The response error interceptor normalizes EVERY failure into an ApiError
+// (no `.config`). Any layer that needs the RAW AxiosError (with `.config` +
+// `.code`) — e.g. the offline layer — MUST register through this hook: it runs
+// at the TOP of the error interceptor, BEFORE the ApiError mapping, and only
+// for transport failures (`!error.response`). A returned synthetic AxiosResponse
+// claims the request (offline path); `undefined` falls through to normal
+// error mapping. The hook is checked before any status branch, so a 4xx/5xx
+// error (which HAS `error.response`) never reaches it.
+export type NetworkFailureHandler =
+  (error: AxiosError) => Promise<AxiosResponse | undefined> | undefined;
+let _networkFailureHandler: NetworkFailureHandler | null = null;
+export function registerNetworkFailureHandler(fn: NetworkFailureHandler): void {
+  _networkFailureHandler = fn;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -169,6 +186,14 @@ function forcedLogout(): void {
 client.interceptors.response.use(
   r => r,
   async (error: AxiosError<ApiErrorPayload>) => {
+    // ── Pre-normalization hook: give the offline layer the RAW AxiosError ──
+    // Runs only for transport failures (no HTTP response). If the handler
+    // returns a synthetic response, that claims the request and we stop.
+    if (!error.response && _networkFailureHandler) {
+      const handled = await _networkFailureHandler(error);
+      if (handled) return handled;
+    }
+
     const req    = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
     const status = error.response?.status;
     const data   = error.response?.data;

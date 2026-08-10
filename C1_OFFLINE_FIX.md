@@ -1,18 +1,16 @@
 # Remaining Tasks — B (Camera), C (Offline), D (WhatsApp) — Full Actionable List
 
-> **Status: 🚧 PAUSED (user closed all windows, 2026-08-09).** Pick up on any PC: `git pull`,
+> **Status: ✅ C.1 COMPLETE (committed, 2026-08-09).** Pick up on any PC: `git pull`,
 > open this file, work task-by-task. **Commit + push after EACH task** (stage ONLY that task's
 > files). C is being implemented first (decided with the user), then B, then D.
 >
-> **Uncommitted worktree right now** (resume point — do NOT lose these):
-> - `M resources/js/lib/offline/queueMath.ts` — `isNetworkFailure()` predicate appended (C.1a code, done)
-> - `?? resources/js/lib/offline/__tests__/probe-chain.spec.ts` — proof that C.1's ordering bug is real (currently FAILS: 0 ops instead of 1)
-> - `?? C1_OFFLINE_FIX.md` → this file
-> - HEAD is `a76ef8b docs: product roadmap ...` (clean apart from the above).
+> **Resume point now**: C.1 (offline interception) is DONE and pushed. Next is **C.2**
+> (documents-module offline hardening). HEAD is the C.1 commit (`fix(offline): offline
+> interception was dead — ...`).
 
 ---
 
-## ⚠️ CRITICAL DISCOVERY — the C.1 blocker (already proven)
+## ⚠️ CRITICAL DISCOVERY — the C.1 blocker (already proven, NOW FIXED)
 
 The entire offline layer **never fires today** (write queue + cached GETs). Root cause is
 **response-interceptor ordering**, not the `navigator.onLine` gate:
@@ -28,14 +26,33 @@ The entire offline layer **never fires today** (write queue + cached GETs). Root
    an `ApiError`, hits `if (!cfg) throw error` (offlineAwareApi.ts line ~62), and rethrows →
    **the offline mutation queue and cached-GET path never run.**
 
-**Proof**: `probe-chain.spec.ts` reproduces the real boot order (client mapper first, then
-`registerOfflineInterceptor()`), stubs a raw network-error adapter, forces
-`navigator.onLine = false`, POSTs, and asserts 1 queued op — it **fails with 0**.
+**Proof** (was): `probe-chain.spec.ts` reproduced the real boot order (client mapper first,
+then `registerOfflineInterceptor()`), stubbed a raw network-error adapter, forced
+`navigator.onLine = false`, POSTed, and asserted 1 queued op — it **failed with 0**.
 
-**Fix shape**: client.ts must offer a **pre-normalization hook** — register a network-failure
-handler that runs BEFORE the ApiError conversion (receives the RAW AxiosError with `.config`),
-returns a synthetic `AxiosResponse` to claim a request (offline path) or `undefined` to fall
-through to normal error mapping. The offline layer registers through that hook.
+**FIX (implemented, C.1, committed)**: client.ts now offers a **pre-normalization hook** —
+`registerNetworkFailureHandler(fn)` — a module-level handler that runs BEFORE the ApiError
+conversion (receives the RAW AxiosError with `.config`/`.code`), returns a synthetic
+`AxiosResponse` to claim a request (offline path) or `undefined` to fall through to normal
+error mapping. The offline layer registers through that hook (not as a second response
+error interceptor).
+
+**Key implementation notes** (deviations from the original plan, all intentional & tested):
+- **Gate is `isNetworkFailure(error)` ONLY** — NOT `isNetworkFailure(error) || !navigator.onLine`.
+  The browser flag is unreliable (flaky links) and as an override it would queue 4xx/5xx or
+  `ERR_CANCELED` when the browser merely *reports* offline. `isNetworkFailure` already
+  subsumes connectivity via the error itself (`!!err.request` fallback covers no-code
+  transport errors). Contract pinned by tests: 4xx/5xx (response present) ALWAYS surface →
+  0 ops, even with `navigator.onLine = false`; `ERR_CANCELED`/config errors never queue;
+  transport failures queue regardless of `navigator.onLine`.
+- Synthetic offline responses (202 ack / cached / empty) have NO `response.config` — axios
+  only injects it on real dispatch. The success interceptor uses `cfg?.method?.toLowerCase()`
+  optional chaining; missing config = non-cacheable and must never clear the stale badge
+  (`_offline` guard is defense-in-depth).
+- `cfg.data` at hook time is the post-transform **JSON string** (axios default
+  `transformRequest`). The hook parses it back to an object so
+  `isDocumentPayload`/`computeQueuedDocumentTotals` work and the queue stores typed data;
+  replay re-sends it and axios re-stringifies → identical wire bytes.
 
 ---
 
@@ -60,43 +77,46 @@ Live smoke via Playwright Chromium (fresh browser, fresh token) — zero console
 > `MAX_RETRIES=3`), `useOffline.ts` (`useSync`, `retryFailedOps`, `useFailedOps`),
 > `queueMath.ts` (pure totals/guards). Offline suites: `resources/js/lib/offline/__tests__/`.
 
-## C.1 Any network failure = offline (server-unreachable) — IN PROGRESS (see discovery above)
+## C.1 Any network failure = offline (server-unreachable) — ✅ COMPLETE
 
 Tasks (detailed):
 
-- **C.1a `isNetworkFailure()` predicate** — ✅ **WRITTEN** (uncommitted) at the end of
-  `queueMath.ts`: `NETWORK_FAILURE_CODES` (ERR_NETWORK, ERR_INTERNET_DISCONNECTED,
+- **C.1a `isNetworkFailure()` predicate** — ✅ **DONE** at the end of `queueMath.ts`:
+  `NETWORK_FAILURE_CODES` (ERR_NETWORK, ERR_INTERNET_DISCONNECTED,
   ERR_CONNECTION_REFUSED/RESET/CLOSED, ERR_NAME_NOT_RESOLVED, ERR_EMPTY_RESPONSE,
   ERR_ADDRESS_UNREACHABLE, ERR_HTTP2_PROTOCOL_ERROR, ENOTFOUND, ECONNREFUSED, ECONNRESET,
   ENETUNREACH, EHOSTUNREACH, ETIMEDOUT, EAI_AGAIN) + `NON_NETWORK_CODES` (ERR_CANCELED,
   ERR_BAD_OPTION, ERR_BAD_OPTION_VALUE, ERR_BAD_REQUEST). Semantics: `error.response` present
   → FALSE (4xx/5xx surface); NON_NETWORK → FALSE; NETWORK → TRUE; no code → `!!err.request`.
-  **TODO**: add unit cases to `__tests__/offline-math.spec.ts` (timeout→true, ERR_CANCELED→false,
-  422→false, no-code-with-request→true, plain/null→false).
+  Unit cases in `__tests__/offline-math.spec.ts` (timeout→true, ERR_CANCELED→false, 422→false,
+  no-code-with-request→true, plain/null→false).
 
-- **C.1b Fix interceptor ordering** — `client.ts`: add
+- **C.1b Fix interceptor ordering** — ✅ **DONE** in `client.ts`:
   `registerNetworkFailureHandler(fn: (error: AxiosError) => Promise<AxiosResponse|undefined> | undefined)`
   (module-level `_networkFailureHandler`). At the TOP of the existing response error interceptor
   (before the ApiError mapping): `if (!error.response && _networkFailureHandler) { const h = await _networkFailureHandler(error); if (h) return h; }`.
   Gives the offline layer the RAW error (`.config` + `.code`).
 
-- **C.1c Rework `offlineAwareApi.ts`** — import `registerNetworkFailureHandler` + `isNetworkFailure`.
-  Keep the success interceptor for GET caching + stale clear, but guard: skip `setCache` AND skip
-  stale-clear when `(response as any)._offline === true` (a synthetic 202 must not re-cache nor
-  clear the stale badge). REMOVE the error half of the success interceptor; register via the hook:
-  gate = `isNetworkFailure(error) || !navigator.onLine`; mutation branch → enqueue + 202 logic;
-  GET branch → cached response; else return `undefined` (falls through to client.ts error mapping).
-  Keep the `registered` once-guard.
+- **C.1c Rework `offlineAwareApi.ts`** — ✅ **DONE**: imports `registerNetworkFailureHandler`
+  + `isNetworkFailure`. Success interceptor kept for GET caching + stale clear, guarded:
+  skip `setCache` AND skip stale-clear when `(response as any)._offline === true` (a synthetic
+  202 must not re-cache nor clear the stale badge), and `cfg?.method` optional-chaining (no
+  `.config` on synthetic responses). The error half is REMOVED; the offline path registers via
+  the hook: **gate = `isNetworkFailure(error)` ONLY** (deviation documented above); mutation
+  branch → enqueue + 202 logic; GET branch → cached response; else return `undefined` (falls
+  through to client.ts error mapping). `registered` once-guard kept.
 
-- **C.1d Regression tests** — replace `probe-chain.spec.ts` with a permanent integration suite
-  (`__tests__/offline-interceptor.spec.ts`): (a) boot-order sim: client-style mapper registered
-  FIRST, then `registerOfflineInterceptor()`; `navigator.onLine = false`; custom adapter throws
-  raw `ERR_NETWORK` with `.config`; `POST /demo/documents` → 1 pending op + 202 response.
-  (b) 422/500 WITH `response` → 0 ops and the error surfaces. Delete the probe once green.
+- **C.1d Regression tests** — ✅ **DONE**: `probe-chain.spec.ts` REPLACED by the permanent
+  `__tests__/offline-interceptor.spec.ts` (9 tests): (a) boot-order sim via the real `client.ts`
+  import + `registerOfflineInterceptor()` (must NOT wipe existing interceptors); `navigator.onLine = false`;
+  custom adapter throws raw `ERR_NETWORK` with `.config`; `POST /demo/documents` → 1 pending op
+  + 202 response with locally computed totals. (b) 422/500 WITH `response` → 0 ops and the error
+  surfaces. Plus: flaky-link (navigator online) still queues; ERR_CANCELED never queues;
+  cached GET served; empty-cache GET → `[]`; stale-badge semantics; non-document mutation →
+  minimal ack body.
 
-- **Verify + commit**: tsc, npm test, build, SW MATCH. Stage ONLY `queueMath.ts`, `client.ts`,
-  `offlineAwareApi.ts`, `offline-math.spec.ts`, `offline-interceptor.spec.ts`, probe deletion.
-  Message: `fix(offline): offline interception was dead — client.ts ApiError stripped .config before the offline interceptor ran; route network failures through a pre-normalization hook (C.1)`
+- **Verify + commit** — ✅ **DONE**: tsc clean, `npm test` 265/265 (16 files), `npm run build`
+  0 errors, SW MATCH. Committed + pushed as `fix(offline): offline interception was dead — ...`.
 
 ## C.2 Documents module offline
 
@@ -231,7 +251,7 @@ Tasks (detailed):
 | Family | Status | Notes |
 |--------|--------|-------|
 | B. Camera-native | ❌ planned | B.1–B.5 defined; start after C |
-| C. Offline everywhere | 🚧 in progress | C.1 blocked by the ordering discovery → C.1a code written (uncommitted); C.2–C.5 pending |
+| C. Offline everywhere | 🚧 in progress | **C.1 DONE** (offline interception fixed + regression suite, committed); C.2–C.5 pending |
 | D. WhatsApp commerce | ❌ planned | D.1–D.5 defined; wa.me-first, Meta Cloud API webhook later |
 
 ## Commits
@@ -242,7 +262,7 @@ files; leave unrelated dirty files untouched):
 | Commit | Contents |
 |--------|----------|
 | *(ROADMAP creation)* | `ROADMAP.md` + AGENTS.md mention — DONE (`a76ef8b`) |
-| *(C.1)* | `queueMath.ts` `isNetworkFailure()` + `client.ts` pre-normalization hook + `offlineAwareApi.ts` hook wiring + tests (incl. replacing the probe) |
+| *(C.1)* | **DONE** — `queueMath.ts` `isNetworkFailure()` + `client.ts` pre-normalization hook + `offlineAwareApi.ts` hook wiring + `offline-interceptor.spec.ts` regression suite (replaced the probe) |
 | *(C.2)* | documents-module offline hardening + field-agent flow verification |
 | *(C.3)* | `cacheTtlForUrl` extension + «جهّز للعمل دون اتصال» prefetch |
 | *(C.4)* | field-agent sync dashboard |

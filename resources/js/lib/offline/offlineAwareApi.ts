@@ -1,5 +1,5 @@
-import client from '@/lib/api/core/client';
-import type { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
+import client, { registerNetworkFailureHandler } from '@/lib/api/core/client';
+import type { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { setCache, getCache, enqueueOp, type EnqueueInput } from './db';
 import {
   computeQueuedDocumentTotals,
@@ -7,6 +7,7 @@ import {
   offlineDocNumber,
   isDocumentUrl,
   isDocumentPayload,
+  isNetworkFailure,
 } from './queueMath';
 
 const CACHEABLE_METHODS = new Set(['get']);
@@ -44,88 +45,126 @@ export function registerOfflineInterceptor(): void {
   if (registered) return;
   registered = true;
 
+  // ── Success interceptor: GET response caching + stale-badge clearing ──────
+  // A synthetic offline response (`_offline: true`, e.g. the 202 write-queue
+  // ack or a cached GET) is NOT a real network response: it must never be
+  // re-cached and must never clear the stale badge.
   client.interceptors.response.use(
     async (response: AxiosResponse) => {
-      const cfg = response.config as InternalAxiosRequestConfig;
-      const method = cfg.method?.toLowerCase() ?? '';
-      if (CACHEABLE_METHODS.has(method) && response.status === 200) {
+      // A synthetic offline response (202 ack / cached / empty) has NO
+      // `config` — axios only injects it on a real dispatch. It must never be
+      // re-cached and must never clear the stale badge, so treat a missing
+      // config as non-cacheable entirely (the `_offline` guard is defense-in-depth).
+      const cfg = response.config as InternalAxiosRequestConfig | undefined;
+      const method = cfg?.method?.toLowerCase() ?? '';
+      const isOfflineSynthetic = (response as unknown as { _offline?: boolean })._offline === true;
+      if (cfg && CACHEABLE_METHODS.has(method) && response.status === 200 && !isOfflineSynthetic) {
         const key = cacheKeyFromUrl(cfg.url ?? '', cfg.params);
         await setCache(key, response.data, cacheTtlForUrl(cfg.url ?? ''));
       }
       // a real network response means we're not stale anymore
-      if (CACHEABLE_METHODS.has(method)) {
+      if (cfg && CACHEABLE_METHODS.has(method) && !isOfflineSynthetic) {
         if (stale) { stale = false; emitStale(); }
       }
       return response;
     },
-    async (error) => {
-      const cfg = error.config as InternalAxiosRequestConfig;
-      if (!cfg) throw error;
-      const method = cfg.method?.toLowerCase() ?? '';
+  );
 
-      // ── Offline mutation → persist to the write queue (FIFO) + optimistic ack
-      if (MUTATING_METHODS.has(method) && !navigator.onLine) {
-        const url = cfg.url ?? '';
-        const isDoc = isDocumentUrl(url) || isDocumentPayload(cfg.data);
+  // ── Network-failure hook: offline interception runs FIRST ─────────────────
+  // Registered through client.ts's pre-normalization hook so it receives the
+  // RAW AxiosError (with `.config` + `.code`) BEFORE the app's ApiError
+  // mapping strips it. Without this the offline write queue + cached GETs
+  // could never fire (the previous error-interceptor ordering silently killed
+  // the whole layer). A returned response claims the request; `undefined`
+  // falls through to client.ts's normal error mapping (the ApiError we want
+  // for genuine 4xx/5xx and non-network transport errors).
+  registerNetworkFailureHandler(async (error: AxiosError): Promise<AxiosResponse | undefined> => {
+    const cfg = error.config as InternalAxiosRequestConfig;
+    if (!cfg) return undefined;
+    const method = cfg.method?.toLowerCase() ?? '';
 
-        const enq: EnqueueInput = {
-          method: method.toUpperCase() as 'POST' | 'PUT' | 'PATCH' | 'DELETE',
-          url,
-          data: cfg.data,
+    // Offline = transport-level failure (server unreachable). `isNetworkFailure`
+    // is the single classifier: FALSE when a response arrived (4xx/5xx must
+    // surface), FALSE for ERR_CANCELED / client config errors, TRUE for network
+    // codes, and TRUE by fallback whenever a request was dispatched but no
+    // response came back. We deliberately do NOT add `|| !navigator.onLine`:
+    // the browser flag is unreliable (flaky links report online while failing)
+    // and as an override it would queue 4xx/5xx — or worse, a canceled op —
+    // whenever the browser happens to report offline. The predicate already
+    // subsumes the connectivity check via the error itself.
+    if (!isNetworkFailure(error)) return undefined;
+
+    // ── Offline mutation → persist to the write queue (FIFO) + optimistic ack
+    if (MUTATING_METHODS.has(method)) {
+      const url = cfg.url ?? '';
+
+      // axios hands us the POST-transform body: a JSON string by default. Parse
+      // it back to an object so `isDocumentPayload`/`computeQueuedDocumentTotals`
+      // see real numbers AND the queue stores typed data (replay re-sends it and
+      // axios re-stringifies → identical wire bytes).
+      const rawData = typeof cfg.data === 'string'
+        ? (() => { try { return JSON.parse(cfg.data); } catch { return cfg.data; } })()
+        : cfg.data;
+      const isDoc = isDocumentUrl(url) || isDocumentPayload(rawData);
+
+      const enq: EnqueueInput = {
+        method: method.toUpperCase() as 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+        url,
+        data: rawData,
+      };
+
+      // A document CREATE gets a temp id so follow-up ops can reference it
+      // and so the UI can show a stable receipt number while offline.
+      let queuedBody: Record<string, unknown> = { ok: true, queued: true, _offline: true };
+      if (isDoc) {
+        const tempId = nextTempId();
+        enq.tempId = method === 'post' ? tempId : null;
+        const totals = computeQueuedDocumentTotals(rawData);
+        queuedBody = {
+          ok: true,
+          queued: true,
+          _offline: true,
+          id: tempId,
+          document_number: offlineDocNumber(tempId),
+          total_ht: totals?.total_ht ?? 0,
+          total_tva: totals?.total_tva ?? 0,
+          total_ttc: totals?.total_ttc ?? 0,
+          net_to_pay: totals?.net_to_pay ?? 0,
+          paid_amount: totals?.paid_amount ?? 0,
+          balance_data: { previous_balance: null, new_balance: null },
         };
-
-        // A document CREATE gets a temp id so follow-up ops can reference it
-        // and so the UI can show a stable receipt number while offline.
-        let queuedBody: Record<string, unknown> = { ok: true, queued: true, _offline: true };
-        if (isDoc) {
-          const tempId = nextTempId();
-          enq.tempId = method === 'post' ? tempId : null;
-          const totals = computeQueuedDocumentTotals(cfg.data);
-          queuedBody = {
-            ok: true,
-            queued: true,
-            _offline: true,
-            id: tempId,
-            document_number: offlineDocNumber(tempId),
-            total_ht: totals?.total_ht ?? 0,
-            total_tva: totals?.total_tva ?? 0,
-            total_ttc: totals?.total_ttc ?? 0,
-            net_to_pay: totals?.net_to_pay ?? 0,
-            paid_amount: totals?.paid_amount ?? 0,
-            balance_data: { previous_balance: null, new_balance: null },
-          };
-        }
-
-        await enqueueOp(enq);
-        return Promise.resolve({
-          data: queuedBody,
-          status: 202,
-          statusText: 'Accepted (queued offline)',
-        } as AxiosResponse);
       }
 
-      // ── Offline GET → serve cached data (fallback empty) with _offline flag
-      if (CACHEABLE_METHODS.has(method) && !navigator.onLine) {
-        const key = cacheKeyFromUrl(cfg.url ?? '', cfg.params);
-        const cached = await getCache(key);
-        if (!stale) { stale = true; emitStale(); }
-        if (cached) {
-          return Promise.resolve({
-            data: cached,
-            status: 200,
-            statusText: 'OK (cached offline)',
-            _offline: true,
-          } as unknown as AxiosResponse);
-        }
+      await enqueueOp(enq);
+      return Promise.resolve({
+        data: queuedBody,
+        status: 202,
+        statusText: 'Accepted (queued offline)',
+        _offline: true,
+      } as unknown as AxiosResponse);
+    }
+
+    // ── Offline GET → serve cached data (fallback empty) with _offline flag
+    if (CACHEABLE_METHODS.has(method)) {
+      const key = cacheKeyFromUrl(cfg.url ?? '', cfg.params);
+      const cached = await getCache(key);
+      if (!stale) { stale = true; emitStale(); }
+      if (cached) {
         return Promise.resolve({
-          data: [],
+          data: cached,
           status: 200,
-          statusText: 'OK (empty offline)',
+          statusText: 'OK (cached offline)',
           _offline: true,
         } as unknown as AxiosResponse);
       }
+      return Promise.resolve({
+        data: [],
+        status: 200,
+        statusText: 'OK (empty offline)',
+        _offline: true,
+      } as unknown as AxiosResponse);
+    }
 
-      throw error;
-    },
-  );
+    return undefined;
+  });
 }

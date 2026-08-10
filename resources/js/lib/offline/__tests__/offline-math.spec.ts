@@ -6,6 +6,7 @@ import {
   isOfflineQueuedResponse,
   isDocumentUrl,
   isDocumentPayload,
+  isNetworkFailure,
 } from '../queueMath';
 
 describe('offline queue math (queueMath.ts)', () => {
@@ -79,5 +80,46 @@ describe('offline queue math (queueMath.ts)', () => {
 
     expect(isDocumentPayload({ lines: [] })).toBe(true);
     expect(isDocumentPayload({ name: 'x' })).toBe(false);
+  });
+});
+
+describe('isNetworkFailure (C.1)', () => {
+  it('treats transport-level codes as network failures even with no request', () => {
+    expect(isNetworkFailure({ code: 'ERR_NETWORK' })).toBe(true);
+    expect(isNetworkFailure({ code: 'ERR_CONNECTION_REFUSED' })).toBe(true);
+    expect(isNetworkFailure({ code: 'ERR_NAME_NOT_RESOLVED' })).toBe(true);
+    expect(isNetworkFailure({ code: 'ETIMEDOUT' })).toBe(true);
+    expect(isNetworkFailure({ code: 'ECONNRESET' })).toBe(true);
+  });
+
+  it('treats a timeout (ECONNABORTED with a dispatched request) as a network failure', () => {
+    expect(isNetworkFailure({ code: 'ECONNABORTED', request: {} })).toBe(true);
+  });
+
+  it('never treats a user/signal abort as a network failure', () => {
+    expect(isNetworkFailure({ code: 'ERR_CANCELED', request: {} })).toBe(false);
+  });
+
+  it('never treats client config errors as network failures', () => {
+    expect(isNetworkFailure({ code: 'ERR_BAD_OPTION', request: {} })).toBe(false);
+    expect(isNetworkFailure({ code: 'ERR_BAD_REQUEST', request: {} })).toBe(false);
+  });
+
+  it('returns false when the server answered (4xx/5xx must surface)', () => {
+    expect(isNetworkFailure({ response: { status: 422 }, code: 'ERR_BAD_REQUEST', request: {} })).toBe(false);
+    expect(isNetworkFailure({ response: { status: 500 } })).toBe(false);
+    expect(isNetworkFailure({ response: { status: 401 } })).toBe(false);
+  });
+
+  it('falls back to a dispatched request (no code, no response) → network failure', () => {
+    expect(isNetworkFailure({ request: {} })).toBe(true);
+  });
+
+  it('returns false for plain values / no request / no response', () => {
+    expect(isNetworkFailure(null)).toBe(false);
+    expect(isNetworkFailure(undefined)).toBe(false);
+    expect(isNetworkFailure('ERR_NETWORK')).toBe(false);
+    expect(isNetworkFailure({})).toBe(false);
+    expect(isNetworkFailure({ code: 5 })).toBe(false);
   });
 });
