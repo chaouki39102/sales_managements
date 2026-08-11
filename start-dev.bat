@@ -5,7 +5,18 @@ echo =====================================
 echo Starting Laravel Server...
 echo =====================================
 
-start "Laravel" cmd /k "cd /d %~dp0 && php artisan serve"
+rem Resolve a PHP 8.3+ binary: prefer C:\xampp\php84 (this dev machine), else PATH php.
+set "PHP=php"
+if exist "C:\xampp\php84\php.exe" set "PHP=C:\xampp\php84\php.exe"
+%PHP% -r "if (PHP_VERSION_ID < 80300) { exit(1); }" 2>nul
+if errorlevel 1 (
+    echo [ERROR] PHP 8.3+ is required but the resolved PHP is too old.
+    echo         Install PHP 8.4 at C:\xampp\php84 (or add it to your PATH), then run again.
+    pause
+    exit /b 1
+)
+
+start "Laravel" cmd /k "cd /d %~dp0 && "%PHP%" artisan serve"
 
 timeout /t 3 >nul
 

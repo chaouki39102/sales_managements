@@ -3,6 +3,7 @@
 ## Global Rules
 - **Always respond in English**, regardless of the language the user writes in.
 - **When reading how API data is returned**, ALWAYS check `extractData()` in `resources/js/lib/api/core/client.ts` — it is the single standard bridge between backend and frontend. Never assume the raw HTTP response shape reaches consumers directly.
+- **PHP runtime is 8.3+ (composer requires `php: ^8.3`)**. XAMPP's bundled PHP is 8.0 and MUST NOT be used — Laravel 13 fails to boot on it. The dev machine has PHP 8.4.24 at `C:\xampp\php84` (prepended to the USER PATH, so `php`/`composer`/`artisan` already resolve to it in new terminals). `start-server.bat` / `start-dev.bat` prefer `C:\xampp\php84\php.exe` when present and hard-fail with a clear message if the resolved PHP is < 8.3 — never bypass this guard with raw `php`. `server-helper/router.php`, `start-helper.ps1` and `watchdog.ps1` resolve `php` from PATH, so they inherit the fixed version automatically.
 
 ## Frontend Core: `resources/js/lib` (start here for any FE work)
 - **`resources/js/lib` IS the frontend core** — auth/session, multitenancy, fiscal-year, the API layer, and the offline layer all live under it. All cross-cutting FE code goes here first; pages/components only consume it.
