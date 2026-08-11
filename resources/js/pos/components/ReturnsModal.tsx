@@ -5,6 +5,7 @@ import type { CommercialDocument, CommercialDocumentLine } from '@/types';
 import { documentsApi } from '@/lib/api/endpoints/documents';
 import { posSessionApi } from '@/lib/api/endpoints/posSession';
 import { apiPost } from '@/lib/api/core/client';
+import { isOfflineQueuedResponse } from '@/lib/offline/queueMath';
 import { formatDZD } from '../utils/calculations';
 import { useNotification } from '@/hooks/useNotification';
 
@@ -107,7 +108,7 @@ export default function ReturnsModal({ sessionId, onClose, onDone }: ReturnsModa
 
     setCreating(true);
     try {
-      await apiPost(`/documents/${doc.id}/return`, {
+      const res = await apiPost(`/documents/${doc.id}/return`, {
         reason: reason || 'مرتجع من نقطة البيع',
         lines: selected.map(s => ({ line_id: s.line.id, quantity: s.qty })),
       });
@@ -132,7 +133,11 @@ export default function ReturnsModal({ sessionId, onClose, onDone }: ReturnsModa
         }
       }
 
-      notify.success('تم إنشاء المرتجع بنجاح');
+      notify.success(
+        isOfflineQueuedResponse(res)
+          ? 'أُضيف المرتجع إلى قائمة الانتظار — سيُحفظ عند توفر الاتصال'
+          : 'تم إنشاء المرتجع بنجاح',
+      );
       onDone();
     } catch (e: any) {
       notify.error(e?.message ?? 'فشل إنشاء المرتجع');

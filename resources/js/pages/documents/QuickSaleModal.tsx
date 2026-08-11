@@ -16,6 +16,7 @@ import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { settingsApi } from '@/lib/api/endpoints/settings';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { useFiscalYear } from '@/context/FiscalYearContext';
+import { isOfflineQueuedResponse } from '@/lib/offline/queueMath';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,7 @@ interface SuccessState {
   net_to_pay: number;
   paid: number;
   remaining: number;
+  offline: boolean;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -640,13 +642,14 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
         }] : [],
       };
       const docRes = await apiPost<Record<string, unknown>>('/documents', docPayload);
-      const docNum = String(docRes?.document_number ?? '—');
+      const docNum = String(docRes?.document_number ?? '');
 
       return {
         document_number: docNum,
         net_to_pay: totals.netPay,
         paid: finalPayAmount,
         remaining: Math.max(0, totals.netPay - finalPayAmount),
+        offline: isOfflineQueuedResponse(docRes),
       };
     },
     onSuccess: async state => {
@@ -795,7 +798,9 @@ export default function QuickSaleModal({ open, onClose, onSaved }: QuickSaleModa
                 }}
               >
                 <i className="ti ti-check-circle" />
-                تم إنشاء الفاتورة {success.document_number}
+                {success.offline
+                  ? <>أُضيفت الفاتورة إلى قائمة الانتظار — سيُحفظ عند توفر الاتصال ({success.document_number})</>
+                  : <>تم إنشاء الفاتورة {success.document_number}</>}
               </div>
               <div style={{ marginTop: 8, display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12 }}>
                 <span>

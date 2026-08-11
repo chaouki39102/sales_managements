@@ -2043,7 +2043,11 @@ export default function CommercialDocumentsPage() {
                     onSaved={(doc) => {
                         closeModal();
                         invalidateDocs();
-                        notify.success(`تم إنشاء ${String((doc as any).document_number ?? "المستند")} بنجاح`);
+                        if ((doc as any)?.offline) {
+                            notify.success(`أُضيفت الفاتورة إلى قائمة الانتظار — سيُحفظ عند توفر الاتصال (${String((doc as any).document_number ?? '')})`);
+                        } else {
+                            notify.success(`تم إنشاء ${String((doc as any).document_number ?? "المستند")} بنجاح`);
+                        }
                     }}
                 />
             )}

@@ -11,6 +11,7 @@ import { useConfirm } from '@/hooks/useConfirm';
 import type { DocumentType } from '@/lib/api/core/types';
 import { usePrintTemplatesList, mapCompany } from '@/pages/settings/print-settings/runtime';
 import { resolveTemplateById } from '@/pages/settings/print-settings/runtime/TemplateResolver';
+import { isOfflineQueuedResponse } from '@/lib/offline/queueMath';
 
 import { useDocumentLookups }  from './useDocumentLookups';
 import { useDocumentForm }     from './useDocumentForm';
@@ -419,8 +420,17 @@ export function useCommercialDocumentController({
           qc.invalidateQueries({ queryKey: [slug, 'party-balance', parseInt(form.party_id)] });
         }
       }
-      const docNum = String((savedDoc as Record<string, unknown>)?.document_number ?? '—');
-      setSuccessMsg(isEdit ? `تم تحديث المستند ${docNum}` : `تم إنشاء المستند ${docNum} ✓`);
+      const docNum = String((savedDoc as Record<string, unknown>)?.document_number ?? '');
+      const queued = isOfflineQueuedResponse(savedDoc);
+      setSuccessMsg(
+        queued
+          ? isEdit
+            ? 'تمت إضافة التعديل إلى قائمة الانتظار — سيُحفظ عند توفر الاتصال'
+            : `تمت إضافة المستند إلى قائمة الانتظار — سيُحفظ عند توفر الاتصال (${docNum})`
+          : isEdit
+            ? `تم تحديث المستند ${docNum}`
+            : `تم إنشاء المستند ${docNum} ✓`,
+      );
       navigator.clipboard?.writeText(docNum).catch(() => {});
       successTimer.current = setTimeout(() => {
         setSuccessMsg('');

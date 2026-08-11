@@ -27,6 +27,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useConfirm } from '@/hooks/useConfirm';
 
 import { useCommercialDocumentController } from './hooks/useCommercialDocumentController';
+import { isOfflineQueuedResponse } from '@/lib/offline/queueMath';
 
 export default function CommercialDocumentPage() {
   const { typeCode, id } = useParams<{ typeCode: string; id: string }>();
@@ -436,7 +437,11 @@ export default function CommercialDocumentPage() {
           onCreated={(returnDoc) => {
             setShowReturnModal(false);
             const num = String((returnDoc as Record<string, unknown>).document_number ?? '');
-            setSuccessMsg(`تم إنشاء المرتجع ${num} ✓`);
+            setSuccessMsg(
+              isOfflineQueuedResponse(returnDoc)
+                ? `أُضيف المرتجع إلى قائمة الانتظار — سيُحفظ عند توفر الاتصال (${num})`
+                : `تم إنشاء المرتجع ${num} ✓`,
+            );
             if (slug) qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
             setTimeout(() => { setSuccessMsg(''); onSaved(); onClose(); }, 1800);
           }}

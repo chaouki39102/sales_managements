@@ -251,7 +251,7 @@ Tasks (detailed):
 | Family | Status | Notes |
 |--------|--------|-------|
 | B. Camera-native | ❌ planned | B.1–B.5 defined; start after C |
-| C. Offline everywhere | 🚧 in progress | **C.1 DONE** (offline interception fixed + regression suite, committed); C.2–C.5 pending |
+| C. Offline everywhere | 🚧 in progress | **C.1 DONE** (offline interception fixed + regression suite) · **C.2 DONE** (documents-module offline hardening + field-agent flow test); C.3–C.5 pending |
 | D. WhatsApp commerce | ❌ planned | D.1–D.5 defined; wa.me-first, Meta Cloud API webhook later |
 
 ## Commits
@@ -263,7 +263,7 @@ files; leave unrelated dirty files untouched):
 |--------|----------|
 | *(ROADMAP creation)* | `ROADMAP.md` + AGENTS.md mention — DONE (`a76ef8b`) |
 | *(C.1)* | **DONE** — `queueMath.ts` `isNetworkFailure()` + `client.ts` pre-normalization hook + `offlineAwareApi.ts` hook wiring + `offline-interceptor.spec.ts` regression suite (replaced the probe) |
-| *(C.2)* | documents-module offline hardening + field-agent flow verification |
+| *(C.2)* | **DONE** — documents-module offline hardening (`document_number` fallback `?? ''` + «سيُحفظ عند توفر الاتصال» toasts in `useCommercialDocumentController`, `QuickSaleModal`, `CommercialDocumentsPage`, `ReturnsModal`, both return flows) + `offline-doc-flow.spec.ts` field-agent flow test (create→edit+pay→sync temp-url rewrite) |
 | *(C.3)* | `cacheTtlForUrl` extension + «جهّز للعمل دون اتصال» prefetch |
 | *(C.4)* | field-agent sync dashboard |
 | *(C.5)* | offline POS Pro Mobile verification/fixes |
