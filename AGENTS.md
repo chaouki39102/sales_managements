@@ -14,7 +14,24 @@
 - **Offline layer** (`lib/offline/`) sits on the SHARED `client` — its cache keys embed the full URL (slug included), so tenant isolation in the offline cache is automatic; never store cross-tenant keys.
 
 ## Date
-2026-08-09
+2026-08-12
+
+### Phase 71 — Offline C.2–C.4 Complete: Docs-Module Hardening + Prefetch Readiness + Sync Dashboard (Aug 11–12)
+
+**Request** (continuing the C-family from `C1_OFFLINE_FIX.md`, worked task-by-task on the dev machine, committed + pushed after each task): C.2 (documents-module offline hardening), C.3 (offline data readiness / prefetch page), C.4 (field-agent sync dashboard). All three are DONE on `main`. Resume point for the next session: **C.5 (offline POS Pro Mobile verification)**.
+
+**C.2 (`79fa4ed` "fix(offline): C.2 — documents-module offline hardening")**: offline-aware success toasts («سيُحفظ عند توفر الاتصال») in the document/return/quick-sale flows — `useCommercialDocumentController` saveMut, `CommercialDocumentPage`, `CommercialDocumentsPage`, `QuickSaleModal`, `ReturnsModal`, `CommercialDocumentModal` — plus `document_number` fallback `?? ''` so queued 202 responses never navigate to a temp id. Regression: `offline-doc-flow.spec.ts` (164 lines) — field-agent flow create→edit+pay→sync with temp-url rewrite via `resolveOpUrl`.
+
+**C.3 (`2213a28` "feat(offline): C.3 offline readiness prefetch page + indicator integration")**: new `lib/offline/prepareOffline.ts` — `OFFLINE_DATASETS` (parties, products, price levels, warehouse stock) + prefetch function + freshness tracking; new page `pages/offline/OfflinePage.tsx` (route `/offline`, sidebar «دون اتصال»); `OfflineIndicator` reworked to show per-dataset cache freshness + prefetch status; `cacheTtlForUrl` extended for field-critical GETs; `offlineAwareApi`/`db`/`useOffline` additions; `offline-cache-ttl.spec.ts` updated.
+
+**C.4 (`95e8920` merge "offline mode")**: `pages/offline/SyncDashboard.tsx` — the full field-agent sync dashboard: pending ops list (method/url/target + time), failed ops with Arabic `lastError` + per-op retry + «إعادة المحاولة للكل», «مزامنة الآن» button + last-synced stamp, temp→real id resolution display (via `useOfflineOps`/`useSync`/`retryFailedOps`/`markOpPending`); `useOffline` additions; `sync-dashboard.spec.ts` (89 lines); wired into `OfflinePage` + nav «دون اتصال».
+
+**Key architectural rules**:
+- A field-agent flow test (create→edit→pay→sync) is the acceptance test for the whole C-family — it exercises enqueue, PUT-via-`documentId` (Phase 46 rule), `resolveOpUrl` temp→real rewrite, and replay ordering in one Vitest flow.
+- The sync dashboard is the FAILURE SURFACE of the queue: every failed op must be visible with its Arabic `lastError` and an explicit retry path (per-op and all) — never silently dropped (Phase 68 follow-up rule).
+- Offline pages live under the normal `DashboardLayout` route tree (`/offline`), reuse `useOffline*` hooks, and must gate tenant queries on `slug`/`selectedYear` like every other page.
+
+**Verification**: `npx tsc --noEmit` clean · `npm test` green (incl. new `offline-doc-flow.spec.ts` + `sync-dashboard.spec.ts`) · `npm run build` 0 errors · SW MATCH. Next pending phase: **C.5** — full task list in `C1_OFFLINE_FIX.md`.
 
 ### Phase 70 — Offline C.1 Checkpoint: Offline Interception Is DEAD CODE + Full B/C/D Task File (Aug 9)
 

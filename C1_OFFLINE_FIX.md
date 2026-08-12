@@ -1,12 +1,13 @@
 # Remaining Tasks — B (Camera), C (Offline), D (WhatsApp) — Full Actionable List
 
-> **Status: ✅ C.1 COMPLETE (committed, 2026-08-09).** Pick up on any PC: `git pull`,
+> **Status: ✅ C.1–C.4 COMPLETE (all committed + pushed).** Pick up on any PC: `git pull`,
 > open this file, work task-by-task. **Commit + push after EACH task** (stage ONLY that task's
 > files). C is being implemented first (decided with the user), then B, then D.
 >
-> **Resume point now**: C.1 (offline interception) is DONE and pushed. Next is **C.2**
-> (documents-module offline hardening). HEAD is the C.1 commit (`fix(offline): offline
-> interception was dead — ...`).
+> **Resume point now**: C.1 (offline interception), C.2 (documents-module offline hardening),
+> C.3 (offline data readiness / «جهّز للعمل دون اتصال» prefetch page), and C.4 (field-agent
+> sync dashboard at `/offline`) are ALL DONE and pushed. Next is **C.5** (offline POS Pro
+> Mobile verification/fixes). HEAD is the merge `offline mode` (95e8920) carrying C.4.
 
 ---
 
@@ -118,7 +119,7 @@ Tasks (detailed):
 - **Verify + commit** — ✅ **DONE**: tsc clean, `npm test` 265/265 (16 files), `npm run build`
   0 errors, SW MATCH. Committed + pushed as `fix(offline): offline interception was dead — ...`.
 
-## C.2 Documents module offline
+## C.2 Documents module offline — ✅ COMPLETE
 
 - Verify + harden commercial-document create/edit (classic form `useCommercialDocumentController`
   saveMut PUT-via-`documentId`, `QuickSaleModal`, returns) against the queued 202 shape.
@@ -129,7 +130,7 @@ Tasks (detailed):
   field-agent flow: create → edit → pay → sync.
 - Verify: unit + a Vitest flow test + Playwright smoke.
 
-## C.3 Offline data readiness for the field
+## C.3 Offline data readiness for the field — ✅ COMPLETE
 
 - Longer cache TTLs for field-critical GETs (parties, products list; stock-at already 30 min)
   via `cacheTtlForUrl` (in `offlineAwareApi.ts`).
@@ -138,7 +139,7 @@ Tasks (detailed):
 - Show cache-freshness per dataset in the offline indicator.
 - Verify: vitest (prefetch writes ops/cache), manual offline reload shows data + stale badge.
 
-## C.4 Field-agent sync dashboard
+## C.4 Field-agent sync dashboard — ✅ COMPLETE
 
 - New page (route `/offline` or inside settings): pending ops list (method/url/target + time),
   failed ops with Arabic `lastError` + per-op retry + «إعادة المحاولة للكل», «مزامنة الآن»
@@ -251,7 +252,7 @@ Tasks (detailed):
 | Family | Status | Notes |
 |--------|--------|-------|
 | B. Camera-native | ❌ planned | B.1–B.5 defined; start after C |
-| C. Offline everywhere | 🚧 in progress | **C.1 DONE** (offline interception fixed + regression suite) · **C.2 DONE** (documents-module offline hardening + field-agent flow test); C.3–C.5 pending |
+| C. Offline everywhere | 🚧 in progress | **C.1 DONE** (offline interception fixed + regression suite) · **C.2 DONE** (documents-module offline hardening + field-agent flow test) · **C.3 DONE** (prefetch page + indicator integration) · **C.4 DONE** (sync dashboard `/offline`); **C.5 pending** |
 | D. WhatsApp commerce | ❌ planned | D.1–D.5 defined; wa.me-first, Meta Cloud API webhook later |
 
 ## Commits
@@ -264,8 +265,8 @@ files; leave unrelated dirty files untouched):
 | *(ROADMAP creation)* | `ROADMAP.md` + AGENTS.md mention — DONE (`a76ef8b`) |
 | *(C.1)* | **DONE** — `queueMath.ts` `isNetworkFailure()` + `client.ts` pre-normalization hook + `offlineAwareApi.ts` hook wiring + `offline-interceptor.spec.ts` regression suite (replaced the probe) |
 | *(C.2)* | **DONE** — documents-module offline hardening (`document_number` fallback `?? ''` + «سيُحفظ عند توفر الاتصال» toasts in `useCommercialDocumentController`, `QuickSaleModal`, `CommercialDocumentsPage`, `ReturnsModal`, both return flows) + `offline-doc-flow.spec.ts` field-agent flow test (create→edit+pay→sync temp-url rewrite) |
-| *(C.3)* | `cacheTtlForUrl` extension + «جهّز للعمل دون اتصال» prefetch |
-| *(C.4)* | field-agent sync dashboard |
+| *(C.3)* | **DONE** (`2213a28`) — `cacheTtlForUrl` extension + «جهّز للعمل دون اتصال» prefetch (`prepareOffline.ts` `OFFLINE_DATASETS` + prefetch fn), `OfflinePage.tsx`, `OfflineIndicator` rework, route `/offline` |
+| *(C.4)* | **DONE** (`95e8920` merge "offline mode") — `SyncDashboard.tsx` (pending/failed op list, per-op + retry-all, مزامنة الآن + last-synced stamp, temp→real id), `useOffline` additions, `sync-dashboard.spec.ts`, route + nav "دون اتصال" |
 | *(C.5)* | offline POS Pro Mobile verification/fixes |
 | *(B.1)* | shared camera-scan hook + non-POS wiring |
 | *(B.2)* | camera product photo capture |
