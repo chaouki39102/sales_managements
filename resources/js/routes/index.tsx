@@ -87,9 +87,11 @@ const NotificationsPage = lazy(() => import('@/pages/notifications/Notifications
 
 // ─── Audit ──────────────────────────────────────────────────────────────────
 const AuditLogPage = lazy(() => import('@/pages/audit/AuditLogPage'));
-
 // ─── Alerts ──────────────────────────────────────────────────────────────────
 const AlertsPage = lazy(() => import('@/pages/alerts/AlertsPage'));
+
+// ─── Offline ─────────────────────────────────────────────────────────────────
+const OfflinePage = lazy(() => import('@/pages/offline/OfflinePage'));
 
 // â”€â”€ Users / Roles / Employees â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const UsersPage     = lazy(() => import('@/pages/users/UsersPage'));
@@ -332,6 +334,9 @@ export function AppRoutes() {
 
           {/* Audit Log */}
           <Route path="audit-log" element={<AuditLogPage />} />
+
+          {/* Offline */}
+          <Route path="offline" element={<OfflinePage />} />
 
           {/* Alerts */}
           <Route path="alerts" element={<AlertsPage />} />

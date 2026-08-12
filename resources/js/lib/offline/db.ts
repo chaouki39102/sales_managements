@@ -101,6 +101,16 @@ export async function setCache<T>(key: string, data: T, ttlMs = 5 * 60 * 1000): 
 }
 
 export async function getCache<T>(key: string): Promise<T | null> {
+  const entry = await getCacheEntry<T>(key);
+  return entry?.data ?? null;
+}
+
+/**
+ * Read a cache entry including its expiry. Used by the offline-readiness panel
+ * (C.3) to report how FRESH a prefetched dataset is, not just whether it exists.
+ * Expired entries are deleted here too, so `getCacheEntry` never lies.
+ */
+export async function getCacheEntry<T>(key: string): Promise<CacheEntry<T> | null> {
   const db = await getDb();
   const entry = await db.get('cache', key) as CacheEntry<T> | undefined;
   if (!entry) return null;
@@ -108,7 +118,7 @@ export async function getCache<T>(key: string): Promise<T | null> {
     await db.delete('cache', key);
     return null;
   }
-  return entry.data;
+  return entry;
 }
 
 export async function clearExpiredCache(): Promise<void> {

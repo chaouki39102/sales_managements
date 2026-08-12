@@ -28,14 +28,32 @@ export function subscribeDataStale(cb: () => void): () => void {
 }
 
 // ── URL-aware cache TTL ────────────────────────────────────────────────────────
-// Stock-at is heavier and changes slowly — cache it 30 min so stock survives short
-// outages; everything else stays at 5 min. The badge stays honest: any offline GET
-// still marks data stale.
+// Field-critical reads change slowly and are what a field agent actually needs
+// offline (C.3): stock, the product catalogue (list + variants), customers/parties,
+// price levels, warehouses and the POS aggregated lookups all get a 30-min TTL so
+// they survive short outages AND a full prefetch covers a working day. Everything
+// else stays at 5 min. The badge stays honest: any offline GET still marks data
+// stale regardless of how long the cached copy is valid.
+const FIELD_CRITICAL_TTL = 30 * 60_000;
+const DEFAULT_TTL = 5 * 60_000;
+// NOTE: the interceptor prepends `/{slug}/`, so urls arrive like `/1/products`.
+const FIELD_CRITICAL_PATTERNS: RegExp[] = [
+  /\/inventory\/stock-at/,
+  /\/products(\/|$)/,
+  /\/product-variants(\/|$)/,
+  /\/parties(\/|$)/,
+  /\/customers(\/|$)/,
+  /\/suppliers(\/|$)/,
+  /\/price-levels(\/|$)/,
+  /\/warehouses(\/|$)/,
+  /\/lookups\/pos(\/|$)/,
+];
 export function cacheTtlForUrl(url: string): number {
-  return /\/inventory\/stock-at/.test(url) ? 30 * 60_000 : 5 * 60_000;
+  return FIELD_CRITICAL_PATTERNS.some(re => re.test(url)) ? FIELD_CRITICAL_TTL : DEFAULT_TTL;
 }
 
-function cacheKeyFromUrl(url: string, params?: unknown): string {
+/** Public key builder so prefetch/freshness tooling can address the same cache entries. */
+export function cacheKeyForUrl(url: string, params?: unknown): string {
   return `api:${url}:${JSON.stringify(params ?? {})}`;
 }
 
@@ -59,7 +77,7 @@ export function registerOfflineInterceptor(): void {
       const method = cfg?.method?.toLowerCase() ?? '';
       const isOfflineSynthetic = (response as unknown as { _offline?: boolean })._offline === true;
       if (cfg && CACHEABLE_METHODS.has(method) && response.status === 200 && !isOfflineSynthetic) {
-        const key = cacheKeyFromUrl(cfg.url ?? '', cfg.params);
+        const key = cacheKeyForUrl(cfg.url ?? '', cfg.params);
         await setCache(key, response.data, cacheTtlForUrl(cfg.url ?? ''));
       }
       // a real network response means we're not stale anymore
@@ -146,7 +164,7 @@ export function registerOfflineInterceptor(): void {
 
     // ── Offline GET → serve cached data (fallback empty) with _offline flag
     if (CACHEABLE_METHODS.has(method)) {
-      const key = cacheKeyFromUrl(cfg.url ?? '', cfg.params);
+      const key = cacheKeyForUrl(cfg.url ?? '', cfg.params);
       const cached = await getCache(key);
       if (!stale) { stale = true; emitStale(); }
       if (cached) {

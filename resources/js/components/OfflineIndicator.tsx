@@ -6,9 +6,13 @@ import {
   useFailedOps,
   useSync,
   useOfflineServed,
+  useOfflineReadiness,
   retryFailedOps,
   type SyncResult,
 } from '@/lib/offline/useOffline';
+import { OFFLINE_DATASETS } from '@/lib/offline/prepareOffline';
+import { useActiveSlug } from '@/lib/store/appStore';
+import { useFiscalYear } from '@/context/FiscalYearContext';
 
 export default function OfflineIndicator() {
   const online = useOnlineStatus();
@@ -20,7 +24,13 @@ export default function OfflineIndicator() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  const slug = useActiveSlug();
+  const { selectedYear } = useFiscalYear();
+  const readiness = useOfflineReadiness({ slug: slug ?? '', fiscalYearId: selectedYear?.id });
+
   const hasFailed = failedCount > 0;
+  const freshCount = readiness.datasets.filter(d => d.fresh).length;
+  const prepNeeded = online && readiness.datasets.length > 0 && freshCount < readiness.datasets.length;
 
   const handleClick = async () => {
     if (!online || syncing) return;
@@ -29,7 +39,11 @@ export default function OfflineIndicator() {
       setOpen(v => !v);
       return;
     }
-    if (pendingCount > 0) await sync();
+    if (pendingCount > 0) {
+      await sync();
+      return;
+    }
+    setOpen(v => !v);
   };
 
   const handleRetryAll = async () => {
@@ -45,8 +59,17 @@ export default function OfflineIndicator() {
     }
   };
 
+  const handlePrefetch = async () => {
+    setBusy(true);
+    try {
+      await readiness.prefetch();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const showBase =
-    (online && (pendingCount > 0 || hasFailed || stale)) || !online;
+    (online && (pendingCount > 0 || hasFailed || stale || prepNeeded)) || !online;
 
   if (!showBase) return null;
 
@@ -58,7 +81,9 @@ export default function OfflineIndicator() {
         ? `${failedCount} معالجة فاشلة`
         : stale
           ? 'بيانات من ذاكرة محلية (قديمة)'
-          : `${pendingCount} في الانتظار`;
+          : prepNeeded
+            ? `تجهيز دون اتصال (${freshCount}/${readiness.datasets.length})`
+            : `${pendingCount} في الانتظار`;
 
   const icon = !online
     ? 'ti-wifi-off'
@@ -68,12 +93,14 @@ export default function OfflineIndicator() {
         ? 'ti-alert-triangle'
         : stale
           ? 'ti-history'
-          : 'ti-cloud-upload';
+          : prepNeeded
+            ? 'ti-cloud-download'
+            : 'ti-cloud-upload';
 
   return (
     <div className="offline-widget">
       <div
-        className={`offline-indicator ${!online ? 'offline' : 'syncing'}${hasFailed ? ' failed' : ''}${stale ? ' stale' : ''}${open ? ' open' : ''}`}
+        className={`offline-indicator ${!online ? 'offline' : 'syncing'}${hasFailed ? ' failed' : ''}${stale ? ' stale' : ''}${prepNeeded ? ' prep' : ''}${open ? ' open' : ''}`}
         onClick={handleClick}
         role="button"
         aria-haspopup="true"
@@ -83,44 +110,87 @@ export default function OfflineIndicator() {
             ? 'أنت في وضع دون اتصال — بعض البيانات من ذاكرة محلية (قديمة)'
             : hasFailed
               ? 'اضغط لعرض العمليات الفاشلة'
-              : `${pendingCount} عملية بانتظار المزامنة — اضغط للمزامنة`
+              : prepNeeded
+                ? `بعض البيانات غير جاهزة للعمل دون اتصال (${freshCount}/${readiness.datasets.length}) — اضغط للتجهيز`
+                : `${pendingCount} عملية بانتظار المزامنة — اضغط للمزامنة`
         }
       >
         <i className={`ti ${icon}`} />
         <span>{label}</span>
-        {hasFailed && !syncing && (
+        {(hasFailed || prepNeeded) && !syncing && (
           <i className="ti ti-chevron-down offline-widget-chevron" />
         )}
       </div>
 
       {open && !syncing && (
         <div className="offline-pop" role="menu">
-          <div className="offline-pop-hd">
-            <span>عمليات فشلت مزامنتها</span>
-            <button
-              type="button"
-              className="offline-pop-retry"
-              onClick={handleRetryAll}
-              disabled={busy}
-            >
-              <i className="ti ti-refresh" />
-              {busy ? 'جارٍ الإعادة...' : 'إعادة المحاولة'}
-            </button>
-          </div>
-          {ops.length === 0 ? (
-            <div className="offline-pop-empty">لا توجد عمليات فاشلة</div>
-          ) : (
-            <ul className="offline-pop-list">
-              {ops.map(op => (
-                <li key={op.id} className="offline-pop-item">
-                  <span className="offline-pop-method">{op.method}</span>
-                  <span className="offline-pop-url" dir="ltr">{op.url}</span>
-                  {op.lastError && (
-                    <span className="offline-pop-err">{op.lastError}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
+          {online && (
+            <div className="offline-pop-prep">
+              <div className="offline-pop-hd">
+                <span>الاستعداد للعمل دون اتصال</span>
+                <button
+                  type="button"
+                  className="offline-pop-retry"
+                  onClick={handlePrefetch}
+                  disabled={busy}
+                  title="تحميل البيانات المهمة الآن لتُستخدم دون اتصال"
+                >
+                  <i className="ti ti-cloud-download" />
+                  {busy ? 'جارٍ التجهيز...' : 'جهّز الآن'}
+                </button>
+              </div>
+              <div className="offline-prep-grid">
+                {OFFLINE_DATASETS.map(ds => {
+                  const f = readiness.datasets.find(x => x.id === ds.id);
+                  return (
+                    <span
+                      key={ds.id}
+                      className={`offline-prep-chip ${f?.fresh ? 'ok' : 'no'}`}
+                      title={f?.fresh ? `${ds.label} — محفوظ محلياً` : `${ds.label} — غير محفوظ`}
+                    >
+                      <i className={`ti ${f?.fresh ? 'ti-circle-check' : 'ti-circle'}`} />
+                      {ds.label}
+                    </span>
+                  );
+                })}
+              </div>
+              <a className="offline-prep-link" href="/offline">
+                صفحة تجهيز البيانات دون اتصال
+                <i className="ti ti-arrow-left" />
+              </a>
+            </div>
+          )}
+
+          {hasFailed && (
+            <>
+              <div className="offline-pop-hd">
+                <span>عمليات فشلت مزامنتها</span>
+                <button
+                  type="button"
+                  className="offline-pop-retry"
+                  onClick={handleRetryAll}
+                  disabled={busy}
+                >
+                  <i className="ti ti-refresh" />
+                  {busy ? 'جارٍ الإعادة...' : 'إعادة المحاولة'}
+                </button>
+              </div>
+              {ops.length === 0 ? (
+                <div className="offline-pop-empty">لا توجد عمليات فاشلة</div>
+              ) : (
+                <ul className="offline-pop-list">
+                  {ops.map(op => (
+                    <li key={op.id} className="offline-pop-item">
+                      <span className="offline-pop-method">{op.method}</span>
+                      <span className="offline-pop-url" dir="ltr">{op.url}</span>
+                      {op.lastError && (
+                        <span className="offline-pop-err">{op.lastError}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           )}
         </div>
       )}

@@ -8,6 +8,13 @@ import {
 } from './db';
 import client from '@/lib/api/core/client';
 import { replayPendingOps, type SyncResult } from './syncEngine';
+import {
+  offlineDatasetsFreshness,
+  prefetchOfflineEssentials,
+  type OfflinePrefetchDeps,
+  type DatasetFreshness,
+  type PrefetchResult,
+} from './prepareOffline';
 
 export type { SyncResult } from './syncEngine';
 
@@ -148,4 +155,62 @@ export async function retryFailedOps(): Promise<void> {
   for (const op of failed) {
     await updatePendingOp(op.id!, { status: 'pending', lastError: null, retries: 0 });
   }
+}
+
+export interface OfflineReadiness {
+  datasets: DatasetFreshness[];
+  refreshing: boolean;
+  prefetching: boolean;
+  lastResults: PrefetchResult[] | null;
+  refresh: () => Promise<void>;
+  prefetch: () => Promise<PrefetchResult[]>;
+}
+
+/**
+ * Offline readiness for the CURRENT company context (C.3): how many field-critical
+ * datasets are cached + fresh for the selected warehouse/fiscal year, and a
+ * prefetch action that warms them. Re-checks freshness on mount and whenever the
+ * deps (slug / warehouse / fiscal year) change.
+ */
+export function useOfflineReadiness(deps: OfflinePrefetchDeps): OfflineReadiness {
+  const [datasets, setDatasets] = useState<DatasetFreshness[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [prefetching, setPrefetching] = useState(false);
+  const [lastResults, setLastResults] = useState<PrefetchResult[] | null>(null);
+
+  const depsKey = JSON.stringify([deps.slug, deps.warehouseId ?? null, deps.fiscalYearId ?? null]);
+
+  const refresh = useCallback(async () => {
+    if (!deps.slug) {
+      setDatasets([]);
+      return;
+    }
+    setRefreshing(true);
+    try {
+      setDatasets(await offlineDatasetsFreshness(deps));
+    } finally {
+      setRefreshing(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [depsKey]);
+
+  const prefetch = useCallback(async (): Promise<PrefetchResult[]> => {
+    if (!deps.slug) return [];
+    setPrefetching(true);
+    try {
+      const results = await prefetchOfflineEssentials(deps);
+      setLastResults(results);
+      setDatasets(await offlineDatasetsFreshness(deps));
+      return results;
+    } finally {
+      setPrefetching(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [depsKey]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  return { datasets, refreshing, prefetching, lastResults, refresh, prefetch };
 }
