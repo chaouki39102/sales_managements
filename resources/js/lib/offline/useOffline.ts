@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   getPendingOpsCount,
   getFailedOpsCount,
+  getPendingOps,
   getPendingOpsByStatus,
   updatePendingOp,
   type PendingOp,
@@ -99,6 +100,56 @@ export function useFailedOps(): { ops: PendingOp[]; refresh: () => Promise<void>
   return { ops, refresh };
 }
 
+/** ALL queued ops (pending + failed), kept fresh every 10s — sync-dashboard feed. */
+export function useOfflineOps(): { ops: PendingOp[]; refresh: () => Promise<void> } {
+  const [ops, setOps] = useState<PendingOp[]>([]);
+
+  const refresh = useCallback(async () => {
+    setOps(await getPendingOps());
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+    const id = setInterval(refresh, 10_000);
+    return () => clearInterval(id);
+  }, [refresh]);
+
+  return { ops, refresh };
+}
+
+const LAST_SYNCED_KEY = 'offline_last_synced_at';
+
+/** Persisted "last successful sync" timestamp (survives reloads; best-effort). */
+export function getLastSyncedAt(): number | null {
+  try {
+    const v = localStorage.getItem(LAST_SYNCED_KEY);
+    return v ? Number(v) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setLastSyncedAt(ts: number = Date.now()): void {
+  try {
+    localStorage.setItem(LAST_SYNCED_KEY, String(ts));
+  } catch {
+    // storage-denied (private mode) — the stamp is best-effort only
+  }
+}
+
+/** Reactive last-synced stamp for the dashboard / indicator. */
+export function useLastSyncedAt(): number | null {
+  const [ts, setTs] = useState<number | null>(() => getLastSyncedAt());
+
+  useEffect(() => {
+    const update = () => setTs(getLastSyncedAt());
+    window.addEventListener('offline:synced', update);
+    return () => window.removeEventListener('offline:synced', update);
+  }, []);
+
+  return ts;
+}
+
 export function useSync(): {
   syncing: boolean;
   lastError: string | null;
@@ -125,9 +176,9 @@ export function useSync(): {
         return payload as { id?: number };
       });
 
-      if (report.replayed > 0) {
-        window.dispatchEvent(new CustomEvent('offline:synced', { detail: { replayed: report.replayed } }));
-      }
+      // a sync that REACHED the server is "last synced" even with 0 ops
+      setLastSyncedAt();
+      window.dispatchEvent(new CustomEvent('offline:synced', { detail: { replayed: report.replayed } }));
       return report;
     } finally {
       syncingRef.current = false;

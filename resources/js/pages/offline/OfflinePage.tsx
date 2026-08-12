@@ -8,6 +8,7 @@ import Skeleton from '@/components/ui/Skeleton';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 import { useWarehouses } from '@/lib/api/endpoints/lookups';
+import SyncDashboard from './SyncDashboard';
 import {
   OFFLINE_DATASETS,
   type DatasetFreshness,
@@ -124,6 +125,8 @@ export default function OfflinePage() {
           )}
         </div>
       </Card>
+
+      <SyncDashboard />
     </div>
   );
 }
