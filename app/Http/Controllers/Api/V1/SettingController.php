@@ -200,6 +200,11 @@ class SettingController extends BaseApiController
             'online_payment_mode', 'online_payment_merchant_id',
             'online_payment_secret_key',
 
+            // import — القيم الافتراضية عند استيراد المنتجات
+            'import_default_family_id', 'import_default_brand_id',
+            'import_default_unit_id', 'import_default_tva_id',
+            'import_default_active', 'import_default_manages_stock',
+
             // general
             'app_name', 'app_logo', 'app_color', 'theme_mode', 'language',
             'timezone', 'date_format', 'time_format',

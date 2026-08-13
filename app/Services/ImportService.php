@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\Party;
 use App\Models\Brand;
 use App\Models\Family;
+use App\Models\Setting;
 use App\Models\Tva;
 use App\Models\Unit;
 use App\Models\PriceLevel;
@@ -37,6 +38,28 @@ class ImportService
         $pendingFamilies = [];
         $pendingBrands = [];
         $pendingUnits = [];
+
+        // القيم الافتراضية من الإعدادات (تُطبّق عندما يترك سطر الإكسل الحقل فارغاً)
+        $defaultFamilyId = (int) Setting::getSetting('import_default_family_id', 0, $companyId);
+        $defaultBrandId  = (int) Setting::getSetting('import_default_brand_id', 0, $companyId);
+        $defaultUnitId   = (int) Setting::getSetting('import_default_unit_id', 0, $companyId);
+        $defaultTvaId    = (int) Setting::getSetting('import_default_tva_id', 0, $companyId);
+        $defaultActive   = (bool) Setting::getSetting('import_default_active', true, $companyId);
+        $defaultManagesStock = (bool) Setting::getSetting('import_default_manages_stock', true, $companyId);
+
+        // تأكد أن المعرفات الافتراضية تعود لنفس المؤسسة
+        if ($defaultFamilyId && !$families->contains(fn($f) => $f->id === $defaultFamilyId)) {
+            $defaultFamilyId = 0;
+        }
+        if ($defaultBrandId && !$brands->contains(fn($b) => $b->id === $defaultBrandId)) {
+            $defaultBrandId = 0;
+        }
+        if ($defaultUnitId && !$units->contains(fn($u) => $u->id === $defaultUnitId)) {
+            $defaultUnitId = 0;
+        }
+        if ($defaultTvaId && !$tvas->contains(fn($t) => $t->id === $defaultTvaId)) {
+            $defaultTvaId = 0;
+        }
 
         $validated = [];
         foreach ($rows as $i => $row) {
@@ -154,6 +177,26 @@ class ImportService
                 $data['active'] = in_array(mb_strtolower(trim($active)), ['نعم', 'yes', 'oui', '1', 'true', 'صح']);
             }
 
+            // ══ القيم الافتراضية من الإعدادات (فقط إذا لم يحدد السطر الحقل) ══
+            if (!isset($data['family_id']) && !isset($data['_pending_family']) && $defaultFamilyId) {
+                $data['family_id'] = $defaultFamilyId;
+            }
+            if (!isset($data['brand_id']) && !isset($data['_pending_brand']) && $defaultBrandId) {
+                $data['brand_id'] = $defaultBrandId;
+            }
+            if (!isset($data['unit_id']) && !isset($data['_pending_unit']) && $defaultUnitId) {
+                $data['unit_id'] = $defaultUnitId;
+            }
+            if (!isset($data['tva_id']) && $defaultTvaId) {
+                $data['tva_id'] = $defaultTvaId;
+            }
+            if (!isset($data['active'])) {
+                $data['active'] = $defaultActive;
+            }
+            if (!isset($data['manages_stock'])) {
+                $data['manages_stock'] = $defaultManagesStock;
+            }
+
             if (count($rowErrors) > 0) {
                 $errors[] = ['line' => $line, 'errors' => $rowErrors, 'row' => $row];
             } else {
@@ -226,6 +269,7 @@ class ImportService
 
                     // Auto-create default packaging if none provided
                     $product->packagings()->create([
+                        'company_id'    => $companyId,
                         'code'          => '1',
                         'label'         => 'unite',
                         'quantity'      => 1,

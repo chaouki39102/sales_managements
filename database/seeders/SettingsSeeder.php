@@ -754,6 +754,64 @@ class SettingsSeeder extends Seeder
             ],
 
             // ══════════════════════════════════════════
+            // group: import — القيم الافتراضية عند استيراد المنتجات
+            // ══════════════════════════════════════════
+            'import_default_family_id' => [
+                'value'         => null,
+                'group'         => 'import',
+                'type'          => 'integer',
+                'description'   => 'الفئة الافتراضية للمنتجات المستوردة عندما لا يحدد سطر الإكسل فئة',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 130,
+            ],
+            'import_default_brand_id' => [
+                'value'         => null,
+                'group'         => 'import',
+                'type'          => 'integer',
+                'description'   => 'العلامة الافتراضية للمنتجات المستوردة عندما لا يحدد سطر الإكسل علامة',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 131,
+            ],
+            'import_default_unit_id' => [
+                'value'         => null,
+                'group'         => 'import',
+                'type'          => 'integer',
+                'description'   => 'الوحدة الافتراضية للمنتجات المستوردة عندما لا يحدد سطر الإكسل وحدة',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 132,
+            ],
+            'import_default_tva_id' => [
+                'value'         => null,
+                'group'         => 'import',
+                'type'          => 'integer',
+                'description'   => 'نسبة الضريبة الافتراضية للمنتجات المستوردة عندما لا يحدد سطر الإكسل ضريبة',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 133,
+            ],
+            'import_default_active' => [
+                'value'         => true,
+                'group'         => 'import',
+                'type'          => 'boolean',
+                'description'   => 'الحالة الافتراضية للمنتجات المستوردة عندما لا يحدد سطر الإكسل "نشط"',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 134,
+            ],
+            'import_default_manages_stock' => [
+                'value'         => true,
+                'group'         => 'import',
+                'type'          => 'boolean',
+                'description'   => 'إدارة المخزون الافتراضية للمنتجات المستوردة عندما لا يحدد سطر الإكسل "يدير المخزون"',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 135,
+            ],
+
+            // ══════════════════════════════════════════
             // group: print — إعدادات الطباعة
             // ══════════════════════════════════════════
             'print:doc_configs' => [

@@ -31,6 +31,7 @@ import { CompanyTab } from "./tabs/CompanyTab";
 import { InvoiceTab } from "./tabs/InvoiceTab";
 import { FiscalTab } from "./tabs/FiscalTab";
 import { InventoryTab } from "./tabs/InventoryTab";
+import { ImportTab } from "./tabs/ImportTab";
 import { AlertsTab } from "./tabs/AlertsTab";
 import { PortalTab } from "./tabs/PortalTab";
 import { DocumentsTab } from "./tabs/DocumentsTab";
@@ -183,6 +184,12 @@ export default function SettingsPage() {
                     <InventoryTab
                         onDirty={() => markTabDirty("inventory")}
                         onClean={() => markTabClean("inventory")}
+                    />
+                )}
+                {tab === "import" && (
+                    <ImportTab
+                        onDirty={() => markTabDirty("import")}
+                        onClean={() => markTabClean("import")}
                     />
                 )}
                 {tab === "alerts" && (

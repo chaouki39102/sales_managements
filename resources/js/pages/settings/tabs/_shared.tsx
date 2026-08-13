@@ -26,6 +26,7 @@ export const TABS = [
     { id: "invoice", label: "تصاميم الفاتورة", icon: "ti-file-invoice" },
     { id: "fiscal", label: "المالية والضرائب", icon: "ti-calculator" },
     { id: "inventory", label: "المخزون", icon: "ti-box" },
+    { id: "import", label: "الاستيراد", icon: "ti-file-import" },
     { id: "alerts", label: "الإشعارات", icon: "ti-bell" },
     { id: "portal", label: "بوابة الزبائن", icon: "ti-world" },
     { id: "documents", label: "المستندات", icon: "ti-file-text" },
