@@ -1,9 +1,10 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
-import { apiPost } from '@/lib/api/core/client';
+import { apiGet, apiPost } from '@/lib/api/core/client';
+import { useActiveSlug } from '@/lib/store/appStore';
 import SimpleTable from '@/components/ui/SimpleTable';
 import type { EntityConfig, ImportField } from './entityConfig';
 
@@ -29,6 +30,7 @@ interface PendingEntities {
   brands?: string[];
   units?: string[];
   price_levels?: string[];
+  product_types?: string[];
 }
 
 interface PreviewResponse {
@@ -54,6 +56,19 @@ interface Props {
 
 export default function ImportWizardModal({ open, onClose, config }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const slug = useActiveSlug();
+
+  const isProducts = config.previewEndpoint.includes('/products/');
+
+  // Product types lookup — only needed for the product import preview
+  const { data: productTypes = [] } = useQuery({
+    queryKey: ['tenant', slug, 'product-types', 'import-wizard'],
+    queryFn: async () => {
+      const res = await apiGet<{ data: unknown[] }>('/product-types', { per_page: 100 });
+      return (res?.data ?? res ?? []) as unknown[];
+    },
+    enabled: !!slug && isProducts,
+  });
 
   // State
   const [step, setStep] = useState<Step>('upload');
@@ -366,6 +381,7 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
               {pending_entities.brands?.map((b) => <li key={b}>الماركة: {b}</li>)}
               {pending_entities.units?.map((u) => <li key={u}>الوحدة: {u}</li>)}
               {pending_entities.price_levels?.map((p) => <li key={p}>فئة السعر: {p}</li>)}
+              {pending_entities.product_types?.map((t) => <li key={t}>نوع المنتج: {t}</li>)}
             </ul>
           </div>
         )}
@@ -375,7 +391,23 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
             <p style={{ fontWeight: 600, marginBottom: 8, color: 'var(--green)' }}>معاينة البيانات الصحيحة (أول 5 أسطر):</p>
             <div style={{ fontSize: 12 }}>
               <SimpleTable
-                columns={Object.keys(validated[0]).map(k => ({ key: k, label: config.fields.find((f) => f.key === k)?.label ?? k }))}
+                columns={Object.keys(validated[0])
+                  .filter((k) => !k.startsWith('_'))
+                  .map(k => ({
+                  key: k,
+                  label: config.fields.find((f) => f.key === k)?.label ?? k,
+                  render: (v, _row, ck) => {
+                    if (ck === 'product_type_id') {
+                      const pt = (productTypes as any[]).find((p) => Number(p.id) === Number(v));
+                      return pt ? String(pt.label ?? pt.name ?? v) : (v === 0 || v === null ? '—' : String(v));
+                    }
+                    if (ck === 'min_margin_percentage') {
+                      if (v === '' || v === null || v === undefined) return '—';
+                      return `${v}%`;
+                    }
+                    return String(v ?? '');
+                  },
+                }))}
                 data={validated.slice(0, 5).map((row, i) => ({ ...row, _idx: i }))}
                 rowKey="_idx"
               />

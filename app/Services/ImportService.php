@@ -39,6 +39,7 @@ class ImportService
         $pendingFamilies = [];
         $pendingBrands = [];
         $pendingUnits = [];
+        $pendingProductTypes = [];
 
         // القيم الافتراضية من الإعدادات (تُطبّق عندما يترك سطر الإكسل الحقل فارغاً)
         $defaultFamilyId = (int) Setting::getSetting('import_default_family_id', 0, $companyId);
@@ -46,9 +47,21 @@ class ImportService
         $defaultUnitId   = (int) Setting::getSetting('import_default_unit_id', 0, $companyId);
         $defaultTvaId    = (int) Setting::getSetting('import_default_tva_id', 0, $companyId);
         $defaultProductTypeId = (int) Setting::getSetting('import_default_product_type_id', 0, $companyId);
-        $defaultMinMargin = (float) Setting::getSetting('import_default_min_margin_percentage', 0, $companyId);
         $defaultActive   = (bool) Setting::getSetting('import_default_active', true, $companyId);
         $defaultManagesStock = (bool) Setting::getSetting('import_default_manages_stock', true, $companyId);
+
+        // الحد الأدنى لهامش الربح الافتراضي — نميّز "غير مضبوط" عن "مضبوط على 0"
+        // (getSetting يعيد 0.0 للسلسلة الفارغة، لذا نقرأ السطر الخام للتمييز)
+        $defaultMinMargin = null;
+        $minMarginRaw = Setting::where('key', 'import_default_min_margin_percentage')
+            ->where('company_id', $companyId)
+            ->value('value')
+            ?? Setting::where('key', 'import_default_min_margin_percentage')
+                ->whereNull('company_id')
+                ->value('value');
+        if ($minMarginRaw !== null && $minMarginRaw !== '') {
+            $defaultMinMargin = (float) $minMarginRaw;
+        }
 
         // تأكد أن المعرفات الافتراضية تعود لنفس المؤسسة
         if ($defaultFamilyId && !$families->contains(fn($f) => $f->id === $defaultFamilyId)) {
@@ -140,14 +153,16 @@ class ImportService
                 }
             }
 
-            // نوع المنتج (product_type)
+            // نوع المنتج (product_type) — auto-create if missing
             $productTypeVal = $this->extract($row, 'product_type');
             if ($productTypeVal !== '') {
+                $key = mb_strtolower(trim($productTypeVal));
                 $pt = $this->resolveProductType($productTypeVal, $productTypes);
                 if ($pt) {
                     $data['product_type_id'] = $pt->id;
                 } else {
-                    $rowErrors[] = "نوع المنتج '$productTypeVal' غير صالح (استخدم: مخزون، خدمة، مستهلك)";
+                    $pendingProductTypes[$key] = trim($productTypeVal);
+                    $data['_pending_product_type'] = trim($productTypeVal);
                 }
             }
 
@@ -179,7 +194,7 @@ class ImportService
             // الحد الأدنى لهامش الربح %
             $minMargin = $this->extract($row, 'min_margin_percentage');
             if ($minMargin !== '') {
-                $data['min_margin_percentage'] = $this->parseNumber($minMargin);
+                $data['min_margin_percentage'] = max(0, $this->parseNumber($minMargin));
             }
 
             // يدير المخزون
@@ -213,10 +228,10 @@ class ImportService
             if (!isset($data['tva_id']) && $defaultTvaId) {
                 $data['tva_id'] = $defaultTvaId;
             }
-            if (!isset($data['product_type_id']) && $defaultProductTypeId) {
+            if (!isset($data['product_type_id']) && !isset($data['_pending_product_type']) && $defaultProductTypeId) {
                 $data['product_type_id'] = $defaultProductTypeId;
             }
-            if (!isset($data['min_margin_percentage']) && $defaultMinMargin > 0) {
+            if (!isset($data['min_margin_percentage']) && $defaultMinMargin !== null) {
                 $data['min_margin_percentage'] = $defaultMinMargin;
             }
             if (!isset($data['active'])) {
@@ -237,6 +252,7 @@ class ImportService
         if (!empty($pendingFamilies)) $pending['families'] = array_values($pendingFamilies);
         if (!empty($pendingBrands))   $pending['brands']   = array_values($pendingBrands);
         if (!empty($pendingUnits))    $pending['units']    = array_values($pendingUnits);
+        if (!empty($pendingProductTypes)) $pending['product_types'] = array_values($pendingProductTypes);
 
         return ['validated' => $validated, 'errors' => $errors, 'pending_entities' => $pending];
     }
@@ -255,6 +271,7 @@ class ImportService
             $families = Family::where('company_id', $companyId)->get()->keyBy(fn($f) => mb_strtolower(trim($f->name)));
             $brands   = Brand::where('company_id', $companyId)->get()->keyBy(fn($b) => mb_strtolower(trim($b->name)));
             $units    = Unit::where('company_id', $companyId)->get()->keyBy(fn($u) => mb_strtolower(trim($u->name)));
+            $productTypes = ProductType::where('company_id', $companyId)->get();
 
             foreach ($rows as $i => $data) {
                 try {
@@ -288,6 +305,13 @@ class ImportService
                             $data['unit_id'] = $units[$key]->id;
                         }
                         unset($data['_pending_unit']);
+                    }
+                    if (isset($data['_pending_product_type'])) {
+                        $pt = $this->resolveProductType($data['_pending_product_type'], $productTypes);
+                        if ($pt) {
+                            $data['product_type_id'] = $pt->id;
+                        }
+                        unset($data['_pending_product_type']);
                     }
 
                     // Extract selling price before create (not in $fillable)
@@ -384,6 +408,25 @@ class ImportService
                     PriceLevel::create(
                         ['company_id' => $companyId, 'name' => $name, 'is_percentage' => true, 'value' => 0]
                     );
+                }
+            }
+        }
+
+        if (!empty($pendingEntities['product_types'])) {
+            foreach ($pendingEntities['product_types'] as $value) {
+                $exists = ProductType::where('company_id', $companyId)
+                    ->where(fn($q) => $q->where('name', $value)->orWhere('label', $value))
+                    ->first();
+                if (!$exists) {
+                    $maxOrder = ProductType::where('company_id', $companyId)->max('display_order') ?? 0;
+                    ProductType::create([
+                        'company_id'    => $companyId,
+                        'name'          => Str::slug($value, '_') ?: $value,
+                        'label'         => $value,
+                        'manages_stock' => true,
+                        'active'        => true,
+                        'display_order' => $maxOrder + 1,
+                    ]);
                 }
             }
         }
