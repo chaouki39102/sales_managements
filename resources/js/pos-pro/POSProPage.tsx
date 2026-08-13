@@ -52,7 +52,7 @@ import type { SoundPresetId } from '@/pos/utils/posSounds';
 import { htToTtc, ttcToHt } from '@/pos/utils/calculations';
 import { renderPreviewToHtml } from '@/pages/settings/print-settings/runtime/renderPreviewToHtml';
 import { mapCompany } from '@/pages/settings/print-settings/runtime/PrintRuntimeAdapter';
-import { tenantKeys } from '@/lib/api/core/queryKeys';
+import { tenantKeys, invalidatePosQueries } from '@/lib/api/core/queryKeys';
 import { toLocalDateKey } from '@/lib/utils';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
 import type { POSSaleSnapshot } from '@/pages/settings/print-settings/types/data';
@@ -100,6 +100,19 @@ export default function POSProPage() {
   const queryClient = useQueryClient();
   const slug = useActiveSlug();
   const company = useActiveCompany();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    if (!slug) return;
+    setRefreshing(true);
+    try {
+      await invalidatePosQueries(queryClient, slug);
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: [slug, 'pos-pro', 'products'] }),
+        queryClient.refetchQueries({ queryKey: [slug, 'pos-pro-stock'] }),
+      ]);
+    } finally { setRefreshing(false); }
+  };
 
   // ── الإعدادات المشتركة (قراءة فقط — نفس قيم POS للاتساق) ────────────────
   const { settings, setSettings, resetSettings } = usePOSSettings(slug);
@@ -1336,6 +1349,16 @@ export default function POSProPage() {
             >
               <i className="ti ti-printer" />
               <span>طباعة</span>
+            </button>
+            <button
+              type="button"
+              className="pp-refresh-btn"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              title="تحديث المنتجات والمخزون"
+            >
+              <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} />
+              <span>تحديث</span>
             </button>
           </div>
 
