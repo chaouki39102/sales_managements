@@ -20,6 +20,7 @@ const NAV_GROUPS = [
       { name: 'نقطة البيع',  href: 'pos',        icon: 'ti-shopping-cart'   },
       { name: 'POS PRO',     href: 'pos/pro',    icon: 'ti-cash-register'   },
       { name: 'جلسات POS',   href: 'pos/sessions', icon: 'ti-chart-bar'     },
+      { name: 'دون اتصال',   href: 'offline',     icon: 'ti-cloud-download' },
     ],
   },
   {
@@ -113,7 +114,6 @@ const NAV_GROUPS = [
       { name: 'التنبيهات الذكية', href: 'alerts',                icon: 'ti-alert-triangle' },
       { name: 'سجل التدقيق',     href: 'audit-log',               icon: 'ti-history'      },
       { name: 'الملف الشخصي',    href: 'profile',                 icon: 'ti-user-circle'  },
-      { name: 'دون اتصال',       href: 'offline',                 icon: 'ti-cloud-download' },
       { name: 'حالة النظام',     href: '/status',                icon: 'ti-server-2'     },
       { name: 'الإعداد الأولي',  href: '/onboarding',            icon: 'ti-rocket'       },
     ],

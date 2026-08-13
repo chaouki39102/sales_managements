@@ -245,6 +245,26 @@
     justify-content: center;
     opacity: 0.6;
 }
+.ppm-session-offline {
+    margin-inline-start: auto;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--red);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 800;
+}
+.ppm-offline-btn {
+    color: var(--red);
+}
+.ppm-offline-btn--sync {
+    color: var(--em);
+    animation: ppm-sync-pulse 1.2s ease-in-out infinite;
+}
+@keyframes ppm-sync-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+}
 
 /* ─── Total card ────────────────────────────────────────────────────────── */
 .ppm-total-card {

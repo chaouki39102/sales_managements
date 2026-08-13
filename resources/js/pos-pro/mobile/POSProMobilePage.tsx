@@ -36,7 +36,10 @@ import {
   useOpenSession,
   useIncrementSession,
   buildIncrementInput,
+  type PosSession,
 } from '@/lib/api/endpoints/posSession';
+import { useOnlineStatus, useOfflineServed, useSync } from '@/lib/offline/useOffline';
+import { isOfflineQueuedResponse } from '@/lib/offline/queueMath';
 import { usePosPro } from '@/pos-pro/hooks/usePosPro';
 import { usePosProCart } from '@/pos-pro/store/usePosProCart';
 import { productToVariant, isVariantOutOfStock } from '@/pos/utils/posHelpers';
@@ -72,6 +75,29 @@ function compoundDiscountPct(linePct: number, invoicePct: number): number {
   if (invoicePct <= 0) return linePct;
   const compounded = 100 - (100 - linePct) * (100 - invoicePct) / 100;
   return Math.min(100, compounded);
+}
+
+// ── آخر جلسة معروفة (C.5 — وضع عدم الاتصال) ───────────────────────────────
+// يُحفظ آخر PosSession حقيقي معروف لكل شركة. عندما تُقدَّم الجلسة من طبقة
+// الـ offline (قيمة فارغة = لا بيانات مخزّنة مؤقتاً)، نعود إليها بدل قفل
+// الشاشة، مع الإبقاء على معرف الجلسة في سلة المدفوعات/الفاتورة.
+const LAST_SESSION_KEY_PREFIX = 'pos-pro-mobile-last-session';
+function isRealSession(s: unknown): s is PosSession {
+  return !!s && typeof s === 'object' && typeof (s as PosSession).id === 'number';
+}
+function lastSessionStorageKey(slug: string | null): string {
+  return `${LAST_SESSION_KEY_PREFIX}:${slug ?? ''}`;
+}
+function loadLastKnownSession(slug: string | null): PosSession | null {
+  try {
+    const raw = localStorage.getItem(lastSessionStorageKey(slug));
+    return raw ? JSON.parse(raw) as PosSession : null;
+  } catch {
+    return null;
+  }
+}
+function saveLastKnownSession(slug: string | null, session: PosSession): void {
+  try { localStorage.setItem(lastSessionStorageKey(slug), JSON.stringify(session)); } catch { /* best-effort */ }
 }
 
 // ── أدوات التنسيق المحلية ──────────────────────────────────────────────────
@@ -156,7 +182,24 @@ export default function POSProMobilePage() {
   }, [defaultWarehouse?.id]);
 
   // ── الجلسة ────────────────────────────────────────────────────────────────
-  const { data: currentSession, isLoading: sessionLoading } = useCurrentPosSession();
+  const { data: serverSession, isLoading: sessionLoading } = useCurrentPosSession();
+  const offlineServed = useOfflineServed();
+  const online = useOnlineStatus();
+  const { syncing, sync } = useSync();
+
+  // آخر جلسة حقيقية معروفة: يُحفظ كل ما يصل من الخادم، ويُعاد استخدامه كـ fallback
+  // عندما تكون الشاشة في وضع عدم الاتصال (تتجاوز الطبقة الخادم ولا تعيد بيانات).
+  useEffect(() => {
+    if (isRealSession(serverSession)) saveLastKnownSession(slug, serverSession);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverSession, slug]);
+
+  const currentSession = useMemo<PosSession | null>(() => {
+    if (isRealSession(serverSession)) return serverSession;
+    if (offlineServed || !online) return loadLastKnownSession(slug);
+    return null;
+  }, [serverSession, offlineServed, online, slug]);
+
   const openSessionMut = useOpenSession();
   const incrementMut = useIncrementSession(currentSession?.id ?? null);
   const [sessionError, setSessionError] = useState<string | null>(null);
@@ -711,7 +754,11 @@ export default function POSProMobilePage() {
         st(() => { const snap = receiptSnapshotRef.current; if (snap && mountedRef.current) handlePrintDirect(snap); }, 900);
       }
 
-      safeToast.success(`تم حفظ الفاتورة ${res.document_number ?? ''}`);
+      if (isOfflineQueuedResponse(res)) {
+        safeToast.success(`أُضيفت الفاتورة إلى قائمة الانتظار — سيُحفظ عند توفر الاتصال (${res.document_number ?? ''})`);
+      } else {
+        safeToast.success(`تم حفظ الفاتورة ${res.document_number ?? ''}`);
+      }
 
       return { ok: true, docNumber: res.document_number };
     } catch (err: unknown) {
@@ -825,6 +872,16 @@ export default function POSProMobilePage() {
           <strong>نقطة البيع</strong>
           <span>جلسة {currentSession ? `#${currentSession.id}` : '—'}</span>
         </div>
+        {(!online || offlineServed) && (
+          <button
+            className={`ppm-appbar-btn ppm-offline-btn${syncing ? ' ppm-offline-btn--sync' : ''}`}
+            onClick={() => void sync()}
+            aria-label="مزامنة العمليات المعلقة"
+            title={syncing ? 'جارٍ المزامنة…' : 'وضع دون اتصال — اضغط للمزامنة'}
+          >
+            <i className={`ti ${syncing ? 'ti-cloud-upload' : 'ti-cloud-off'}`} />
+          </button>
+        )}
         <button className="ppm-appbar-btn" onClick={() => setSheet('held')} aria-label="سلال معلقة">
           <i className="ti ti-basket-pause" />
           {pos.heldCarts.length > 0 && <span className="ppm-badge">{pos.heldCarts.length}</span>}
@@ -837,6 +894,7 @@ export default function POSProMobilePage() {
         <span>
           {currentSession?.warehouse?.name ?? 'المستودع'} — {currentSession?.opening_cash != null ? `رصيد افتتاح ${money(currentSession.opening_cash)}` : 'جلسة مفتوحة'}
         </span>
+        {!online && <span className="ppm-session-offline">دون اتصال</span>}
       </div>
 
       {/* ── بطاقة الإجمالي ──────────────────────────────────────────────── */}
