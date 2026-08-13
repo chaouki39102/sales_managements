@@ -15,7 +15,7 @@
 - **Offline layer** (`lib/offline/`) sits on the SHARED `client` — its cache keys embed the full URL (slug included), so tenant isolation in the offline cache is automatic; never store cross-tenant keys.
 
 ## Date
-2026-08-12
+2026-08-13
 
 ### Phase 71 — Offline C.2–C.4 Complete: Docs-Module Hardening + Prefetch Readiness + Sync Dashboard (Aug 11–12)
 
@@ -33,6 +33,25 @@
 - Offline pages live under the normal `DashboardLayout` route tree (`/offline`), reuse `useOffline*` hooks, and must gate tenant queries on `slug`/`selectedYear` like every other page.
 
 **Verification**: `npx tsc --noEmit` clean · `npm test` green (incl. new `offline-doc-flow.spec.ts` + `sync-dashboard.spec.ts`) · `npm run build` 0 errors · SW MATCH. Next pending phase: **C.5** — full task list in `C1_OFFLINE_FIX.md`.
+
+### Phase 72 — Product Import Improvements: Auto-Create Product Types + Preview Polish + Margin Guards (Aug 13)
+
+**Request**: 5 approved import enhancements on top of the shipped product-type + min-margin defaults feature (`3dd9fd4`, `885c321`): (1) auto-create unknown product types via the pending-entities pattern, (2) AGENTS.md deploy note (seed + `cache:clear`) — added in Global Rules, (3) import wizard preview showing parsed product-type / min-margin values before commit, (4) clamp negative `min_margin_percentage` to 0, (5) distinguish "unset" from "set to 0" for `import_default_min_margin_percentage`. Committed `8733ee3`, pushed to `main`.
+
+**Suggestion 1 — product types auto-created on import** (`app/Services/ImportService.php`): unknown `product_type` values now become **pending entities** exactly like families/brands/units — a new `$pendingProductTypes` accumulator keyed by lowercased value, `$data['_pending_product_type']` on the validated row (so the default-type guard skips it via `!isset($data['_pending_product_type'])`), `pending['product_types']` in the `validateProducts` response. `importProducts` refetches the product types and resolves `_pending_product_type` via `resolveProductType` (label OR name match) before unset; `ensureEntities` auto-creates missing types (`name = Str::slug($value, '_') ?: $value`, `label = $value`, `manages_stock = true`, `active = true`, `display_order = max+1`, existence check by name OR label). The old row error «نوع المنتج 'X' غير صالح» is GONE — an unknown type is no longer a validation failure.
+
+**Suggestion 3 — wizard preview polish** (`resources/js/pages/import/ImportWizardModal.tsx`): added `product_types?: string[]` to `PendingEntities` + a «نوع المنتج: X» pending-entity list item. The preview table now uses `SimpleColumn.render`: `product_type_id` resolves to the friendly label via a gated `useQuery` on `/product-types` (enabled only when the config preview endpoint is products + slug present), `min_margin_percentage` renders with a `%` suffix, and `_pending_*` sentinel columns are filtered out of the preview. `handleExecute` already forwards `previewResult.pending_entities` to the execute step, so pending product types flow end-to-end with no controller change.
+
+**Suggestion 4 + 5 — margin guards** (`ImportService.php`): `min_margin_percentage` is now `max(0, $this->parseNumber($minMargin))` (negative clamped to 0). The default margin is read via the **raw DB value** (`Setting::where('key', ...)->where('company_id', $companyId)->value('value')` with the null-company fallback, mirroring `getSetting`'s fallback chain) because `getSetting` returns `0.0` for an empty string — so `''` (unset → skip, `$defaultMinMargin !== null` guard) is now distinct from `'0'` (explicitly set → applied as 0).
+
+**Key architectural rules**:
+- The pending-entities pattern is the SSOT for import auto-creation: accumulate per-key in `validateProducts` (keyed by normalized value for de-dup), emit `pending['<entity>']`, re-fetch + resolve sentinel rows in `importProducts` (`_pending_*` data keys are transient, unset before create), auto-create in `ensureEntities` BEFORE the product loop. The wizard already forwards `pending_entities` from preview to execute — any NEW pending entity type just needs the backend accumulator + a frontend type/render addition.
+- A backend-sentinel key on a validated row (`_pending_*`) must be hidden from the import preview table (`.filter((k) => !k.startsWith('_'))`) — it's an internal contract, not a column the user imported.
+- **`getSetting` cannot distinguish "unset" from "set to 0"** (empty string → `0.0`); any setting whose empty default means "disabled/absent" and whose explicit 0 is meaningful must be read via the raw DB value (`Setting::where(...)->value('value')`), not `getSetting`.
+- `ensureEntities` is `private` — smoke tests must exercise it through `importProducts` (which calls it internally), not direct invocation.
+- New auto-created entities follow the model's conventions: ProductType unique is `['company_id','name']`, `Str::slug` of an Arabic label is `''` so the slug-or-label fallback keeps the name non-empty and matches `resolveProductType`'s name OR label comparison.
+
+**Verification**: `vendor\bin\pest.bat` 70 passed (466 assertions) · `npm test` 273/273 · `npx tsc --noEmit` clean · `npm run build` 0 errors, 222 precache · SW MATCH. Smoke harness `import_defaults_smoke.php` (force-rolled-back) extended to 8 cases, all PASS: defaults applied, explicit wins, unknown type → pending (empty errors + `_pending_product_type`), negative margin clamped to 0, default margin 0 applied (raw '0'), pending product type auto-created via importProducts, import resolves it, `seedForCompany` seeds both keys with correct types.
 
 ### Phase 70 — Offline C.1 Checkpoint: Offline Interception Is DEAD CODE + Full B/C/D Task File (Aug 9)
 
