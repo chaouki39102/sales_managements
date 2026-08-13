@@ -267,33 +267,51 @@ class ImportService
     {
         if (empty($pendingEntities)) return;
 
+        // NOTE: firstOrCreate/updateOrCreate are NOT used here on purpose.
+        // Laravel wraps their create in DB::transaction() (a SAVEPOINT) when called
+        // inside an open transaction, and never issues RELEASE SAVEPOINT — the
+        // repeated same-name savepoint churn makes Windows SQLite return
+        // "unable to open database file" (CANTOPEN) on the 2nd-3rd iteration.
+        // Explicit first()+create() is the safe equivalent (see G/D4 diag tests).
+
         if (!empty($pendingEntities['families'])) {
             foreach ($pendingEntities['families'] as $name) {
-                Family::firstOrCreate(
-                    ['company_id' => $companyId, 'name' => $name],
-                    $userId ? ['created_by' => $userId, 'updated_by' => $userId] : []
-                );
+                $family = Family::where('company_id', $companyId)->where('name', $name)->first();
+                if (!$family) {
+                    Family::create(
+                        ['company_id' => $companyId, 'name' => $name]
+                        + ($userId ? ['created_by' => $userId, 'updated_by' => $userId] : [])
+                    );
+                }
             }
         }
 
         if (!empty($pendingEntities['brands'])) {
             foreach ($pendingEntities['brands'] as $name) {
-                Brand::firstOrCreate(['company_id' => $companyId, 'name' => $name]);
+                $brand = Brand::where('company_id', $companyId)->where('name', $name)->first();
+                if (!$brand) {
+                    Brand::create(['company_id' => $companyId, 'name' => $name]);
+                }
             }
         }
 
         if (!empty($pendingEntities['units'])) {
             foreach ($pendingEntities['units'] as $name) {
-                Unit::firstOrCreate(['company_id' => $companyId, 'name' => $name]);
+                $unit = Unit::where('company_id', $companyId)->where('name', $name)->first();
+                if (!$unit) {
+                    Unit::create(['company_id' => $companyId, 'name' => $name]);
+                }
             }
         }
 
         if (!empty($pendingEntities['price_levels'])) {
             foreach ($pendingEntities['price_levels'] as $name) {
-                PriceLevel::firstOrCreate(
-                    ['company_id' => $companyId, 'name' => $name],
-                    ['is_percentage' => true, 'value' => 0]
-                );
+                $level = PriceLevel::where('company_id', $companyId)->where('name', $name)->first();
+                if (!$level) {
+                    PriceLevel::create(
+                        ['company_id' => $companyId, 'name' => $name, 'is_percentage' => true, 'value' => 0]
+                    );
+                }
             }
         }
     }
