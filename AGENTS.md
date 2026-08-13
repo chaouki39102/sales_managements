@@ -36,7 +36,28 @@
 
 ### Phase 71 — Offline C.2–C.4 Complete: Docs-Module Hardening + Prefetch Readiness + Sync Dashboard (Aug 11–12)
 
-**Request** (continuing the C-family from `C1_OFFLINE_FIX.md`, worked task-by-task on the dev machine, committed + pushed after each task): C.2 (documents-module offline hardening), C.3 (offline data readiness / prefetch page), C.4 (field-agent sync dashboard). All three are DONE on `main`. Resume point for the next session: **C.5 (offline POS Pro Mobile verification)**.
+**Request** (continuing the C-family from `C1_OFFLINE_FIX.md`, worked task-by-task on the dev machine, committed + pushed after each task): C.2 (documents-module offline hardening), C.3 (offline data readiness / prefetch page), C.4 (field-agent sync dashboard). All three are DONE on `main`.
+
+### Phase 71 follow-up — Offline C.5 Complete: POS Pro Mobile Offline (Aug 13)
+
+**Request**: "complete c1" — finish the last pending C-family task: offline POS Pro Mobile (`/pos/pro/mobile` must keep working for a field agent with no connection). A code audit confirmed **C.5 was already implemented and pushed** (`314afea`, an ancestor of HEAD `2d7fbf7`), but neither `AGENTS.md` nor `C1_OFFLINE_FIX.md` was ever updated after that commit — both still listed C.5 as "pending". No code gaps were found in the verification pass, so this phase closed the docs gap and re-verified the whole C-family end-to-end.
+
+**C.5 (`314afea` "feat(offline): C.5 offline POS Pro Mobile + visible offline sidebar/topbar entry")** — what `/pos/pro/mobile` gained for offline field use:
+- **Session fallback**: `loadLastKnownSession`/`saveLastKnownSession` persist the last real `PosSession` to localStorage (key `pos-pro-mobile-last-session:{slug}`); when `useCurrentPosSession` comes back empty or is served from the offline cache (`useOfflineServed` / `useOnlineStatus`), the page falls back to the last-known session instead of locking the screen — the session id still flows into the payment/receipt pipeline.
+- **Offline success toast**: queued mutations are detected via `isOfflineQueuedResponse(res)` → «أُضيفت الفاتورة إلى قائمة الانتظار — سيُحفظ عند توفر الاتصال (OFFLINE-<n>)» (the `OFFLINE-<n>` document number rides through the same print pipeline).
+- **Offline affordances**: `useSync` drives an appbar cloud button (tap → `sync()`, spins while syncing) shown only when offline or serving stale data, plus a «دون اتصال» chip in the session strip (`.ppm-offline-btn` / `.ppm-session-offline` in `pos-pro-mobile.css`).
+- **Entry point**: «دون اتصال» became a first-class sidebar item in `DashboardLayout` pointing at the `/offline` sync dashboard.
+- Cart hold/restore and camera scan are local-store/local-device (offline-safe by design); payment queue, cached GETs, and auto-sync-on-reconnect come from the C.1–C.4 offline layer.
+
+**Docs closed this phase**: `C1_OFFLINE_FIX.md` — status header now «C.1–C.5 COMPLETE», C.5 section marked ✅ COMPLETE with its scope + verification, progress + commits tables updated, resume point set to **B.1 (camera-native — shared scan hook)**. Also removed the stale POS Pro gap-list context that was accidentally active earlier this session (user: "i dont want to add any things to pos pro" — POS Pro feature work is out of scope; the C-family is the only active roadmap).
+
+**Key architectural rules** (C.5):
+- A mobile POS must NEVER hard-lock on a missing/empty session when offline: fall back to a persisted last-known `PosSession` (per-slug localStorage) so payment and print keep working; the authoritative session returns on the next real sync.
+- Queued mutations are surfaced to the field agent with a distinct offline toast keyed on `isOfflineQueuedResponse(res)` — never a generic "saved" that implies the server accepted money.
+- Offline affordances (sync button, «دون اتصال» badge) are driven by the reactive `useOnlineStatus`/`useOfflineServed`/`useSync` signals from `lib/offline/useOffline`, matching the C.4 sync dashboard's signals.
+- After a task is implemented AND pushed, update the roadmap docs (`C1_OFFLINE_FIX.md` + `AGENTS.md`) in the SAME effort — a committed feature with stale docs reads as "pending" to every later session.
+
+**Verification (this session)**: `npx tsc --noEmit` clean · `npm test` **273/273** (18 files, incl. all 9 offline suites: db-migration, offline-cache-ttl, offline-doc-flow, offline-interceptor, offline-math, offline-queue, retry-failed, sync-dashboard, sync-engine) · `npm run build` 0 errors, **224 precache entries** · **SW MATCH** (root `public/sw.js` hash == `public/build/sw.js` hash). No PHP touched → pest not re-run. Next pending: **B.1** — full task list in `C1_OFFLINE_FIX.md`.
 
 **C.2 (`79fa4ed` "fix(offline): C.2 — documents-module offline hardening")**: offline-aware success toasts («سيُحفظ عند توفر الاتصال») in the document/return/quick-sale flows — `useCommercialDocumentController` saveMut, `CommercialDocumentPage`, `CommercialDocumentsPage`, `QuickSaleModal`, `ReturnsModal`, `CommercialDocumentModal` — plus `document_number` fallback `?? ''` so queued 202 responses never navigate to a temp id. Regression: `offline-doc-flow.spec.ts` (164 lines) — field-agent flow create→edit+pay→sync with temp-url rewrite via `resolveOpUrl`.
 
@@ -49,7 +70,7 @@
 - The sync dashboard is the FAILURE SURFACE of the queue: every failed op must be visible with its Arabic `lastError` and an explicit retry path (per-op and all) — never silently dropped (Phase 68 follow-up rule).
 - Offline pages live under the normal `DashboardLayout` route tree (`/offline`), reuse `useOffline*` hooks, and must gate tenant queries on `slug`/`selectedYear` like every other page.
 
-**Verification**: `npx tsc --noEmit` clean · `npm test` green (incl. new `offline-doc-flow.spec.ts` + `sync-dashboard.spec.ts`) · `npm run build` 0 errors · SW MATCH. Next pending phase: **C.5** — full task list in `C1_OFFLINE_FIX.md`.
+**Verification**: `npx tsc --noEmit` clean · `npm test` green (incl. new `offline-doc-flow.spec.ts` + `sync-dashboard.spec.ts`) · `npm run build` 0 errors · SW MATCH. (C-family now complete through C.5 — see the C.5 follow-up above.)
 
 ### Phase 72 — Product Import Improvements: Auto-Create Product Types + Preview Polish + Margin Guards (Aug 13)
 

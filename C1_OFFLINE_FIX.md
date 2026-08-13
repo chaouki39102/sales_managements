@@ -1,13 +1,15 @@
 # Remaining Tasks — B (Camera), C (Offline), D (WhatsApp) — Full Actionable List
 
-> **Status: ✅ C.1–C.4 COMPLETE (all committed + pushed).** Pick up on any PC: `git pull`,
+> **Status: ✅ C.1–C.5 COMPLETE (all committed + pushed).** Pick up on any PC: `git pull`,
 > open this file, work task-by-task. **Commit + push after EACH task** (stage ONLY that task's
 > files). C is being implemented first (decided with the user), then B, then D.
 >
-> **Resume point now**: C.1 (offline interception), C.2 (documents-module offline hardening),
-> C.3 (offline data readiness / «جهّز للعمل دون اتصال» prefetch page), and C.4 (field-agent
-> sync dashboard at `/offline`) are ALL DONE and pushed. Next is **C.5** (offline POS Pro
-> Mobile verification/fixes). HEAD is the merge `offline mode` (95e8920) carrying C.4.
+> **Resume point now**: the whole C family (offline everywhere / field agents) is DONE and
+> pushed. C.1 (offline interception), C.2 (documents-module offline hardening), C.3 (offline
+> data readiness / «جهّز للعمل دون اتصال» prefetch page), C.4 (field-agent sync dashboard at
+> `/offline`), and C.5 (offline POS Pro Mobile verification, committed `314afea` with the
+> last-known-session fallback + offline sync affordances). Next is **B.1** (camera-native
+> commerce — shared scan hook). HEAD: `2d7fbf7` (Phase 73 POS refresh).
 
 ---
 
@@ -70,7 +72,7 @@ Live smoke via Playwright Chromium (fresh browser, fresh token) — zero console
 
 ---
 
-# C. Offline Everywhere / Field Agents  (FIRST — in progress)
+# C. Offline Everywhere / Field Agents  (FIRST — ✅ DONE)
 
 > Context: `resources/js/lib/offline/` — `db.ts` (IndexedDB write queue, `PendingOp`, FIFO
 > `id ASC`, verbatim method+url), `offlineAwareApi.ts` (interceptor), `syncEngine.ts`
@@ -147,13 +149,33 @@ Tasks (detailed):
 - Reuse `useFailedOps`/`getPendingOps`; existing `OfflineIndicator` popover stays the quick glance.
 - Verify: tsc, vitest, build, SW MATCH, live smoke.
 
-## C.5 Offline POS Pro Mobile
+## C.5 Offline POS Pro Mobile — ✅ COMPLETE
 
 - Verify `/pos/pro/mobile` (shares desktop POS Pro cart store + payment pipeline) fully offline:
   session-open guard falls back to last-known session, cart hold/restore, camera scan, payment
   queue, thermal print with `OFFLINE-<n>`, auto-sync on reconnect.
 - Fix whatever breaks; field-agent POS is the demo.
 - Verify: build + SW MATCH + Playwright offline simulation.
+
+**DONE** (committed `314afea`): `/pos/pro/mobile` now keeps working offline —
+- **Session fallback**: `loadLastKnownSession`/`saveLastKnownSession` (localStorage per slug)
+  persist the last real `PosSession` from the server; `useCurrentPosSession` results that come
+  back empty/offline (via `useOfflineServed` / `useOnlineStatus`) fall back to the last-known
+  session instead of locking the screen — the session id stays in the payment/receipt pipeline.
+- **Offline success toast**: queued mutations are detected via
+  `isOfflineQueuedResponse(res)` → «أُضيفت الفاتورة إلى قائمة الانتظار — سيُحفظ عند توفر
+  الاتصال (OFFLINE-<n>)» instead of the normal saved message.
+- **Offline affordances**: `useOnlineStatus`/`useOfflineServed`/`useSync` drive an appbar
+  cloud button (tap → `sync()`, spins while `syncing`) shown only offline/stale, plus a
+  «دون اتصال» chip in the session strip.
+- **Entry point**: «دون اتصال» became a first-class sidebar item (nav group in
+  `DashboardLayout`) pointing at the `/offline` sync dashboard.
+- Cart hold/restore and camera scan are local-store/local-device (offline-safe by design);
+  payment queue, cached GETs, and auto-sync-on-reconnect come from the C.1–C.4 offline layer.
+
+**Verification (this session)**: `npx tsc --noEmit` clean · `npm test` 273/273 (18 files, incl.
+all 9 offline suites) · `npm run build` 0 errors, 224 precache entries · SW MATCH
+(root `public/sw.js` hash == `public/build/sw.js`).
 
 ---
 
@@ -251,8 +273,8 @@ Tasks (detailed):
 
 | Family | Status | Notes |
 |--------|--------|-------|
-| B. Camera-native | ❌ planned | B.1–B.5 defined; start after C |
-| C. Offline everywhere | 🚧 in progress | **C.1 DONE** (offline interception fixed + regression suite) · **C.2 DONE** (documents-module offline hardening + field-agent flow test) · **C.3 DONE** (prefetch page + indicator integration) · **C.4 DONE** (sync dashboard `/offline`); **C.5 pending** |
+| B. Camera-native | ❌ planned | B.1–B.5 defined; start after C (C is done) |
+| C. Offline everywhere | ✅ done | **C.1** (offline interception fixed + regression suite) · **C.2** (documents-module offline hardening + field-agent flow test) · **C.3** (prefetch page + indicator integration) · **C.4** (sync dashboard `/offline`) · **C.5** (offline POS Pro Mobile, `314afea`) — all committed + pushed |
 | D. WhatsApp commerce | ❌ planned | D.1–D.5 defined; wa.me-first, Meta Cloud API webhook later |
 
 ## Commits
@@ -267,7 +289,7 @@ files; leave unrelated dirty files untouched):
 | *(C.2)* | **DONE** — documents-module offline hardening (`document_number` fallback `?? ''` + «سيُحفظ عند توفر الاتصال» toasts in `useCommercialDocumentController`, `QuickSaleModal`, `CommercialDocumentsPage`, `ReturnsModal`, both return flows) + `offline-doc-flow.spec.ts` field-agent flow test (create→edit+pay→sync temp-url rewrite) |
 | *(C.3)* | **DONE** (`2213a28`) — `cacheTtlForUrl` extension + «جهّز للعمل دون اتصال» prefetch (`prepareOffline.ts` `OFFLINE_DATASETS` + prefetch fn), `OfflinePage.tsx`, `OfflineIndicator` rework, route `/offline` |
 | *(C.4)* | **DONE** (`95e8920` merge "offline mode") — `SyncDashboard.tsx` (pending/failed op list, per-op + retry-all, مزامنة الآن + last-synced stamp, temp→real id), `useOffline` additions, `sync-dashboard.spec.ts`, route + nav "دون اتصال" |
-| *(C.5)* | offline POS Pro Mobile verification/fixes |
+| *(C.5)* | **DONE** (`314afea`) — offline POS Pro Mobile: last-known-session fallback (localStorage per slug), offline queued toast (`isOfflineQueuedResponse`), appbar cloud sync button + «دون اتصال» chip, «دون اتصال» sidebar entry; verified tsc/273 tests/build 224 precache/SW MATCH |
 | *(B.1)* | shared camera-scan hook + non-POS wiring |
 | *(B.2)* | camera product photo capture |
 | *(B.3)* | fiscal-QR → reopen document |
