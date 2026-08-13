@@ -9,7 +9,7 @@ import {
     keepPreviousData,
 } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPut, apiDelete } from "../core/client";
-import { tenantKeys } from "../core/queryKeys";
+import { tenantKeys, invalidatePosQueries } from "../core/queryKeys";
 import { useActiveSlug, useSelectedYearId } from "../../store/appStore";
 import type {
     StockMovement,
@@ -241,6 +241,8 @@ export function useInventoryMutations() {
         qc.invalidateQueries({ queryKey: tenantKeys.inventory.all(slug) });
         // إبطال المنتجات — الحركات تغير current_stock
         qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
+        // إبطال بيانات POS — المخزون والمنتجات تظهر مباشرة في نقاط البيع
+        invalidatePosQueries(qc, slug);
     };
 
     return {

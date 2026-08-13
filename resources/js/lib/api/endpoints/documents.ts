@@ -16,7 +16,7 @@
 
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiGet, apiPost, apiPut, apiDelete } from '../core/client';
-import { tenantKeys } from '../core/queryKeys';
+import { tenantKeys, invalidatePosQueries } from '../core/queryKeys';
 import { useActiveSlug } from '../../store/appStore';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 import type {
@@ -298,13 +298,18 @@ export function useDocumentMutations() {
   const { selectedYear }     = useFiscalYear();
 
   const invalidateAll = () => {
-    if (slug) qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
+    if (slug) {
+      qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
+      // المستندات تغيّر المخزون والأرصدة — حدّث بيانات POS مباشرة
+      invalidatePosQueries(qc, slug);
+    }
   };
 
   const invalidateOne = (doc: CommercialDocument) => {
     if (slug) {
       qc.setQueryData(tenantKeys.documents.detail(slug, doc.id), doc);
       qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
+      invalidatePosQueries(qc, slug);
     }
   };
 
