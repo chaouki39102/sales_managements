@@ -17,6 +17,23 @@
 ## Date
 2026-08-13
 
+### Phase 73 — POS Refresh: Button + Auto-Invalidation (PAUSED, resume via `POS_REFRESH_TODO.md`) (Aug 13)
+
+**Request**: admin stock/product changes don't reflect in the POS page. Root cause: POS uses separate query keys + long `staleTime` (classic POS products `[slug,'products','pos',...]` 5 min, POS Pro products `[slug,'pos-pro','products',...]` 5 min, stock keys `[slug,'pos-stock',...]` / `[slug,'pos-pro-stock',...]` 10s, balances `[slug,'party-balance',...]` 30s) and admin mutations never invalidate the POS keys. User approved **refresh button + auto-invalidation** ("YES").
+
+**DONE (committed)**: `resources/js/lib/api/core/queryKeys.ts` gained the `posKeys` family + `invalidatePosQueries(qc, slug)` helper (invalidates `products`/`stock`/`proProducts`/`proStock`/`balances` prefixes — prefix match, covers both POSes; `import type { QueryClient }` keeps the module dependency-free).
+
+**RESUME**: work task-by-task from `POS_REFRESH_TODO.md` (project root), commit + push after EACH task:
+1. Refresh button in classic POS (`POSTopBar.tsx` props `refreshing`/`onRefresh` + button + `.ti-spin` CSS in `pos.css`; `POSPage.tsx` handler via `invalidatePosQueries` + refetch).
+2. Refresh button in POS Pro (`POSProPage.tsx` `.pos-pro-scan-row` next to `pp-print-btn`; `.pp-refresh-btn` CSS).
+3. Auto-invalidation wiring: add `invalidatePosQueries(qc, slug)` to `useInventoryMutations.invalidate` (`inventory.ts:238-244`), `useProductMutations.invalidateAll`/`invalidateOne` (`products.ts:310-319`), and `useDocumentMutations.invalidateAll` (`documents.ts:300-302`) — so admin stock/product/doc changes reach POS instantly (products.ts currently only invalidates `[slug,'products']`, missing POS Pro products + both stock keys).
+4. Verify: `npx tsc --noEmit` clean · `npm test` green (baseline 273/273) · `npm run build` 0 errors · SW MATCH (`public/sw.js` hash == `public/build/sw.js`). Commit + push.
+
+**Key architectural rules (added this phase)**:
+- A refresh button must call `invalidatePosQueries` (marks stale) AND `refetchQueries` (forces the network call) so it gives instant feedback even when queries are inside `staleTime`.
+- POS query keys live in `posKeys` (`queryKeys.ts`) — the single source for what "refresh POS" means; never scatter `['products','pos']` string literals across pages/endpoints.
+- Prefix invalidation (`exact: false`, the default) is intentional: `[slug,'products']` covers `[slug,'products','pos',...]`, `[slug,'pos-stock']` covers every warehouse/year combo.
+
 ### Phase 71 — Offline C.2–C.4 Complete: Docs-Module Hardening + Prefetch Readiness + Sync Dashboard (Aug 11–12)
 
 **Request** (continuing the C-family from `C1_OFFLINE_FIX.md`, worked task-by-task on the dev machine, committed + pushed after each task): C.2 (documents-module offline hardening), C.3 (offline data readiness / prefetch page), C.4 (field-agent sync dashboard). All three are DONE on `main`. Resume point for the next session: **C.5 (offline POS Pro Mobile verification)**.

@@ -6,7 +6,11 @@
 //   companyKeys → /companies/* (CompanyController — company owner)
 //   adminKeys   → /admin/* (AdminCompanyController — super-admin فقط)
 //   tenantKeys  → /{slug}/* (كل tenant resources)
+//   posKeys     → مفاتيح مخزون POS (الكلاسيكي + Pro) — تستخدمها أزرار التحديث
+//                 والإبطال التلقائي عند تغيّر المخزون/المنتجات
 // ════════════════════════════════════════════════════════════════════════════
+
+import type { QueryClient } from '@tanstack/react-query';
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 export const authKeys = {
@@ -219,4 +223,36 @@ export const tenantKeys = {
         list: (slug: string) => [slug, 'backups', 'list']                                                                    as const,
     },
 } as const;
+
+// ─── POS keys (الكلاسيكي + Pro) ───────────────────────────────────────────────
+// مفاتيح خاصة بصفحات البيع — كل منها بادئة، فيطابق الإبطال كل استعلاماتها.
+// المواضع الحقيقية:
+//   classic POS products → [slug, 'products', 'pos', {...}]      (POSPage)
+//   classic POS stock    → [slug, 'pos-stock', whId, yearId, ...] (POSPage)
+//   POS Pro products     → [slug, 'pos-pro', 'products', {...}]  (POSProPage)
+//   POS Pro stock        → [slug, 'pos-pro-stock', whId, yearId]  (POSProPage)
+export const posKeys = {
+  products:  (slug: string) => [slug, 'products']      as const,
+  stock:     (slug: string) => [slug, 'pos-stock']     as const,
+  proProducts: (slug: string) => [slug, 'pos-pro', 'products'] as const,
+  proStock:  (slug: string) => [slug, 'pos-pro-stock'] as const,
+  balances:  (slug: string) => [slug, 'party-balance'] as const,
+} as const;
+
+/**
+ * إبطال كل مفاتيح POS (منتجات + مخزون + أرصدة) لشركة معينة.
+ * يُستدعى من:
+ *   - زر التحديث في POS الكلاسيكي و POS Pro
+ *   - الإبطال التلقائي عند تغيّر المخزون/المنتجات (useInventoryMutations,
+ *     useProductMutations) — لأن تحديثاً في صفحة الإدارة يجب أن يظهر فوراً
+ *     في شريط البيع دون انتظار انتهاء staleTime (5 دقائق للمنتجات).
+ */
+export function invalidatePosQueries(qc: QueryClient, slug: string | null | undefined) {
+  if (!slug) return;
+  qc.invalidateQueries({ queryKey: posKeys.products(slug) });
+  qc.invalidateQueries({ queryKey: posKeys.stock(slug) });
+  qc.invalidateQueries({ queryKey: posKeys.proProducts(slug) });
+  qc.invalidateQueries({ queryKey: posKeys.proStock(slug) });
+  qc.invalidateQueries({ queryKey: posKeys.balances(slug) });
+}
 
