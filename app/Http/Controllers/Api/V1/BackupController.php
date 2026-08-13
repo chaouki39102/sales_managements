@@ -27,6 +27,28 @@ class BackupController extends BaseApiController
     }
 
     /**
+     * استيراد نسخة احتياطية من ملف يرفعه المستخدم (استعادة من نسخة خارجية).
+     *
+     * بعد الاستيراد تظهر النسخة في القائمة ويمكن التحقق منها/استعادتها عبر
+     * المسار العادي — هكذا تُعاد استخدام كل آليات verify/restore الموجودة.
+     */
+    public function import(Request $request): JsonResponse
+    {
+        try {
+            $uploaded = $request->file('file');
+            if (!$uploaded || !$uploaded->isValid()) {
+                return $this->errorResponse('يرجى اختيار ملف نسخة احتياطية صالح.', 422, 'BACKUP_IMPORT_INVALID');
+            }
+
+            $imported = $this->backupService->import($uploaded);
+
+            return $this->successResponse($imported, 'تم استيراد النسخة الاحتياطية بنجاح', 201);
+        } catch (\Throwable $e) {
+            return $this->backupError($e);
+        }
+    }
+
+    /**
      * قائمة ملفات النسخ الاحتياطي.
      */
     public function index(Request $request): JsonResponse
@@ -164,6 +186,26 @@ class BackupController extends BaseApiController
                     'لا يمكن فك تشفير النسخة — مفتاح التشفير غير صحيح أو الملف تالف.',
                     422,
                     'BACKUP_DECRYPT_FAILED'
+                ),
+                str_contains($msg, 'File too large')        => $this->errorResponse(
+                    'حجم الملف يتجاوز الحد المسموح للرفع.',
+                    422,
+                    'BACKUP_IMPORT_TOO_LARGE'
+                ),
+                str_contains($msg, 'File extension not allowed') => $this->errorResponse(
+                    'امتداد الملف غير مدعوم — المقبول: .gz / .enc / .sqlite / .sql.',
+                    422,
+                    'BACKUP_IMPORT_EXTENSION'
+                ),
+                str_contains($msg, 'Not a gzip backup')     => $this->errorResponse(
+                    'الملف ليس نسخة احتياطية مضغوطة صالحة (لا يبدأ برأس gzip).',
+                    422,
+                    'BACKUP_IMPORT_NOT_GZIP'
+                ),
+                str_contains($msg, 'Not an encrypted backup') => $this->errorResponse(
+                    'الملف ليس نسخة احتياطية مشفرة صالحة (رأس التشفير غير موجود).',
+                    422,
+                    'BACKUP_IMPORT_NOT_ENC'
                 ),
                 default                                  => $this->errorResponse(
                     $msg,

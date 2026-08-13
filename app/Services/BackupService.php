@@ -184,6 +184,63 @@ class BackupService
         return $this->resolve($file);
     }
 
+    /**
+     * Import an uploaded backup file (an offline/external copy) into
+     * storage/app/backups. A fresh sha256 sidecar is written so the imported
+     * file can then be verified / restored through the normal flow.
+     *
+     * @return array{name:string,size:int,date:string,driver:string,extension:string,encrypted:bool}
+     *
+     * @throws RuntimeException on disallowed extension, oversized file, or an
+     *                          unreadable payload (bad gzip / encrypted header)
+     */
+    public function import(\Illuminate\Http\UploadedFile $file): array
+    {
+        $this->ensureDir();
+
+        $original = (string) $file->getClientOriginalName();
+        $ext      = strtolower(pathinfo($original, PATHINFO_EXTENSION));
+
+        if (!in_array($ext, ['gz', 'enc', 'sqlite', 'sql'], true)) {
+            $shown = $ext !== '' ? '.'.$ext : 'بدون امتداد';
+            throw new RuntimeException("File extension not allowed: {$shown} — expected .gz / .enc / .sqlite / .sql.");
+        }
+
+        $max = (int) ($this->config['max_upload_bytes'] ?? 128 * 1024 * 1024);
+        if (($file->getSize() ?: 0) > $max) {
+            throw new RuntimeException('File too large: '.$this->humanBytes($file->getSize() ?: 0).' exceeds the '.$this->humanBytes($max).' limit.');
+        }
+
+        $name = 'backup-imported-'.date('Y-m-d-His').'-'.substr(uniqid(), -4).'-'.$this->slug(pathinfo($original, PATHINFO_FILENAME)).'.'.$ext;
+        $dest = $this->dir.DIRECTORY_SEPARATOR.$name;
+
+        $file->move($this->dir, $name);
+
+        // Early sanity so the user gets immediate feedback: gzip magic or our
+        // encrypted-backup header. Deeper checks still happen at restore time.
+        $head = (string) file_get_contents($dest, false, null, 0, 4);
+        if ($ext === 'gz' && substr($head, 0, 2) !== "\x1f\x8b") {
+            @unlink($dest);
+            throw new RuntimeException('Not a gzip backup: the file does not start with a gzip header.');
+        }
+        if ($ext === 'enc' && substr($head, 0, 4) !== self::MAGIC) {
+            @unlink($dest);
+            throw new RuntimeException('Not an encrypted backup: missing the backup header.');
+        }
+
+        $hash = hash_file('sha256', $dest);
+        file_put_contents($dest.'.sha256', $hash);
+
+        return [
+            'name'      => $name,
+            'size'      => (int) filesize($dest),
+            'date'      => date('c'),
+            'driver'    => $this->driverFromName($name),
+            'extension' => $ext,
+            'encrypted' => $ext === 'enc',
+        ];
+    }
+
     public function driver(): string
     {
         return (string) (config('database.connections.'.config('database.default').'.driver') ?: 'sqlite');
@@ -653,6 +710,19 @@ class BackupService
     protected function slug(string $value): string
     {
         return preg_replace('/[^a-zA-Z0-9._-]/', '-', $value) ?: 'label';
+    }
+
+    protected function humanBytes(int $bytes): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB'];
+        $i = 0;
+        $value = (float) $bytes;
+        while ($value >= 1024 && $i < count($units) - 1) {
+            $value /= 1024;
+            $i++;
+        }
+
+        return round($value, 2).' '.$units[$i];
     }
 
     protected function resolve(string $file, bool $strict = true): string

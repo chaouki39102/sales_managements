@@ -33,6 +33,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Import (restore from an uploaded file)
+    |--------------------------------------------------------------------------
+    |
+    | max_upload_bytes : upper bound for a single uploaded backup file. Note
+    |                    that PHP's own upload_max_filesize / post_max_size in
+    |                    php.ini must also permit the size (see AGENTS.md).
+    |
+    */
+
+    'max_upload_bytes' => (int) env('BACKUP_MAX_UPLOAD_BYTES', 128 * 1024 * 1024),
+
+    /*
+    |--------------------------------------------------------------------------
     | MySQL client paths
     |--------------------------------------------------------------------------
     |

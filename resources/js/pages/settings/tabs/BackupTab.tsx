@@ -3,6 +3,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // يعرض تبويب "النسخ الاحتياطي" في الإعدادات:
 //   - إنشاء نسخة احتياطية جديدة (مع تسمية اختيارية)
+//   - استعادة من ملف خارجي (رفع نسخة نُزّلت سابقاً ثم تأكيد الاستعادة)
 //   - قائمة النسخ الحالية (الاسم / الحجم / التاريخ / نوع قاعدة البيانات)
 //   - تنزيل نسخة، التحقق من سلامتها (sha256)، استعادتها، أو حذفها
 //
@@ -10,7 +11,7 @@
 // storage/app/backups عبر BackupController). الاستعادة تحذيرية وتتطلب تأكيداً.
 // ════════════════════════════════════════════════════════════════════════════
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { ConfirmModal } from "./_shared";
@@ -48,13 +49,17 @@ const fmtDate = (iso: string) => {
 export function BackupTab() {
     const notify = useNotification();
     const { data: backups = [], isLoading, refetch } = useBackups();
-    const { create, verify, restore, remove } = useBackupMutations();
+    const { create, verify, restore, remove, importBackup } = useBackupMutations();
 
     const [label, setLabel] = useState("");
     const [busy, setBusy] = useState(false);
     const [confirmRestore, setConfirmRestore] = useState<BackupFile | null>(null);
     const [confirmDelete, setConfirmDelete] = useState<BackupFile | null>(null);
     const [restoreBusy, setRestoreBusy] = useState(false);
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [pick, setPick] = useState<File | null>(null);
+    const [importBusy, setImportBusy] = useState(false);
 
     const handleCreate = async () => {
         if (busy) return;
@@ -71,6 +76,25 @@ export function BackupTab() {
             notify.error("فشل إنشاء النسخة", err?.message ?? "حدث خطأ");
         } finally {
             setBusy(false);
+        }
+    };
+
+    const handleImportRestore = async () => {
+        if (!pick || importBusy) return;
+        setImportBusy(true);
+        try {
+            const imported = await importBackup.mutateAsync(pick);
+            setPick(null);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+            notify.success("تم استيراد النسخة", "أكد الاستعادة الآن لاستبدال قاعدة البيانات الحالية.");
+            // إعادة استخدام تأكيد الاستعادة العادي — النسخة المستوردة تظهر في
+            // القائمة وتُستعاد عبر المسار المعروف (/backups/{file}/restore).
+            setConfirmRestore(imported);
+        } catch (e: unknown) {
+            const err = e as Error;
+            notify.error("فشل استيراد النسخة", err?.message ?? "حدث خطأ");
+        } finally {
+            setImportBusy(false);
         }
     };
 
@@ -210,6 +234,88 @@ export function BackupTab() {
                     </div>
                     <div>
                         • يمكن تنزيل النسخة والاحتفاظ بها خارج الجهاز كنسخة أمان.
+                    </div>
+                </div>
+            </Card>
+
+            {/* ─── استعادة من ملف خارجي ────────────────────────────────────── */}
+            <Card title="استعادة من ملف نسخة خارجية" titleIcon="ti-database-import">
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".gz,.enc,.sqlite,.sql"
+                    onChange={(e) => setPick(e.target.files?.[0] ?? null)}
+                    style={{ display: "none" }}
+                />
+                <div
+                    style={{
+                        display: "flex",
+                        gap: 10,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                    }}
+                >
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={importBusy}
+                        icon={<i className="ti ti-folder-open" />}
+                    >
+                        اختيار ملف...
+                    </Button>
+                    <span
+                        style={{
+                            flex: 1,
+                            minWidth: 160,
+                            fontSize: 12.5,
+                            color: pick ? "var(--t2)" : "var(--t4)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            direction: "ltr",
+                            textAlign: "right",
+                        }}
+                        title={pick ? pick.name : ""}
+                    >
+                        {pick ? `${pick.name} — ${fmtBytes(pick.size)}` : "لم يتم اختيار أي ملف بعد"}
+                    </span>
+                    <Button
+                        variant="primary"
+                        onClick={handleImportRestore}
+                        disabled={!pick || importBusy}
+                        icon={
+                            importBusy ? (
+                                <i
+                                    className="ti ti-loader"
+                                    style={{
+                                        animation: "spin .7s linear infinite",
+                                    }}
+                                />
+                            ) : (
+                                <i className="ti ti-history" />
+                            )
+                        }
+                    >
+                        {importBusy ? "جارٍ الاستيراد..." : "استعادة من هذا الملف"}
+                    </Button>
+                </div>
+                <div
+                    style={{
+                        marginTop: 12,
+                        fontSize: 12,
+                        color: "var(--t4)",
+                        lineHeight: 1.7,
+                    }}
+                >
+                    <div>
+                        • اختر نسخة احتياطية نزّلتها سابقاً ({" "}
+                        <span style={{ direction: "ltr" }}>.gz / .enc / .sqlite / .sql</span>{" "}
+                        ) وسيتم استيرادها ثم استعادتها.
+                    </div>
+                    <div>
+                        • ستُستبدل قاعدة البيانات الحالية — سيُطلب منك تأكيد صريح قبل
+                        الاستبدال.
                     </div>
                 </div>
             </Card>

@@ -4,6 +4,7 @@
 // المسارات (كلها داخل /{company} وتتطلب can:update_company):
 //   GET    /backups                  → قائمة النسخ
 //   POST   /backups                  → إنشاء نسخة جديدة
+//   POST   /backups/import           → استيراد ملف نسخة خارجية (رفع multipart)
 //   POST   /backups/{file}/verify    → التحقق من المجموع الاختباري
 //   GET    /backups/{file}/download  → تنزيل الملف (blob)
 //   POST   /backups/{file}/restore   → استعادة (تستبدل قاعدة البيانات)
@@ -11,7 +12,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiDelete, apiDownload, apiGet, apiPost } from '../core/client';
+import { apiDelete, apiDownload, apiGet, apiPost, apiUpload } from '../core/client';
 import { tenantKeys } from '../core/queryKeys';
 import { useActiveSlug } from '../../store/appStore';
 
@@ -63,6 +64,11 @@ export const backupsApi = {
   restore:  (file: string, confirmed: boolean) =>
     apiPost<BackupRestoreResult>(`/backups/${enc(file)}/restore`, { confirmed }),
   delete:   (file: string)                  => apiDelete(`/backups/${enc(file)}`),
+  import:   (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return apiUpload<BackupFile>("/backups/import", fd);
+  },
 } as const;
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
@@ -107,5 +113,10 @@ export function useBackupMutations() {
     onSuccess:  invalidate,
   });
 
-  return { create, verify, restore, remove };
+  const importBackup = useMutation({
+    mutationFn: backupsApi.import,
+    onSuccess:  invalidate,
+  });
+
+  return { create, verify, restore, remove, importBackup };
 }

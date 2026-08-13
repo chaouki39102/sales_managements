@@ -719,6 +719,7 @@ Route::prefix('v1')->group(function () {
 
                 // ── النسخ الاحتياطي واستعادة قاعدة البيانات ────────────
                 Route::prefix('backups')->group(function () {
+                    Route::post('import',    [\App\Http\Controllers\Api\V1\BackupController::class, 'import']);
                     Route::get('/',        [\App\Http\Controllers\Api\V1\BackupController::class, 'index']);
                     Route::post('/',       [\App\Http\Controllers\Api\V1\BackupController::class, 'store']);
                     Route::post('{file}/verify',    [\App\Http\Controllers\Api\V1\BackupController::class, 'verify']);
