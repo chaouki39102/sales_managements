@@ -33,6 +33,7 @@ class ImportService
         $brands   = Brand::where('company_id', $companyId)->get()->keyBy(fn($b) => mb_strtolower(trim($b->name)));
         $tvas     = Tva::where('company_id', $companyId)->get();
         $units    = Unit::where('company_id', $companyId)->get()->keyBy(fn($u) => mb_strtolower(trim($u->name)));
+        $productTypes = ProductType::where('company_id', $companyId)->get();
         $allRefs  = Product::where('company_id', $companyId)->pluck('id', 'ref')->map(fn($v, $k) => mb_strtolower(trim($k)));
         $allBarcodes = Product::where('company_id', $companyId)->pluck('id', 'barcode')->filter()->map(fn($v, $k) => mb_strtolower(trim($k)));
         $pendingFamilies = [];
@@ -44,6 +45,8 @@ class ImportService
         $defaultBrandId  = (int) Setting::getSetting('import_default_brand_id', 0, $companyId);
         $defaultUnitId   = (int) Setting::getSetting('import_default_unit_id', 0, $companyId);
         $defaultTvaId    = (int) Setting::getSetting('import_default_tva_id', 0, $companyId);
+        $defaultProductTypeId = (int) Setting::getSetting('import_default_product_type_id', 0, $companyId);
+        $defaultMinMargin = (float) Setting::getSetting('import_default_min_margin_percentage', 0, $companyId);
         $defaultActive   = (bool) Setting::getSetting('import_default_active', true, $companyId);
         $defaultManagesStock = (bool) Setting::getSetting('import_default_manages_stock', true, $companyId);
 
@@ -59,6 +62,9 @@ class ImportService
         }
         if ($defaultTvaId && !$tvas->contains(fn($t) => $t->id === $defaultTvaId)) {
             $defaultTvaId = 0;
+        }
+        if ($defaultProductTypeId && !$productTypes->contains(fn($pt) => $pt->id === $defaultProductTypeId)) {
+            $defaultProductTypeId = 0;
         }
 
         $validated = [];
@@ -134,6 +140,17 @@ class ImportService
                 }
             }
 
+            // نوع المنتج (product_type)
+            $productTypeVal = $this->extract($row, 'product_type');
+            if ($productTypeVal !== '') {
+                $pt = $this->resolveProductType($productTypeVal, $productTypes);
+                if ($pt) {
+                    $data['product_type_id'] = $pt->id;
+                } else {
+                    $rowErrors[] = "نوع المنتج '$productTypeVal' غير صالح (استخدم: مخزون، خدمة، مستهلك)";
+                }
+            }
+
             // الوحدة (unit) — auto-create if missing
             $unitName = $this->extract($row, 'unit');
             if ($unitName) {
@@ -157,6 +174,12 @@ class ImportService
             $sellPrice = $this->extract($row, 'selling_price');
             if ($sellPrice !== '') {
                 $data['default_selling_price_ht'] = $this->parseNumber($sellPrice);
+            }
+
+            // الحد الأدنى لهامش الربح %
+            $minMargin = $this->extract($row, 'min_margin_percentage');
+            if ($minMargin !== '') {
+                $data['min_margin_percentage'] = $this->parseNumber($minMargin);
             }
 
             // يدير المخزون
@@ -189,6 +212,12 @@ class ImportService
             }
             if (!isset($data['tva_id']) && $defaultTvaId) {
                 $data['tva_id'] = $defaultTvaId;
+            }
+            if (!isset($data['product_type_id']) && $defaultProductTypeId) {
+                $data['product_type_id'] = $defaultProductTypeId;
+            }
+            if (!isset($data['min_margin_percentage']) && $defaultMinMargin > 0) {
+                $data['min_margin_percentage'] = $defaultMinMargin;
             }
             if (!isset($data['active'])) {
                 $data['active'] = $defaultActive;
@@ -672,6 +701,16 @@ class ImportService
         // Try by name
         $key = mb_strtolower($value);
         return $tvas->first(fn($t) => mb_strtolower(trim($t->name ?? '')) === $key);
+    }
+
+    private function resolveProductType(string $value, $productTypes): ?ProductType
+    {
+        $value = mb_strtolower(trim($value));
+        // Try by label (Arabic) or name (English/slug)
+        return $productTypes->first(
+            fn($pt) => mb_strtolower(trim($pt->label ?? '')) === $value
+                || mb_strtolower(trim($pt->name ?? '')) === $value
+        );
     }
 
     private function resolvePartyType(string $value, $partyTypes): ?int

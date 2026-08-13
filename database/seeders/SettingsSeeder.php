@@ -810,6 +810,24 @@ class SettingsSeeder extends Seeder
                 'is_editable'   => true,
                 'display_order' => 135,
             ],
+            'import_default_product_type_id' => [
+                'value'         => null,
+                'group'         => 'import',
+                'type'          => 'integer',
+                'description'   => 'نوع المنتج الافتراضي للمنتجات المستوردة عندما لا يحدد سطر الإكسل "نوع المنتج"',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 136,
+            ],
+            'import_default_min_margin_percentage' => [
+                'value'         => null,
+                'group'         => 'import',
+                'type'          => 'float',
+                'description'   => 'الحد الأدنى لهامش الربح (%) الافتراضي للمنتجات المستوردة عندما لا يحدد سطر الإكسل الهامش',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 137,
+            ],
 
             // ══════════════════════════════════════════
             // group: print — إعدادات الطباعة

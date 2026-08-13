@@ -204,6 +204,7 @@ class SettingController extends BaseApiController
             'import_default_family_id', 'import_default_brand_id',
             'import_default_unit_id', 'import_default_tva_id',
             'import_default_active', 'import_default_manages_stock',
+            'import_default_product_type_id', 'import_default_min_margin_percentage',
 
             // general
             'app_name', 'app_logo', 'app_color', 'theme_mode', 'language',

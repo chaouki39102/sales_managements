@@ -39,6 +39,8 @@ export function ImportTab({
     const [brandId, setBrandId] = useState("");
     const [unitId, setUnitId] = useState("");
     const [tvaId, setTvaId] = useState("");
+    const [productTypeId, setProductTypeId] = useState("");
+    const [minMarginPct, setMinMarginPct] = useState("");
     const [active, setActive] = useState(true);
     const [managesStock, setManagesStock] = useState(true);
 
@@ -70,6 +72,13 @@ export function ImportTab({
         staleTime: 10 * 60_000,
         placeholderData: [],
     });
+    const { data: productTypes = [] } = useQuery({
+        queryKey: ['tenant', slug, 'product-types', 'settings-tab'],
+        queryFn: () => apiGet<any>("/product-types", { per_page: 100 }).then(extractList),
+        enabled: !!slug,
+        staleTime: 10 * 60_000,
+        placeholderData: [],
+    });
 
     const initialSettings = useMemo(
         () => ({
@@ -77,6 +86,8 @@ export function ImportTab({
             import_default_brand_id: Number(gs("import_default_brand_id", "")),
             import_default_unit_id: Number(gs("import_default_unit_id", "")),
             import_default_tva_id: Number(gs("import_default_tva_id", "")),
+            import_default_product_type_id: Number(gs("import_default_product_type_id", "")),
+            import_default_min_margin_percentage: Number(gs("import_default_min_margin_percentage", "")),
             import_default_active: gs<boolean>("import_default_active", true),
             import_default_manages_stock: gs<boolean>("import_default_manages_stock", true),
         }),
@@ -91,6 +102,8 @@ export function ImportTab({
         setBrandId(str(gs("import_default_brand_id", "")));
         setUnitId(str(gs("import_default_unit_id", "")));
         setTvaId(str(gs("import_default_tva_id", "")));
+        setProductTypeId(str(gs("import_default_product_type_id", "")));
+        setMinMarginPct(str(gs("import_default_min_margin_percentage", "")));
         setActive(gs<boolean>("import_default_active", true));
         setManagesStock(gs<boolean>("import_default_manages_stock", true));
     }, [allSettings]);
@@ -101,6 +114,8 @@ export function ImportTab({
             import_default_brand_id: brandId ? Number(brandId) : "",
             import_default_unit_id: unitId ? Number(unitId) : "",
             import_default_tva_id: tvaId ? Number(tvaId) : "",
+            import_default_product_type_id: productTypeId ? Number(productTypeId) : "",
+            import_default_min_margin_percentage: minMarginPct !== "" ? Number(minMarginPct) : "",
             import_default_active: active,
             import_default_manages_stock: managesStock,
         };
@@ -156,6 +171,26 @@ export function ImportTab({
                                 <option key={t.id} value={t.id}>{t.name}</option>
                             ))}
                         </select>
+                    </div>
+                    <div className="fg">
+                        <label>نوع المنتج الافتراضي</label>
+                        <select value={productTypeId} onChange={e => { setProductTypeId(e.target.value); markDirty(); onDirty?.(); }}>
+                            <option value="">— بدون —</option>
+                            {(productTypes as any[]).map((pt: any) => (
+                                <option key={pt.id} value={pt.id}>{pt.label || pt.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="fg">
+                        <label>الحد الأدنى لهامش الربح %</label>
+                        <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            placeholder="مثال: 10"
+                            value={minMarginPct}
+                            onChange={e => { setMinMarginPct(e.target.value); markDirty(); onDirty?.(); }}
+                        />
                     </div>
                 </div>
             </Card>
