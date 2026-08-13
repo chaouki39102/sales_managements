@@ -575,9 +575,8 @@ class BackupService
             throw new RuntimeException('Unable to stage the restored database file.');
         }
 
-        // 3) Validate BEFORE swapping: refuse to install a corrupt / non-SQLite /
-        //    truncated file over the live database. The sha256 already covers the
-        //    gzip, but a staged copy can still be damaged on disk.
+        // 3) Validate BEFORE touching the live database: refuse to install a
+        //    corrupt / non-SQLite / truncated file over the real data.
         try {
             $this->assertValidSqlite($staged);
         } catch (\Throwable $e) {
@@ -585,46 +584,61 @@ class BackupService
             throw $e;
         }
 
-        // 4) Drop every connection held by THIS process (the built-in server is
-        //    single-request, so after this no handle to the old file remains here).
+        // 4) Restore the CONTENT through SQLite's Online Backup API
+        //    (SQLite3::backup), NOT by replacing the file on disk. The built-in
+        //    dev server holds database.sqlite open for the whole request, so
+        //    rename()/copy() over the file fails on Windows with a sharing
+        //    violation (the "locked by another process" the user hit) and — worse
+        //    — the original in-place copy() left a half-written file that broke
+        //    the next sale with "unable to open database file". The backup API
+        //    copies page-by-page into the open live database and takes its own
+        //    locks, so it works on an open/locked database and can never leave a
+        //    truncated or missing file behind.
+        if (!class_exists(\SQLite3::class)) {
+            @unlink($staged);
+            throw new RuntimeException('Restore failed: the sqlite3 extension is not loaded on this PHP.');
+        }
+
+        // Drop the framework's connections first so we are the only writer while
+        // the backup copy runs (single-request server, so nothing else competes).
         DB::purge();
         foreach (DB::getConnections() as $conn) {
             $conn->disconnect();
         }
 
-        // 5) Atomic swap: rename() replaces the target file atomically (MoveFileExW
-        //    with MOVEFILE_REPLACE_EXISTING on Windows). Unlike the old in-place
-        //    copy(), there is NO zero-length / half-written window where a concurrent
-        //    reader (or the server's next request) would hit "unable to open database
-        //    file". Old -journal/-wal/-shm siblings belong to the replaced file and
-        //    are removed so the new DB starts from a clean state.
-        $swapped = false;
-        for ($attempt = 1; $attempt <= 5; $attempt++) {
-            @unlink($dbPath.'-journal');
-            @unlink($dbPath.'-wal');
-            @unlink($dbPath.'-shm');
-
-            if (@rename($staged, $dbPath)) {
-                $swapped = true;
-                break;
-            }
-
-            usleep(250_000); // Windows sharing violations (AV scanner / other PC) — retry
-        }
-        if (!$swapped) {
+        $restored = null;
+        $live = null;
+        try {
+            $restored = new \SQLite3($staged, SQLITE3_OPEN_READONLY);
+            $live = new \SQLite3($dbPath, SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE);
+        } catch (\Throwable $e) {
             @unlink($staged);
-            throw new RuntimeException(
-                'Restore failed: the live database file is locked by another process '.
-                '(the running server, another PC, or a file scanner). Close other windows '.
-                'that use the application and try again.'
-            );
+            throw new RuntimeException('Restore failed: unable to open the SQLite databases ('.$e->getMessage().').', 0, $e);
         }
 
+        try {
+            // $restored is the SOURCE, $live the DESTINATION (the method is called
+            // on the source instance). Copies restored -> live page by page.
+            if (!$restored->backup($live)) {
+                $code = $live->lastErrorCode();
+                $msg  = $live->lastErrorMsg();
+                throw new RuntimeException("Restore failed while copying the database (SQLite error {$code}: {$msg}).");
+            }
+        } catch (\Throwable $e) {
+            if ($e instanceof RuntimeException) {
+                throw $e;
+            }
+            throw new RuntimeException('Restore failed while copying the database: '.$e->getMessage(), 0, $e);
+        } finally {
+            $live?->close();
+            $restored?->close();
+        }
+
+        @unlink($staged);
         clearstatcache();
 
-        // 6) Post-restore: the current request may have re-opened a connection while
-        //    Laravel resolved the next query — purge + disconnect again, then flush
-        //    caches and leave the next request to open the fresh file lazily.
+        // 5) The live file now holds the restored content; drop every connection
+        //    so the next request opens the fresh data, and flush cached settings.
         DB::purge();
         foreach (DB::getConnections() as $conn) {
             $conn->disconnect();
