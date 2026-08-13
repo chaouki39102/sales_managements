@@ -555,21 +555,122 @@ class BackupService
     protected function restoreSqlite(string $plain): string
     {
         $dbPath = (string) config('database.connections.sqlite.database');
+        if (!is_file($dbPath)) {
+            throw new RuntimeException("SQLite database not found at {$dbPath} — nothing to restore over.");
+        }
 
+        // 1) Safety copy of the CURRENT live DB (read-only snapshot, safe at any
+        //    point — SQLite shares the file for reads). Kept for manual rollback.
+        $safety = $dbPath.'.before-restore-'.date('Y-m-d-His');
+        if (!@copy($dbPath, $safety)) {
+            throw new RuntimeException('Unable to take a safety copy of the current database — restore aborted.');
+        }
+
+        // 2) Stage the restored DB into the SAME directory as the target. A rename()
+        //    is only atomic on the same volume, so the temp file MUST live beside
+        //    database.sqlite (never in sys_get_temp_dir() on another drive).
+        $staged = $dbPath.'.restore-tmp-'.bin2hex(random_bytes(4)).'.sqlite';
+        if (!@copy($plain, $staged)) {
+            @unlink($staged);
+            throw new RuntimeException('Unable to stage the restored database file.');
+        }
+
+        // 3) Validate BEFORE swapping: refuse to install a corrupt / non-SQLite /
+        //    truncated file over the live database. The sha256 already covers the
+        //    gzip, but a staged copy can still be damaged on disk.
+        try {
+            $this->assertValidSqlite($staged);
+        } catch (\Throwable $e) {
+            @unlink($staged); // never leave a rejected temp beside the live DB
+            throw $e;
+        }
+
+        // 4) Drop every connection held by THIS process (the built-in server is
+        //    single-request, so after this no handle to the old file remains here).
+        DB::purge();
         foreach (DB::getConnections() as $conn) {
             $conn->disconnect();
         }
 
-        $safety = $dbPath.'.before-restore-'.date('Y-m-d-His');
-        copy($dbPath, $safety);
+        // 5) Atomic swap: rename() replaces the target file atomically (MoveFileExW
+        //    with MOVEFILE_REPLACE_EXISTING on Windows). Unlike the old in-place
+        //    copy(), there is NO zero-length / half-written window where a concurrent
+        //    reader (or the server's next request) would hit "unable to open database
+        //    file". Old -journal/-wal/-shm siblings belong to the replaced file and
+        //    are removed so the new DB starts from a clean state.
+        $swapped = false;
+        for ($attempt = 1; $attempt <= 5; $attempt++) {
+            @unlink($dbPath.'-journal');
+            @unlink($dbPath.'-wal');
+            @unlink($dbPath.'-shm');
 
-        copy($plain, $dbPath);
-        @unlink($dbPath.'-wal');
-        @unlink($dbPath.'-shm');
+            if (@rename($staged, $dbPath)) {
+                $swapped = true;
+                break;
+            }
+
+            usleep(250_000); // Windows sharing violations (AV scanner / other PC) — retry
+        }
+        if (!$swapped) {
+            @unlink($staged);
+            throw new RuntimeException(
+                'Restore failed: the live database file is locked by another process '.
+                '(the running server, another PC, or a file scanner). Close other windows '.
+                'that use the application and try again.'
+            );
+        }
+
+        clearstatcache();
+
+        // 6) Post-restore: the current request may have re-opened a connection while
+        //    Laravel resolved the next query — purge + disconnect again, then flush
+        //    caches and leave the next request to open the fresh file lazily.
+        DB::purge();
+        foreach (DB::getConnections() as $conn) {
+            $conn->disconnect();
+        }
 
         $this->afterRestore();
 
         return $safety;
+    }
+
+    /**
+     * Refuse to install a file that is not a valid, uncorrupt SQLite database.
+     *
+     * @throws RuntimeException when the file cannot be opened, fails SQLite's own
+     *                          integrity check, or is missing the migrations table
+     */
+    protected function assertValidSqlite(string $path): void
+    {
+        try {
+            $pdo = new \PDO('sqlite:'.$path, null, null, [
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+            ]);
+        } catch (\PDOException $e) {
+            throw new RuntimeException('The restored file is not a valid SQLite database: '.$e->getMessage(), 0, $e);
+        }
+
+        try {
+            $check = (string) ($pdo->query('PRAGMA integrity_check')->fetchColumn() ?? '');
+            if ($check !== 'ok') {
+                throw new RuntimeException("The restored database failed SQLite's integrity check ({$check}) — refusing to restore it.");
+            }
+
+            $tables = $pdo->query("SELECT name FROM sqlite_master WHERE type='table'")->fetchAll(\PDO::FETCH_COLUMN);
+            if (!in_array('migrations', $tables, true)) {
+                throw new RuntimeException('The restored database is missing the migrations table — refusing to restore it.');
+            }
+
+            $count = (int) $pdo->query('SELECT COUNT(*) FROM migrations')->fetchColumn();
+            if ($count < 1) {
+                throw new RuntimeException('The restored database has no applied migrations — refusing to restore it.');
+            }
+        } catch (\PDOException $e) {
+            throw new RuntimeException('Unable to validate the restored database: '.$e->getMessage(), 0, $e);
+        } finally {
+            $pdo = null;
+        }
     }
 
     protected function restoreMysql(string $plain): string

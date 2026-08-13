@@ -187,6 +187,16 @@ class BackupController extends BaseApiController
                     422,
                     'BACKUP_DECRYPT_FAILED'
                 ),
+                str_contains($msg, 'locked by another process') => $this->errorResponse(
+                    'لا يمكن استعادة النسخة الآن — ملف قاعدة البيانات مقفل من عملية أخرى (الخادم أو كمبيوتر آخر أو برنامج حماية). أغلق النوافذ الأخرى التي تستخدم التطبيق وحاول مجدداً.',
+                    423,
+                    'BACKUP_LOCKED'
+                ),
+                str_contains($msg, 'refusing to restore it') => $this->errorResponse(
+                    'تم رفض الاستعادة: ملف النسخة غير صالح كقاعدة بيانات (فشل فحص سلامة SQLite أو بنية غير مكتملة).',
+                    422,
+                    'BACKUP_INVALID_DB'
+                ),
                 str_contains($msg, 'File too large')        => $this->errorResponse(
                     'حجم الملف يتجاوز الحد المسموح للرفع.',
                     422,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Core\Traits;
 
+use App\Models\Audit;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
