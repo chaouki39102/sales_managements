@@ -35,6 +35,8 @@ interface POSTopBarProps {
   onSettings:         () => void;
   onKioskMode:        () => void;
   onOpenDrawer:       () => void;
+  refreshing:         boolean;
+  onRefresh:          () => void;
   toastEnabled:       boolean;
   onToggleToast:      () => void;
   clearSearchOnAdd:   boolean;
@@ -49,7 +51,7 @@ export default function POSTopBar({
   onHeld, onNewSale, onManual, onReceipt,
   onSession, onSessionInvoices, onFullscreen, onKbHelp,
   onToggleQuickbar, onReturn, onSettings, onKioskMode,
-  onOpenDrawer, toastEnabled, onToggleToast,
+  onOpenDrawer, refreshing, onRefresh, toastEnabled, onToggleToast,
   clearSearchOnAdd, onToggleClearSearch,
 }: POSTopBarProps) {
 
@@ -292,6 +294,17 @@ export default function POSTopBar({
         </FloatingTooltip>
 
         <span className="tb-sep" aria-hidden="true" />
+
+        <FloatingTooltip content="تحديث المنتجات والمخزون">
+          <button
+            className="btn btn-xs"
+            onClick={onRefresh}
+            disabled={refreshing}
+          >
+            <i className={`ti ti-refresh${refreshing ? ' ti-spin' : ''}`} />
+            <span className="tb-txt"> تحديث</span>
+          </button>
+        </FloatingTooltip>
 
         <FloatingTooltip content="شريط المنتجات السريعة">
           <button

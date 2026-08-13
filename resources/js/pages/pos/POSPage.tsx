@@ -82,7 +82,7 @@ import { mapCompany }           from '@/pages/settings/print-settings/runtime/Pr
 import { isWebUsbSupported, printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
 import { useQueryClient }       from '@tanstack/react-query';
 import { partyBalancesApi } from '@/lib/api/endpoints/partyBalances';
-import { tenantKeys } from '@/lib/api/core/queryKeys';
+import { tenantKeys, invalidatePosQueries } from '@/lib/api/core/queryKeys';
 import { toLocalDateKey } from '@/lib/utils';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
 import type { POSSaleSnapshot } from '@/pages/settings/print-settings/types/data';
@@ -128,6 +128,19 @@ function POSPage() {
   const [showCloseSession, setShowCloseSession] = useState(false);
   const [showSessionInvoices, setShowSessionInvoices] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    if (!slug) return;
+    setRefreshing(true);
+    try {
+      await invalidatePosQueries(queryClient, slug);
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: [slug, 'products', 'pos'] }),
+        queryClient.refetchQueries({ queryKey: [slug, 'pos-stock'] }),
+      ]);
+    } finally { setRefreshing(false); }
+  };
 
   const getErrorMessage = (error: unknown, fallback: string) => {
     if (error instanceof Error && error.message) return error.message;
@@ -1750,6 +1763,8 @@ const handleCompleteSale = useCallback(async (params: {
         onToggleQuickbar={handleToggleQuickbar}
         onKioskMode={() => navigate('/pos/kiosk')}
         onOpenDrawer={handleOpenDrawer}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
         toastEnabled={settings.toastEnabled}
         onToggleToast={() => setSettings({ toastEnabled: !settings.toastEnabled })}
         clearSearchOnAdd={settings.clearSearchOnAdd}

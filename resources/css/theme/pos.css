@@ -4,6 +4,10 @@
    SSOT للمودالات (.ov, .modal, .m-*) — تم نقلها من pages.css
 ═══════════════════════════════════════════════════════════════════════ */
 
+/* دوران أيقونة التحديث أثناء إعادة الجلب */
+@keyframes tiSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.ti-spin { animation: tiSpin 1s linear infinite; display: inline-block; }
+
 /* ════════════════════════════════════════════════════
    WRAPPER
 ════════════════════════════════════════════════════ */
