@@ -644,6 +644,42 @@ class BackupService
             $conn->disconnect();
         }
 
+        // 6) Settle the restored file's journal state and prove it is writable NOW.
+        //    The backup API copies page-by-page under the DESTINATION's rollback
+        //    journal (journal_mode=delete). On Windows a lingering journal/lock
+        //    makes the very NEXT write fail with SQLite CANTOPEN ("unable to open
+        //    database file") — exactly what the user hit right after a restore
+        //    (the first import write died with `General error: 14`). Force the
+        //    journal to fully create + delete inside a write transaction (rolled
+        //    back, no data touched) while this request is the only writer, so any
+        //    residue settles HERE instead of exploding on the next request.
+        $settle = null;
+        try {
+            $settle = new \PDO('sqlite:'.$dbPath, null, null, [
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+            ]);
+            $settle->exec('PRAGMA journal_mode = DELETE');
+            $settled = false;
+            for ($i = 1; $i <= 5 && !$settled; $i++) {
+                try {
+                    $settle->exec('BEGIN IMMEDIATE');
+                    $settle->exec('ROLLBACK');
+                    $settled = true;
+                } catch (\Throwable $e) {
+                    if ($i === 5) {
+                        throw new RuntimeException(
+                            'Restore completed but the database is not writable yet: '.$e->getMessage(),
+                            0,
+                            $e
+                        );
+                    }
+                    usleep(250_000); // Windows lock-release timing; re-probe briefly
+                }
+            }
+        } finally {
+            $settle = null;
+        }
+
         $this->afterRestore();
 
         return $safety;

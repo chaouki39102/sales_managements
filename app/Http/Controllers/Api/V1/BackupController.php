@@ -192,6 +192,11 @@ class BackupController extends BaseApiController
                     423,
                     'BACKUP_LOCKED'
                 ),
+                str_contains($msg, 'not writable yet') => $this->errorResponse(
+                    'اكتمل الاسترجاع لكن قاعدة البيانات ما زالت غير قابلة للكتابة حالياً — أعد المحاولة بعد لحظات.',
+                    423,
+                    'BACKUP_NOT_WRITABLE_YET'
+                ),
                 str_contains($msg, 'refusing to restore it') => $this->errorResponse(
                     'تم رفض الاستعادة: ملف النسخة غير صالح كقاعدة بيانات (فشل فحص سلامة SQLite أو بنية غير مكتملة).',
                     422,
