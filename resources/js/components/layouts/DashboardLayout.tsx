@@ -20,6 +20,7 @@ const NAV_GROUPS = [
       { name: 'نقطة البيع',  href: 'pos',        icon: 'ti-shopping-cart'   },
       { name: 'POS PRO',     href: 'pos/pro',    icon: 'ti-cash-register'   },
       { name: 'جلسات POS',   href: 'pos/sessions', icon: 'ti-chart-bar'     },
+      { name: 'مراقبة مباشرة', href: 'pos/monitor', icon: 'ti-device-desktop-analytics' },
       { name: 'دون اتصال',   href: 'offline',     icon: 'ti-cloud-download' },
     ],
   },

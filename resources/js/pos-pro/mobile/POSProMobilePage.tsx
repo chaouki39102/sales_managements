@@ -36,6 +36,7 @@ import {
   useOpenSession,
   useIncrementSession,
   buildIncrementInput,
+  useSessionHeartbeat,
   type PosSession,
 } from '@/lib/api/endpoints/posSession';
 import { useOnlineStatus, useOfflineServed, useSync } from '@/lib/offline/useOffline';
@@ -183,6 +184,7 @@ export default function POSProMobilePage() {
 
   // ── الجلسة ────────────────────────────────────────────────────────────────
   const { data: serverSession, isLoading: sessionLoading } = useCurrentPosSession();
+  useSessionHeartbeat(serverSession?.id ?? null);
   const offlineServed = useOfflineServed();
   const online = useOnlineStatus();
   const { syncing, sync } = useSync();

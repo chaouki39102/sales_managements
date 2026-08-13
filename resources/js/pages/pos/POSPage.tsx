@@ -52,6 +52,7 @@ import {
   useCloseSession,
   useIncrementSession,
   buildIncrementInput,
+  useSessionHeartbeat,
 } from '@/lib/api/endpoints/posSession';
 
 const ProfessionalPaymentModal = React.lazy(() => import('@/pos/components/ProfessionalPaymentModal'));
@@ -120,6 +121,7 @@ function POSPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const { data: currentSession, isLoading: sessionLoading } = useCurrentPosSession();
+  useSessionHeartbeat(currentSession?.id ?? null);
   const openSessionMut   = useOpenSession();
   const closeSessionMut  = useCloseSession(currentSession?.id ?? null);
   const incrementMut     = useIncrementSession(currentSession?.id ?? null);

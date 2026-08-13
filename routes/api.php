@@ -735,6 +735,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('current',                [PosSessionController::class, 'current']);
                 Route::post('/',                     [PosSessionController::class, 'open']);
                 Route::post('{session}/increment',   [PosSessionController::class, 'increment']);
+                Route::post('{session}/heartbeat',   [PosSessionController::class, 'heartbeat']);
                 Route::post('{session}/close',       [PosSessionController::class, 'close']);
                 Route::get('/',                      [PosSessionController::class, 'index']);
                 Route::get('{session}',              [PosSessionController::class, 'show']);

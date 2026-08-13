@@ -72,6 +72,8 @@ class PosSessionController extends Controller
             'warehouse_id'   => $data['warehouse_id'],
             'fiscal_year_id' => $data['fiscal_year_id'],
             'opened_at'      => now(),
+            'last_seen_at'   => now(),
+            'last_active_at' => now(),
             'opening_cash'   => $data['opening_cash'],
             'opening_note'   => $data['opening_note'] ?? null,
             'device_name'       => $deviceName,
@@ -129,7 +131,9 @@ class PosSessionController extends Controller
             $session->increment('total_discount',     $data['total_discount']);
 
             $session->update([
-                'net_sales' => $session->gross_sales - $session->returns_total,
+                'net_sales'      => $session->gross_sales - $session->returns_total,
+                'last_seen_at'   => now(),
+                'last_active_at' => now(),
             ]);
 
             foreach ($data['payments'] ?? [] as $p) {
@@ -224,6 +228,28 @@ class PosSessionController extends Controller
         return response()->json(['data' => $hostname ?: null]);
     }
 
+    /**
+     * نبضة قلب خفيفة من جهاز POS مفتوح: تحدّث last_seen_at دائماً،
+     * و last_active_at فقط عند وجود نشاط حقيقي من الوكيل.
+     */
+    public function heartbeat(Request $request): JsonResponse
+    {
+        $session = $this->findOpenSession($request, $request->route('session'));
+
+        $update = ['last_seen_at' => now()];
+        if ($request->boolean('active')) {
+            $update['last_active_at'] = now();
+        }
+        $session->update($update);
+
+        return response()->json(['data' => [
+            'session_id'   => $session->id,
+            'is_online'    => true,
+            'last_seen_at' => $session->last_seen_at,
+            'last_active_at' => $session->last_active_at,
+        ]]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $sessions = PosSession::forCompany($this->company($request)->id)
@@ -263,7 +289,12 @@ class PosSessionController extends Controller
             'status'                => $s->status,
             'opened_at'             => $s->opened_at,
             'closed_at'             => $s->closed_at,
+            'last_seen_at'          => $s->last_seen_at,
+            'last_active_at'        => $s->last_active_at,
             'duration'              => $s->duration,
+            'is_online'             => $s->is_online,
+            'work_minutes'          => $s->work_minutes,
+            'idle_minutes'          => $s->idle_minutes,
             'user'                  => $s->user,
             'warehouse'             => $s->warehouse,
             'opening_cash'          => $s->opening_cash,

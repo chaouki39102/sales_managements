@@ -8,9 +8,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PosSession extends Model
 {
+    /** بعد كم ثانية من آخر نبضة تعتبر الجلسة "غير متصلة" */
+    public const ONLINE_WINDOW_SECONDS = 90;
+
     protected $fillable = [
         'company_id', 'user_id', 'warehouse_id', 'fiscal_year_id',
-        'opened_at', 'closed_at',
+        'opened_at', 'closed_at', 'last_seen_at', 'last_active_at',
         'opening_cash', 'opening_note', 'device_name', 'device_ip', 'device_user_agent', 'device_browser_info',
         'invoices_count', 'returns_count',
         'gross_sales', 'returns_total', 'net_sales',
@@ -22,11 +25,13 @@ class PosSession extends Model
         'cash_difference', 'closing_note', 'manager_note', 'status',
     ];
 
-    protected $appends = ['duration'];
+    protected $appends = ['duration', 'is_online', 'work_minutes', 'idle_minutes'];
 
     protected $casts = [
         'opened_at'              => 'datetime',
         'closed_at'              => 'datetime',
+        'last_seen_at'           => 'datetime',
+        'last_active_at'         => 'datetime',
         'opening_cash'           => 'decimal:2',
         'gross_sales'            => 'decimal:2',
         'returns_total'          => 'decimal:2',
@@ -69,5 +74,32 @@ class PosSession extends Model
         $h = intdiv($mins, 60);
         $m = $mins % 60;
         return $h > 0 ? "{$h}س {$m}د" : "{$m}د";
+    }
+
+    /**
+     * هل الجلسة "متصلة الآن"؟ — مفتوحة + آخر نبضة قلب ضمن نافذة الحضور.
+     * إذا لم تُسجَّل نبضة بعد (لا last_seen_at)، نعتبرها متصلة فقط إن لم يمرّ وقت.
+     */
+    public function getIsOnlineAttribute(): bool
+    {
+        if (!$this->isOpen() || !$this->last_seen_at) {
+            return false;
+        }
+        return $this->last_seen_at->diffInSeconds(now()) <= self::ONLINE_WINDOW_SECONDS;
+    }
+
+    /** مدة العمل بالدقائق: من الفتح حتى الإغلاق (أو حتى الآن للجلسة المفتوحة). */
+    public function getWorkMinutesAttribute(): int
+    {
+        $end = $this->closed_at ?? now();
+        return max(0, (int) floor($this->opened_at->diffInSeconds($end) / 60));
+    }
+
+    /** دقائق الخمول: منذ آخر نشاط حقيقي (نبضة نشِطة) حتى الإغلاق/الآن. */
+    public function getIdleMinutesAttribute(): int
+    {
+        $anchor = $this->last_active_at ?? $this->opened_at;
+        $end    = $this->closed_at ?? now();
+        return max(0, (int) floor($anchor->diffInSeconds($end) / 60));
     }
 }

@@ -1,0 +1,338 @@
+/* ============================================================
+   Session Monitor — «مراقبة الجلسات» — screen-style live cards
+   ============================================================ */
+
+.sm-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ── header row ──────────────────────────────────────────── */
+.sm-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sm-live-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--em);
+  background: var(--emb);
+  padding: 6px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.sm-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--em);
+  box-shadow: 0 0 0 0 rgba(10, 138, 92, .5);
+}
+
+.sm-live-dot.pulse {
+  animation: sm-live-pulse 1.2s ease-out infinite;
+}
+
+@keyframes sm-live-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(10, 138, 92, .5); }
+  70%  { box-shadow: 0 0 0 7px rgba(10, 138, 92, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(10, 138, 92, 0); }
+}
+
+.sm-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sm-search > i {
+  position: absolute;
+  inset-inline-start: 10px;
+  font-size: 14px;
+  color: var(--t2);
+  pointer-events: none;
+}
+
+.sm-search input {
+  width: 230px;
+  padding: 8px 30px 8px 10px;
+  border: 1px solid var(--bd);
+  border-radius: 10px;
+  background: var(--bg2);
+  color: var(--t1);
+  font-size: 13px;
+  outline: none;
+  transition: border-color .15s;
+}
+
+.sm-search input:focus {
+  border-color: var(--em);
+}
+
+.sm-search-x {
+  position: absolute;
+  inset-inline-end: 6px;
+  border: none;
+  background: transparent;
+  color: var(--t2);
+  cursor: pointer;
+  padding: 2px;
+  display: inline-flex;
+}
+
+.sm-search-x:hover { color: var(--red); }
+
+.sm-status-pill {
+  border: 1px solid var(--bd);
+  background: var(--bg2);
+  color: var(--t2);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.sm-status-pill.on {
+  background: var(--em);
+  border-color: var(--em);
+  color: #fff;
+}
+
+/* ── KPI strip ───────────────────────────────────────────── */
+.sm-kpis .kpi { margin-bottom: 0; }
+
+/* ── loading skeletons ───────────────────────────────────── */
+.sm-loading {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.sm-skeleton {
+  height: 330px;
+  border-radius: 14px;
+  background: linear-gradient(90deg, var(--bg3) 25%, var(--bg4) 50%, var(--bg3) 75%);
+  background-size: 400% 100%;
+  animation: sm-shimmer 1.3s infinite;
+}
+
+@keyframes sm-shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* ── cards grid ──────────────────────────────────────────── */
+.sm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.sm-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* monitor frame */
+.sm-screen {
+  border: 1px solid var(--bd);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--bg2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
+  transition: border-color .2s, box-shadow .2s;
+}
+
+.sm-card--online .sm-screen {
+  border-color: rgba(10, 138, 92, .45);
+  box-shadow: 0 2px 14px rgba(10, 138, 92, .12);
+}
+
+.sm-screen-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--bd);
+  background: var(--bg3);
+}
+
+.sm-led-wrap { display: inline-flex; }
+
+.sm-led {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #b0b4bc;
+  flex-shrink: 0;
+}
+
+.sm-card--online .sm-led {
+  background: var(--em);
+  animation: sm-led-blink 2s ease-in-out infinite;
+}
+
+.sm-card--away .sm-led { background: var(--orange); }
+
+@keyframes sm-led-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .35; }
+}
+
+.sm-screen-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--t1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sm-status {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.sm-status--online { background: var(--emb); color: var(--em); }
+.sm-status--away   { background: var(--orb);  color: var(--orange); }
+.sm-status--closed { background: var(--bg4);  color: var(--t2); }
+
+.sm-screen-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.sm-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sm-row-ic {
+  font-size: 14px;
+  color: var(--t2);
+  flex-shrink: 0;
+}
+
+.sm-row-val {
+  font-size: 13px;
+  color: var(--t1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sm-ip {
+  margin-inline-start: auto;
+  font-size: 11.5px;
+  color: var(--t2);
+  background: var(--bg4);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+/* metrics */
+.sm-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.sm-metric {
+  background: var(--bg3);
+  border: 1px solid var(--bd);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sm-metric-lbl {
+  font-size: 11px;
+  color: var(--t2);
+}
+
+.sm-metric-val {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: var(--t1);
+  direction: ltr;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.sm-metric-val--work { color: var(--em); }
+.sm-metric-val--idle { color: var(--orange); }
+.sm-metric-val--cash { color: var(--gold); }
+
+.sm-closed-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--t2);
+  background: var(--bg4);
+  border-radius: 8px;
+  padding: 6px 9px;
+}
+
+.sm-closed-row i { font-size: 13px; }
+
+/* card footer */
+.sm-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sm-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--bd);
+  background: var(--bg2);
+  color: var(--t2);
+  border-radius: 10px;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.sm-action:hover {
+  border-color: var(--em);
+  color: var(--em);
+  background: var(--emb);
+}
+
+.sm-action--close:hover {
+  border-color: var(--red);
+  color: var(--red);
+  background: var(--redb);
+}
+
+@media (max-width: 640px) {
+  .sm-search input { width: 160px; }
+}

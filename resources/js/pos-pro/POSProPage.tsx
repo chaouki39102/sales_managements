@@ -35,6 +35,7 @@ import {
   useOpenSession,
   useIncrementSession,
   buildIncrementInput,
+  useSessionHeartbeat,
 } from '@/lib/api/endpoints/posSession';
 import { usePosPro } from '@/pos-pro/hooks/usePosPro';
 import { usePosProKeyboardShortcuts } from '@/pos-pro/hooks/usePosProKeyboardShortcuts';
@@ -173,6 +174,7 @@ export default function POSProPage() {
 
   // ── الجلسة ─────────────────────────────────────────────────────────────────
   const { data: currentSession, isLoading: sessionLoading } = useCurrentPosSession();
+  useSessionHeartbeat(currentSession?.id ?? null);
   const openSessionMut  = useOpenSession();
   const incrementMut    = useIncrementSession(currentSession?.id ?? null);
   const [sessionError, setSessionError] = useState<string | null>(null);
