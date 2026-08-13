@@ -15,13 +15,15 @@
 # second instance exit immediately, so re-runs are harmless (no race-prone
 # command-line scanning).
 
-$root = Split-Path -Parent $MyInvocation.MyCommand.Path
+# Project root = parent of this script's directory (server-helper\watchdog.ps1
+# → C:\...\sales_managements). All php / artisan / router paths are root-relative.
+$root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 
 # Machine-specific settings (shared with share-public-order.ps1). If the
 # config file is missing, the standard Tailscale install path is used.
 $TailscaleCli = 'C:\Program Files\Tailscale\tailscale.exe'
 $AppPort = 8000
-$configPath = Join-Path (Split-Path -Parent $root) 'share-public-order.config.ps1'
+$configPath = Join-Path $root 'share-public-order.config.ps1'
 if (Test-Path -LiteralPath $configPath) { . $configPath }
 
 # Single-instance guard (named mutex - auto-released by the OS if we die).
@@ -32,7 +34,14 @@ function PortUp([int]$port) {
     return [bool](Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue)
 }
 
-$php = (Get-Command php -ErrorAction SilentlyContinue).Source
+# Prefer the dev-machine PHP 8.3+ build (Laravel 13 refuses < 8.3). XAMPP's
+# bundled `php` on PATH is 8.0 and would crash the helper/app it restarts.
+$php84 = 'C:\xampp\php84\php.exe'
+if (Test-Path -LiteralPath $php84) {
+    $php = $php84
+} else {
+    $php = (Get-Command php -ErrorAction SilentlyContinue).Source
+}
 $script:funnelTick = 0
 
 while ($true) {

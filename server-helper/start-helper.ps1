@@ -5,8 +5,17 @@
 # Usage:  powershell -NoProfile -ExecutionPolicy Bypass -File server-helper\start-helper.ps1
 param([switch]$SkipApp)
 
-$root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$php  = (Get-Command php -ErrorAction SilentlyContinue).Source
+# Project root = parent of this script's directory (server-helper\start-helper.ps1
+# → C:\...\sales_managements). All php / artisan / router paths are root-relative.
+$root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+# Prefer the dev-machine PHP 8.3+ build (Laravel 13 refuses < 8.3). XAMPP's
+# bundled `php` on PATH is 8.0 and would crash `php artisan serve`.
+$php84 = 'C:\xampp\php84\php.exe'
+if (Test-Path -LiteralPath $php84) {
+    $php = $php84
+} else {
+    $php = (Get-Command php -ErrorAction SilentlyContinue).Source
+}
 if (-not $php) { Write-Error 'php not found in PATH'; exit 1 }
 
 function PortUp([int]$port) {
@@ -28,7 +37,7 @@ if (-not $SkipApp -and -not (PortUp 8000)) {
 # the app (8000) whenever it dies, so ERR_CONNECTION_REFUSED heals itself.
 # Spawned unconditionally (hidden); watchdog.ps1's named mutex makes a second
 # instance exit immediately, so this is safe on every boot/manual re-run.
-$watchdogScript = Join-Path $root 'watchdog.ps1'
+$watchdogScript = Join-Path $root 'server-helper\watchdog.ps1'
 Start-Process -FilePath 'powershell' `
     -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', "`"$watchdogScript`"" `
     -WorkingDirectory $root -WindowStyle Hidden

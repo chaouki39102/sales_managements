@@ -21,6 +21,17 @@ const APP_PORT   = 8000;
 const HELPER_URL = 'http://127.0.0.1:8777';
 const TMP_OPTS   = ['http' => ['timeout' => 2.0, 'ignore_errors' => true]];
 
+// The PHP binary to use for `php artisan serve` / `migrate:status`. Prefer the
+// dev-machine PHP 8.3+ build (Laravel 13 refuses < 8.3; XAMPP ships PHP 8.0
+// which would crash on boot). Fall back to the interpreter running this router
+// (PHP_BINARY), then to bare `php` from PATH.
+function php_bin(): string {
+    if (is_file('C:\xampp\php84\php.exe')) return 'C:\xampp\php84\php.exe';
+    $bin = defined('PHP_BINARY') ? PHP_BINARY : '';
+    if (is_file($bin) && stripos(basename($bin), 'php') !== false) return $bin;
+    return 'php';
+}
+
 $ROOT   = dirname(__DIR__);   // D:\xampp\htdocs\sales-management
 $METHOD = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $PATH   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
@@ -132,7 +143,7 @@ function migrations_status(string $root): array {
         return $cache;
     }
     // [ran_count, pending_count, error]
-    $lines = shell('cd /d "' . $root . '" && php artisan migrate:status');
+    $lines = shell('cd /d "' . $root . '" && "' . php_bin() . '" artisan migrate:status');
     $ran = 0; $pending = 0;
     foreach ($lines as $l) {
         if (preg_match('/\bRan\b|\bPending\b/i', $l)) {
@@ -159,7 +170,7 @@ function start_server(string $root): array {
     // log file. pclose(popen(...,'r')) does NOT wait for the child, so the request
     // returns immediately instead of blocking until the server exits.
     $log = $root . '\\storage\\logs\\server-console.log';
-    $cmd = 'start "" /MIN cmd /C "cd /d "' . $root . '" && php artisan serve --host=0.0.0.0 --port=' . APP_PORT . ' > "' . $log . '" 2>&1"';
+    $cmd = 'start "" /MIN cmd /C "cd /d "' . $root . '" && "' . php_bin() . '" artisan serve --host=0.0.0.0 --port=' . APP_PORT . ' > "' . $log . '" 2>&1"';
     @pclose(@popen($cmd, 'r'));
     for ($i = 0; $i < 30; $i++) {
         if (port_has_listener(APP_PORT)) {
