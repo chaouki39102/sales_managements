@@ -16,12 +16,44 @@ export interface OcrProgress {
   progress: number;
 }
 
+/** which tier produced a product match (shown as a badge in the modal) */
+export type MatchTier = 'exact' | 'fuzzy' | 'price';
+
+export interface ProductMatchSuggestion {
+  product: ProductLite;
+  tier: MatchTier;
+  /** higher = better (needle length for exact, Dice for fuzzy, 1−relDiff for price) */
+  score: number;
+}
+
+/**
+ * Detected invoice column layout (from the header row).
+ * Real supplier invoices print a header like «Qty Désignation PU HT Total»;
+ * knowing which columns exist lets the parser read qty from the qty column and
+ * price from the PU column instead of assuming "first number / last number".
+ */
+export interface ColumnLayout {
+  headerIndex: number;
+  headerText: string;
+  hasQtyCol: boolean;
+  /** qty column appears BEFORE the designation/name column */
+  qtyBeforeName: boolean;
+  /** ≥1 total-type column (HT / Total / Montant) appears after the PU column */
+  trailingTotalCols: number;
+}
+
 export interface OcrLineCandidate {
   /** raw OCR line text (before product matching) */
   text: string;
   quantity: number;
   unitPrice: number | null;
   product: ProductLite | null;
+  /** matched product id (mirror of `product`) — handy for the UI */
+  productId?: string | number | null;
+  /** which tier produced the match (exact / fuzzy / price) */
+  matchTier?: MatchTier | null;
+  /** top suggested products when the line has no confident match */
+  suggestions?: ProductMatchSuggestion[];
 }
 
 export interface ProductLite {
@@ -262,31 +294,37 @@ export function diceTokens(a: string, b: string): number {
   return (2 * inter) / (ta.length + tb.length);
 }
 
-export function matchProduct(
+/**
+ * Rank candidate products for an OCR line, best first, tier-major:
+ * exact (barcode/ref/name substring, longest needle first) → fuzzy (token/char
+ * Dice, ≥ DICE_MIN_SCORE, best first) → price proximity (≤ PRICE_MATCH_TOLERANCE,
+ * closest first). `matchProduct` is `ranked[0]`; the modal's suggestion picker
+ * shows the top entries with their tier badge.
+ */
+export function rankProductCandidates(
   namePart: string,
   products: ProductLite[],
   unitPrice?: number | null,
-): ProductLite | null {
+): ProductMatchSuggestion[] {
   const hay = normalizeForMatch(namePart);
-  if (!hay) return null;
+  if (!hay) return [];
 
-  // Tier 1 — exact substring (barcode → ref → name), longest hit wins
-  let best: { p: ProductLite; score: number } | null = null;
+  const exact: ProductMatchSuggestion[] = [];
+  const fuzzy: ProductMatchSuggestion[] = [];
+  const price: ProductMatchSuggestion[] = [];
+
+  // Tier 1 — exact substring (barcode → ref → name), longest needle wins
   for (const p of products) {
+    let score = 0;
     const barcode = normalizeForMatch(p.barcode);
-    if (barcode.length >= 4 && hay.includes(barcode) && (!best || barcode.length > best.score)) {
-      best = { p, score: barcode.length };
-    }
+    if (barcode.length >= 4 && hay.includes(barcode)) score = Math.max(score, barcode.length);
     const ref = normalizeForMatch(p.ref);
-    if (ref.length >= 2 && hay.includes(ref) && (!best || ref.length > best.score)) {
-      best = { p, score: ref.length };
-    }
+    if (ref.length >= 2 && hay.includes(ref)) score = Math.max(score, ref.length);
     const name = normalizeForMatch(p.name);
-    if (name.length >= 2 && hay.includes(name) && (!best || name.length > best.score)) {
-      best = { p, score: name.length };
-    }
+    if (name.length >= 2 && hay.includes(name)) score = Math.max(score, name.length);
+    if (score > 0) exact.push({ product: p, tier: 'exact', score });
   }
-  if (best) return best.p;
+  exact.sort((a, b) => b.score - a.score);
 
   // Tier 2 — fuzzy name similarity (handles OCR noise / word order / dropped
   // sizes like "2كلغ"). Digits are stripped from BOTH sides so a size the OCR
@@ -295,33 +333,95 @@ export function matchProduct(
   const strippedHay = stripDigits(hay);
   const tokens = strippedHay.split(/\s+/).filter(Boolean);
   if (tokens.length >= 2) {
-    let fuzzyBest: { p: ProductLite; score: number } | null = null;
     for (const p of products) {
       const pname = stripDigits(normalizeForMatch(p.name));
-      const token = diceTokens(strippedHay, pname);
-      const chars = charDice(strippedHay, pname);
-      const d = Math.max(token, chars);
-      if (d >= DICE_MIN_SCORE && (!fuzzyBest || d > fuzzyBest.score)) {
-        fuzzyBest = { p, score: d };
-      }
+      const d = Math.max(diceTokens(strippedHay, pname), charDice(strippedHay, pname));
+      if (d >= DICE_MIN_SCORE) fuzzy.push({ product: p, tier: 'fuzzy', score: d });
     }
-    if (fuzzyBest) return fuzzyBest.p;
+    fuzzy.sort((a, b) => b.score - a.score);
   }
 
   // Tier 3 — price proximity (unitPrice vs catalog purchase price)
   if (unitPrice != null && Number.isFinite(unitPrice) && unitPrice > 0) {
-    let priceBest: { p: ProductLite; diff: number } | null = null;
     for (const p of products) {
       const pp = effectiveProductPrice(p);
       if (pp <= 0) continue;
       const diff = Math.abs(unitPrice - pp) / pp;
-      if (diff <= PRICE_MATCH_TOLERANCE && (!priceBest || diff < priceBest.diff)) {
-        priceBest = { p, diff };
-      }
+      if (diff <= PRICE_MATCH_TOLERANCE) price.push({ product: p, tier: 'price', score: 1 - diff });
     }
-    if (priceBest) return priceBest.p;
+    price.sort((a, b) => b.score - a.score);
   }
 
+  // Tier-major merge so the top suggestion always preserves matchProduct's
+  // precedence (exact > fuzzy > price) while still offering cross-tier options.
+  const TIER_ORDER = { exact: 0, fuzzy: 1, price: 2 } as const;
+  return [...exact, ...fuzzy, ...price]
+    .sort((a, b) => TIER_ORDER[a.tier] - TIER_ORDER[b.tier] || b.score - a.score)
+    .slice(0, 3);
+}
+
+/** Top-ranked match (best suggestion) or null when nothing qualifies. */
+export function matchProduct(
+  namePart: string,
+  products: ProductLite[],
+  unitPrice?: number | null,
+): ProductLite | null {
+  return rankProductCandidates(namePart, products, unitPrice)[0]?.product ?? null;
+}
+
+// ─── Column-layout detection ─────────────────────────────────────────────────
+
+/** Header token patterns, matched against single cleaned tokens. */
+const COL_QTY_RE = /^(qty|qte|quantite|quantity|qnt|كمي|الكمية|الكميه)$/;
+const COL_DES_RE = /^(designation|article|libelle|produit|product|nom|name|item|description|desc|بيان|البيان)$/;
+const COL_PU_RE = /^(pu|prix|prixunitaire|unitprice|price|الوحدة|الوحده|سعر)$/;
+const COL_TOTAL_RE = /^(total|montant|ht|ttc|amount|subtotal|المجموع|الاجمالي)$/;
+
+function headerKinds(header: string): string[] {
+  const kinds: string[] = [];
+  for (const tok of header.split(/\s+/)) {
+    // normalizeForMatch folds accents («Désignation»→designation, «Qté»→qte)
+    // and collapses separators («P.U»→pu, «unit_price»→unitprice).
+    const clean = normalizeForMatch(tok).replace(/\s+/g, '');
+    if (!clean) continue;
+    if (COL_QTY_RE.test(clean)) kinds.push('qty');
+    else if (COL_DES_RE.test(clean)) kinds.push('des');
+    else if (COL_PU_RE.test(clean)) kinds.push('pu');
+    else if (COL_TOTAL_RE.test(clean)) kinds.push('total');
+  }
+  return kinds;
+}
+
+/**
+ * Only look for the table header among the first lines of the invoice —
+ * a footer or totals block must never be mistaken for it.
+ */
+export const COL_HEADER_MAX_INDEX = 15;
+
+/**
+ * Detect the line-table header (e.g. «Qty Désignation PU HT Total»,
+ * «الكمية البيان سعر الوحدة الإجمالي»). Knowing which columns exist lets the
+ * parser read qty from the qty column and price from the PU column instead of
+ * assuming "first number / last number".
+ */
+export function detectColumnLayout(lines: string[]): ColumnLayout | null {
+  for (let i = 0; i < Math.min(lines.length, COL_HEADER_MAX_INDEX); i++) {
+    const kinds = headerKinds(lines[i]);
+    if (!kinds.includes('des')) continue;
+    if (!(kinds.includes('qty') || kinds.includes('pu') || kinds.includes('total'))) continue;
+    let trailingTotalCols = 0;
+    const puIdx = kinds.indexOf('pu');
+    for (let k = puIdx + 1; k < kinds.length; k++) {
+      if (kinds[k] === 'total') trailingTotalCols++;
+    }
+    return {
+      headerIndex: i,
+      headerText: lines[i],
+      hasQtyCol: kinds.includes('qty'),
+      qtyBeforeName: kinds.includes('qty') && kinds.indexOf('qty') < kinds.indexOf('des'),
+      trailingTotalCols,
+    };
+  }
   return null;
 }
 
@@ -339,8 +439,38 @@ function extractNumberTokens(line: string): number[] {
   return tokens;
 }
 
+/**
+ * Pure-numeric tokens only. A product's SIZE number is glued to its unit
+ * («عسل 1كلغ», «1kg», «1L») — it is part of the NAME, never the qty/price
+ * column. So qty/price must come from standalone number tokens only:
+ * «عسل 1كلغ 2 500.00» → qty 2, price 500 (not qty 1).
+ */
+function extractProductNumberTokens(line: string): number[] {
+  const tokens: number[] = [];
+  for (const part of line.split(/\s+/)) {
+    if (!part || !/^[\d.,]+$/.test(part)) continue;
+    const n = parseNumber(part);
+    if (n !== null) tokens.push(n);
+  }
+  return tokens;
+}
+
 function stripIndex(line: string): string {
   return line.replace(/^\s*(\d{1,2})[.)]\s*/, '');
+}
+
+/**
+ * Extract the product-name part of a line: everything left after numeric
+ * tokens, stray separators and index remnants are removed. Sizes glued to the
+ * name («1كلغ», «1L», «2kg») are themselves removed here so the name-only
+ * search never has to match a size digit the OCR dropped — the number-intact
+ * line is searched as a fallback in the caller.
+ */
+export function productNamePart(working: string): string {
+  const numRe = /(\d{1,3}(?:[.,]\d{3})*[.,]\d{1,2}|\d+)/g;
+  let namePart = working.replace(numRe, ' ').replace(/[.,]/g, ' ').replace(/\s+/g, ' ').trim();
+  namePart = namePart.replace(/^[.)\-]\s*/, '');
+  return namePart;
 }
 
 function stripMultiplier(line: string): { rest: string; qty: number | null; price: number | null } {
@@ -398,7 +528,14 @@ export function parseInvoiceText(text: string, ctx: ParseContext = {}): OcrInvoi
 
   const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 
-  for (const line of lines) {
+  // Detect the line-table header («Qty Désignation PU HT Total») so qty/price
+  // are read from the right columns and the header itself is never a product line.
+  const layout = detectColumnLayout(lines);
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (layout && i === layout.headerIndex) continue;
+
     const date = extractDate(line);
     if (date) {
       if (!result.documentDate) result.documentDate = date;
@@ -467,11 +604,25 @@ export function parseInvoiceText(text: string, ctx: ParseContext = {}): OcrInvoi
     if (looksLikeIndex(working)) working = stripIndex(working);
     working = working.replace(/\s+/g, ' ').trim();
 
-    const nums = extractNumberTokens(working);
+    const nums = extractProductNumberTokens(working);
     if (qty === null || price === null) {
       if (nums.length >= 2) {
-        qty = qty ?? nums[0];
-        price = price ?? nums[nums.length - 1];
+        if (layout?.hasQtyCol) {
+          // Layout-aware: price is the PU column, qty is the qty column.
+          // When totals follow the PU column (e.g. «PU HT Total»), the rightmost
+          // number is a line total, not the unit price.
+          let priceIdx = nums.length - 1;
+          if (layout.trailingTotalCols >= 1 && nums.length >= 3) priceIdx = nums.length - 2;
+          price = price ?? nums[priceIdx];
+          qty = qty ?? ((layout.qtyBeforeName || priceIdx === 0) ? nums[0] : nums[priceIdx - 1]);
+        } else if (layout && layout.trailingTotalCols >= 1) {
+          // «Désignation PU HT» — no qty column; first number is the unit price.
+          price = price ?? nums[0];
+          qty = qty ?? 1;
+        } else {
+          qty = qty ?? nums[0];
+          price = price ?? nums[nums.length - 1];
+        }
       } else if (nums.length === 1) {
         price = price ?? nums[0];
         qty = qty ?? 1;
@@ -482,20 +633,22 @@ export function parseInvoiceText(text: string, ctx: ParseContext = {}): OcrInvoi
 
     if (qty !== null && qty <= 0) qty = 1;
 
-    // Name part = line minus its numeric tokens
-    let namePart = working;
-    const numRe = /(\d{1,3}(?:[.,]\d{3})*[.,]\d{1,2}|\d+)/g;
-    namePart = namePart.replace(numRe, ' ').replace(/[.,]/g, ' ').replace(/\s+/g, ' ').trim();
-    // also strip stray index remnants
-    namePart = namePart.replace(/^[.)\-]\s*/, '');
-
-    const product = matchProduct(namePart, products, price) ?? matchProduct(working, products, price);
+    const namePart = productNamePart(working);
+    let ranked = rankProductCandidates(namePart, products, price);
+    let winner = ranked[0] ?? null;
+    if (!winner) {
+      ranked = rankProductCandidates(working, products, price);
+      winner = ranked[0] ?? null;
+    }
 
     result.lines.push({
       text: line,
       quantity: qty ?? 1,
       unitPrice: price,
-      product,
+      product: winner?.product ?? null,
+      productId: winner?.product?.id ?? null,
+      matchTier: winner?.tier ?? null,
+      suggestions: ranked,
     });
   }
 

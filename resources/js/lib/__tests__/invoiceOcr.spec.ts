@@ -3,6 +3,7 @@ import {
   normalizeDigits, parseNumber, extractDate, normalizeForMatch,
   matchSupplier, matchProduct, parseInvoiceText, computeOcrScale,
   diceTokens, effectiveProductPrice, stripDigits, charDice,
+  rankProductCandidates, detectColumnLayout,
 } from '../invoiceOcr';
 import type { ProductLite, SupplierLite } from '../invoiceOcr';
 
@@ -210,7 +211,112 @@ const FA_OCR = [
   'Total TTC: 2980.95',
 ].join('\n');
 
+describe('detectColumnLayout', () => {
+  it('detects a qty-before-name header with trailing total columns', () => {
+    const layout = detectColumnLayout(['Qty Désignation PU HT Total']);
+    expect(layout).not.toBeNull();
+    expect(layout!.hasQtyCol).toBe(true);
+    expect(layout!.qtyBeforeName).toBe(true);
+    expect(layout!.trailingTotalCols).toBe(2);
+    expect(layout!.headerIndex).toBe(0);
+  });
+  it('detects a name-first qty-after header (Désignation Qté PU)', () => {
+    const layout = detectColumnLayout(['Désignation Qté PU']);
+    expect(layout!.hasQtyCol).toBe(true);
+    expect(layout!.qtyBeforeName).toBe(false);
+    expect(layout!.trailingTotalCols).toBe(0);
+  });
+  it('detects a no-qty header (Désignation PU HT)', () => {
+    const layout = detectColumnLayout(['Désignation PU HT']);
+    expect(layout!.hasQtyCol).toBe(false);
+    expect(layout!.trailingTotalCols).toBe(1);
+  });
+  it('detects an Arabic header', () => {
+    const layout = detectColumnLayout(['الكمية البيان سعر الوحدة الإجمالي']);
+    expect(layout).not.toBeNull();
+    expect(layout!.hasQtyCol).toBe(true);
+    expect(layout!.qtyBeforeName).toBe(true);
+  });
+  it('ignores the footer / totals block (not a table header)', () => {
+    const layout = detectColumnLayout(['Total HT: 2505.00', 'TVA 19%: 475.95', 'Total TTC: 2980.95']);
+    expect(layout).toBeNull();
+  });
+  it('returns null when there is no recognizable header', () => {
+    expect(detectColumnLayout(['SARL ALIMENTS BOULANGE', 'Facture N° FA-0001'])).toBeNull();
+  });
+});
+
+describe('parseInvoiceText — layout-aware columns', () => {
+  const HONEY = [{ id: 20, name: 'عسل 1كلغ' }];
+
+  it('reads qty from the qty column and price from the PU column (French header)', () => {
+    const r = parseInvoiceText('Qty Désignation PU HT Total\n2 عسل 1كلغ 500.00 1000.00', { products: HONEY });
+    expect(r.lines).toHaveLength(1);
+    expect(r.lines[0].quantity).toBe(2);
+    expect(r.lines[0].unitPrice).toBe(500);   // PU, not the line total 1000
+  });
+
+  it('reads qty from a qty-after-name column (Désignation Qté PU)', () => {
+    const r = parseInvoiceText('Désignation Qté PU\nعسل 1كلغ 2 500.00', { products: HONEY });
+    expect(r.lines).toHaveLength(1);
+    expect(r.lines[0].quantity).toBe(2);
+    expect(r.lines[0].unitPrice).toBe(500);
+  });
+
+  it('treats the first number as the unit price when there is no qty column (Désignation PU HT)', () => {
+    const r = parseInvoiceText('Désignation PU HT\nعسل 1كلغ 500.00 1000.00', { products: HONEY });
+    expect(r.lines).toHaveLength(1);
+    expect(r.lines[0].quantity).toBe(1);
+    expect(r.lines[0].unitPrice).toBe(500);
+  });
+
+  it('never treats the header row itself as a product line', () => {
+    const r = parseInvoiceText('Qty Désignation PU HT Total\n2 عسل 1كلغ 500.00 1000.00', { products: HONEY });
+    expect(r.lines).toHaveLength(1);
+  });
+});
+
+describe('rankProductCandidates', () => {
+  const CAT = [
+    { id: 1, name: 'Lait L\'Étoile 1L' },
+    { id: 2, name: 'Sucre Blanc 1kg', barcode: '6130410837123' },
+    { id: 3, name: 'Huile de Table 5L' },
+  ];
+
+  it('ranks exact matches first, longest needle first', () => {
+    const partial: ProductLite[] = [
+      { id: 1, name: 'Lait' },
+      { id: 2, name: 'Lait Étoile' },
+    ];
+    const ranked = rankProductCandidates('Lait Étoile', partial);
+    expect(ranked[0].product.id).toBe(2);
+    expect(ranked[0].tier).toBe('exact');
+  });
+
+  it('returns up to 3 suggestions with exact first and price tier following', () => {
+    const mixed: ProductLite[] = [
+      { id: 11, name: 'Lait Étoile', purchase_price_ht: 999 },
+      { id: 12, name: 'Huile Légère', purchase_price_ht: 95 },
+    ];
+    const ranked = rankProductCandidates('Lait Étoile', mixed, 95);
+    expect(ranked.length).toBeLessThanOrEqual(3);
+    expect(ranked[0].product.id).toBe(11);   // exact name hit beats price
+    expect(ranked[0].tier).toBe('exact');
+    expect(ranked.map((r) => r.product.id)).toContain(12);  // price tier still offered
+  });
+
+  it('exposes the tier on each suggestion', () => {
+    const ranked = rankProductCandidates('6130410837123', CAT);
+    expect(ranked[0].tier).toBe('exact');
+    const fuzzy = rankProductCandidates('CAFÉ AU LAIT', [{ id: 5, name: 'Cafe Au Lait 1L' }]);
+    expect(fuzzy[0].tier).toBe('fuzzy');
+    const price = rankProductCandidates('Bidon', [{ id: 9, name: 'Huile en Vrac', purchase_price_ht: 450 }], 450);
+    expect(price[0].tier).toBe('price');
+  });
+});
+
 describe('parseInvoiceText', () => {
+
   it('extracts date, supplier, reference and totals from a supplier FA', () => {
     const r = parseInvoiceText(FA_OCR, { suppliers: SUPPLIERS, products: PRODUCTS });
     expect(r.documentDate).toBe('2026-08-12');
@@ -245,6 +351,23 @@ describe('parseInvoiceText', () => {
     const r = parseInvoiceText('SARL ALIMENTS BOULANGE\nBureau de vente', { products: PRODUCTS });
     expect(r.lines).toHaveLength(0);
     expect(r.supplier).toBeNull();
+  });
+
+  it('reads qty from the qty column, not the size glued to the name', () => {
+    const HONEY = [{ id: 20, name: 'عسل 1كلغ' }];
+    const r = parseInvoiceText('عسل 1كلغ 2 500.00', { products: HONEY });
+    expect(r.lines).toHaveLength(1);
+    expect(r.lines[0].quantity).toBe(2);      // the qty column, NOT the «1» from 1كلغ
+    expect(r.lines[0].unitPrice).toBe(500);
+    expect(r.lines[0].product?.id).toBe(20);  // still matched to «عسل 1كلغ»
+  });
+
+  it('reads qty first when the qty column precedes the name', () => {
+    const HONEY = [{ id: 20, name: 'عسل 1كلغ' }];
+    const r = parseInvoiceText('2 عسل 1كلغ 500.00', { products: HONEY });
+    expect(r.lines).toHaveLength(1);
+    expect(r.lines[0].quantity).toBe(2);
+    expect(r.lines[0].unitPrice).toBe(500);
   });
 
   it('returns an empty result for empty input', () => {
