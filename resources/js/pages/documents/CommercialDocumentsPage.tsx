@@ -49,7 +49,10 @@ import { DeliveryProgressBar } from "./components/DeliveryProgressBar";
 import ConvertDocumentModal from "./components/ConvertDocumentModal";
 import BatchPrintModal from "./components/BatchPrintModal";
 const TemplatePrintModal = React.lazy(() => import('@/pages/settings/print-settings/components/shared/TemplatePrintModal'));
+const BarcodeScannerModal = React.lazy(() => import('@/components/BarcodeScannerModal'));
 import { usePrintTemplatesList, mapCompany } from '@/pages/settings/print-settings/runtime';
+import { useBarcodeScan } from "@/hooks/useBarcodeScan";
+import { parseFiscalQrNumber } from "@/lib/fiscalQr";
 import { ApprovalStatusBadge, ApprovalActions } from "./components/ApprovalWorkflow";
 import { useApprovalCheckBatch } from "@/lib/api/endpoints/approvals";
 import { SendDocumentMailModal } from "./components/SendDocumentMailModal";
@@ -933,6 +936,31 @@ export default function CommercialDocumentsPage() {
     }, []);
 
     const closeModal = useCallback(() => { setModal(null); setViewDocId(null); setEditDocFull(null); }, []);
+
+    // ── B.3 — مسح QR الفاتورة المطبوعة → فتح المستند المعني ──────────────────
+    // الكاميرا تمسح رمز QR الضريبي (JSON v1: invoice.number)، ثم نبحث في
+    // documents عن الرقم المطابق بالضبط ونفتح نافذة العرض الخاصة به.
+    const docScan = useBarcodeScan<CommercialDocument>({
+        resolve: async (code) => {
+            const number = parseFiscalQrNumber(code);
+            if (!number) return null;
+            try {
+                const res = await apiGet<PaginatedResponse<CommercialDocument>>("/documents", {
+                    "filter[document_number]": number,
+                    per_page: 5,
+                });
+                const list = Array.isArray(res) ? res : (res?.data ?? []);
+                return list.find((d) => d.document_number === number) ?? null;
+            } catch {
+                return null;
+            }
+        },
+        onFound: (doc) => {
+            setViewDocId(doc.id);
+            setModal("view");
+        },
+        onNotFound: () => notify.error("لم يتم العثور على مستند بهذا الرقم"),
+    });
 
     const handleMultiSortChange = useCallback((sorts: MultiSortState) => {
         setMultiSort(sorts);
@@ -1841,6 +1869,15 @@ export default function CommercialDocumentsPage() {
                     <i className="ti ti-layout-columns" aria-hidden="true" />
                 </button>
             )}
+            {/* B.3 — مسح QR الفاتورة المطبوع لفتح المستند مباشرة */}
+            <button
+                title="مسح QR الفاتورة لفتح المستند"
+                onClick={docScan.openScanner}
+                style={{ height: 28, width: 28, borderRadius: 7, border: "1px solid var(--b2)", background: "var(--bg2)", color: "var(--t4)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all .15s" }}
+                aria-label="مسح QR الفاتورة لفتح المستند"
+            >
+                <i className="ti ti-camera" aria-hidden="true" />
+            </button>
             {isSalable && !isReadOnly && (
                 <button onClick={() => setModal("quick")} style={{ height: 32, padding: "0 14px", borderRadius: 8, border: `1px solid color-mix(in srgb, ${opColor} 35%, transparent)`, background: `color-mix(in srgb, ${opColor} 8%, transparent)`, color: opColor, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
                     <i className="ti ti-bolt" style={{ fontSize: 14 }} aria-hidden="true" />
@@ -1854,7 +1891,7 @@ export default function CommercialDocumentsPage() {
                 </button>
             )}
         </div>
-    ), [isFetching, isLoading, isReadOnly, isSalable, opColor, hiddenColumnKeys.length, initialSnapshot, resetColState, navigate, typeCode]);
+    ), [isFetching, isLoading, isReadOnly, isSalable, opColor, hiddenColumnKeys.length, initialSnapshot, resetColState, navigate, typeCode, docScan.openScanner]);
 
     // ── Page title ────────────────────────────────────────────────────────────
     const tableTitle = useMemo(() => (
@@ -2074,6 +2111,19 @@ export default function CommercialDocumentsPage() {
                     }}
                     onPrint={() => { closeModal(); setPrintDocId(viewDocId); }}
                 />
+            )}
+
+            {/* B.3 — ماسح QR الكاميرا (يُحمَّل كود المفكك فقط عند فتحه) */}
+            {docScan.open && (
+                <Suspense fallback={null}>
+                    <BarcodeScannerModal
+                        open={docScan.open}
+                        onScan={docScan.handleScan}
+                        onClose={docScan.closeScanner}
+                        title="مسح QR المستند لفتحه"
+                        hint="صوّب الكاميرا على رمز QR المطبوع على الفاتورة لفتح المستند مباشرة"
+                    />
+                </Suspense>
             )}
 
             {convertDocId != null && (

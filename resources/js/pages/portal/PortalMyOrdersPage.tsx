@@ -3,12 +3,14 @@
 // صفحة مستقلة عن متجر «اطلب سلعة»: تصفية بالحالة + تفاصيل + تأكيد/تعديل/إلغاء.
 // «تعديل» يعيد الزبون إلى متجر الطلب في وضع التعديل (drawer مفتوح).
 // ════════════════════════════════════════════════════════════════════════════
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { portalApi, type PortalOrderStatus, type PortalOrder } from '@/lib/api/portal/portal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useConfirm } from '@/hooks/useConfirm';
+import { useBarcodeScan } from '@/hooks/useBarcodeScan';
+import { parseFiscalQrNumber } from '@/lib/fiscalQr';
 import OrderPipeline from './OrderPipeline';
 import {
   fmtMoney, fmtMoneySigned, fmtDate, Pager,
@@ -39,6 +41,9 @@ const STATUS_TABS: { key: PortalOrderStatus | ''; label: string }[] = [
   { key: 'cancelled', label: 'ملغى' },
 ];
 
+// B.3 — الكاميرا تُحمَّل فقط عند فتح الماسح (chunk مستقل).
+const BarcodeScannerModal = React.lazy(() => import('@/components/BarcodeScannerModal'));
+
 export default function PortalMyOrdersPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
@@ -47,6 +52,8 @@ export default function PortalMyOrdersPage() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<PortalOrderStatus | ''>('');
   const [submitted, setSubmitted] = useState<number | null>(null);
+  // B.3 — رقم الطلب/الفاتورة الممسوح (قيمة `search` الفعلية لطلب القائمة).
+  const [scanRef, setScanRef] = useState('');
   const [toast, setToast] = useState('');
   const [toastKind, setToastKind] = useState<'ok' | 'err'>('ok');
 
@@ -125,9 +132,33 @@ export default function PortalMyOrdersPage() {
   };
 
   const ordersQuery = useQuery({
-    queryKey: ['portal', slug, 'orders', 'list', page, statusFilter],
-    queryFn: () => portalApi.orders({ page, per_page: 10, status: statusFilter || undefined }),
+    queryKey: ['portal', slug, 'orders', 'list', page, statusFilter, scanRef],
+    queryFn: () => portalApi.orders({ page, per_page: 10, status: statusFilter || undefined, search: scanRef || undefined }),
     placeholderData: keepPreviousData,
+  });
+
+  // B.3 — «تتبع بالمسح»: يمسح الزبون QR الفاتورة المطبوعة (يحمل رقم الفاتورة
+  // المحوَّلة FV/POS، والبحث في الخادم يطابقه عبر source_document_id)، فيُعرض
+  // الطلب المطابق تماماً ويُفتح تفاصيله.
+  const orderScan = useBarcodeScan<PortalOrder>({
+    resolve: async (code) => {
+      const number = parseFiscalQrNumber(code);
+      if (!number) return null;
+      const res = await portalApi.orders({ search: number, per_page: 20 });
+      const list = res?.data ?? [];
+      // الرقم المسموح من QR الفاتورة = رقم الفاتورة المحوَّلة (document.document_number)،
+      // وليس مرجع الطلب (CMD-…) — وكلاهما يُقبل دفاعياً.
+      return (
+        list.find((o) => o.document?.document_number === number || o.reference === number) ?? null
+      );
+    },
+    onFound: (o) => {
+      setScanRef(o.reference);
+      setStatusFilter('');
+      setPage(1);
+      setSubmitted(o.id);
+    },
+    onNotFound: () => showToast('لم يتم العثور على طلب بهذا الرقم', 'err'),
   });
 
   const cancelOrder = useMutation({
@@ -216,6 +247,28 @@ export default function PortalMyOrdersPage() {
                 {tab.label}
               </button>
             ))}
+          </div>
+          {/* B.3 — تتبع الطلب بمسح QR الفاتورة المطبوعة */}
+          <div className="portal-toolbar-sp">
+            {scanRef && (
+              <button
+                type="button"
+                className="portal-btn portal-btn--sm portal-btn--ghost"
+                onClick={() => { setScanRef(''); setStatusFilter(''); setPage(1); setSubmitted(null); }}
+                title="مسح البحث بالرقم الممسوح"
+              >
+                <i className="ti ti-x" />
+                <span className="portal-prod-ref">{scanRef}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              className="portal-btn portal-btn--sm portal-btn--em"
+              onClick={orderScan.openScanner}
+              title="تتبع بالمسح — صوّب الكاميرا على QR الفاتورة"
+            >
+              <i className="ti ti-camera" /> مسح
+            </button>
           </div>
         </div>
 
@@ -376,6 +429,19 @@ export default function PortalMyOrdersPage() {
 
       <ConfirmDialog {...confirmDialogProps} />
       {toast && <div className="portal-toast"><i className={`ti ${toastKind === 'ok' ? 'ti-circle-check' : 'ti-circle-x'}`} /> {toast}</div>}
+
+      {/* B.3 — ماسح QR الكاميرا لتتبع الطلب */}
+      {orderScan.open && (
+        <React.Suspense fallback={null}>
+          <BarcodeScannerModal
+            open={orderScan.open}
+            onScan={orderScan.handleScan}
+            onClose={orderScan.closeScanner}
+            title="مسح QR الفاتورة لتتبع الطلب"
+            hint="صوّب الكاميرا على رمز QR المطبوع على الفاتورة للعثور على طلبك"
+          />
+        </React.Suspense>
+      )}
     </section>
   );
 }

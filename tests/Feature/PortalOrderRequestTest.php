@@ -583,3 +583,33 @@ it('allowed_next is audience-scoped, notes-only update keeps lines, legacy pendi
     test()->patchJson($adminUrl, ['status' => 'pending'])
         ->assertStatus(422);
 });
+
+it('B.3: customer search by the converted FV number finds the order (scan-to-track)', function () {
+    // الزبون يطلب سلعة ثم يؤكدها
+    $url = '/api/v1/'.TEST_COMPANY_SLUG.'/portal/orders';
+    $created = test()->withToken(test()->token)->postJson(
+        $url,
+        ['items' => [['product_id' => test()->productA, 'quantity' => 2]]]
+    )->assertStatus(201)->json('data');
+
+    // إدارة: تؤكد وتُحوّل الطلب إلى فاتورة (تنتج رقم FV-… الحقيقي)
+    actingAsAuthenticatedTenantUser();
+    $adminOrderUrl = '/api/v1/'.TEST_COMPANY_SLUG.'/portal-orders/'.$created['id'];
+    DB::table('products')->where('id', test()->productA)->update(['allow_negative_stock' => true]);
+    test()->patchJson($adminOrderUrl, ['status' => 'confirmed'])->assertOk();
+
+    $res = test()->postJson($adminOrderUrl.'/convert', ['target' => 'FV'])->assertOk()->json('data');
+    $fvNumber = $res['sale']['document_number'];
+
+    // QR الفاتورة يحمل رقم الفاتورة المحوَّلة — البحث به يجب أن يجد الطلب
+    portalOrderAuthGet($url.'?search='.urlencode($fvNumber))
+        ->assertOk()
+        ->assertJsonPath('data.meta.total', 1)
+        ->assertJsonPath('data.data.0.id', $created['id'])
+        ->assertJsonPath('data.data.0.reference', $created['reference']);
+
+    // البحث برقم غير موجود لا يعيد شيئاً
+    portalOrderAuthGet($url.'?search='.urlencode('FV-9999-999999'))
+        ->assertOk()
+        ->assertJsonPath('data.meta.total', 0);
+});

@@ -440,7 +440,17 @@ class PortalOrderService
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
                 $q->where('reference', 'like', "%{$search}%")
-                  ->orWhereHas('party', fn($p) => $p->where('name', 'like', "%{$search}%"));
+                  ->orWhereHas('party', fn($p) => $p->where('name', 'like', "%{$search}%"))
+                  // B.3 — «تتبع بالمسح»: الزبون يمسح QR الفاتورة المطبوعة (رقمها
+                  // يخص الفاتورة المحوَّلة FV/POS وليس رقم الطلب CMD). نطابق رقم
+                  // مستند التحويل عبر source_document_id ← أمر الزبون هذا.
+                  ->orWhereExists(function ($sub) use ($search) {
+                      $sub->select(DB::raw(1))
+                          ->from('commercial_documents as conv')
+                          ->whereColumn('conv.source_document_id', 'portal_orders.commercial_document_id')
+                          ->where('conv.document_number', 'like', "%{$search}%")
+                          ->whereNull('conv.deleted_at');
+                  });
             });
         }
 

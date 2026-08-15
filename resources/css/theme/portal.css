@@ -1554,6 +1554,14 @@ html.dark .portal-login-box {
   border-bottom: 1px solid var(--b1);
   flex-wrap: wrap;
 }
+/* B.3 — أزرار «تتبع بالمسح»/مسح الرقم في شريط طلباتي: تُدفع إلى الطرف المقابل */
+.portal-toolbar-sp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: auto;
+  flex-wrap: wrap;
+}
 .portal-search {
   display: flex;
   align-items: center;

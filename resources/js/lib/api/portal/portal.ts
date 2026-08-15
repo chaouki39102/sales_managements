@@ -310,6 +310,7 @@ export interface PortalOrderFilters {
   page?: number;
   per_page?: number;
   status?: PortalOrderStatus;
+  search?: string;
 }
 
 // إعدادات البوابة العامة — تُجلب بدون مصادقة وتُستخدم لتوجيه واجهة المتجر
@@ -398,11 +399,12 @@ export const portalApi = {
       per_page: filters.per_page ?? 24,
       search: filters.search || undefined,
     }),
-  orders:   (filters: { page?: number; per_page?: number; status?: PortalOrderStatus } = {}) =>
+  orders:   (filters: { page?: number; per_page?: number; status?: PortalOrderStatus; search?: string } = {}) =>
     portalGet<PortalPaginated<PortalOrder>>('/portal/orders', {
       page: filters.page ?? 1,
       per_page: filters.per_page ?? 10,
       status: filters.status || undefined,
+      search: filters.search || undefined,
     }),
   orderDetail: (id: number) =>
     portalGet<PortalOrder>(`/portal/orders/${id}`),
