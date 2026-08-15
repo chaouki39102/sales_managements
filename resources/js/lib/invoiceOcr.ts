@@ -408,13 +408,67 @@ declare global {
   }
 }
 
+export const OCR_MAX_DIM = 1600;
+export const OCR_MAX_BYTES = 30 * 1024 * 1024;
+
+/**
+ * Downscale target for OCR input. Photos from a phone camera are typically
+ * 3000–4000px wide — tesseract is dramatically slower on those for no gain.
+ * Anything already ≤ maxDim keeps its size.
+ */
+export function computeOcrScale(width: number, height: number, maxDim = OCR_MAX_DIM): number {
+  const longest = Math.max(width || 0, height || 0);
+  if (longest <= 0) return 1;
+  return Math.min(1, maxDim / longest);
+}
+
+function loadImage(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('تعذر قراءة الصورة')); };
+    img.src = url;
+  });
+}
+
+/**
+ * Validate + preprocess an image before OCR. Decodes it, downscales the
+ * longest side to ≤ `OCR_MAX_DIM` and re-encodes to JPEG 0.92 — a 4000px
+ * phone photo becomes ~1600px, cutting OCR time ~5× with equal accuracy.
+ * Returns the original `File` when nothing needs to change (already small
+ * JPEG), otherwise a processed `File`. Throws a clear Arabic error for
+ * non-images, oversized files and undecodable images.
+ */
+export async function prepareOcrFile(file: File): Promise<File> {
+  if (!file.type || !file.type.startsWith('image/')) {
+    throw new Error('الملف المحدد ليس صورة — اختر صورة فاتورة');
+  }
+  if (file.size > OCR_MAX_BYTES) {
+    throw new Error('الصورة كبيرة جداً (الحد الأقصى 30MB) — اختر صورة أصغر');
+  }
+  const img = await loadImage(file);
+  const scale = computeOcrScale(img.naturalWidth, img.naturalHeight);
+  if (scale === 1 && file.type === 'image/jpeg') return file;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return file;
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', 0.92));
+  if (!blob) return file;
+  return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+}
+
 /**
  * Run OCR on a captured image and return the raw recognized text.
  * - Test seam: when `window.__OCR_TEST_TEXT__` is set it is returned verbatim
- *   (no tesseract import, no worker) — used by Playwright.
- * - Otherwise lazy-imports tesseract.js, creates a worker with `ara+eng`
- *   traineddata (loaded from the CDN on first use — needs connectivity),
- *   reports progress via onProgress, and terminates the worker afterwards.
+ *   (no tesseract import, no worker, no preprocessing) — used by Playwright.
+ * - Otherwise the image is preprocessed (downscale + JPEG re-encode, see
+ *   `prepareOcrFile`) then lazy-imports tesseract.js, creates a worker with
+ *   `ara+eng` traineddata (loaded from the CDN on first use — needs
+ *   connectivity), reports progress via onProgress, and terminates the worker.
  */
 export async function runInvoiceOcr(
   file: File,
@@ -424,6 +478,8 @@ export async function runInvoiceOcr(
     return window.__OCR_TEST_TEXT__;
   }
   const Tesseract = await import('tesseract.js');
+  opts.onProgress?.({ status: 'preparing image', progress: 0 });
+  const prepared = await prepareOcrFile(file);
   const worker = await Tesseract.createWorker(opts.lang ?? 'ara+eng', 1, {
     logger: (m: { status?: string; progress?: number }) => {
       if (m && m.status && opts.onProgress) {
@@ -432,7 +488,7 @@ export async function runInvoiceOcr(
     },
   });
   try {
-    const { data } = await worker.recognize(file);
+    const { data } = await worker.recognize(prepared);
     return data.text;
   } finally {
     await worker.terminate();

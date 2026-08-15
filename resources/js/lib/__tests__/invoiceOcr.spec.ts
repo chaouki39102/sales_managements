@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   normalizeDigits, parseNumber, extractDate, normalizeForMatch,
-  matchSupplier, matchProduct, parseInvoiceText,
+  matchSupplier, matchProduct, parseInvoiceText, computeOcrScale,
 } from '../invoiceOcr';
 import type { ProductLite, SupplierLite } from '../invoiceOcr';
 
@@ -180,5 +180,28 @@ describe('parseInvoiceText', () => {
     expect(r.supplier).toBeNull();
     expect(r.lines).toEqual([]);
     expect(r.totalTtc).toBeNull();
+  });
+});
+
+describe('computeOcrScale', () => {
+  it('keeps images already ≤ 1600px unchanged', () => {
+    expect(computeOcrScale(1200, 900)).toBe(1);
+    expect(computeOcrScale(1600, 1600)).toBe(1);
+    expect(computeOcrScale(800, 1600)).toBe(1);
+  });
+  it('downscales the longest side of a phone photo to 1600px', () => {
+    expect(computeOcrScale(4000, 3000)).toBeCloseTo(0.4, 6);
+    expect(computeOcrScale(3000, 4000)).toBeCloseTo(0.4, 6);
+  });
+  it('preserves aspect ratio via the longest side', () => {
+    expect(computeOcrScale(3200, 1600)).toBeCloseTo(0.5, 6);
+    expect(computeOcrScale(1600, 3200)).toBeCloseTo(0.5, 6);
+  });
+  it('honours a custom max dimension', () => {
+    expect(computeOcrScale(4000, 3000, 2000)).toBeCloseTo(0.5, 6);
+  });
+  it('is a no-op for empty/zero dimensions', () => {
+    expect(computeOcrScale(0, 0)).toBe(1);
+    expect(computeOcrScale(1200, 0)).toBe(1);
   });
 });

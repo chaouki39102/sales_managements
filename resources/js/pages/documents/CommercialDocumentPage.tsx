@@ -443,7 +443,7 @@ export default function CommercialDocumentPage() {
         onCapture={(file) => { setOcrFile(file); setShowOcrCamera(false); }}
         onClose={() => setShowOcrCamera(false)}
         title="تصوير فاتورة المورد"
-        hint="صوّب الكاميرا على فاتورة المورد لقراءتها تلقائياً وتعبئة الأسطر"
+        hint="صوّب الكاميرا على فاتورة المورد لقراءتها تلقائياً، أو ارفع صورة من الجهاز"
       />
 
       <InvoiceOcrModal
@@ -452,6 +452,7 @@ export default function CommercialDocumentPage() {
         suppliers={lookups.parties}
         products={lookups.products}
         needsParty={needsParty}
+        onRequestCapture={() => setShowOcrCamera(true)}
         onClose={() => setOcrFile(null)}
         onApply={(payload) => {
           set('document_date', payload.documentDate);

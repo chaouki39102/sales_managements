@@ -36,12 +36,25 @@ interface InvoiceOcrModalProps {
   needsParty: boolean;
   onClose: () => void;
   onApply: (payload: OcrApplyPayload) => void;
+  /** Re-open the camera capture modal to re-photograph the invoice. */
+  onRequestCapture?: () => void;
 }
 
 const todayKey = () => new Date().toISOString().slice(0, 10);
 
+/** tesseract.js emits English status strings — map them to Arabic for the UI. */
+const OCR_STATUS_LABELS: Record<string, string> = {
+  'preparing image': 'تجهيز الصورة',
+  'loading tesseract core': 'تحميل محرك القراءة',
+  'initializing tesseract': 'تهيئة محرك القراءة',
+  'loading language traineddata': 'تحميل ملفات اللغة',
+  'initializing api': 'تهيئة واجهة القراءة',
+  'recognizing text': 'قراءة النص',
+};
+const ocrStatusLabel = (s: string | null | undefined) => (s ? OCR_STATUS_LABELS[s] ?? s : '…');
+
 export function InvoiceOcrModal({
-  open, file, suppliers, products, needsParty, onClose, onApply,
+  open, file, suppliers, products, needsParty, onClose, onApply, onRequestCapture,
 }: InvoiceOcrModalProps) {
   const [phase, setPhase] = useState<'idle' | 'ocr' | 'preview'>('idle');
   const [progress, setProgress] = useState<OcrProgress | null>(null);
@@ -53,7 +66,13 @@ export function InvoiceOcrModal({
   const [supplierSearch, setSupplierSearch] = useState('');
   const [productSearch, setProductSearch] = useState('');
   const [showRaw, setShowRaw] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
   const nextKey = useRef(1);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // The modal owns the image after the first `file` prop: drag & drop and
+  // «تغيير الصورة» swap it in-place without the page needing to re-open.
+  const [currentFile, setCurrentFile] = useState<File | null>(null);
 
   const reset = useCallback(() => {
     setPhase('idle');
@@ -66,15 +85,28 @@ export function InvoiceOcrModal({
     setSupplierSearch('');
     setProductSearch('');
     setShowRaw(false);
+    setDragActive(false);
+    setCurrentFile(null);
   }, []);
 
+  const acceptFile = useCallback((f: File | null | undefined) => {
+    if (f && f.type && f.type.startsWith('image/')) {
+      setCurrentFile(f);
+    } else if (f) {
+      setPhase('idle');
+      setError('الملف المحدد ليس صورة — اختر صورة فاتورة');
+    }
+  }, []);
+
+  const pickImage = useCallback(() => fileInputRef.current?.click(), []);
+
   const runOcr = useCallback(async () => {
-    if (!file) return;
+    if (!currentFile) return;
     setPhase('ocr');
     setProgress(null);
     setError(null);
     try {
-      const text = await runInvoiceOcr(file, {
+      const text = await runInvoiceOcr(currentFile, {
         onProgress: (p) => setProgress(p),
       });
       const result = parseInvoiceText(text, { products, suppliers });
@@ -95,11 +127,18 @@ export function InvoiceOcrModal({
       setError(e instanceof Error ? e.message : 'تعذر قراءة الفاتورة');
       setPhase('idle');
     }
-  }, [file, products, suppliers]);
+  }, [currentFile, products, suppliers]);
 
   useEffect(() => {
-    if (open && file) void runOcr();
-  }, [open, file, runOcr]);
+    if (open && file) setCurrentFile(file);
+  }, [open, file]);
+
+  useEffect(() => {
+    if (open && currentFile) void runOcr();
+  }, [open, currentFile, runOcr]);
+
+  const thumbUrl = useMemo(() => (currentFile ? URL.createObjectURL(currentFile) : null), [currentFile]);
+  useEffect(() => () => { if (thumbUrl) URL.revokeObjectURL(thumbUrl); }, [thumbUrl]);
 
   useEffect(() => {
     if (!open) reset();
@@ -164,19 +203,61 @@ export function InvoiceOcrModal({
   const progressPct = progress?.progress != null ? Math.round(progress.progress * 100) : 0;
 
   return (
-    <Modal open={open} onClose={handleClose} title="قراءة فاتورة المورد" size="xl">
+    <Modal open={open} onClose={handleClose} title="قراءة فاتورة المورد" size="xl" subtitle="يمكنك إسقاط صورة أخرى هنا أو إعادة التصوير في أي وقت">
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+        onDragLeave={(e) => { e.preventDefault(); setDragActive(false); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragActive(false);
+          acceptFile(e.dataTransfer.files?.[0]);
+        }}
+        style={{ position: 'relative', minHeight: 200 }}
+      >
+        {dragActive && (
+          <div
+            style={{
+              position: 'absolute', inset: 0, zIndex: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'color-mix(in srgb, var(--em) 8%, transparent)', border: '2px dashed var(--em)', borderRadius: 'var(--r1)',
+              pointerEvents: 'none', gap: 8,
+            }}
+          >
+            <span style={{ fontSize: 14, color: 'var(--em)', fontWeight: 600 }}><i className="ti ti-photo" /> أفلت الصورة هنا لقراءتها</span>
+          </div>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => {
+            acceptFile(e.target.files?.[0]);
+            e.target.value = '';
+          }}
+        />
+
       {phase === 'ocr' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '20px 8px', alignItems: 'center' }}>
+          {currentFile && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {thumbUrl && (
+                <img src={thumbUrl} alt="فاتورة المورد" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--b3)' }} />
+              )}
+              <span style={{ fontSize: 12, color: 'var(--t3)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentFile.name}</span>
+              <Button size="sm" variant="outline" onClick={pickImage}>تغيير الصورة</Button>
+              {onRequestCapture && <Button size="sm" variant="outline" onClick={onRequestCapture}>إعادة التصوير</Button>}
+            </div>
+          )}
           <span className="ic" style={{ animation: 'spin 1s linear infinite', fontSize: 40, color: 'var(--em)' }}>
             <i className="ti ti-scan" />
           </span>
           <div style={{ fontSize: 14, color: 'var(--t2)' }}>
-            {progress?.status === 'recognizing text' ? 'جارٍ قراءة النص…' : 'جارٍ تحميل محرك القراءة…'}
+            {progress?.status === 'recognizing text' ? 'جارٍ قراءة النص…' : progress?.status === 'preparing image' ? 'جارٍ تجهيز الصورة…' : 'جارٍ تحميل محرك القراءة…'}
           </div>
           <div style={{ width: '70%', height: 8, background: 'var(--b2)', borderRadius: 99, overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${progressPct}%`, background: 'var(--em)', borderRadius: 99, transition: 'width .3s' }} />
           </div>
-          <div style={{ fontSize: 12, color: 'var(--t4)' }}>{progress?.status ?? '…'} {progressPct}%</div>
+          <div style={{ fontSize: 12, color: 'var(--t4)' }}>{ocrStatusLabel(progress?.status)} {progressPct}%</div>
           <Button size="sm" variant="outline" onClick={handleClose}>إلغاء</Button>
         </div>
       )}
@@ -187,6 +268,7 @@ export function InvoiceOcrModal({
           <div style={{ fontSize: 14, color: 'var(--t2)', textAlign: 'center' }}>{error}</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <Button size="sm" variant="outline" onClick={handleClose}>إغلاق</Button>
+            <Button size="sm" variant="outline" onClick={pickImage}>تغيير الصورة</Button>
             <Button size="sm" variant="primary" onClick={() => void runOcr()}>إعادة المحاولة</Button>
           </div>
         </div>
@@ -203,6 +285,12 @@ export function InvoiceOcrModal({
             >
               {showRaw ? 'إخفاء النص الخام' : 'عرض النص الخام'}
             </button>
+            <span style={{ width: 1, height: 16, background: 'var(--b3)' }} />
+            {currentFile && thumbUrl && (
+              <img src={thumbUrl} alt="فاتورة المورد" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--b3)' }} />
+            )}
+            <Button size="sm" variant="outline" onClick={pickImage}>تغيير الصورة</Button>
+            {onRequestCapture && <Button size="sm" variant="outline" onClick={onRequestCapture}>إعادة التصوير</Button>}
           </div>
           {showRaw && (
             <pre style={{ maxHeight: 160, overflow: 'auto', background: 'var(--b1)', border: '1px solid var(--b2)', borderRadius: 'var(--r1)', padding: 10, fontSize: 11, color: 'var(--t3)', whiteSpace: 'pre-wrap' }}>
@@ -365,6 +453,7 @@ export function InvoiceOcrModal({
           </div>
         </div>
       )}
+      </div>
     </Modal>
   );
 }
