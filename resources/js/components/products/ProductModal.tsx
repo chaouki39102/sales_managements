@@ -32,7 +32,9 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { useNotification } from '@/hooks/useNotification';
 import CopyConfigModal from '@/components/products/CopyConfigModal';
 const BarcodeScannerModal = React.lazy(() => import('@/components/BarcodeScannerModal'));
+const CameraCaptureModal = React.lazy(() => import('@/components/CameraCaptureModal'));
 import { useProductBarcodes, useBarcodeMutations } from '@/lib/api/endpoints/barcodes';
+import { isOfflineQueuedResponse } from '@/lib/offline/queueMath';
 import type { Product, Family, Brand, ProductType, PriceLevel, Barcode } from '@/lib/api/core/types';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -428,6 +430,11 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
   const [imgUploadPct, setImgUploadPct] = useState(0);
   const imgFileRef = useRef<HTMLInputElement>(null);
 
+  // ── صورة ملتقطة بالكاميرا (تُرفع عند الحفظ) ──
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
+
   // ── Barcodes ──
   const [barcodeInput, setBarcodeInput] = useState('');
   const [showAddBarcode, setShowAddBarcode] = useState(false);
@@ -516,6 +523,29 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
     if (form.images.includes(url)) return;
     set('images', [...form.images, url]);
   }
+
+  // ── صورة الكاميرا: معاينة محلية + رفع عند الحفظ (B.2) ──
+  // المنتج قد لا يملك بعد id في وضع الإنشاء، لذا نُبقي الصورة كـ blob محلي
+  // (بدون أي طلب شبكة) ونرفعها فور نجاح الحفظ عبر مسار الرفع الموجود.
+  const handleCameraCapture = useCallback((file: File) => {
+    setPendingImage(prev => {
+      if (prev) return prev;
+      return file;
+    });
+    setPendingImageUrl(prev => {
+      if (prev) return prev;
+      return URL.createObjectURL(file);
+    });
+    setIsDirty(true);
+  }, []);
+
+  const clearPendingImage = useCallback(() => {
+    setPendingImage(null);
+    setPendingImageUrl(prev => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }, []);
 
   async function handleUploadImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -802,11 +832,6 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
       isEdit
         ? apiPut<any>(`/products/${product.id}`, payload)
         : apiPost<any>('/products', payload),
-    onSuccess: (saved) => {
-      if (slug) qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
-      onSaved(saved);
-      onClose();
-    },
     onError: (err: any) => {
       setApiError(err?.message ?? 'حدث خطأ أثناء الحفظ');
       if (err?.errors) {
@@ -842,16 +867,46 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
     return true;
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!validate()) return;
     setApiError('');
-    mutation.mutate(buildPayload(form));
+    let saved: any;
+    try {
+      saved = await mutation.mutateAsync(buildPayload(form));
+    } catch {
+      return; // onError يعرض رسالة الخطأ ويملأ الحقول
+    }
+
+    // رفع صورة الكاميرا المعلّقة فور حصول المنتج على id حقيقي (B.2):
+    // - وضع التعديل: id المنتج حقيقي دائماً (الرفع ينتظر في قائمة الانتظار إن كنا دون اتصال).
+    // - وضع الإنشاء عبر الشبكة: id يأتي من استجابة الإنشاء.
+    // - وضع الإنشاء دون اتصال: لا id حقيقي بعد → لا يمكن الرفع، نُعلم المستخدم فقط.
+    const realId = isEdit ? (product?.id ?? null) : (isOfflineQueuedResponse(saved) ? null : saved?.id);
+    if (pendingImage && pendingImageUrl && realId) {
+      try {
+        const fd = new FormData();
+        fd.append('image', pendingImage);
+        const updated = await productsApi.uploadImage(realId, fd, p => setImgUploadPct(p));
+        if (updated?.images) set('images', updated.images);
+        notify.success('تم رفع الصورة الملتقطة');
+      } catch (e) {
+        notify.error('فشل رفع الصورة الملتقطة', e instanceof Error ? e.message : undefined);
+      }
+    } else if (pendingImage) {
+      notify.info('أُضيف المنتج إلى قائمة الانتظار', 'ستُرفع الصورة الملتقطة لاحقاً من صفحة تعديل المنتج');
+    }
+
+    clearPendingImage();
+    if (slug) qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
+    onSaved(saved);
+    onClose();
   }
 
   async function handleClose() {
     if (isDirty && !mutation.isPending) {
       if (!await confirm('لديك تعديلات غير محفوظة. هل تريد الخروج؟')) return;
     }
+    clearPendingImage();
     onClose();
   }
 
@@ -898,7 +953,7 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
     if (tabId === 'pricing')  return form.prices.some(p => p.price !== '' || p.rate !== '' || p.margin !== '') ? 'done' : 'empty';
     if (tabId === 'packagings') return form.packagings.length > 0 ? 'done' : 'empty';
     if (tabId === 'discounts')  return form.manages_quantity_discounts && form.quantity_discounts.length > 0 ? 'done' : 'empty';
-    if (tabId === 'images')   return form.images.length > 0 ? 'done' : 'empty';
+    if (tabId === 'images')   return form.images.length > 0 || pendingImageUrl ? 'done' : 'empty';
     if (tabId === 'seo')      return (form.meta_title || form.meta_description) ? 'done' : 'empty';
     return 'empty';
   }
@@ -906,7 +961,7 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
     if (tabId === 'pricing')    return form.prices.filter(p => p.price !== '' || p.rate !== '' || p.margin !== '').length || null;
     if (tabId === 'packagings') return form.packagings.length || null;
     if (tabId === 'discounts')  return form.quantity_discounts.filter(d => d.active).length || null;
-    if (tabId === 'images')     return form.images.length || null;
+    if (tabId === 'images')     return form.images.length + (pendingImageUrl ? 1 : 0) || null;
     if (tabId === 'barcodes')   return (productBarcodes as Barcode[]).length || null;
     return null;
   }
@@ -1847,6 +1902,24 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
           />
           <button
             type="button"
+            onClick={() => setShowCamera(true)}
+            disabled={pendingImageUrl !== null}
+            style={{
+              padding: '7px 16px', borderRadius: 'var(--r2)',
+              border: '1px solid var(--em)', background: 'var(--emb)',
+              color: 'var(--em)', fontSize: 12, fontWeight: 600,
+              cursor: 'pointer', whiteSpace: 'nowrap',
+              display: 'flex', alignItems: 'center', gap: 6,
+              opacity: pendingImageUrl ? 0.5 : 1,
+            }}
+            title="التقاط صورة بالكاميرا — تُرفع عند الحفظ"
+          >
+            {pendingImageUrl
+              ? <><i className="ti ti-check" /> صورة ملتقطة</>
+              : <><i className="ti ti-camera" /> كاميرا</>}
+          </button>
+          <button
+            type="button"
             onClick={toggleImgSuggest}
             style={{
               padding: '7px 16px', borderRadius: 'var(--r2)',
@@ -1974,15 +2047,51 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
           </div>
         )}
 
-        {form.images.length === 0 ? (
+        {form.images.length === 0 && !pendingImageUrl ? (
           <div style={{ textAlign: 'center', padding: '56px 0', color: 'var(--t4)' }}>
             <i className="ti ti-photo-off" style={{ fontSize: 40, opacity: 0.3 }} />
             <div style={{ marginTop: 12, fontSize: 13 }}>لا توجد صور</div>
-            <div style={{ fontSize: 11, marginTop: 4 }}>أضف روابط الصور أعلاه</div>
+            <div style={{ fontSize: 11, marginTop: 4 }}>أضف روابط الصور أو التقط صورة بالكاميرا</div>
           </div>
         ) : (
           <div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
+              {pendingImageUrl && (
+                <div style={{
+                  position: 'relative', borderRadius: 'var(--r3)', overflow: 'hidden',
+                  border: '2px dashed var(--em)', background: 'var(--bg3)', aspectRatio: '1',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <img
+                    src={pendingImageUrl}
+                    alt="صورة ملتقطة بالكاميرا"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                  {/* شارة ملتقطة بالكاميرا */}
+                  <div style={{
+                    position: 'absolute', top: 6, right: 6, background: 'rgba(10,138,92,.92)',
+                    color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 8px',
+                    borderRadius: 999, display: 'flex', alignItems: 'center', gap: 4,
+                  }}>
+                    <i className="ti ti-camera" style={{ fontSize: 11 }} /> ملتقطة
+                  </div>
+                  {/* إزالة */}
+                  <button
+                    onClick={clearPendingImage}
+                    title="إزالة الصورة الملتقطة"
+                    style={{
+                      position: 'absolute', top: 6, left: 6, padding: '4px 7px', borderRadius: 8,
+                      background: 'rgba(212,43,43,.85)', border: 'none', color: '#fff',
+                      cursor: 'pointer', fontSize: 13,
+                    }}
+                  ><i className="ti ti-trash" /></button>
+                  {/* ستُرفع عند الحفظ */}
+                  <div style={{
+                    position: 'absolute', bottom: 6, left: 6, background: 'rgba(0,0,0,.65)',
+                    color: '#fff', fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 999,
+                  }}>ستُرفع عند الحفظ</div>
+                </div>
+              )}
               {form.images.map((img, idx) => (
                 <div key={idx} style={{
                   position: 'relative', borderRadius: 'var(--r3)', overflow: 'hidden',
@@ -2035,6 +2144,7 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
               <i className="ti ti-info-circle" style={{ fontSize: 13 }} />
               {form.images.length} صورة — الصورة ذات النجمة تظهر في نقاط البيع.
               مرر الماوس على الصورة لتعيينها رئيسية أو حذفها أو فتحها.
+              {pendingImageUrl && ' الصورة الملتقطة ستُرفع تلقائياً عند الحفظ.'}
             </div>
           </div>
         )}
@@ -2561,6 +2671,15 @@ export default function ProductModal({ open, product, onClose, onSaved }: Produc
           open={showBarcodeScanner}
           onScan={code => { set('barcode', code); setShowBarcodeScanner(false); }}
           onClose={() => setShowBarcodeScanner(false)}
+        />
+      </Suspense>
+      <Suspense fallback={null}>
+        <CameraCaptureModal
+          open={showCamera}
+          onCapture={handleCameraCapture}
+          onClose={() => setShowCamera(false)}
+          title="التقاط صورة للمنتج"
+          hint="صوّب الكاميرا على المنتج واضغط زر الالتقاط — ستُرفع الصورة عند الحفظ"
         />
       </Suspense>
     </div>
