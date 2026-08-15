@@ -186,13 +186,14 @@ all 9 offline suites) · `npm run build` 0 errors, 224 precache entries · SW MA
 > rendered on FV/POS prints (Phase 69 / upgrade 1) and can be DECODED to reopen a doc. Product
 > photo upload exists (`image_url`/upload path).
 
-## B.1 Camera scan everywhere
+## B.1 Camera scan everywhere — ✅ COMPLETE (`555f5bd`)
 
-- Shared `useBarcodeScan()` hook + global camera affordance outside the POS:
-  documents form (scan product barcode → add as line), products page (scan → open product),
-  parties page (scan party barcode/NIF → open).
+- Shared `useBarcodeScan()` hook (`resources/js/hooks/useBarcodeScan.ts`) + global camera affordance
+  outside the POS: documents form (scan product barcode → add as line), products page (scan → open
+  product), parties page (scan party barcode/NIF → open).
 - Refactor `BarcodeScannerModal` to accept `title`/`hint` + `onScan` so every page reuses one impl.
-- Verify: tsc, build, SW MATCH, Playwright scan-smoke (mock the camera feed).
+- Verify: tsc, build, SW MATCH, Playwright scan-smoke (mock the camera feed) — ✅ all green
+  (`barcode-scan.pw.spec.ts`, 3/3 passed; `npm test` 273/273; build 224 precache; SW MATCH).
 
 ## B.2 Photograph a product
 
@@ -273,7 +274,7 @@ all 9 offline suites) · `npm run build` 0 errors, 224 precache entries · SW MA
 
 | Family | Status | Notes |
 |--------|--------|-------|
-| B. Camera-native | ❌ planned | B.1–B.5 defined; start after C (C is done) |
+| B. Camera-native | 🔄 in progress | **B.1 DONE** (`555f5bd`) — shared `useBarcodeScan` + `title`/`hint`-capable modal, wired into documents form / products / parties with Playwright smoke; next **B.2** |
 | C. Offline everywhere | ✅ done | **C.1** (offline interception fixed + regression suite) · **C.2** (documents-module offline hardening + field-agent flow test) · **C.3** (prefetch page + indicator integration) · **C.4** (sync dashboard `/offline`) · **C.5** (offline POS Pro Mobile, `314afea`) — all committed + pushed |
 | D. WhatsApp commerce | ❌ planned | D.1–D.5 defined; wa.me-first, Meta Cloud API webhook later |
 
@@ -290,7 +291,7 @@ files; leave unrelated dirty files untouched):
 | *(C.3)* | **DONE** (`2213a28`) — `cacheTtlForUrl` extension + «جهّز للعمل دون اتصال» prefetch (`prepareOffline.ts` `OFFLINE_DATASETS` + prefetch fn), `OfflinePage.tsx`, `OfflineIndicator` rework, route `/offline` |
 | *(C.4)* | **DONE** (`95e8920` merge "offline mode") — `SyncDashboard.tsx` (pending/failed op list, per-op + retry-all, مزامنة الآن + last-synced stamp, temp→real id), `useOffline` additions, `sync-dashboard.spec.ts`, route + nav "دون اتصال" |
 | *(C.5)* | **DONE** (`314afea`) — offline POS Pro Mobile: last-known-session fallback (localStorage per slug), offline queued toast (`isOfflineQueuedResponse`), appbar cloud sync button + «دون اتصال» chip, «دون اتصال» sidebar entry; verified tsc/273 tests/build 224 precache/SW MATCH |
-| *(B.1)* | shared camera-scan hook + non-POS wiring |
+| *(B.1)* | **DONE** (`555f5bd`) — shared camera-scan hook + non-POS wiring |
 | *(B.2)* | camera product photo capture |
 | *(B.3)* | fiscal-QR → reopen document |
 | *(B.4)* | supplier-invoice photo → OCR prefill → FA |
