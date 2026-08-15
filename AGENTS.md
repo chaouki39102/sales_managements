@@ -12,7 +12,39 @@
 - **Auth** lives in `resources/js/context/AuthContext.tsx` (`useAuth()` → `user`/`isAuthenticated`/`isLoading`/`isSuperAdmin`, plus login/logout/2FA). **Any React Query that needs the session must gate it**: `enabled: !!slug && isAuthenticated && !authLoading` (the exact pattern `FiscalYearContext.tsx:59-64` uses) — never fetch tenant data before auth resolves.
 - **Fiscal year** lives in `resources/js/context/FiscalYearContext.tsx` (`useFiscalYear()` → `selectedYear`/`isReadOnly`/`open`/`closed`). Its SSOT id is `appStore.selectedYearId`. Backend scoping: Pattern A/B endpoints use `filter[fiscal_year_id]`; Pattern C endpoints use a flat `fiscal_year_id` (see Phase 22). Changing company resets `selectedYearId` automatically.
 - **Context folder**: `resources/js/context/` holds `AuthContext.tsx`, `FiscalYearContext.tsx`, `RememberMeBoot.tsx` (restores `{company + year}` snapshot into the store before routes render).
-- **Offline layer** (`lib/offline/`) sits on the SHARED `client` — its cache keys embed the full URL (slug included), so tenant isolation in the offline cache is automatic; never store cross-tenant keys.
+- **Offline layer** (`lib/offline/`) sits on the SHARED `client` — its cache keys embed the full URL (slug included), so tenant isolation in the offline cache is automatic; never store cross-tenant keys. The **write queue** (`pendingOps` in IndexedDB) is now tenant-scoped too: every op carries `slug` (captured from the url's first segment at enqueue), and reads/counts/replay/clear filter by the ACTIVE slug via `useActiveSlug()`/`appActions.getActiveSlug()` — legacy rows without the field fall back to `opSlug(url)`, and tenant-less ops (empty slug) stay visible to every company.
+
+## Date
+2026-08-15
+
+### Phase 77 — Offline Queue Tenant Scoping + Failed-Op Dismissal (Aug 15)
+
+**Bug (user report)**: after a `migrate:fresh` + re-seed, the offline indicator showed a persistent «عمليات فشلت مزامنتها» badge with `DELETE /el-houda-emballage-6a7ae911e0aab/products/8` and `…/products/9` failing with 404 «المورد غير موجود» on every retry. Two distinct defects: (1) the write queue (`pendingOps`) was NOT tenant-scoped — ops from any company were replayed against whatever company was active (cross-tenant `/{B}/{A}/…`), and (2) ops whose RESOURCE is genuinely gone (server wiped by `migrate:fresh`) are permanently 404 — retry can never fix them, so the user needed a way to dismiss them. Fixed with **tenant scoping + a dismiss/clear-failed affordance**.
+
+**T1 — queue tenant scoping** (`resources/js/lib/offline/db.ts`):
+- `PendingOp` + `EnqueueInput` gained `slug?: string`. `enqueueOp` stores `op.slug ?? slugFromUrl(op.url)` — the interceptor already wrote `/{slug}/` into the url, so the first path segment IS the tenant.
+- New helpers: `slugFromUrl(url)` (leading `/{...}` segment, `''` when none) and `opSlug(op)` (`op.slug ?? slugFromUrl(op.url)` — legacy-rows fallback, so pre-fix records in existing browsers keep working with no migration/DB_VERSION bump).
+- Optional `slug` param on `getPendingOps(slug?)`, `getPendingOpsByStatus(status, slug?)`, `getPendingOpsCount(slug?)`, `getFailedOpsCount(slug?)` — filtered in JS after `getAll` (queue is tiny; no slug index needed). A row with an EMPTY derived slug (a public-route mutation, not company-scoped) is kept for every company — it carries no tenant data and is safe to replay anywhere.
+- New `clearFailedOps(slug?)` — deletes every failed op for the active tenant (the dismissal path).
+
+**T2 — interceptor captures the tenant** (`offlineAwareApi.ts`): the enqueue input now sets `slug: slugFromUrl(url)`.
+
+**T3 — replay scoped** (`syncEngine.ts`): `replayPendingOps(replay, slug?)` reads and counts via `getPendingOps(slug)`/`getPendingOpsCount(slug)` — a sync pass only ever touches the ACTIVE company's ops.
+
+**T4 — hooks thread the slug** (`useOffline.ts`): `usePendingOpsCount`, `useFailedOpsCount`, `useFailedOps`, `useOfflineOps` now call `useActiveSlug()` (reactive — they re-refresh when the company switches); `useSync.run` and `retryFailedOps` read `appActions.getActiveSlug()` at call time (non-React). `useOffline.ts` imports from `appStore` (which depends only on zustand + types) — no circular import.
+
+**T5 — user-facing dismissal**: `OfflineIndicator.tsx` popover — per-op × dismiss button (`removePendingOp` + refresh) plus a «مسح الفاشلة» header button (`clearFailedOps(slug)`); `SyncDashboard.tsx` — per-failed-row «حذف» button and a «مسح الفاشلة (N)» footer button next to «إعادة المحاولة للكل». New CSS: `.offline-pop-hd-actions`, `.offline-pop-del`, `.offline-op-actions` (layout.css); the popover item gained `position:relative; padding-inline-end` so the × sits clear of the content.
+
+**Tests**: `offline-queue.spec.ts` +4 (slug derivation, enqueue stores explicit-vs-derived slug, scoped reads/counts + legacy-rows fallback + tenant-less kept for all, `clearFailedOps` only touches the active tenant), `sync-engine.spec.ts` +1 (replay scoped to `company-a` only touches A's ops, B's stay queued), `offline-interceptor.spec.ts` asserts `op.slug === 'demo'`. **283/283** (19 files).
+
+**Key architectural rules**:
+- The offline write queue must be tenant-scoped like the GET cache: an op's tenant is the `/{slug}/` prefix the request interceptor writes into the url — capture it AT ENQUEUE (`slugFromUrl`), never at replay (the active slug may have changed). All reads, counts, replay and clear must filter by the ACTIVE slug, or stale ops from a previous company (surviving a `migrate:fresh`) replay against the wrong tenant and permanently pollute the failed badge.
+- Keep the field OPTIONAL + derive from the url (`opSlug`) for legacy rows — no IndexedDB `DB_VERSION` bump/migration needed for existing browsers (Phase 68 follow-up rule: version bumps are for schema/index changes only).
+- Tenant-less ops (empty slug = public-route mutations) stay visible to every company; they carry no tenant data and are safe to replay regardless.
+- Retry can NEVER fix a permanent 404 on a resource the server no longer has (post-`migrate:fresh`); the UI must offer an explicit per-op dismiss and a clear-failed action — never silently drop, never force an eternal retry loop. `clearFailedOps` is scoped so one company can't wipe another's queue.
+- Hooks need the slug REACTIVELY (`useActiveSlug()` — re-runs on company switch) but the sync/retry actions need it at CALL TIME (`appActions.getActiveSlug()`) — both live in `appStore` and importing them into `useOffline` adds no cycle.
+
+**Verification**: `npx tsc --noEmit` clean · `npm test` **283/283** (19 files, all 9 offline suites: db-migration, offline-cache-ttl, offline-doc-flow, offline-interceptor, offline-math, offline-queue, retry-failed, sync-dashboard, sync-engine) · `npm run build` 0 errors, **226 precache entries** · **SW MATCH**. No PHP touched → pest not re-run. Next pending: **B.4** (photograph a supplier invoice → OCR prefill → FA) — full list in `C1_OFFLINE_FIX.md`.
 
 ## Date
 2026-08-13

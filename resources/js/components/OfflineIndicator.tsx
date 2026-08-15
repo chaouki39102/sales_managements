@@ -10,6 +10,7 @@ import {
   retryFailedOps,
   type SyncResult,
 } from '@/lib/offline/useOffline';
+import { removePendingOp, clearFailedOps, type PendingOp } from '@/lib/offline/db';
 import { OFFLINE_DATASETS } from '@/lib/offline/prepareOffline';
 import { useActiveSlug } from '@/lib/store/appStore';
 import { useFiscalYear } from '@/context/FiscalYearContext';
@@ -54,6 +55,30 @@ export default function OfflineIndicator() {
       await refresh();
       if (report.failed > 0) setOpen(true);
       else setOpen(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Drop a single failed op the server can never accept (e.g. a 404 on a resource gone after `migrate:fresh`). */
+  const handleDismissOp = async (op: PendingOp) => {
+    if (op.id == null) return;
+    setBusy(true);
+    try {
+      await removePendingOp(op.id);
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Remove EVERY failed op of the CURRENT company (retry can never fix a permanent 4xx). */
+  const handleClearFailed = async () => {
+    setBusy(true);
+    try {
+      await clearFailedOps(slug ?? undefined);
+      await refresh();
+      setOpen(false);
     } finally {
       setBusy(false);
     }
@@ -165,15 +190,27 @@ export default function OfflineIndicator() {
             <>
               <div className="offline-pop-hd">
                 <span>عمليات فشلت مزامنتها</span>
-                <button
-                  type="button"
-                  className="offline-pop-retry"
-                  onClick={handleRetryAll}
-                  disabled={busy}
-                >
-                  <i className="ti ti-refresh" />
-                  {busy ? 'جارٍ الإعادة...' : 'إعادة المحاولة'}
-                </button>
+                <div className="offline-pop-hd-actions">
+                  <button
+                    type="button"
+                    className="offline-pop-retry"
+                    onClick={handleClearFailed}
+                    disabled={busy}
+                    title="حذف العمليات الفاشلة الحالية — لن تُعاد المحاولة"
+                  >
+                    <i className="ti ti-trash" />
+                    مسح الفاشلة
+                  </button>
+                  <button
+                    type="button"
+                    className="offline-pop-retry"
+                    onClick={handleRetryAll}
+                    disabled={busy}
+                  >
+                    <i className="ti ti-refresh" />
+                    {busy ? 'جارٍ الإعادة...' : 'إعادة المحاولة'}
+                  </button>
+                </div>
               </div>
               {ops.length === 0 ? (
                 <div className="offline-pop-empty">لا توجد عمليات فاشلة</div>
@@ -186,6 +223,16 @@ export default function OfflineIndicator() {
                       {op.lastError && (
                         <span className="offline-pop-err">{op.lastError}</span>
                       )}
+                      <button
+                        type="button"
+                        className="offline-pop-del"
+                        onClick={() => void handleDismissOp(op)}
+                        disabled={busy}
+                        title="حذف العملية"
+                        aria-label="حذف العملية"
+                      >
+                        <i className="ti ti-x" />
+                      </button>
                     </li>
                   ))}
                 </ul>

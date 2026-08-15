@@ -63,17 +63,21 @@ export function resolveOpUrl(url: string, tempMap: Map<number, number>): string 
 }
 
 /**
- * Replay the FIFO write queue through `replay`. Order is insertion order
- * (auto-increment ids). A success removes the op; a permanent (4xx) failure or
- * a retryable failure past MAX_RETRIES marks the op `failed` (surfaced in the
- * UI, never silently dropped); other failures bump `retries` and leave it queued.
+ * Replay the FIFO write queue through `replay`, scoped to ONE tenant: only ops
+ * whose `slug` matches `slug` (the active company) are replayed, so ops queued
+ * under a previous/other company never hit the current company's API (and a
+ * stale queue surviving a `migrate:fresh` can never 404 against the new data).
+ * Order is insertion order (auto-increment ids). A success removes the op; a
+ * permanent (4xx) failure or a retryable failure past MAX_RETRIES marks the op
+ * `failed` (surfaced in the UI, never silently dropped); other failures bump
+ * `retries` and leave it queued.
  */
-export async function replayPendingOps(replay: HttpReplayFn): Promise<SyncReport> {
+export async function replayPendingOps(replay: HttpReplayFn, slug?: string): Promise<SyncReport> {
   let replayed = 0;
   let failed = 0;
   const tempMap = new Map<number, number>();
 
-  const ops = await getPendingOps();
+  const ops = await getPendingOps(slug);
   for (const op of ops) {
     const url = resolveOpUrl(op.url, tempMap);
     try {
@@ -95,6 +99,6 @@ export async function replayPendingOps(replay: HttpReplayFn): Promise<SyncReport
     }
   }
 
-  const remaining = await getPendingOpsCount();
+  const remaining = await getPendingOpsCount(slug);
   return { replayed, failed, remaining };
 }

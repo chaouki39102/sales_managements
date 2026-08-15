@@ -6,10 +6,13 @@ import {
   getPendingOpsByStatus,
   removePendingOp,
   clearPendingOps,
+  clearFailedOps,
   updatePendingOp,
   getPendingOpsCount,
   getFailedOpsCount,
   extractTargetIdFromUrl,
+  slugFromUrl,
+  opSlug,
 } from '../db';
 
 describe('offline write queue (db.ts)', () => {
@@ -94,5 +97,65 @@ describe('offline write queue (db.ts)', () => {
     const ops = await getPendingOps();
     expect(ops.map(o => o.id as number)).toEqual([o1.id as number, o3.id as number]);
     expect(ops.map(o => (o.data as { seq: number }).seq)).toEqual([1, 3]);
+  });
+
+  it('derives the tenant slug from the first url path segment', () => {
+    expect(slugFromUrl('/company-a/products/8')).toBe('company-a');
+    expect(slugFromUrl('company-a/documents')).toBe('company-a');
+    expect(slugFromUrl('/documents/123')).toBe('documents');
+    expect(slugFromUrl('/public-route?x=1')).toBe('public-route');
+    expect(slugFromUrl('')).toBe('');
+    expect(opSlug({ slug: undefined, url: '/company-a/products/8' })).toBe('company-a');
+    expect(opSlug({ slug: 'company-b', url: '/company-a/products/8' })).toBe('company-b');
+  });
+
+  it('stores the tenant slug at enqueue: explicit wins, else derived from the url', async () => {
+    await enqueueOp({ method: 'POST', url: '/company-a/documents', data: {} });
+    await enqueueOp({ method: 'POST', url: '/company-b/documents', data: {}, slug: 'company-b' });
+    await enqueueOp({ method: 'POST', url: '/company-a/products', data: {}, slug: 'company-a' });
+
+    const ops = await getPendingOps();
+    expect(ops.map(o => o.slug)).toEqual(['company-a', 'company-b', 'company-a']);
+  });
+
+  it('scopes reads/counts to the active tenant and keeps tenant-less ops for every tenant', async () => {
+    await enqueueOp({ method: 'DELETE', url: '/company-a/products/8', data: {} });
+    await enqueueOp({ method: 'DELETE', url: '/company-b/products/9', data: {} });
+    await enqueueOp({ method: 'DELETE', url: '/company-a/products/10', data: {} });
+    // legacy row shape: no `slug` field — must be matched via its url (opSlug)
+    await enqueueOp({ method: 'POST', url: '/company-c/documents', data: {}, slug: undefined });
+
+    expect(await getPendingOps('company-a')).toHaveLength(2);
+    expect(await getPendingOps('company-b')).toHaveLength(1);
+    expect(await getPendingOpsCount('company-a')).toBe(2);
+    expect(await getPendingOpsCount('company-b')).toBe(1);
+
+    const statuses = await getPendingOpsByStatus('pending', 'company-a');
+    expect(statuses).toHaveLength(2);
+    expect(statuses.map(o => o.url)).toEqual([
+      '/company-a/products/8',
+      '/company-a/products/10',
+    ]);
+
+    // no slug → full queue (callers without a tenant context)
+    expect(await getPendingOps()).toHaveLength(4);
+  });
+
+  it('clearFailedOps removes ONLY the active tenant\'s failed ops', async () => {
+    const a = await enqueueOp({ method: 'DELETE', url: '/company-a/products/8', data: {} });
+    await enqueueOp({ method: 'DELETE', url: '/company-b/products/9', data: {} });
+    await updatePendingOp(a.id as number, { status: 'failed', lastError: '404 المورد غير موجود', retries: 3 });
+
+    expect(await getFailedOpsCount('company-a')).toBe(1);
+    expect(await getFailedOpsCount('company-b')).toBe(0);
+
+    const removed = await clearFailedOps('company-a');
+
+    expect(removed).toBe(1);
+    expect(await getFailedOpsCount()).toBe(0);
+    // the OTHER tenant's op is untouched
+    const ops = await getPendingOps();
+    expect(ops).toHaveLength(1);
+    expect(ops[0].url).toBe('/company-b/products/9');
   });
 });

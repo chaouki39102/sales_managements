@@ -150,4 +150,26 @@ describe('sync engine (syncEngine.ts)', () => {
     expect(report.replayed).toBe(1);
     expect(await getPendingOps()).toHaveLength(0);
   });
+
+  it('replay scoped to a slug only touches THAT tenant\'s ops (cross-tenant isolation)', async () => {
+    const replayed: string[] = [];
+    const replay: HttpReplayFn = async ({ url }) => {
+      replayed.push(url);
+      return {};
+    };
+    await enqueueOp({ method: 'DELETE', url: '/company-a/products/8', data: {} });
+    await enqueueOp({ method: 'DELETE', url: '/company-b/products/9', data: {} });
+    await enqueueOp({ method: 'DELETE', url: '/company-a/products/10', data: {} });
+
+    // syncing while company A is active → B's stale ops stay queued
+    const report = await replayPendingOps(replay, 'company-a');
+
+    expect(replayed).toEqual(['/company-a/products/8', '/company-a/products/10']);
+    // remaining is scoped to the ACTIVE tenant (A's queue is now empty); B's op
+    // is untouched below — isolation is proven by the queue contents, not the count.
+    expect(report).toEqual({ replayed: 2, failed: 0, remaining: 0 });
+    const left = await getPendingOps();
+    expect(left).toHaveLength(1);
+    expect(left[0].url).toBe('/company-b/products/9');
+  });
 });

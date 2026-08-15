@@ -14,7 +14,8 @@ import {
   retryFailedOps,
   type SyncResult,
 } from '@/lib/offline/useOffline';
-import { markOpPending, type PendingOp } from '@/lib/offline/db';
+import { markOpPending, removePendingOp, clearFailedOps, type PendingOp } from '@/lib/offline/db';
+import { useActiveSlug } from '@/lib/store/appStore';
 
 function fmtTime(ts: number | null): string {
   if (!ts) return '—';
@@ -29,6 +30,7 @@ const METHOD_VARIANT: Record<PendingOp['method'], string> = {
 
 export default function SyncDashboard() {
   const online = useOnlineStatus();
+  const slug = useActiveSlug();
   const { ops, refresh } = useOfflineOps();
   const { syncing, lastError, sync } = useSync();
   const lastSyncedAt = useLastSyncedAt();
@@ -63,6 +65,17 @@ export default function SyncDashboard() {
     }
   };
 
+  const handleDismissOp = async (op: PendingOp) => {
+    if (!op.id) return;
+    setBusy(true);
+    try {
+      await removePendingOp(op.id);
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleRetryAll = async () => {
     setBusy(true);
     try {
@@ -70,6 +83,16 @@ export default function SyncDashboard() {
       await refresh();
       const r = await sync();
       setReport(r);
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleClearFailed = async () => {
+    setBusy(true);
+    try {
+      await clearFailedOps(slug ?? undefined);
       await refresh();
     } finally {
       setBusy(false);
@@ -185,15 +208,27 @@ export default function SyncDashboard() {
                   </td>
                   <td>
                     {op.status === 'failed' && (
-                      <button
-                        type="button"
-                        className="btn btn-xs btn-b"
-                        onClick={() => void handleRetryOp(op)}
-                        disabled={busy || syncing || !online}
-                      >
-                        <i className="ti ti-refresh" />
-                        إعادة
-                      </button>
+                      <div className="offline-op-actions">
+                        <button
+                          type="button"
+                          className="btn btn-xs btn-b"
+                          onClick={() => void handleRetryOp(op)}
+                          disabled={busy || syncing || !online}
+                        >
+                          <i className="ti ti-refresh" />
+                          إعادة
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-xs btn-r"
+                          onClick={() => void handleDismissOp(op)}
+                          disabled={busy}
+                          title="حذف العملية — لن تُعاد المحاولة"
+                        >
+                          <i className="ti ti-trash" />
+                          حذف
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -205,6 +240,16 @@ export default function SyncDashboard() {
 
       {failed.length > 0 && (
         <div className="offline-dash-footer">
+          <button
+            type="button"
+            className="btn btn-r"
+            onClick={() => void handleClearFailed()}
+            disabled={busy || syncing}
+            title="حذف العمليات الفاشلة الحالية — لن تُعاد المحاولة (مفيدة للعمليات التي لن يقبلها الخادم أبداً)"
+          >
+            <i className="ti ti-trash" />
+            مسح الفاشلة ({failed.length})
+          </button>
           <button
             type="button"
             className="btn btn-b"

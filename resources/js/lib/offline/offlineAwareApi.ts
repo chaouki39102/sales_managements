@@ -1,6 +1,6 @@
 import client, { registerNetworkFailureHandler } from '@/lib/api/core/client';
 import type { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
-import { setCache, getCache, enqueueOp, type EnqueueInput } from './db';
+import { setCache, getCache, enqueueOp, slugFromUrl, type EnqueueInput } from './db';
 import {
   computeQueuedDocumentTotals,
   nextTempId,
@@ -128,6 +128,11 @@ export function registerOfflineInterceptor(): void {
       const enq: EnqueueInput = {
         method: method.toUpperCase() as 'POST' | 'PUT' | 'PATCH' | 'DELETE',
         url,
+        // the interceptor has already prepended `/{slug}/` to tenant URLs — that
+        // first path segment IS the tenant this op belongs to. Reads/replay are
+        // scoped to the ACTIVE slug so one company's ops never replay against
+        // another's (or pollute its badge).
+        slug: slugFromUrl(url),
         data: rawData,
       };
 

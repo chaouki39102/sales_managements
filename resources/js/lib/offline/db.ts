@@ -68,11 +68,20 @@ export type PendingOpStatus = 'pending' | 'failed';
  * enqueued op replays first. `method` + `url` are stored VERBATIM and replayed
  * verbatim — a CREATE stays POST, an UPDATE stays PUT (Phase 46 rule: replay
  * must PUT via `documentId`, never naively convert).
+ *
+ * `slug` is the TENANT the op belongs to (the company slug the interceptor
+ * prepends to the URL). Reads, counts and replay are scoped to the ACTIVE slug
+ * so ops queued under one company never replay against — or pollute the badge
+ * of — another (e.g. stale ops surviving a `migrate:fresh`). Legacy records
+ * written before the field existed fall back to parsing the slug out of `url`
+ * (see `opSlug`).
  */
 export interface PendingOp {
   id?: number;
   method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   url: string;
+  /** Tenant company slug — the first path segment of a tenant URL. */
+  slug?: string;
   data?: unknown;
   createdAt: number;
   /** Optimistic temp id (negative) assigned when a CREATE is queued offline. */
@@ -89,6 +98,30 @@ export interface PendingOp {
 export function extractTargetIdFromUrl(url: string): number | null {
   const m = String(url).replace(/\/+$/, '').match(/(\d+)$/);
   return m ? Number(m[1]) : null;
+}
+
+/** Leading tenant slug of a URL, e.g. `/company-a/products/8` → `company-a`. */
+export function slugFromUrl(url: string): string {
+  const m = String(url).replace(/^\/+/, '').match(/^([^/?]+)/);
+  return m ? m[1] : '';
+}
+
+/** Tenant an op belongs to: explicit `slug` field, else derived from its url (legacy rows). */
+export function opSlug(op: Pick<PendingOp, 'slug' | 'url'>): string {
+  return op.slug ?? slugFromUrl(op.url);
+}
+
+/**
+ * Keep only rows belonging to the given tenant. A row with NO tenant (empty
+ * derived slug — a public-route mutation, not company-scoped) is kept for every
+ * company: it carries no tenant data and is safe to replay regardless.
+ */
+function scopedBySlug<T extends Pick<PendingOp, 'slug' | 'url'>>(rows: T[], slug?: string): T[] {
+  if (!slug) return rows;
+  return rows.filter(r => {
+    const s = opSlug(r);
+    return s === slug || s === '';
+  });
 }
 
 export async function setCache<T>(key: string, data: T, ttlMs = 5 * 60 * 1000): Promise<void> {
@@ -149,6 +182,8 @@ export async function invalidateCache(prefix: string): Promise<void> {
 export interface EnqueueInput {
   method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   url: string;
+  /** Tenant slug — stored verbatim; falls back to `slugFromUrl(url)`. */
+  slug?: string;
   data?: unknown;
   tempId?: number | null;
   targetId?: number | null;
@@ -159,6 +194,7 @@ export async function enqueueOp(op: EnqueueInput): Promise<PendingOp> {
   const record: PendingOp = {
     method: op.method,
     url: op.url,
+    slug: op.slug ?? slugFromUrl(op.url),
     data: op.data,
     createdAt: Date.now(),
     tempId: op.tempId ?? null,
@@ -171,14 +207,18 @@ export async function enqueueOp(op: EnqueueInput): Promise<PendingOp> {
   return { ...record, id };
 }
 
-export async function getPendingOps(): Promise<PendingOp[]> {
+/**
+ * ALL queued ops for `slug` (or every op when no slug — callers without a
+ * tenant context). Legacy rows with no `slug` field are matched by `opSlug`.
+ */
+export async function getPendingOps(slug?: string): Promise<PendingOp[]> {
   const db = await getDb();
-  return db.getAll('pendingOps');
+  return scopedBySlug(await db.getAll('pendingOps'), slug);
 }
 
-export async function getPendingOpsByStatus(status: PendingOpStatus): Promise<PendingOp[]> {
+export async function getPendingOpsByStatus(status: PendingOpStatus, slug?: string): Promise<PendingOp[]> {
   const db = await getDb();
-  return db.getAllFromIndex('pendingOps', 'status', status);
+  return scopedBySlug(await db.getAllFromIndex('pendingOps', 'status', status), slug);
 }
 
 export async function updatePendingOp(id: number, patch: Partial<PendingOp>): Promise<void> {
@@ -212,12 +252,21 @@ export async function clearPendingOps(): Promise<void> {
   await db.clear('pendingOps');
 }
 
-export async function getPendingOpsCount(): Promise<number> {
+/** Remove every FAILED op for `slug` — a user-initiated dismissal of ops the server can never accept (e.g. a 404 on a resource gone after a `migrate:fresh`). */
+export async function clearFailedOps(slug?: string): Promise<number> {
   const db = await getDb();
-  return db.count('pendingOps');
+  const failed = await getPendingOpsByStatus('failed', slug);
+  if (failed.length === 0) return 0;
+  const tx = db.transaction('pendingOps', 'readwrite');
+  await Promise.all(failed.map(op => tx.store.delete(op.id as number)));
+  await tx.done;
+  return failed.length;
 }
 
-export async function getFailedOpsCount(): Promise<number> {
-  const db = await getDb();
-  return db.countFromIndex('pendingOps', 'status', 'failed');
+export async function getPendingOpsCount(slug?: string): Promise<number> {
+  return (await getPendingOps(slug)).length;
+}
+
+export async function getFailedOpsCount(slug?: string): Promise<number> {
+  return (await getPendingOpsByStatus('failed', slug)).length;
 }

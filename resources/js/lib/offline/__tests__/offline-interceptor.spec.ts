@@ -125,6 +125,7 @@ describe('offline interception (client.ts hook boot order)', () => {
     expect(ops).toHaveLength(1);
     expect(ops[0].method).toBe('POST');
     expect(ops[0].url).toBe('/demo/documents');
+    expect(ops[0].slug).toBe('demo'); // tenant captured from the url's first segment
     expect(ops[0].tempId).toBeLessThan(0);
     expect(ops[0].data).toEqual(DOC_PAYLOAD);
   });
@@ -229,6 +230,7 @@ describe('offline interception (client.ts hook boot order)', () => {
     expect(ops).toHaveLength(1);
     expect(ops[0].method).toBe('PATCH');
     expect(ops[0].url).toBe('/demo/parties/9');
+    expect(ops[0].slug).toBe('demo');
     expect(ops[0].data).toEqual({ name: 'offline edit' });
   });
 });

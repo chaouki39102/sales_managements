@@ -9,6 +9,7 @@ import {
 } from './db';
 import client from '@/lib/api/core/client';
 import { replayPendingOps, type SyncResult } from './syncEngine';
+import { useActiveSlug, appActions } from '@/lib/store/appStore';
 import {
   offlineDatasetsFreshness,
   prefetchOfflineEssentials,
@@ -55,11 +56,12 @@ export function useOnlineStatus(): boolean {
 }
 
 export function usePendingOpsCount(): number {
+  const slug = useActiveSlug();
   const [count, setCount] = useState(0);
 
   const refresh = useCallback(async () => {
-    setCount(await getPendingOpsCount());
-  }, []);
+    setCount(await getPendingOpsCount(slug ?? undefined));
+  }, [slug]);
 
   useEffect(() => {
     refresh();
@@ -71,11 +73,12 @@ export function usePendingOpsCount(): number {
 }
 
 export function useFailedOpsCount(): number {
+  const slug = useActiveSlug();
   const [count, setCount] = useState(0);
 
   const refresh = useCallback(async () => {
-    setCount(await getFailedOpsCount());
-  }, []);
+    setCount(await getFailedOpsCount(slug ?? undefined));
+  }, [slug]);
 
   useEffect(() => {
     refresh();
@@ -87,11 +90,12 @@ export function useFailedOpsCount(): number {
 }
 
 export function useFailedOps(): { ops: PendingOp[]; refresh: () => Promise<void> } {
+  const slug = useActiveSlug();
   const [ops, setOps] = useState<PendingOp[]>([]);
 
   const refresh = useCallback(async () => {
-    setOps(await getPendingOpsByStatus('failed'));
-  }, []);
+    setOps(await getPendingOpsByStatus('failed', slug ?? undefined));
+  }, [slug]);
 
   useEffect(() => {
     void refresh();
@@ -102,11 +106,12 @@ export function useFailedOps(): { ops: PendingOp[]; refresh: () => Promise<void>
 
 /** ALL queued ops (pending + failed), kept fresh every 10s — sync-dashboard feed. */
 export function useOfflineOps(): { ops: PendingOp[]; refresh: () => Promise<void> } {
+  const slug = useActiveSlug();
   const [ops, setOps] = useState<PendingOp[]>([]);
 
   const refresh = useCallback(async () => {
-    setOps(await getPendingOps());
-  }, []);
+    setOps(await getPendingOps(slug ?? undefined));
+  }, [slug]);
 
   useEffect(() => {
     void refresh();
@@ -160,8 +165,11 @@ export function useSync(): {
   const syncingRef = useRef(false);
 
   const run = useCallback(async (): Promise<SyncResult> => {
+    // Replay ONLY the active company's ops — a stale queue from a previous
+    // company (or surviving a `migrate:fresh`) must never hit this tenant.
+    const slug = appActions.getActiveSlug() ?? undefined;
     if (syncingRef.current) {
-      return { replayed: 0, failed: 0, remaining: await getPendingOpsCount() };
+      return { replayed: 0, failed: 0, remaining: await getPendingOpsCount(slug) };
     }
     syncingRef.current = true;
     setSyncing(true);
@@ -174,7 +182,7 @@ export function useSync(): {
         const payload = (res as { data?: { data?: unknown } })?.data?.data
           ?? (res as { data?: unknown })?.data;
         return payload as { id?: number };
-      });
+      }, slug);
 
       // a sync that REACHED the server is "last synced" even with 0 ops
       setLastSyncedAt();
@@ -202,7 +210,8 @@ export function useSync(): {
 
 /** Reset every failed op back to pending (user clicked "retry") — then call sync(). */
 export async function retryFailedOps(): Promise<void> {
-  const failed = await getPendingOpsByStatus('failed');
+  const slug = appActions.getActiveSlug() ?? undefined;
+  const failed = await getPendingOpsByStatus('failed', slug);
   for (const op of failed) {
     await updatePendingOp(op.id!, { status: 'pending', lastError: null, retries: 0 });
   }
