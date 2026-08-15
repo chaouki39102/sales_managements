@@ -3,12 +3,16 @@
 // صفحة الأطراف الموحدة — زبائن + موردون + مختلط
 // ════════════════════════════════════════════════════════════════════════════
 import {
-  useState, useMemo, useCallback, useRef, useEffect,
+  useState, useMemo, useCallback, useRef, useEffect, Suspense, lazy,
 } from 'react';
 import {
-  useParties, useClients, useSuppliers, usePartyMutations,
+  useParties, useClients, useSuppliers, usePartyMutations, partiesApi,
 } from '@/lib/api/endpoints/parties';
 import { useModal }    from '@/hooks/useModal';
+import { useBarcodeScan } from '@/hooks/useBarcodeScan';
+import { useNotification } from '@/hooks/useNotification';
+
+const BarcodeScannerModal = lazy(() => import('@/components/BarcodeScannerModal'));
 import PageHeader      from '@/components/ui/PageHeader';
 import Badge           from '@/components/ui/Badge';
 import Button          from '@/components/ui/Button';
@@ -164,6 +168,26 @@ export default function PartiesPage() {
   const openEdit   = (p: Party) => { setEditing(p); setInitType(p.party_type_id); formModal.openModal(); };
   const openStats  = (p: Party) => { setViewParty(p); statsModal.openModal(); };
 
+  // ── مسح NIF/RC/كود/هاتف بالكاميرا → فتح الطرف (مطابقة الصفحة ثم بحث الخادم) ──
+  const notify = useNotification();
+  const matchParty = (p: Party, code: string) =>
+    p.nif === code || p.rc === code || p.code === code ||
+    p.phone === code || p.mobile === code;
+  const partyScanner = useBarcodeScan<Party>({
+    resolve: async (code) => {
+      const local = parties.find((p) => matchParty(p, code));
+      if (local) return local;
+      try {
+        const res = await partiesApi.list({ search: code, per_page: 5, include: 'partyType,wilaya,commune' });
+        return (res?.data ?? []).find((p) => matchParty(p, code)) ?? null;
+      } catch {
+        return null;
+      }
+    },
+    onFound: (p) => openStats(p),
+    onNotFound: () => notify.error('لم يتم العثور على طرف بهذا الرقم'),
+  });
+
   const tabs: { key: TabKey; label: string; icon: string }[] = [
     { key: 'all',      label: 'الكل',     icon: 'ti-users' },
     { key: 'customer', label: 'الزبائن',  icon: 'ti-user' },
@@ -178,6 +202,9 @@ export default function PartiesPage() {
         subtitle={`${meta?.total ?? '...'} طرف — زبائن وموردون`}
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
+            <Button size="sm" variant="outline" icon={<i className="ti ti-camera" />} onClick={partyScanner.openScanner}>
+              مسح بالكاميرا
+            </Button>
             <Button size="sm" icon={<i className="ti ti-table-export" />}>تصدير</Button>
             <Button size="sm" icon={<i className="ti ti-table-import" />} onClick={importModal.openModal}>استيراد</Button>
             <NewPartyBtn onSelect={openCreate} />
@@ -420,6 +447,17 @@ export default function PartiesPage() {
         onClose={importModal.closeModal}
         config={PARTY_IMPORT_CONFIG}
       />
+
+      {/* Scan NIF/RC → فتح الطرف */}
+      <Suspense fallback={null}>
+        <BarcodeScannerModal
+          open={partyScanner.open}
+          onScan={partyScanner.handleScan}
+          onClose={partyScanner.closeScanner}
+          title="مسح NIF / RC لفتح الطرف"
+          hint="صوّب الكاميرا على رمز NIF أو RC أو هاتف طرف لفتح إحصاءاته"
+        />
+      </Suspense>
     </div>
   );
 }

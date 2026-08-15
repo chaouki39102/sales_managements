@@ -8,6 +8,10 @@ import type { LineItem, ColKey } from '../types/document.types';
 import { ALL_COLUMNS } from '../types/document.types';
 import type { ComputeLineWarning } from '../hooks/useComputeLine';
 import { validateLineStock } from '../utils/document.utils';
+import { useBarcodeScan } from '../../../hooks/useBarcodeScan';
+import { useNotification } from '../../../hooks/useNotification';
+
+const BarcodeScannerModal = React.lazy(() => import('../../../components/BarcodeScannerModal'));
 
 interface DocumentLinesSectionProps {
   lines: LineItem[];
@@ -64,6 +68,17 @@ export default function DocumentLinesSection({
   warehouses,
 }: DocumentLinesSectionProps) {
   const [stockAlertOpen, setStockAlertOpen] = useState(true);
+  const notify = useNotification();
+
+  // ── مسح الباركود بالكاميرا: إضافة المنتج الممسوح كسطر مباشرة ──────────────
+  const scanner = useBarcodeScan<{ id: number; name: string; ref?: string | null; barcode?: string | null }>({
+    resolve: (code) =>
+      products.find(
+        (p) => p.barcode === code || p.ref === code || String(p.id) === code,
+      ) ?? null,
+    onFound: (p) => addLineWithProduct(String(p.id)),
+    onNotFound: () => notify.error('لم يتم العثور على منتج بهذا الباركود'),
+  });
 
   // ═══════════════════════════════════════════════════════════════════════
   // 🆕 تنقّل بلوحة المفاتيح (Enter) بين حقول جدول/بطاقات الأسطر — نمط
@@ -190,13 +205,29 @@ export default function DocumentLinesSection({
 
         {!isLinesReadOnly && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, marginBottom: 8 }}>
-            <BarcodeInput
-              products={products}
-              onProductFound={(productId) => {
-                addLineWithProduct(String(productId));
-              }}
-              disabled={isLinesReadOnly}
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <BarcodeInput
+                products={products}
+                onProductFound={(productId) => {
+                  addLineWithProduct(String(productId));
+                }}
+                disabled={isLinesReadOnly}
+              />
+              <button
+                onClick={scanner.openScanner}
+                title="مسح الباركود بالكاميرا"
+                style={{
+                  width: 32, height: 32, flexShrink: 0, borderRadius: 'var(--r1)',
+                  border: '1px solid var(--b3)', background: 'transparent',
+                  color: 'var(--t3)', cursor: 'pointer', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--em)'; e.currentTarget.style.color = 'var(--em)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--b3)'; e.currentTarget.style.color = 'var(--t3)'; }}
+              >
+                <i className="ti ti-camera" style={{ fontSize: 16 }} />
+              </button>
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 10.5, color: 'var(--t4)', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <i className="ti ti-keyboard" style={{ fontSize: 12 }} />
@@ -408,6 +439,17 @@ export default function DocumentLinesSection({
           />
         )}
       </div>
+      {scanner.open && (
+        <React.Suspense fallback={null}>
+          <BarcodeScannerModal
+            open={scanner.open}
+            onScan={scanner.handleScan}
+            onClose={scanner.closeScanner}
+            title="مسح الباركود لإضافة منتج"
+            hint="صوّب الكاميرا على باركود المنتج ليُضاف كسطر تلقائياً"
+          />
+        </React.Suspense>
+      )}
     </Section>
   );
 }

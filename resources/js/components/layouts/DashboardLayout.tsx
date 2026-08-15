@@ -61,9 +61,10 @@ const NAV_GROUPS = [
   {
     label: 'الأطراف',
     items: [
-      { name: 'الزبائن',   href: 'clients',   icon: 'ti-users'        },
-      { name: 'الموردون',  href: 'suppliers', icon: 'ti-truck'        },
-      { name: 'الديون',    href: 'debts',     icon: 'ti-receipt'      },
+      { name: 'كل الأطراف', href: 'parties',   icon: 'ti-id'              },
+      { name: 'الزبائن',    href: 'clients',   icon: 'ti-users'           },
+      { name: 'الموردون',   href: 'suppliers', icon: 'ti-truck'           },
+      { name: 'الديون',     href: 'debts',     icon: 'ti-receipt'         },
     ],
   },
   {
@@ -937,7 +938,7 @@ const meta = useTopbarTitle();
               { href:'pos/pro',      icon:'ti-cash-register', label:'POS PRO' },
               { href:'inventory',    icon:'ti-package',       label:'مخزون'  },
               { href:'finance',      icon:'ti-building-bank', label:'خزينة'  },
-              { href:'clients',      icon:'ti-users',         label:'زبائن'  },
+              { href:'parties',      icon:'ti-id',           label:'أطراف'  },
               { href:'documents/FV', icon:'ti-file-text',     label:'فواتير' },
               { href:'expenses',     icon:'ti-credit-card',   label:'مصاريف' },
               { href:'products',     icon:'ti-list',          label:'منتجات' },

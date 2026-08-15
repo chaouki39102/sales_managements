@@ -5,6 +5,10 @@ interface Props {
   open: boolean;
   onScan: (barcode: string) => void;
   onClose: () => void;
+  /** عنوان المودال — افتراضياً «مسح الباركود بالكاميرا» */
+  title?: string;
+  /** سطر توضيحي صغير تحت العنوان */
+  hint?: string;
 }
 
 const QRZ_CONFIG = { fps: 15, qrbox: { width: 280, height: 140 }, formatsToSupport: [
@@ -17,7 +21,7 @@ function beep() {
   try { new AudioContext().resume().then(() => { const ctx = new AudioContext(); const o = ctx.createOscillator(); const g = ctx.createGain(); o.connect(g); g.connect(ctx.destination); g.gain.value = 0.15; o.frequency.value = 1200; o.start(); o.stop(ctx.currentTime + 0.1); }); } catch { }
 }
 
-export default function BarcodeScannerModal({ open, onScan, onClose }: Props) {
+export default function BarcodeScannerModal({ open, onScan, onClose, title, hint }: Props) {
   const ref = useRef<Html5Qrcode | null>(null);
   const startedRef = useRef(false);
   const [error, setError] = useState('');
@@ -79,9 +83,14 @@ export default function BarcodeScannerModal({ open, onScan, onClose }: Props) {
         background: '#fff', borderRadius: 12, padding: 16,
         width: 360, maxWidth: '90vw', textAlign: 'center',
       }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
-          مسح الباركود بالكاميرا
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: hint ? 4 : 12 }}>
+          {title ?? 'مسح الباركود بالكاميرا'}
         </div>
+        {hint && (
+          <div style={{ fontSize: 11, color: 'var(--t4)', marginBottom: 10 }}>
+            {hint}
+          </div>
+        )}
         {error ? (
           <div style={{ padding: '40px 0', color: '#c0392b', fontSize: 13 }}>{error}</div>
         ) : (

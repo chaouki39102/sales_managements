@@ -16,6 +16,7 @@ import ProgressBar from '@/components/ui/ProgressBar';
 const ProductModal = React.lazy(() => import('@/components/products/ProductModal'));
 const ImportWizardModal = React.lazy(() => import('@/pages/import/ImportWizardModal'));
 const TemplatePrintModal = React.lazy(() => import('@/pages/settings/print-settings/components/shared/TemplatePrintModal'));
+const BarcodeScannerModal = React.lazy(() => import('@/components/BarcodeScannerModal'));
 import { PRODUCT_IMPORT_CONFIG } from '@/pages/import/entityConfig';
 import { apiGet, apiPost } from '@/lib/api/core/client';
 import { proxyImage } from '@/lib/api/imageProxy';
@@ -25,6 +26,7 @@ import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { useProductAggregatedLookups } from '@/lib/api/endpoints/lookups';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useNotification } from '@/hooks/useNotification';
+import { useBarcodeScan } from '@/hooks/useBarcodeScan';
 import { ConfirmDialog } from '@/components/ui';
 import type { Column } from '@/components/ui/DataTable';
 import type { Product, PaginatedResponse } from '@/lib/api/core/types';
@@ -211,6 +213,26 @@ export default function ProductsPage() {
 
   const products: Product[] = response?.data ?? [];
   const meta = response?.meta ?? { current_page: 1, last_page: 1, total: 0, from: 0, to: 0 };
+
+  // ── Scan barcode → open product (matches loaded page, then server search) ──
+  const productScanner = useBarcodeScan<Product>({
+    resolve: async (code) => {
+      const local = products.find((p) => p.barcode === code || p.ref === code || String(p.id) === code);
+      if (local) return local;
+      try {
+        const res = await apiGet<PaginatedResponse<Product>>('/products', {
+          per_page: 5,
+          include: 'family,brand,productType,prices,packagings',
+          'filter[search]': code,
+        });
+        return (res?.data ?? []).find((p) => p.barcode === code || p.ref === code || String(p.id) === code) ?? null;
+      } catch {
+        return null;
+      }
+    },
+    onFound: (p) => { setEditingProduct(p); modal.openModal(); },
+    onNotFound: () => notify.error('لم يتم العثور على منتج بهذا الباركود'),
+  });
 
   // ── Stats (computed from server total + current page data) ──
   const stats = {
@@ -436,6 +458,9 @@ export default function ProductsPage() {
         subtitle={`إدارة المنتجات — ${meta.total} منتج`}
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
+            <Button size="sm" variant="outline" icon={<i className="ti ti-camera" />} onClick={productScanner.openScanner}>
+              مسح بالكاميرا
+            </Button>
             <Button size="sm" icon={<i className="ti ti-table-import" />} onClick={importModal.openModal}>
               استيراد
             </Button>
@@ -644,6 +669,17 @@ export default function ProductsPage() {
           onSaved={() => {
             notify.success(editingProduct ? 'تم تعديل المنتج بنجاح' : 'تمت إضافة المنتج بنجاح');
           }}
+        />
+      </Suspense>
+
+      {/* Scan barcode → open product */}
+      <Suspense fallback={null}>
+        <BarcodeScannerModal
+          open={productScanner.open}
+          onScan={productScanner.handleScan}
+          onClose={productScanner.closeScanner}
+          title="مسح الباركود لفتح المنتج"
+          hint="صوّب الكاميرا على باركود منتج لفتحه مباشرة"
         />
       </Suspense>
 

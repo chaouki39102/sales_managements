@@ -32,6 +32,7 @@ const STATIC: Record<string, PageMeta> = {
   '/categories':              { title: 'الفئات',                 path: 'مخزون ← فئات'              },
   '/brands':                  { title: 'العلامات التجارية',      path: 'مخزون ← علامات'            },
   '/units':                   { title: 'وحدات القياس',           path: 'مخزون ← وحدات'             },
+  '/parties':                 { title: 'كل الأطراف',             path: 'محاسبة ← أطراف'            },
   '/suppliers':               { title: 'الموردون',               path: 'مخزون ← موردون'            },
   '/warehouses':              { title: 'المستودعات',              path: 'مخزون ← مستودعات'          },
   '/clients':                 { title: 'الزبائن',                path: 'محاسبة ← زبائن'            },

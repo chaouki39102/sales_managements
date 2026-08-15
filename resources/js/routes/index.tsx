@@ -36,6 +36,7 @@ const InventoryPage  = lazy(() => import('@/pages/inventory/InventoryPage'));
 // â”€â”€ Parties â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ClientsPage   = lazy(() => import('@/pages/clients/ClientsPage'));
 const SuppliersPage = lazy(() => import('@/pages/suppliers/SuppliersPage'));
+const PartiesPage   = lazy(() => import('@/pages/parties/PartiesPage'));
 
 // â”€â”€ Finance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const FinancePage  = lazy(() => import('@/pages/finance/FinancePage'));
@@ -272,6 +273,7 @@ export function AppRoutes() {
           <Route path="inventory" element={<InventoryPage />} />
 
           {/* Parties */}
+          <Route path="parties"   element={<PartiesPage />} />
           <Route path="clients"   element={<ClientsPage />} />
           <Route path="suppliers" element={<SuppliersPage />} />
           <Route path="portal-orders" element={<PortalOrdersAdminPage />} />
