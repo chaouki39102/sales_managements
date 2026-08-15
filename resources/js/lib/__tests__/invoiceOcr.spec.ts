@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   normalizeDigits, parseNumber, extractDate, normalizeForMatch,
   matchSupplier, matchProduct, parseInvoiceText, computeOcrScale,
+  diceTokens, effectiveProductPrice, stripDigits, charDice,
 } from '../invoiceOcr';
 import type { ProductLite, SupplierLite } from '../invoiceOcr';
 
@@ -115,6 +116,78 @@ describe('matchProduct', () => {
   });
   it('returns null for unrelated text', () => {
     expect(matchProduct('Condiments assortis', PRODUCTS)).toBeNull();
+  });
+});
+
+describe('matchProduct — fuzzy name fallback', () => {
+  const CAT = [
+    { id: 1, name: 'Cafe Au Lait 1L' },
+    { id: 2, name: 'Sucre Blanc 1kg' },
+  ];
+
+  it('matches an OCR-noisy name via token Dice similarity', () => {
+    expect(matchProduct('CAFÉ AU LAIT 1L', CAT)?.id).toBe(1);
+  });
+  it('matches when a word is inserted by OCR but the overlap stays high', () => {
+    expect(matchProduct('Sucre le Blanc', CAT)?.id).toBe(2);
+  });
+  it('rejects unrelated multi-token text', () => {
+    expect(matchProduct('Produits Divers SARL', CAT)).toBeNull();
+  });
+});
+
+describe('matchProduct — price fallback', () => {
+  const CAT = [
+    { id: 9, name: 'Huile en Vrac', purchase_price_ht: 450 },
+    { id: 10, name: 'Sucre en Vrac', purchase_price_ht: 95 },
+  ];
+
+  it('matches by price when the name does not appear at all', () => {
+    expect(matchProduct('Bidon 5L 2 x 450.00', CAT, 450)?.id).toBe(9);
+  });
+  it('accepts a unit price within tolerance (string price field)', () => {
+    expect(matchProduct('Bidon', CAT, 461)?.id).toBe(9);
+    expect(effectiveProductPrice({ id: 9, name: 'x', purchase_price_ht: '450' })).toBe(450);
+  });
+  it('rejects a unit price outside tolerance', () => {
+    expect(matchProduct('Bidon', CAT, 520)).toBeNull();
+  });
+  it('prefers a name match over a price match', () => {
+    const mixed = [
+      { id: 11, name: 'Lait Étoile', purchase_price_ht: 999 },
+      { id: 12, name: 'Huile Légère', purchase_price_ht: 95 },
+    ];
+    expect(matchProduct('Lait Étoile', mixed, 95)?.id).toBe(11);
+  });
+});
+
+describe('matchProduct — digit-insensitive Arabic names', () => {
+  const AR = [{ id: 7, name: 'عسيلو مرجان 2كلغ' }];
+
+  it('matches when OCR drops the size digit (2كلغ) and flips a letter', () => {
+    expect(matchProduct('عسيلة مرجان', AR)?.id).toBe(7);
+  });
+  it('matches the full name when the size survives OCR', () => {
+    expect(matchProduct('عسيلو مرجان 2كلغ', AR)?.id).toBe(7);
+  });
+  it('keeps digits while comparing at the char level (bigram Dice)', () => {
+    expect(charDice('عسيلة مرجان', 'عسيلو مرجان كلغ')).toBeGreaterThanOrEqual(0.5);
+  });
+});
+
+describe('stripDigits', () => {
+  it('removes Latin, Arabic-Indic and Persian digits', () => {
+    expect(stripDigits('عسيلو 2كلغ ٠٥٠٠ ۴۵۶').trim()).toBe('عسيلو كلغ');
+    expect(stripDigits('ABC123')).toBe('ABC');
+  });
+});
+
+describe('diceTokens', () => {
+  it('computes Sørensen–Dice similarity over normalized tokens', () => {
+    expect(diceTokens('a b c', 'a b d')).toBeCloseTo(2 * 2 / (3 + 3), 6);
+    expect(diceTokens('a b', 'a b')).toBe(1);
+    expect(diceTokens('a b', 'c d')).toBe(0);
+    expect(diceTokens('', 'a')).toBe(0);
   });
 });
 

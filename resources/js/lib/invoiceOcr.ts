@@ -30,6 +30,11 @@ export interface ProductLite {
   ref?: string | null;
   barcode?: string | null;
   tvaRate?: number | null;
+  /** catalog purchase price — used by the price-proximity matching tier */
+  price?: number | string | null;
+  /** Product objects passed straight from the API also expose these */
+  purchase_price_ht?: number | string | null;
+  current_cost_price?: number | string | null;
 }
 
 export interface SupplierLite {
@@ -198,13 +203,74 @@ export function matchSupplier(
 /**
  * Longest-substring match of a product against a line's "name part".
  * Tries barcode (min 4 chars) then ref then name — the longest hit wins.
+ * When the exact tiers fail, falls back to:
+ *   • fuzzy name similarity (token Dice coefficient) for near/OCR-noisy names
+ *   • price proximity (`unitPrice` vs the catalog purchase price) — supplier
+ *     invoice unit prices usually land within 10% of the catalog purchase cost,
+ *     so an unrelated-but-exact-price product is still a useful suggestion
+ *     (the human confirms in the modal before the line is used).
  */
+export const PRICE_MATCH_TOLERANCE = 0.10;
+/** fuzzy tiers accept scores at/above this (both token and char Dice) */
+export const DICE_MIN_SCORE = 0.5;
+
+/** Remove every digit (Latin, Arabic-Indic, Persian) from a string. */
+export function stripDigits(s: string): string {
+  return s.replace(/[\d٠-٩۰-۹]/g, '');
+}
+
+/** Sørensen–Dice over character bigrams of two space-removed strings. */
+export function charDice(a: string, b: string): number {
+  const x = a.replace(/\s+/g, '');
+  const y = b.replace(/\s+/g, '');
+  if (!x.length || !y.length) return 0;
+  const bigrams = (s: string) => {
+    const set = new Map<string, number>();
+    for (let i = 0; i + 1 < s.length; i++) {
+      const g = s.slice(i, i + 2);
+      set.set(g, (set.get(g) ?? 0) + 1);
+    }
+    return set;
+  };
+  const ma = bigrams(x);
+  const mb = bigrams(y);
+  let inter = 0;
+  for (const [g, v] of ma) inter += Math.min(v, mb.get(g) ?? 0);
+  return (2 * inter) / (x.length - 1 + y.length - 1);
+}
+
+export function effectiveProductPrice(p: ProductLite): number {
+  const raw = p.purchase_price_ht ?? p.current_cost_price ?? p.price ?? 0;
+  const n = typeof raw === 'number' ? raw : parseFloat(String(raw ?? ''));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/** Sørensen–Dice similarity on normalized tokens (multiset-aware). */
+export function diceTokens(a: string, b: string): number {
+  const ta = a.split(/\s+/).filter(Boolean);
+  const tb = b.split(/\s+/).filter(Boolean);
+  if (!ta.length || !tb.length) return 0;
+  const count = (t: string[]) => {
+    const m = new Map<string, number>();
+    for (const x of t) m.set(x, (m.get(x) ?? 0) + 1);
+    return m;
+  };
+  const ma = count(ta);
+  const mb = count(tb);
+  let inter = 0;
+  for (const [k, v] of ma) inter += Math.min(v, mb.get(k) ?? 0);
+  return (2 * inter) / (ta.length + tb.length);
+}
+
 export function matchProduct(
   namePart: string,
   products: ProductLite[],
+  unitPrice?: number | null,
 ): ProductLite | null {
   const hay = normalizeForMatch(namePart);
   if (!hay) return null;
+
+  // Tier 1 — exact substring (barcode → ref → name), longest hit wins
   let best: { p: ProductLite; score: number } | null = null;
   for (const p of products) {
     const barcode = normalizeForMatch(p.barcode);
@@ -220,7 +286,43 @@ export function matchProduct(
       best = { p, score: name.length };
     }
   }
-  return best?.p ?? null;
+  if (best) return best.p;
+
+  // Tier 2 — fuzzy name similarity (handles OCR noise / word order / dropped
+  // sizes like "2كلغ"). Digits are stripped from BOTH sides so a size the OCR
+  // misread or dropped never penalizes the score; the best of token-level and
+  // character-bigram Dice wins (bigrams survive one-letter OCR variants).
+  const strippedHay = stripDigits(hay);
+  const tokens = strippedHay.split(/\s+/).filter(Boolean);
+  if (tokens.length >= 2) {
+    let fuzzyBest: { p: ProductLite; score: number } | null = null;
+    for (const p of products) {
+      const pname = stripDigits(normalizeForMatch(p.name));
+      const token = diceTokens(strippedHay, pname);
+      const chars = charDice(strippedHay, pname);
+      const d = Math.max(token, chars);
+      if (d >= DICE_MIN_SCORE && (!fuzzyBest || d > fuzzyBest.score)) {
+        fuzzyBest = { p, score: d };
+      }
+    }
+    if (fuzzyBest) return fuzzyBest.p;
+  }
+
+  // Tier 3 — price proximity (unitPrice vs catalog purchase price)
+  if (unitPrice != null && Number.isFinite(unitPrice) && unitPrice > 0) {
+    let priceBest: { p: ProductLite; diff: number } | null = null;
+    for (const p of products) {
+      const pp = effectiveProductPrice(p);
+      if (pp <= 0) continue;
+      const diff = Math.abs(unitPrice - pp) / pp;
+      if (diff <= PRICE_MATCH_TOLERANCE && (!priceBest || diff < priceBest.diff)) {
+        priceBest = { p, diff };
+      }
+    }
+    if (priceBest) return priceBest.p;
+  }
+
+  return null;
 }
 
 // ─── Line parsing ────────────────────────────────────────────────────────────
@@ -387,7 +489,7 @@ export function parseInvoiceText(text: string, ctx: ParseContext = {}): OcrInvoi
     // also strip stray index remnants
     namePart = namePart.replace(/^[.)\-]\s*/, '');
 
-    const product = matchProduct(namePart, products) ?? matchProduct(working, products);
+    const product = matchProduct(namePart, products, price) ?? matchProduct(working, products, price);
 
     result.lines.push({
       text: line,
