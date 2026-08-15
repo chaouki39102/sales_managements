@@ -1,8 +1,8 @@
 # Product Roadmap — "Better Than SAP/Odoo" Features
 
-> **Status: 🚧 IN PROGRESS (Aug 9) — section C (offline everywhere / field agents) is being
-> implemented first (decided with the user; B and D follow in order).** Pick up on any PC:
-> `git pull`, open this file, and work task-by-task. Commit + push after EACH task.
+> **Status: 🚧 IN PROGRESS (Aug 15) — section C (offline everywhere / field agents) is COMPLETE
+> (C.1–C.5); section B (camera-native) is in progress — B.1, B.2, B.3 DONE; B.4 next.** Pick up on
+> any PC: `git pull`, open this file, and work task-by-task. Commit + push after EACH task.
 
 > **Goal**: beat SAP/Odoo not on module count but on speed-to-value, mobile/offline-first,
 > built-in Algerian fiscal compliance (BSC QR, G50/G12, IFU, fiscal stamp, fiscal-year engine,
@@ -37,15 +37,15 @@
 > prints (Phase 69 / upgrade 1) and can be DECODED to reopen a document. Product photo upload
 > exists in the product form (`image_url`/upload path).
 
-- [ ] **B.1 Camera scan everywhere** — a shared `useBarcodeScan()` hook + a global camera
+- [x] **B.1 Camera scan everywhere** — a shared `useBarcodeScan()` hook + a global camera
       affordance so scanning works OUTSIDE the POS: the documents form (scan a product
       barcode → add that product as a line), the products page (scan → open that product),
       the parties page (scan a party barcode/NIF → open). Refactor `BarcodeScannerModal` to
       accept a `title`/`hint` + `onScan` so every page reuses one implementation.
-- [ ] **B.2 Photograph a product** — in the product create/edit form, capture a photo with
+- [x] **B.2 Photograph a product** — in the product create/edit form, capture a photo with
       the camera (`getUserMedia` → canvas → blob → existing upload path) instead of only
       pasting a URL. Store the local blob preview + upload on save; offline → queue the upload.
-- [ ] **B.3 Scan printed invoice → reopen the doc** — on the documents page, a camera button
+- [x] **B.3 Scan printed invoice → reopen the doc** — on the documents page, a camera button
       that decodes the printed BSC/fiscal QR (`qrcode_content`, JSON v1: includes the doc
       number/reference) and navigates to that exact document. Also used by the portal's
       "scan to track my order".
@@ -146,8 +146,8 @@
 
 | Family | Status | Notes |
 |--------|--------|-------|
-| B. Camera-native | ❌ planned | B.1–B.5 tasks defined; start after C (chosen order B→C→D, but C implemented first) |
-| C. Offline everywhere | 🚧 in progress | C.1 done (any network failure = offline); C.2–C.5 pending |
+| B. Camera-native | 🔄 in progress | **B.1 DONE** (`555f5bd` + `ac0d6d9`), **B.2 DONE** (`fff065f` + `a9377d1`), **B.3 DONE** (`1dee679`); B.4 next |
+| C. Offline everywhere | ✅ done | C.1–C.5 all committed + pushed |
 | D. WhatsApp commerce | ❌ planned | D.1–D.5 tasks defined; wa.me-first, Meta Cloud API webhook later |
 
 ## Commits
@@ -165,7 +165,7 @@ files belonging to that task; leave unrelated dirty files untouched):
 | *(C.5)* | offline POS Pro Mobile verification/fixes |
 | *(B.1)* | shared camera-scan hook + non-POS wiring |
 | *(B.2)* | camera product photo capture |
-| *(B.3)* | fiscal-QR → reopen document |
+| *(B.3)* | **DONE** (`1dee679`) — fiscal QR decoder (`lib/fiscalQr.ts`) + square scan box fix (ZXing) + admin documents reopen-by-scan + portal scan-to-track |
 | *(B.4)* | supplier-invoice photo → OCR prefill → FA |
 | *(B.5)* | camera stock-taking → stock adjustment |
 | *(D.1)* | wa.me click-to-chat links |

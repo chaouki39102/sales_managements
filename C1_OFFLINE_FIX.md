@@ -1,15 +1,15 @@
 # Remaining Tasks — B (Camera), C (Offline), D (WhatsApp) — Full Actionable List
 
-> **Status: ✅ C.1–C.5 + B.1–B.2 COMPLETE (all committed + pushed).** Pick up on any PC: `git pull`,
+> **Status: ✅ C.1–C.5 + B.1–B.3 COMPLETE (all committed + pushed).** Pick up on any PC: `git pull`,
 > open this file, work task-by-task. **Commit + push after EACH task** (stage ONLY that task's
 > files). C is being implemented first (decided with the user), then B, then D.
 >
 > **Resume point now**: the whole C family (offline everywhere / field agents) is DONE and
 > pushed (C.1 offline interception, C.2 documents-module offline hardening, C.3 prefetch
-> page, C.4 sync dashboard at `/offline`, C.5 offline POS Pro Mobile `314afea`). **B.1** and
-> **B.2** are DONE (camera scan everywhere + camera product-photo capture). Next is **B.3**
-> (scan printed invoice fiscal QR → reopen the doc). HEAD: `a9377d1` (B.2 + mocked pdf-export
-> spec).
+> page, C.4 sync dashboard at `/offline`, C.5 offline POS Pro Mobile `314afea`). **B.1**, **B.2**
+> and **B.3** are DONE (camera scan everywhere + camera product-photo capture + scan printed
+> fiscal QR → reopen the exact document). Next is **B.4** (photograph a supplier invoice → OCR
+> prefill → FA doc). HEAD: `1dee679` (B.3 + full verification).
 
 ---
 
@@ -224,12 +224,37 @@ all 9 offline suites) · `npm run build` 0 errors, 224 precache entries · SW MA
   PDF button, and asserts the download is named `FV-2026-000001.pdf` with a `%PDF-` header.
   Playwright suite green 16/16.
 
-## B.3 Scan printed invoice → reopen the doc
+## B.3 Scan printed invoice → reopen the doc — ✅ COMPLETE (`1dee679`)
 
-- On the documents page: a camera button that decodes the printed BSC/fiscal QR (`qrcode_content`,
-  JSON v1 incl. doc number/reference) and navigates to that exact document.
-- Also used by the portal's "scan to track my order".
-- Verify: build, live smoke with a printed-QR fixture.
+- `resources/js/lib/fiscalQr.ts` — pure, dependency-free decoder for the printed fiscal QR
+  (JSON v1 from `FiscalInvoiceQrService::dataString()`, `invoice.number` = e.g. `FV-2026-000001`).
+  Tolerant by design: any JSON object carrying a string `invoice.number` decodes, so a future
+  official-spec bump that keeps the number in the same place survives.
+- **Admin documents page** (`CommercialDocumentsPage.tsx`): a camera button in the toolbar
+  (`.ti-camera`, `title="مسح QR الفاتورة لفتح المستند"`) opens the lazy `BarcodeScannerModal`
+  (title «مسح QR المستند لفتحه»). On decode it searches `/documents?filter[document_number]=N`
+  and opens the `DocumentViewModal` for the EXACT match; no match → toast «لم يتم العثور على
+  مستند بهذا الرقم». `useBarcodeScan` resolve is async (server lookup).
+- **Portal «طلباتي»** (`PortalMyOrdersPage.tsx`): a «مسح» button in the toolbar (`.portal-toolbar-sp`,
+  em pill). Decode → `portalApi.orders({ search: number })`; the resolved order's `reference` is
+  the CMD number while `document.document_number` is the converted FV/POS number (both accepted
+  defensively) → search chip + order detail open. `portalApi.orders` gained `search`; the backend
+  (`PortalOrderService::paginate`) matches the CONVERTED doc number via
+  `conv.source_document_id = portal_orders.commercial_document_id` (`orWhereExists`), scoped to
+  `conv.deleted_at IS NULL`.
+- **Decoder blocker (the real B.3 work)**: `BarcodeScannerModal` `QRZ_CONFIG.qrbox` was a
+  landscape `280×140`, but html5-qrcode v2.3.8 decodes with **ZXing** (not jsQR), and its
+  `foreverScan` crops the video into a decode canvas fixed at the qrbox size — a square QR was
+  capped at 140px (~1.8px/module) and ZXing could never decode it. The box is now **square
+  `280×280`** (~3.6px/module) → the full payload decodes. This is a deliberate product
+  improvement, not a test hack.
+- **Verify** (`fiscal-scan.pw.spec.ts`, 3/3): REAL-QR E2E — `getUserMedia` replaced by a canvas
+  stream continuously redrawn from the committed QR SVG fixture, sized `280 × videoWidth/clientWidth`
+  so the QR exactly fills the square scan box in video pixels (exercises the real ZXing decode path).
+  Tests: admin scan → exact FV view modal; unknown QR → not-found toast; portal scan → CMD order
+  tracked. Plus a Pest regression (`PortalOrderRequestTest` «B.3: customer search by the converted
+  FV number finds the order») proving the `source_document_id` search. Full green: tsc clean ·
+  vitest 278/278 (19 files) · Playwright 19/19 · build 226 precache · SW MATCH · pest portal suite 25/25.
 
 ## B.4 Photograph a supplier invoice → book it (OCR)
 
@@ -296,7 +321,7 @@ all 9 offline suites) · `npm run build` 0 errors, 224 precache entries · SW MA
 
 | Family | Status | Notes |
 |--------|--------|-------|
-| B. Camera-native | 🔄 in progress | **B.1 DONE** (`555f5bd` + `ac0d6d9`) — shared `useBarcodeScan` + `title`/`hint`-capable modal, wired into documents form / products / parties with Playwright smoke; follow-up unmounts the hidden duplicate quick-create modal body. **B.2 DONE** (`fff065f` + `a9377d1`) — camera product-photo capture (`CameraCaptureModal`, pending blob preview, upload-on-save, offline info toast) + `pdf-export.pw.spec.ts` fully mocked; Playwright 16/16. Next **B.3** |
+| B. Camera-native | 🔄 in progress | **B.1 DONE** (`555f5bd` + `ac0d6d9`) — shared `useBarcodeScan` + `title`/`hint`-capable modal, wired into documents form / products / parties with Playwright smoke; follow-up unmounts the hidden duplicate quick-create modal body. **B.2 DONE** (`fff065f` + `a9377d1`) — camera product-photo capture (`CameraCaptureModal`, pending blob preview, upload-on-save, offline info toast) + `pdf-export.pw.spec.ts` fully mocked; Playwright 16/16. **B.3 DONE** (`1dee679`) — `lib/fiscalQr.ts` decoder + square 280×280 scan box (ZXing real-decode fix) + admin documents camera button → exact doc + portal scan-to-track; fiscal-scan.pw.spec.ts 3/3 real-QR E2E; Playwright 19/19, pest portal 25/25. Next **B.4** |
 | C. Offline everywhere | ✅ done | **C.1** (offline interception fixed + regression suite) · **C.2** (documents-module offline hardening + field-agent flow test) · **C.3** (prefetch page + indicator integration) · **C.4** (sync dashboard `/offline`) · **C.5** (offline POS Pro Mobile, `314afea`) — all committed + pushed |
 | D. WhatsApp commerce | ❌ planned | D.1–D.5 defined; wa.me-first, Meta Cloud API webhook later |
 
@@ -315,7 +340,7 @@ files; leave unrelated dirty files untouched):
 | *(C.5)* | **DONE** (`314afea`) — offline POS Pro Mobile: last-known-session fallback (localStorage per slug), offline queued toast (`isOfflineQueuedResponse`), appbar cloud sync button + «دون اتصال» chip, «دون اتصال» sidebar entry; verified tsc/273 tests/build 224 precache/SW MATCH |
 | *(B.1)* | **DONE** (`555f5bd` + `ac0d6d9`) — shared camera-scan hook + non-POS wiring; follow-up unmounts the hidden duplicate quick-create modal body + repaired `pdf-export` fixture |
 | *(B.2)* | **DONE** (`fff065f`) — `CameraCaptureModal.tsx` + `ProductModal` wiring (capture → pending blob preview → upload-on-save with real id; offline-queued create → info toast) + `camera-capture.pw.spec.ts` 2/2; `a9377d1` makes `pdf-export.pw.spec.ts` fully-mocked (Playwright 16/16) |
-| *(B.3)* | fiscal-QR → reopen document |
+| *(B.3)* | **DONE** (`1dee679`) — `lib/fiscalQr.ts` decoder (JSON v1, `invoice.number`) + square `280×280` qrbox in `BarcodeScannerModal` (ZXing real-decode fix: landscape 280×140 capped the square QR at 140px and never decoded) + admin documents camera button → exact doc view + portal scan-to-track (`portalApi.orders` `search`, backend matches the converted FV/POS number via `source_document_id`); `fiscal-scan.pw.spec.ts` 3/3 real-QR E2E + Pest portal scan-to-track regression (portal suite 25/25) |
 | *(B.4)* | supplier-invoice photo → OCR prefill → FA |
 | *(B.5)* | camera stock-taking → stock adjustment |
 | *(D.1)* | wa.me click-to-chat links |
