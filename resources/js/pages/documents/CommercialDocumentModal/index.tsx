@@ -521,7 +521,21 @@ export default function CommercialDocumentModal({
 
   // ════════════════════════════════════════════════════════════════════════════
   // RENDER — حاوية دائمة في DOM مع تحكم CSS بالظهور
+  // الجسد الثقيل (الحقول/الأسطر/الكاميرا) يُزال من DOM عند الإغلاق لتجنّب تكرار
+  // عناصر مخفية في كل صفحة (مثل زر الكاميرا و BarcodeInput)؛ يُبقى 250ms فقط
+  // بعد الإغلاق حتى تكتمل حركة الخروج، والحالة (form/lookups) محفوظة في الكنترولر
+  // والمسودات في localStorage فلا نفقد شيئاً عند إعادة الفتح.
   // ════════════════════════════════════════════════════════════════════════════
+
+  const [bodyMounted, setBodyMounted] = useState(open);
+  useEffect(() => {
+    if (open) {
+      setBodyMounted(true);
+      return;
+    }
+    const t = setTimeout(() => setBodyMounted(false), 250);
+    return () => clearTimeout(t);
+  }, [open]);
 
   return (
     <div style={{
@@ -534,7 +548,7 @@ export default function CommercialDocumentModal({
       backdropFilter: open ? 'blur(3px)' : 'none',
       transition: 'opacity .25s, background .25s',
     }}>
-      {modalContent}
+      {bodyMounted ? modalContent : null}
     </div>
   );
 }

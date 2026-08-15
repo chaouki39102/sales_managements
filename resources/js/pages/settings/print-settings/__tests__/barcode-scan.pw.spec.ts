@@ -94,12 +94,13 @@ test.describe('B.1 Camera scan everywhere — non-POS pages', () => {
     await page.goto('/documents/FV/new');
 
     // The camera icon button next to the barcode input in the lines section.
-    // Scope to #main: a second, identical button lives in the globally-mounted
-    // quick-create CommercialDocumentModal (App.tsx DocumentQuickCreateProvider)
-    // whose body stays in the DOM with opacity:0 / pointer-events:none when
-    // closed — Playwright's visibility check ignores opacity, so without the
-    // #main scope this strict locator resolves to 2 elements.
-    const camBtn = page.locator('#main button[title="مسح الباركود بالكاميرا"]');
+    // Strict global count: exactly ONE such button must exist on the page. This is
+    // the regression guard for the CommercialDocumentModal body gating fix — the
+    // globally-mounted quick-create modal (App.tsx DocumentQuickCreateProvider)
+    // used to keep its full form in the DOM when closed (opacity:0), leaking a
+    // hidden duplicate camera button onto every page; its body is now unmounted.
+    const camBtn = page.locator('button[title="مسح الباركود بالكاميرا"]');
+    await expect(camBtn).toHaveCount(1);
     await expect(camBtn).toBeVisible();
 
     await camBtn.click();

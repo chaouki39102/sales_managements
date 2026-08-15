@@ -8,16 +8,16 @@ import { test, expect } from '@playwright/test';
  * `{document_number}.pdf` via the client-side dompdf.js engine (WASM inlined).
  *
  * Requires a live seeded token (created with the tinker one-liner in the
- * phase notes) and a real FV document (id 310 = FV-2026-000001) in company 1.
+ * phase notes) and a real FV document (FV-2026-000001) in company 1.
  */
 const FV_NUMBER = 'FV-2026-000001';
-const SLUG = 'el-houda-emballage-6a5e589dc1cfe';
+const SLUG = 'el-houda-emballage-6a7ae911e0aab';
 
 test.describe('Official PDF export', () => {
   test('invoices list → TemplatePrintModal → PDF download named {number}.pdf', async ({ page }) => {
     await page.goto('/login');
     await page.evaluate(([slug]) => {
-      window.localStorage.setItem('auth_token', '36|QwIaheZVoVmGPkGXFzIWGSn63cuRyssNQ6N5FBh542dd120a');
+      window.localStorage.setItem('auth_token', '10|pJjKE3oqym4zNLiq7fJgPbMGMHPrDBrsNlHTt4b603813dca');
       window.sessionStorage.setItem('app-store', JSON.stringify({
         state: {
           activeCompany: { id: 1, name: 'test', slug },
