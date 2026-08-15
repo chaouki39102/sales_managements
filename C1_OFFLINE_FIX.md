@@ -1,15 +1,15 @@
 # Remaining Tasks — B (Camera), C (Offline), D (WhatsApp) — Full Actionable List
 
-> **Status: ✅ C.1–C.5 COMPLETE (all committed + pushed).** Pick up on any PC: `git pull`,
+> **Status: ✅ C.1–C.5 + B.1–B.2 COMPLETE (all committed + pushed).** Pick up on any PC: `git pull`,
 > open this file, work task-by-task. **Commit + push after EACH task** (stage ONLY that task's
 > files). C is being implemented first (decided with the user), then B, then D.
 >
 > **Resume point now**: the whole C family (offline everywhere / field agents) is DONE and
-> pushed. C.1 (offline interception), C.2 (documents-module offline hardening), C.3 (offline
-> data readiness / «جهّز للعمل دون اتصال» prefetch page), C.4 (field-agent sync dashboard at
-> `/offline`), and C.5 (offline POS Pro Mobile verification, committed `314afea` with the
-> last-known-session fallback + offline sync affordances). Next is **B.1** (camera-native
-> commerce — shared scan hook). HEAD: `2d7fbf7` (Phase 73 POS refresh).
+> pushed (C.1 offline interception, C.2 documents-module offline hardening, C.3 prefetch
+> page, C.4 sync dashboard at `/offline`, C.5 offline POS Pro Mobile `314afea`). **B.1** and
+> **B.2** are DONE (camera scan everywhere + camera product-photo capture). Next is **B.3**
+> (scan printed invoice fiscal QR → reopen the doc). HEAD: `a9377d1` (B.2 + mocked pdf-export
+> spec).
 
 ---
 
@@ -203,12 +203,26 @@ all 9 offline suites) · `npm run build` 0 errors, 224 precache entries · SW MA
   `pdf-export.pw.spec.ts` fixture (dead token + stale slug + missing FV → recreated via
   `CommercialDocumentService`). Full suite green: Playwright 14/14, vitest 273/273.
 
-## B.2 Photograph a product
+## B.2 Photograph a product — ✅ COMPLETE (`fff065f` + `a9377d1`)
 
-- In the product create/edit form: capture a photo with the camera (`getUserMedia` → canvas →
-  blob → existing upload path) instead of only pasting a URL.
-- Local blob preview + upload on save; offline → queue the upload (ties into C).
-- Verify: tsc, build, live smoke.
+- `CameraCaptureModal.tsx` (lazy-loaded): camera capture on the product create/edit form
+  (`getUserMedia` → video preview → canvas → blob File) instead of only pasting a URL. A
+  «كاميرا» toolbar button (the «الملتفطة» typo fixed to «الملتقطة») opens it; the capture
+  appears as a pending local blob preview in the image strip.
+- Upload is deferred to save: `handleSubmit` awaits the create/update mutation, resolves the
+  REAL product id (edit → existing id; network create → `saved.id`; offline-queued create →
+  none), then uploads the pending blob via the existing `productsApi.uploadImage` path with a
+  progress bar. Offline create → info toast «أُضيف المنتج إلى قائمة الانتظار — ستُرفع الصورة
+  الملتقطة لاحقاً من صفحة تعديل المنتج». Pending blob is revoked on close/save (no leaks);
+  switching tabs keeps it (local state only, no network).
+- Verify: tsc clean · `npm test` 273/273 · `npm run build` 0 errors · SW MATCH · Playwright
+  `camera-capture.pw.spec.ts` 2/2 (create + edit mode, mocked camera + mocked upload route).
+- Test repair (`a9377d1`): `pdf-export.pw.spec.ts` converted to a FULLY-MOCKED E2E (the old
+  one depended on a live seed token + a real FV-2026-000001 in company 1 — both rotted). The
+  new spec boots the docs page from mocked `/document-types`, `/documents` list + `/documents/7`
+  detail routes (registered AFTER `bootstrapApp`), walks the row «طباعة» → TemplatePrintModal →
+  PDF button, and asserts the download is named `FV-2026-000001.pdf` with a `%PDF-` header.
+  Playwright suite green 16/16.
 
 ## B.3 Scan printed invoice → reopen the doc
 
@@ -282,7 +296,7 @@ all 9 offline suites) · `npm run build` 0 errors, 224 precache entries · SW MA
 
 | Family | Status | Notes |
 |--------|--------|-------|
-| B. Camera-native | 🔄 in progress | **B.1 DONE** (`555f5bd` + `ac0d6d9`) — shared `useBarcodeScan` + `title`/`hint`-capable modal, wired into documents form / products / parties with Playwright smoke; follow-up unmounts the hidden duplicate quick-create modal body; next **B.2** |
+| B. Camera-native | 🔄 in progress | **B.1 DONE** (`555f5bd` + `ac0d6d9`) — shared `useBarcodeScan` + `title`/`hint`-capable modal, wired into documents form / products / parties with Playwright smoke; follow-up unmounts the hidden duplicate quick-create modal body. **B.2 DONE** (`fff065f` + `a9377d1`) — camera product-photo capture (`CameraCaptureModal`, pending blob preview, upload-on-save, offline info toast) + `pdf-export.pw.spec.ts` fully mocked; Playwright 16/16. Next **B.3** |
 | C. Offline everywhere | ✅ done | **C.1** (offline interception fixed + regression suite) · **C.2** (documents-module offline hardening + field-agent flow test) · **C.3** (prefetch page + indicator integration) · **C.4** (sync dashboard `/offline`) · **C.5** (offline POS Pro Mobile, `314afea`) — all committed + pushed |
 | D. WhatsApp commerce | ❌ planned | D.1–D.5 defined; wa.me-first, Meta Cloud API webhook later |
 
@@ -300,7 +314,7 @@ files; leave unrelated dirty files untouched):
 | *(C.4)* | **DONE** (`95e8920` merge "offline mode") — `SyncDashboard.tsx` (pending/failed op list, per-op + retry-all, مزامنة الآن + last-synced stamp, temp→real id), `useOffline` additions, `sync-dashboard.spec.ts`, route + nav "دون اتصال" |
 | *(C.5)* | **DONE** (`314afea`) — offline POS Pro Mobile: last-known-session fallback (localStorage per slug), offline queued toast (`isOfflineQueuedResponse`), appbar cloud sync button + «دون اتصال» chip, «دون اتصال» sidebar entry; verified tsc/273 tests/build 224 precache/SW MATCH |
 | *(B.1)* | **DONE** (`555f5bd` + `ac0d6d9`) — shared camera-scan hook + non-POS wiring; follow-up unmounts the hidden duplicate quick-create modal body + repaired `pdf-export` fixture |
-| *(B.2)* | camera product photo capture |
+| *(B.2)* | **DONE** (`fff065f`) — `CameraCaptureModal.tsx` + `ProductModal` wiring (capture → pending blob preview → upload-on-save with real id; offline-queued create → info toast) + `camera-capture.pw.spec.ts` 2/2; `a9377d1` makes `pdf-export.pw.spec.ts` fully-mocked (Playwright 16/16) |
 | *(B.3)* | fiscal-QR → reopen document |
 | *(B.4)* | supplier-invoice photo → OCR prefill → FA |
 | *(B.5)* | camera stock-taking → stock adjustment |
