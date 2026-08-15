@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Core\Http\Controllers\BaseApiController;
 use App\Http\Resources\ProductResource;
+use App\Http\Resources\ProductPosResource;
 use App\Services\ProductService;
 use App\Models\Product;
 use App\Models\ProductPackaging;
@@ -26,6 +27,20 @@ class ProductController extends BaseApiController
     }
 
     // ========== دوال إضافية فقط (غير موجودة في BaseApiController) ==========
+
+    /**
+     * index — يُفوّض إلى BaseApiController مع تبديل الـ Resource حسب الاستهلاك:
+     *   - pos=1 (قوائم POS Pro / POS Pro Mobile) → ProductPosResource المُقتطع
+     *   - خلاف ذلك → ProductResource الكامل (صفحات إدارة المنتجات)
+     * الكنترولر يُنشأ لكل طلب، فلا يوجد تسريب للحالة بين الطلبات.
+     */
+    public function index(Request $request): JsonResponse
+    {
+        if ($request->boolean('pos')) {
+            $this->resourceClass = ProductPosResource::class;
+        }
+        return parent::index($request);
+    }
 
     public function active(Request $request): JsonResponse
     {

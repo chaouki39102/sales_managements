@@ -32,7 +32,8 @@
 // شريط أدوات العرض يحوي أيضاً ترتيب النتائج: الاسم / السعر (تصاعدي/تنازلي) /
 // المخزون (الأقل/الأعلى أولاً) — القائمة المفلترة تُرتَّب دون فقدان التمييز.
 // ════════════════════════════════════════════════════════════════════════════
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import Modal from '@/components/ui/Modal';
 import POSProProductInfoModal from './POSProProductInfoModal';
 import { formatDZD } from '@/pos/utils/calculations';
@@ -42,6 +43,14 @@ import type { ProductVariant, ProductPackaging, Family, PriceLevel, CartItem } f
 import type { GridDefaultSize, PriceDisplayMode } from '@/pos/hooks/usePOSSettings';
 
 const GRID_SIZE_OPTIONS: GridDefaultSize[] = ['xs', 'sm', 'md', 'lg'];
+
+// ── الترويسة الافتراضية للشبكة (نفس قيم CSS minmax في .pp-grid--*) ──────────
+const GRID_MIN_WIDTH: Record<GridDefaultSize, number> = { xs: 96, sm: 120, md: 150, lg: 200 };
+const GRID_GAP = 10;
+const GRID_ROW_ESTIMATE = 210;
+const LIST_ROW_ESTIMATE = 40;
+
+type GridRow = { variant: ProductVariant; idx: number };
 
 const SORT_OPTIONS = [
   { v: 'name',       l: 'الاسم' },
@@ -151,13 +160,12 @@ interface PPCardProps {
   onQty?: Props['onQty'];
   onInfo: (v: ProductVariant) => void;
   onHi: (idx: number) => void;
-  elRef?: (el: HTMLElement | null) => void;
 }
 
 const PPCard = React.memo(function PPCard({
   v, idx, hi, query, priceLevels, selectedPriceLevelId, priceDisplayMode,
   showStockOnCard, allowNegativeStock, inCartQty, qtyInCartUnits, variantCount,
-  onAdd, onQty, onInfo, onHi, elRef,
+  onAdd, onQty, onInfo, onHi,
 }: PPCardProps) {
   const rawStock = v.current_stock;
   const unknownStock = rawStock === undefined;
@@ -230,7 +238,6 @@ const PPCard = React.memo(function PPCard({
   return (
     <div
       data-hl-idx={idx}
-      ref={elRef}
       role="button"
       tabIndex={-1}
       className={[
@@ -356,11 +363,10 @@ interface PPRowProps {
   onQty?: Props['onQty'];
   onInfo: (v: ProductVariant) => void;
   onHi: (idx: number) => void;
-  elRef?: (el: HTMLElement | null) => void;
 }
 
 const PPRow = React.memo(function PPRow({
-  v, idx, hi, query, priceLevels, selectedPriceLevelId, inCartQty, qtyInCartUnits, outStock, onAdd, onQty, onInfo, onHi, elRef,
+  v, idx, hi, query, priceLevels, selectedPriceLevelId, inCartQty, qtyInCartUnits, outStock, onAdd, onQty, onInfo, onHi,
 }: PPRowProps) {
   const priceHt = getVariantPrice(v, selectedPriceLevelId, priceLevels);
   const tvaRate = v.tva?.rate ?? 0;
@@ -377,7 +383,6 @@ const PPRow = React.memo(function PPRow({
   return (
     <div
       data-hl-idx={idx}
-      ref={elRef}
       role="button"
       tabIndex={-1}
       className={[
@@ -488,8 +493,9 @@ export default function POSProProductDrawer({
   });
   const [infoVariant, setInfoVariant] = useState<ProductVariant | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const cardRefs  = useRef(new Map<number, HTMLElement>());
-  const rowRefs   = useRef(new Map<number, HTMLElement>());
+  const gridScrollRef = useRef<HTMLDivElement>(null);
+  const listScrollRef  = useRef<HTMLDivElement>(null);
+  const [columns, setColumns] = useState(0);
 
   useEffect(() => { writeLS('pos-pro-drawer-view', view); }, [view]);
   useEffect(() => { writeLS('pos-pro-drawer-grid', gsize); }, [gsize]);
@@ -552,24 +558,62 @@ export default function POSProProductDrawer({
   // أعد التمييز لأول نتيجة عند تغيّر القائمة المفلترة
   useEffect(() => { setHi(0); }, [filtered.length]);
 
-  // مرّر البطاقة/الصف المميز لتبقى ظاهرة (سجّلات قديمة لمنقول مفصول → isConnected)
-  useEffect(() => {
-    const map = view === 'grid' ? cardRefs : rowRefs;
-    const el = map.current.get(hi);
-    if (el && el.isConnected) el.scrollIntoView({ block: 'nearest' });
-  }, [hi, view]);
+  // ── الشبكة: عدد الأعمدة يُستنتج من عرض الحاوية (مثل POS الكلاسيكي) ───────
+  useLayoutEffect(() => {
+    if (view !== 'grid') return;
+    const el = gridScrollRef.current;
+    if (!el) return;
+    const minW = GRID_MIN_WIDTH[gsize];
+    const calc = () => {
+      const w = el.clientWidth;
+      if (w <= 0) return;
+      setColumns(Math.max(1, Math.floor(w / minW)));
+    };
+    calc();
+    const obs = new ResizeObserver(calc);
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [view, gsize, open]);
 
-  // سجّل البطاقات/الصفوف في خريطة ثابتة تُقرأ من data-hl-idx (لا حاجة لأغلفة مؤقتة)
-  const registerCard = useCallback((el: HTMLElement | null) => {
-    if (!el) return;
-    const i = Number(el.dataset.hlIdx);
-    if (!Number.isNaN(i)) cardRefs.current.set(i, el);
-  }, []);
-  const registerRow = useCallback((el: HTMLElement | null) => {
-    if (!el) return;
-    const i = Number(el.dataset.hlIdx);
-    if (!Number.isNaN(i)) rowRefs.current.set(i, el);
-  }, []);
+  // ── الترويسة الافتراضية: صفوف ثابتة للشبكة، صف لكل عنصر في القائمة ──────
+  const gridRows = useMemo(() => {
+    if (columns < 1) return [] as GridRow[][];
+    const r: GridRow[][] = [];
+    for (let i = 0; i < filtered.length; i += columns) {
+      const row: GridRow[] = [];
+      for (let j = 0; j < columns && i + j < filtered.length; j++) row.push({ variant: filtered[i + j], idx: i + j });
+      r.push(row);
+    }
+    return r;
+  }, [filtered, columns]);
+
+  const gridV = useVirtualizer({
+    count: gridRows.length,
+    getScrollElement: () => gridScrollRef.current,
+    estimateSize: () => GRID_ROW_ESTIMATE,
+    overscan: 3,
+  });
+  const listV = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => listScrollRef.current,
+    estimateSize: () => LIST_ROW_ESTIMATE,
+    overscan: 8,
+  });
+
+  // إعادة قياس عند تغيّر العرض/الأعمدة/القائمة (useLayoutEffect لمنع وميض)
+  useLayoutEffect(() => { gridV.measure(); }, [columns, gsize, filtered.length, gridV]);
+  useLayoutEffect(() => { listV.measure(); }, [filtered.length, listV]);
+
+  // مرّر الصف المميز ليبقى ظاهراً (يحل محل scrollIntoView — يعمل حتى خارج
+  // النطاق المرسوم بالترويسة)
+  useEffect(() => {
+    if (view === 'grid') {
+      if (columns < 1) return;
+      gridV.scrollToIndex(Math.floor(hi / columns), { align: 'auto' });
+    } else {
+      listV.scrollToIndex(Math.min(hi, Math.max(0, filtered.length - 1)), { align: 'auto' });
+    }
+  }, [hi, view, columns, filtered.length, gridV, listV]);
 
   // خريطة كمية السلة (بالوحدات) + عدد الخيارات لكل منتج
   const cartQtyByVariantId = useMemo(() => {
@@ -760,31 +804,57 @@ export default function POSProProductDrawer({
           </div>
         </div>
 
-        {/* الشبكة أو القائمة */}
+        {/* الشبكة أو القائمة (ترويسة افتراضية: الصفوف فقط تُرسم) */}
         {view === 'grid' ? (
-          <div className={`pp-grid pp-grid--${gsize}`}>
-            {filtered.map((v, i) => (
-              <PPCard
-                key={v.id}
-                v={v}
-                idx={i}
-                hi={i === hi}
-                query={query.trim()}
-                priceLevels={priceLevels}
-                selectedPriceLevelId={selectedPriceLevelId}
-                priceDisplayMode={priceDisplayMode}
-                showStockOnCard={showStockOnCard}
-                allowNegativeStock={allowNegativeStock}
-                inCartQty={cartQtyByVariantId.get(v.id as number) ?? 0}
-                qtyInCartUnits={qtyInCartById?.get(v.id as number) ?? 0}
-                variantCount={variantCountById.get(v.product_id) ?? 1}
-                onAdd={onAdd}
-                onQty={onQty}
-                onInfo={handleInfo}
-                onHi={handleHi}
-                elRef={registerCard}
-              />
-            ))}
+          <div className={`pp-grid pp-grid--${gsize}`} ref={gridScrollRef} style={{ overflow: 'auto', display: 'block' }}>
+            {gridRows.length > 0 && (
+              <div style={{ height: `${gridV.getTotalSize()}px`, position: 'relative' }}>
+                {gridV.getVirtualItems().map(vr => {
+                  const row = gridRows[vr.index];
+                  if (!row) return null;
+                  return (
+                    <div
+                      key={vr.index}
+                      data-index={vr.index}
+                      ref={gridV.measureElement}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${vr.start}px)`,
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+                        gap: GRID_GAP,
+                        padding: 2,
+                      }}
+                    >
+                      {row.map(item => (
+                        <PPCard
+                          key={item.variant.id}
+                          v={item.variant}
+                          idx={item.idx}
+                          hi={hi === item.idx}
+                          query={query.trim()}
+                          priceLevels={priceLevels}
+                          selectedPriceLevelId={selectedPriceLevelId}
+                          priceDisplayMode={priceDisplayMode}
+                          showStockOnCard={showStockOnCard}
+                          allowNegativeStock={allowNegativeStock}
+                          inCartQty={cartQtyByVariantId.get(item.variant.id as number) ?? 0}
+                          qtyInCartUnits={qtyInCartById?.get(item.variant.id as number) ?? 0}
+                          variantCount={variantCountById.get(item.variant.product_id) ?? 1}
+                          onAdd={onAdd}
+                          onQty={onQty}
+                          onInfo={handleInfo}
+                          onHi={handleHi}
+                        />
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             {filtered.length === 0 && (
               <div className="pp-empty">
                 <i className="ti ti-search-off" />
@@ -793,7 +863,7 @@ export default function POSProProductDrawer({
             )}
           </div>
         ) : (
-          <div className="pp-list">
+          <div className="pp-list" ref={listScrollRef} style={{ overflow: 'auto', display: 'block' }}>
             <div className="pp-lhead">
               <span>المنتج</span>
               <span>الوحدة</span>
@@ -803,25 +873,44 @@ export default function POSProProductDrawer({
               <span>المخزون</span>
               <span className="pp-lhead-actions">إضافة</span>
             </div>
-            {filtered.map((v, i) => (
-              <PPRow
-                key={v.id}
-                v={v}
-                idx={i}
-                hi={i === hi}
-                query={query.trim()}
-                priceLevels={priceLevels}
-                selectedPriceLevelId={selectedPriceLevelId}
-                inCartQty={cartQtyByVariantId.get(v.id as number) ?? 0}
-                qtyInCartUnits={qtyInCartById?.get(v.id as number) ?? 0}
-                outStock={isVariantOutOfStock(v, allowNegativeStock)}
-                onAdd={onAdd}
-                onQty={onQty}
-                onInfo={handleInfo}
-                onHi={handleHi}
-                elRef={registerRow}
-              />
-            ))}
+            {filtered.length > 0 && (
+              <div style={{ height: `${listV.getTotalSize()}px`, position: 'relative' }}>
+                {listV.getVirtualItems().map(vr => {
+                  const v = filtered[vr.index];
+                  if (!v) return null;
+                  return (
+                    <div
+                      key={vr.index}
+                      data-index={vr.index}
+                      ref={listV.measureElement}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${vr.start}px)`,
+                      }}
+                    >
+                      <PPRow
+                        v={v}
+                        idx={vr.index}
+                        hi={hi === vr.index}
+                        query={query.trim()}
+                        priceLevels={priceLevels}
+                        selectedPriceLevelId={selectedPriceLevelId}
+                        inCartQty={cartQtyByVariantId.get(v.id as number) ?? 0}
+                        qtyInCartUnits={qtyInCartById?.get(v.id as number) ?? 0}
+                        outStock={isVariantOutOfStock(v, allowNegativeStock)}
+                        onAdd={onAdd}
+                        onQty={onQty}
+                        onInfo={handleInfo}
+                        onHi={handleHi}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             {filtered.length === 0 && (
               <div className="pp-empty">
                 <i className="ti ti-search-off" />

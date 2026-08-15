@@ -26,6 +26,24 @@ class InventoryStockService
 {
     use ResolvesFiscalYear;
 
+    /**
+     * مفتاح إصدار ذاكرة المخزون لكل شركة.
+     *
+     * مخزن الملفات (file cache) لا يدعم tags ولا مسحاً ببادئة، لذلك تُدمج قيمة
+     * إصدار متزايدة في مفتاح stock-at. أي كتابة/حذف لحركات المخزون
+     * (عبر StockMovementObserver) تزيد الإصدار فتبطل كل مفاتيح الشركة فوراً
+     * دون انتظار انتهاء TTL — مهم لأن الواجهة تعيد جلب stock-at بعد كل عملية بيع.
+     */
+    public static function invalidateCache(int $companyId): void
+    {
+        Cache::increment('stock-at-version:' . $companyId);
+    }
+
+    private static function stockVersion(int $companyId): int
+    {
+        return (int) Cache::get('stock-at-version:' . $companyId, 0);
+    }
+
     public function __construct(
         private CompanyContextService $companyContext
     ) {}
@@ -55,6 +73,12 @@ class InventoryStockService
         $companyId = $this->companyContext->get();
         $fiscalYearId ??= $this->resolveFiscalYearId($companyId, $date);
 
+        // توحيد التاريخ إلى Y-m-d (بعض المتصلين قد يمررون datetime كاملاً)
+        // ثم إغلاق اليوم بـ 23:59:59 — يُبقي المقارنة sargable لتستخدم الفهرس
+        // المركب stock_movements_company_id_fiscal_year_id_movement_date_index
+        // بدلاً من strftime غير القابل للفهرسة في whereDate.
+        $date = substr(trim($date), 0, 10);
+
         // ─── 1. الرصيد الافتتاحي ─────────────────────────────────────────────
         $openingQuery = DB::table('opening_balances_stock')
             ->select(
@@ -83,7 +107,7 @@ class InventoryStockService
             ->where('sm.fiscal_year_id', $fiscalYearId)
             ->where('sm.is_validated',   true)
             ->whereNull('sm.deleted_at')
-            ->whereDate('sm.movement_date', '<=', $date)
+            ->where('sm.movement_date', '<=', $date . ' 23:59:59')
             ->when($warehouseId, fn($q) => $q->where('sm.warehouse_id', $warehouseId))
             ->groupBy('sm.product_id');
 
@@ -97,9 +121,9 @@ class InventoryStockService
             ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
             ->groupBy('product_id');
 
-        // ─── 3. Query الرئيسية (مخزنة 30 ثانية) ────────────────────────────────
-        $cacheKey = 'stock-at:' . implode('_', [$companyId, $date, $warehouseId ?? 'all', $fiscalYearId, $search ?? '']);
-        $rows = Cache::remember($cacheKey, 5, function () use (
+        // ─── 3. Query الرئيسية (مخزنة 60 ثانية) ────────────────────────────────
+        $cacheKey = 'stock-at:v' . self::stockVersion($companyId) . ':' . implode('_', [$companyId, $date, $warehouseId ?? 'all', $fiscalYearId, $search ?? '']);
+        $rows = Cache::remember($cacheKey, 60, function () use (
             $companyId, $date, $warehouseId, $fiscalYearId, $search, $openingQuery, $movementsQuery, $lotsCountQuery,
         ) {
             return DB::table('products as p')

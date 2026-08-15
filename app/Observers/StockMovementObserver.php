@@ -6,6 +6,7 @@ namespace App\Observers;
 use App\Models\Setting;
 use App\Models\StockMovement;
 use App\Models\ProductLot;
+use App\Services\InventoryStockService;
 use App\Services\InventoryValuationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -50,6 +51,9 @@ class StockMovementObserver
      */
     public function created(StockMovement $movement): void
     {
+        // بطلان ذاكرة stock-at فوراً (بدون انتظار TTL)
+        InventoryStockService::invalidateCache($movement->company_id);
+
         try {
             DB::transaction(function () use ($movement) {
                 // ✅ نتأكد من تحميل الـ relationship قبل الاستخدام
@@ -151,6 +155,14 @@ class StockMovementObserver
             'company_id' => $movement->company_id,
             'lot_id' => $lot->id,
         ]);
+    }
+
+    /**
+     * بعد حذف الحركة (ناعم أو حاسم): بطلان ذاكرة stock-at
+     */
+    public function deleted(StockMovement $movement): void
+    {
+        InventoryStockService::invalidateCache($movement->company_id);
     }
 
     /**

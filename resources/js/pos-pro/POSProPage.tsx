@@ -244,10 +244,11 @@ export default function POSProPage() {
 
   // ── المنتجات (كلها دفعة واحدة — الفلترة محلية داخل المودال) ──────────────
   const { data: productsRaw, isLoading: productsLoading } = useQuery({
-    queryKey: [slug, 'pos-pro', 'products', { perPage: 2000 }],
+    queryKey: [slug, 'pos-pro', 'products', { perPage: 2000, pos: 1 }],
     queryFn: () => productsApi.list({
       per_page: 2000,
       simple: 1,
+      pos: 1,
       include: 'tva,unit,family,prices,quantityDiscounts,packagings,barcodes',
       filter: { active: 1 },
     }),
@@ -275,7 +276,7 @@ export default function POSProPage() {
         ),
       ),
     enabled:   !!slug && !!activeWarehouse?.id,
-    staleTime: 10_000,
+    staleTime: 60_000,
   });
 
   const allVariants: ProductVariant[] = useMemo(() =>
