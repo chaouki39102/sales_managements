@@ -5,6 +5,10 @@
 //
 // Returns null for empty / non-http(s) URLs (data:, blob:, relative paths)
 // so callers can fall back to the raw URL / placeholder.
+//
+// Same-origin URLs (the app's own /storage/... uploads) are returned verbatim —
+// the proxy's SSRF guard rejects loopback/private hosts (400), so the app's own
+// images must NEVER be routed through it.
 
 export function proxyImage(
   url?: string | null,
@@ -13,6 +17,13 @@ export function proxyImage(
   if (!url) return null;
 
   if (!/^https?:\/\//i.test(url)) return null;
+
+  try {
+    const target = new URL(url);
+    if (target.host === window.location.host) return url;
+  } catch {
+    return null;
+  }
 
   const q = new URLSearchParams({ url, w: String(width) });
   return `/api/v1/image-proxy?${q.toString()}`;
