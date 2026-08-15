@@ -305,8 +305,12 @@ export function parseInvoiceText(text: string, ctx: ParseContext = {}): OcrInvoi
 
     const supplierMatch = matchSupplier(line, suppliers);
     if (supplierMatch) {
-      result.supplier = supplierMatch;
-      result.supplierRaw = line;
+      // FIRST supplier hit wins — a later weak phone/NIF match must never
+      // overwrite a strong name match from the invoice header.
+      if (!result.supplier) {
+        result.supplier = supplierMatch;
+        result.supplierRaw = line;
+      }
       continue;
     }
     const supPrefix = line.match(SUPPLIER_LINE_PREFIXES);
@@ -333,7 +337,8 @@ export function parseInvoiceText(text: string, ctx: ParseContext = {}): OcrInvoi
       if (nums.length === 0) continue;
       const last = nums[nums.length - 1];
       if (/%|٪/.test(line) && /tva|ضريبة|t\.v\.a/i.test(line)) {
-        result.tvaRate = last;
+        // «TVA 19% : 475.95» — the RATE is the first number on a % line.
+        result.tvaRate = nums[0];
       } else if (/\bht\b|مجموع ال|الإجمالي|الاجمالي|المجموع/i.test(line) && !/ttc|مجموع شامل/i.test(line)) {
         result.totalHt = last;
       } else {
@@ -382,7 +387,7 @@ export function parseInvoiceText(text: string, ctx: ParseContext = {}): OcrInvoi
     // also strip stray index remnants
     namePart = namePart.replace(/^[.)\-]\s*/, '');
 
-    const product = matchProduct(namePart, products);
+    const product = matchProduct(namePart, products) ?? matchProduct(working, products);
 
     result.lines.push({
       text: line,

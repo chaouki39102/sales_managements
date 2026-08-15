@@ -17,6 +17,55 @@
 ## Date
 2026-08-15
 
+### Phase 79 — B.4 Complete: Photograph a Supplier Invoice → OCR Prefill → FA Document (Aug 15)
+
+**Request** (continuing the B/C/D roadmap in `C1_OFFLINE_FIX.md`, B.4 = fourth Camera-native task): on the purchase (`FA`) document page, photograph a supplier invoice with the camera, OCR it, and PRE-FILL the document form (supplier, date, lines) for human confirmation before save. OCR is a *prefill helper* — the stored doc is still a normal `FA` doc saved by the standard pipeline.
+
+**T0 — pure OCR parser** (`resources/js/lib/invoiceOcr.ts`, NEW, dependency-free):
+- `parseInvoiceText(text, ctx)` → `OcrInvoiceResult` (`documentDate`, `supplier` + `supplierRaw`, `reference`, `lines[]` with `quantity`/`unitPrice`/matched `product`, `totalTtc`/`totalHt`/`tvaRate`). Line loop classifies each OCR line as date / supplier / reference (`FACTURE N° FA-...` / `فاتورة رقم ...`) / total / skip (contact+header keywords) / product-line candidate.
+- `parseNumber` — French **and** English decimal conventions (`1.520,00` / `1,520.00` / `1.520` thousands / `1 520.00`), Arabic-Indic + Persian digits (`normalizeDigits`), currency tokens stripped, null on garbage.
+- `extractDate` — ISO `yyyy-mm-dd`, `dd/mm/yyyy`, `d/m/yy` → `yyyy-mm-dd`, invalid dates rejected.
+- `normalizeForMatch` — tashkeel/tatweel stripped, `أإآٱ→ا`, `ة→ه`, `ى→ي`, accented Latin folded.
+- `matchSupplier` / `matchProduct` — **longest-needle wins** so `SARL ALIMENTS` never shadows `SARL ALIMENTS BOULANGE`; supplier matches name/code/phone/email/NIF/RC; product tries barcode (min 4) then ref then name.
+- `runInvoiceOcr(file)` — **lazy** `import('tesseract.js')` (`ara+eng`, CDN traineddata, progress via logger, worker terminated after); `window.__OCR_TEST_TEXT__` seam short-circuits the runner (Playwright-only, no tesseract import in tests).
+
+**Parser bugs caught & fixed by the new spec** (real defects, not test issues):
+- `matchSupplier` **overwrote a strong name match with a later weak phone/NIF match** (the `Tél:` line replaced the header name) — now the FIRST supplier hit wins.
+- TVA on a `%` line took the LAST number (`TVA 19%: 475.95` → rate 475.95); now the RATE is the FIRST number.
+- Product matching ran on a **number-stripped** name part, which killed barcode/ref matches (barcodes are numeric) and names containing sizes (`Lait L'Étoile 1L` → `Lait L'Étoile L`); the parser now falls back to `matchProduct(working)` (number-intact text).
+
+**T1 — lazy modal** (`resources/js/pages/documents/components/InvoiceOcrModal.tsx`, NEW, named export): `React.lazy` + Suspense (tesseract worker chunk only loads when the modal opens). Props `{ open, file, suppliers, products, needsParty, onClose, onApply }`; `OcrApplyPayload = { documentDate, partyId, lines: {product_id?, description, quantity, unit_price_ht, tva_rate?}[] }`. Flow: capture `File` → `runInvoiceOcr` (spinner + progress) → parsed preview table (per-line qty / unit price / description editable, product dropdown from the catalog, match shown, unmapped → «بدون مطابقة» + red badge) → date + supplier selectors (`needsParty` hides party when the doc's party is fixed) → «تعبئة المستند» → `onApply` then `onClose`. The modal never writes the doc — it only returns the prefill payload.
+
+**T2 — page wiring** (`CommercialDocumentPage.tsx` + `DocumentLinesSection.tsx`):
+- `DocumentLinesSection` gained `onOcrInvoice?: () => void`; a «تصوير فاتورة المورد» camera toolbar button (`ti-camera`) renders only when `isPurchase && onOcrInvoice` (gated by the page, next to «استيراد من Excel»).
+- Page state `showOcrCamera` + `ocrFile`; `onOcrInvoice={isPurchase ? () => setShowOcrCamera(true) : undefined}`; reuse `CameraCaptureModal` (title «تصوير فاتورة المورد», hint «صوّب الكاميرا على فاتورة المورد لقراءتها تلقائياً وتعبئة الأسطر»); on capture → store the `File`, close camera, open OCR modal.
+- `onApply` → `set('document_date', payload.documentDate)`, `set('party_id', payload.partyId)`, `bulkAddLines(payload.lines)` — the human still confirms/pays/saves via the standard FA pipeline. `suppliers={lookups.parties}` (purchase lookups = `/suppliers`), `products={lookups.products}`.
+
+**T3 — vitest** (`resources/js/lib/__tests__/invoiceOcr.spec.ts`, NEW, 35 tests): digit normalization, 9 number-parsing cases (both decimal conventions + Arabic digits), 6 date cases, Arabic/Latin name normalization, supplier longest-hit + NIF/phone fields, product barcode-first + longest-hit, and a full `FA_OCR` fixture (name/NIF/adresse/tél/FACTURE N°/date/3 lines/HT/TVA/TTC) asserting date, supplier id, reference, totals, per-line qty+price+matched products, and that header/contact lines never become product lines.
+
+**Key architectural rules**:
+- OCR is a **prefill helper**, never a writer: the modal returns an `OcrApplyPayload` and the page feeds it into the existing form `set`/`bulkAddLines` — the saved doc is a normal `FA` built by the standard service, so the integrity gate (Phase 52) and stock engine are untouched. The human always confirms before save.
+- The tesseract runner must stay **lazy and seam-gated**: only a dynamic `import('tesseract.js')` (so the ~large worker chunk never ships to pages that don't open the modal), and `window.__OCR_TEST_TEXT__` so vitest never touches tesseract — the pure parser helpers are the unit-testable surface.
+- Keep the parser **pure and dependency-free** (no React, no store); real-world OCR text is noisy, so it must be tolerant: French/Arabic decimal separators, Arabic-Indic digits, and a fallback where anything that doesn't clearly match a header/total rule surfaces as a candidate line for human confirmation.
+- A line classifier must run date → supplier → reference → totals → skip → product **in order** and must never let contact/header/total lines become product lines; product matching must try the number-intact text as a fallback because barcodes/refs are numeric and product names carry sizes (`1L`, `1kg`).
+
+**Verification**: `npx tsc --noEmit` clean · `npm test` **321/321** (20 files; new `invoiceOcr.spec.ts` 35/35 — caught 3 real parser bugs) · `npm run build` 0 errors, **227 precache entries** · **SW MATCH** (root `public/sw.js` committed with the build). No PHP touched → pest not re-run. `C1_OFFLINE_FIX.md`: B.4 ✅, progress table → B in progress (next **B.5**), commits table filled. Next pending: **B.5 (camera stock-taking → stock adjustment)** — full list in `C1_OFFLINE_FIX.md`.
+
+### Phase 78 — Dev-Server Performance Diagnosis: opcache + `Expect: 100-continue` (Aug 15)
+
+**User report**: "confirm payment / full-cash sale takes a few seconds" on `POST /documents` via `artisan serve` (127.0.0.1:8000). Two independent causes, both dev-environment (NOT app bugs):
+
+**C1 — opcache cold-start (the user-facing slowness)**: the dev machine's PHP `C:\xampp\php` (8.4.20) had `opcache.enable=0` — every request re-parsed+compiled the whole framework (~1.1s warm `/api/v1/health`). Fixed machine-locally in `C:\xampp\php\php.ini` (backup `.bak-20260815`): `opcache.enable=1`, `opcache.enable_cli=1`, `opcache.revalidate_freq=0` → warm health **1.125s → 0.062s**. This php.ini change is machine-local and NOT committed — do not expect it on another PC.
+
+**C2 — `Expect: 100-continue` (HTTP-client artifact, not browser-facing)**: any HTTP client (curl, Postman) auto-sends `Expect: 100-continue` for bodies **> 1024 bytes**. PHP's built-in server (`php artisan serve`) waits **~1s** before honoring it; Apache/Nginx handle it natively. Proved by bisection: payloads 478/1010 bytes = 94–156ms TTFB, payloads 1028/1053/1247/1251 bytes = 1.0s TTFB — perfect split at the 1024-byte boundary, with the request body otherwise identical (even an unrelated `"foo": 123` key flips it purely by crossing 1KB). Adding `-H "Expect:"` to curl drops the full POS-shaped payload (with `payments`) from 1.015s → **0.156s**. Browsers/fetch/axios do NOT send `Expect: 100-continue`, so the real POS flow in a browser is unaffected by C2; it only bites command-line curl/scripted clients against the dev server. Instrumentation confirmed the app was fast (controller caught the 409 at ~32ms; `handleError` ~2ms; service path 58ms via CLI probe) — the ~900ms was entirely the HTTP server's 100-continue wait, not app code.
+
+**Key architectural rules**:
+- When measuring API latency with curl against `php artisan serve`, ALWAYS send `-H "Expect:"` for bodies > 1KB — otherwise every measurement overstates real latency by ~1s and misdirects debugging into the app (the `payments`-vs-not rabbit hole was pure artifact). Browser/fetch timing is the ground truth for user-facing latency.
+- opcache is a machine-local performance knob; a "slow first request" on a dev box with a fresh PHP install is usually opcache disabled, not app code. Enable `opcache.enable` + `revalidate_freq=0` before profiling.
+- If you ever need to confirm "is the app or the server slow", instrument the controller (`microtime(true)` buckets around authorize/validate/service, logged to Laravel log) — the bucket boundaries immediately separate app cost from HTTP-layer cost.
+
+**Verification**: instrumentation reverted cleanly (`rg PerfProbe` = none; `php -l` clean on both controllers; `git status` clean). No committed code changes this phase — all findings are environment-level (opcache php.ini + dev-server 100-continue behavior). Next pending: **B.4** (photograph a supplier invoice → OCR prefill → FA) — full list in `C1_OFFLINE_FIX.md`.
+
 ### Phase 77 — Offline Queue Tenant Scoping + Failed-Op Dismissal (Aug 15)
 
 **Bug (user report)**: after a `migrate:fresh` + re-seed, the offline indicator showed a persistent «عمليات فشلت مزامنتها» badge with `DELETE /el-houda-emballage-6a7ae911e0aab/products/8` and `…/products/9` failing with 404 «المورد غير موجود» on every retry. Two distinct defects: (1) the write queue (`pendingOps`) was NOT tenant-scoped — ops from any company were replayed against whatever company was active (cross-tenant `/{B}/{A}/…`), and (2) ops whose RESOURCE is genuinely gone (server wiped by `migrate:fresh`) are permanently 404 — retry can never fix them, so the user needed a way to dismiss them. Fixed with **tenant scoping + a dismiss/clear-failed affordance**.

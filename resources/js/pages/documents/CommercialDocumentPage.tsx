@@ -21,6 +21,8 @@ import DocumentTotalsSection from './CommercialDocumentModal/DocumentTotalsSecti
 import { DocumentChainPanel } from './components/DocumentChainPanel';
 import { ReturnDocumentModal } from './components/ReturnDocumentModal';
 import { BulkImportModal } from './components/BulkImportModal';
+import { InvoiceOcrModal } from './components/InvoiceOcrModal';
+import CameraCaptureModal from '@/components/CameraCaptureModal';
 import { ShippingInfoSection } from './components/ShippingInfoSection';
 import { PaymentTermsTable } from './components/PaymentTermsTable';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -121,6 +123,10 @@ export default function CommercialDocumentPage() {
   }, [errors.warehouse_id, errors.fiscal_year_id, errors.currency_id]);
 
   const [alertsOpen, setAlertsOpen] = useState(true);
+
+  // ── B.4 — تصوير فاتورة المورد → OCR → تعبئة نموذج الشراء ──────────────────
+  const [showOcrCamera, setShowOcrCamera] = useState(false);
+  const [ocrFile, setOcrFile] = useState<File | null>(null);
   
 
   if (!lookupsReady) {
@@ -416,6 +422,7 @@ export default function CommercialDocumentPage() {
             productSuggestions={productSuggestions}
             isLoadingSuggestions={isLoadingSuggestions}
             setShowBulkImport={setShowBulkImport}
+            onOcrInvoice={isPurchase ? () => setShowOcrCamera(true) : undefined}
             slug={slug}
             affectsStock={affectsStock}
             stockDir={stockDir}
@@ -429,6 +436,28 @@ export default function CommercialDocumentPage() {
         onClose={() => setShowBulkImport(false)}
         products={lookups.products}
         onImport={(importedLines) => { bulkAddLines(importedLines); }}
+      />
+
+      <CameraCaptureModal
+        open={showOcrCamera}
+        onCapture={(file) => { setOcrFile(file); setShowOcrCamera(false); }}
+        onClose={() => setShowOcrCamera(false)}
+        title="تصوير فاتورة المورد"
+        hint="صوّب الكاميرا على فاتورة المورد لقراءتها تلقائياً وتعبئة الأسطر"
+      />
+
+      <InvoiceOcrModal
+        open={!!ocrFile}
+        file={ocrFile}
+        suppliers={lookups.parties}
+        products={lookups.products}
+        needsParty={needsParty}
+        onClose={() => setOcrFile(null)}
+        onApply={(payload) => {
+          set('document_date', payload.documentDate);
+          set('party_id', payload.partyId);
+          bulkAddLines(payload.lines);
+        }}
       />
 
       {showReturnModal && !!existingDoc && (

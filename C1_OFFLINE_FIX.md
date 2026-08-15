@@ -1,15 +1,15 @@
 # Remaining Tasks — B (Camera), C (Offline), D (WhatsApp) — Full Actionable List
 
-> **Status: ✅ C.1–C.5 + B.1–B.3 COMPLETE (all committed + pushed).** Pick up on any PC: `git pull`,
+> **Status: ✅ C.1–C.5 + B.1–B.4 COMPLETE (all committed + pushed).** Pick up on any PC: `git pull`,
 > open this file, work task-by-task. **Commit + push after EACH task** (stage ONLY that task's
 > files). C is being implemented first (decided with the user), then B, then D.
 >
 > **Resume point now**: the whole C family (offline everywhere / field agents) is DONE and
 > pushed (C.1 offline interception, C.2 documents-module offline hardening, C.3 prefetch
-> page, C.4 sync dashboard at `/offline`, C.5 offline POS Pro Mobile `314afea`). **B.1**, **B.2**
-> and **B.3** are DONE (camera scan everywhere + camera product-photo capture + scan printed
-> fiscal QR → reopen the exact document). Next is **B.4** (photograph a supplier invoice → OCR
-> prefill → FA doc). HEAD: `1dee679` (B.3 + full verification).
+> page, C.4 sync dashboard at `/offline`, C.5 offline POS Pro Mobile `314afea`). **B.1**, **B.2**,
+> **B.3** and **B.4** are DONE (camera scan everywhere + camera product-photo capture + scan
+> printed fiscal QR → reopen the exact document + photograph a supplier invoice → OCR prefill →
+> FA doc). Next is **B.5** (camera stock-taking → stock adjustment). HEAD: B.4.
 
 ---
 
@@ -256,12 +256,24 @@ all 9 offline suites) · `npm run build` 0 errors, 224 precache entries · SW MA
   FV number finds the order») proving the `source_document_id` search. Full green: tsc clean ·
   vitest 278/278 (19 files) · Playwright 19/19 · build 226 precache · SW MATCH · pest portal suite 25/25.
 
-## B.4 Photograph a supplier invoice → book it (OCR)
+## B.4 Photograph a supplier invoice → book it (OCR) — ✅ COMPLETE
 
-- Camera capture → OCR (server-side or lazy client OCR lib) → PRE-FILL the purchase doc form
-  (supplier, date, lines) for human confirmation before save. OCR is a *prefill* helper — the
-  stored doc is still a normal `FA` doc.
-- Verify: build, live smoke with a fixture image.
+- ✅ **DONE** — lazy `InvoiceOcrModal` (`resources/js/pages/documents/components/InvoiceOcrModal.tsx`)
+  + pure parser `resources/js/lib/invoiceOcr.ts` (lazy tesseract.js runner, no bundle cost until
+  used) wired into the purchase (`FA`) document page: `DocumentLinesSection` gains a
+  «تصوير فاتورة المورد» camera toolbar button (purchases only) → `CameraCaptureModal` (reused) →
+  OCR → preview modal (date / supplier / reference / per-line qty+unit-price with product matching,
+  editable) → «تعبئة المستند» applies `document_date` + `party_id` + lines via `bulkAddLines`.
+  OCR is a *prefill* helper — the stored doc is still a normal `FA` doc, saved by the standard
+  pipeline.
+- **Parser robustness**: French/Arabic decimal + Arabic-Indic digits, `dd/mm/yyyy` + ISO dates,
+  longest-hit supplier/product matching (NIF/RC/phone/barcode/ref), TVA rate = first number on a
+  `%` line, product matching falls back to number-intact text so barcodes/refs/sizes (`1L`, `1kg`)
+  still match, header/contact/total lines never become product lines.
+- Verify: build, live smoke with a fixture image. **Vitest 321/321 (20 files, new
+  `invoiceOcr.spec.ts` 35 tests)** · tsc clean · build 0 errors, **227 precache entries** · **SW MATCH**.
+  (The tesseract OCR run itself is lazy and CDN-backed — needs connectivity; the `__OCR_TEST_TEXT__`
+  seam covers automated tests.)
 
 ## B.5 Camera stock-taking
 
@@ -321,7 +333,7 @@ all 9 offline suites) · `npm run build` 0 errors, 224 precache entries · SW MA
 
 | Family | Status | Notes |
 |--------|--------|-------|
-| B. Camera-native | 🔄 in progress | **B.1 DONE** (`555f5bd` + `ac0d6d9`) — shared `useBarcodeScan` + `title`/`hint`-capable modal, wired into documents form / products / parties with Playwright smoke; follow-up unmounts the hidden duplicate quick-create modal body. **B.2 DONE** (`fff065f` + `a9377d1`) — camera product-photo capture (`CameraCaptureModal`, pending blob preview, upload-on-save, offline info toast) + `pdf-export.pw.spec.ts` fully mocked; Playwright 16/16. **B.3 DONE** (`1dee679`) — `lib/fiscalQr.ts` decoder + square 280×280 scan box (ZXing real-decode fix) + admin documents camera button → exact doc + portal scan-to-track; fiscal-scan.pw.spec.ts 3/3 real-QR E2E; Playwright 19/19, pest portal 25/25. Next **B.4** |
+| B. Camera-native | 🔄 in progress | **B.1 DONE** (`555f5bd` + `ac0d6d9`) — shared `useBarcodeScan` + `title`/`hint`-capable modal, wired into documents form / products / parties with Playwright smoke; follow-up unmounts the hidden duplicate quick-create modal body. **B.2 DONE** (`fff065f` + `a9377d1`) — camera product-photo capture (`CameraCaptureModal`, pending blob preview, upload-on-save, offline info toast) + `pdf-export.pw.spec.ts` fully mocked; Playwright 16/16. **B.3 DONE** (`1dee679`) — `lib/fiscalQr.ts` decoder + square 280×280 scan box (ZXing real-decode fix) + admin documents camera button → exact doc + portal scan-to-track; fiscal-scan.pw.spec.ts 3/3 real-QR E2E; Playwright 19/19, pest portal 25/25. **B.4 DONE** — supplier-invoice photo → OCR prefill → FA (lazy `InvoiceOcrModal` + `lib/invoiceOcr.ts` parser, vitest 321/321). Next **B.5** |
 | C. Offline everywhere | ✅ done | **C.1** (offline interception fixed + regression suite) · **C.2** (documents-module offline hardening + field-agent flow test) · **C.3** (prefetch page + indicator integration) · **C.4** (sync dashboard `/offline`) · **C.5** (offline POS Pro Mobile, `314afea`) — all committed + pushed |
 | D. WhatsApp commerce | ❌ planned | D.1–D.5 defined; wa.me-first, Meta Cloud API webhook later |
 
@@ -341,7 +353,7 @@ files; leave unrelated dirty files untouched):
 | *(B.1)* | **DONE** (`555f5bd` + `ac0d6d9`) — shared camera-scan hook + non-POS wiring; follow-up unmounts the hidden duplicate quick-create modal body + repaired `pdf-export` fixture |
 | *(B.2)* | **DONE** (`fff065f`) — `CameraCaptureModal.tsx` + `ProductModal` wiring (capture → pending blob preview → upload-on-save with real id; offline-queued create → info toast) + `camera-capture.pw.spec.ts` 2/2; `a9377d1` makes `pdf-export.pw.spec.ts` fully-mocked (Playwright 16/16) |
 | *(B.3)* | **DONE** (`1dee679`) — `lib/fiscalQr.ts` decoder (JSON v1, `invoice.number`) + square `280×280` qrbox in `BarcodeScannerModal` (ZXing real-decode fix: landscape 280×140 capped the square QR at 140px and never decoded) + admin documents camera button → exact doc view + portal scan-to-track (`portalApi.orders` `search`, backend matches the converted FV/POS number via `source_document_id`); `fiscal-scan.pw.spec.ts` 3/3 real-QR E2E + Pest portal scan-to-track regression (portal suite 25/25) |
-| *(B.4)* | supplier-invoice photo → OCR prefill → FA |
+| *(B.4)* | **DONE** — supplier-invoice photo → OCR prefill → FA: lazy `InvoiceOcrModal` + pure `lib/invoiceOcr.ts` parser (French/Arabic decimals, Arabic-Indic digits, dates, longest-hit supplier/product matching incl. barcode/ref via number-intact fallback, TVA rate first-number, skip header/total lines) + `CameraCaptureModal` reuse wired into the FA document page (`DocumentLinesSection` «تصوير فاتورة المورد» button, `onApply` → `document_date`/`party_id`/`bulkAddLines`); new `invoiceOcr.spec.ts` (35 tests, vitest 321/321), tsc clean, build 227 precache, SW MATCH |
 | *(B.5)* | camera stock-taking → stock adjustment |
 | *(D.1)* | wa.me click-to-chat links |
 | *(D.2)* | WhatsApp invoice/statement send |

@@ -41,6 +41,10 @@ interface DocumentLinesSectionProps {
   productSuggestions: unknown;
   isLoadingSuggestions: boolean;
   setShowBulkImport: React.Dispatch<React.SetStateAction<boolean>>;
+  /**
+   * فتح كاميرا «تصوير فاتورة المورد» (تعبئة OCR) — يُمرَّر فقط لمستندات الشراء.
+   */
+  onOcrInvoice?: () => void;
   slug: string | null | undefined;
   affectsStock: boolean;
   stockDir: 1 | -1 | 0;
@@ -63,7 +67,7 @@ export default function DocumentLinesSection({
   addLine, addLineWithProduct, removeLine, duplicateLine, updateLine,
   lineErr, savedDraft, draftKey, restoreDraft, set,
   needsParty, productSuggestions, isLoadingSuggestions,
-  setShowBulkImport, slug,
+  setShowBulkImport, onOcrInvoice, slug,
   affectsStock, stockDir,
   warehouses,
 }: DocumentLinesSectionProps) {
@@ -425,6 +429,22 @@ export default function DocumentLinesSection({
               <i className="ti ti-upload" />
               استيراد من Excel
             </button>
+            {isPurchase && onOcrInvoice && (
+              <button
+                onClick={onOcrInvoice}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '7px 14px', borderRadius: 'var(--r2)',
+                  border: '1px dashed var(--b3)', background: 'transparent',
+                  color: 'var(--t3)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--em)'; e.currentTarget.style.color = 'var(--em)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--b3)'; e.currentTarget.style.color = 'var(--t3)'; }}
+              >
+                <i className="ti ti-camera" />
+                تصوير فاتورة المورد
+              </button>
+            )}
           </div>
         )}
 

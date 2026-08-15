@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 
 // B.2 — camera still-capture (getUserMedia → canvas → File), shared across the
 // app. Mirrors BarcodeScannerModal's self-contained overlay + z-index convention
@@ -23,6 +23,7 @@ export default function CameraCaptureModal({ open, onCapture, onClose, title, hi
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState('');
   const [capturing, setCapturing] = useState(false);
   const [shot, setShot] = useState<{ file: File; url: string } | null>(null);
@@ -114,6 +115,14 @@ export default function CameraCaptureModal({ open, onCapture, onClose, title, hi
     onClose();
   }
 
+  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    onCapture(file);
+    onClose();
+  }
+
   // revoke the preview URL when unmounting mid-shot
   useEffect(() => () => { if (shot) URL.revokeObjectURL(shot.url); }, [shot]);
 
@@ -161,6 +170,14 @@ export default function CameraCaptureModal({ open, onCapture, onClose, title, hi
         )}
         <canvas ref={canvasRef} style={{ display: 'none' }} />
 
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          style={{ display: 'none' }}
+        />
+
         <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 12 }}>
           {shot ? (
             <>
@@ -188,22 +205,35 @@ export default function CameraCaptureModal({ open, onCapture, onClose, title, hi
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              onClick={capture}
-              disabled={capturing}
-              style={{
-                padding: '8px 20px', borderRadius: 8, border: 'none',
-                background: 'var(--em)', color: '#fff', cursor: 'pointer',
-                fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6,
-                opacity: capturing ? 0.6 : 1,
-              }}
-            >
-              {capturing
-                ? <i className="ti ti-loader" style={{ fontSize: 14, animation: 'spin 1s linear infinite' }} />
-                : <i className="ti ti-camera" style={{ fontSize: 14 }} />}
-              {capturing ? 'جاري الالتقاط...' : 'التقاط الصورة'}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={capture}
+                disabled={capturing}
+                style={{
+                  padding: '8px 20px', borderRadius: 8, border: 'none',
+                  background: 'var(--em)', color: '#fff', cursor: 'pointer',
+                  fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6,
+                  opacity: capturing ? 0.6 : 1,
+                }}
+              >
+                {capturing
+                  ? <i className="ti ti-loader" style={{ fontSize: 14, animation: 'spin 1s linear infinite' }} />
+                  : <i className="ti ti-camera" style={{ fontSize: 14 }} />}
+                {capturing ? 'جاري الالتقاط...' : 'التقاط الصورة'}
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  padding: '8px 16px', borderRadius: 8,
+                  border: '1px solid var(--b3)', background: 'var(--bg3)',
+                  cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <i className="ti ti-photo" style={{ fontSize: 14 }} /> رفع صورة من الجهاز
+              </button>
+            </>
           )}
           <button
             type="button"
