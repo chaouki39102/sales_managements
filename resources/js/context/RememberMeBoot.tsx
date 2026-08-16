@@ -25,7 +25,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth }            from '@/context/AuthContext';
 import { useActiveCompany, appActions } from '@/lib/store/appStore';
-import { getRememberPref, getSavedSession } from '@/lib/store/rememberMe';
+import { getRememberPref, getSavedSession, setSavedSession } from '@/lib/store/rememberMe';
 import { apiPost }            from '@/lib/api/core/client';
 
 export function RememberMeBoot({ children }: { children: React.ReactNode }) {
@@ -55,7 +55,15 @@ export function RememberMeBoot({ children }: { children: React.ReactNode }) {
     appActions.setSelectedYearId(saved.yearId);
 
     // مزامنة/تحقق في الخلفية مع الباكند (لا تحجب الرسم)
-    apiPost('/companies/switch', { company_id: saved.company.id })
+    apiPost<any>('/companies/switch', { company_id: saved.company.id })
+      .then((fresh) => {
+        // إذا غيّرت إعادة البذر slug الشركة، يعيد السيرفر الشركة بالـ slug
+        // الحالي — نعيد المزامنة (appStore + اللقطة) بدل إبقاء slug قديم 404.
+        if (fresh?.slug && fresh.slug !== saved.company.slug) {
+          appActions.setActiveCompany(fresh);
+          setSavedSession(user.id, { company: fresh, yearId: saved.yearId });
+        }
+      })
       .catch((e: any) => {
         const status = e?.response?.status;
         if (status && status >= 400 && status < 500) {
