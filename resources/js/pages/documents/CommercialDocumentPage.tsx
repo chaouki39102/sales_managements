@@ -1,4 +1,4 @@
-import React, { Suspense, useState, useEffect, useCallback } from 'react';
+import React, { Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { apiGet } from '@/lib/api/core/client';
@@ -127,7 +127,13 @@ export default function CommercialDocumentPage() {
   // ── B.4 — تصوير فاتورة المورد → OCR → تعبئة نموذج الشراء ──────────────────
   const [showOcrCamera, setShowOcrCamera] = useState(false);
   const [ocrFile, setOcrFile] = useState<File | null>(null);
-  
+  const ocrImageInputRef = useRef<HTMLInputElement>(null);
+
+  const handleOcrImagePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) setOcrFile(file);
+  };
 
   if (!lookupsReady) {
     return (
@@ -423,6 +429,7 @@ export default function CommercialDocumentPage() {
             isLoadingSuggestions={isLoadingSuggestions}
             setShowBulkImport={setShowBulkImport}
             onOcrInvoice={isPurchase ? () => setShowOcrCamera(true) : undefined}
+            onOcrImage={isPurchase ? () => ocrImageInputRef.current?.click() : undefined}
             slug={slug}
             affectsStock={affectsStock}
             stockDir={stockDir}
@@ -436,6 +443,14 @@ export default function CommercialDocumentPage() {
         onClose={() => setShowBulkImport(false)}
         products={lookups.products}
         onImport={(importedLines) => { bulkAddLines(importedLines); }}
+      />
+
+      <input
+        ref={ocrImageInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleOcrImagePicked}
       />
 
       <CameraCaptureModal

@@ -4,10 +4,11 @@ import {
   matchSupplier, matchProduct, parseInvoiceText, computeOcrScale,
   diceTokens, effectiveProductPrice, stripDigits, charDice,
   rankProductCandidates, detectColumnLayout,
+  detectColumnStripes, assignRowColumnsGeometric,
 } from '../invoiceOcr';
-import type { ProductLite, SupplierLite } from '../invoiceOcr';
+import type { ProductLite, SupplierLite, OcrLine, OcrWord, ColumnKind } from '../invoiceOcr';
 
-// B.4 — pure OCR-parsing helpers (no DOM, no tesseract).
+// B.4 — pure OCR-parsing helpers (no DOM, no OCR engine).
 
 describe('normalizeDigits', () => {
   it('converts Arabic-Indic and Persian digits to Latin', () => {
@@ -237,6 +238,27 @@ describe('detectColumnLayout', () => {
     expect(layout!.hasQtyCol).toBe(true);
     expect(layout!.qtyBeforeName).toBe(true);
   });
+  it('detects a many-column English header with a packQty column', () => {
+    const layout = detectColumnLayout(['Designation Qty PackQty UnitPrice Total']);
+    expect(layout).not.toBeNull();
+    expect(layout!.hasQtyCol).toBe(true);
+    expect(layout!.qtyBeforeName).toBe(false);
+    expect(layout!.trailingTotalCols).toBe(1);
+    expect(layout!.columns).toEqual(['des', 'qty', 'pack', 'pu', 'total']);
+  });
+  it('detects a French pack header (Désignation Qté Carton PU HT Total)', () => {
+    const layout = detectColumnLayout(['Désignation Qté Carton PU HT Total']);
+    expect(layout).not.toBeNull();
+    expect(layout!.hasQtyCol).toBe(true);
+    expect(layout!.trailingTotalCols).toBe(2);
+    expect(layout!.columns).toEqual(['des', 'qty', 'pack', 'pu', 'total', 'total']);
+  });
+  it('detects an Arabic header with a packQty column (البيان عدد العبوات)', () => {
+    const layout = detectColumnLayout(['البيان عدد العبوات سعر الوحدة الإجمالي']);
+    expect(layout).not.toBeNull();
+    expect(layout!.hasQtyCol).toBe(true);
+    expect(layout!.columns).toContain('pack');
+  });
   it('ignores the footer / totals block (not a table header)', () => {
     const layout = detectColumnLayout(['Total HT: 2505.00', 'TVA 19%: 475.95', 'Total TTC: 2980.95']);
     expect(layout).toBeNull();
@@ -273,6 +295,138 @@ describe('parseInvoiceText — layout-aware columns', () => {
   it('never treats the header row itself as a product line', () => {
     const r = parseInvoiceText('Qty Désignation PU HT Total\n2 عسل 1كلغ 500.00 1000.00', { products: HONEY });
     expect(r.lines).toHaveLength(1);
+  });
+
+  it('maps a many-column row positionally (designation qty packQty unitprice total)', () => {
+    const r = parseInvoiceText(
+      'Designation Qty PackQty UnitPrice Total\nعسل 2 12 520.00 6240.00',
+      { products: HONEY },
+    );
+    expect(r.lines).toHaveLength(1);
+    expect(r.lines[0].quantity).toBe(2);   // qty column, not the packQty value
+    expect(r.lines[0].packQty).toBe(12);
+    expect(r.lines[0].unitPrice).toBe(520);
+  });
+
+  it('keeps qty/price correct when the packQty cell is blank', () => {
+    const r = parseInvoiceText(
+      'Designation Qty PackQty UnitPrice Total\nعسل 2 520.00 1040.00',
+      { products: HONEY },
+    );
+    expect(r.lines).toHaveLength(1);
+    expect(r.lines[0].quantity).toBe(2);
+    expect(r.lines[0].packQty).toBeNull();
+    expect(r.lines[0].unitPrice).toBe(520);   // not the line total 1040
+  });
+
+  it('maps a French pack row (Désignation Qté Carton PU HT Total)', () => {
+    const r = parseInvoiceText(
+      'Désignation Qté Carton PU HT Total\nعسل 2 12 520.00 1000.00 6240.00',
+      { products: HONEY },
+    );
+    expect(r.lines).toHaveLength(1);
+    expect(r.lines[0].quantity).toBe(2);
+    expect(r.lines[0].packQty).toBe(12);
+    expect(r.lines[0].unitPrice).toBe(520);
+  });
+});
+
+describe('geometric column reader (structured OcrLine input)', () => {
+  const HONEY = [{ id: 20, name: 'Miel 1kg' }];
+
+  // Build an OcrLine from [text, xCenter] pairs; y ascends per row index.
+  const ocrLine = (parts: Array<[string, number]>, y = 100): OcrLine => {
+    const words: OcrWord[] = parts.map(([text, cx]) => {
+      const w = Math.max(10, text.length * 12);
+      return { text, x: cx - w / 2, y, w, h: 20, confidence: 0.95 };
+    });
+    return { words, text: words.map((w) => w.text).join(' '), y };
+  };
+
+  const HEADER: OcrLine = ocrLine(
+    [['Qty', 150], ['Désignation', 350], ['Pack', 430], ['PU', 900], ['Total', 1250]],
+    50,
+  );
+
+  it('detectColumnStripes anchors each numeric column at its header word center', () => {
+    const lines = [HEADER, ocrLine([['2', 150], ['Miel', 300], ['12', 430], ['520.00', 900], ['1040.00', 1250]], 100)];
+    const layout = detectColumnLayout(lines.map((l) => l.text));
+    const stripes = detectColumnStripes(lines, layout!);
+    expect(stripes).toHaveLength(4); // qty, pack, pu, total (des is skipped)
+    expect(stripes!.find((s) => s.kind === 'qty')!.x).toBeCloseTo(150, 3);
+    expect(stripes!.find((s) => s.kind === 'pu')!.x).toBeCloseTo(900, 3);
+    expect(stripes!.find((s) => s.kind === 'total')!.x).toBeCloseTo(1250, 3);
+  });
+
+  it('falls back to body-number clustering when a header anchor is missing', () => {
+    const header = ocrLine([['PU', 900], ['Total', 1250]], 50);
+    const lines = [
+      header,
+      ocrLine([['2', 150], ['Miel', 300], ['500.00', 900], ['1000.00', 1250]], 100),
+      ocrLine([['1', 150], ['Sucre', 300], ['300.00', 900], ['300.00', 1250]], 150),
+    ];
+    // Manual layout: qty header was dropped by OCR but the text token still
+    // exists in the joined header line, so a real parse keeps columns intact.
+    const layout = { headerIndex: 0, headerText: 'PU Total', columns: ['qty', 'des', 'pu', 'total'] as ColumnKind[], hasQtyCol: true, qtyBeforeName: true, trailingTotalCols: 1 };
+    const stripes = detectColumnStripes(lines, layout);
+    expect(stripes).not.toBeNull();
+    expect(stripes!.find((s) => s.kind === 'qty')!.x).toBeCloseTo(150, 3);
+    expect(stripes!.find((s) => s.kind === 'pu')!.x).toBeCloseTo(900, 3);
+  });
+
+  it('snaps each number to the nearest stripe (far-apart columns)', () => {
+    const stripes = [
+      { kind: 'qty' as const, x: 150 },
+      { kind: 'pu' as const, x: 900 },
+      { kind: 'total' as const, x: 1250 },
+    ];
+    const row = ocrLine([['3', 150], ['Miel', 300], ['520.00', 900], ['1560.00', 1250]], 100);
+    const m = assignRowColumnsGeometric(row, stripes);
+    expect(m.quantity).toBe(3);
+    expect(m.packQty).toBeNull();
+    expect(m.unitPrice).toBe(520);
+  });
+
+  it('keeps qty/price correct when a blank pack cell leaves gaps (geometry beats ends-fill)', () => {
+    const stripes = [
+      { kind: 'qty' as const, x: 150 },
+      { kind: 'pack' as const, x: 430 },
+      { kind: 'pu' as const, x: 900 },
+      { kind: 'total' as const, x: 1250 },
+    ];
+    // qty cell is blank → the pack value sits under the pack stripe and must
+    // NOT become the qty (the text-positional ends-fill would read qty=12).
+    const row = ocrLine([['Miel', 300], ['12', 430], ['520.00', 900], ['6240.00', 1250]], 100);
+    const m = assignRowColumnsGeometric(row, stripes);
+    expect(m.quantity).toBeNull();
+    expect(m.packQty).toBe(12);
+    expect(m.unitPrice).toBe(520);
+  });
+
+  it('parseInvoiceText with OcrLine[] reads qty/price geometrically', () => {
+    const lines = [
+      HEADER,
+      ocrLine([['Miel', 300], ['12', 430], ['520.00', 900], ['6240.00', 1250]], 100),
+    ];
+    const r = parseInvoiceText(lines, { products: HONEY });
+    expect(r.rawText).toBe('Qty Désignation Pack PU Total\nMiel 12 520.00 6240.00');
+    expect(r.lines).toHaveLength(1);
+    expect(r.lines[0].quantity).toBe(1);     // blank qty cell → default 1, never 12
+    expect(r.lines[0].packQty).toBe(12);
+    expect(r.lines[0].unitPrice).toBe(520);
+  });
+
+  it('structured totals/date still classified and the header never becomes a line', () => {
+    const lines = [
+      HEADER,
+      ocrLine([['2', 150], ['Miel', 300], ['520.00', 900], ['1040.00', 1250]], 100),
+      ocrLine([['Total', 400], ['HT', 600], ['1040.00', 1250]], 150),
+    ];
+    const r = parseInvoiceText(lines, { products: HONEY });
+    expect(r.lines).toHaveLength(1);
+    expect(r.totalHt).toBe(1040);
+    expect(r.lines[0].quantity).toBe(2);
+    expect(r.lines[0].unitPrice).toBe(520);
   });
 });
 
@@ -380,18 +534,18 @@ describe('parseInvoiceText', () => {
 });
 
 describe('computeOcrScale', () => {
-  it('keeps images already ≤ 1600px unchanged', () => {
+  it('keeps images already ≤ 2400px unchanged', () => {
     expect(computeOcrScale(1200, 900)).toBe(1);
     expect(computeOcrScale(1600, 1600)).toBe(1);
     expect(computeOcrScale(800, 1600)).toBe(1);
   });
-  it('downscales the longest side of a phone photo to 1600px', () => {
-    expect(computeOcrScale(4000, 3000)).toBeCloseTo(0.4, 6);
-    expect(computeOcrScale(3000, 4000)).toBeCloseTo(0.4, 6);
+  it('downscales the longest side of a phone photo to 2400px', () => {
+    expect(computeOcrScale(4000, 3000)).toBeCloseTo(0.6, 6);
+    expect(computeOcrScale(3000, 4000)).toBeCloseTo(0.6, 6);
   });
   it('preserves aspect ratio via the longest side', () => {
-    expect(computeOcrScale(3200, 1600)).toBeCloseTo(0.5, 6);
-    expect(computeOcrScale(1600, 3200)).toBeCloseTo(0.5, 6);
+    expect(computeOcrScale(3200, 1600)).toBeCloseTo(0.75, 6);
+    expect(computeOcrScale(1600, 3200)).toBeCloseTo(0.75, 6);
   });
   it('honours a custom max dimension', () => {
     expect(computeOcrScale(4000, 3000, 2000)).toBeCloseTo(0.5, 6);

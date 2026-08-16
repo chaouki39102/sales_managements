@@ -61,6 +61,55 @@ export default defineConfig({
                 // is handled by react-router and never hits the SW.
                 navigateFallback: null,
                 runtimeCaching: [
+                    // ppu-paddle-ocr model files + onnxruntime-web wasm/runtime.
+                    // The OCR engine fetches the PP-OCRv6 detection/recognition
+                    // models + dictionary from the ppu GitHub CDN and the
+                    // onnxruntime-web wasm from jsDelivr on FIRST use. Cache
+                    // them CacheFirst so the OCR modal works offline after the
+                    // first successful run (same constraint as the old
+                    // tesseract traineddata, but persisted).
+                    {
+                        urlPattern: /^https:\/\/media\.githubusercontent\.com\/media\/PT-Perkasa-Pilar-Utama\/ppu-paddle-ocr-models/,
+                        handler: 'CacheFirst',
+                        options: {
+                            cacheName: 'ocr-models-cache',
+                            expiration: {
+                                maxEntries: 20,
+                                maxAgeSeconds: 30 * 24 * 60 * 60,
+                            },
+                            cacheableResponse: {
+                                statuses: [0, 200],
+                            },
+                        },
+                    },
+                    {
+                        urlPattern: /^https:\/\/raw\.githubusercontent\.com\/PT-Perkasa-Pilar-Utama\/ppu-paddle-ocr-models/,
+                        handler: 'CacheFirst',
+                        options: {
+                            cacheName: 'ocr-models-cache',
+                            expiration: {
+                                maxEntries: 20,
+                                maxAgeSeconds: 30 * 24 * 60 * 60,
+                            },
+                            cacheableResponse: {
+                                statuses: [0, 200],
+                            },
+                        },
+                    },
+                    {
+                        urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/npm\/onnxruntime-web/,
+                        handler: 'CacheFirst',
+                        options: {
+                            cacheName: 'ocr-models-cache',
+                            expiration: {
+                                maxEntries: 30,
+                                maxAgeSeconds: 30 * 24 * 60 * 60,
+                            },
+                            cacheableResponse: {
+                                statuses: [0, 200],
+                            },
+                        },
+                    },
                     // Health/status probe: ALWAYS live — a diagnostic page must
                     // reflect reality, never a stale cached response. This must
                     // sit BEFORE the generic /api/v1/ rule (first match wins).

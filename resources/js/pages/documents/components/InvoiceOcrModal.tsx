@@ -60,14 +60,12 @@ const TIER_META: Record<MatchTier, { label: string; color: string }> = {
 const fmtMoney = (n: number) =>
   n.toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** tesseract.js emits English status strings — map them to Arabic for the UI. */
+/** ppu-paddle-ocr emits English status strings — map them to Arabic for the UI. */
 const OCR_STATUS_LABELS: Record<string, string> = {
   'preparing image': 'تجهيز الصورة',
-  'loading tesseract core': 'تحميل محرك القراءة',
-  'initializing tesseract': 'تهيئة محرك القراءة',
-  'loading language traineddata': 'تحميل ملفات اللغة',
-  'initializing api': 'تهيئة واجهة القراءة',
+  'loading ocr model': 'تحميل نموذج الذكاء الاصطناعي',
   'recognizing text': 'قراءة النص',
+  done: 'اكتمال',
 };
 const ocrStatusLabel = (s: string | null | undefined) => (s ? OCR_STATUS_LABELS[s] ?? s : '…');
 
@@ -130,7 +128,10 @@ export function InvoiceOcrModal({
         onProgress: (p) => setProgress(p),
       });
       const result = parseInvoiceText(text, { products, suppliers });
-      setRawText(text);
+      // runInvoiceOcr returns the structured OcrLine[] when word geometry is
+      // available (enables the geometric column reader); the raw view always
+      // shows plain text.
+      setRawText(typeof text === 'string' ? text : text.map((l) => l.text).join('\n'));
       setDocumentDate(result.documentDate ?? todayKey());
       if (result.supplier) setSupplierId(String(result.supplier.id));
       setTotals({ ht: result.totalHt, ttc: result.totalTtc, tvaRate: result.tvaRate });
@@ -301,7 +302,7 @@ export function InvoiceOcrModal({
             <i className="ti ti-scan" />
           </span>
           <div style={{ fontSize: 14, color: 'var(--t2)' }}>
-            {progress?.status === 'recognizing text' ? 'جارٍ قراءة النص…' : progress?.status === 'preparing image' ? 'جارٍ تجهيز الصورة…' : 'جارٍ تحميل محرك القراءة…'}
+            {progress?.status === 'recognizing text' ? 'جارٍ قراءة النص…' : progress?.status === 'preparing image' ? 'جارٍ تجهيز الصورة…' : 'جارٍ تحميل نموذج الذكاء الاصطناعي…'}
           </div>
           <div style={{ width: '70%', height: 8, background: 'var(--b2)', borderRadius: 99, overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${progressPct}%`, background: 'var(--em)', borderRadius: 99, transition: 'width .3s' }} />
