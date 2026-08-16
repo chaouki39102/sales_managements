@@ -712,7 +712,10 @@ export default function ProductsPage() {
         <ImportWizardModal
           open={importModal.open}
           onClose={importModal.closeModal}
-          onImported={() => qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) })}
+          onImported={() => {
+            qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
+            qc.invalidateQueries({ queryKey: tenantKeys.lookups.productsAggregated(slug) });
+          }}
           config={PRODUCT_IMPORT_CONFIG}
         />
       </Suspense>
