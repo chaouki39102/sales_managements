@@ -101,10 +101,11 @@ export const useCurrentTheme     = () => useAppStore((s) => s.theme);
 // ─── Actions (خارج React — للـ Interceptors والـ event handlers) ─────────────
 
 export const appActions = {
-  getActiveSlug:    () => useAppStore.getState().activeCompany?.slug ?? null,
-  setActiveCompany: (company: ActiveCompany | null) =>
+  getActiveSlug:     () => useAppStore.getState().activeCompany?.slug ?? null,
+  getSelectedYearId: () => useAppStore.getState().selectedYearId,
+  setActiveCompany:  (company: ActiveCompany | null) =>
     useAppStore.getState().setActiveCompany(company),
   setSelectedYearId: (id: number | null) =>
     useAppStore.getState().setSelectedYearId(id),
-  reset:            () => useAppStore.getState().reset(),
+  reset:             () => useAppStore.getState().reset(),
 };
