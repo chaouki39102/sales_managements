@@ -1,6 +1,7 @@
 // resources/js/pages/clients/ClientsPage.tsx
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { usePartyMutations, fetchAllCustomers } from '@/lib/api/endpoints/parties';
 import { useModal } from '@/hooks/useModal';
 import { useERPExport } from '@/components/ui/DataTable';
@@ -343,6 +344,8 @@ export default function ClientsPage() {
   const portalModal = useModal();
   const [portalParty, setPortalParty] = useState<Party | null>(null);
   const slug        = useActiveSlug();
+  const qc          = useQueryClient();
+  const refreshParties = () => { if (slug) qc.invalidateQueries({ queryKey: tenantKeys.parties.all(slug) }); };
 
   const activeParam: number | undefined =
     statusFilter === 'active' ? 1 : statusFilter === 'inactive' ? 0 : undefined;
@@ -679,6 +682,7 @@ export default function ClientsPage() {
       <ImportWizardModal
         open={importModal.open}
         onClose={importModal.closeModal}
+        onImported={refreshParties}
         config={PARTY_IMPORT_CONFIG}
       />
 

@@ -342,7 +342,12 @@ export default function ProductsPage() {
       )},
     { key: 'family_brand', label: 'الفئة / العلامة',
       render: (prod: any) => (
-        <div style={{ fontSize: 12 }}>{getFamilyName(prod.family_id)}</div>
+        <div style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span>{getFamilyName(prod.family_id)}</span>
+          {prod.brand_id != null && (
+            <span style={{ color: 'var(--t4)', fontSize: 11 }}>{getBrandName(prod.brand_id)}</span>
+          )}
+        </div>
       )},
     { key: 'purchase_price', label: 'سعر الشراء', thStyle: { textAlign: 'right' as const, cursor: 'pointer' }, tdStyle: { textAlign: 'right' as const }, sortable: true, sortField: 'purchase_price_ht',
       render: (prod: any) => (
@@ -706,7 +711,8 @@ export default function ProductsPage() {
       <Suspense fallback={null}>
         <ImportWizardModal
           open={importModal.open}
-          onClose={() => { importModal.closeModal(); qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) }); }}
+          onClose={importModal.closeModal}
+          onImported={() => qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) })}
           config={PRODUCT_IMPORT_CONFIG}
         />
       </Suspense>

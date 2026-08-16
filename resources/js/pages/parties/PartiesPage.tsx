@@ -8,6 +8,9 @@ import {
 import {
   useParties, useClients, useSuppliers, usePartyMutations, partiesApi,
 } from '@/lib/api/endpoints/parties';
+import { useQueryClient } from '@tanstack/react-query';
+import { tenantKeys } from '@/lib/api/core/queryKeys';
+import { useActiveSlug } from '@/lib/store/appStore';
 import { useModal }    from '@/hooks/useModal';
 import { useBarcodeScan } from '@/hooks/useBarcodeScan';
 import { useNotification } from '@/hooks/useNotification';
@@ -119,6 +122,9 @@ export default function PartiesPage() {
   const formModal  = useModal();
   const statsModal = useModal();
   const importModal = useModal();
+  const qc = useQueryClient();
+  const slug = useActiveSlug();
+  const refreshParties = () => { if (slug) qc.invalidateQueries({ queryKey: tenantKeys.parties.all(slug) }); };
 
   useEffect(() => {
     const t = setTimeout(() => { setDebouncedQ(search); setPage(1); }, 350);
@@ -445,6 +451,7 @@ export default function PartiesPage() {
       <ImportWizardModal
         open={importModal.open}
         onClose={importModal.closeModal}
+        onImported={refreshParties}
         config={PARTY_IMPORT_CONFIG}
       />
 

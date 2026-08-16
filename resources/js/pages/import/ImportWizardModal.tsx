@@ -52,9 +52,11 @@ interface Props {
   open: boolean;
   onClose: () => void;
   config: EntityConfig;
+  /** Fired after a successful import execution so the host page can refresh its lists. */
+  onImported?: () => void;
 }
 
-export default function ImportWizardModal({ open, onClose, config }: Props) {
+export default function ImportWizardModal({ open, onClose, config, onImported }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const slug = useActiveSlug();
 
@@ -191,6 +193,7 @@ export default function ImportWizardModal({ open, onClose, config }: Props) {
     onSuccess: (res) => {
       setImportResult(res);
       setStep('result');
+      onImported?.();
     },
   });
 

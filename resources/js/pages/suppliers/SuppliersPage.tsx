@@ -1,6 +1,9 @@
 // resources/js/pages/suppliers/SuppliersPage.tsx
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSuppliers, usePartyMutations } from '@/lib/api/endpoints/parties';
+import { tenantKeys } from '@/lib/api/core/queryKeys';
+import { useActiveSlug } from '@/lib/store/appStore';
 import { useModal } from '@/hooks/useModal';
 import { useERPExport } from '@/components/ui/DataTable';
 import PageHeader from '@/components/ui/PageHeader';
@@ -42,6 +45,9 @@ const SUPPLIERS_EXPORT_COLS: Column<Party>[] = [
 
 export default function SuppliersPage() {
     const { exportData } = useERPExport({ defaultFileName: 'الموردون', defaultCurrency: 'DZD' });
+    const slug = useActiveSlug();
+    const qc = useQueryClient();
+    const refreshSuppliers = () => { if (slug) qc.invalidateQueries({ queryKey: tenantKeys.parties.all(slug) }); };
     const [search, setSearch] = useState('');
     const [editing, setEditing] = useState<Party | null>(null);
     const modal = useModal();
@@ -156,6 +162,7 @@ const meta = (data as any)?.meta;
             <ImportWizardModal
                 open={importModal.open}
                 onClose={importModal.closeModal}
+                onImported={refreshSuppliers}
                 config={PARTY_IMPORT_CONFIG}
             />
         </div>
