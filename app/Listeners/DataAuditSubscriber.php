@@ -2,12 +2,14 @@
 
 namespace App\Listeners;
 
+use App\Core\Traits\AuditableEnhanced;
 use App\Models\Audit;
 use App\Models\Traits\HasCompany;
 use App\Services\CompanyContextService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 /**
  * يسجّل كل عمليات الإنشاء/التعديل/الحذف على جميع النماذج المرتبطة بشركة
@@ -82,7 +84,15 @@ class DataAuditSubscriber
             return false;
         }
 
-        return in_array(HasCompany::class, class_uses_recursive($model), true);
+        $uses = class_uses_recursive($model);
+
+        // النماذج التي تسجّل تدقيقها بنفسها (AuditableEnhanced) تُستثنى هنا
+        // لمنع كتابة صفّين لنفس الحدث (مشكلة التكرار المكتشفة في Phase 79).
+        if (in_array(AuditableEnhanced::class, $uses, true)) {
+            return false;
+        }
+
+        return in_array(HasCompany::class, $uses, true);
     }
 
     private function write(Model $model, string $event, array $oldValues, array $newValues): void
@@ -93,19 +103,28 @@ class DataAuditSubscriber
 
         $request = app()->runningInConsole() ? null : request();
 
-        Audit::create([
-            'company_id'     => $companyId,
-            'user_id'        => $user?->getKey(),
-            'user_type'      => $user ? get_class($user) : null,
-            'event'          => $event,
-            'auditable_type' => get_class($model),
-            'auditable_id'   => $model->getKey(),
-            'old_values'     => $oldValues,
-            'new_values'     => $newValues,
-            'url'            => $request?->fullUrl(),
-            'ip_address'     => $request?->ip(),
-            'user_agent'     => $request ? mb_substr((string) $request->userAgent(), 0, 1023) : null,
-            'tags'           => null,
-        ]);
+        try {
+            Audit::create([
+                'company_id'     => $companyId,
+                'user_id'        => $user?->getKey(),
+                'user_type'      => $user ? get_class($user) : null,
+                'event'          => $event,
+                'auditable_type' => get_class($model),
+                'auditable_id'   => $model->getKey(),
+                'old_values'     => $oldValues,
+                'new_values'     => $newValues,
+                'url'            => $request?->fullUrl(),
+                'ip_address'     => $request?->ip(),
+                'user_agent'     => $request ? mb_substr((string) $request->userAgent(), 0, 1023) : null,
+                'tags'           => null,
+            ]);
+        } catch (\Throwable $e) {
+            // تدوين التدقيق لا يجب أبداً أن يفشل عملية مالية (بيع/دفع/تحويل).
+            Log::error('Failed to record audit event', [
+                'model' => get_class($model),
+                'event' => $event,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

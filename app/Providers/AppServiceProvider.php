@@ -8,6 +8,8 @@ use App\Observers\CommercialDocumentObserver;
 use App\Observers\CompanyObserver;
 use App\Policies\CompanyPolicy;
 use App\Services\CompanyContextService;
+use App\Support\Database\RetryingSQLiteConnection;
+use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -22,6 +24,20 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // ══════════════════════════════════════════════════════
+        // SQLite — transient Windows file-lock retry
+        // ══════════════════════════════════════════════════════
+
+        // Windows Defender / Search Indexer can momentarily lock database.sqlite
+        // (or its -journal/-wal sibling) during a write → SQLite error 14
+        // "unable to open database file" (CANTOPEN) or 5 "database is locked".
+        // Replace the stock sqlite connection with a retrying variant so a
+        // transient lock never 500s a POS payment (the statement is rolled back
+        // at statement level, so retry is safe).
+        Connection::resolverFor('sqlite', static function ($connection, $database, $prefix, $config) {
+            return new RetryingSQLiteConnection($connection, $database, $prefix, $config);
+        });
+
         // ══════════════════════════════════════════════════════
         // Route Binding
         // ══════════════════════════════════════════════════════

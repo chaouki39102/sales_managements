@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Core\Traits;
 
 use App\Models\Audit;
+use App\Services\CompanyContextService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -42,7 +43,8 @@ trait AuditableEnhanced
     {
         try {
             Audit::create([
-                'user_id'       => Auth::id(),
+                'company_id'     => $model->getAttribute('company_id') ?? app(CompanyContextService::class)->get(),
+                'user_id'        => Auth::id(),
                 'user_type'     => Auth::check() ? get_class(Auth::user()) : null,
                 'event'         => $event,
                 'auditable_type' => get_class($model),
