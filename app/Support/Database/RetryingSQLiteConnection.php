@@ -20,10 +20,31 @@ use Illuminate\Database\SQLiteConnection;
  */
 class RetryingSQLiteConnection extends SQLiteConnection
 {
-    protected int $maxRetries = 5;
+    protected int $maxRetries = 12;
 
-    /** @var int[] Delays in ms before retry attempt N (index 0 = first retry). */
-    protected array $retryDelaysMs = [0, 50, 100, 200, 400];
+    /**
+     * @var int[] Delays in ms before retry attempt N (index 0 = first retry).
+     *
+     * The Defender/Search-Indexer lock windows observed in production exceeded
+     * the old ~750ms budget, so the total retry window is now ~8.5s: a multi-
+     * second scan spike becomes a (rare) slow success instead of a 500 that
+     * rolls back a POS payment. Backoff is capped at 1s to bound a pathological
+     * single-request hold time.
+     *
+     * Overridable per-connection via config key 'retry_delays_ms' (e.g. tests
+     * and ops tuning), in which case maxRetries follows the array length.
+     */
+    protected array $retryDelaysMs = [0, 50, 100, 200, 400, 800, 1000, 1000, 1000, 1000, 1000, 1000];
+
+    public function __construct($pdo, $database = '', $tablePrefix = '', array $config = [])
+    {
+        parent::__construct($pdo, $database, $tablePrefix, $config);
+
+        if (isset($config['retry_delays_ms'])) {
+            $this->retryDelaysMs = array_map('intval', $config['retry_delays_ms']);
+            $this->maxRetries = count($this->retryDelaysMs);
+        }
+    }
 
     protected function runQueryCallback($query, $bindings, $callback)
     {

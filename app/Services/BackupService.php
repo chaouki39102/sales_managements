@@ -645,20 +645,20 @@ class BackupService
         }
 
         // 6) Settle the restored file's journal state and prove it is writable NOW.
-        //    The backup API copies page-by-page under the DESTINATION's rollback
-        //    journal (journal_mode=delete). On Windows a lingering journal/lock
-        //    makes the very NEXT write fail with SQLite CANTOPEN ("unable to open
-        //    database file") — exactly what the user hit right after a restore
-        //    (the first import write died with `General error: 14`). Force the
-        //    journal to fully create + delete inside a write transaction (rolled
-        //    back, no data touched) while this request is the only writer, so any
-        //    residue settles HERE instead of exploding on the next request.
+        //    The live DB runs in WAL mode (config/database.php journal_mode=wal) —
+        //    delete-journal mode caused exactly this CANTOPEN ("unable to open
+        //    database file") on Windows whenever an AV/Search-Indexer scanner raced
+        //    the per-transaction -journal file. Force WAL on the restored file,
+        //    checkpoint it, and prove it is writable with a rolled-back write
+        //    transaction while this request is the only writer, so any lock residue
+        //    from the restore's `SQLite3::backup()` handle settles HERE instead of
+        //    exploding on the next request.
         $settle = null;
         try {
             $settle = new \PDO('sqlite:'.$dbPath, null, null, [
                 \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
             ]);
-            $settle->exec('PRAGMA journal_mode = DELETE');
+            $settle->exec('PRAGMA journal_mode = WAL');
             $settled = false;
             for ($i = 1; $i <= 5 && !$settled; $i++) {
                 try {
@@ -674,6 +674,13 @@ class BackupService
                         );
                     }
                     usleep(250_000); // Windows lock-release timing; re-probe briefly
+                }
+            }
+            if ($settled) {
+                try {
+                    $settle->exec('PRAGMA wal_checkpoint(TRUNCATE)');
+                } catch (\Throwable $e) {
+                    // checkpoint is best-effort; a busy WAL just defers folding frames
                 }
             }
         } finally {

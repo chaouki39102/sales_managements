@@ -47,6 +47,8 @@ function makeFlakyConnection(int $failuresLeft, string $message, int $code): Ret
 
     return new RetryingSQLiteConnection($pdo, ':memory:', '', [
         'database' => ':memory:',
+        // Keep the give-up test fast: tiny per-retry backoff (5 retries → 6 attempts).
+        'retry_delays_ms' => [0, 1, 1, 1, 1],
     ]);
 }
 
@@ -71,7 +73,7 @@ it('retries a transient database-is-locked (error 5) and succeeds', function () 
 });
 
 it('gives up after maxRetries retries and surfaces the original QueryException', function () {
-    // maxRetries = 5 retries after the initial attempt → 6 prepare() calls total.
+    // Test config → 5 retries after the initial attempt → 6 prepare() calls total.
     $conn = makeFlakyConnection(99, 'unable to open database file', 14);
 
     try {
