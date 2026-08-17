@@ -18,6 +18,25 @@
 ## Date
 2026-08-15
 
+### Phase 80 — B.5 Complete: Camera Stock-Take → Stock Adjustment (Aug 15)
+
+**Request** (continuing the B/C/D roadmap in `C1_OFFLINE_FIX.md`, B.5 = fifth Camera-native task): a stock-take page at `/inventory/stock-take` where a field agent scans product barcodes with the camera, enters the counted quantity, and creates stock-in or stock-out adjustments against the system stock.
+
+**What was built**:
+- **New page** `resources/js/pages/inventory/StockTakePage.tsx` (~510 lines): warehouse selector with default detection (all warehouses, default marked «افتراضي»), manual barcode/ref text input + camera scanner (`BarcodeScannerModal`), product lookup via `/products` search + exact match on `barcode === code || ref === code || String(id) === code`, system stock fetch via `/inventory/stock-at?product_id&warehouse_id&fiscal_year_id`, counted qty input with live difference badge (green «نقص» when counted < system, red «زيادة» when counted > system, amber «مطابق» when equal), submit creates stock movement (IN when counted > system, OUT when counted < system), session log table tracking all adjustments, summary stats header (total items scanned, added, removed).
+- **Movement type selection**: uses the seeded `in`/`out` types (direction 1/-1) NOT the `adjustment` type (direction 0, which `InventoryStockService` ignores — movements with `quantity > 0` only register when `direction > 0`).
+- **Route** `/inventory/stock-take` registered in `routes/index.tsx` after the inventory route.
+- **Nav item** `'جرد بالكاميرا'` (`ti-barcode`) added to the inventory group in `DashboardLayout.tsx`.
+- **Extended `StockMovementCreateInput`** in `inventory.ts` with optional fields: `cost_price`, `total_price`, `price_source`, `reason`.
+
+**Key architectural rules**:
+- The stock-take page creates **IN/OUT movements** (direction 1/-1), NEVER `adjustment` (direction 0). `InventoryStockService` sums `quantity × direction` — direction 0 movements are silently ignored, so a stock-take using the adjustment type would appear to work (200 OK, history shows) but never change the computed stock.
+- The warehouse selector defaults to the company's default warehouse (matching the stock-at endpoint's default behavior); the system stock fetch uses `fiscal_year_id` from `useFiscalYear()` (the SSOT).
+- `useWarehouses` and `useStockMovementTypes` are from `lookups.ts`, not `inventory.ts` — the movement types lookup is a shared entity, not an inventory-specific hook.
+- Query invalidation after creating movements uses `tenantKeys.inventory.all(slug)` (prefix invalidation covers stock-at, stock-movements, and any future inventory keys).
+
+**Verification**: `npx tsc --noEmit` clean · `npm test` **365/365** (20 files) · `npm run build` 0 errors, **233 precache entries** · **SW MATCH**. No PHP touched → pest not re-run. `C1_OFFLINE_FIX.md`: B.5 ✅, progress table → B done (ALL B COMPLETE), commits table filled. Next pending: **D.1** (wa.me click-to-chat links).
+
 ### Phase 79 — B.4 Complete: Photograph a Supplier Invoice → OCR Prefill → FA Document (Aug 15)
 
 **Request** (continuing the B/C/D roadmap in `C1_OFFLINE_FIX.md`, B.4 = fourth Camera-native task): on the purchase (`FA`) document page, photograph a supplier invoice with the camera, OCR it, and PRE-FILL the document form (supplier, date, lines) for human confirmation before save. OCR is a *prefill helper* — the stored doc is still a normal `FA` doc saved by the standard pipeline.

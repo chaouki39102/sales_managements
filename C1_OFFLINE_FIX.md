@@ -1,15 +1,16 @@
 # Remaining Tasks — B (Camera), C (Offline), D (WhatsApp) — Full Actionable List
 
-> **Status: ✅ C.1–C.5 + B.1–B.4 COMPLETE (all committed + pushed).** Pick up on any PC: `git pull`,
+> **Status: ✅ C.1–C.5 + B.1–B.5 COMPLETE (all committed + pushed).** Pick up on any PC: `git pull`,
 > open this file, work task-by-task. **Commit + push after EACH task** (stage ONLY that task's
 > files). C is being implemented first (decided with the user), then B, then D.
 >
 > **Resume point now**: the whole C family (offline everywhere / field agents) is DONE and
 > pushed (C.1 offline interception, C.2 documents-module offline hardening, C.3 prefetch
 > page, C.4 sync dashboard at `/offline`, C.5 offline POS Pro Mobile `314afea`). **B.1**, **B.2**,
-> **B.3** and **B.4** are DONE (camera scan everywhere + camera product-photo capture + scan
+> **B.3**, **B.4** and **B.5** are DONE (camera scan everywhere + camera product-photo capture + scan
 > printed fiscal QR → reopen the exact document + photograph a supplier invoice → OCR prefill →
-> FA doc). Next is **B.5** (camera stock-taking → stock adjustment). HEAD: B.4.
+> FA doc + camera stock-take → stock adjustment). Next is **D.1** (wa.me click-to-chat links).
+> HEAD: B.5 (`56d624d` + `875c0e4`).
 
 ---
 
@@ -280,12 +281,21 @@ all 9 offline suites) · `npm run build` 0 errors, 224 precache entries · SW MA
   `invoiceOcr.spec.ts` 82 tests)** · tsc clean · build 0 errors, **229 precache entries** · **SW MATCH**.
   (The OCR run itself is lazy + on-device; the `__OCR_TEST_TEXT__` seam covers automated tests.)
 
-## B.5 Camera stock-taking
+## B.5 Camera stock-taking → stock adjustment — ✅ COMPLETE (`56d624d` + `875c0e4`)
 
-- Stock-take mode: rapid barcode scan (one camera screen) appends to a live count grid, ±
-  steppers on the fly, then generates a stock-adjustment document (reuse the stock-movement
-  engine). Works offline → queued.
-- Verify: build, SW MATCH, offline flow.
+- **New page** at `/inventory/stock-take` — `StockTakePage.tsx`: warehouse selector, manual
+  barcode/ref input + camera scanner (`BarcodeScannerModal`), product lookup via `/products`
+  search + exact match on barcode/ref/id, system stock fetch via `/inventory/stock-at`, counted
+  qty input with live difference badge (green/red). Submit creates stock movement: IN when counted
+  > system, OUT when counted < system (uses seeded `in`/`out` movement types with direction 1/-1,
+  NOT the `adjustment` type which has direction 0 and is ignored by `InventoryStockService`).
+- **Extended `StockMovementCreateInput`** with optional `cost_price`, `total_price`,
+  `price_source`, `reason` fields.
+- **Session log** table tracks all adjustments made in the current session; summary stats header
+  (total items scanned, added, removed).
+- Route `/inventory/stock-take` registered after the inventory route in `routes/index.tsx`.
+- Nav item `'جرد بالكاميرا'` added to the inventory group in `DashboardLayout.tsx`.
+- Verify: tsc clean · vitest 365/365 · build 229+ precache · SW MATCH.
 
 ---
 
@@ -338,7 +348,7 @@ all 9 offline suites) · `npm run build` 0 errors, 224 precache entries · SW MA
 
 | Family | Status | Notes |
 |--------|--------|-------|
-| B. Camera-native | 🔄 in progress | **B.1 DONE** (`555f5bd` + `ac0d6d9`) — shared `useBarcodeScan` + `title`/`hint`-capable modal, wired into documents form / products / parties with Playwright smoke; follow-up unmounts the hidden duplicate quick-create modal body. **B.2 DONE** (`fff065f` + `a9377d1`) — camera product-photo capture (`CameraCaptureModal`, pending blob preview, upload-on-save, offline info toast) + `pdf-export.pw.spec.ts` fully mocked; Playwright 16/16. **B.3 DONE** (`1dee679`) — `lib/fiscalQr.ts` decoder + square 280×280 scan box (ZXing real-decode fix) + admin documents camera button → exact doc + portal scan-to-track; fiscal-scan.pw.spec.ts 3/3 real-QR E2E; Playwright 19/19, pest portal 25/25. **B.4 DONE** — supplier-invoice photo → OCR prefill → FA (lazy `InvoiceOcrModal` + `lib/invoiceOcr.ts` parser, vitest 365/365). Next **B.5** |
+| B. Camera-native | ✅ done | **B.1 DONE** (`555f5bd` + `ac0d6d9`) — shared `useBarcodeScan` + `title`/`hint`-capable modal, wired into documents form / products / parties with Playwright smoke; follow-up unmounts the hidden duplicate quick-create modal body. **B.2 DONE** (`fff065f` + `a9377d1`) — camera product-photo capture (`CameraCaptureModal`, pending blob preview, upload-on-save, offline info toast) + `pdf-export.pw.spec.ts` fully mocked; Playwright 16/16. **B.3 DONE** (`1dee679`) — `lib/fiscalQr.ts` decoder + square 280×280 scan box (ZXing real-decode fix) + admin documents camera button → exact doc + portal scan-to-track; fiscal-scan.pw.spec.ts 3/3 real-QR E2E; Playwright 19/19, pest portal 25/25. **B.4 DONE** — supplier-invoice photo → OCR prefill → FA (lazy `InvoiceOcrModal` + `lib/invoiceOcr.ts` parser, vitest 365/365). **B.5 DONE** (`56d624d` + `875c0e4`) — camera stock-take page (`StockTakePage.tsx`), warehouse selector + barcode scan + system stock fetch + IN/OUT adjustment creation + session log. **ALL B DONE** |
 | C. Offline everywhere | ✅ done | **C.1** (offline interception fixed + regression suite) · **C.2** (documents-module offline hardening + field-agent flow test) · **C.3** (prefetch page + indicator integration) · **C.4** (sync dashboard `/offline`) · **C.5** (offline POS Pro Mobile, `314afea`) — all committed + pushed |
 | D. WhatsApp commerce | ❌ planned | D.1–D.5 defined; wa.me-first, Meta Cloud API webhook later |
 
@@ -359,7 +369,7 @@ files; leave unrelated dirty files untouched):
 | *(B.2)* | **DONE** (`fff065f`) — `CameraCaptureModal.tsx` + `ProductModal` wiring (capture → pending blob preview → upload-on-save with real id; offline-queued create → info toast) + `camera-capture.pw.spec.ts` 2/2; `a9377d1` makes `pdf-export.pw.spec.ts` fully-mocked (Playwright 16/16) |
 | *(B.3)* | **DONE** (`1dee679`) — `lib/fiscalQr.ts` decoder (JSON v1, `invoice.number`) + square `280×280` qrbox in `BarcodeScannerModal` (ZXing real-decode fix: landscape 280×140 capped the square QR at 140px and never decoded) + admin documents camera button → exact doc view + portal scan-to-track (`portalApi.orders` `search`, backend matches the converted FV/POS number via `source_document_id`); `fiscal-scan.pw.spec.ts` 3/3 real-QR E2E + Pest portal scan-to-track regression (portal suite 25/25) |
 | *(B.4)* | **DONE** (`14fc032` + `ec38053` + `fd3d0d2` + smart-OCR) — supplier-invoice photo → OCR prefill → FA: lazy `InvoiceOcrModal` + pure `lib/invoiceOcr.ts` parser (French/Arabic decimals, Arabic-Indic digits, dates, longest-hit supplier/product matching incl. barcode/ref via number-intact fallback, TVA rate first-number, skip header/total lines) + `CameraCaptureModal` reuse wired into the FA document page (`DocumentLinesSection` «تصوير فاتورة المورد» button, `onApply` → `document_date`/`party_id`/`bulkAddLines`); follow-ups: image preprocessing + drag & drop + re-capture + Arabic OCR status (`ec38053`), robust 3-tier product matching exact→fuzzy→price (`fd3d0d2`), smart-OCR column-layout detection + detected-totals reconciliation + top-3 suggestion picker, OCR engine swap tesseract→`ppu-paddle-ocr` (on-device, `V6_SMALL_MODEL` + `spaceRecovery`, workbox `ocr-models-cache` rules, `OCR_MAX_DIM` 2400) + positional many-column mapping (`assignRowColumns`, packQty extraction) + **geometric column reader** (`detectColumnStripes`/`assignRowColumnsGeometric` — word boxes snapped to column stripes by x-position); `invoiceOcr.spec.ts` 82 tests (vitest 365/365), tsc clean, build 229 precache, SW MATCH |
-| *(B.5)* | camera stock-taking → stock adjustment |
+| *(B.5)* | **DONE** (`56d624d` + `875c0e4`) — camera stock-take page: `StockTakePage.tsx` (warehouse selector + barcode/ref text input + camera scanner + system stock fetch + counted qty input with live diff badge + IN/OUT adjustment creation + session log table + summary stats) + route `/inventory/stock-take` + nav item `'جرد بالكاميرا'` in inventory group + `StockMovementCreateInput` extended with `cost_price`/`total_price`/`price_source`/`reason` optional fields; tsc clean, vitest 365/365, build 233 precache, SW MATCH |
 | *(D.1)* | wa.me click-to-chat links |
 | *(D.2)* | WhatsApp invoice/statement send |
 | *(D.3)* | Meta Cloud API inbound webhook → portal order |
