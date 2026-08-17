@@ -26,6 +26,11 @@ class StockMovementObserver
      */
     public function creating(StockMovement $movement): void
     {
+        // ضمان وجود قيمة افتراضية قبل الإدخال (العمود NOT NULL)
+        if (is_null($movement->stock_balance_after)) {
+            $movement->stock_balance_after = 0;
+        }
+
         if (!$movement->stockMovementType) return;
 
         // حركات الخروج (مبيعات)
