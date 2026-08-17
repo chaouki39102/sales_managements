@@ -6,11 +6,13 @@ import PageHeader from '@/components/ui/PageHeader';
 import StockTab          from './StockTab';
 import OpeningBalanceTab from './OpeningBalanceTab';
 import ProductLotsTab    from './ProductLotsTab';
+import MovementsTab      from './MovementsTab';
 
 const TABS = [
-  { key: 'stock',   label: 'المخزون الحالي',    icon: 'ti-packages' },
-  { key: 'lots',    label: 'دفعات المنتجات',    icon: 'ti-barcode'  },
-  { key: 'opening', label: 'الرصيد الافتتاحي',  icon: 'ti-flag-2'   },
+  { key: 'stock',     label: 'المخزون الحالي',    icon: 'ti-packages'          },
+  { key: 'lots',      label: 'دفعات المنتجات',    icon: 'ti-barcode'           },
+  { key: 'movements', label: 'الحركات',            icon: 'ti-arrows-exchange'   },
+  { key: 'opening',   label: 'الرصيد الافتتاحي',  icon: 'ti-flag-2'            },
 ] as const;
 
 type TabKey = typeof TABS[number]['key'];
@@ -49,9 +51,10 @@ export default function InventoryPage() {
       />
 
       {/* ── محتوى ── */}
-      {tab === 'stock'   && <StockTab />}
-      {tab === 'lots'    && <ProductLotsTab />}
-      {tab === 'opening' && <OpeningBalanceTab />}
+      {tab === 'stock'     && <StockTab />}
+      {tab === 'lots'      && <ProductLotsTab />}
+      {tab === 'movements' && <MovementsTab />}
+      {tab === 'opening'   && <OpeningBalanceTab />}
 
     </div>
   );
