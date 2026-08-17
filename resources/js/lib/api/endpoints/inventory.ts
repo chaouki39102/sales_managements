@@ -55,6 +55,7 @@ export interface StockMovementCreateInput {
     cost_price?: number;
     total_price?: number;
     price_source?: string;
+    is_validated?: boolean;
     reason?: string | null;
     notes?: string | null;
     lot_number?: string | null;

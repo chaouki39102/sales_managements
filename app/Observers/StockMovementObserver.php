@@ -31,6 +31,14 @@ class StockMovementObserver
             $movement->stock_balance_after = 0;
         }
 
+        // الحركات المُنشأة يدوياً (جرد، رصيد افتتاحي…) تُفعّل تلقائياً
+        // حتى تظهر في استعلام stock-at الذي يُلهم is_validated = true
+        if (is_null($movement->is_validated)) {
+            $movement->is_validated = true;
+            $movement->validated_by = auth()->id();
+            $movement->validated_at = now();
+        }
+
         if (!$movement->stockMovementType) return;
 
         // حركات الخروج (مبيعات)

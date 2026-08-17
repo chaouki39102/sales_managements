@@ -194,6 +194,7 @@ export default function StockTakePage() {
         cost_price: scannedProduct.cost_price,
         total_price: Math.abs(diff) * scannedProduct.cost_price,
         price_source: 'adjustment',
+        is_validated: true,
         reason: isPositive
           ? `جرد: العدّ ${counted} — النظام ${systemStock} → فارق +${diff}`
           : `جرد: العدّ ${counted} — النظام ${systemStock} → فارق ${diff}`,
