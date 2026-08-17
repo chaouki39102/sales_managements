@@ -145,6 +145,7 @@ export default function StockTab() {
   const { selectedYear } = useFiscalYear();
 
   // ── فلاتر ──
+  const [date,        setDate]        = useState(() => new Date().toISOString().slice(0, 10));
   const [warehouseId, setWarehouseId] = useState<number | ''>('');
   const [search,      setSearch]      = useState('');
   const [filter,      setFilter]      = useState<Filter>('all');
@@ -163,7 +164,7 @@ export default function StockTab() {
       return next;
     });
 
-  useEffect(() => { setPage(1); }, [search, filter, warehouseId]);
+  useEffect(() => { setPage(1); }, [search, filter, warehouseId, date]);
 
   // ── المستودعات ──
   const { data: warehouses = [] } = useWarehouses();
@@ -172,12 +173,13 @@ export default function StockTab() {
   const { data, isLoading, isFetching } = useQuery({
     queryKey: [
       slug, 'inventory', 'stock-at',
-      { fiscal_year_id: selectedYear?.id, warehouse_id: warehouseId || null, search },
+      { fiscal_year_id: selectedYear?.id, warehouse_id: warehouseId || null, date, search },
     ],
     queryFn: () => apiGet<StockAtRow[]>('/inventory/stock-at', {
       ...(selectedYear?.id ? { fiscal_year_id: selectedYear.id } : {}),
       ...(warehouseId ? { warehouse_id: warehouseId } : {}),
-      ...(search      ? { search }                    : {}),
+      ...(date        ? { date }                           : {}),
+      ...(search      ? { search }                         : {}),
     }),
     enabled:         !!slug,
     staleTime:       2 * 60_000,
@@ -293,6 +295,22 @@ export default function StockTab() {
               borderRadius: 8, color: 'var(--t1)', fontSize: 13,
               fontFamily: 'Tajawal, sans-serif', outline: 'none',
               boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        {/* تاريخ المخزون */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <i className="ti ti-clock" style={{ color: 'var(--t3)', fontSize: 15 }} />
+          <input
+            type="date"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            style={{
+              padding: '6px 10px',
+              background: 'var(--bg2)', border: '1px solid var(--b2)',
+              borderRadius: 8, color: 'var(--t1)', fontSize: 13,
+              fontFamily: 'Tajawal, sans-serif', outline: 'none', cursor: 'pointer',
             }}
           />
         </div>
