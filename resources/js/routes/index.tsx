@@ -32,6 +32,7 @@ const POSProMobilePage        = lazy(() => import('@/pos-pro/mobile/POSProMobile
 // â”€â”€ Products / Inventory â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ProductsPage   = lazy(() => import('@/pages/products/ProductsPage'));
 const InventoryPage  = lazy(() => import('@/pages/inventory/InventoryPage'));
+const StockTakePage  = lazy(() => import('@/pages/inventory/StockTakePage'));
 
 // â”€â”€ Parties â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ClientsPage   = lazy(() => import('@/pages/clients/ClientsPage'));
@@ -271,6 +272,7 @@ export function AppRoutes() {
           {/* Products */}
           <Route path="products"  element={<ProductsPage />} />
           <Route path="inventory" element={<InventoryPage />} />
+          <Route path="inventory/stock-take" element={<StockTakePage />} />
 
           {/* Parties */}
           <Route path="parties"   element={<PartiesPage />} />

@@ -52,6 +52,10 @@ export interface StockMovementCreateInput {
     movement_date: string;
     quantity: number;
     unit_price: number;
+    cost_price?: number;
+    total_price?: number;
+    price_source?: string;
+    reason?: string | null;
     notes?: string | null;
     lot_number?: string | null;
 }

@@ -52,6 +52,7 @@ const NAV_GROUPS = [
     items: [
       { name: 'المنتجات',       href: 'products',   icon: 'ti-package'                          },
       { name: 'إدارة المخزون',  href: 'inventory',  icon: 'ti-building-warehouse', badgeWarn: true },
+      { name: 'جرد بالكاميرا', href: 'inventory/stock-take', icon: 'ti-clipboard-check' },
       { name: 'المستودعات',     href: 'warehouses', icon: 'ti-building-warehouse'               },
       { name: 'الفئات',         href: 'categories', icon: 'ti-folder-open'                      },
       { name: 'العلامات',       href: 'brands',     icon: 'ti-award'                            },
