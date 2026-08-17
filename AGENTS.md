@@ -37,6 +37,32 @@
 
 **Verification**: `npx tsc --noEmit` clean · `npm test` **365/365** (20 files) · `npm run build` 0 errors, **233 precache entries** · **SW MATCH**. No PHP touched → pest not re-run. `C1_OFFLINE_FIX.md`: B.5 ✅, progress table → B done (ALL B COMPLETE), commits table filled. Next pending: **D.1** (wa.me click-to-chat links).
 
+### Phase 81 — D.1 Complete: WhatsApp Click-to-Chat Links Everywhere (Aug 15)
+
+**Request** (continuing the B/C/D roadmap in `C1_OFFLINE_FIX.md`, D.1 = first WhatsApp Commerce task): add `wa.me` click-to-chat links everywhere party/phone numbers are displayed — POS customer cards, document view modals, client/supplier lists, party lists, portal admin order details. Phone normalization for Algeria (strip leading 0, prepend 213).
+
+**What was built**:
+- **Shared utility** `resources/js/lib/wa.ts` (NEW, dependency-free): `normalizeWaPhone(phone)` — strips non-digits, strips leading 00, prepends 213 for local 0… numbers; `buildWhatsAppLink(phone, text)` — returns `https://wa.me/<digits>?text=<encoded>` or null for empty/invalid phone.
+- **Reusable component** `resources/js/components/ui/WhatsAppLink.tsx` (NEW): renders a green `ti-brand-whatsapp` icon link with optional label, gating on valid phone.
+- **`portalUtils.tsx`** re-exports `normalizeWaPhone` + `buildWhatsAppLink` from `@/lib/wa` for backward compatibility with portal consumers.
+- **Integration points** (7 locations):
+  - `POSProTopCards.tsx` — CustomerCard phone: `tel:` link replaced with `wa.me` (green WhatsApp icon).
+  - `ProfessionalCart.tsx` — Classic POS customer section phone: plain text replaced with `wa.me` link.
+  - `CommercialDocumentsPage.tsx` — Document View Modal party phone: plain text replaced with `wa.me` link.
+  - `ClientsPage.tsx` — Phone + Mobile table columns: plain text replaced with `wa.me` links.
+  - `PartiesPage.tsx` — Phone column: plain text replaced with `wa.me` link.
+  - `SuppliersPage.tsx` — Supplier card phone: plain text replaced with `wa.me` link.
+  - `PortalOrdersAdminPage.tsx` — Guest order phone + registered order phone chip: plain text replaced with `wa.me` links.
+- **Vitest** `resources/js/lib/__tests__/wa.spec.ts` (NEW, 10 tests): `normalizeWaPhone` (6 cases: local, double-zero, international, non-digits, null/empty, dashes) + `buildWhatsAppLink` (4 cases: valid URL, empty phone, null phone, special chars).
+
+**Key architectural rules**:
+- All WhatsApp phone normalization lives in ONE place: `lib/wa.ts` (`normalizeWaPhone`). Never duplicate the strip-leading-0/prepend-213 logic in individual files.
+- `buildWhatsAppLink` returns `null` for empty/invalid phones — consumers must guard and fall back to `tel:` or plain text, never render a broken link.
+- The existing `portalUtils.tsx` functions are re-exported from `lib/wa.ts` — do NOT maintain two copies of the normalization logic.
+- Phone is displayed as-is (localized format) with a green WhatsApp icon next to it; the `wa.me` link opens in a new tab with `noopener,noreferrer`.
+
+**Verification**: `npx tsc --noEmit` clean · `npm test` **375/375** (21 files, incl. `wa.spec.ts` 10/10) · `npm run build` 0 errors, **234 precache entries** · **SW MATCH**. No PHP touched → pest not re-run. `C1_OFFLINE_FIX.md`: D.1 ✅, progress table → D in progress, commits table filled. Next pending: **D.2** (send invoice/statement via WhatsApp).
+
 ### Phase 79 — B.4 Complete: Photograph a Supplier Invoice → OCR Prefill → FA Document (Aug 15)
 
 **Request** (continuing the B/C/D roadmap in `C1_OFFLINE_FIX.md`, B.4 = fourth Camera-native task): on the purchase (`FA`) document page, photograph a supplier invoice with the camera, OCR it, and PRE-FILL the document form (supplier, date, lines) for human confirmation before save. OCR is a *prefill helper* — the stored doc is still a normal `FA` doc saved by the standard pipeline.

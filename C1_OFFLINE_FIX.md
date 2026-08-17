@@ -1,6 +1,6 @@
 # Remaining Tasks — B (Camera), C (Offline), D (WhatsApp) — Full Actionable List
 
-> **Status: ✅ C.1–C.5 + B.1–B.5 COMPLETE (all committed + pushed).** Pick up on any PC: `git pull`,
+> **Status: ✅ C.1–C.5 + B.1–B.5 + D.1 COMPLETE (all committed + pushed).** Pick up on any PC: `git pull`,
 > open this file, work task-by-task. **Commit + push after EACH task** (stage ONLY that task's
 > files). C is being implemented first (decided with the user), then B, then D.
 >
@@ -9,8 +9,8 @@
 > page, C.4 sync dashboard at `/offline`, C.5 offline POS Pro Mobile `314afea`). **B.1**, **B.2**,
 > **B.3**, **B.4** and **B.5** are DONE (camera scan everywhere + camera product-photo capture + scan
 > printed fiscal QR → reopen the exact document + photograph a supplier invoice → OCR prefill →
-> FA doc + camera stock-take → stock adjustment). Next is **D.1** (wa.me click-to-chat links).
-> HEAD: B.5 (`56d624d` + `875c0e4`).
+> FA doc + camera stock-take → stock adjustment). **D.1** is DONE (wa.me click-to-chat links).
+> Next is **D.2** (send invoice/statement via WhatsApp).
 
 ---
 
@@ -306,12 +306,18 @@ all 9 offline suites) · `npm run build` 0 errors, 224 precache entries · SW MA
 > **click-to-chat (`wa.me` deep links, no API)** for D.1/D.2/D.4-outbound vs the
 > **Meta WhatsApp Business Cloud API (webhook)** for D.3/D.4/D.5.
 
-## D.1 Click-to-chat everywhere
+## D.1 Click-to-chat everywhere ✅ DONE
 
 - `wa.me` deep links with prefilled Arabic message on: party card, document header, portal order
   row. E.g. `https://wa.me/<phone>?text=<encoded message with doc number + total>`.
 - Phone normalization (strip leading 0 / add 213).
-- Verify: tsc, build, live smoke (link hrefs correct).
+- **Done**: shared `lib/wa.ts` utility (`normalizeWaPhone`/`buildWhatsAppLink`) + reusable
+  `WhatsAppLink` component. Integrated into: POS Pro CustomerCard (replaces `tel:` link),
+  Classic POS ProfessionalCart (replaces plain text), Document View Modal party card,
+  ClientsPage phone/mobile columns, PartiesPage phone column, SuppliersPage phone,
+  PortalOrdersAdminPage guest + registered phone. `portalUtils.tsx` re-exports for backward
+  compat. vitest 10/10 new cases (`lib/__tests__/wa.spec.ts`). tsc clean, 375/375 tests,
+  build 234 precache, SW MATCH.
 
 ## D.2 Send invoice/statement via WhatsApp
 
@@ -350,7 +356,7 @@ all 9 offline suites) · `npm run build` 0 errors, 224 precache entries · SW MA
 |--------|--------|-------|
 | B. Camera-native | ✅ done | **B.1 DONE** (`555f5bd` + `ac0d6d9`) — shared `useBarcodeScan` + `title`/`hint`-capable modal, wired into documents form / products / parties with Playwright smoke; follow-up unmounts the hidden duplicate quick-create modal body. **B.2 DONE** (`fff065f` + `a9377d1`) — camera product-photo capture (`CameraCaptureModal`, pending blob preview, upload-on-save, offline info toast) + `pdf-export.pw.spec.ts` fully mocked; Playwright 16/16. **B.3 DONE** (`1dee679`) — `lib/fiscalQr.ts` decoder + square 280×280 scan box (ZXing real-decode fix) + admin documents camera button → exact doc + portal scan-to-track; fiscal-scan.pw.spec.ts 3/3 real-QR E2E; Playwright 19/19, pest portal 25/25. **B.4 DONE** — supplier-invoice photo → OCR prefill → FA (lazy `InvoiceOcrModal` + `lib/invoiceOcr.ts` parser, vitest 365/365). **B.5 DONE** (`56d624d` + `875c0e4`) — camera stock-take page (`StockTakePage.tsx`), warehouse selector + barcode scan + system stock fetch + IN/OUT adjustment creation + session log. **ALL B DONE** |
 | C. Offline everywhere | ✅ done | **C.1** (offline interception fixed + regression suite) · **C.2** (documents-module offline hardening + field-agent flow test) · **C.3** (prefetch page + indicator integration) · **C.4** (sync dashboard `/offline`) · **C.5** (offline POS Pro Mobile, `314afea`) — all committed + pushed |
-| D. WhatsApp commerce | ❌ planned | D.1–D.5 defined; wa.me-first, Meta Cloud API webhook later |
+| D. WhatsApp commerce | 🔄 in progress | **D.1 DONE** (wa.me click-to-chat links) · D.2–D.5 pending |
 
 ## Commits
 
@@ -370,7 +376,7 @@ files; leave unrelated dirty files untouched):
 | *(B.3)* | **DONE** (`1dee679`) — `lib/fiscalQr.ts` decoder (JSON v1, `invoice.number`) + square `280×280` qrbox in `BarcodeScannerModal` (ZXing real-decode fix: landscape 280×140 capped the square QR at 140px and never decoded) + admin documents camera button → exact doc view + portal scan-to-track (`portalApi.orders` `search`, backend matches the converted FV/POS number via `source_document_id`); `fiscal-scan.pw.spec.ts` 3/3 real-QR E2E + Pest portal scan-to-track regression (portal suite 25/25) |
 | *(B.4)* | **DONE** (`14fc032` + `ec38053` + `fd3d0d2` + smart-OCR) — supplier-invoice photo → OCR prefill → FA: lazy `InvoiceOcrModal` + pure `lib/invoiceOcr.ts` parser (French/Arabic decimals, Arabic-Indic digits, dates, longest-hit supplier/product matching incl. barcode/ref via number-intact fallback, TVA rate first-number, skip header/total lines) + `CameraCaptureModal` reuse wired into the FA document page (`DocumentLinesSection` «تصوير فاتورة المورد» button, `onApply` → `document_date`/`party_id`/`bulkAddLines`); follow-ups: image preprocessing + drag & drop + re-capture + Arabic OCR status (`ec38053`), robust 3-tier product matching exact→fuzzy→price (`fd3d0d2`), smart-OCR column-layout detection + detected-totals reconciliation + top-3 suggestion picker, OCR engine swap tesseract→`ppu-paddle-ocr` (on-device, `V6_SMALL_MODEL` + `spaceRecovery`, workbox `ocr-models-cache` rules, `OCR_MAX_DIM` 2400) + positional many-column mapping (`assignRowColumns`, packQty extraction) + **geometric column reader** (`detectColumnStripes`/`assignRowColumnsGeometric` — word boxes snapped to column stripes by x-position); `invoiceOcr.spec.ts` 82 tests (vitest 365/365), tsc clean, build 229 precache, SW MATCH |
 | *(B.5)* | **DONE** (`56d624d` + `875c0e4`) — camera stock-take page: `StockTakePage.tsx` (warehouse selector + barcode/ref text input + camera scanner + system stock fetch + counted qty input with live diff badge + IN/OUT adjustment creation + session log table + summary stats) + route `/inventory/stock-take` + nav item `'جرد بالكاميرا'` in inventory group + `StockMovementCreateInput` extended with `cost_price`/`total_price`/`price_source`/`reason` optional fields; tsc clean, vitest 365/365, build 233 precache, SW MATCH |
-| *(D.1)* | wa.me click-to-chat links |
+| *(D.1)* | **DONE** — shared `lib/wa.ts` (`normalizeWaPhone`/`buildWhatsAppLink`) + `WhatsAppLink` component + integrated wa.me links into: POS Pro CustomerCard, Classic POS ProfessionalCart, Document View Modal, ClientsPage, PartiesPage, SuppliersPage, PortalOrdersAdminPage; `portalUtils.tsx` re-exports for backward compat; vitest `wa.spec.ts` 10/10; tsc clean, 375/375, build 234 precache, SW MATCH |
 | *(D.2)* | WhatsApp invoice/statement send |
 | *(D.3)* | Meta Cloud API inbound webhook → portal order |
 | *(D.4)* | WhatsApp status/payment notifications (opt-in) |

@@ -312,23 +312,8 @@ export function PortalError({ message }: { message: string }) {
 }
 
 // ─── واتساب ─────────────────────────────────────────────────────────────────
-// رقم الهاتف بصيغة دولية لأرقام wa.me: نزيل كل ما ليس رقماً، ثم أصفار 00 البادئة،
-// وإن بقي الرقم محلياً (يبدأ بـ 0) نضيف رمز الدولة الجزائري 213.
-export function normalizeWaPhone(phone: string | null | undefined): string {
-  let digits = (phone ?? '').replace(/[^\d]/g, '');
-  digits = digits.replace(/^00/, '');
-  if (digits.startsWith('0')) {
-    digits = '213' + digits.slice(1);
-  }
-  return digits;
-}
-
-// رابط محادثة واتساب برسالة جاهزة — يعيد null إن لم يكن هناك رقم صالح.
-export function buildWhatsAppLink(phone: string | null | undefined, text: string): string | null {
-  const n = normalizeWaPhone(phone);
-  if (!n) return null;
-  return `https://wa.me/${n}?text=${encodeURIComponent(text)}`;
-}
+// Re-export from shared utility for backward-compat.
+export { normalizeWaPhone, buildWhatsAppLink } from '@/lib/wa';
 
 // رسالة ملخصة لطلب (مرجع + حالة + تاريخ + عدد أصناف + مجموع + ملاحظات).
 export function waOrderMessage(order: PortalOrder): string {

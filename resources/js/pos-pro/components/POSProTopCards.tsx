@@ -10,6 +10,7 @@
 import { formatDZD } from '@/pos/utils/calculations';
 import { useParty } from '@/lib/api/endpoints/parties';
 import { usePartyBalance } from '@/lib/api/endpoints/partyBalances';
+import { buildWhatsAppLink } from '@/lib/wa';
 import type { CartTotals, Party } from '@/types';
 
 // ─── TotalCard ────────────────────────────────────────────────────────────────
@@ -102,7 +103,12 @@ export function CustomerCard({ client, onOpenCustomers }: CustomerCardProps) {
 
       {(phone || client?.email || client?.address) && (
         <div className="pp-cust-contact">
-          {phone && <a href={`tel:${phone}`} title="اتصال"><i className="ti ti-phone" /> {phone}</a>}
+          {phone && (() => {
+            const waLink = buildWhatsAppLink(phone, '');
+            return waLink
+              ? <a href={waLink} target="_blank" rel="noopener noreferrer" title="مراسلة واتساب" style={{ color: '#25D366' }}><i className="ti ti-brand-whatsapp" /> {phone}</a>
+              : <span><i className="ti ti-phone" /> {phone}</span>;
+          })()}
           {client?.email && <a href={`mailto:${client.email}`} title="بريد"><i className="ti ti-mail" /> {client.email}</a>}
           {client?.address && <span title="العنوان"><i className="ti ti-map-pin" /> {client.address}</span>}
         </div>

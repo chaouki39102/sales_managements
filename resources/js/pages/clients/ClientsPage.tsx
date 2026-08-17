@@ -22,6 +22,7 @@ import { PARTY_IMPORT_CONFIG } from '@/pages/import/entityConfig';
 import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
 import { portalAccessApi } from '@/lib/api/endpoints/portalAccess';
 import { useNotification } from '@/hooks/useNotification';
+import { buildWhatsAppLink } from '@/lib/wa';
 import { createPortal } from 'react-dom';
 import { apiGet } from '@/lib/api/core/client';
 import type { Party } from '@/types';
@@ -255,9 +256,9 @@ export default function ClientsPage() {
     { key: 'code', label: 'الرمز', tdStyle: { fontSize: 12, fontFamily: 'monospace' },
       render: (c: any) => c.code || '—' },
     { key: 'phone', label: 'الهاتف', tdStyle: { fontSize: 14 },
-      render: (c: any) => c.phone || '—' },
+      render: (c: any) => { const wa = buildWhatsAppLink(c.phone, ''); return wa ? <a href={wa} target="_blank" rel="noopener noreferrer" style={{ color: '#25D366' }} title="واتساب">{c.phone} <i className="ti ti-brand-whatsapp" style={{ fontSize: 10 }}/></a> : (c.phone || '—'); }},
     { key: 'mobile', label: 'الجوال', tdStyle: { fontSize: 14 },
-      render: (c: any) => c.mobile || '—' },
+      render: (c: any) => { const wa = buildWhatsAppLink(c.mobile, ''); return wa ? <a href={wa} target="_blank" rel="noopener noreferrer" style={{ color: '#25D366' }} title="واتساب">{c.mobile} <i className="ti ti-brand-whatsapp" style={{ fontSize: 10 }}/></a> : (c.mobile || '—'); }},
     { key: 'fax', label: 'الفاكس',
       render: (c: any) => c.fax || '—' },
     { key: 'email', label: 'البريد',

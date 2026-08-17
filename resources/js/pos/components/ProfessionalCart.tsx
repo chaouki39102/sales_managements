@@ -21,6 +21,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef, useLayoutEffe
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { CartItem, CartTotals, Party, ProductPackaging } from '@/types';
 import { formatDZD } from '../utils/calculations';
+import { buildWhatsAppLink } from '@/lib/wa';
 import { getEffectiveShortcut } from '../hooks/useKeyboardMap';
 import CartRow from './CartRow';
 import CustomerSearchModal from './CustomerSearchModal';
@@ -461,11 +462,12 @@ const ProfessionalCart = forwardRef<ProfessionalCartHandle, ProfessionalCartProp
                   <div className="ctv2-name">
                     {client?.name ?? 'زبون الصندوق'}
                   </div>
-                  {client?.phone && (
-                    <div className="ctv2-meta">
-                      <i className="ti ti-phone" style={{ fontSize: 10 }} /> {client.phone}
-                    </div>
-                  )}
+                  {client?.phone && (() => {
+                    const waLink = buildWhatsAppLink(client.phone, '');
+                    return waLink
+                      ? <a href={waLink} target="_blank" rel="noopener noreferrer" className="ctv2-meta" style={{ color: '#25D366', textDecoration: 'none' }} title="مراسلة واتساب"><i className="ti ti-brand-whatsapp" style={{ fontSize: 10 }} /> {client.phone}</a>
+                      : <div className="ctv2-meta"><i className="ti ti-phone" style={{ fontSize: 10 }} /> {client.phone}</div>;
+                  })()}
                 </div>
 
                 {client?.balance !== undefined && Number(client.balance) > 0 && (

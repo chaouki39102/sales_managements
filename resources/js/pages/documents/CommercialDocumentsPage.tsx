@@ -63,6 +63,7 @@ import type { SimpleColumn } from "@/components/ui/SimpleTable";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useNotification } from '@/hooks/useNotification';
+import { buildWhatsAppLink } from '@/lib/wa';
 import type { DocumentType, CommercialDocument, PaginatedResponse } from "@/lib/api/core/types";
 
 // أنماط SmartFilter الخاصة بالمشروع (مفصولة عن library)
@@ -520,7 +521,13 @@ function DocumentViewModal({
                         const pty = d.party as Record<string, unknown> | undefined;
                         if (!pty) return null;
                         return <>
-                            {pty.phone && <div className="text-xs text-t4 mt-2 ltr">{String(pty.phone)}</div>}
+                            {pty.phone && (() => {
+                                const phone = String(pty.phone);
+                                const waLink = buildWhatsAppLink(phone, '');
+                                return waLink
+                                    ? <a href={waLink} target="_blank" rel="noopener noreferrer" className="text-xs text-t4 mt-2 ltr" style={{ color: '#25D366' }} title="مراسلة واتساب">{phone} <i className="ti ti-brand-whatsapp" style={{ fontSize: 10 }} /></a>
+                                    : <div className="text-xs text-t4 mt-2 ltr">{phone}</div>;
+                            })()}
                             {pty.nif && <div className="text-xs text-t4">NIF: {String(pty.nif)}</div>}
                             {pty.rc && <div className="text-xs text-t4">RC: {String(pty.rc)}</div>}
                         </>;

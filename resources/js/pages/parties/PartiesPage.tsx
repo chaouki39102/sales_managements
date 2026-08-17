@@ -14,6 +14,7 @@ import { useActiveSlug } from '@/lib/store/appStore';
 import { useModal }    from '@/hooks/useModal';
 import { useBarcodeScan } from '@/hooks/useBarcodeScan';
 import { useNotification } from '@/hooks/useNotification';
+import { buildWhatsAppLink } from '@/lib/wa';
 
 const BarcodeScannerModal = lazy(() => import('@/components/BarcodeScannerModal'));
 import PageHeader      from '@/components/ui/PageHeader';
@@ -332,7 +333,12 @@ export default function PartiesPage() {
                 label: 'الهاتف',
                 render: (_v, row) => {
                   const p = row as unknown as Party;
-                  return <span style={{ fontSize: 12, color: 'var(--t3)' }}>{p.phone || p.mobile || '—'}</span>;
+                  const phone = p.phone || p.mobile || '';
+                  if (!phone) return <span style={{ fontSize: 12, color: 'var(--t3)' }}>—</span>;
+                  const wa = buildWhatsAppLink(phone, '');
+                  return wa
+                    ? <a href={wa} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: '#25D366' }} title="واتساب">{phone} <i className="ti ti-brand-whatsapp" style={{ fontSize: 10 }}/></a>
+                    : <span style={{ fontSize: 12, color: 'var(--t3)' }}>{phone}</span>;
                 },
               },
               {

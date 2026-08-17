@@ -23,6 +23,7 @@ import SimpleTable from '@/components/ui/SimpleTable';
 import { useNotification } from '@/hooks/useNotification';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useProductSearch } from '@/lib/api/endpoints/products';
+import { buildWhatsAppLink } from '@/lib/wa';
 import type { Product, ProductPackaging } from '@/lib/api/core/types';
 import {
   usePortalOrders,
@@ -941,7 +942,12 @@ export default function PortalOrdersAdminPage() {
                     <i className="ti ti-phone" />
                     <div>
                       <span>رقم الهاتف</span>
-                      <b>{order.customer_phone || 'غير متوفر'}</b>
+                      {(() => {
+                        const wa = buildWhatsAppLink(order.customer_phone || '', '');
+                        return wa
+                          ? <a href={wa} target="_blank" rel="noopener noreferrer" style={{ color: '#25D366' }} title="واتساب"><b>{order.customer_phone || 'غير متوفر'}</b> <i className="ti ti-brand-whatsapp" style={{ fontSize: 10 }}/></a>
+                          : <b>{order.customer_phone || 'غير متوفر'}</b>;
+                      })()}
                     </div>
                   </div>
                   <div className="poa-cust-detail">
@@ -957,9 +963,12 @@ export default function PortalOrdersAdminPage() {
                   {order.party?.code && (
                     <span className="poa-chip"><i className="ti ti-barcode" /> {order.party.code}</span>
                   )}
-                  {order.party?.phone && (
-                    <span className="poa-chip"><i className="ti ti-phone" /> {order.party.phone}</span>
-                  )}
+                  {order.party?.phone && (() => {
+                    const wa = buildWhatsAppLink(order.party.phone, '');
+                    return wa
+                      ? <a href={wa} target="_blank" rel="noopener noreferrer" className="poa-chip" style={{ color: '#25D366', textDecoration: 'none' }} title="واتساب"><i className="ti ti-brand-whatsapp" /> {order.party.phone}</a>
+                      : <span className="poa-chip"><i className="ti ti-phone" /> {order.party.phone}</span>;
+                  })()}
                   {order.document?.document_date && (
                     <span className="poa-chip"><i className="ti ti-calendar" /> بتاريخ {order.document.document_date}</span>
                   )}

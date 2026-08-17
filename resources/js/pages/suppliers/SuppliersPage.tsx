@@ -18,6 +18,7 @@ import ProgressBar from '@/components/ui/ProgressBar';
 import Switch from '@/components/ui/Switch';
 import AlertBar from '@/components/ui/AlertBar';
 import ImportWizardModal from '@/pages/import/ImportWizardModal';
+import { buildWhatsAppLink } from '@/lib/wa';
 import { PARTY_IMPORT_CONFIG } from '@/pages/import/entityConfig';
 import type { Party } from '@/types';
 import type { Column } from '@/components/ui/DataTable';
@@ -130,7 +131,12 @@ const meta = (data as any)?.meta;
 
                                 {(c.phone || c.nif) && (
                                     <div className="flex flex-col gap-4 text-sm text-t3">
-                                        {c.phone && <div className="flex items-center gap-6"><i className="ti ti-phone" style={{ fontSize: 13, color: 'var(--t4)' }}/><span>{c.phone}</span></div>}
+                                        {c.phone && (() => {
+                                            const wa = buildWhatsAppLink(c.phone, '');
+                                            return wa
+                                                ? <a href={wa} target="_blank" rel="noopener noreferrer" className="flex items-center gap-6" style={{ color: '#25D366', textDecoration: 'none' }} title="واتساب"><i className="ti ti-brand-whatsapp" style={{ fontSize: 13 }}/><span>{c.phone}</span></a>
+                                                : <div className="flex items-center gap-6"><i className="ti ti-phone" style={{ fontSize: 13, color: 'var(--t4)' }}/><span>{c.phone}</span></div>;
+                                        })()}
                                         {c.nif && <div className="flex items-center gap-6"><i className="ti ti-file-certificate" style={{ fontSize: 13, color: 'var(--t4)' }}/><span style={{ fontFamily: 'monospace', fontSize: 11 }}>NIF: {c.nif}</span></div>}
                                     </div>
                                 )}
