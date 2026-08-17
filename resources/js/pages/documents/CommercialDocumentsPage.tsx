@@ -63,7 +63,7 @@ import type { SimpleColumn } from "@/components/ui/SimpleTable";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useNotification } from '@/hooks/useNotification';
-import { buildWhatsAppLink } from '@/lib/wa';
+import { buildWhatsAppLink, waDocMessage } from '@/lib/wa';
 import type { DocumentType, CommercialDocument, PaginatedResponse } from "@/lib/api/core/types";
 
 // أنماط SmartFilter الخاصة بالمشروع (مفصولة عن library)
@@ -485,6 +485,35 @@ function DocumentViewModal({
                     <Button size="sm" variant="info" icon={<i className="ti ti-mail" />} onClick={onClose}>
                         إرسال
                     </Button>
+                    {(() => {
+                        const pty = d.party as Record<string, unknown> | undefined;
+                        const phone = String(pty?.phone ?? pty?.mobile ?? '');
+                        const msg = waDocMessage({
+                            document_number: d.document_number as string,
+                            document_date: d.document_date as string,
+                            document_type_name: docType?.name as string,
+                            document_type_code: docType?.code as string,
+                            party_name: getPartyName(data),
+                            total_ht: d.total_ht as number,
+                            total_tva: d.total_tva as number,
+                            total_ttc: d.total_ttc as number,
+                            total_discount: d.total_discount as number,
+                            total_stamp: d.total_stamp as number,
+                            net_to_pay: d.net_to_pay as number,
+                            paid_amount: d.paid_amount as number,
+                            remaining_amount: d.remaining_amount as number,
+                            notes: d.notes as string,
+                            lines_count: lines.length,
+                        });
+                        const waLink = buildWhatsAppLink(phone, msg);
+                        return waLink ? (
+                            <a href={waLink} target="_blank" rel="noopener noreferrer">
+                                <Button size="sm" variant="primary" icon={<i className="ti ti-brand-whatsapp" />} style={{ background: '#25D366', borderColor: '#25D366', color: '#fff' }}>
+                                    واتساب
+                                </Button>
+                            </a>
+                        ) : null;
+                    })()}
                     <Button size="sm" variant="primary" icon={<i className="ti ti-printer" />} onClick={onPrint || onClose}>
                         طباعة
                     </Button>

@@ -23,7 +23,7 @@ import SimpleTable from '@/components/ui/SimpleTable';
 import { useNotification } from '@/hooks/useNotification';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useProductSearch } from '@/lib/api/endpoints/products';
-import { buildWhatsAppLink } from '@/lib/wa';
+import { buildWhatsAppLink, waDocMessage } from '@/lib/wa';
 import type { Product, ProductPackaging } from '@/lib/api/core/types';
 import {
   usePortalOrders,
@@ -869,6 +869,24 @@ export default function PortalOrdersAdminPage() {
             </>
           ) : (
             <>
+              {(() => {
+                const phone = String(order?.party?.phone ?? order?.customer_phone ?? '');
+                const msg = order ? [
+                  'السلام عليكم،',
+                  `طلبك رقم ${order.reference} — ${order.status_label}`,
+                  `التاريخ: ${fmtDate(order.requested_at)}`,
+                  `عدد الأصناف: ${order.items_count}`,
+                  `المجموع: ${fmt(order.total_ttc)} دج`,
+                ].join('\n') : '';
+                const waLink = buildWhatsAppLink(phone, msg);
+                return waLink ? (
+                  <a href={waLink} target="_blank" rel="noopener noreferrer">
+                    <Button size="sm" icon={<i className="ti ti-brand-whatsapp" />} style={{ background: '#25D366', borderColor: '#25D366', color: '#fff' }}>
+                      إرسال على واتساب
+                    </Button>
+                  </a>
+                ) : null;
+              })()}
               {convertable && (
                 <Button
                   variant="primary"
@@ -1321,6 +1339,30 @@ export default function PortalOrdersAdminPage() {
                     <span className="poa-hint poa-hint--gold"><i className="ti ti-alert-triangle" /> باقي <b>{fmt(convertResult.remaining_amount)} DZD</b></span>
                   )}
                 </div>
+                {(() => {
+                  const phone = String(order?.party?.phone ?? order?.customer_phone ?? '');
+                  const msg = waDocMessage({
+                    document_number: convertResult.document_number,
+                    document_date: convertResult.document_date,
+                    document_type_name: convertResult.document_type === 'POS' ? 'فاتورة POS' : 'فاتورة بيع',
+                    document_type_code: convertResult.document_type,
+                    party_name: order?.party?.name ?? order?.customer_name ?? null,
+                    total_ttc: convertResult.total_ttc,
+                    net_to_pay: convertResult.net_to_pay,
+                    paid_amount: convertResult.paid_amount,
+                    remaining_amount: convertResult.remaining_amount,
+                  });
+                  const waLink = buildWhatsAppLink(phone, msg);
+                  return waLink ? (
+                    <div className="mt-8">
+                      <a href={waLink} target="_blank" rel="noopener noreferrer">
+                        <Button size="sm" icon={<i className="ti ti-brand-whatsapp" />} style={{ background: '#25D366', borderColor: '#25D366', color: '#fff' }}>
+                          إرسال الفاتورة على واتساب
+                        </Button>
+                      </a>
+                    </div>
+                  ) : null;
+                })()}
               </div>
             )}
           </div>

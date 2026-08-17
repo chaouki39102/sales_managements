@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeWaPhone, buildWhatsAppLink } from '../wa';
+import { normalizeWaPhone, buildWhatsAppLink, waDocMessage } from '../wa';
 
 describe('normalizeWaPhone', () => {
   it('converts local 0-prefixed number to 213…', () => {
@@ -38,5 +38,78 @@ describe('buildWhatsAppLink', () => {
   it('encodes special characters in text', () => {
     const link = buildWhatsAppLink('0555123456', 'Hello & Goodbye');
     expect(link).toContain('Hello%20%26%20Goodbye');
+  });
+});
+
+describe('waDocMessage', () => {
+  it('builds a basic invoice message with doc number, date, totals', () => {
+    const msg = waDocMessage({
+      document_number: 'FV-2026-0001',
+      document_date: '2026-08-15',
+      document_type_name: 'فاتورة بيع',
+      party_name: 'SARL Test',
+      total_ht: 1000,
+      total_tva: 190,
+      total_ttc: 1190,
+    });
+    expect(msg).toContain('فاتورة بيع');
+    expect(msg).toContain('FV-2026-0001');
+    expect(msg).toContain('SARL Test');
+    // fr-DZ locale: non-breaking space as thousands sep, comma as decimal
+    expect(msg).toMatch(/1[\s\u00a0]000[,\.]00/);
+    expect(msg).toContain('190');
+    expect(msg).toMatch(/1[\s\u00a0]190[,\.]00/);
+  });
+  it('includes discount and stamp when present', () => {
+    const msg = waDocMessage({
+      total_ht: 1000,
+      total_tva: 190,
+      total_ttc: 1200,
+      total_discount: 50,
+      total_stamp: 10,
+    });
+    expect(msg).toContain('الخصم');
+    expect(msg).toContain('الطابع');
+  });
+  it('omits discount and stamp when zero', () => {
+    const msg = waDocMessage({
+      total_ht: 1000,
+      total_tva: 190,
+      total_ttc: 1190,
+      total_discount: 0,
+      total_stamp: 0,
+    });
+    expect(msg).not.toContain('الخصم');
+    expect(msg).not.toContain('الطابع');
+  });
+  it('includes paid and remaining amounts when present', () => {
+    const msg = waDocMessage({
+      total_ttc: 5000,
+      paid_amount: 3000,
+      remaining_amount: 2000,
+    });
+    expect(msg).toContain('المدفوع');
+    expect(msg).toMatch(/3[\s\u00a0]000[,\.]00/);
+    expect(msg).toContain('المتبقي');
+    expect(msg).toMatch(/2[\s\u00a0]000[,\.]00/);
+  });
+  it('includes notes when present', () => {
+    const msg = waDocMessage({
+      total_ttc: 100,
+      notes: 'livraison urgente',
+    });
+    expect(msg).toContain('ملاحظات: livraison urgente');
+  });
+  it('omits notes when null', () => {
+    const msg = waDocMessage({
+      total_ttc: 100,
+      notes: null,
+    });
+    expect(msg).not.toContain('ملاحظات');
+  });
+  it('handles completely empty doc', () => {
+    const msg = waDocMessage({});
+    expect(msg).toContain('السلام عليكم');
+    expect(msg).toContain('رقم —');
   });
 });
