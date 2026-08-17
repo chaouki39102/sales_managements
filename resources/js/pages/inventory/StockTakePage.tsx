@@ -12,6 +12,7 @@ import { useWarehouses, useStockMovementTypes } from '@/lib/api/endpoints/lookup
 import { tenantKeys } from '@/lib/api/core/queryKeys';
 import type { Warehouse } from '@/lib/api/core/types';
 import { fmt } from './inventoryTypes';
+import { apiGet } from '@/lib/api/core/client';
 import { toast } from 'sonner';
 
 const BarcodeScannerModal = lazy(() => import('@/components/BarcodeScannerModal'));
@@ -89,7 +90,6 @@ export default function StockTakePage() {
 
     try {
       // Search products by barcode/ref
-      const { apiGet } = await import('@/lib/api/core/client');
       const result = await apiGet<{ data: any[] }>('/products', {
         per_page: 5,
         include: 'unit',
