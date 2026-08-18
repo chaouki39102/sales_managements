@@ -15,6 +15,7 @@ use App\Models\Company;          // ✅ أضفنا هذا
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class CommercialDocumentController extends BaseApiController
 {
@@ -555,6 +556,45 @@ class CommercialDocumentController extends BaseApiController
             );
         } catch (\Throwable $e) {
             return $this->handleError($e, 'generateQRCode');
+        }
+    }
+
+    /**
+     * توليد رابط مشاركة عام للوثيقة (بدون مصادقة).
+     *
+     * يُنشئ توكن فريد صالح لمدة 7 أيام يسمح بعرض الوثيقة بدون تسجيل دخول.
+     * الرابط: {origin}/share/{token}
+     */
+    public function share(Company $company, CommercialDocument $commercialDocument): JsonResponse
+    {
+        try {
+            $this->authorizeAction('view', $commercialDocument);
+
+            $now = now();
+
+            // إعادة استخدام التوكن الحالي إذا كان لا يزال صالحاً
+            if (
+                $commercialDocument->share_token &&
+                $commercialDocument->share_expires_at &&
+                $commercialDocument->share_expires_at->isFuture()
+            ) {
+                return $this->successResponse([
+                    'share_url'  => url("/share/{$commercialDocument->share_token}"),
+                    'expires_at' => $commercialDocument->share_expires_at->toIso8601String(),
+                ], 'تم إنشاء رابط المشاركة بنجاح');
+            }
+
+            $commercialDocument->update([
+                'share_token'      => Str::uuid()->toString(),
+                'share_expires_at' => $now->copy()->addDays(7),
+            ]);
+
+            return $this->successResponse([
+                'share_url'  => url("/share/{$commercialDocument->share_token}"),
+                'expires_at' => $commercialDocument->share_expires_at->toIso8601String(),
+            ], 'تم إنشاء رابط المشاركة بنجاح');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'share');
         }
     }
 

@@ -49,7 +49,7 @@ const _fmt = (n: number | string | null | undefined) =>
   Number(n ?? 0).toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** Build an Arabic summary message for a commercial document, suitable for wa.me prefilled text. */
-export function waDocMessage(doc: WaDoc): string {
+export function waDocMessage(doc: WaDoc, shareUrl?: string | null): string {
   const lines: string[] = [
     'السلام عليكم،',
     `مرفق مستند ${doc.document_type_name ?? doc.document_type_code ?? ''} رقم ${doc.document_number ?? '—'}`,
@@ -64,5 +64,6 @@ export function waDocMessage(doc: WaDoc): string {
   if (Number(doc.paid_amount ?? 0) > 0) lines.push(`المدفوع: ${_fmt(doc.paid_amount)} دج`);
   if (Number(doc.remaining_amount ?? 0) > 0) lines.push(`المتبقي: ${_fmt(doc.remaining_amount)} دج`);
   if (doc.notes) lines.push(`ملاحظات: ${doc.notes}`);
+  if (shareUrl) lines.push(`\n🔗 رابط الوثيقة: ${shareUrl}`);
   return lines.join('\n');
 }

@@ -158,6 +158,14 @@ Route::prefix('v1')->group(function () {
     Route::get('/health', [HealthController::class, 'check']);
 
     // ═══════════════════════════════════════════
+    // ①-d SHARE — عرض وثيقة عامة بالتوكن (بدون مصادقة)
+    // ═══════════════════════════════════════════
+    // رابط مشاركة صالح لمدة 7 أيام يُولّد عبر POST /documents/{id}/share.
+    // يعرض بيانات الوثيقة (رقم، تاريخ، أطراف، أسطر، إجماليات) للعميل
+    // بدون تسجيل دخول — مخصص لإرساله عبر واتساب.
+    Route::get('/share/{token}', \App\Http\Controllers\Api\V1\PublicDocumentShareController::class);
+
+    // ═══════════════════════════════════════════
     // ①-b CUSTOMER PORTAL (بوابة الزبائن) — لكل مؤسسة
     // ═══════════════════════════════════════════
     // مسارات لكل مؤسسة على حدة: /api/v1/{company}/portal/*
@@ -575,6 +583,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('documents/overdue',      [CommercialDocumentController::class, 'overdue']);
                 Route::get('documents/check-number', [CommercialDocumentController::class, 'checkNumber']);
                 Route::get('documents/next-number',  [CommercialDocumentController::class, 'nextNumber']);
+                Route::post('documents/{commercialDocument}/share', [CommercialDocumentController::class, 'share']);
                 Route::post('documents/compute-line',   [DocumentComputeController::class, 'computeLine']);
                 Route::post('documents/compute-totals', [DocumentComputeController::class, 'computeTotals']);
 

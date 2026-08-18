@@ -112,4 +112,16 @@ describe('waDocMessage', () => {
     expect(msg).toContain('السلام عليكم');
     expect(msg).toContain('رقم —');
   });
+  it('appends share URL when provided', () => {
+    const msg = waDocMessage({ total_ttc: 100 }, 'https://example.com/share/abc123');
+    expect(msg).toContain('🔗 رابط الوثيقة: https://example.com/share/abc123');
+  });
+  it('omits share URL when not provided', () => {
+    const msg = waDocMessage({ total_ttc: 100 });
+    expect(msg).not.toContain('رابط الوثيقة');
+  });
+  it('omits share URL when null', () => {
+    const msg = waDocMessage({ total_ttc: 100 }, null);
+    expect(msg).not.toContain('رابط الوثيقة');
+  });
 });

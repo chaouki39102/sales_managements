@@ -56,6 +56,7 @@ import { parseFiscalQrNumber } from "@/lib/fiscalQr";
 import { ApprovalStatusBadge, ApprovalActions } from "./components/ApprovalWorkflow";
 import { useApprovalCheckBatch } from "@/lib/api/endpoints/approvals";
 import { SendDocumentMailModal } from "./components/SendDocumentMailModal";
+import { documentsApi } from "@/lib/api/endpoints/documents";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import SimpleTable from "@/components/ui/SimpleTable";
@@ -488,31 +489,38 @@ function DocumentViewModal({
                     {(() => {
                         const pty = d.party as Record<string, unknown> | undefined;
                         const phone = String(pty?.phone ?? pty?.mobile ?? '');
-                        const msg = waDocMessage({
-                            document_number: d.document_number as string,
-                            document_date: d.document_date as string,
-                            document_type_name: docType?.name as string,
-                            document_type_code: docType?.code as string,
-                            party_name: getPartyName(data),
-                            total_ht: d.total_ht as number,
-                            total_tva: d.total_tva as number,
-                            total_ttc: d.total_ttc as number,
-                            total_discount: d.total_discount as number,
-                            total_stamp: d.total_stamp as number,
-                            net_to_pay: d.net_to_pay as number,
-                            paid_amount: d.paid_amount as number,
-                            remaining_amount: d.remaining_amount as number,
-                            notes: d.notes as string,
-                            lines_count: lines.length,
-                        });
-                        const waLink = buildWhatsAppLink(phone, msg);
-                        return waLink ? (
-                            <a href={waLink} target="_blank" rel="noopener noreferrer">
-                                <Button size="sm" variant="primary" icon={<i className="ti ti-brand-whatsapp" />} style={{ background: '#25D366', borderColor: '#25D366', color: '#fff' }}>
-                                    واتساب
-                                </Button>
-                            </a>
-                        ) : null;
+                        if (!phone) return null;
+                        const handleClick = async () => {
+                            let shareUrl: string | null = null;
+                            try {
+                                const res = await documentsApi.share(d.id as number);
+                                shareUrl = res.share_url;
+                            } catch { /* share not critical */ }
+                            const msg = waDocMessage({
+                                document_number: d.document_number as string,
+                                document_date: d.document_date as string,
+                                document_type_name: docType?.name as string,
+                                document_type_code: docType?.code as string,
+                                party_name: getPartyName(data),
+                                total_ht: d.total_ht as number,
+                                total_tva: d.total_tva as number,
+                                total_ttc: d.total_ttc as number,
+                                total_discount: d.total_discount as number,
+                                total_stamp: d.total_stamp as number,
+                                net_to_pay: d.net_to_pay as number,
+                                paid_amount: d.paid_amount as number,
+                                remaining_amount: d.remaining_amount as number,
+                                notes: d.notes as string,
+                                lines_count: lines.length,
+                            }, shareUrl);
+                            const waLink = buildWhatsAppLink(phone, msg);
+                            if (waLink) window.open(waLink, '_blank', 'noopener,noreferrer');
+                        };
+                        return (
+                            <Button size="sm" variant="primary" icon={<i className="ti ti-brand-whatsapp" />} style={{ background: '#25D366', borderColor: '#25D366', color: '#fff' }} onClick={handleClick}>
+                                واتساب
+                            </Button>
+                        );
                     })()}
                     <Button size="sm" variant="primary" icon={<i className="ti ti-printer" />} onClick={onPrint || onClose}>
                         طباعة

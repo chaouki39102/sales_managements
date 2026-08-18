@@ -24,6 +24,7 @@ import { useNotification } from '@/hooks/useNotification';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useProductSearch } from '@/lib/api/endpoints/products';
 import { buildWhatsAppLink, waDocMessage } from '@/lib/wa';
+import { documentsApi } from '@/lib/api/endpoints/documents';
 import type { Product, ProductPackaging } from '@/lib/api/core/types';
 import {
   usePortalOrders,
@@ -1341,27 +1342,34 @@ export default function PortalOrdersAdminPage() {
                 </div>
                 {(() => {
                   const phone = String(order?.party?.phone ?? order?.customer_phone ?? '');
-                  const msg = waDocMessage({
-                    document_number: convertResult.document_number,
-                    document_date: convertResult.document_date,
-                    document_type_name: convertResult.document_type === 'POS' ? 'فاتورة POS' : 'فاتورة بيع',
-                    document_type_code: convertResult.document_type,
-                    party_name: order?.party?.name ?? order?.customer_name ?? null,
-                    total_ttc: convertResult.total_ttc,
-                    net_to_pay: convertResult.net_to_pay,
-                    paid_amount: convertResult.paid_amount,
-                    remaining_amount: convertResult.remaining_amount,
-                  });
-                  const waLink = buildWhatsAppLink(phone, msg);
-                  return waLink ? (
+                  if (!phone) return null;
+                  const handleClick = async () => {
+                    let shareUrl: string | null = null;
+                    try {
+                      const res = await documentsApi.share(convertResult.id);
+                      shareUrl = res.share_url;
+                    } catch { /* share not critical */ }
+                    const msg = waDocMessage({
+                      document_number: convertResult.document_number,
+                      document_date: convertResult.document_date,
+                      document_type_name: convertResult.document_type === 'POS' ? 'فاتورة POS' : 'فاتورة بيع',
+                      document_type_code: convertResult.document_type,
+                      party_name: order?.party?.name ?? order?.customer_name ?? null,
+                      total_ttc: convertResult.total_ttc,
+                      net_to_pay: convertResult.net_to_pay,
+                      paid_amount: convertResult.paid_amount,
+                      remaining_amount: convertResult.remaining_amount,
+                    }, shareUrl);
+                    const waLink = buildWhatsAppLink(phone, msg);
+                    if (waLink) window.open(waLink, '_blank', 'noopener,noreferrer');
+                  };
+                  return (
                     <div className="mt-8">
-                      <a href={waLink} target="_blank" rel="noopener noreferrer">
-                        <Button size="sm" icon={<i className="ti ti-brand-whatsapp" />} style={{ background: '#25D366', borderColor: '#25D366', color: '#fff' }}>
-                          إرسال الفاتورة على واتساب
-                        </Button>
-                      </a>
+                      <Button size="sm" icon={<i className="ti ti-brand-whatsapp" />} style={{ background: '#25D366', borderColor: '#25D366', color: '#fff' }} onClick={handleClick}>
+                        إرسال الفاتورة على واتساب
+                      </Button>
                     </div>
-                  ) : null;
+                  );
                 })()}
               </div>
             )}

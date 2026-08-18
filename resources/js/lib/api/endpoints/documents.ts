@@ -219,6 +219,9 @@ export const documentsApi = {
   qrcode: (id: number) =>
     apiGet<{ url: string }>(`/documents/${id}/qrcode`),
 
+  share: (id: number) =>
+    apiPost<{ share_url: string; expires_at: string }>(`/documents/${id}/share`),
+
   // ── Lines ──────────────────────────────────────────────────────────────────
 
   lines: {

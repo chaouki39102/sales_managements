@@ -93,6 +93,9 @@ const AuditLogPage = lazy(() => import('@/pages/audit/AuditLogPage'));
 // ─── Alerts ──────────────────────────────────────────────────────────────────
 const AlertsPage = lazy(() => import('@/pages/alerts/AlertsPage'));
 
+// ─── Share ───────────────────────────────────────────────────────────────────
+const ShareDocumentPage = lazy(() => import('@/pages/share/ShareDocumentPage'));
+
 // ─── Offline ─────────────────────────────────────────────────────────────────
 const OfflinePage = lazy(() => import('@/pages/offline/OfflinePage'));
 
@@ -430,6 +433,12 @@ export function AppRoutes() {
             </RequireCompany>
           }
         />
+
+        {/* ═══════════════════════════════════════════════════════════════════════
+            رابط المشاركة العام — بدون مصادقة، لكل مؤسسة بالتوكن
+            GET /share/:token → PublicDocumentShareController
+            ═══════════════════════════════════════════════════════════════════════ */}
+        <Route path="/share/:token" element={<ShareDocumentPage />} />
 
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/login" replace />} />
