@@ -1,6 +1,6 @@
 # Remaining Tasks — B (Camera), C (Offline), D (WhatsApp) — Full Actionable List
 
-> **Status: ✅ C.1–C.5 + B.1–B.5 + D.1 COMPLETE (all committed + pushed).** Pick up on any PC: `git pull`,
+> **Status: ✅ C.1–C.5 + B.1–B.5 + D.1–D.2 COMPLETE (all committed + pushed).** Pick up on any PC: `git pull`,
 > open this file, work task-by-task. **Commit + push after EACH task** (stage ONLY that task's
 > files). C is being implemented first (decided with the user), then B, then D.
 >
@@ -10,7 +10,7 @@
 > **B.3**, **B.4** and **B.5** are DONE (camera scan everywhere + camera product-photo capture + scan
 > printed fiscal QR → reopen the exact document + photograph a supplier invoice → OCR prefill →
 > FA doc + camera stock-take → stock adjustment). **D.1** is DONE (wa.me click-to-chat links).
-> Next is **D.2** (send invoice/statement via WhatsApp).
+> **D.2** is DONE (send document summary via WhatsApp). Next is **D.3** (Meta Cloud API inbound webhook).
 
 ---
 
@@ -319,14 +319,29 @@ all 9 offline suites) · `npm run build` 0 errors, 224 precache entries · SW MA
   compat. vitest 10/10 new cases (`lib/__tests__/wa.spec.ts`). tsc clean, 375/375 tests,
   build 234 precache, SW MATCH.
 
-## D.2 Send invoice/statement via WhatsApp
+## D.2 Send invoice/statement via WhatsApp — ✅ DONE (`47fdbb8` + `987c141`)
 
 - «أرسل على واتساب» action on a document (and portal order / statement): generate PDF (existing
   export path), produce a shareable link (signed download route), open `wa.me` with the link +
   Arabic caption. Fallback to the web receipt URL when PDF unavailable.
-- Verify: build, live smoke.
+- **Done (1/2, `47fdbb8`)**: `waDocMessage()` in `lib/wa.ts` builds an Arabic summary (type, number, date, HT,
+  TVA, stamp, TTC, paid, remaining, notes). `DocumentViewModal` gains a «إرسال على واتساب»
+  button (`ti-brand-whatsapp`) in the header that opens `wa.me` with the doc summary. Portal
+  admin order detail (`PortalOrdersAdminPage`) same pattern.
+- **Done (2/2, `987c141`)**: Public document share link feature:
+  - Backend: migration (`share_token` + `share_expires_at` on `commercial_documents`), `CommercialDocument` model, `CommercialDocumentController::share()` (idempotent UUID token, 7-day expiry), `PublicDocumentShareController` (public `GET /share/{token}`, no auth, full document view), routes (authenticated `POST documents/{id}/share` + public `GET /share/{token}`)
+  - Frontend: `ShareDocumentPage.tsx` (standalone RTL page at `/share/:token`), `documentsApi.share(id)` endpoint, `/share` in `TRULY_PUBLIC`, route registered
+  - WhatsApp integration: `waDocMessage()` accepts optional `shareUrl` → appends `🔗 رابط الوثيقة: {url}`. DocumentViewModal + PortalOrdersAdminPage converted-doc WhatsApp buttons fetch share URL on click via `documentsApi.share()`
+  - `portal.css`: full share page styles (`.share-*`)
+  - vitest 385/385 (+3 shareUrl tests), tsc clean, build 234 precache, SW MATCH.
 
-## D.3 Inbound WhatsApp order intake (webhook)
+## D.3 Inbound WhatsApp order intake (webhook) — ⏸ DEFERRED
+
+- Meta WhatsApp Business Cloud API webhook: inbound message → match phone to a party (or portal
+  account) → parse a simple order format → create a portal `CMD` order (existing
+  `PortalOrderService`) → respond with summary + payment link.
+- Requires a business phone + Meta app — sandbox-first, mock webhook for dev.
+- Verify: pest tests (webhook signature/messages), build.
 
 - Meta WhatsApp Business Cloud API webhook: inbound message → match phone to a party (or portal
   account) → parse a simple order format → create a portal `CMD` order (existing
@@ -356,7 +371,7 @@ all 9 offline suites) · `npm run build` 0 errors, 224 precache entries · SW MA
 |--------|--------|-------|
 | B. Camera-native | ✅ done | **B.1 DONE** (`555f5bd` + `ac0d6d9`) — shared `useBarcodeScan` + `title`/`hint`-capable modal, wired into documents form / products / parties with Playwright smoke; follow-up unmounts the hidden duplicate quick-create modal body. **B.2 DONE** (`fff065f` + `a9377d1`) — camera product-photo capture (`CameraCaptureModal`, pending blob preview, upload-on-save, offline info toast) + `pdf-export.pw.spec.ts` fully mocked; Playwright 16/16. **B.3 DONE** (`1dee679`) — `lib/fiscalQr.ts` decoder + square 280×280 scan box (ZXing real-decode fix) + admin documents camera button → exact doc + portal scan-to-track; fiscal-scan.pw.spec.ts 3/3 real-QR E2E; Playwright 19/19, pest portal 25/25. **B.4 DONE** — supplier-invoice photo → OCR prefill → FA (lazy `InvoiceOcrModal` + `lib/invoiceOcr.ts` parser, vitest 365/365). **B.5 DONE** (`56d624d` + `875c0e4`) — camera stock-take page (`StockTakePage.tsx`), warehouse selector + barcode scan + system stock fetch + IN/OUT adjustment creation + session log. **ALL B DONE** |
 | C. Offline everywhere | ✅ done | **C.1** (offline interception fixed + regression suite) · **C.2** (documents-module offline hardening + field-agent flow test) · **C.3** (prefetch page + indicator integration) · **C.4** (sync dashboard `/offline`) · **C.5** (offline POS Pro Mobile, `314afea`) — all committed + pushed |
-| D. WhatsApp commerce | 🔄 in progress | **D.1 DONE** (wa.me click-to-chat links) · D.2–D.5 pending |
+| D. WhatsApp commerce | 🔄 in progress | **D.1 DONE** (wa.me click-to-chat links) · **D.2 DONE** (share link + wa.me send) · D.3–D.5 deferred |
 
 ## Commits
 
@@ -377,7 +392,7 @@ files; leave unrelated dirty files untouched):
 | *(B.4)* | **DONE** (`14fc032` + `ec38053` + `fd3d0d2` + smart-OCR) — supplier-invoice photo → OCR prefill → FA: lazy `InvoiceOcrModal` + pure `lib/invoiceOcr.ts` parser (French/Arabic decimals, Arabic-Indic digits, dates, longest-hit supplier/product matching incl. barcode/ref via number-intact fallback, TVA rate first-number, skip header/total lines) + `CameraCaptureModal` reuse wired into the FA document page (`DocumentLinesSection` «تصوير فاتورة المورد» button, `onApply` → `document_date`/`party_id`/`bulkAddLines`); follow-ups: image preprocessing + drag & drop + re-capture + Arabic OCR status (`ec38053`), robust 3-tier product matching exact→fuzzy→price (`fd3d0d2`), smart-OCR column-layout detection + detected-totals reconciliation + top-3 suggestion picker, OCR engine swap tesseract→`ppu-paddle-ocr` (on-device, `V6_SMALL_MODEL` + `spaceRecovery`, workbox `ocr-models-cache` rules, `OCR_MAX_DIM` 2400) + positional many-column mapping (`assignRowColumns`, packQty extraction) + **geometric column reader** (`detectColumnStripes`/`assignRowColumnsGeometric` — word boxes snapped to column stripes by x-position); `invoiceOcr.spec.ts` 82 tests (vitest 365/365), tsc clean, build 229 precache, SW MATCH |
 | *(B.5)* | **DONE** (`56d624d` + `875c0e4`) — camera stock-take page: `StockTakePage.tsx` (warehouse selector + barcode/ref text input + camera scanner + system stock fetch + counted qty input with live diff badge + IN/OUT adjustment creation + session log table + summary stats) + route `/inventory/stock-take` + nav item `'جرد بالكاميرا'` in inventory group + `StockMovementCreateInput` extended with `cost_price`/`total_price`/`price_source`/`reason` optional fields; tsc clean, vitest 365/365, build 233 precache, SW MATCH |
 | *(D.1)* | **DONE** — shared `lib/wa.ts` (`normalizeWaPhone`/`buildWhatsAppLink`) + `WhatsAppLink` component + integrated wa.me links into: POS Pro CustomerCard, Classic POS ProfessionalCart, Document View Modal, ClientsPage, PartiesPage, SuppliersPage, PortalOrdersAdminPage; `portalUtils.tsx` re-exports for backward compat; vitest `wa.spec.ts` 10/10; tsc clean, 375/375, build 234 precache, SW MATCH |
-| *(D.2)* | WhatsApp invoice/statement send |
+| *(D.2)* | **DONE** (`47fdbb8` + `987c141`) — `waDocMessage()` Arabic summary + DocumentViewModal «إرسال على واتساب» + PortalOrdersAdminPage converted-doc button; public share link: migration (`share_token`/`share_expires_at`), `share()` endpoint (idempotent UUID, 7-day), `PublicDocumentShareController`, `ShareDocumentPage` (`/share/:token`), `documentsApi.share(id)`, `TRULY_PUBLIC`, `/share` route, `.share-*` CSS, 3 vitest shareUrl tests; tsc clean, 385/385, build 234 precache, SW MATCH |
 | *(D.3)* | Meta Cloud API inbound webhook → portal order |
 | *(D.4)* | WhatsApp status/payment notifications (opt-in) |
 | *(D.5)* | reminders + broadcast with opt-out |

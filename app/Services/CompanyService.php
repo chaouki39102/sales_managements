@@ -40,27 +40,49 @@ class CompanyService extends \App\Core\Services\BaseService
 
     protected function afterCreate(Model $item, array $data, ?Request $request): void
     {
-        // ربط المالك بالشركة في الجدول الوسيط
-        $ownerId = $data['owner_id'] ?? auth()->id();
-
-        DB::table('company_user')->insertOrIgnore([
-            'user_id'    => $ownerId,
-            'company_id' => $item->id,
-            'role'       => 'owner',
-            'active'     => true,
-            'is_default' => true,
-            'joined_at'  => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        // باقي المهام (بذر الأدوار وتعيين دور admin للمالك) يتولاها CompanyObserver تلقائياً
-        Log::info("Company created: {$item->name}, owner: {$ownerId}");
+        // company_user insert moved to afterCreateCommitted — runs AFTER the
+        // transaction commits, so a WAL lock can't roll back the company row.
+        Log::info("Company created: {$item->name}, owner: " . ($data['owner_id'] ?? auth()->id()));
     }
 
     protected function afterCreateCommitted(Model $item, array $data, $request): void
     {
-        Log::info("New company created: {$item->name} by User#" . auth()->id());
+        $ownerId = $data['owner_id'] ?? auth()->id();
+
+        // insertOrIgnore is idempotent — safe to retry on WAL lock.
+        // Runs AFTER the transaction commits, so a lock can't roll back the company.
+        $attempts = 0;
+        while (true) {
+            try {
+                DB::table('company_user')->insertOrIgnore([
+                    'user_id'    => $ownerId,
+                    'company_id' => $item->id,
+                    'role'       => 'owner',
+                    'active'     => true,
+                    'is_default' => true,
+                    'joined_at'  => now(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                break;
+            } catch (\Illuminate\Database\QueryException $e) {
+                $code = (int) ($e->errorInfo[1] ?? 0);
+                $isLock = $code === 5 || $code === 14
+                    || str_contains($e->getMessage(), 'unable to open database file')
+                    || str_contains($e->getMessage(), 'database is locked');
+                if (!$isLock || $attempts >= 3) {
+                    Log::warning("company_user insert failed after {$attempts} attempts", [
+                        'company_id' => $item->id,
+                        'user_id'    => $ownerId,
+                        'error'      => $e->getMessage(),
+                    ]);
+                    return; // company is committed, user can retry membership later
+                }
+                usleep(++$attempts * 500_000); // 500ms, 1000ms
+            }
+        }
+
+        Log::info("New company created: {$item->name} by User#{$ownerId}");
     }
 
     // ═══════════════════════════════════════════

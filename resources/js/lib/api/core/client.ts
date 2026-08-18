@@ -10,6 +10,7 @@ import axios, {
 } from 'axios';
 
 // ─── Slug getter ──────────────────────────────────────────────────────────────
+import { callReset } from '@/lib/store/storeBridge';
 let _getSlug: () => string | null = () => null;
 export function connectSlugToInterceptor(getter: () => string | null): void {
   _getSlug = getter;
@@ -178,10 +179,31 @@ const processQueue = (err: unknown, token: string | null) => {
 
 function forcedLogout(): void {
   tokenStorage.clear();
+  // ✅ Kill in-memory zustand state FIRST — prevents persist middleware from
+  // re-writing stale data back to sessionStorage after we clear it
+  callReset();
   try { sessionStorage.clear(); } catch {}
   const ret = window.location.pathname !== '/login'
     ? window.location.pathname + window.location.search : '/dashboard';
   window.location.href = `/login?return=${encodeURIComponent(ret)}`;
+}
+
+// ─── Stale-company cleanup (reused by 403 + 404 handlers) ────────────────────
+function clearStaleCompanyAndRedirect(): void {
+  // ✅ Kill in-memory zustand state FIRST — so persist middleware can't re-write
+  // the stale slug back to sessionStorage between our removeItem and the redirect
+  callReset();
+  try { sessionStorage.removeItem('app-store'); } catch {}
+  // Clear all rememberMe snapshots
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k?.startsWith('pos-remembered-session:')) keysToRemove.push(k);
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+  } catch {}
+  if (window.location.pathname !== '/onboarding') window.location.href = '/onboarding';
 }
 
 client.interceptors.response.use(
@@ -213,14 +235,21 @@ client.interceptors.response.use(
 
     if (status === 403) {
       const code = data?.code;
-      if (code === 'COMPANY_SUSPENDED' || code === 'COMPANY_INACTIVE') {
-        try { sessionStorage.removeItem('app-store'); } catch {}
-        if (window.location.pathname !== '/onboarding') window.location.href = '/onboarding';
+      if (code === 'COMPANY_SUSPENDED' || code === 'COMPANY_INACTIVE' || code === 'COMPANY_NO_MEMBERSHIP') {
+        clearStaleCompanyAndRedirect();
       }
       return Promise.reject(makeError(403, data));
     }
 
-    if (status === 404) return Promise.reject(makeError(404, { message: 'المورد غير موجود',                           code: 'NOT_FOUND' }));
+    if (status === 404) {
+      const code = data?.code;
+      if (code === 'COMPANY_NOT_FOUND') {
+        // الـ slug المخزّن لم يعد يشير إلى شركة موجودة (例: بعد DB wipe)
+        // → نزّع كل شيء ونعيد التوجيه إلى onboarding
+        clearStaleCompanyAndRedirect();
+      }
+      return Promise.reject(makeError(404, { message: data?.message ?? 'المورد غير موجود', code: code ?? 'NOT_FOUND' }));
+    }
     if (status === 405) return Promise.reject(makeError(405, { message: 'الإجراء غير مدعوم على هذا المسار',           code: 'METHOD_NOT_ALLOWED' }));
     if (status === 422) return Promise.reject(makeError(422, data));
     if (status === 429) return Promise.reject(makeError(429, { message: 'تجاوزت الحد المسموح',                        code: 'RATE_LIMITED' }));

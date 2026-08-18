@@ -1,7 +1,8 @@
 # Product Roadmap — "Better Than SAP/Odoo" Features
 
-> **Status: 🚧 IN PROGRESS (Aug 15) — section C (offline everywhere / field agents) is COMPLETE
-> (C.1–C.5); section B (camera-native) is in progress — B.1, B.2, B.3 DONE; B.4 next.** Pick up on
+> **Status: 🚧 IN PROGRESS (Aug 18) — section C (offline everywhere / field agents) is COMPLETE
+> (C.1–C.5); section B (camera-native) is COMPLETE (B.1–B.5); section D (WhatsApp commerce)
+> in progress — D.1, D.2 DONE; D.3–D.5 deferred.** Pick up on
 > any PC: `git pull`, open this file, and work task-by-task. Commit + push after EACH task.
 
 > **Goal**: beat SAP/Odoo not on module count but on speed-to-value, mobile/offline-first,
@@ -117,14 +118,16 @@
 > integration exists yet — decide between **click-to-chat (`wa.me` deep links, no API)** for
 > D.1/D.2/D.4-outbound and the **Meta WhatsApp Business Cloud API (webhook)** for D.3/D.4/D.5.
 
-- [ ] **D.1 Click-to-chat everywhere** — `wa.me` deep links with a prefilled Arabic message on:
+- [x] **D.1 Click-to-chat everywhere** — `wa.me` deep links with a prefilled Arabic message on:
       party card, document header, portal order row. E.g.
       `https://wa.me/<phone>?text=<encoded message with doc number + total>` — zero API, works
       on any phone with WhatsApp installed. Phone normalization (strip leading 0 / add 213).
-- [ ] **D.2 Send invoice/statement via WhatsApp** — «أرسل على واتساب» action on a document
+- [x] **D.2 Send invoice/statement via WhatsApp** — «أرسل على واتساب» action on a document
       (and the portal order / statement): generate the PDF (existing export path), produce a
       shareable link (signed download route), and open `wa.me` with the link + Arabic caption.
       Falls back to sending the web receipt URL when PDF generation is unavailable.
+      Backend: `share_token`/`share_expires_at` columns, `share()` endpoint, `PublicDocumentShareController`.
+      Frontend: `ShareDocumentPage`, `documentsApi.share()`, `waDocMessage(shareUrl?)`.
 - [ ] **D.3 Inbound WhatsApp order intake (webhook)** — Meta WhatsApp Business Cloud API
       webhook receives an inbound message → match the phone number to a party (or portal
       account) → parse a simple order format (e.g. lines via a reply-flow / catalog numbers) →
@@ -146,9 +149,9 @@
 
 | Family | Status | Notes |
 |--------|--------|-------|
-| B. Camera-native | 🔄 in progress | **B.1 DONE** (`555f5bd` + `ac0d6d9`), **B.2 DONE** (`fff065f` + `a9377d1`), **B.3 DONE** (`1dee679`); B.4 next |
+| B. Camera-native | ✅ done | B.1–B.5 all committed + pushed |
 | C. Offline everywhere | ✅ done | C.1–C.5 all committed + pushed |
-| D. WhatsApp commerce | ❌ planned | D.1–D.5 tasks defined; wa.me-first, Meta Cloud API webhook later |
+| D. WhatsApp commerce | 🔄 in progress | **D.1 DONE** (`555f5bd` etc.), **D.2 DONE** (`47fdbb8` + `987c141`); D.3–D.5 deferred |
 
 ## Commits
 

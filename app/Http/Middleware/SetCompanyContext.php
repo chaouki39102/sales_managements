@@ -37,7 +37,15 @@ class SetCompanyContext
         } else {
             $company = Company::where('slug', $raw)
                 ->where('active', true)
-                ->firstOrFail();
+                ->first();
+
+            if (!$company) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'المؤسسة غير موجودة أو معطّلة.',
+                    'code'    => 'COMPANY_NOT_FOUND',
+                ], 404);
+            }
         }
 
         /** @var User $user */
@@ -51,7 +59,11 @@ class SetCompanyContext
                 ->first();
 
             if (!$membership) {
-                abort(403, 'ليس لديك صلاحية الوصول لهذه المؤسسة.');
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'ليس لديك صلاحية الوصول لهذه المؤسسة.',
+                    'code'    => 'COMPANY_NO_MEMBERSHIP',
+                ], 403);
             }
 
             if (!$membership->active) {

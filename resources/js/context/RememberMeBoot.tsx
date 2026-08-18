@@ -31,7 +31,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth }            from '@/context/AuthContext';
 import { useActiveCompany, appActions } from '@/lib/store/appStore';
-import { getRememberPref, getSavedSession, setSavedSession } from '@/lib/store/rememberMe';
+import { getRememberPref, getSavedSession, setSavedSession, clearSavedSession } from '@/lib/store/rememberMe';
 import { apiPost }            from '@/lib/api/core/client';
 
 export function RememberMeBoot({ children }: { children: React.ReactNode }) {
@@ -49,7 +49,7 @@ export function RememberMeBoot({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // الشركة الفعّالة: إمّا موجودة مسبقاً في الـ store (sessionStorage)،
+    // الشركة الفعّالة: إمّا موجودة مسبقاً في الـ store (sessionStorage)，
     // أو تُستعاد من اللقطة المحفوظة إن وُجدت (استعادة فورية محلية).
     let effectiveCompany = activeCompany?.slug ? activeCompany : null;
 
@@ -62,10 +62,9 @@ export function RememberMeBoot({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // تحقق خلفي دائم (لا يحجب الرسم): /companies/switch يحل بالـ company_id
-    // الثابت، فإذا غيّرت إعادة البذر slug الشركة يعيد السيرفر الحقيقة →
-    // نعيد مزامنة slug الشركة (appStore + اللقطة) بدل إبقاء slug قديم
-    // ينتج 404 على كل طلبات الإيجار. لو أُلغيت العضوية → 4xx → إعادة تعيين.
+    // ✅ If we restored from localStorage, VALIDATE before rendering the app.
+    // Without this, all React Query hooks fire with the stale slug before the
+    // async switch call returns — producing dozens of 404s and a visible glitch.
     if (effectiveCompany) {
       const { slug: storedSlug, id: companyId } = effectiveCompany;
       const yearId = appActions.getSelectedYearId();
@@ -77,17 +76,27 @@ export function RememberMeBoot({ children }: { children: React.ReactNode }) {
               setSavedSession(user.id, { company: fresh, yearId });
             }
           }
+          // ✅ Only NOW let the app render — company is validated
+          setHydrated(true);
         })
         .catch((e: any) => {
           const status = e?.response?.status;
           if (status && status >= 400 && status < 500) {
-            // الشركة لم تعد صالحة → نعود لشاشة اختيار الشركة
+            // الشركة لم تعد صالحة → ن清洗 كلTHING (zustand + localStorage)
+            // حتى لا تتكرر المشكلة بعد كل تحميل صفحة
             appActions.reset();
+            clearSavedSession(user.id);
+            // Redirect directly — no need to set hydrated
+            window.location.href = '/onboarding';
+            return;
           }
+          // Network error or unexpected status — let the app render (will retry)
+          setHydrated(true);
         });
+    } else {
+      // No company to validate — render immediately
+      setHydrated(true);
     }
-
-    setHydrated(true);
   }, [hydrated, isLoading, isAuthenticated, user, isSuperAdmin, activeCompany?.slug]);
 
   if (!hydrated) {

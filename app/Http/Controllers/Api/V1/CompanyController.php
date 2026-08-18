@@ -187,19 +187,6 @@ class CompanyController extends BaseApiController
                     $request
                 );
 
-                // ✅ ربط المالك في pivot — afterCreate في CompanyService قد يفعلها أيضاً
-                // insertOrIgnore يضمن عدم التكرار
-                DB::table('company_user')->insertOrIgnore([
-                    'user_id'    => auth()->id(),
-                    'company_id' => $created->id,
-                    'role'       => 'owner',
-                    'active'     => true,
-                    'is_default' => true,
-                    'joined_at'  => now(),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
                 return $created;
             });
 

@@ -16,6 +16,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { ActiveCompany } from '../api/core/types';
+import { registerReset } from './storeBridge';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -109,3 +110,7 @@ export const appActions = {
     useAppStore.getState().setSelectedYearId(id),
   reset:             () => useAppStore.getState().reset(),
 };
+
+// Register reset into the zero-dependency bridge so client.ts can call it
+// without importing appStore (which would create a circular chunk dependency).
+registerReset(appActions.reset);
