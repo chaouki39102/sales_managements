@@ -600,10 +600,11 @@ export default function DashboardLayout() {
   }, [toggleSidebar]);
 
   // ✅ نستخدم FiscalYearContext مباشرة — بدون useParams
-  const { years, selectedYear, isLoading: fiscalLoading, refetch } = useFiscalYear();
+  const { years, selectedYear, isLoading: fiscalLoading, isError: fiscalError, refetch } = useFiscalYear();
 
   // ✅ fiscalState مشتق بالكامل من Context
-  const fiscalState: 'loading' | 'noYear' | 'ready' =
+  const fiscalState: 'loading' | 'error' | 'noYear' | 'ready' =
+    fiscalError        ? 'error'   :  // ← خطأ في الجلب (network/server) — NOT the same as "no year"
     fiscalLoading         ? 'loading' :
     !activeCompany?.slug  ? 'loading' :   // ← ننتظر لو الشركة لم تُحدَّد بعد
     years.length === 0    ? 'noYear'  :
@@ -887,6 +888,36 @@ const meta = useTopbarTitle();
             <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', gap:12, color:'var(--t4)' }}>
               <i className="ti ti-loader" style={{ fontSize:20, color:'var(--em)', animation:'spin 1s linear infinite' }} />
               <span style={{ fontSize:14 }}>جارٍ تحميل بيانات السنة المالية...</span>
+            </div>
+          )}
+
+          {/* ✅ خطأ في جلب السنوات المالية — إعادة محاولة */}
+          {fiscalState === 'error' && (
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', padding:16 }}>
+              <div style={{
+                background:'var(--bg2)', borderRadius:16, width:'100%', maxWidth:380,
+                border:'1px solid var(--redbo)', padding:'32px 28px', textAlign:'center',
+              }}>
+                <div style={{ fontSize:36, marginBottom:12 }}>⚠️</div>
+                <div style={{ fontSize:16, fontWeight:700, color:'var(--t1)', marginBottom:8 }}>
+                  فشل تحميل السنوات المالية
+                </div>
+                <div style={{ fontSize:13, color:'var(--t4)', marginBottom:20, lineHeight:1.6 }}>
+                  تعذر الاتصال بالخادم. تحقق من اتصالك ثم أعد المحاولة.
+                </div>
+                <button
+                  onClick={() => refetch()}
+                  style={{
+                    padding:'10px 24px', borderRadius:'var(--r2)', border:'none',
+                    background:'var(--em)', color:'#fff', fontSize:14, fontWeight:700,
+                    cursor:'pointer', fontFamily:'Tajawal, sans-serif',
+                    display:'inline-flex', alignItems:'center', gap:8,
+                  }}
+                >
+                  <i className="ti ti-refresh" />
+                  إعادة المحاولة
+                </button>
+              </div>
             </div>
           )}
 

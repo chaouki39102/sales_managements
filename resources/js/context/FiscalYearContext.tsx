@@ -47,6 +47,8 @@ interface FiscalYearContextType {
   goToCurrentYear: () => void;
   isLoading:       boolean;
   loading:         boolean;
+  isError:         boolean;
+  error:           Error | null;
   hasMultipleOpen: boolean;
   isReadOnly:      boolean;
   refetch:         () => void;
@@ -68,7 +70,8 @@ function useFiscalYearsAuth() {
     queryFn:   () => fiscalYearsApi.list(),
     enabled,
     staleTime: 5 * 60_000,
-    retry:     false,  // ✅ لا نُعيد المحاولة إذا فشل (يمنع loops)
+    retry:     1,  // ✅ محاولة واحدة إضافية للخطأ العابر (network glitch)
+    refetchOnWindowFocus: true,  // ✅ إعادة الجلب عند العودة للنافذة
     select: (response) => {
       const years = response.data;
       return {
@@ -88,7 +91,7 @@ function useFiscalYearsAuth() {
 
 export function FiscalYearProvider({ children }: { children: React.ReactNode }) {
   // ✅ استخدام useFiscalYearsAuth بدل useFiscalYears
-  const { data, isLoading, refetch } = useFiscalYearsAuth();
+  const { data, isLoading, isError, error, refetch } = useFiscalYearsAuth();
   const selectedYearId    = useAppStore(s => s.selectedYearId);
   const setSelectedYearId = useAppStore(s => s.setSelectedYearId);
 
@@ -134,6 +137,8 @@ export function FiscalYearProvider({ children }: { children: React.ReactNode }) 
       goToCurrentYear,
       isLoading,
       loading:         isLoading,
+      isError,
+      error:           error instanceof Error ? error : null,
       hasMultipleOpen: open.length > 1,
       isReadOnly,
       refetch,
