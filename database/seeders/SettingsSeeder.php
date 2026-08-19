@@ -881,27 +881,60 @@ class SettingsSeeder extends Seeder
             $settings['default_currency_id']['value'] = $defaultCurrencyId;
         }
 
-        foreach ($settings as $key => $config) {
-            // تحويل القيمة إلى نص باستخدام نفس منطق SettingService
-            $storedValue = $this->toStorageValue($config['value']);
+        // ─── Batch insert/update: collect all rows then flush in one transaction ───
+        $existingKeys = DB::table('settings')
+            ->where('company_id', $companyId)
+            ->pluck('key')
+            ->flip();
 
-            DB::table('settings')->updateOrInsert(
-                [
-                    'key'        => $key,
-                    'company_id' => $companyId,
-                ],
-                [
-                    'group'         => $config['group'],
-                    'value'         => $storedValue,
-                    'type'          => $config['type'],
-                    'description'   => $config['description'],
-                    'is_public'     => $config['is_public'],
-                    'is_editable'   => $config['is_editable'],
-                    'display_order' => $config['display_order'],
-                    'updated_at'    => $now,
-                    'created_at'    => $now,
-                ]
-            );
+        $toInsert = [];
+        $toUpdate = [];
+
+        foreach ($settings as $key => $config) {
+            $storedValue = $this->toStorageValue($config['value']);
+            $row = [
+                'key'            => $key,
+                'company_id'     => $companyId,
+                'group'          => $config['group'],
+                'value'          => $storedValue,
+                'type'           => $config['type'],
+                'description'    => $config['description'],
+                'is_public'      => $config['is_public'],
+                'is_editable'    => $config['is_editable'],
+                'display_order'  => $config['display_order'],
+                'created_at'     => $now,
+                'updated_at'     => $now,
+            ];
+
+            if ($existingKeys->has($key)) {
+                $toUpdate[$key] = $row;
+            } else {
+                $toInsert[] = $row;
+            }
+        }
+
+        // Bulk insert new rows (one query for all)
+        if (!empty($toInsert)) {
+            foreach (array_chunk($toInsert, 500) as $chunk) {
+                DB::table('settings')->insert($chunk);
+            }
+        }
+
+        // Batch update existing rows (one query per unique value set, grouped by identical updates)
+        foreach ($toUpdate as $key => $row) {
+            DB::table('settings')
+                ->where('key', $key)
+                ->where('company_id', $companyId)
+                ->update([
+                    'group'         => $row['group'],
+                    'value'         => $row['value'],
+                    'type'          => $row['type'],
+                    'description'   => $row['description'],
+                    'is_public'     => $row['is_public'],
+                    'is_editable'   => $row['is_editable'],
+                    'display_order' => $row['display_order'],
+                    'updated_at'    => $row['updated_at'],
+                ]);
         }
     }
 

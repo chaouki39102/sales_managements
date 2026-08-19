@@ -155,14 +155,6 @@ class AdminSeedController extends Controller
                     $applied[] = $key;
                 }
 
-                // السنة المالية
-                if (!DB::table('fiscal_years')->where('company_id', $company->id)->exists()) {
-                    $this->seedFiscalYear($company->id);
-                    $applied[] = 'fiscal-year';
-                } else {
-                    $skipped[] = 'fiscal-year';
-                }
-
                 // أدوار الشركة
                 if (!DB::table('roles')->where('company_id', $company->id)->exists()) {
                     $this->roleService->seedRoles($company->id);
@@ -233,21 +225,6 @@ class AdminSeedController extends Controller
     // ─────────────────────────────────────────────────────────────
     // Helpers
     // ─────────────────────────────────────────────────────────────
-
-    private function seedFiscalYear(int $companyId): void
-    {
-        $year = now()->year;
-        DB::table('fiscal_years')->insert([
-            'company_id' => $companyId,
-            'name'       => "Exercice {$year}",
-            'start_date' => "{$year}-01-01",
-            'end_date'   => "{$year}-12-31",
-            'is_closed'  => false,
-            'is_current' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-    }
 
     private function assignOwnerRole(Company $company): void
     {

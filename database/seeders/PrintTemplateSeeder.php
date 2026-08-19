@@ -183,7 +183,7 @@ class PrintTemplateSeeder extends Seeder
         }
 
         foreach ($companies as $company) {
-            self::seedForCompany($company->id, $this->command instanceof \Illuminate\Console\Output\OutputInterface ? $this->command : null);
+            self::seedForCompany($company->id, $this->command);
         }
 
         $this->command->info('PrintTemplateSeeder completed successfully.');
@@ -193,14 +193,16 @@ class PrintTemplateSeeder extends Seeder
      * Seed default print templates for a single company.
      * Called by CompanySeeder via CompanyObserver when a new company is created.
      */
-    public static function seedForCompany(int $companyId, ?\Illuminate\Console\Output\OutputInterface $output = null): void
+    public static function seedForCompany(int $companyId, mixed $output = null): void
     {
-        foreach (self::DOC_TYPES as $docCode) {
-            $existing = PrintTemplate::where('company_id', $companyId)
-                ->where('doc_type_code', $docCode)
-                ->first();
+        $existingDocs = PrintTemplate::where('company_id', $companyId)
+            ->pluck('doc_type_code')
+            ->flip();
 
-            if ($existing) {
+        $rowsToInsert = [];
+
+        foreach (self::DOC_TYPES as $docCode) {
+            if ($existingDocs->has($docCode)) {
                 continue;
             }
 
@@ -210,17 +212,22 @@ class PrintTemplateSeeder extends Seeder
             $config['show_fiscal_stamp'] = in_array($docCode, ['FV', 'BL', 'FA', 'BR', 'AV']);
             $config['show_qr_code'] = $docCode === 'FV';
 
-            PrintTemplate::create([
+            $rowsToInsert[] = [
                 'company_id'    => $companyId,
                 'name'          => 'قالب ' . ($docCode === 'POS' ? 'إيصال' : 'فاتورة') . ' افتراضي',
                 'doc_type_code' => $docCode,
                 'paper_size'    => '80mm',
                 'is_default'    => true,
                 'is_active'     => true,
-                'config'        => $config,
-            ]);
+                'config'        => json_encode($config, JSON_UNESCAPED_UNICODE),
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ];
+        }
 
-            $output?->info("Created default template for company #{$companyId} / {$docCode}");
+        if (!empty($rowsToInsert)) {
+            PrintTemplate::insert($rowsToInsert);
+            $output?->info("Created " . count($rowsToInsert) . " default templates for company #{$companyId}");
         }
     }
 }

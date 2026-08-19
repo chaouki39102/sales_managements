@@ -217,10 +217,11 @@ class CompanyRoleService
 
     private function assignPermissionsToRoles(int $companyId): void
     {
-        $globalPerms = Permission::whereNull('company_id')->get();
+        $allPerms = Permission::whereNull('company_id')->get()->keyBy('name');
+
+        $rowsToInsert = [];
 
         foreach ($this->getRolePermissionsMap() as $roleName => $permNames) {
-
             $role = Role::where('name', $roleName)
                 ->where('company_id', $companyId)
                 ->where('guard_name', 'web')
@@ -231,8 +232,29 @@ class CompanyRoleService
                 continue;
             }
 
-            $perms = $globalPerms->whereIn('name', $permNames);
-            $role->syncPermissions($perms);
+            foreach ($permNames as $permName) {
+                $perm = $allPerms->get($permName);
+                if ($perm) {
+                    $rowsToInsert[] = [
+                        'permission_id' => $perm->id,
+                        'role_id'       => $role->id,
+                    ];
+                }
+            }
+        }
+
+        if (!empty($rowsToInsert)) {
+            // Bulk insert: skip duplicates via INSERT OR IGNORE (SQLite) / IGNORE (MySQL)
+            $driver = DB::getDriverName();
+            if ($driver === 'sqlite') {
+                foreach (array_chunk($rowsToInsert, 500) as $chunk) {
+                    DB::table('role_has_permissions')->insertOrIgnore($chunk);
+                }
+            } else {
+                foreach (array_chunk($rowsToInsert, 500) as $chunk) {
+                    DB::table('role_has_permissions')->insert($chunk);
+                }
+            }
         }
     }
 

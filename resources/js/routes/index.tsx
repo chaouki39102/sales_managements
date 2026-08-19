@@ -171,17 +171,16 @@ function PageLoader() {
 
 /** ظٹطھط·ظ„ط¨ طھط³ط¬ظٹظ„ ط¯ط®ظˆظ„ ظپظ‚ط· */
 /** طھط³ط¬ظٹظ„ ط¯ط®ظˆظ„ + ظ„ط§ ط´ط±ظƒط© ظ†ط´ط·ط© + ظ„ظٹط³ super-admin */
-function RequireNoCompany({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, isSuperAdmin } = useAuth();
-  const activeCompany = useActiveCompany();
+
+/** Any authenticated user (no company gate) */
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
   if (isLoading) return <PageLoader />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  // السوبر أدمن لا يمر من هنا أبداً — له داشبورده الخاص
-  if (isSuperAdmin) return <Navigate to="/admin/dashboard" replace />;
-  // مستخدم عادي مع شركة نشطة (مُستعادة من "تذكر اختياري") → مباشرة للوحة
-  if (activeCompany?.slug) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
+
+
 
 /** طھط³ط¬ظٹظ„ ط¯ط®ظˆظ„ + ط´ط±ظƒط© ظ†ط´ط·ط© (ظ…ط³طھط®ط¯ظ… ط¹ط§ط¯ظٹ ظپظ‚ط·) */
 function RequireCompany({ children }: { children: React.ReactNode }) {
@@ -228,9 +227,9 @@ export function AppRoutes() {
         <Route
           path="/onboarding"
           element={
-            <RequireNoCompany>
+            <RequireAuth>
               <OnboardingPage />
-            </RequireNoCompany>
+            </RequireAuth>
           }
         />
 

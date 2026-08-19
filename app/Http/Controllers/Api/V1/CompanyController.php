@@ -10,7 +10,6 @@ use App\Services\CompanyContextService;
 use App\Services\QRCodeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -181,14 +180,10 @@ class CompanyController extends BaseApiController
                 unset($data['plan'], $data['max_users'], $data['max_warehouses'], $data['max_products'], $data['notes']);
             }
 
-            $company = DB::transaction(function () use ($data, $request) {
-                $created = $this->companyService->create(
-                    array_merge($data, ['owner_id' => auth()->id()]),
-                    $request
-                );
-
-                return $created;
-            });
+            $company = $this->companyService->create(
+                array_merge($data, ['owner_id' => auth()->id()]),
+                $request
+            );
 
             return $this->successResponse(
                 new CompanyResource($company->load('owner:id,name,email')),

@@ -120,11 +120,23 @@ class DataAuditSubscriber
             ]);
         } catch (\Throwable $e) {
             // تدوين التدقيق لا يجب أبداً أن يفشل عملية مالية (بيع/دفع/تحويل).
-            Log::error('Failed to record audit event', [
-                'model' => get_class($model),
-                'event' => $event,
-                'error' => $e->getMessage(),
-            ]);
+            // CANTOPEN/LOCKED during Windows Defender scans is transient — warn only.
+            $code = (int) ($e->errorInfo[1] ?? 0);
+            $isLock = $code === 5 || $code === 14
+                || str_contains($e->getMessage(), 'unable to open database file')
+                || str_contains($e->getMessage(), 'database is locked');
+            if ($isLock) {
+                Log::warning('Audit skipped (transient DB lock)', [
+                    'model' => get_class($model),
+                    'event' => $event,
+                ]);
+            } else {
+                Log::error('Failed to record audit event', [
+                    'model' => get_class($model),
+                    'event' => $event,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
     }
 }

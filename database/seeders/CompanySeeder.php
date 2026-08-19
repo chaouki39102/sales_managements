@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\Company;
 use App\Services\CompanyRoleService;
-use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -97,9 +96,6 @@ class CompanySeeder extends Seeder
             ExpenseCategorySeeder::class,
         ]);
 
-        // ─── المرحلة 6: السنة المالية الأولى ─────────────────────
-        $this->seedFiscalYear($companyId);
-
         // ─── المرحلة 7: الإعدادات العامة للشركة (جديد) ───────────
         // 🔥 استدعاء SettingsSeeder لإنشاء الإعدادات الافتراضية
         $this->command?->info("⚙️  جاري إنشاء إعدادات الشركة...");
@@ -169,26 +165,7 @@ class CompanySeeder extends Seeder
         $this->command?->line("  ↳ Client Cash party created");
     }
 
-    private function seedFiscalYear(int $companyId): void
-    {
-        // تجنب التكرار
-        if (DB::table('fiscal_years')->where('company_id', $companyId)->exists()) {
-            return;
-        }
-
-        $year = Carbon::now()->year;
-
-        DB::table('fiscal_years')->insert([
-            'company_id' => $companyId,
-            'name'       => "Exercice {$year}",
-            'start_date' => "{$year}-01-01",
-            'end_date'   => "{$year}-12-31",
-            'is_closed'  => false,
-            'is_current' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-    }
+    // ─────────────────────────────────────────────────────────────
 
     private function assignOwnerRole(int $companyId): void
     {

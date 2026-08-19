@@ -46,11 +46,27 @@ class PortalOrderInstaller
             ['name' => 'adjustment', 'label' => 'تعديل',      'description' => 'تعديلات المخزون',                 'display_order' => 4],
         ];
 
+        $existing = DB::table('document_base_operations')
+            ->where('company_id', $companyId)
+            ->pluck('name')
+            ->flip();
+
+        $toInsert = [];
+        $now = now();
+
         foreach ($operations as $op) {
-            DB::table('document_base_operations')->updateOrInsert(
-                ['company_id' => $companyId, 'name' => $op['name']],
-                [...$op, 'company_id' => $companyId, 'active' => true, 'updated_at' => now()],
-            );
+            if ($existing->has($op['name'])) {
+                DB::table('document_base_operations')
+                    ->where('company_id', $companyId)
+                    ->where('name', $op['name'])
+                    ->update([...$op, 'active' => true, 'updated_at' => $now]);
+            } else {
+                $toInsert[] = [...$op, 'company_id' => $companyId, 'active' => true, 'created_at' => $now, 'updated_at' => $now];
+            }
+        }
+
+        if (!empty($toInsert)) {
+            DB::table('document_base_operations')->insert($toInsert);
         }
     }
 
@@ -67,11 +83,27 @@ class PortalOrderInstaller
             ['name' => 'returned',       'label' => 'مرتجع',        'color' => 'purple'],
         ];
 
+        $existing = DB::table('document_statuses')
+            ->where('company_id', $companyId)
+            ->pluck('name')
+            ->flip();
+
+        $toInsert = [];
+        $now = now();
+
         foreach ($statuses as $status) {
-            DB::table('document_statuses')->updateOrInsert(
-                ['company_id' => $companyId, 'name' => $status['name']],
-                [...$status, 'company_id' => $companyId, 'active' => true, 'updated_at' => now()],
-            );
+            if ($existing->has($status['name'])) {
+                DB::table('document_statuses')
+                    ->where('company_id', $companyId)
+                    ->where('name', $status['name'])
+                    ->update([...$status, 'active' => true, 'updated_at' => $now]);
+            } else {
+                $toInsert[] = [...$status, 'company_id' => $companyId, 'active' => true, 'created_at' => $now, 'updated_at' => $now];
+            }
+        }
+
+        if (!empty($toInsert)) {
+            DB::table('document_statuses')->insert($toInsert);
         }
     }
 
@@ -90,30 +122,46 @@ class PortalOrderInstaller
 
         $types = [
             // ─── مبيعات ───────────────────────────────────────────────────────
-            ['name' => 'Devis',                       'name_latin' => 'Quote',               'code' => 'DEV', 'document_base_operation_id' => $sale,     'affects_stock_direction' =>  0, 'requires_party' => true,  'affects_accounting' => false, 'display_order' =>  1],
-            ['name' => 'Bon de commande client',      'name_latin' => 'Customer Order',      'code' => 'BCC', 'document_base_operation_id' => $sale,     'affects_stock_direction' =>  0, 'requires_party' => true,  'affects_accounting' => false, 'display_order' =>  2],
-            ['name' => 'Bon de livraison',            'name_latin' => 'Delivery Note',       'code' => 'BL',  'document_base_operation_id' => $sale,     'affects_stock_direction' => -1, 'requires_party' => true,  'affects_accounting' => false, 'display_order' =>  3],
-            ['name' => 'Facture de vente',            'name_latin' => 'Sales Invoice',       'code' => 'FV',  'document_base_operation_id' => $sale,     'affects_stock_direction' => -1, 'requires_party' => true,  'affects_accounting' => true,  'display_order' =>  4],
-            ['name' => 'Avoir sur vente',             'name_latin' => 'Sales Credit Note',   'code' => 'AV',  'document_base_operation_id' => $sale,     'affects_stock_direction' =>  1, 'requires_party' => true,  'affects_accounting' => true,  'display_order' =>  5],
+            ['name' => 'Devis',                       'name_latin' => 'Quote',               'code' => 'DEV', 'document_base_operation_id' => $sale,     'affects_stock_direction' =>  0, 'requires_party' => true,  'affects_accounting' => false, 'display_order' =>  1, 'description' => null],
+            ['name' => 'Bon de commande client',      'name_latin' => 'Customer Order',      'code' => 'BCC', 'document_base_operation_id' => $sale,     'affects_stock_direction' =>  0, 'requires_party' => true,  'affects_accounting' => false, 'display_order' =>  2, 'description' => null],
+            ['name' => 'Bon de livraison',            'name_latin' => 'Delivery Note',       'code' => 'BL',  'document_base_operation_id' => $sale,     'affects_stock_direction' => -1, 'requires_party' => true,  'affects_accounting' => false, 'display_order' =>  3, 'description' => null],
+            ['name' => 'Facture de vente',            'name_latin' => 'Sales Invoice',       'code' => 'FV',  'document_base_operation_id' => $sale,     'affects_stock_direction' => -1, 'requires_party' => true,  'affects_accounting' => true,  'display_order' =>  4, 'description' => null],
+            ['name' => 'Avoir sur vente',             'name_latin' => 'Sales Credit Note',   'code' => 'AV',  'document_base_operation_id' => $sale,     'affects_stock_direction' =>  1, 'requires_party' => true,  'affects_accounting' => true,  'display_order' =>  5, 'description' => null],
             // ─── بوابة الزبائن ────────────────────────────────────────────────
             ['name' => 'أمر زبون',                     'name_latin' => 'Portal Customer Order','code' => 'CMD','document_base_operation_id' => $sale,     'affects_stock_direction' =>  0, 'requires_party' => true,  'affects_accounting' => false, 'display_order' =>  6, 'description' => 'طلبات بوابة الزبائن'],
             // ─── مشتريات ─────────────────────────────────────────────────────
-            ['name' => 'Demande de prix',             'name_latin' => 'Price Request',       'code' => 'DDP', 'document_base_operation_id' => $purchase, 'affects_stock_direction' =>  0, 'requires_party' => true,  'affects_accounting' => false, 'display_order' =>  7],
-            ['name' => 'Bon de commande fournisseur', 'name_latin' => 'Supplier Order',      'code' => 'BCF', 'document_base_operation_id' => $purchase, 'affects_stock_direction' =>  0, 'requires_party' => true,  'affects_accounting' => false, 'display_order' =>  8],
-            ['name' => 'Bon de réception',            'name_latin' => 'Goods Received Note', 'code' => 'BR',  'document_base_operation_id' => $purchase, 'affects_stock_direction' =>  1, 'requires_party' => true,  'affects_accounting' => false, 'display_order' =>  9],
-            ['name' => "Facture d'achat",             'name_latin' => 'Purchase Invoice',    'code' => 'FA',  'document_base_operation_id' => $purchase, 'affects_stock_direction' =>  1, 'requires_party' => true,  'affects_accounting' => true,  'display_order' => 10],
-            ['name' => 'Avoir sur achat',             'name_latin' => 'Purchase Debit Note', 'code' => 'AA',  'document_base_operation_id' => $purchase, 'affects_stock_direction' => -1, 'requires_party' => true,  'affects_accounting' => true,  'display_order' => 11],
+            ['name' => 'Demande de prix',             'name_latin' => 'Price Request',       'code' => 'DDP', 'document_base_operation_id' => $purchase, 'affects_stock_direction' =>  0, 'requires_party' => true,  'affects_accounting' => false, 'display_order' =>  7, 'description' => null],
+            ['name' => 'Bon de commande fournisseur', 'name_latin' => 'Supplier Order',      'code' => 'BCF', 'document_base_operation_id' => $purchase, 'affects_stock_direction' =>  0, 'requires_party' => true,  'affects_accounting' => false, 'display_order' =>  8, 'description' => null],
+            ['name' => 'Bon de réception',            'name_latin' => 'Goods Received Note', 'code' => 'BR',  'document_base_operation_id' => $purchase, 'affects_stock_direction' =>  1, 'requires_party' => true,  'affects_accounting' => false, 'display_order' =>  9, 'description' => null],
+            ['name' => "Facture d'achat",             'name_latin' => 'Purchase Invoice',    'code' => 'FA',  'document_base_operation_id' => $purchase, 'affects_stock_direction' =>  1, 'requires_party' => true,  'affects_accounting' => true,  'display_order' => 10, 'description' => null],
+            ['name' => 'Avoir sur achat',             'name_latin' => 'Purchase Debit Note', 'code' => 'AA',  'document_base_operation_id' => $purchase, 'affects_stock_direction' => -1, 'requires_party' => true,  'affects_accounting' => true,  'display_order' => 11, 'description' => null],
             // ─── نقاط بيع ──────────────────────────────────────────────────
             ['name' => 'مبيعات POS',                   'name_latin' => 'POS Sales',            'code' => 'POS','document_base_operation_id' => $sale,     'affects_stock_direction' => -1, 'requires_party' => true,  'affects_accounting' => true,  'display_order' => 13, 'description' => 'فواتير مبيعات نقطة البيع POS'],
             // ─── نقل ─────────────────────────────────────────────────────────
-            ['name' => 'Bon de transfert',            'name_latin' => 'Stock Transfer Note', 'code' => 'BT',  'document_base_operation_id' => $transfer, 'affects_stock_direction' =>  0, 'requires_party' => false, 'affects_accounting' => false, 'display_order' => 14],
+            ['name' => 'Bon de transfert',            'name_latin' => 'Stock Transfer Note', 'code' => 'BT',  'document_base_operation_id' => $transfer, 'affects_stock_direction' =>  0, 'requires_party' => false, 'affects_accounting' => false, 'display_order' => 14, 'description' => null],
         ];
 
+        $existing = DB::table('document_types')
+            ->where('company_id', $companyId)
+            ->pluck('code')
+            ->flip();
+
+        $toInsert = [];
+        $now = now();
+
         foreach ($types as $type) {
-            DB::table('document_types')->updateOrInsert(
-                ['company_id' => $companyId, 'code' => $type['code']],
-                [...$type, 'company_id' => $companyId, 'is_printable' => true, 'active' => true, 'updated_at' => now()],
-            );
+            if ($existing->has($type['code'])) {
+                DB::table('document_types')
+                    ->where('company_id', $companyId)
+                    ->where('code', $type['code'])
+                    ->update([...$type, 'is_printable' => true, 'active' => true, 'updated_at' => $now]);
+            } else {
+                $toInsert[] = [...$type, 'company_id' => $companyId, 'is_printable' => true, 'active' => true, 'created_at' => $now, 'updated_at' => $now];
+            }
+        }
+
+        if (!empty($toInsert)) {
+            DB::table('document_types')->insert($toInsert);
         }
     }
 
@@ -132,11 +180,31 @@ class PortalOrderInstaller
             }
         }
 
+        $existing = DB::table('document_type_conversions')
+            ->where('company_id', $companyId)
+            ->select('source_code', 'target_code')
+            ->get()
+            ->map(fn($r) => $r->source_code . '|' . $r->target_code)
+            ->flip();
+
+        $toInsert = [];
+        $now = now();
+
         foreach ($conversions as $conv) {
-            DB::table('document_type_conversions')->updateOrInsert(
-                ['company_id' => $companyId, 'source_code' => $conv['source_code'], 'target_code' => $conv['target_code']],
-                [...$conv, 'company_id' => $companyId, 'updated_at' => now()],
-            );
+            $key = $conv['source_code'] . '|' . $conv['target_code'];
+            if ($existing->has($key)) {
+                DB::table('document_type_conversions')
+                    ->where('company_id', $companyId)
+                    ->where('source_code', $conv['source_code'])
+                    ->where('target_code', $conv['target_code'])
+                    ->update(['display_order' => $conv['display_order'], 'updated_at' => $now]);
+            } else {
+                $toInsert[] = [...$conv, 'company_id' => $companyId, 'created_at' => $now, 'updated_at' => $now];
+            }
+        }
+
+        if (!empty($toInsert)) {
+            DB::table('document_type_conversions')->insert($toInsert);
         }
     }
 }

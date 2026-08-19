@@ -2,7 +2,6 @@
 // app/Console/Commands/AssignCompanyToExistingRecords.php
 namespace App\Console\Commands;
 
-use App\Models\Company;
 use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -12,7 +11,6 @@ class AssignCompanyToExistingRecords extends Command
 {
     protected $signature = 'tenancy:assign
                             {--company-id= : معرف الشركة الافتراضية}
-                            {--create-default : إنشاء شركة افتراضية إذا لم توجد}
                             {--dry-run : عرض ما سيتم دون تنفيذ}';
 
     protected $description = 'تعيين company_id لجميع السجلات الحالية';
@@ -62,15 +60,6 @@ class AssignCompanyToExistingRecords extends Command
     {
         if ($id = $this->option('company-id')) {
             return (int) $id;
-        }
-
-        if ($this->option('create-default')) {
-            $company = Company::firstOrCreate(
-                ['slug' => 'default'],
-                ['name' => 'الشركة الافتراضية', 'active' => true]
-            );
-            $this->info("الشركة الافتراضية: [{$company->id}] {$company->name}");
-            return $company->id;
         }
 
         return null;

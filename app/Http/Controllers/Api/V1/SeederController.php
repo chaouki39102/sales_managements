@@ -45,7 +45,6 @@ class SeederController extends BaseApiController
         'DocumentTypeSeeder',
         'NumberingSeriesSeeder',
         'PartierSeeder',
-        'FiscalYearSeeder',
     ];
 
     public function run(Request $request): JsonResponse
