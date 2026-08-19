@@ -10,7 +10,9 @@ use App\Policies\CompanyPolicy;
 use App\Services\CompanyContextService;
 use App\Support\Database\RetryingSQLiteConnection;
 use Illuminate\Database\Connection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -37,6 +39,28 @@ class AppServiceProvider extends ServiceProvider
         Connection::resolverFor('sqlite', static function ($connection, $database, $prefix, $config) {
             return new RetryingSQLiteConnection($connection, $database, $prefix, $config);
         });
+
+        // WAL auto-checkpoint on boot
+        // ─────────────────────────────────────────────────────────────
+        // On Windows, the WAL file can grow large (e.g. 4+ MB, exceeding
+        // the DB file itself) causing SQLite error 14 "unable to open
+        // database file" (CANTOPEN) on writes.  A TRUNCATE checkpoint at
+        // boot folds WAL frames into the main DB and keeps the WAL near
+        // zero so the file stays small and indexable.
+        if (config('database.default') === 'sqlite') {
+            try {
+                DB::connection('sqlite')->getPdo()->exec(
+                    'PRAGMA wal_checkpoint(TRUNCATE)'
+                );
+            } catch (\Throwable $e) {
+                // Non-fatal — if the DB is locked at boot we skip; the
+                // RetryingSQLiteConnection will handle transient errors
+                // at request time.
+                Log::debug('[SQLite] WAL checkpoint skipped at boot', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         // ══════════════════════════════════════════════════════
         // Route Binding

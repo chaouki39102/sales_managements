@@ -22,17 +22,22 @@ trait ResolvesFiscalYear
 {
     public function resolveFiscalYearId(int $companyId, string $date): int
     {
+        // Use raw date-string comparison instead of whereDate() so SQLite
+        // can use the index on start_date / end_date columns.
+        // Date columns store 'YYYY-MM-DD' — lexicographic compare is correct.
+        $dateOnly = substr($date, 0, 10);
+
         $id = DB::table('fiscal_years')
             ->where('company_id', $companyId)
-            ->whereDate('start_date', '<=', $date)
-            ->whereDate('end_date',   '>=', $date)
+            ->where('start_date', '<=', $dateOnly)
+            ->where('end_date',   '>=', $dateOnly)
             ->value('id');
 
         if ($id) return $id;
 
         $id = DB::table('fiscal_years')
             ->where('company_id', $companyId)
-            ->whereDate('start_date', '<=', $date)
+            ->where('start_date', '<=', $dateOnly)
             ->orderByDesc('start_date')
             ->value('id');
 

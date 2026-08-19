@@ -473,12 +473,12 @@ class PortalOrderService
             );
             $query->orderByDesc('id');
         } elseif ($sortBy === 'items_count') {
-            $query->orderBy(
-                DB::table('commercial_document_lines')
-                    ->selectRaw('COUNT(*)')
-                    ->whereColumn('commercial_document_lines.commercial_document_id', 'portal_orders.commercial_document_id'),
-                $sortDir,
+            // orderBy() requires a column/expression, not a Builder.
+            // Wrap the correlated subquery in DB::raw() so it becomes a SQL expression.
+            $subquery = DB::raw(
+                '(SELECT COUNT(*) FROM commercial_document_lines WHERE commercial_document_lines.commercial_document_id = portal_orders.commercial_document_id)'
             );
+            $query->orderBy($subquery, $sortDir);
             $query->orderByDesc('id');
         } elseif (in_array($sortBy, $sortableColumns, true)) {
             $query->orderBy($sortBy, $sortDir);

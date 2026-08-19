@@ -1013,10 +1013,16 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     private function generateDocumentNumber(DocumentType $documentType, int $companyId): string
     {
-        return DB::transaction(function () use ($documentType, $companyId) {
-            $prefix = $documentType->code;
-            $year   = date('Y');
+        // On SQLite, lockForUpdate() is a no-op — two concurrent requests can
+        // both read the same max number and generate a duplicate.  We mitigate
+        // this by looping: after generating a candidate we check if it already
+        // exists, and if so bump the sequence.  The loop caps at 50 to avoid
+        // an infinite cycle in pathological cases.
+        $prefix = $documentType->code;
+        $year   = date('Y');
+        $maxAttempts = 50;
 
+        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
             $last = CommercialDocument::withTrashed()
                 ->where('company_id', $companyId)
                 ->where('document_number', 'like', "{$prefix}-{$year}-%")
@@ -1030,19 +1036,42 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 $seq   = (int) end($parts) + 1;
             }
 
-            $result = sprintf('%s-%s-%06d', $prefix, $year, $seq);
+            $candidate = sprintf('%s-%s-%06d', $prefix, $year, $seq);
 
-            \Illuminate\Support\Facades\Log::debug('[DocGen]', [
-                'prefix' => $prefix,
-                'year' => $year,
-                'company' => $companyId,
-                'last_found' => $last?->document_number,
-                'seq' => $seq,
-                'result' => $result,
+            // Verify the candidate doesn't already exist (covers the SQLite
+            // race where lockForUpdate is a no-op or WAL read was stale).
+            $exists = CommercialDocument::withTrashed()
+                ->where('company_id', $companyId)
+                ->where('document_number', $candidate)
+                ->exists();
+
+            if (!$exists) {
+                \Illuminate\Support\Facades\Log::debug('[DocGen]', [
+                    'prefix'   => $prefix,
+                    'year'     => $year,
+                    'company'  => $companyId,
+                    'last_found' => $last?->document_number,
+                    'seq'      => $seq,
+                    'result'   => $candidate,
+                    'attempts' => $attempt + 1,
+                ]);
+
+                return $candidate;
+            }
+
+            \Illuminate\Support\Facades\Log::warning('[DocGen] collision, retrying', [
+                'candidate' => $candidate,
+                'attempt'   => $attempt + 1,
             ]);
+        }
 
-            return $result;
-        });
+        // Fallback — should never reach here under normal conditions.
+        $fallback = sprintf('%s-%s-%06d', $prefix, $year, (int) microtime(true) % 999999 + 1);
+        \Illuminate\Support\Facades\Log::error('[DocGen] exhausted retries, using fallback', [
+            'fallback' => $fallback,
+        ]);
+
+        return $fallback;
     }
 
     private function getCurrentFiscalYearId(int $companyId): ?int
