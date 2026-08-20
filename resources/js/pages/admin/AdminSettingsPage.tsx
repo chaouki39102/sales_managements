@@ -157,8 +157,18 @@ export default function AdminSettingsPage() {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['admin', 'system', 'db-status'] });
       notify.success(data.message ?? 'تم التبديل ✓');
+      // Prompt for server restart after a short delay
+      setTimeout(() => {
+        if (window.confirm('تم تبديل قاعدة البيانات. هل تريد إعادة تشغيل الخادم الآن؟')) {
+          window.location.href = '/status';
+        }
+      }, 1500);
     },
-    onError: (e: any) => notify.error(e?.error ?? e?.message ?? 'فشل التبديل'),
+    onError: (e: any) => {
+      const msg = e?.error ?? e?.message ?? 'فشل التبديل';
+      const detail = e?.detail ? `\n${e.detail}` : '';
+      notify.error(msg + detail);
+    },
   });
 
   const setF = (key: keyof SystemSettings, value: any) =>
@@ -475,7 +485,10 @@ export default function AdminSettingsPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <button
                 disabled={dbSwitchMut.isPending || dbStatus.current_driver === 'sqlite'}
-                onClick={() => dbSwitchMut.mutate('sqlite')}
+                onClick={() => {
+                  if (!window.confirm('هل تريد التبديل إلى SQLite؟\nسيتم تغيير ملف .env وإيقاف الخادم مؤقتاً.')) return;
+                  dbSwitchMut.mutate('sqlite');
+                }}
                 style={{
                   padding: '12px 14px', borderRadius: 9, border: 'none', cursor: 'pointer',
                   background: dbStatus.current_driver === 'sqlite' ? '#8b5cf615' : '#8b5cf610',
@@ -492,7 +505,10 @@ export default function AdminSettingsPage() {
               </button>
               <button
                 disabled={dbSwitchMut.isPending || dbStatus.current_driver === 'mysql'}
-                onClick={() => dbSwitchMut.mutate('mysql')}
+                onClick={() => {
+                  if (!window.confirm('هل تريد التبديل إلى MySQL / MariaDB؟\nسيتم تغيير ملف .env وإيقاف الخادم مؤقتاً.')) return;
+                  dbSwitchMut.mutate('mysql');
+                }}
                 style={{
                   padding: '12px 14px', borderRadius: 9, border: 'none', cursor: 'pointer',
                   background: dbStatus.current_driver === 'mysql' ? '#f59e0b15' : '#f59e0b10',

@@ -160,31 +160,32 @@ class AdminSystemSettingsController extends Controller
         }
 
         // ── Step 3: Write .env (now safe — migrations already ran) ──
+        // Backup before any write
+        $backupPath = $envPath . '.bak-' . date('Ymd-His');
+        @copy($envPath, $backupPath);
+
         $env = file_get_contents($envPath);
 
-        // DB_CONNECTION
-        $env = preg_replace('/^DB_CONNECTION=.*/m', "DB_CONNECTION={$target}", $env);
+        // DB_CONNECTION — uncomment if commented out
+        if (preg_match('/^#[ \t]*DB_CONNECTION=/m', $env)) {
+            $env = preg_replace('/^#[ \t]*DB_CONNECTION=.*/m', "DB_CONNECTION={$target}", $env);
+        } else {
+            $env = preg_replace('/^DB_CONNECTION=.*/m', "DB_CONNECTION={$target}", $env);
+        }
 
         if ($target === 'sqlite') {
-            // Point DB_DATABASE to the SQLite file
-            $env = preg_replace(
-                '/^DB_DATABASE=.*/m',
-                'DB_DATABASE=' . addslashes($sqliteFile),
-                $env
-            );
-            // Ensure HOST/PORT/USERNAME/PASSWORD are set (needed for MySQL fallback)
-            if (!preg_match('/^DB_HOST=/m', $env))    $env .= "\nDB_HOST=127.0.0.1";
-            if (!preg_match('/^DB_PORT=/m', $env))    $env .= "\nDB_PORT=3306";
-            if (!preg_match('/^DB_USERNAME=/m', $env)) $env .= "\nDB_USERNAME=root";
-            if (!preg_match('/^DB_PASSWORD=/m', $env)) $env .= "\nDB_PASSWORD=";
+            // Quote Windows backslash paths
+            $escapedSqlite = str_replace('\\', '\\\\', $sqliteFile);
+            $this->setEnvLine($env, 'DB_DATABASE', $escapedSqlite);
         } else {
-            // MySQL — restore DB_DATABASE to the MySQL database name
-            $env = preg_replace('/^DB_DATABASE=.*/m', "DB_DATABASE={$mysqlDb}", $env);
-            if (!preg_match('/^DB_HOST=/m', $env))    $env .= "\nDB_HOST=127.0.0.1";
-            if (!preg_match('/^DB_PORT=/m', $env))    $env .= "\nDB_PORT=3306";
-            if (!preg_match('/^DB_USERNAME=/m', $env)) $env .= "\nDB_USERNAME=root";
-            if (!preg_match('/^DB_PASSWORD=/m', $env)) $env .= "\nDB_PASSWORD=";
+            $this->setEnvLine($env, 'DB_DATABASE', $mysqlDb);
         }
+
+        // Ensure HOST/PORT/USERNAME/PASSWORD are set
+        $this->appendEnvIfMissing($env, 'DB_HOST', '127.0.0.1');
+        $this->appendEnvIfMissing($env, 'DB_PORT', '3306');
+        $this->appendEnvIfMissing($env, 'DB_USERNAME', 'root');
+        $this->appendEnvIfMissing($env, 'DB_PASSWORD', '');
 
         file_put_contents($envPath, $env);
         Artisan::call('config:clear');
@@ -279,5 +280,35 @@ class AdminSystemSettingsController extends Controller
         if (is_float($value)) return 'float';
         if (is_array($value)) return 'json';
         return 'string';
+    }
+
+    /**
+     * Set or uncomment a KEY=VALUE line in .env content (by reference).
+     * Handles commented-out lines (# DB_HOST=...) by uncommenting them.
+     */
+    private function setEnvLine(string &$env, string $key, string $value): void
+    {
+        // Already exists uncommented — replace
+        if (preg_match('/^' . preg_quote($key, '/') . '=/m', $env)) {
+            $env = preg_replace('/^' . preg_quote($key, '/') . '=.*/m', "{$key}={$value}", $env);
+            return;
+        }
+        // Exists commented out — uncomment + replace
+        if (preg_match('/^#[ \t]*' . preg_quote($key, '/') . '=/m', $env)) {
+            $env = preg_replace('/^#[ \t]*' . preg_quote($key, '/') . '=.*/m', "{$key}={$value}", $env);
+            return;
+        }
+        // Does not exist — append
+        $env .= "\n{$key}={$value}";
+    }
+
+    /**
+     * Append KEY=VALUE to .env if the key is not already set (even commented).
+     */
+    private function appendEnvIfMissing(string &$env, string $key, string $value): void
+    {
+        if (!preg_match('/^#?[ \t]*' . preg_quote($key, '/') . '=/m', $env)) {
+            $env .= "\n{$key}={$value}";
+        }
     }
 }

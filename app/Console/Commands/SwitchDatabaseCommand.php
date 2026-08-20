@@ -59,28 +59,27 @@ class SwitchDatabaseCommand extends Command
             return 1;
         }
 
+        // Backup before write
+        $backupPath = $envPath . '.bak-' . date('Ymd-His');
+        @copy($envPath, $backupPath);
+        $this->line("  Backup saved: {$backupPath}");
+
         $env = file_get_contents($envPath);
 
-        // Replace DB_CONNECTION line
-        $env = preg_replace('/^DB_CONNECTION=.*/m', "DB_CONNECTION={$driver}", $env);
+        // Replace DB_CONNECTION line (handle commented-out)
+        if (preg_match('/^#[ \t]*DB_CONNECTION=/m', $env)) {
+            $env = preg_replace('/^#[ \t]*DB_CONNECTION=.*/m', "DB_CONNECTION={$driver}", $env);
+        } else {
+            $env = preg_replace('/^DB_CONNECTION=.*/m', "DB_CONNECTION={$driver}", $env);
+        }
 
-        // Ensure DB_HOST/PORT/USERNAME/PASSWORD exist for MySQL targets
+        // Ensure DB_HOST/PORT/USERNAME/PASSWORD exist for MySQL targets (uncomment if commented)
         if ($driver === 'mysql') {
-            if (! preg_match('/^DB_HOST=/m', $env)) {
-                $env .= "\nDB_HOST=127.0.0.1";
-            }
-            if (! preg_match('/^DB_PORT=/m', $env)) {
-                $env .= "\nDB_PORT=3306";
-            }
-            if (! preg_match('/^DB_DATABASE=/m', $env)) {
-                $env .= "\nDB_DATABASE=sales_management";
-            }
-            if (! preg_match('/^DB_USERNAME=/m', $env)) {
-                $env .= "\nDB_USERNAME=root";
-            }
-            if (! preg_match('/^DB_PASSWORD=/m', $env)) {
-                $env .= "\nDB_PASSWORD=";
-            }
+            $this->setEnvLine($env, 'DB_HOST', '127.0.0.1');
+            $this->setEnvLine($env, 'DB_PORT', '3306');
+            $this->setEnvLine($env, 'DB_DATABASE', 'sales_management');
+            $this->setEnvLine($env, 'DB_USERNAME', 'root');
+            $this->setEnvLine($env, 'DB_PASSWORD', '');
         }
 
         file_put_contents($envPath, $env);
@@ -124,6 +123,20 @@ class SwitchDatabaseCommand extends Command
         }
 
         return 0;
+    }
+
+    /**
+     * Set or uncomment a KEY=VALUE line in .env content (by reference).
+     */
+    private function setEnvLine(string &$env, string $key, string $value): void
+    {
+        if (preg_match('/^' . preg_quote($key, '/') . '=/m', $env)) {
+            $env = preg_replace('/^' . preg_quote($key, '/') . '=.*/m', "{$key}={$value}", $env);
+        } elseif (preg_match('/^#[ \t]*' . preg_quote($key, '/') . '=/m', $env)) {
+            $env = preg_replace('/^#[ \t]*' . preg_quote($key, '/') . '=.*/m', "{$key}={$value}", $env);
+        } else {
+            $env .= "\n{$key}={$value}";
+        }
     }
 
     private function showCurrent(): int

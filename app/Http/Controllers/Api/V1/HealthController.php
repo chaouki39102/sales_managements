@@ -150,10 +150,10 @@ class HealthController extends BaseApiController
             'fix'    => $buildOk ? null : 'npm run build',
         ];
 
-        // 6. migrations (cached — heavy command)
-        [$ran, $pending] = Cache::remember('health:migrations', 60, function () use ($root) {
+        // 6. migrations (cached per driver — heavy command)
+        [$ran, $pending] = Cache::remember("health:migrations:{$driver}", 60, function () use ($root, $driver) {
             try {
-                Artisan::call('migrate:status');
+                Artisan::call('migrate:status', ['--database' => $driver]);
                 $out    = Artisan::output();
                 $ran    = preg_match_all('/\bRan\b/i', $out);
                 $pending = preg_match_all('/\bPending\b/i', $out);
