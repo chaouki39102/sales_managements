@@ -16,7 +16,65 @@
 - **Offline layer** (`lib/offline/`) sits on the SHARED `client` — its cache keys embed the full URL (slug included), so tenant isolation in the offline cache is automatic; never store cross-tenant keys. The **write queue** (`pendingOps` in IndexedDB) is now tenant-scoped too: every op carries `slug` (captured from the url's first segment at enqueue), and reads/counts/replay/clear filter by the ACTIVE slug via `useActiveSlug()`/`appActions.getActiveSlug()` — legacy rows without the field fall back to `opSlug(url)`, and tenant-less ops (empty slug) stay visible to every company.
 
 ## Date
-2026-08-15
+2026-08-20
+
+### Phase 82 — MySQL Migration + DB Switch UI (Aug 20)
+
+**Request**: migrate the dev database from SQLite to MySQL/MariaDB to eliminate file-locking slowness on POS sale completion, then add a super-admin DB switch feature (SQLite ↔ MySQL) in the admin dashboard.
+
+**What was built (backend)**:
+- **MySQL fully migrated**: 127 migrations + seeds complete, 83 settings seeded with valid JSON. MariaDB 10.4.32 at `127.0.0.1:3306`, database `sales_management`, `utf8mb4_unicode_ci`, root user no password. Health endpoint on MySQL: 64-86ms stable (no file-locking variance).
+- **`AdminSystemSettingsController::switchDb()`** — the core switch logic, **critical ordering**:
+  1. Validate + compute target `.env` values BEFORE writing
+  2. Ensure target DB is reachable + run `migrate --force` on target (current request still uses the OLD driver, so auth/session works)
+  3. Write `.env` + clear config cache — NEXT request boots with the new driver
+  - **MySQL DB name is hardcoded** (`'sales_management'`) — `env('DB_DATABASE')` returns the CURRENT driver's value (SQLite path when on SQLite), not the target's. Using it causes MySQL to try connecting to a file path as a database name (error 1049).
+  - **SQLite `DB_DATABASE`** is set to the full file path (`database_path('database.sqlite')`); when switching to MySQL, `DB_DATABASE` is restored to just the database name (`sales_management`).
+- **`GET /api/v1/admin/system/db-status`** — returns `current_driver`, `connected`, connection details (host/database for MySQL, path/size/writable for SQLite), `pending_migrations`, `error`.
+- **`POST /api/v1/admin/system/switch-db`** — accepts `{driver: "sqlite"|"mysql"}`, returns `{message, driver, reachable, migrated, migration_error}`.
+- **`HealthController`** — driver-aware extension check (`pdo_sqlite` vs `pdo_mysql`) so the health endpoint works on both drivers.
+- **`SwitchDatabaseCommand`** (`php artisan db:use [sqlite|mysql] [--fresh]`) — CLI fallback for when the server is down and the UI can't be used.
+
+**What was built (frontend)**:
+- **`DbStatus` / `DbSwitchResult` types** in `lib/api/admin/system.ts` — `dbApi.status()` + `dbApi.switchTo(driver)`.
+- **`AdminSettingsPage.tsx`** — new "قاعدة البيانات" section: driver card (MySQL/SQLite icon + connection details + migration status + error), two switch buttons (disabled when already on that driver), loading spinner during switch, Arabic hint about restart requirement.
+
+**MySQL storage fixes** (the `json_valid` CHECK constraint on `settings.value`):
+- `SettingsSeeder::toStorageValue()` — JSON-encodes non-null values before storage
+- `SettingService::prepareValueForStorage()` — JSON-encodes values for MySQL
+- `Setting::setSetting()` — `json_encode($value)` before storage; `getTypedValue()` already handles both formats (JSON string + raw)
+- 7 migration files — shortened composite index names to fit MySQL's 64-char limit
+
+**Key architectural rules**:
+- **`artisan serve` re-reads `.env` on each HTTP request** — after switching drivers, the NEXT request boots with the new config. But if the NEW driver's DB lacks required tables (e.g. `personal_access_tokens` for Sanctum auth), the switch endpoint itself crashes before it can run. **Solution**: `switchDb()` runs migrations on the target DB *before* writing `.env`, while the current request is still on the OLD driver (auth already passed). This makes the switch self-healing — the target DB always has tables by the time the next request boots.
+- **`env('DB_DATABASE')` is NOT portable between drivers** — it holds the current driver's value. Always hardcode the MySQL database name and the SQLite file path independently; never derive one from `env()`.
+- **SQLite `DB_DATABASE`** must be the full path (`C:\...\database.sqlite`), not just `sales_management` — Laravel's SQLite config reads `env('DB_DATABASE', database_path('database.sqlite'))`, so a non-path value would try to open `sales_management` as a relative file.
+- **MySQL `settings.value`** has a `CHECK (json_valid(...))` constraint — every write path must JSON-encode values. The read side (`getTypedValue()`/`castValue()`) handles both JSON strings and raw values gracefully.
+- **Runtime DB switching from the UI is NOT best practice** (data corruption risk, no connection pooling, transaction in-flight during switch). It was implemented at the user's request for the super admin dashboard only. A production deployment should use a server restart.
+- **Tests always use in-memory SQLite** (`phpunit.xml`: `DB_CONNECTION=sqlite`, `DB_DATABASE=:memory:`) — never touch the dev DB.
+- **MySQL index names** must be ≤ 64 characters — auto-generated composite names like `2025_10_15_094100_create_stock_movements_index_on_stock_product_warehouse_date` exceed this. Use short custom names.
+
+**Files created**:
+- `app/Console/Commands/SwitchDatabaseCommand.php`
+
+**Files modified (20)**:
+- `app/Http/Controllers/Api/V1/Admin/AdminSystemSettingsController.php` — `switchDb()` rewritten (migrate before .env, hardcode MySQL name, SQLite path)
+- `app/Http/Controllers/Api/V1/HealthController.php` — driver-aware extension check
+- `app/Models/Setting.php` — `json_encode` in `setSetting()`
+- `app/Services/SettingService.php` — `prepareValueForStorage()` JSON-encode
+- `app/Services/CompanyRoleService.php` — MySQL index name fix
+- `database/seeders/SettingsSeeder.php` — `toStorageValue()` JSON-encode
+- 7 migration files — index name fixes for MySQL 64-char limit
+- `routes/api_admin.php` — `db-status` GET + `switch-db` POST
+- `resources/js/lib/api/admin/system.ts` — `DbStatus`, `DbSwitchResult`, `dbApi`
+- `resources/js/lib/api/admin/index.ts` — export `DbSwitchResult`
+- `resources/js/lib/admin.ts` — `dbApi` wrapper
+- `resources/js/pages/admin/AdminSettingsPage.tsx` — "قاعدة البيانات" section
+- `server-helper/router.php` — reads `DB_DRIVER` from .env
+
+**Verification**: `php -l` clean on all PHP files. `npx tsc --noEmit` clean. `npm run build` 0 errors, 235 precache entries. Full round-trip tested: MySQL → SQLite (migrated, health green, 127 migrations) → restart → SQLite → MySQL (migrated back, health green). Commit `79db044`, pushed to `origin/main`.
+
+**Current state**: `.env` is set to `DB_CONNECTION=mysql` (the production/recommended driver). SQLite file (`database/database.sqlite`) is also fully migrated and can be switched to via the admin UI.
 
 ### Phase 80 — B.5 Complete: Camera Stock-Take → Stock Adjustment (Aug 15)
 
