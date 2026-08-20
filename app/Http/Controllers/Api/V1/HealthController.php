@@ -60,7 +60,10 @@ class HealthController extends BaseApiController
         $root = base_path();
 
         // 1. PHP extensions
-        $required = ['pdo_sqlite', 'mbstring', 'openssl', 'curl', 'fileinfo', 'zip'];
+        $driver = config('database.default');
+        $required = $driver === 'mysql'
+            ? ['pdo_mysql', 'mbstring', 'openssl', 'curl', 'fileinfo', 'zip']
+            : ['pdo_sqlite', 'mbstring', 'openssl', 'curl', 'fileinfo', 'zip'];
         $missing  = array_values(array_filter($required, fn ($e) => !extension_loaded($e)));
         $checks[] = [
             'id'     => 'extensions',
@@ -86,19 +89,41 @@ class HealthController extends BaseApiController
             'fix'    => $envKeySet ? null : 'php artisan key:generate',
         ];
 
-        // 3. sqlite file
-        $dbFile     = $root . '/database/database.sqlite';
-        $dbExists   = is_file($dbFile);
-        $dbWritable = $dbExists && is_writable($dbFile);
-        $checks[] = [
-            'id'     => 'database',
-            'name'   => 'قاعدة البيانات (sqlite)',
-            'ok'     => $dbExists && $dbWritable,
-            'detail' => $dbExists
-                ? ('database/database.sqlite · ' . ($dbWritable ? 'قابلة للكتابة' : 'غير قابلة للكتابة'))
-                : 'الملف غير موجود',
-            'fix'    => ($dbExists && $dbWritable) ? null : 'أنشئ database/database.sqlite (start-server.bat يفعل ذلك تلقائياً).',
-        ];
+        // 3. database connectivity (driver-aware)
+        if ($driver === 'mysql') {
+            $dbHost = config('database.connections.mysql.host', '127.0.0.1');
+            $dbPort = config('database.connections.mysql.port', 3306);
+            $dbConnectedCheck = false;
+            $dbCheckDetail    = '';
+            try {
+                $pdo = DB::connection('mysql')->getPdo();
+                $dbConnectedCheck = true;
+                $serverVersion = $pdo->query('SELECT VERSION()')->fetchColumn();
+                $dbCheckDetail = "MySQL/MariaDB $serverVersion · $dbHost:$dbPort";
+            } catch (\Throwable $e) {
+                $dbCheckDetail = 'MySQL غير متاح: ' . $e->getMessage();
+            }
+            $checks[] = [
+                'id'     => 'database',
+                'name'   => 'قاعدة البيانات (MySQL)',
+                'ok'     => $dbConnectedCheck,
+                'detail' => $dbCheckDetail,
+                'fix'    => $dbConnectedCheck ? null : 'تأكد أن MySQL يعمل (C:\\xampp\\mysql\\bin\\mysqld.exe).',
+            ];
+        } else {
+            $dbFile     = $root . '/database/database.sqlite';
+            $dbExists   = is_file($dbFile);
+            $dbWritable = $dbExists && is_writable($dbFile);
+            $checks[] = [
+                'id'     => 'database',
+                'name'   => 'قاعدة البيانات (sqlite)',
+                'ok'     => $dbExists && $dbWritable,
+                'detail' => $dbExists
+                    ? ('database/database.sqlite · ' . ($dbWritable ? 'قابلة للكتابة' : 'غير قابلة للكتابة'))
+                    : 'الملف غير موجود',
+                'fix'    => ($dbExists && $dbWritable) ? null : 'أنشئ database/database.sqlite (start-server.bat يفعل ذلك تلقائياً).',
+            ];
+        }
 
         // 4. storage writable
         $storageBad = [];

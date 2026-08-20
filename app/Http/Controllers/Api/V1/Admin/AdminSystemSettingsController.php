@@ -6,12 +6,197 @@ use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class AdminSystemSettingsController extends Controller
 {
     protected string $cacheKey = 'system_settings';
+
+    // ══════════════════════════════════════════════════════════
+    // Database Driver — Current Status
+    // ══════════════════════════════════════════════════════════
+    public function dbStatus(): JsonResponse
+    {
+        $driver = config('database.default');
+
+        $detail = match ($driver) {
+            'mysql' => $this->mysqlDetail(),
+            default => $this->sqliteDetail(),
+        };
+
+        return response()->json([
+            'data' => array_merge([
+                'current_driver' => $driver,
+            ], $detail),
+        ]);
+    }
+
+    private function mysqlDetail(): array
+    {
+        try {
+            $pdo = DB::connection('mysql')->getPdo();
+            $serverVersion = $pdo->query('SELECT VERSION()')->fetchColumn();
+            return [
+                'connected'    => true,
+                'server'       => "MySQL/MariaDB $serverVersion",
+                'host'         => config('database.connections.mysql.host') . ':' . config('database.connections.mysql.port'),
+                'database'     => config('database.connections.mysql.database'),
+                'pending_migrations' => $this->pendingMigrations('mysql'),
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'connected'    => false,
+                'server'       => null,
+                'host'         => config('database.connections.mysql.host') . ':' . config('database.connections.mysql.port'),
+                'database'     => config('database.connections.mysql.database'),
+                'error'        => $e->getMessage(),
+                'pending_migrations' => 0,
+            ];
+        }
+    }
+
+    private function sqliteDetail(): array
+    {
+        $path = config('database.connections.sqlite.database');
+        $exists = is_file($path);
+
+        return [
+            'connected' => $exists,
+            'path'      => $path,
+            'writable'  => $exists && is_writable($path),
+            'size'      => $exists ? round(filesize($path) / 1024, 1) . ' KB' : null,
+            'pending_migrations' => $this->pendingMigrations('sqlite'),
+        ];
+    }
+
+    private function pendingMigrations(string $driver): int
+    {
+        try {
+            Artisan::call('migrate:status', [], $output = new \Symfony\Component\Console\Output\BufferedOutput());
+            $out = $output->fetch();
+            return preg_match_all('/\bPending\b/i', $out);
+        } catch (\Throwable) {
+            return -1;
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // Database Driver — Switch
+    //
+    // CRITICAL ORDER:
+    //   1. Validate + decide .env values BEFORE writing
+    //   2. Ensure target DB file/connection exists + run migrations
+    //      (current request is still on the OLD driver, so auth works)
+    //   3. Write .env + clear config cache
+    //   4. Return — NEXT request boots with the new driver and finds
+    //      the tables we just migrated
+    // ══════════════════════════════════════════════════════════
+    public function switchDb(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'driver' => 'required|in:sqlite,mysql',
+        ]);
+
+        $target = $data['driver'];
+        $current = config('database.default');
+
+        if ($current === $target) {
+            return response()->json(['message' => "قاعدة البيانات تعمل بالفعل عبر {$target}."]);
+        }
+
+        $envPath = base_path('.env');
+        if (!is_file($envPath)) {
+            return response()->json(['error' => 'ملف .env غير موجود.'], 500);
+        }
+
+        // ── Step 1: Compute the DB_DATABASE value for the target driver ──
+        // We MUST hardcode these because env('DB_DATABASE') returns the CURRENT driver's value
+        // (SQLite path when on SQLite, MySQL name when on MySQL) — not the target's value.
+        $sqliteFile = database_path('database.sqlite');
+        $mysqlDb    = 'sales_management';
+
+        // ── Step 2: Ensure target is reachable + migrate (while OLD driver is active) ──
+        $reachable      = false;
+        $reachableError = null;
+        $migrated       = false;
+        $migrationError = null;
+
+        try {
+            if ($target === 'mysql') {
+                DB::connection('mysql')->getPdo();
+                $reachable = true;
+            } else {
+                // Ensure the SQLite file exists
+                if (!is_file($sqliteFile)) {
+                    file_put_contents($sqliteFile, '');
+                }
+                DB::connection('sqlite')->getPdo();
+                $reachable = true;
+            }
+        } catch (\Throwable $e) {
+            $reachableError = $e->getMessage();
+        }
+
+        if (!$reachable) {
+            return response()->json([
+                'error'  => "الاتصال بـ {$target} فشل.",
+                'detail' => $reachableError,
+            ], 500);
+        }
+
+        // Run migrations on the target NOW — the current request still uses
+        // the OLD driver (auth already passed), so the target connection is free.
+        try {
+            $output = new \Symfony\Component\Console\Output\BufferedOutput();
+            Artisan::call('migrate', [
+                '--database' => $target,
+                '--force'    => true,
+            ], $output);
+            $migrated = true;
+        } catch (\Throwable $e) {
+            $migrationError = $e->getMessage();
+        }
+
+        // ── Step 3: Write .env (now safe — migrations already ran) ──
+        $env = file_get_contents($envPath);
+
+        // DB_CONNECTION
+        $env = preg_replace('/^DB_CONNECTION=.*/m', "DB_CONNECTION={$target}", $env);
+
+        if ($target === 'sqlite') {
+            // Point DB_DATABASE to the SQLite file
+            $env = preg_replace(
+                '/^DB_DATABASE=.*/m',
+                'DB_DATABASE=' . addslashes($sqliteFile),
+                $env
+            );
+            // Ensure HOST/PORT/USERNAME/PASSWORD are set (needed for MySQL fallback)
+            if (!preg_match('/^DB_HOST=/m', $env))    $env .= "\nDB_HOST=127.0.0.1";
+            if (!preg_match('/^DB_PORT=/m', $env))    $env .= "\nDB_PORT=3306";
+            if (!preg_match('/^DB_USERNAME=/m', $env)) $env .= "\nDB_USERNAME=root";
+            if (!preg_match('/^DB_PASSWORD=/m', $env)) $env .= "\nDB_PASSWORD=";
+        } else {
+            // MySQL — restore DB_DATABASE to the MySQL database name
+            $env = preg_replace('/^DB_DATABASE=.*/m', "DB_DATABASE={$mysqlDb}", $env);
+            if (!preg_match('/^DB_HOST=/m', $env))    $env .= "\nDB_HOST=127.0.0.1";
+            if (!preg_match('/^DB_PORT=/m', $env))    $env .= "\nDB_PORT=3306";
+            if (!preg_match('/^DB_USERNAME=/m', $env)) $env .= "\nDB_USERNAME=root";
+            if (!preg_match('/^DB_PASSWORD=/m', $env)) $env .= "\nDB_PASSWORD=";
+        }
+
+        file_put_contents($envPath, $env);
+        Artisan::call('config:clear');
+
+        return response()->json([
+            'message'   => "تم التبديل إلى {$target}.",
+            'driver'    => $target,
+            'reachable' => true,
+            'migrated'  => $migrated,
+            'migration_error' => $migrationError,
+        ]);
+    }
 
     public function index(): JsonResponse
     {

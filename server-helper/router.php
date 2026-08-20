@@ -112,7 +112,18 @@ function server_health(): ?array {
 }
 
 function extensions_ok(): array {
-    $required = ['pdo_sqlite', 'mbstring', 'openssl', 'curl', 'fileinfo', 'zip'];
+    // Read DB_CONNECTION from .env to pick the right driver extension
+    $envFile = dirname(__DIR__) . DIRECTORY_SEPARATOR . '.env';
+    $driver = 'sqlite'; // default
+    if (is_file($envFile)) {
+        $envContent = @file_get_contents($envFile) ?: '';
+        if (preg_match('/^DB_CONNECTION=(.+)$/m', $envContent, $m)) {
+            $driver = strtolower(trim($m[1]));
+        }
+    }
+    $required = $driver === 'mysql'
+        ? ['pdo_mysql', 'mbstring', 'openssl', 'curl', 'fileinfo', 'zip']
+        : ['pdo_sqlite', 'mbstring', 'openssl', 'curl', 'fileinfo', 'zip'];
     $missing = array_values(array_filter($required, fn ($e) => !extension_loaded($e)));
     return [$missing, array_values(array_filter($required, fn ($e) => extension_loaded($e)))];
 }
@@ -278,16 +289,38 @@ function build_diagnostic(string $root): array {
         'fix'    => $envKeySet ? null : 'php artisan key:generate',
     ];
 
-    $dbFile  = $root . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'database.sqlite';
-    $dbExists = is_file($dbFile);
-    $dbWritable = $dbExists && is_writable($dbFile);
-    $checks[] = [
-        'id'     => 'database',
-        'name'   => 'قاعدة البيانات (sqlite)',
-        'ok'     => $dbExists && $dbWritable,
-        'detail' => $dbExists ? ('database/database.sqlite · ' . ($dbWritable ? 'قابلة للكتابة' : 'غير قابلة للكتابة')) : 'الملف غير موجود',
-        'fix'    => $dbExists && $dbWritable ? null : 'أنشئ database/database.sqlite (start-server.bat يفعل ذلك تلقائياً).',
-    ];
+    // Database check — driver-aware
+    $envFile2 = $root . DIRECTORY_SEPARATOR . '.env';
+    $dbDriver = 'sqlite';
+    if (is_file($envFile2)) {
+        $envC = @file_get_contents($envFile2) ?: '';
+        if (preg_match('/^DB_CONNECTION=(.+)$/m', $envC, $m2)) $dbDriver = strtolower(trim($m2[1]));
+    }
+    if ($dbDriver === 'mysql') {
+        $dbHost = '127.0.0.1'; $dbPort = 3306;
+        $dbOk = false; $dbDetail = '';
+        $fp = @fsockopen($dbHost, $dbPort, $errno, $errstr, 2.0);
+        if ($fp) { fclose($fp); $dbOk = true; $dbDetail = "MySQL/MariaDB متاح على $dbHost:$dbPort"; }
+        else { $dbDetail = "MySQL غير متاح على $dbHost:$dbPort — $errstr"; }
+        $checks[] = [
+            'id'     => 'database',
+            'name'   => 'قاعدة البيانات (MySQL)',
+            'ok'     => $dbOk,
+            'detail' => $dbDetail,
+            'fix'    => $dbOk ? null : 'تأكد أن MySQL يعمل (C:\\xampp\\mysql\\bin\\mysqld.exe).',
+        ];
+    } else {
+        $dbFile  = $root . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'database.sqlite';
+        $dbExists = is_file($dbFile);
+        $dbWritable = $dbExists && is_writable($dbFile);
+        $checks[] = [
+            'id'     => 'database',
+            'name'   => 'قاعدة البيانات (sqlite)',
+            'ok'     => $dbExists && $dbWritable,
+            'detail' => $dbExists ? ('database/database.sqlite · ' . ($dbWritable ? 'قابلة للكتابة' : 'غير قابلة للكتابة')) : 'الملف غير موجود',
+            'fix'    => $dbExists && $dbWritable ? null : 'أنشئ database/database.sqlite (start-server.bat يفعل ذلك تلقائياً).',
+        ];
+    }
 
     [$ran, $pending, $migErr] = migrations_status($root);
     $migOk = $migErr === null && $pending === 0;

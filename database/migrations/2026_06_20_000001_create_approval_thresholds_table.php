@@ -20,7 +20,7 @@ return new class extends Migration {
             $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete()->cascadeOnUpdate();
             $table->timestamps();
 
-            $table->index(['company_id', 'document_type_id', 'is_active']);
+            $table->index(['company_id', 'document_type_id', 'is_active'], 'at_compid_doctype_active_idx');
         });
     }
     public function down(): void {

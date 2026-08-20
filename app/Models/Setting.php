@@ -115,7 +115,17 @@ class Setting extends Model
             return false;
         }
 
-        $setting->value = $value;
+        if (is_null($value)) {
+            $setting->value = 'null';
+        } elseif (is_bool($value)) {
+            $setting->value = $value ? 'true' : 'false';
+        } elseif (is_array($value) || is_object($value)) {
+            $setting->value = json_encode($value, JSON_UNESCAPED_UNICODE);
+        } else {
+            $encoded = json_encode((string) $value);
+            $setting->value = $encoded !== false ? $encoded : 'null';
+        }
+
         $result = $setting->save();
 
         if ($result) {

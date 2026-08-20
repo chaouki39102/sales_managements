@@ -5,6 +5,8 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/admin';
+import { dbApi } from '@/lib/api/admin';
+import type { DbStatus } from '@/lib/api/admin';
 import PageHeader from '@/components/ui/PageHeader';
 import type { SystemSettings } from '@/types/admin';
 import { useNotification } from '@/hooks/useNotification';
@@ -142,6 +144,22 @@ export default function AdminSettingsPage() {
 
   const bootWilMut  = useMutation({ mutationFn: adminApi.bootWilayas,     onSuccess: () => notify.success('تم تثبيت الولايات والبلديات ✓') });
   const bootPermMut = useMutation({ mutationFn: adminApi.bootPermissions, onSuccess: () => notify.success('تم تثبيت الصلاحيات ✓') });
+
+  // ── Database Driver ──────────────────────────────────────────────────────────
+  const { data: dbStatus, isLoading: dbLoading } = useQuery<DbStatus>({
+    queryKey: ['admin', 'system', 'db-status'],
+    queryFn:  dbApi.status,
+    staleTime: 30_000,
+  });
+
+  const dbSwitchMut = useMutation({
+    mutationFn: (driver: string) => dbApi.switchTo(driver),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['admin', 'system', 'db-status'] });
+      notify.success(data.message ?? 'تم التبديل ✓');
+    },
+    onError: (e: any) => notify.error(e?.error ?? e?.message ?? 'فشل التبديل'),
+  });
 
   const setF = (key: keyof SystemSettings, value: any) =>
     setForm(f => f ? { ...f, [key]: value } : f);
@@ -375,6 +393,125 @@ export default function AdminSettingsPage() {
             الخطط والاشتراكات
           </button>
         </div>
+      </Section>
+
+      {/* قاعدة البيانات */}
+      <Section title="قاعدة البيانات" icon="ti-database" color="#0ea5e9">
+        {dbLoading ? (
+          <div style={{ padding: '14px 0', display: 'flex', alignItems: 'center', gap: 10, color: 'var(--t4)' }}>
+            <i className="ti ti-loader-2" style={{ fontSize: 18, animation: 'spin .8s linear infinite' }} />
+            جارٍ التحقق من حالة قاعدة البيانات...
+          </div>
+        ) : dbStatus ? (
+          <>
+            {/* Current Driver Card */}
+            <div style={{
+              padding: '14px 16px', borderRadius: 10, marginBottom: 14,
+              background: dbStatus.connected ? '#0ea5e910' : '#ef444410',
+              border: `1px solid ${dbStatus.connected ? '#0ea5e930' : '#ef444430'}`,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 9, display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', background: dbStatus.current_driver === 'mysql' ? '#f59e0b20' : '#8b5cf620',
+                  color: dbStatus.current_driver === 'mysql' ? '#f59e0b' : '#8b5cf6', fontSize: 18,
+                }}>
+                  <i className={`ti ${dbStatus.current_driver === 'mysql' ? 'ti-server' : 'ti-file-code'}`} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>
+                    {dbStatus.current_driver === 'mysql' ? 'MySQL / MariaDB' : 'SQLite'}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--t4)' }}>
+                   DRIVER = {dbStatus.current_driver}
+                  </div>
+                </div>
+                <div style={{
+                  marginRight: 'auto', padding: '4px 10px', borderRadius: 6,
+                  background: dbStatus.connected ? '#10b98120' : '#ef444420',
+                  color: dbStatus.connected ? 'var(--green)' : 'var(--red)',
+                  fontSize: 11, fontWeight: 700,
+                }}>
+                  {dbStatus.connected ? 'متصلة ✓' : 'غير متصلة ✗'}
+                </div>
+              </div>
+
+              {/* Connection details */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px', fontSize: 12, color: 'var(--t3)' }}>
+                {dbStatus.current_driver === 'mysql' ? (
+                  <>
+                    <span><i className="ti ti-server" style={{ marginInlineEnd: 4 }} />{dbStatus.server ?? 'غير معروف'}</span>
+                    <span><i className="ti ti-link" style={{ marginInlineEnd: 4 }} />{dbStatus.host}</span>
+                    <span><i className="ti ti-database" style={{ marginInlineEnd: 4 }} />{dbStatus.database}</span>
+                  </>
+                ) : (
+                  <>
+                    <span><i className="ti ti-file" style={{ marginInlineEnd: 4 }} />{dbStatus.path}</span>
+                    {dbStatus.size && <span><i className="ti ti-scale" style={{ marginInlineEnd: 4 }} />{dbStatus.size}</span>}
+                    <span>
+                      <i className={`ti ${dbStatus.writable ? 'ti-check' : 'ti-x'}`} style={{ marginInlineEnd: 4, color: dbStatus.writable ? 'var(--green)' : 'var(--red)' }} />
+                      {dbStatus.writable ? 'قابلة للكتابة' : 'غير قابلة للكتابة'}
+                    </span>
+                  </>
+                )}
+                {dbStatus.pending_migrations >= 0 && (
+                  <span style={{ color: dbStatus.pending_migrations > 0 ? '#f59e0b' : undefined }}>
+                    <i className="ti ti-git-branch" style={{ marginInlineEnd: 4 }} />
+                    {dbStatus.pending_migrations > 0 ? `${dbStatus.pending_migrations} ترحيل معلّق` : 'ترحيلات مطبّقة'}
+                  </span>
+                )}
+              </div>
+              {dbStatus.error && (
+                <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 6, background: '#ef444415', color: 'var(--red)', fontSize: 11.5 }}>
+                  {dbStatus.error}
+                </div>
+              )}
+            </div>
+
+            {/* Switch Buttons */}
+            <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 10 }}>
+              التبديل يُغيّر ملف .env ويُنظّف الكاش — أعد تشغيل الخادم بعد التبديل.
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <button
+                disabled={dbSwitchMut.isPending || dbStatus.current_driver === 'sqlite'}
+                onClick={() => dbSwitchMut.mutate('sqlite')}
+                style={{
+                  padding: '12px 14px', borderRadius: 9, border: 'none', cursor: 'pointer',
+                  background: dbStatus.current_driver === 'sqlite' ? '#8b5cf615' : '#8b5cf610',
+                  opacity: dbStatus.current_driver === 'sqlite' ? 0.5 : 1,
+                  color: '#8b5cf6', fontSize: 12, fontWeight: 700,
+                  fontFamily: 'Tajawal,sans-serif', display: 'flex', alignItems: 'center', gap: 8,
+                  justifyContent: 'center', transition: 'all .2s',
+                }}>
+                {dbSwitchMut.isPending && dbSwitchMut.variables === 'sqlite'
+                  ? <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} />
+                  : <i className="ti ti-file-code" />}
+                SQLite
+                {dbStatus.current_driver === 'sqlite' && <span style={{ fontSize: 10, opacity: 0.7 }}>(الحالية)</span>}
+              </button>
+              <button
+                disabled={dbSwitchMut.isPending || dbStatus.current_driver === 'mysql'}
+                onClick={() => dbSwitchMut.mutate('mysql')}
+                style={{
+                  padding: '12px 14px', borderRadius: 9, border: 'none', cursor: 'pointer',
+                  background: dbStatus.current_driver === 'mysql' ? '#f59e0b15' : '#f59e0b10',
+                  opacity: dbStatus.current_driver === 'mysql' ? 0.5 : 1,
+                  color: '#f59e0b', fontSize: 12, fontWeight: 700,
+                  fontFamily: 'Tajawal,sans-serif', display: 'flex', alignItems: 'center', gap: 8,
+                  justifyContent: 'center', transition: 'all .2s',
+                }}>
+                {dbSwitchMut.isPending && dbSwitchMut.variables === 'mysql'
+                  ? <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} />
+                  : <i className="ti ti-server" />}
+                MySQL / MariaDB
+                {dbStatus.current_driver === 'mysql' && <span style={{ fontSize: 10, opacity: 0.7 }}>(الحالية)</span>}
+              </button>
+            </div>
+          </>
+        ) : (
+          <div style={{ padding: '14px 0', color: 'var(--t4)', fontSize: 12 }}>تعذّر جلب الحالة</div>
+        )}
       </Section>
 
 

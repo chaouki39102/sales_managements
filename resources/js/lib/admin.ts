@@ -18,6 +18,7 @@ import {
   maintenanceApi,
   systemBootApi,
   activityApi,
+  dbApi,
 } from './api/admin';
 
 // ─── Named re-exports ────────────────────────────────────────────────────────
@@ -32,6 +33,7 @@ export {
   maintenanceApi,
   systemBootApi,
   activityApi,
+  dbApi,
 };
 
 // ─── adminApi — wrapper بدون تكرار كود ───────────────────────────────────────
@@ -114,6 +116,10 @@ export const adminApi = {
   clearCache:         maintenanceApi.cache,
   runScheduler:       maintenanceApi.scheduler,
   exportBackup:       maintenanceApi.backup,
+
+  // Database
+  getDbStatus:  dbApi.status,
+  switchDb:     dbApi.switchTo,
 
   // Reports
   getReports: (period: '7d' | '30d' | '90d') =>

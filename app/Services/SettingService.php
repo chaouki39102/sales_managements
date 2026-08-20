@@ -324,15 +324,17 @@ class SettingService extends BaseService
      */
     private function prepareValueForStorage(mixed $value): string
     {
+        if (is_null($value)) {
+            return 'null';
+        }
         if (is_bool($value)) {
             return $value ? 'true' : 'false';
         }
-
         if (is_array($value) || is_object($value)) {
             return json_encode($value, JSON_UNESCAPED_UNICODE);
         }
-
-        return (string) $value;
+        $encoded = json_encode((string) $value);
+        return $encoded !== false ? $encoded : 'null';
     }
 
     /**

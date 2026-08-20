@@ -15,7 +15,7 @@ return new class extends Migration {
             $table->decimal('rate', 15, 8);
             $table->date('rate_date')->index();
             $table->timestamps();
-            $table->unique(['company_id', 'from_currency_id', 'to_currency_id', 'rate_date']);
+            $table->unique(['company_id', 'from_currency_id', 'to_currency_id', 'rate_date'], 'er_compid_from_to_date_uniq');
         });
         if (DB::getDriverName() !== 'sqlite') {
             DB::statement("ALTER TABLE exchange_rates COMMENT 'لتخزين أسعار صرف العملات اليومية'");

@@ -44,6 +44,10 @@ Route::prefix('v1/admin')
             Route::get('settings',  [AdminSystemSettingsController::class, 'index'])  ->name('settings');
             Route::put('settings',  [AdminSystemSettingsController::class, 'update']) ->name('settings.update');
 
+            // قاعدة البيانات — الطلب صيانة
+            Route::get('db-status',  [AdminSystemSettingsController::class, 'dbStatus'])  ->name('db.status');
+            Route::post('switch-db', [AdminSystemSettingsController::class, 'switchDb']) ->name('db.switch');
+
             // الصيانة
             Route::get('maintenance',              [AdminMaintenanceController::class, 'status'])     ->name('maintenance');
             Route::post('maintenance/enable',      [AdminMaintenanceController::class, 'enable'])     ->name('maintenance.enable');

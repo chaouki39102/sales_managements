@@ -244,16 +244,9 @@ class CompanyRoleService
         }
 
         if (!empty($rowsToInsert)) {
-            // Bulk insert: skip duplicates via INSERT OR IGNORE (SQLite) / IGNORE (MySQL)
-            $driver = DB::getDriverName();
-            if ($driver === 'sqlite') {
-                foreach (array_chunk($rowsToInsert, 500) as $chunk) {
-                    DB::table('role_has_permissions')->insertOrIgnore($chunk);
-                }
-            } else {
-                foreach (array_chunk($rowsToInsert, 500) as $chunk) {
-                    DB::table('role_has_permissions')->insert($chunk);
-                }
+            // Bulk insert: skip duplicates — insertOrIgnore works on both SQLite and MySQL
+            foreach (array_chunk($rowsToInsert, 500) as $chunk) {
+                DB::table('role_has_permissions')->insertOrIgnore($chunk);
             }
         }
     }

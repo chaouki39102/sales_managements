@@ -30,7 +30,7 @@ return new class extends Migration {
             $table->softDeletes();
 
             $table->unique(['company_id', 'code']);
-            $table->index(['company_id', 'treasury_account_type_id', 'active']);
+            $table->index(['company_id', 'treasury_account_type_id', 'active'], 'ta_compid_type_active_idx');
         });
     }
     public function down(): void {

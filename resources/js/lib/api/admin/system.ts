@@ -25,6 +25,32 @@ export const settingsApi = {
   update: (d: Partial<SystemSettings>)  => apiPut<SystemSettings>('/admin/system/settings', d),
 } as const;
 
+export interface DbStatus {
+  current_driver: string;
+  connected: boolean;
+  server?: string;
+  host?: string;
+  database?: string;
+  path?: string;
+  writable?: boolean;
+  size?: string;
+  error?: string;
+  pending_migrations: number;
+}
+
+export interface DbSwitchResult {
+  message: string;
+  driver: string;
+  reachable: boolean;
+  migrated: boolean;
+  migration_error?: string;
+}
+
+export const dbApi = {
+  status:  ()               => apiGet<DbStatus>('/admin/system/db-status'),
+  switchTo: (driver: string) => apiPost<DbSwitchResult>('/admin/system/switch-db', { driver }),
+} as const;
+
 export const maintenanceApi = {
   status:    ()              => apiGet<{ maintenance_mode: boolean; message?: string }>('/admin/system/maintenance'),
   enable:    (msg?: string)  => apiPost('/admin/system/maintenance/enable',   { message: msg }),

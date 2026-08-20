@@ -38,7 +38,7 @@ return new class extends Migration {
             $table->softDeletes();
 
             $table->index(['company_id', 'product_id', 'warehouse_id', 'movement_date'], 'stock_mov_prod_wh_date_idx');
-            $table->index(['company_id', 'movement_date', 'stock_movement_type_id']);
+            $table->index(['company_id', 'movement_date', 'stock_movement_type_id'], 'sm_compid_date_type_idx');
             $table->index(['company_id', 'warehouse_id', 'movement_date']);
             $table->index(['company_id', 'fiscal_year_id', 'movement_date']);
             $table->index('lot_number');

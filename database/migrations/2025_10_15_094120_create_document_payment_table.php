@@ -14,7 +14,7 @@ return new class extends Migration {
             $table->decimal('amount_applied', 15, 4)->comment('Amount of payment applied to this document');
             $table->text('notes')->nullable();
             $table->timestamps();
-            $table->index(['company_id', 'commercial_document_id', 'payment_id']);
+            $table->index(['company_id', 'commercial_document_id', 'payment_id'], 'dp_compid_doc_pmt_idx');
             $table->index('payment_id');
         });
     }

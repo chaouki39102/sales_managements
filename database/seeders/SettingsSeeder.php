@@ -28,13 +28,17 @@ class SettingsSeeder extends Seeder
      */
     private function toStorageValue(mixed $value): string
     {
+        if (is_null($value)) {
+            return 'null';
+        }
         if (is_bool($value)) {
             return $value ? 'true' : 'false';
         }
         if (is_array($value) || is_object($value)) {
             return json_encode($value, JSON_UNESCAPED_UNICODE);
         }
-        return (string) $value;
+        $encoded = json_encode((string) $value);
+        return $encoded !== false ? $encoded : 'null';
     }
 
     /**
@@ -874,7 +878,7 @@ class SettingsSeeder extends Seeder
         // (currencies معرفاتها تسلسلية عامة — بعد المؤسسة الأولى لا تكون 1 بالضرورة).
         $defaultCurrencyId = DB::table('currencies')
             ->where('company_id', $companyId)
-            ->orderBy('is_default', 'desc')
+            ->orderBy('is_base_currency', 'desc')
             ->orderBy('id')
             ->value('id');
         if ($defaultCurrencyId) {
