@@ -178,7 +178,9 @@ class AdminSystemSettingsController extends Controller
             $escapedSqlite = str_replace('\\', '\\\\', $sqliteFile);
             $this->setEnvLine($env, 'DB_DATABASE', $escapedSqlite);
         } else {
-            $this->setEnvLine($env, 'DB_DATABASE', $mysqlDb);
+            // MySQL uses its own MYSQL_DATABASE env var (not DB_DATABASE which is for SQLite)
+            $this->setEnvLine($env, 'MYSQL_DATABASE', $mysqlDb);
+            $this->appendEnvIfMissing($env, 'MYSQL_DATABASE', $mysqlDb);
         }
 
         // Ensure HOST/PORT/USERNAME/PASSWORD are set

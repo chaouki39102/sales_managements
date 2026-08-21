@@ -73,13 +73,16 @@ class SwitchDatabaseCommand extends Command
             $env = preg_replace('/^DB_CONNECTION=.*/m', "DB_CONNECTION={$driver}", $env);
         }
 
-        // Ensure DB_HOST/PORT/USERNAME/PASSWORD exist for MySQL targets (uncomment if commented)
+        // Set DB_DATABASE for the target driver
         if ($driver === 'mysql') {
             $this->setEnvLine($env, 'DB_HOST', '127.0.0.1');
             $this->setEnvLine($env, 'DB_PORT', '3306');
-            $this->setEnvLine($env, 'DB_DATABASE', 'sales_management');
+            $this->setEnvLine($env, 'MYSQL_DATABASE', 'sales_management');
             $this->setEnvLine($env, 'DB_USERNAME', 'root');
             $this->setEnvLine($env, 'DB_PASSWORD', '');
+        } elseif ($driver === 'sqlite') {
+            $sqliteFile = str_replace('\\', '\\\\', database_path('database.sqlite'));
+            $this->setEnvLine($env, 'DB_DATABASE', $sqliteFile);
         }
 
         file_put_contents($envPath, $env);
