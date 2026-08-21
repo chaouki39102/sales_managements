@@ -14,6 +14,8 @@ export interface SettingMeta {
   description?: string;
   groupKey?: string;
   dependsOn?: keyof PrintTemplate;
+  /** When set, the child is only visible when the parent's value equals this value. For toggle parents, falsy parent = hidden. For pills/select/slider parents, parent !== dependsOnValue = hidden. */
+  dependsOnValue?: unknown;
   options?: readonly { v: string; l: string }[];
   min?: number;
   max?: number;
@@ -289,7 +291,7 @@ export const SETTINGS_REGISTRY: Record<string, SettingMeta> = {
   // ── Barcode / QR ──
   show_barcode:         { key: 'show_barcode', label: 'Show Barcode', labelAr: 'إظهار الباركود', category: 'barcode', component: 'toggle', defaultValue: true, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'footer.barcode' },
   barcode_content:      { key: 'barcode_content', label: 'Barcode Content', labelAr: 'محتوى الباركود', category: 'barcode', component: 'pills', defaultValue: 'doc-number', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_barcode', options: [{ v: 'doc-number', l: 'رقم المستند' }, { v: 'total', l: 'المجموع' }, { v: 'custom', l: 'نص مخصص' }] },
-  barcode_custom_text:  { key: 'barcode_custom_text', label: 'Barcode Custom Text', labelAr: 'نص الباركود المخصص', category: 'barcode', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'barcode_content' },
+  barcode_custom_text:  { key: 'barcode_custom_text', label: 'Barcode Custom Text', labelAr: 'نص الباركود المخصص', category: 'barcode', component: 'input', defaultValue: '', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'barcode_content', dependsOnValue: 'custom' },
   show_qr:              { key: 'show_qr', label: 'Show QR Code', labelAr: 'إظهار رمز QR', category: 'qr', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS , field: 'footer.qr' },
   qr_content:           { key: 'qr_content', label: 'QR Content', labelAr: 'محتوى QR', category: 'qr', component: 'pills', defaultValue: 'doc-number', supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, dependsOn: 'show_qr', options: [{ v: 'doc-number', l: 'رقم المستند' }, { v: 'company-info', l: 'معلومات الشركة' }, { v: 'both', l: 'كلاهما' }] },
   show_qr_code:         { key: 'show_qr_code', label: 'Fiscal QR (E-Invoice)', labelAr: 'رمز QR الجبائي (فاتورة إلكترونية)', category: 'qr', component: 'toggle', defaultValue: false, supportedPapers: ALL_PAPERS, supportedDocs: ALL_DOCS, field: 'footer.qrCode', docDefaults: { FV: true } },
@@ -427,9 +429,15 @@ export function isSettingVisible(key: string, docType: DocTypeCode, paperSize: P
   if (!meta.supportedDocs.includes(docType)) return false;
   if (!meta.supportedPapers.includes(paperSize)) return false;
   if (tpl && meta.dependsOn) {
-    const parentMeta = SETTINGS_REGISTRY[meta.dependsOn];
     const parentVal = (tpl as any)[meta.dependsOn];
-    if (parentMeta?.component === 'toggle' && !parentVal) return false;
+    if (meta.dependsOnValue !== undefined) {
+      // pills / select / any: child visible only when parent equals dependsOnValue
+      if (parentVal !== meta.dependsOnValue) return false;
+    } else {
+      // toggle: child visible only when parent is truthy
+      const parentMeta = SETTINGS_REGISTRY[meta.dependsOn];
+      if (parentMeta?.component === 'toggle' && !parentVal) return false;
+    }
   }
   return true;
 }

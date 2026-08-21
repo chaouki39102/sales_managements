@@ -14,11 +14,15 @@ function makeTpl(doc: DocType, paper: PaperSize, overrides: Record<string, any> 
   );
 
   // Enable all toggle dependsOn parents so children are un-gated for doc/paper tests
+  // Also set non-toggle parents to their dependsOnValue so their children are visible
   for (const [_key, meta] of Object.entries(SETTINGS_REGISTRY)) {
     if (meta.dependsOn) {
       const parentMeta = SETTINGS_REGISTRY[meta.dependsOn];
       if (parentMeta && parentMeta.component === 'toggle') {
         base[meta.dependsOn] = true;
+      } else if (meta.dependsOnValue !== undefined) {
+        // pills/select: set parent to the dependsOnValue so child is visible
+        base[meta.dependsOn] = meta.dependsOnValue;
       }
     }
   }
@@ -109,10 +113,45 @@ describe('VisibilityEngine — Edge Cases', () => {
     expect(typeof result).toBe('boolean');
   });
 
-  it('barcode_custom_text should not be auto-gated by dependsOn', () => {
+  it('barcode_custom_text should be visible only when barcode_content is custom', () => {
     const tpl = makeTpl('FV', '80mm');
+    // dependsOnValue: 'custom' — only visible when parent equals 'custom'
+    tpl['barcode_content'] = 'custom';
+    expect(isSettingVisible('barcode_custom_text', 'FV', '80mm', tpl)).toBe(true);
+
     tpl['barcode_content'] = 'doc-number';
-    const visible = isSettingVisible('barcode_custom_text', 'FV', '80mm', tpl);
-    expect(visible).toBe(true);
+    expect(isSettingVisible('barcode_custom_text', 'FV', '80mm', tpl)).toBe(false);
+
+    tpl['barcode_content'] = 'default';
+    expect(isSettingVisible('barcode_custom_text', 'FV', '80mm', tpl)).toBe(false);
+  });
+});
+
+describe('VisibilityEngine — dependsOnValue Gating (non-toggle parents)', () => {
+  it('should hide children when non-toggle parent value does not match dependsOnValue', () => {
+    // Find all settings with dependsOnValue
+    const withDependsOnValue = Object.entries(SETTINGS_REGISTRY).filter(
+      ([, m]) => m.dependsOnValue !== undefined && m.dependsOn
+    );
+
+    for (const [childKey, childMeta] of withDependsOnValue) {
+      const tpl = makeTpl('FV', '80mm');
+      // Set parent to a value that does NOT match dependsOnValue
+      (tpl as any)[childMeta.dependsOn!] = '__wrong_value__';
+      expect(isSettingVisible(childKey, 'FV', '80mm', tpl)).toBe(false);
+    }
+  });
+
+  it('should show children when non-toggle parent value matches dependsOnValue', () => {
+    const withDependsOnValue = Object.entries(SETTINGS_REGISTRY).filter(
+      ([, m]) => m.dependsOnValue !== undefined && m.dependsOn
+    );
+
+    for (const [childKey, childMeta] of withDependsOnValue) {
+      const tpl = makeTpl('FV', '80mm');
+      // Set parent to the exact dependsOnValue
+      (tpl as any)[childMeta.dependsOn!] = childMeta.dependsOnValue;
+      expect(isSettingVisible(childKey, 'FV', '80mm', tpl)).toBe(true);
+    }
   });
 });
