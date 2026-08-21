@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Core\Http\Controllers\BaseApiController;
 use App\Models\PrintTemplate;
+use App\Services\CompanyContextService;
 use App\Services\TemplateLibraryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -131,10 +133,13 @@ class PrintTemplateController extends BaseApiController
     public function setDefault($company, int $id): JsonResponse
     {
         try {
-            $template = PrintTemplate::whereKey($id)->firstOrFail();
-            $template->is_default = true;
-            $template->save();
-            return $this->successResponse($template->fresh(), 'تم تعيين القالب الافتراضي');
+            $template = DB::transaction(function () use ($id) {
+                $tpl = PrintTemplate::whereKey($id)->firstOrFail();
+                $tpl->is_default = true;
+                $tpl->save();
+                return $tpl->fresh();
+            });
+            return $this->successResponse($template, 'تم تعيين القالب الافتراضي');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'setDefault');
         }
@@ -214,6 +219,15 @@ class PrintTemplateController extends BaseApiController
 
             if ($request->has('doc_type_code') && $request->input('doc_type_code')) {
                 $payload['doc_type_code'] = $request->input('doc_type_code');
+            }
+
+            $duplicate = PrintTemplate::where('name', $payload['name'] ?? null)
+                ->where('doc_type_code', $payload['doc_type_code'] ?? null)
+                ->where('company_id', CompanyContextService::get()?->id)
+                ->exists();
+
+            if ($duplicate) {
+                return $this->errorResponse('القالب مثبت بالفعل لهذه الشركة', 409);
             }
 
             $template = PrintTemplate::create($payload);
