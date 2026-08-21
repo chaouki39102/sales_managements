@@ -46,7 +46,13 @@ export function QuickNav({ controlsRef }: { controlsRef: React.RefObject<HTMLDiv
           key={s.id} type="button"
           onClick={() => {
             const el = controlsRef.current?.querySelector(`#${s.id}`);
-            el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            if (!el) return;
+            if (el.children.length <= 1) {
+              (el.querySelector('button') as HTMLButtonElement)?.click();
+            }
+            setTimeout(() => {
+              el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 50);
           }}
           style={{
             padding: '3px 8px', borderRadius: 5, fontSize: 11,
