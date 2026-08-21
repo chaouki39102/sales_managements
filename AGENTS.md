@@ -16,7 +16,7 @@
 - **Offline layer** (`lib/offline/`) sits on the SHARED `client` — its cache keys embed the full URL (slug included), so tenant isolation in the offline cache is automatic; never store cross-tenant keys. The **write queue** (`pendingOps` in IndexedDB) is now tenant-scoped too: every op carries `slug` (captured from the url's first segment at enqueue), and reads/counts/replay/clear filter by the ACTIVE slug via `useActiveSlug()`/`appActions.getActiveSlug()` — legacy rows without the field fall back to `opSlug(url)`, and tenant-less ops (empty slug) stay visible to every company.
 
 ## Date
-2026-08-20
+2026-08-21
 
 ### Phase 82 — MySQL Migration + DB Switch UI (Aug 20)
 
@@ -50,6 +50,10 @@
 - **`env('DB_DATABASE')` is NOT portable between drivers** — it holds the current driver's value. Always hardcode the MySQL database name and the SQLite file path independently; never derive one from `env()`.
 - **SQLite `DB_DATABASE`** must be the full path (`C:\...\database.sqlite`), not just `sales_management` — Laravel's SQLite config reads `env('DB_DATABASE', database_path('database.sqlite'))`, so a non-path value would try to open `sales_management` as a relative file.
 - **MySQL `settings.value`** has a `CHECK (json_valid(...))` constraint — every write path must JSON-encode values. The read side (`getTypedValue()`/`castValue()`) handles both JSON strings and raw values gracefully.
+- **CLI subprocess env inheritance**: when spawning `php artisan migrate` via `Symfony\Component\Process\Process`, the child inherits the parent's `putenv()` environment. Since phpdotenv won't override already-set env vars, the parent's old `DB_CONNECTION=sqlite` leaks into the subprocess even after writing `DB_CONNECTION=mysql` to `.env`. **Always pass `'DB_CONNECTION' => $driver` in the process env array** to force the correct driver.
+- **Atomic .env writes**: use temp-file-then-rename (`$envPath . '.tmp-' . getmypid()`) so a crash mid-write never corrupts the real `.env`. On Windows, `rename()` fails if the destination exists, so `unlink()` first, then `rename()`, with a direct-write fallback.
+- **`MYSQL_DATABASE` vs `DB_DATABASE`**: MySQL reads `env('MYSQL_DATABASE', 'sales_management')` (in `config/database.php`), NOT `env('DB_DATABASE')`. When switching TO MySQL, write `MYSQL_DATABASE=sales_management`; when switching TO SQLite, write `DB_DATABASE=<full-path>`. Never clear `DB_DATABASE` when switching to MySQL — it stays for backward compatibility.
+- **Auto-create MySQL DB**: both CLI and API create the database via raw PDO (`CREATE DATABASE IF NOT EXISTS`) before migration — the caller doesn't need to manually set up MySQL first.
 - **Runtime DB switching from the UI is NOT best practice** (data corruption risk, no connection pooling, transaction in-flight during switch). It was implemented at the user's request for the super admin dashboard only. A production deployment should use a server restart.
 - **Tests always use in-memory SQLite** (`phpunit.xml`: `DB_CONNECTION=sqlite`, `DB_DATABASE=:memory:`) — never touch the dev DB.
 - **MySQL index names** must be ≤ 64 characters — auto-generated composite names like `2025_10_15_094100_create_stock_movements_index_on_stock_product_warehouse_date` exceed this. Use short custom names.
@@ -72,9 +76,17 @@
 - `resources/js/pages/admin/AdminSettingsPage.tsx` — "قاعدة البيانات" section
 - `server-helper/router.php` — reads `DB_DRIVER` from .env
 
-**Verification**: `php -l` clean on all PHP files. `npx tsc --noEmit` clean. `npm run build` 0 errors, 235 precache entries. Full round-trip tested: MySQL → SQLite (migrated, health green, 127 migrations) → restart → SQLite → MySQL (migrated back, health green). Commit `79db044`, pushed to `origin/main`.
+**Phase 82 follow-up — CLI + API DB switch pro improvements (`a42f737`, Aug 21)**:
+- **Auto-create MySQL DB**: both CLI (`SwitchDatabaseCommand::createMysqlDatabase`) and API (`AdminSystemSettingsController::createMysqlDatabase`) create the MySQL database via raw PDO (`CREATE DATABASE IF NOT EXISTS ... utf8mb4_unicode_ci`) before attempting migration — no manual DB setup needed.
+- **Atomic .env write**: temp-file-then-rename (`$envPath . '.tmp-' . getmypid()`) prevents corruption if the process crashes mid-write; both CLI and API use this pattern.
+- **CLI subprocess env fix** (critical bug): `Artisan::call('migrate')` in the same process doesn't work because `config:clear` only clears the cache file — the running process still holds the OLD config in memory. Fixed by spawning a `Symfony\Component\Process\Process` subprocess. BUT phpdotenv won't override env vars already set via `putenv()`, so the parent's old `DB_CONNECTION=sqlite` leaked into the subprocess. Fixed by passing `'DB_CONNECTION' => $driver` in the subprocess env array.
+- **Post-switch verification**: API re-reads the written `.env` to confirm `DB_CONNECTION` and `MYSQL_DATABASE` are correct; CLI verifies the new connection via `DB::connection($driver)->getPdo()`.
+- **Arabic error messages**: MySQL not found → "تأكد من تشغيل MySQL/XAMPP"; SQLite not writable → "تأكد من وجود مجلد database/".
+- **MYSQL_DATABASE separation**: MySQL config reads `env('MYSQL_DATABASE', 'sales_management')`, NOT `env('DB_DATABASE')`. CLI/API now write `MYSQL_DATABASE` for MySQL targets, `DB_DATABASE` for SQLite targets.
 
-**Current state**: `.env` is set to `DB_CONNECTION=mysql` (the production/recommended driver). SQLite file (`database/database.sqlite`) is also fully migrated and can be switched to via the admin UI.
+**Verified**: full round-trip CLI: SQLite→MySQL (auto-create + 127 migrations) ✅ → SQLite (all green) ✅. API auto-create + migrate also green. Commit `a42f737`, pushed to `origin/main`.
+
+**Current state**: `.env` is set to `DB_CONNECTION=sqlite` (switched back after testing). SQLite file (`database/database.sqlite`) is fully migrated. MySQL DB `sales_management` also has 127 migrations.
 
 ### Phase 80 — B.5 Complete: Camera Stock-Take → Stock Adjustment (Aug 15)
 
