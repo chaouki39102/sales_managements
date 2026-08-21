@@ -468,7 +468,7 @@ export function useCommercialDocumentController({
     },
   });
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setApiErr('');
     if (isReadOnly) return;
     if (isEdit && !docNumber.trim()) {
@@ -487,7 +487,7 @@ export function useCommercialDocumentController({
         setApiErr('تجاوز حد الائتمان — يتطلب موافقة المدير');
         return;
       }
-      if (!window.confirm(`تجاوز حد الائتمان بـ ${fmtDZD(creditCheck.exceed_by)} دج — هل تريد المتابعة؟`)) return;
+      if (!await deleteConfirm.confirm(`تجاوز حد الائتمان بـ ${fmtDZD(creditCheck.exceed_by)} دج — هل تريد المتابعة؟`)) return;
     }
     if (validate()) saveMut.mutate();
   };

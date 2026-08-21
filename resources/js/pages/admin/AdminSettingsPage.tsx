@@ -10,6 +10,8 @@ import type { DbStatus } from '@/lib/api/admin';
 import PageHeader from '@/components/ui/PageHeader';
 import type { SystemSettings } from '@/types/admin';
 import { useNotification } from '@/hooks/useNotification';
+import { useConfirm } from '@/hooks/useConfirm';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { apiPost } from '@/lib/api/core/client';
 
 // ─── Toggle ───────────────────────────────────────────────────────────────────
@@ -91,6 +93,7 @@ function NumField({ label, desc, value, onChange, min = 0 }: {
 export default function AdminSettingsPage() {
   const qc = useQueryClient();
   const notify = useNotification();
+  const { confirm, confirmDialogProps } = useConfirm();
   const [form, setForm]   = useState<SystemSettings | null>(null);
 
   // ── Queries ────────────────────────────────────────────────────────────────
@@ -158,8 +161,8 @@ export default function AdminSettingsPage() {
       qc.invalidateQueries({ queryKey: ['admin', 'system', 'db-status'] });
       notify.success(data.message ?? 'تم التبديل ✓');
       // Prompt for server restart after a short delay
-      setTimeout(() => {
-        if (window.confirm('تم تبديل قاعدة البيانات. هل تريد إعادة تشغيل الخادم الآن؟')) {
+      setTimeout(async () => {
+        if (await confirm('تم تبديل قاعدة البيانات. هل تريد إعادة تشغيل الخادم الآن؟')) {
           window.location.href = '/status';
         }
       }, 1500);
@@ -485,8 +488,8 @@ export default function AdminSettingsPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <button
                 disabled={dbSwitchMut.isPending || dbStatus.current_driver === 'sqlite'}
-                onClick={() => {
-                  if (!window.confirm('هل تريد التبديل إلى SQLite؟\nسيتم تغيير ملف .env وإيقاف الخادم مؤقتاً.')) return;
+                onClick={async () => {
+                  if (!await confirm('هل تريد التبديل إلى SQLite؟\nسيتم تغيير ملف .env وإيقاف الخادم مؤقتاً.')) return;
                   dbSwitchMut.mutate('sqlite');
                 }}
                 style={{
@@ -505,8 +508,8 @@ export default function AdminSettingsPage() {
               </button>
               <button
                 disabled={dbSwitchMut.isPending || dbStatus.current_driver === 'mysql'}
-                onClick={() => {
-                  if (!window.confirm('هل تريد التبديل إلى MySQL / MariaDB؟\nسيتم تغيير ملف .env وإيقاف الخادم مؤقتاً.')) return;
+                onClick={async () => {
+                  if (!await confirm('هل تريد التبديل إلى MySQL / MariaDB؟\nسيتم تغيير ملف .env وإيقاف الخادم مؤقتاً.')) return;
                   dbSwitchMut.mutate('mysql');
                 }}
                 style={{
@@ -530,7 +533,7 @@ export default function AdminSettingsPage() {
         )}
       </Section>
 
-
+      <ConfirmDialog {...confirmDialogProps} />
     </div>
   );
 }
