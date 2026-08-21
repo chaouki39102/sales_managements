@@ -127,6 +127,27 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [chartMode, setChartMode] = useState<'weekly' | 'monthly'>('weekly');
   const company = useActiveCompany();
+
+  // تأجيل تحميل الصفحات الأكثر استخداماً أثناء الخمول
+  // يُحمِّل chunks الصفحات الشائعة في الخلفية عند تحميل لوحة التحكم
+  React.useEffect(() => {
+    if (!('requestIdleCallback' in window)) return;
+    const tasks = [
+      () => import('@/pages/pos/POSPage'),
+      () => import('@/pos-pro/POSProPage'),
+      () => import('@/pages/documents/CommercialDocumentsPage'),
+      () => import('@/pages/products/ProductsPage'),
+    ];
+    let i = 0;
+    const scheduleNext = () => {
+      if (i >= tasks.length) return;
+      (window as any).requestIdleCallback(() => {
+        tasks[i++]().catch(() => {});
+        scheduleNext();
+      }, { timeout: 5000 });
+    };
+    scheduleNext();
+  }, []);
   const slug = company?.slug ?? '';
   const [linkCopied, setLinkCopied] = useState(false);
 

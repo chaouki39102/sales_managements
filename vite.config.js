@@ -208,6 +208,29 @@ export default defineConfig({
     },
     build: {
         chunkSizeWarningLimit: 1100,
+        rollupOptions: {
+            output: {
+                manualChunks(id) {
+                    if (id.includes('node_modules')) {
+                        if (id.includes('react-dom') || id.includes('react-dom/client')) {
+                            return 'vendor-react-dom';
+                        }
+                        if (id.includes('/react/') || id.includes('/react/jsx')) {
+                            return 'vendor-react';
+                        }
+                        if (id.includes('react-router') || id.includes('history')) {
+                            return 'vendor-router';
+                        }
+                        if (id.includes('immer')) {
+                            return 'vendor-immer';
+                        }
+                        if (id.includes('axios')) {
+                            return 'vendor-axios';
+                        }
+                    }
+                },
+            },
+        },
     },
     server: {
         port: 5173,

@@ -54,6 +54,8 @@ export function GlobalDocumentFAB() {
   });
   const wrapperRef = useRef<HTMLDivElement>(null);
 
+  const lastTypeCode = useMemo(() => loadLastTypeCode(slug), [slug]);
+
   const { data: documentTypes = [] } = useQuery<DocumentType[]>({
     queryKey: [slug, 'document-types-all'],
     queryFn: () =>
@@ -61,11 +63,9 @@ export function GlobalDocumentFAB() {
         const list = Array.isArray(res) ? (res as DocumentType[]) : ((res as Record<string, unknown>).data as DocumentType[]) ?? [];
         return list;
       }),
-    enabled: !!slug,
+    enabled: !!slug && (menuOpen || !lastTypeCode),
     staleTime: 10 * 60_000,
   });
-
-  const lastTypeCode = useMemo(() => loadLastTypeCode(slug), [slug]);
   const lastType = useMemo(
     () => documentTypes.find((t) => t.code === lastTypeCode) ?? null,
     [documentTypes, lastTypeCode],

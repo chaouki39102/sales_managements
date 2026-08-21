@@ -32,8 +32,8 @@ export function useAlerts() {
       return apiGet<AlertsResponse>('/alerts/unread');
     },
     enabled: !!slug,
-    refetchInterval: 60_000,
-    staleTime: 30_000,
+    refetchInterval: 120_000,
+    staleTime: 60_000,
   });
 
   const markAsRead = useMutation({
