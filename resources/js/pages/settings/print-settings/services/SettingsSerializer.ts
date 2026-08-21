@@ -23,18 +23,36 @@ export interface ApiResponse {
 }
 
 /**
+ * Check if a value is JSON-serializable.
+ * Functions, Symbols, undefined, DOM nodes, and circular refs are not.
+ */
+function isSerializable(val: unknown): boolean {
+  if (val === undefined || typeof val === 'function' || typeof val === 'symbol') return false;
+  if (val === null || typeof val !== 'object') return true;
+  try { JSON.stringify(val); return true; } catch { return false; }
+}
+
+/**
  * Build API payload from a template.
  *
  * All settings keys from the input are collected into config.
  * Top-level fields (name, doc_type_code, etc.) are sent at the top level.
  * The ENTIRE config is always sent — the DB must be the complete source of truth.
+ *
+ * Non-serializable values (functions, circular refs, DOM nodes) are skipped
+ * with a console warning to prevent silent save failures.
  */
 export function toApiPayload(tpl: Partial<PrintTemplate>): Record<string, unknown> {
   const t = tpl as Record<string, unknown>;
   const config: Record<string, unknown> = {};
   for (const key of Object.keys(t)) {
     if (!TOP_LEVEL_KEYS.has(key)) {
-      config[key] = t[key];
+      const val = t[key];
+      if (isSerializable(val)) {
+        config[key] = val;
+      } else {
+        console.warn(`[SettingsSerializer] Skipping non-serializable config key "${key}"`);
+      }
     }
   }
   delete config.template_version;

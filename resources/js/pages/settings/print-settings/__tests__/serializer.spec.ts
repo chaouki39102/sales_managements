@@ -3,6 +3,17 @@ import { toApiPayload, fromApiResponse, TEMPLATE_VERSION } from '../services/Set
 import { SETTINGS_REGISTRY } from '../services/SettingsRegistry';
 import { createMockTemplate } from './fixtures/templates';
 
+/** Known top-level fields that go in the DB columns (NOT inside config). */
+const KNOWN_TOP_LEVEL = new Set([
+  'id', 'name', 'doc_type_code', 'paper_size', 'is_default', 'is_active',
+  'template_version', 'created_at', 'updated_at',
+]);
+
+/** Keys that toApiPayload actually writes to the top-level output. */
+const WRITABLE_TOP_LEVEL = new Set([
+  'name', 'doc_type_code', 'paper_size', 'is_default', 'is_active', 'template_version',
+]);
+
 describe('SettingsSerializer — toApiPayload', () => {
   it('should strip top-level fields into config', () => {
     const tpl = createMockTemplate({}, 'FV', '80mm');
@@ -41,6 +52,24 @@ describe('SettingsSerializer — toApiPayload', () => {
     expect(payload.name).toBe('Test');
     expect(payload.doc_type_code).toBe('POS');
     expect(payload.paper_size).toBe('80mm');
+  });
+
+  it('should skip non-serializable config values (functions, circular refs)', () => {
+    const fn = () => {};
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+
+    const tpl = createMockTemplate({
+      show_logo: fn as any,
+      title_text: circular as any,
+    }, 'FV', 'A4');
+
+    const payload = toApiPayload(tpl);
+    const config = payload.config as Record<string, unknown>;
+
+    expect(config).not.toHaveProperty('show_logo');
+    expect(config).not.toHaveProperty('title_text');
+    expect(config.margin_top).toBe(3);
   });
 });
 
@@ -215,5 +244,27 @@ describe('SettingsSerializer — Round-trip Symmetry', () => {
       config: {},
     } as any);
     expect(result.template_version).toBe(TEMPLATE_VERSION);
+  });
+});
+
+describe('SettingsSerializer — TOP_LEVEL_KEYS Drift Guard', () => {
+  it('toApiPayload must include all writable top-level keys in its output', () => {
+    const tpl = createMockTemplate({}, 'FV', 'A4');
+    const payload = toApiPayload(tpl);
+    const outputTopKeys = new Set(Object.keys(payload));
+
+    for (const key of WRITABLE_TOP_LEVEL) {
+      expect(outputTopKeys.has(key)).toBe(true);
+    }
+  });
+
+  it('toApiPayload config must NOT contain any known top-level key', () => {
+    const tpl = createMockTemplate({}, 'FV', 'A4');
+    const payload = toApiPayload(tpl);
+    const config = payload.config as Record<string, unknown>;
+
+    for (const key of KNOWN_TOP_LEVEL) {
+      expect(config).not.toHaveProperty(key);
+    }
   });
 });
