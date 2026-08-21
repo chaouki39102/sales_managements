@@ -154,4 +154,27 @@ describe('VisibilityEngine — dependsOnValue Gating (non-toggle parents)', () =
       expect(isSettingVisible(childKey, 'FV', '80mm', tpl)).toBe(true);
     }
   });
+
+  it('should handle 3-level chain: toggle OFF hides grandchild even when direct parent matches', () => {
+    // Chain: show_barcode (toggle) → barcode_content (pills) → barcode_custom_text (input, dependsOnValue: 'custom')
+    const tpl = makeTpl('FV', '80mm');
+
+    // Root toggle OFF → barcode_content hidden
+    tpl.show_barcode = false;
+    expect(isSettingVisible('barcode_content', 'FV', '80mm', tpl)).toBe(false);
+
+    // Even if we force-set barcode_content = 'custom', barcode_custom_text is still hidden
+    // because its ancestor show_barcode is OFF
+    (tpl as any).barcode_content = 'custom';
+    expect(isSettingVisible('barcode_custom_text', 'FV', '80mm', tpl)).toBe(false);
+
+    // Now turn root ON → barcode_content visible (value='custom') → barcode_custom_text visible
+    tpl.show_barcode = true;
+    expect(isSettingVisible('barcode_content', 'FV', '80mm', tpl)).toBe(true);
+    expect(isSettingVisible('barcode_custom_text', 'FV', '80mm', tpl)).toBe(true);
+
+    // Root ON but barcode_content ≠ 'custom' → barcode_custom_text hidden
+    (tpl as any).barcode_content = 'doc-number';
+    expect(isSettingVisible('barcode_custom_text', 'FV', '80mm', tpl)).toBe(false);
+  });
 });

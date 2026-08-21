@@ -428,16 +428,22 @@ export function isSettingVisible(key: string, docType: DocTypeCode, paperSize: P
   if (!meta) return true;
   if (!meta.supportedDocs.includes(docType)) return false;
   if (!meta.supportedPapers.includes(paperSize)) return false;
-  if (tpl && meta.dependsOn) {
-    const parentVal = (tpl as any)[meta.dependsOn];
-    if (meta.dependsOnValue !== undefined) {
-      // pills / select / any: child visible only when parent equals dependsOnValue
-      if (parentVal !== meta.dependsOnValue) return false;
+
+  // Walk the dependsOn chain — a setting is only visible when ALL ancestors are satisfied
+  let currentKey: string | undefined = key;
+  while (currentKey && tpl) {
+    const currentMeta: SettingMeta | undefined = SETTINGS_REGISTRY[currentKey];
+    if (!currentMeta?.dependsOn) break;
+
+    const parentVal = (tpl as any)[currentMeta.dependsOn];
+    if (currentMeta.dependsOnValue !== undefined) {
+      if (parentVal !== currentMeta.dependsOnValue) return false;
     } else {
-      // toggle: child visible only when parent is truthy
-      const parentMeta = SETTINGS_REGISTRY[meta.dependsOn];
+      const parentMeta = SETTINGS_REGISTRY[currentMeta.dependsOn];
       if (parentMeta?.component === 'toggle' && !parentVal) return false;
     }
+    currentKey = currentMeta.dependsOn;
   }
+
   return true;
 }
