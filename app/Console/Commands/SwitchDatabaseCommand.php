@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
+use Symfony\Component\Process\Process;
 
 /**
  * Switch the active database driver without manually editing .env.
@@ -59,7 +60,43 @@ class SwitchDatabaseCommand extends Command
             return 1;
         }
 
-        // Backup before write
+        // ── Ensure target DB exists ──
+        if ($driver === 'mysql') {
+            $mysqlDb = 'sales_management';
+            try {
+                \Illuminate\Support\Facades\DB::connection('mysql')->getPdo();
+                $this->line("  MySQL database '{$mysqlDb}' exists.");
+            } catch (\Throwable $e) {
+                if (str_contains($e->getMessage(), 'Unknown database') || str_contains($e->getMessage(), '1049')) {
+                    $this->line("  MySQL database '{$mysqlDb}' not found — creating...");
+                    if ($this->createMysqlDatabase($mysqlDb)) {
+                        $this->info("  Created database '{$mysqlDb}'.");
+                    } else {
+                        $this->error("  Failed to create database '{$mysqlDb}'.");
+                        $this->error("  Make sure MySQL is running and root user has CREATE DATABASE privilege.");
+                        return 1;
+                    }
+                } else {
+                    $this->error("  MySQL connection failed: {$e->getMessage()}");
+                    $this->error("  Make sure MySQL is running on "
+                        . config('database.connections.mysql.host') . ':'
+                        . config('database.connections.mysql.port'));
+                    return 1;
+                }
+            }
+        } elseif ($driver === 'sqlite') {
+            $sqliteFile = database_path('database.sqlite');
+            if (! file_exists($sqliteFile)) {
+                $dir = dirname($sqliteFile);
+                if (! is_dir($dir)) {
+                    mkdir($dir, 0755, true);
+                }
+                file_put_contents($sqliteFile, '');
+                $this->line("  Created {$sqliteFile}");
+            }
+        }
+
+        // ── Backup + write .env atomically ──
         $backupPath = $envPath . '.bak-' . date('Ymd-His');
         @copy($envPath, $backupPath);
         $this->line("  Backup saved: {$backupPath}");
@@ -85,44 +122,74 @@ class SwitchDatabaseCommand extends Command
             $this->setEnvLine($env, 'DB_DATABASE', $sqliteFile);
         }
 
-        file_put_contents($envPath, $env);
+        // Atomic write: temp → rename
+        $tmpPath = $envPath . '.tmp-' . getmypid();
+        $written = @file_put_contents($tmpPath, $env);
+        if ($written === false) {
+            $this->error("  Failed to write temp file {$tmpPath}");
+            @unlink($tmpPath);
+            return 1;
+        }
+        if (file_exists($envPath)) {
+            @unlink($envPath);
+        }
+        if (! @rename($tmpPath, $envPath)) {
+            @file_put_contents($envPath, $env);
+            @unlink($tmpPath);
+        }
 
-        // Clear config cache so the new driver is picked up
         Artisan::call('config:clear', [], $this->getOutput());
 
         $this->newLine();
         $this->info("Switched: [{$current}] → [{$driver}]");
         $this->line("  Config cache cleared.");
 
-        // Optionally run fresh migrations + seed
+        // ── Auto-migrate via subprocess ──
+        // Must run in a subprocess because in-process Artisan::call('config:clear')
+        // only clears the cache file — the running process still holds the OLD config.
+        $this->newLine();
+        $this->line("  Migrating [{$driver}]...");
+
+        $phpBinary = PHP_BINARY;
+        $artisanPath = base_path('artisan');
+
         if ($this->option('fresh')) {
-            $this->newLine();
-            $this->warn("Running migrate:fresh --seed on [{$driver}]...");
-
-            if ($driver === 'sqlite') {
-                // Ensure the SQLite file exists
-                $dbPath = config('database.connections.sqlite.database');
-                if ($dbPath && $dbPath !== ':memory:' && ! file_exists($dbPath)) {
-                    touch($dbPath);
-                    $this->line("  Created {$dbPath}");
-                }
-            }
-
-            $exitCode = Artisan::call('migrate:fresh', ['--seed' => true, '--force' => true], $this->getOutput());
-            if ($exitCode !== 0) {
-                $this->error('migrate:fresh failed. Check the output above.');
-                return $exitCode;
-            }
+            $this->warn("  Running migrate:fresh --seed...");
+            $cmd = [$phpBinary, $artisanPath, 'migrate:fresh', '--seed', '--force'];
         } else {
-            $this->newLine();
-            $this->line("  Next steps:");
-            if ($driver === 'sqlite') {
-                $this->line("    php artisan migrate:fresh --seed");
-            } else {
-                $this->line("    php artisan migrate:fresh --seed");
-            }
-            $this->line("  Or re-run with --fresh to do it automatically:");
-            $this->line("    php artisan db:use {$driver} --fresh");
+            $this->line("  Running migrate...");
+            $cmd = [$phpBinary, $artisanPath, 'migrate', '--force'];
+        }
+
+        // Inherit the parent's env but FORCE DB_CONNECTION to the target driver.
+        // phpdotenv won't override env vars already set via putenv(), so the
+        // parent's old DB_CONNECTION=sqlite would leak into the subprocess.
+        $env = array_merge(getenv(), [
+            'DB_CONNECTION' => $driver,
+        ]);
+
+        $process = new Process($cmd, null, $env);
+        $process->setTimeout(null);
+        $process->run(function ($type, $output) {
+            $this->line('  ' . trim($output));
+        });
+
+        if ($process->getExitCode() !== 0) {
+            $this->error("  Migration failed (exit {$process->getExitCode()}): {$process->getErrorOutput()}");
+            $this->error("  The .env is set to [{$driver}] but tables may be missing.");
+            $this->error("  Run: php artisan db:use {$driver} --fresh");
+            return $process->getExitCode();
+        }
+
+        $this->newLine();
+        $this->info("  Done. [{$driver}] is ready.");
+
+        // Verify the new connection works
+        try {
+            \Illuminate\Support\Facades\DB::connection($driver)->getPdo();
+            $this->info("  Connection verified.");
+        } catch (\Throwable $e) {
+            $this->warn("  Warning: could not verify connection: {$e->getMessage()}");
         }
 
         return 0;
@@ -139,6 +206,32 @@ class SwitchDatabaseCommand extends Command
             $env = preg_replace('/^#[ \t]*' . preg_quote($key, '/') . '=.*/m', "{$key}={$value}", $env);
         } else {
             $env .= "\n{$key}={$value}";
+        }
+    }
+
+    /**
+     * Create a MySQL database via raw PDO.
+     */
+    private function createMysqlDatabase(string $dbName): bool
+    {
+        try {
+            $host = config('database.connections.mysql.host', '127.0.0.1');
+            $port = config('database.connections.mysql.port', '3306');
+            $user = config('database.connections.mysql.username', 'root');
+            $pass = config('database.connections.mysql.password', '');
+
+            $pdo = new \PDO("mysql:host={$host};port={$port}", $user, $pass, [
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+            ]);
+
+            $dbNameEscaped = preg_replace('/[^a-zA-Z0-9_]/', '', $dbName);
+            $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbNameEscaped}` "
+                . "CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+
+            $pdo = null;
+            return true;
+        } catch (\Throwable) {
+            return false;
         }
     }
 

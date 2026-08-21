@@ -89,8 +89,9 @@ class AdminSystemSettingsController extends Controller
     //   1. Validate + decide .env values BEFORE writing
     //   2. Ensure target DB file/connection exists + run migrations
     //      (current request is still on the OLD driver, so auth works)
-    //   3. Write .env + clear config cache
-    //   4. Return — NEXT request boots with the new driver and finds
+    //   3. Atomic .env write (temp file → rename) + clear config cache
+    //   4. Post-switch verification — re-read .env + connect new driver
+    //   5. Return — NEXT request boots with the new driver and finds
     //      the tables we just migrated
     // ══════════════════════════════════════════════════════════
     public function switchDb(Request $request): JsonResponse
@@ -111,7 +112,7 @@ class AdminSystemSettingsController extends Controller
             return response()->json(['error' => 'ملف .env غير موجود.'], 500);
         }
 
-        // ── Step 1: Compute the DB_DATABASE value for the target driver ──
+        // ── Step 1: Compute target driver values ──
         // We MUST hardcode these because env('DB_DATABASE') returns the CURRENT driver's value
         // (SQLite path when on SQLite, MySQL name when on MySQL) — not the target's value.
         $sqliteFile = database_path('database.sqlite');
@@ -120,20 +121,49 @@ class AdminSystemSettingsController extends Controller
         // ── Step 2: Ensure target is reachable + migrate (while OLD driver is active) ──
         $reachable      = false;
         $reachableError = null;
+        $dbCreated      = false;
         $migrated       = false;
         $migrationError = null;
+        $migrationsRan  = '';
 
         try {
             if ($target === 'mysql') {
-                DB::connection('mysql')->getPdo();
-                $reachable = true;
+                // Try connecting — if the DB doesn't exist, auto-create it
+                try {
+                    DB::connection('mysql')->getPdo();
+                    $reachable = true;
+                } catch (\Throwable $e) {
+                    $msg = $e->getMessage();
+                    // MySQL error 1049 = Unknown database, error 2005 = Unknown server
+                    if (str_contains($msg, 'Unknown database') || str_contains($msg, '1049')) {
+                        $dbCreated = $this->createMysqlDatabase($mysqlDb);
+                        if ($dbCreated) {
+                            DB::connection('mysql')->getPdo();
+                            $reachable = true;
+                        } else {
+                            $reachableError = "فشل إنشاء قاعدة البيانات '{$mysqlDb}'. تأكد من أن MySQL يعمل والمستخدم root具有 صلاحية CREATE DATABASE.";
+                        }
+                    } else {
+                        $reachableError = "فشل الاتصال بـ MySQL: {$msg}\nتأكد من أن MySQL يعمل على "
+                            . config('database.connections.mysql.host') . ':'
+                            . config('database.connections.mysql.port');
+                    }
+                }
             } else {
                 // Ensure the SQLite file exists
                 if (!is_file($sqliteFile)) {
+                    $dir = dirname($sqliteFile);
+                    if (!is_dir($dir)) {
+                        mkdir($dir, 0755, true);
+                    }
                     file_put_contents($sqliteFile, '');
                 }
-                DB::connection('sqlite')->getPdo();
-                $reachable = true;
+                if (!is_writable($sqliteFile)) {
+                    $reachableError = "ملف SQLite غير قابل للكتابة: {$sqliteFile}";
+                } else {
+                    DB::connection('sqlite')->getPdo();
+                    $reachable = true;
+                }
             }
         } catch (\Throwable $e) {
             $reachableError = $e->getMessage();
@@ -141,8 +171,11 @@ class AdminSystemSettingsController extends Controller
 
         if (!$reachable) {
             return response()->json([
-                'error'  => "الاتصال بـ {$target} فشل.",
-                'detail' => $reachableError,
+                'error'   => "الاتصال بـ {$target} فشل.",
+                'detail'  => $reachableError,
+                'hint'    => $target === 'mysql'
+                    ? 'تأكد من تشغيل MySQL/XAMPP ثم أعد المحاولة.'
+                    : 'تأكد من وجود مجلد database/ والملف قابل للكتابة.',
             ], 500);
         }
 
@@ -155,11 +188,12 @@ class AdminSystemSettingsController extends Controller
                 '--force'    => true,
             ], $output);
             $migrated = true;
+            $migrationsRan = $output->fetch();
         } catch (\Throwable $e) {
             $migrationError = $e->getMessage();
         }
 
-        // ── Step 3: Write .env (now safe — migrations already ran) ──
+        // ── Step 3: Atomic .env write ──
         // Backup before any write
         $backupPath = $envPath . '.bak-' . date('Ymd-His');
         @copy($envPath, $backupPath);
@@ -174,13 +208,11 @@ class AdminSystemSettingsController extends Controller
         }
 
         if ($target === 'sqlite') {
-            // Quote Windows backslash paths
             $escapedSqlite = str_replace('\\', '\\\\', $sqliteFile);
             $this->setEnvLine($env, 'DB_DATABASE', $escapedSqlite);
         } else {
             // MySQL uses its own MYSQL_DATABASE env var (not DB_DATABASE which is for SQLite)
             $this->setEnvLine($env, 'MYSQL_DATABASE', $mysqlDb);
-            $this->appendEnvIfMissing($env, 'MYSQL_DATABASE', $mysqlDb);
         }
 
         // Ensure HOST/PORT/USERNAME/PASSWORD are set
@@ -189,16 +221,77 @@ class AdminSystemSettingsController extends Controller
         $this->appendEnvIfMissing($env, 'DB_USERNAME', 'root');
         $this->appendEnvIfMissing($env, 'DB_PASSWORD', '');
 
-        file_put_contents($envPath, $env);
+        // Atomic write: temp file → rename (prevents corruption on crash)
+        $tmpPath = $envPath . '.tmp-' . getmypid();
+        $written = @file_put_contents($tmpPath, $env);
+        if ($written === false) {
+            @unlink($tmpPath);
+            return response()->json([
+                'error' => 'فشل كتابة ملف .env (tmp).',
+                'hint'  => 'تأكد من صلاحيات الكتابة في مجلد المشروع.',
+            ], 500);
+        }
+
+        // rename() is atomic on the same filesystem; on Windows it may fail
+        // if the destination exists, so we unlink first
+        if (file_exists($envPath)) {
+            @unlink($envPath);
+        }
+        if (!@rename($tmpPath, $envPath)) {
+            // Last resort fallback — write directly (non-atomic)
+            @file_put_contents($envPath, $env);
+            @unlink($tmpPath);
+        }
+
         Artisan::call('config:clear');
 
+        // ── Step 4: Post-switch verification ──
+        // Re-read the .env we just wrote to confirm it's correct
+        $verifyEnv = file_get_contents($envPath);
+        $envOk = str_contains($verifyEnv, "DB_CONNECTION={$target}");
+        if ($target === 'mysql') {
+            $envOk = $envOk && str_contains($verifyEnv, "MYSQL_DATABASE={$mysqlDb}");
+        }
+
         return response()->json([
-            'message'   => "تم التبديل إلى {$target}.",
-            'driver'    => $target,
-            'reachable' => true,
-            'migrated'  => $migrated,
+            'message'         => $dbCreated
+                ? "تم إنشاء قاعدة البيانات '{$mysqlDb}' والتبديل إلى {$target}."
+                : "تم التبديل إلى {$target}.",
+            'driver'          => $target,
+            'db_created'      => $dbCreated,
+            'reachable'       => true,
+            'migrated'        => $migrated,
             'migration_error' => $migrationError,
+            'env_verified'    => $envOk,
+            'hint'            => "الطلب التالي سي工作任务 على {$target} تلقائياً.",
         ]);
+    }
+
+    /**
+     * Create a MySQL database via raw PDO (bypasses Laravel connection config).
+     * Returns true on success.
+     */
+    private function createMysqlDatabase(string $dbName): bool
+    {
+        try {
+            $host = config('database.connections.mysql.host', '127.0.0.1');
+            $port = config('database.connections.mysql.port', '3306');
+            $user = config('database.connections.mysql.username', 'root');
+            $pass = config('database.connections.mysql.password', '');
+
+            $pdo = new \PDO("mysql:host={$host};port={$port}", $user, $pass, [
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+            ]);
+
+            $dbNameEscaped = preg_replace('/[^a-zA-Z0-9_]/', '', $dbName);
+            $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbNameEscaped}` "
+                . "CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+
+            $pdo = null;
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     public function index(): JsonResponse
