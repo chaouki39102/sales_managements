@@ -295,12 +295,22 @@ class PortalController extends BaseApiController
                 default      => $query->orderByDesc('p.payment_date')->orderByDesc('p.id'),
             };
 
+            // خلاصة الإجماليات عبر كل الصفوف المطابقة (وليس الصفحة الحالية فقط).
+            $totalsQuery = (clone $query)->withoutOrderBindings();
+            $totals = $totalsQuery->selectRaw("
+                COALESCE(SUM(CASE WHEN p.direction = 'in'  THEN p.amount ELSE 0 END), 0) as total_in,
+                COALESCE(SUM(CASE WHEN p.direction = 'out' THEN p.amount ELSE 0 END), 0) as total_out
+            ")->first();
+
             $paginator = $query->paginate($perPage, ['*'], 'page', $page);
 
-            return $this->successResponse(
-                $this->paginated($paginator->through(fn ($p) => $this->paymentRow($p))),
-                'تم جلب قائمة الدفعات بنجاح'
-            );
+            $response = $this->paginated($paginator->through(fn ($p) => $this->paymentRow($p)));
+            $response['summary'] = [
+                'total_in'  => round((float) $totals->total_in, 2),
+                'total_out' => round((float) $totals->total_out, 2),
+            ];
+
+            return $this->successResponse($response, 'تم جلب قائمة الدفعات بنجاح');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal.payments');
         }

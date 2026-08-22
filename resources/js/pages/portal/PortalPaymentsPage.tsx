@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { portalApi, type PortalPaymentFilters } from '@/lib/api/portal/portal';
+import { useDebounce } from '@/hooks/useDebounce';
 import { fmtMoney, fmtDate, DirBadge, Pager, PortalLoading, PortalError, PortalEmpty } from './portalUtils';
 
 const DIR_OPTIONS = [
@@ -71,8 +72,8 @@ export default function PortalPaymentsPage() {
   const from = meta.per_page * (meta.current_page - 1) + 1;
   const to = Math.min(meta.per_page * meta.current_page, meta.total);
 
-  const totalIn = rows.filter(r => r.direction === 'in').reduce((s, r) => s + r.amount, 0);
-  const totalOut = rows.filter(r => r.direction === 'out').reduce((s, r) => s + r.amount, 0);
+  const totalIn = data.summary?.total_in ?? 0;
+  const totalOut = data.summary?.total_out ?? 0;
 
   return (
     <section className="portal-card">
@@ -195,14 +196,4 @@ export default function PortalPaymentsPage() {
       )}
     </section>
   );
-}
-
-// ─── useDebounce hook ─────────────────────────────────────────────────────
-function useDebounce<T>(value: T, ms: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), ms);
-    return () => clearTimeout(t);
-  }, [value, ms]);
-  return debounced;
 }

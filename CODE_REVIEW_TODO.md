@@ -1,6 +1,6 @@
 # CODE_REVIEW_TODO.md — Full Code Review Checklist
 
-> Status: **Section 4 COMPLETE** (Aug 22, 2026). Next up: **Section 5 — Portal (Admin + Customer)**. Pick up any time, task-by-task.
+> Status: **Section 5 COMPLETE** (Aug 22, 2026). Next up: **Section 6 — Documents Module**. Pick up any time, task-by-task.
 
 ## How to use
 - Work task-by-task (one section at a time)
@@ -79,19 +79,19 @@
 
 ## Section 5 — Portal (Admin + Customer)
 
-- [ ] `resources/js/pages/portal/PortalOrdersAdminPage.tsx` — admin orders
-- [ ] `resources/js/pages/portal/PortalMyOrdersPage.tsx` — customer my orders
-- [ ] `resources/js/pages/portal/PortalOrdersPage.tsx` — customer catalog
-- [ ] `resources/js/pages/portal/PortalLoginPage.tsx` — portal login
-- [ ] `resources/js/pages/portal/PortalLayout.tsx` — portal layout
-- [ ] `resources/js/pages/portal/PortalDashboardPage.tsx` — portal dashboard
-- [ ] `resources/js/pages/portal/PortalDocumentsPage.tsx` — portal documents
-- [ ] `resources/js/pages/portal/PortalStatementPage.tsx` — portal statement
-- [ ] `resources/js/pages/portal/PortalProfilePage.tsx` — portal profile
-- [ ] `resources/js/pages/portal/PortalTrackOrderPage.tsx` — order tracking
-- [ ] `resources/js/pages/portal/PortalPublicOrderPage.tsx` — public order
-- [ ] `resources/js/lib/api/portal/client.ts` — portal axios instance
-- [ ] `resources/js/lib/api/portal/portal.ts` — portal API
+- [x] `resources/js/pages/portal/PortalOrdersAdminPage.tsx` — admin orders
+- [x] `resources/js/pages/portal/PortalMyOrdersPage.tsx` — customer my orders
+- [x] `resources/js/pages/portal/PortalOrdersPage.tsx` — customer catalog
+- [x] `resources/js/pages/portal/PortalLoginPage.tsx` — portal login
+- [x] `resources/js/pages/portal/PortalLayout.tsx` — portal layout
+- [x] `resources/js/pages/portal/PortalDashboardPage.tsx` — portal dashboard
+- [x] `resources/js/pages/portal/PortalDocumentsPage.tsx` — portal documents
+- [x] `resources/js/pages/portal/PortalStatementPage.tsx` — portal statement
+- [x] `resources/js/pages/portal/PortalProfilePage.tsx` — portal profile
+- [x] `resources/js/pages/portal/PortalTrackOrderPage.tsx` — order tracking
+- [x] `resources/js/pages/portal/PortalPublicOrderPage.tsx` — public order
+- [x] `resources/js/lib/api/portal/client.ts` — portal axios instance
+- [x] `resources/js/lib/api/portal/portal.ts` — portal API
 
 ## Section 6 — Documents Module
 
@@ -242,6 +242,14 @@
 | 49 | 4 | Info | Observation | `usePosProKeyboardShortcuts.ts` | 60–82 | Global event listener has `anyModalOpen` guard (checks modal overlays, customer sheet, held sheet, discount popover, etc.) — shortcuts correctly disabled when any UI panel is open | Verified |
 | 50 | 4 | Info | Observation | `POSPage.tsx` + `POSProPage.tsx` | 878 / 928 | Both pages compute `effectiveTotalHt/Tva` identically: `gross = qty × unitPrice × packQty`, `ht = gross − discount`, `tva = ht × tvaRate/100`. Classic reads `snapshot.totals`, Pro reads `pos.totals` — same underlying values | Verified |
 | 51 | 4 | Info | Observation | `ReorderableTopCards.tsx` | — | Pointer-based drag-swap with 6px threshold, `setPointerCapture`, localStorage persistence. Interactive elements (`button,a,input,select,textarea`) excluded via `closest()` — no click/swap conflict | Verified |
+| 52 | 5 | High | Computed-from-paginated | `PortalPaymentsPage.tsx` | ~180–200 | `totalIn`/`totalOut` summed from paginated `rows` (only ~20/page visible), not all matching rows — summary was always wrong for >1 page of payments | Fixed: backend `payments()` computes `SUM(CASE...)` over ALL matching rows before pagination; frontend reads `data.summary.total_in/total_out` |
+| 53 | 5 | Medium | Duplicate hook | `PortalPaymentsPage.tsx` | 201–207 | Local `useDebounce` (6-line copy) duplicated `hooks/useDebounce.ts` (canonical). Fragile — both drift independently | Fixed: removed local copy, imported shared hook |
+| 54 | 5 | Medium | Untyped store | `portalStore.ts` | 6 | `portalUser: unknown \| null` — `setPortalUser` accepted `any`, losing all type safety on portal user shape | Fixed: typed as `PortalUser \| null`; setter accepts full user OR updater fn; `PortalProfilePage.tsx` uses merge-update |
+| 55 | 5 | Medium | Bot detection | `ImageProxyController.php` | 57–66 | Facebook CDN (`fbcdn.net`) returns 403 for ALL server-side requests regardless of headers (TLS fingerprinting). Proxy redirect still fails for some browsers | Fixed: `imageProxy.ts` skips proxy for known bot-blocked CDNs (fbcdn.net) — returns original URL directly for browser fetch |
+| 56 | 5 | Info | Observation | `PortalStatementPage.tsx` | — | Server-side `summary.total_debit/total_credit` are authoritative; `computeStatementSummary` in `portalUtils.tsx` matches server values. NOT a bug | Verified |
+| 57 | 5 | Info | Observation | `PortalOrdersAdminPage.tsx` | many | 3 inline `style=` props: WhatsApp brand green `#25D366` (one-off color, no CSS class needed), 2 dynamic width percentages (reactive to editing state). NOT a bug | Verified |
+| 58 | 5 | Info | Observation | `PortalMyOrdersPage.tsx` | ~211–212 | `from`/`to` vars used in `Pager` component — NOT dead code despite unused in page title | Verified |
+| 59 | 5 | Info | Observation | `PwaInstallBanner.tsx` | — | `beforeinstallprompt` warning is informational — banner correctly calls `preventDefault()` then `prompt()` on user click. Standard PWA pattern | Verified |
 
 ---
 
@@ -253,3 +261,4 @@
 | 2 — Backend Controllers + Models + Routes | Aug 22, 2026 | 16 fixed + 2 observations (rows 17–34 above). Clean: CommercialDocument model, Party model, CommercialDocumentObserver, DataAuditSubscriber, api_admin.php | section commit |
 | 3 — Frontend Core + Offline | Aug 22, 2026 | 3 fixed + 5 observations (rows 35–42 above). Clean: types.ts, queryKeys.ts, syncEngine.ts, AuthContext.tsx, FiscalYearContext.tsx, DashboardLayout.tsx. Verified: tsc clean, vitest 391/391 (21 files) | section commit |
 | 4 — POS Classic + Pro + Mobile | Aug 22, 2026 | 0 fixed + 9 observations (rows 43–51 above). Clean: all 18 files verified — cart stores, payment modal, keyboard shortcuts, calculations, product grid, scanbar, top cards, draggable cards, print service. Verified: tsc clean, vitest 391/391 | section commit |
+| 5 — Portal (Admin + Customer) | Aug 22, 2026 | 4 fixed + 5 observations (rows 52–59 above). Fixed: payments summary (server-side SQL), duplicate useDebounce, portalStore typing, image proxy skip-CDN. Verified: tsc clean, vitest 391/391 (21 files), build 0 errors, 239 precache, SW MATCH | section commit |

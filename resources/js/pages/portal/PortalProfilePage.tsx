@@ -99,7 +99,7 @@ export default function PortalProfilePage() {
     mutationFn: () => portalApi.updateProfile({ name: editName, email: editEmail }),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['portal', slug, 'profile'] });
-      setPortalUser({ ...data });
+      setPortalUser(prev => prev ? { ...prev, ...data } : null);
       showToast('تم تحديث الملف الشخصي بنجاح');
     },
     onError: (err: Error) => showToast(err.message || 'تعذر التحديث'),

@@ -359,6 +359,15 @@ export interface PortalPaymentFilters {
   sort?: 'date_desc' | 'date_asc' | 'amount_asc' | 'amount_desc';
 }
 
+export interface PortalPaymentSummary {
+  total_in:  number;
+  total_out: number;
+}
+
+export interface PortalPaymentsResponse extends PortalPaginated<PortalPayment> {
+  summary: PortalPaymentSummary;
+}
+
 export const portalApi = {
   login:    (email: string, password: string) =>
     portalPost<PortalLoginResponse>('/portal/auth/login', { email, password }),
@@ -378,7 +387,7 @@ export const portalApi = {
     }),
   document: (id: number) => portalGet<PortalDocumentDetail>(`/portal/documents/${id}`),
   payments: (filters: PortalPaymentFilters = {}) =>
-    portalGet<PortalPaginated<PortalPayment>>('/portal/payments', {
+    portalGet<PortalPaymentsResponse>('/portal/payments', {
       page: filters.page ?? 1,
       per_page: filters.per_page ?? 15,
       search: filters.search || undefined,
