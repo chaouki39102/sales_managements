@@ -113,10 +113,11 @@ class TransactionIntegrityService
         $tvaRate  = round((float) ($fields['tva_rate']                ?? 0), 2);
         $discPct  = round((float) ($fields['discount_percentage']     ?? 0), 4);
         $discAmt  = round((float) ($fields['discount_amount_per_unit'] ?? 0), 4);
+        // Verbatim parity with CommercialDocumentLineObserver::calculateLineTotals:
+        // `packaging_units_snapshot ?? 1` with NO clamping. The observer never
+        // sanitizes a <=0 snapshot, so neither may the gate — any extra clamp here
+        // would mask a real divergence instead of flagging it.
         $snapshot = round((float) ($fields['packaging_units_snapshot'] ?? 1), 4);
-        if ($snapshot <= 0) {
-            $snapshot = 1.0;
-        }
 
         $gross = $qty * $price;
 
@@ -207,7 +208,14 @@ class TransactionIntegrityService
         $stampEnabled = $isAccounting
             && Setting::getSetting('fiscal_stamp_enabled', true, $document->company_id);
         if ($stampEnabled) {
-            $expectedStamp = round($this->stampCalculator->calculateFromAmount($rawTtc), 2);
+            // Mirror recalculateTotals' try/catch: a calculator failure stores
+            // stamp = 0.0 there, so expecting anything else here would flag the
+            // very document the service just saved as "unclean".
+            try {
+                $expectedStamp = round($this->stampCalculator->calculateFromAmount($rawTtc), 2);
+            } catch (\Throwable) {
+                $expectedStamp = 0.0;
+            }
             $storedStamp   = (float) ($document->getAttribute('total_stamp') ?? 0);
             if (abs($storedStamp - $expectedStamp) > self::TOLERANCE) {
                 $violations[] = "الوثيقة: total_stamp مخزَّن {$storedStamp} ≠ متوقع {$expectedStamp}";

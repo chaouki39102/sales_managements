@@ -148,9 +148,22 @@ class SettingService extends BaseService
         $this->clearCache();
 
         // Also clear per-key cache used by Setting::getSetting()
+        // ⚠️ getSetting يبني المفتاح بـ "setting:{$companyId}:{$key}" —
+        //    مع company_id = null يُنتج الاستيفاء سلسلة فارغة: "setting::{key}"
+        //    (وليس "setting:null:") — لذا مسح مفتاح حرفي 'null' لا يمسح شيئاً.
         foreach ($settingsDict as $key => $value) {
-            Cache::forget("setting:{$companyId}:{$key}");
-            Cache::forget("setting:null:{$key}");
+            if ($companyId) {
+                Cache::forget("setting:{$companyId}:{$key}");
+                // قراءة الشركة قد تكون سقطت للسطر العام (لا override لها) —
+                // قيمتها مخزّنة تحت مفتاحها هي أيضاً.
+                Cache::forget("setting::{$key}");
+            } else {
+                // كتابة عامة → كل ذاكرة fallback لأي شركة أصبحت قديمة
+                Cache::forget("setting::{$key}");
+                foreach (\App\Models\Company::pluck('id') as $cid) {
+                    Cache::forget("setting:{$cid}:{$key}");
+                }
+            }
         }
 
         return $upserted;

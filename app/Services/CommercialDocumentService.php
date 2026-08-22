@@ -315,6 +315,12 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         if ($hasPayments) {
             $payments = $request?->input('payments') ?? $data['payments'] ?? [];
             $this->payments()->syncPayments($item, $payments);
+        } else {
+            // AU3-bis: التعديل بلا حمولة دفعات لا يعني "المستند بلا دفعات".
+            // recalculateTotals أعلاه أعاد remaining_amount = net_to_pay —
+            // نُعيد اشتقاق paid/remaining/status من الدفعات المرتبطة فعلياً
+            // حتى لا يُمحى المبلغ المدفوع عند أي تعديل عادي (اسم/تاريخ/أسطر).
+            $this->payments()->refreshAmountsAndStatus($item);
         }
 
         // ✅ Snapshots intentionally NOT recomputed on update — they are frozen
@@ -441,32 +447,37 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             );
         }
 
-        $validatedStatusId = $this->getStatusId($companyId, 'validated');
+        // المعاملة الذرية: الاعتماد + إنشاء حركات المخزون معاً أو لا شيء.
+        // بدونها: فشل منتصف الطريق (مخزون غير كافٍ مثلاً) يترك المستند
+        // "معتمداً" بلا حركات مخزون — ولا يمكن إعادة الاعتماد لاحقاً.
+        DB::transaction(function () use ($document, $companyId) {
+            $validatedStatusId = $this->getStatusId($companyId, 'validated');
 
-        if (!$validatedStatusId) {
-            throw new BusinessRuleException(
-                "لم يُعثر على حالة 'validated' للشركة #{$companyId}",
-                500
-            );
-        }
-
-        $document->updateQuietly([
-            'document_status_id' => $validatedStatusId,
-            'validated_at'       => now(),
-            'validated_by'       => auth()->id(),
-        ]);
-
-        $document->load('documentType', 'lines.product');
-
-        if (($document->documentType?->affects_stock_direction ?? 0) !== 0) {
-            $existingMovements = StockMovement::whereHas('commercialDocumentLine', function ($q) use ($document) {
-                $q->where('commercial_document_id', $document->id);
-            })->exists();
-
-            if (!$existingMovements) {
-                $this->createStockMovements($document);
+            if (!$validatedStatusId) {
+                throw new BusinessRuleException(
+                    "لم يُعثر على حالة 'validated' للشركة #{$companyId}",
+                    500
+                );
             }
-        }
+
+            $document->updateQuietly([
+                'document_status_id' => $validatedStatusId,
+                'validated_at'       => now(),
+                'validated_by'       => $this->actorUserId(),
+            ]);
+
+            $document->load('documentType', 'lines.product');
+
+            if (($document->documentType?->affects_stock_direction ?? 0) !== 0) {
+                $existingMovements = StockMovement::whereHas('commercialDocumentLine', function ($q) use ($document) {
+                    $q->where('commercial_document_id', $document->id);
+                })->exists();
+
+                if (!$existingMovements) {
+                    $this->createStockMovements($document);
+                }
+            }
+        });
     }
 
     /**
@@ -920,7 +931,6 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 'warehouse_id'                => $document->warehouse_id,
                 'product_id'                  => $line->product_id,
                 'stock_movement_type_id'      => $stockMovementTypeId,
-                'commercial_document_id'      => $document->id,
                 'commercial_document_line_id' => $line->id,
                 'quantity'                    => $baseQty,
                 'unit_price'                  => (float) $line->unit_price_ht,
@@ -932,7 +942,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 'manufacturing_date'          => $line->line_attributes['manufacturing_date'] ?? null,
                 'expiration_date'             => $line->line_attributes['expiration_date'] ?? null,
                 'is_validated'                => true,
-                'user_id'                     => auth()->id(),
+                'user_id'                     => $this->actorUserId(),
                 'stock_balance_after'         => 0, // يُحدَّث بـ StockMovementObserver
             ]);
         }

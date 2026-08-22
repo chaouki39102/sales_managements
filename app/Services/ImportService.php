@@ -34,8 +34,8 @@ class ImportService
         $tvas     = Tva::where('company_id', $companyId)->get();
         $units    = Unit::where('company_id', $companyId)->get()->keyBy(fn($u) => mb_strtolower(trim($u->name)));
         $productTypes = ProductType::where('company_id', $companyId)->get();
-        $allRefs  = Product::where('company_id', $companyId)->pluck('id', 'ref')->map(fn($v, $k) => mb_strtolower(trim($k)));
-        $allBarcodes = Product::where('company_id', $companyId)->pluck('id', 'barcode')->filter()->map(fn($v, $k) => mb_strtolower(trim($k)));
+        $allRefs  = Product::where('company_id', $companyId)->pluck('id', 'ref')->mapWithKeys(fn($id, $ref) => [mb_strtolower(trim((string) $ref)) => $id]);
+        $allBarcodes = Product::where('company_id', $companyId)->pluck('id', 'barcode')->filter()->mapWithKeys(fn($id, $bc) => [mb_strtolower(trim((string) $bc)) => $id]);
         $pendingFamilies = [];
         $pendingBrands = [];
         $pendingUnits = [];
@@ -444,8 +444,8 @@ class ImportService
         $communes    = Commune::all()->keyBy(fn($c) => mb_strtolower(trim($c->name)));
         $legalForms  = LegalForm::where('company_id', $companyId)->get()->keyBy(fn($l) => mb_strtolower(trim($l->name)));
         $partyTypes  = PartyType::where('company_id', $companyId)->get();
-        $existingNifs   = Party::where('company_id', $companyId)->whereNotNull('nif')->pluck('id', 'nif')->map(fn($v, $k) => mb_strtolower(trim($k)));
-        $existingCodes  = Party::where('company_id', $companyId)->whereNotNull('code')->pluck('id', 'code')->map(fn($v, $k) => mb_strtolower(trim($k)));
+        $existingNifs   = Party::where('company_id', $companyId)->whereNotNull('nif')->pluck('id', 'nif')->mapWithKeys(fn($id, $nif) => [mb_strtolower(trim((string) $nif)) => $id]);
+        $existingCodes  = Party::where('company_id', $companyId)->whereNotNull('code')->pluck('id', 'code')->mapWithKeys(fn($id, $code) => [mb_strtolower(trim((string) $code)) => $id]);
         $pendingPriceLevels = [];
         $batchNifs  = [];
         $batchCodes = [];
@@ -553,8 +553,18 @@ class ImportService
             if ($ai) $data['ai'] = $ai;
 
             // تاريخ السجل التجاري
+            // تاريخ السجل التجاري — العمود يُقرأ عبر cast 'date' في Party، وأي
+            // سلسلة غير قابلة للتحليل (dd/mm/yyyy جزائرية أو خربشة) كانت تُفشل
+            // الاستيراد كله باستثناء 500 في منتصف الحفظ. نُطبّعها أو نرفض السطر.
             $rcDate = $this->extract($row, 'rc_date');
-            if ($rcDate) $data['rc_date'] = $rcDate;
+            if ($rcDate) {
+                $parsed = $this->parseImportDate($rcDate);
+                if ($parsed === null) {
+                    $rowErrors[] = "تاريخ السجل التجاري '$rcDate' غير صالح";
+                } else {
+                    $data['rc_date'] = $parsed;
+                }
+            }
 
             // الشكل القانوني
             $legalFormName = $this->extract($row, 'legal_form');
@@ -727,10 +737,40 @@ class ImportService
         return isset($row[$key]) ? trim((string) $row[$key]) : '';
     }
 
+    /**
+     * تحليل تاريخ مستورد بصيغ متعددة (dd/mm/yyyy الجزائرية، dd-mm-yyyy،
+     * yyyy-mm-dd، yyyy/mm/dd). يعيد Y-m-d أو null عند الفشل — لا يُرمى استثناء.
+     */
+    private function parseImportDate(string $value): ?string
+    {
+        $value = trim($value);
+        foreach (['d/m/Y', 'd-m-Y', 'Y-m-d', 'Y/m/d'] as $format) {
+            $dt = \DateTime::createFromFormat($format, $value);
+            if ($dt && $dt->format($format) === $value) {
+                return $dt->format('Y-m-d');
+            }
+        }
+        try {
+            return \Carbon\Carbon::parse($value)->toDateString();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     private function parseNumber(string $value): float
     {
-        $value = str_replace([' ', ','], ['', '.'], $value);
-        return (float) $value;
+        $value = trim($value);
+        // كلا الفاصلان معاً؟ الأخير هو الفاصلة العشرية — يدعم "1.520,00" و"1,520.00".
+        // الحالات أحادية الفاصل تبقى على السلوك القديم (فاصلة = عشرية دائماً).
+        if (str_contains($value, ',') && str_contains($value, '.')) {
+            $decimal  = strrpos($value, ',') > strrpos($value, '.') ? ',' : '.';
+            $thousand = $decimal === ',' ? '.' : ',';
+            $value    = str_replace([' ', $thousand], '', $value);
+            $value    = str_replace($decimal, '.', $value);
+
+            return (float) $value;
+        }
+        return (float) str_replace([' ', ','], ['', '.'], $value);
     }
 
     private function resolveTva(string $value, $tvas, int $companyId): ?Tva
@@ -760,7 +800,7 @@ class ImportService
     {
         $value = mb_strtolower(trim($value));
         $map = [
-            'زبون' => 'client', 'زبون' => 'client', 'client' => 'client', 'customer' => 'client',
+            'زبون' => 'client', 'client' => 'client', 'customer' => 'client',
             'مورد' => 'supplier', 'fournisseur' => 'supplier', 'supplier' => 'supplier',
             'كلاهما' => 'both', 'mixed' => 'both', 'les deux' => 'both',
         ];

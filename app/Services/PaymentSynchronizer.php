@@ -121,9 +121,15 @@ class PaymentSynchronizer
 
                 $newAccountId = (int) $payment->treasury_account_id;
                 $delta = $amount - $oldAmount;
-                if (abs($delta) > 0.001 && $payment->status === 'confirmed' && $newAccountId > 0) {
-                    if ($oldAccountId !== $newAccountId) {
-                        $this->adjustTreasuryBalance($oldAccountId, $oldAmount, $this->oppositeDirection($oldDirection));
+                $accountSwitched = $oldAccountId !== $newAccountId;
+                if ($payment->status === 'confirmed' && $newAccountId > 0
+                    && (abs($delta) > 0.001 || ($accountSwitched && $oldAccountId > 0))) {
+                    if ($accountSwitched) {
+                        // تحويل بين خزينتين: اقلب الحجز من القديمة إلى الجديدة
+                        // حتى لو لم يتغير المبلغ — القيمة تنتقل ولا تُفقد من الدفتر.
+                        if ($oldAccountId > 0) {
+                            $this->adjustTreasuryBalance($oldAccountId, $oldAmount, $this->oppositeDirection($oldDirection));
+                        }
                         $this->adjustTreasuryBalance($newAccountId, $amount, $oldDirection);
                     } else {
                         $this->adjustTreasuryBalance($newAccountId, abs($delta), $delta > 0 ? $oldDirection : $this->oppositeDirection($oldDirection));
@@ -153,7 +159,7 @@ class PaymentSynchronizer
                     'payment_date'        => $paymentData['payment_date'] ?? $document->document_date,
                     'reference'           => $paymentData['reference'] ?? null,
                     'notes'               => $paymentData['notes'] ?? null,
-                    'user_id'             => auth()->id(),
+                    'user_id'             => auth()->user() instanceof \App\Models\User ? (int) auth()->id() : null,
                     'fiscal_year_id'      => $document->fiscal_year_id,
                     'party_id'            => $document->party_id,
                     'currency_id'         => $document->currency_id,
@@ -177,6 +183,22 @@ class PaymentSynchronizer
         $this->recalculatePaymentAmounts($document);
 
         // 6. مزامنة حالة المستند (paid / partially_paid / validated)
+        $this->syncDocumentStatus($document);
+    }
+
+    /**
+     * إعادة اشتقاق paid_amount/remaining_amount وحالة المستند من الدفعات
+     * المرتبطة فعلياً به.
+     *
+     * يُستدعى من CommercialDocumentService::afterUpdate عندما تصل حمولة تعديل
+     * بلا مصفوفة payments — recalculateTotals يعيد remaining = net_to_pay،
+     * وهنا نُصحّحه من واقع الدفعات الموجودة (ولا يُمحى المبلغ المدفوع).
+     * آمن للاستدعاء غير المشروط: syncDocumentStatus يتجاهل draft/cancelled/
+     * returned والمستندات ذات net_to_pay <= 0.
+     */
+    public function refreshAmountsAndStatus(CommercialDocument $document): void
+    {
+        $this->recalculatePaymentAmounts($document);
         $this->syncDocumentStatus($document);
     }
 

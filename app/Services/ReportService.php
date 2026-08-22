@@ -107,6 +107,7 @@ class ReportService
             $lineAgg = DB::table('commercial_document_lines as cdl')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->whereNull('cd.deleted_at')
                 ->where('cd.company_id', $this->companyId())
                 ->whereIn('cdl.commercial_document_id', $docIds)
                 ->select(
@@ -129,6 +130,7 @@ class ReportService
                 ->join('products as p', 'p.id', '=', 'cdl.product_id')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->whereNull('cd.deleted_at')
                 ->where('cd.company_id', $this->companyId())
                 ->whereIn('cdl.commercial_document_id', $docIds)
                 ->select(
@@ -253,6 +255,7 @@ class ReportService
                 ->join('products as p', 'p.id', '=', 'cdl.product_id')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->whereNull('cd.deleted_at')
                 ->where('cd.company_id', $this->companyId())
                 ->whereIn('cdl.commercial_document_id', $docIds)
                 ->select(
@@ -335,6 +338,7 @@ class ReportService
         $partyIdsWithDocs = collect();
         $baseDocsQuery = DB::table('commercial_documents as cd')
             ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->whereNull('cd.deleted_at')
             ->where('cd.company_id', $this->companyId())
             ->whereIn('dt.code', self::SALE_CODES);
         if (!empty($filters['fiscal_year_id'])) {
@@ -360,6 +364,7 @@ class ReportService
         if ($partyIds->isNotEmpty()) {
             $statsQuery = DB::table('commercial_documents as cd')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->whereNull('cd.deleted_at')
                 ->where('cd.company_id', $this->companyId())
                 ->whereIn('cd.party_id', $partyIds)
                 ->whereIn('dt.code', self::SALE_CODES);
@@ -397,6 +402,7 @@ class ReportService
 
             $allDocIds = DB::table('commercial_documents as cd')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->whereNull('cd.deleted_at')
                 ->where('cd.company_id', $this->companyId())
                 ->whereIn('cd.party_id', $partyIds)
                 ->whereIn('dt.code', self::SALE_CODES)
@@ -410,6 +416,7 @@ class ReportService
                 ->join('products as p', 'p.id', '=', 'cdl.product_id')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->whereNull('cd.deleted_at')
                 ->where('cd.company_id', $this->companyId())
                 ->whereIn('cdl.commercial_document_id', $allDocIds)
                 ->select(
@@ -483,6 +490,7 @@ class ReportService
         $partyIdsWithDocs = collect();
         $baseDocsQuery = DB::table('commercial_documents as cd')
             ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->whereNull('cd.deleted_at')
             ->where('cd.company_id', $this->companyId())
             ->whereIn('dt.code', self::PURCHASE_CODES);
         if (!empty($filters['fiscal_year_id'])) {
@@ -507,6 +515,7 @@ class ReportService
         if ($partyIds->isNotEmpty()) {
             $statsQuery = DB::table('commercial_documents as cd')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->whereNull('cd.deleted_at')
                 ->where('cd.company_id', $this->companyId())
                 ->whereIn('cd.party_id', $partyIds)
                 ->whereIn('dt.code', self::PURCHASE_CODES);
@@ -598,6 +607,7 @@ class ReportService
             $statsQuery = DB::table('commercial_document_lines as cdl')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->whereNull('cd.deleted_at')
                 ->where('cd.company_id', $this->companyId())
                 ->whereIn('cdl.product_id', $productIds)
                 ->whereIn('dt.code', self::SALE_CODES);
@@ -635,6 +645,7 @@ class ReportService
             $statsQuery = DB::table('commercial_document_lines as cdl')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->whereNull('cd.deleted_at')
                 ->where('cd.company_id', $this->companyId())
                 ->whereIn('cdl.product_id', $productIds)
                 ->whereIn('dt.code', self::PURCHASE_CODES);
@@ -670,6 +681,7 @@ class ReportService
             $avgRows = DB::table('commercial_document_lines as cdl')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->whereNull('cd.deleted_at')
                 ->where('cd.company_id', $this->companyId())
                 ->whereIn('cdl.product_id', $productIds)
                 ->whereIn('dt.code', self::PURCHASE_CODES)
@@ -690,6 +702,7 @@ class ReportService
         $useWarehouseStock = !empty($filters['warehouse_id']) && $productIds->isNotEmpty();
         if ($useWarehouseStock) {
             $stockRows = DB::table('stock_movements as sm')
+                ->whereNull('sm.deleted_at')
                 ->join('stock_movement_types as smt', function ($j) {
                 $j->on('smt.id', '=', 'sm.stock_movement_type_id')
                   ->on('smt.company_id', '=', 'sm.company_id');
@@ -821,6 +834,7 @@ class ReportService
         $salesQ = DB::table('commercial_document_lines as cdl')
             ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
             ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->whereNull('cd.deleted_at')
             ->where('cd.company_id', $this->companyId())
             ->whereIn('dt.code', self::SALE_CODES);
         if ($fyId) $salesQ->where('cd.fiscal_year_id', $fyId);
@@ -847,6 +861,7 @@ class ReportService
             $avgRows = DB::table('commercial_document_lines as cdl')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->whereNull('cd.deleted_at')
                 ->where('cd.company_id', $this->companyId())
                 ->whereIn('cdl.product_id', $productIds)
                 ->whereIn('dt.code', self::PURCHASE_CODES)
@@ -941,10 +956,12 @@ class ReportService
 
         $salesQ = DB::table('commercial_documents as cd')
             ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->whereNull('cd.deleted_at')
             ->where('cd.company_id', $this->companyId())
             ->whereIn('dt.code', self::SALE_CODES);
         $purchaseQ = DB::table('commercial_documents as cd')
             ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->whereNull('cd.deleted_at')
             ->where('cd.company_id', $this->companyId())
             ->whereIn('dt.code', self::PURCHASE_CODES);
 
@@ -1025,6 +1042,7 @@ class ReportService
             }
         } elseif (!empty($filters['warehouse_id']) && $productIds->isNotEmpty()) {
             $stockRows = DB::table('stock_movements as sm')
+                ->whereNull('sm.deleted_at')
                 ->join('stock_movement_types as smt', function ($j) {
                 $j->on('smt.id', '=', 'sm.stock_movement_type_id')
                   ->on('smt.company_id', '=', 'sm.company_id');
@@ -1153,6 +1171,7 @@ class ReportService
         $rows = DB::table('commercial_document_lines as cdl')
             ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
             ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->whereNull('cd.deleted_at')
             ->where('cd.company_id', $this->companyId())
             ->whereDate('cd.document_date', '>=', $from)
             ->whereDate('cd.document_date', '<=', $to)
@@ -1205,6 +1224,7 @@ class ReportService
         $rows = DB::table('commercial_document_lines as cdl')
             ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
             ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->whereNull('cd.deleted_at')
             ->where('cd.company_id', $this->companyId())
             ->whereDate('cd.document_date', '>=', $from)
             ->whereDate('cd.document_date', '<=', $to)
@@ -1259,8 +1279,13 @@ class ReportService
 
     public function agingReport(array $filters = []): array
     {
-        $refDate = $filters['as_of_date'] ?? now()->toDateString();
-        $ref     = Carbon::parse($refDate);
+        $refInput = $filters['as_of_date'] ?? $filters['to_date'] ?? null;
+        try {
+            $ref     = $refInput ? Carbon::parse($refInput) : now();
+        } catch (\Throwable) {
+            $ref     = now();
+        }
+        $refDate  = $ref->toDateString();
 
         $query = CommercialDocument::with('party')
             ->whereHas('documentType', fn($q) => $q->whereIn('code', array_merge(self::SALE_CODES, ['BL', 'BCC'])))
@@ -1423,6 +1448,7 @@ class ReportService
             $costAgg = DB::table('commercial_document_lines as cdl')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->whereNull('cd.deleted_at')
                 ->where('cd.company_id', $companyId)
                 ->whereIn('cdl.commercial_document_id', $salesIds)
                 ->selectRaw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity * cdl.cost_price_ht ELSE cdl.quantity * cdl.cost_price_ht END) as total_cost")
@@ -1433,6 +1459,7 @@ class ReportService
                 ->join('products as p', 'p.id', '=', 'cdl.product_id')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->whereNull('cd.deleted_at')
                 ->where('cd.company_id', $companyId)
                 ->whereIn('cdl.commercial_document_id', $salesIds)
                 ->select(
@@ -1471,6 +1498,7 @@ class ReportService
 
         // â”€â”€ ط§ظ„ظ…طµط§ط±ظٹظپ: ط§ظ„ط¥ط¬ظ…ط§ظ„ظٹ + ط§ظ„طھظˆط²ظٹط¹ ط­ط³ط¨ ط§ظ„طھطµظ†ظٹظپ â”€â”€
         $expenseRows = DB::table('expenses as e')
+            ->whereNull('e.deleted_at')
             ->leftJoin('expense_categories as ec', 'ec.id', '=', 'e.expense_category_id')
             ->where('e.company_id', $companyId)
             ->whereBetween('e.date', [$from, $to])
@@ -1541,6 +1569,7 @@ class ReportService
             $monthlyCost = DB::table('commercial_document_lines as cdl')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->whereNull('cd.deleted_at')
                 ->where('cd.company_id', $companyId)
                 ->whereIn('cdl.commercial_document_id', $salesIds)
                 ->selectRaw("substr(cd.document_date, 1, 7) as month, SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity * cdl.cost_price_ht ELSE cdl.quantity * cdl.cost_price_ht END) as cost")
@@ -1691,6 +1720,7 @@ class ReportService
         $query = DB::table('commercial_document_lines as cdl')
             ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
             ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->whereNull('cd.deleted_at')
             ->where('cd.company_id', $this->companyId())
             ->whereDate('cd.document_date', '>=', $from)
             ->whereDate('cd.document_date', '<=', $to);
@@ -1842,7 +1872,7 @@ class ReportService
 
         $salesQuery = CommercialDocument::whereHas('documentType', fn($q) => $q->whereIn('code', self::SALE_CODES));
         $purchaseQuery = CommercialDocument::whereHas('documentType', fn($q) => $q->whereIn('code', self::PURCHASE_CODES));
-        $expenseQuery = DB::table('expenses')->where('company_id', $this->companyId());
+        $expenseQuery = DB::table('expenses')->whereNull('deleted_at')->where('company_id', $this->companyId());
 
         if ($from && $to) {
             $salesQuery->whereBetween('document_date', [$from, $to]);
@@ -1866,6 +1896,7 @@ class ReportService
             $salesCost = DB::table('commercial_document_lines as cdl')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+                ->whereNull('cd.deleted_at')
                 ->where('cd.company_id', $this->companyId())
                 ->whereIn('cdl.commercial_document_id', $salesIds)
                 ->selectRaw("COALESCE(SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity * cdl.cost_price_ht ELSE cdl.quantity * cdl.cost_price_ht END), 0) as total")
@@ -1880,6 +1911,7 @@ class ReportService
         $expenseByCategory = [];
         if ($from && $to) {
             $expenseByCategory = DB::table('expenses as e')
+                ->whereNull('e.deleted_at')
                 ->leftJoin('expense_categories as ec', 'ec.id', '=', 'e.expense_category_id')
                 ->where('e.company_id', $this->companyId())
                 ->whereBetween('e.date', [$from, $to])
@@ -2055,6 +2087,7 @@ class ReportService
         }
 
         $query = DB::table('expenses as e')
+            ->whereNull('e.deleted_at')
             ->leftJoin('expense_categories as ec', 'ec.id', '=', 'e.expense_category_id')
             ->where('e.company_id', $companyId);
 
@@ -2066,6 +2099,7 @@ class ReportService
         )->orderBy('e.date', 'desc')->get();
 
         $byCategoryQb = DB::table('expenses as e')
+            ->whereNull('e.deleted_at')
             ->leftJoin('expense_categories as ec', 'ec.id', '=', 'e.expense_category_id')
             ->where('e.company_id', $companyId)
             ->select('ec.name as category_name', DB::raw('SUM(e.amount) as total'), DB::raw('COUNT(*) as count'))
@@ -2076,6 +2110,7 @@ class ReportService
         $byCategory = $byCategoryQb->get();
 
         $monthlyQb = DB::table('expenses')
+            ->whereNull('deleted_at')
             ->where('company_id', $companyId)
             ->select(DB::raw("DATE_FORMAT(date, '%Y-%m') as month"), DB::raw('SUM(amount) as total'), DB::raw('COUNT(*) as count'))
             ->groupBy('month')
@@ -2172,6 +2207,7 @@ class ReportService
     public function stockMovementsReport(array $filters = []): array
     {
         $query = DB::table('stock_movements as sm')
+            ->whereNull('sm.deleted_at')
             ->join('products as p', 'p.id', '=', 'sm.product_id')
             ->leftJoin('warehouses as w', 'w.id', '=', 'sm.warehouse_id')
             ->leftJoin('stock_movement_types as smt', function ($j) {
@@ -2194,6 +2230,7 @@ class ReportService
         )->orderBy('sm.movement_date', 'desc')->limit(500)->get();
 
         $summaryQuery = DB::table('stock_movements as sm')
+            ->whereNull('sm.deleted_at')
             ->leftJoin('stock_movement_types as smt', function ($j) {
             $j->on('smt.id', '=', 'sm.stock_movement_type_id')
               ->on('smt.company_id', '=', 'sm.company_id');
