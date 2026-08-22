@@ -30,7 +30,7 @@ class HealthController extends BaseApiController
             $dbError = $e->getMessage();
         }
 
-        $checks   = $this->buildChecks($dbConnected, $dbError);
+        $checks   = $this->buildChecks();
         $problem  = $this->rootProblem($checks);
         $status   = $dbConnected ? 'ok' : 'degraded';
 
@@ -55,7 +55,7 @@ class HealthController extends BaseApiController
     /**
      * @return array<int, array{id:string,name:string,ok:bool,detail:string,fix:?string}>
      */
-    private function buildChecks(bool $dbConnected, ?string $dbError): array
+    private function buildChecks(): array
     {
         $root = base_path();
 

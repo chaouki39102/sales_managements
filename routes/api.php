@@ -766,6 +766,9 @@ Route::prefix('v1')->group(function () {
 
             // ✅ print-templates: قوالب الطباعة — لكل أعضاء الشركة (قراءة وكتابة)
             Route::get('print-templates',                    [PrintTemplateController::class, 'index']);
+            // ✅ مكتبة القوالب الجاهزة — قبل {id} وإلا التُقطت كمعرّف قالب
+            Route::get('print-templates/library',            [PrintTemplateController::class, 'library']);
+            Route::post('print-templates/library/install',   [PrintTemplateController::class, 'installLibrary']);
             Route::get('print-templates/{id}',               [PrintTemplateController::class, 'show']);
             Route::post('print-templates',                   [PrintTemplateController::class, 'store']);
             Route::put('print-templates/{id}',               [PrintTemplateController::class, 'update']);
@@ -773,9 +776,6 @@ Route::prefix('v1')->group(function () {
             Route::post('print-templates/{id}/set-default',  [PrintTemplateController::class, 'setDefault']);
             Route::post('print-templates/{id}/duplicate',    [PrintTemplateController::class, 'duplicate']);
             Route::post('print-templates/upload-logo',       [PrintTemplateController::class, 'uploadLogo']);
-            // مكتبة القوالب الجاهزة
-            Route::get('print-templates/library',            [PrintTemplateController::class, 'library']);
-            Route::post('print-templates/library/install',   [PrintTemplateController::class, 'installLibrary']);
 
             // pdf-export: تصدير PDF من HTML معبأ
             Route::post('pdf/export',                        [PdfExportController::class, 'export']);

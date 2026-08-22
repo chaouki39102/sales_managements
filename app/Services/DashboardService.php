@@ -140,16 +140,31 @@ class DashboardService
     public function getInventorySummary(): array
     {
         $totalProducts = Product::count();
-        $lowStockProducts = Product::whereColumn('current_stock', '<=', 'min_stock_alert')->count();
-        $stockIn = StockMovement::whereYear('created_at', Carbon::now()->year)
-            ->whereMonth('created_at', Carbon::now()->month)
-            ->where('movement_type_id', 1)
-            ->sum('quantity');
 
-        $stockOut = StockMovement::whereYear('created_at', Carbon::now()->year)
-            ->whereMonth('created_at', Carbon::now()->month)
-            ->where('movement_type_id', 2)
-            ->sum('quantity');
+        // جدول products لا يحتوي عمود current_stock — المخزون يُحسب من حركات
+        // المخزون عبر الخدمة المرجعية (مخزَّنة 60 ثانية لكل شركة).
+        $lowStockProducts = collect(
+            app(InventoryStockService::class)->getStockAt(now()->toDateString())
+        )->filter(fn ($r) => (float) $r['current_stock'] <= (float) $r['min_stock_alert'])
+        ->count();
+
+        // أنواع الحركات تُعرَّف بـ stock_movement_types.direction (+1/-1) —
+        // لا يوجد عمود movement_type_id على جدول stock_movements.
+        $monthlyMovements = StockMovement::query()
+            ->join('stock_movement_types as smt', function ($j) {
+                $j->on('smt.id', '=', 'stock_movements.stock_movement_type_id')
+                  ->on('smt.company_id', '=', 'stock_movements.company_id');
+            })
+            ->whereYear('stock_movements.created_at', Carbon::now()->year)
+            ->whereMonth('stock_movements.created_at', Carbon::now()->month);
+
+        $stockIn = (clone $monthlyMovements)
+            ->where('smt.direction', '>', 0)
+            ->sum('stock_movements.quantity');
+
+        $stockOut = (clone $monthlyMovements)
+            ->where('smt.direction', '<', 0)
+            ->sum('stock_movements.quantity');
 
         return [
             'total_products' => $totalProducts,

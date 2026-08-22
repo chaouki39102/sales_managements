@@ -74,7 +74,9 @@ class AdminSystemSettingsController extends Controller
     private function pendingMigrations(string $driver): int
     {
         try {
-            Artisan::call('migrate:status', [], $output = new \Symfony\Component\Console\Output\BufferedOutput());
+            // --database إلزامي: بدونه يُحصى الترحيل المعلق على الاتصال
+            // الافتراضي الحالي لا على المشغّل المطلوب فتعرض الواجهة رقماً خاطئاً.
+            Artisan::call('migrate:status', ['--database' => $driver], $output = new \Symfony\Component\Console\Output\BufferedOutput());
             $out = $output->fetch();
             return preg_match_all('/\bPending\b/i', $out);
         } catch (\Throwable) {
@@ -468,6 +470,11 @@ class AdminSystemSettingsController extends Controller
                         'updated_at'  => now(),
                     ]
                 );
+
+                // الكتابة عبر DB::table تتجاوز أحداث النموذج — ذاكرة
+                // getSetting لكل مفتاح (company_id = null) يجب تفريغها يدوياً
+                // وإلا بقيت القيمة القديمة معلقة حتى 24 ساعة.
+                Setting::clearCacheForKey($key);
             }
         });
 

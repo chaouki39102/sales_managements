@@ -77,16 +77,19 @@ class Setting extends Model
 
         // ✅ Cache::remember بدون tags — يعمل مع كل drivers
         return Cache::remember($cacheKey, now()->addHours(24), function () use ($key, $default, $companyId) {
+            // نتجاوز CompanyScope هنا: الدالة تدير نطاق الشركة صراحةً، ووجود
+            // scope إضافي يُبطل قراءة السطر العام (company_id NULL) ويُلغي أي
+            // companyId صريح مختلف عن سياق الجلسة.
             // ① First try company-specific row
             if ($companyId !== null) {
-                $setting = static::where('key', $key)->where('company_id', $companyId)->first();
+                $setting = static::withoutGlobalScopes()->where('key', $key)->where('company_id', $companyId)->first();
                 if ($setting) {
                     return $setting->getTypedValue();
                 }
             }
 
             // ② Fall back to global (null company_id) row
-            $setting = static::where('key', $key)->whereNull('company_id')->first();
+            $setting = static::withoutGlobalScopes()->where('key', $key)->whereNull('company_id')->first();
 
             if (!$setting) {
                 return $default;
@@ -101,7 +104,8 @@ class Setting extends Model
      */
     public static function setSetting(string $key, $value, ?int $companyId = null): bool
     {
-        $query = static::where('key', $key);
+        // نفس السبب: تجاوز CompanyScope — الفلترة هنا صريحة عبر companyId.
+        $query = static::withoutGlobalScopes()->where('key', $key);
 
         if ($companyId !== null) {
             $query->where('company_id', $companyId);

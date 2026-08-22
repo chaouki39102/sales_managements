@@ -44,11 +44,16 @@ class PrintTemplate extends Model
         parent::boot();
 
         static::saving(function (self $model) {
-            if ($model->is_default) {
-                static::where('doc_type_code', $model->doc_type_code)
-                    ->where('id', '!=', $model->id)
-                    ->update(['is_default' => false]);
+            if (!$model->is_default) {
+                return;
             }
+            // عند الإنشاء لا يوجد id بعد — where('id','!=',null) لا تطابق
+            // أي سطر فيبقى الافتراضي القديم معلّماً (افتراضيان معاً).
+            $siblings = static::where('doc_type_code', $model->doc_type_code);
+            if ($model->exists) {
+                $siblings->where('id', '!=', $model->id);
+            }
+            $siblings->update(['is_default' => false]);
         });
     }
 }

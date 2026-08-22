@@ -14,6 +14,8 @@ use App\Core\Traits\AuditableEnhanced;
 use App\Models\Traits\HasCompany;
 use App\Models\Traits\HasTenantRouteBinding;
 use App\Models\Traits\HasTenantSlug;
+use App\Services\CompanyContextService;
+use App\Services\InventoryStockService;
 
 #[Cacheable]
 class Product extends Model
@@ -244,8 +246,41 @@ class Product extends Model
     public function getIsLowStockAttribute(): bool
     {
         if (!$this->manages_stock) return false;
-        return (float) ($this->attributes['current_stock'] ?? 0)
-            <= (float) $this->min_stock_alert;
+
+        // بعض الاستعلامات تُرفق current_stock كعمود محسوب (alias) — يُقدَّم دائماً
+        if (array_key_exists('current_stock', $this->attributes)) {
+            return (float) $this->attributes['current_stock']
+                <= (float) $this->min_stock_alert;
+        }
+
+        // جدول products لا يحتوي عمود current_stock — المخزون يُحسب من حركات
+        // المخزون عبر الخدمة المرجعية (مخزَّنة 60 ثانية لكل شركة). أي فشل
+        // (لا سياق شركة / لا سنة مالية في الكونسول أو الاختبارات) → false.
+        $stock = static::contextualStockMap((int) $this->company_id)[$this->id] ?? null;
+
+        return $stock !== null && (float) $stock <= (float) $this->min_stock_alert;
+    }
+
+    private static array $contextualStockMaps = [];
+
+    private static function contextualStockMap(int $companyId): array
+    {
+        if ($companyId <= 0) return [];
+
+        if (!array_key_exists($companyId, static::$contextualStockMaps)) {
+            try {
+                $rows = app(CompanyContextService::class)->runAs(
+                    $companyId,
+                    fn () => app(InventoryStockService::class)->getStockAt(now()->toDateString())
+                );
+                static::$contextualStockMaps[$companyId] =
+                    collect($rows)->pluck('current_stock', 'id')->all();
+            } catch (\Throwable) {
+                static::$contextualStockMaps[$companyId] = [];
+            }
+        }
+
+        return static::$contextualStockMaps[$companyId];
     }
 
     private static array $defaultPriceLevelIdByCompany = [];

@@ -155,26 +155,38 @@ class InventoryReportService
 
     /**
      * ملخص المخزون الحالي للـ Dashboard
+     *
+     * جدول products لا يحتوي عمود current_stock — المخزون يُحسب من حركات
+     * المخزون عبر InventoryStockService (المصدر المرجعي، مخزَّن 60 ثانية).
      */
-    public function getStockSummary(): array
+    public function getStockSummary(?int $warehouseId = null): array
     {
         $companyId = $this->companyId();
 
-        $totals = DB::table('products as p')
-            ->where('p.company_id', $companyId)
-            ->selectRaw('
-                COUNT(*) as total_products,
-                SUM(CASE WHEN p.current_stock <= 0 THEN 1 ELSE 0 END) as out_of_stock,
-                SUM(CASE WHEN p.current_stock > 0 AND p.current_stock <= p.min_stock_alert THEN 1 ELSE 0 END) as low_stock,
-                SUM(p.current_stock * p.current_cost_price) as total_value
-            ')
-            ->first();
+        $outOfStock = 0;
+        $lowStock   = 0;
+        $totalValue = 0.0;
+
+        foreach (app(InventoryStockService::class)->getStockAt(now()->toDateString(), $warehouseId) as $row) {
+            $stock = (float) $row['current_stock'];
+
+            if ($stock <= 0) {
+                $outOfStock++;
+            } elseif ($stock <= (float) $row['min_stock_alert']) {
+                $lowStock++;
+            }
+
+            $totalValue += (float) $row['total_value'];
+        }
 
         return [
-            'total_products' => (int)   ($totals->total_products ?? 0),
-            'out_of_stock'   => (int)   ($totals->out_of_stock   ?? 0),
-            'low_stock'      => (int)   ($totals->low_stock      ?? 0),
-            'total_value'    => (float) ($totals->total_value    ?? 0),
+            'total_products' => DB::table('products')
+                ->where('company_id', $companyId)
+                ->whereNull('deleted_at')
+                ->count(),
+            'out_of_stock'   => $outOfStock,
+            'low_stock'      => $lowStock,
+            'total_value'    => round($totalValue, 2),
         ];
     }
 
@@ -183,33 +195,21 @@ class InventoryReportService
      */
     public function getLowStockProducts(?int $warehouseId = null): Collection
     {
-        $companyId = $this->companyId();
-
-        return DB::table('products as p')
-            ->leftJoin('families as f', 'f.id', '=', 'p.family_id')
-            ->where('p.company_id', $companyId)
-            ->where('p.active', true)
-            ->where(function ($q) {
-                $q->where('p.current_stock', '<=', 0)
-                  ->orWhereColumn('p.current_stock', '<=', 'p.min_stock_alert');
-            })
-            ->select(
-                'p.id',
-                'p.name',
-                'p.ref',
-                'p.current_stock',
-                'p.min_stock_alert',
-                'p.current_cost_price',
-                'f.name as family_name'
-            )
-            ->orderByRaw('p.current_stock ASC')
-            ->get()
-            ->map(function ($item) {
-                $item->current_stock    = (float) $item->current_stock;
-                $item->min_stock_alert  = (float) $item->min_stock_alert;
-                $item->current_cost_price = (float) $item->current_cost_price;
-                $item->status = $item->current_stock <= 0 ? 'out' : 'low';
-                return $item;
-            });
+        return collect(
+            app(InventoryStockService::class)->getStockAt(now()->toDateString(), $warehouseId)
+        )
+            ->filter(fn ($r) => (float) $r['current_stock']
+                <= max(0.0, (float) $r['min_stock_alert']))
+            ->map(fn ($r) => (object) [
+                'id'                 => $r['id'],
+                'name'               => $r['name'],
+                'ref'                => $r['ref'],
+                'current_stock'      => (float) $r['current_stock'],
+                'min_stock_alert'    => (float) $r['min_stock_alert'],
+                'current_cost_price' => (float) $r['current_cost_price'],
+                'family_name'        => $r['family']['name'] ?? null,
+                'status'             => (float) $r['current_stock'] <= 0 ? 'out' : 'low',
+            ])
+            ->values();
     }
 }

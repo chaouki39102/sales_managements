@@ -1,6 +1,6 @@
 # CODE_REVIEW_TODO.md — Full Code Review Checklist
 
-> Status: **Section 1 COMPLETE** (Aug 22, 2026). Next up: **Section 2 — Backend Controllers + Models + Routes**. Pick up any time, task-by-task.
+> Status: **Section 2 COMPLETE** (Aug 22, 2026). Next up: **Section 3 — Frontend Core + Offline**. Pick up any time, task-by-task.
 
 ## How to use
 - Work task-by-task (one section at a time)
@@ -25,20 +25,20 @@
 
 ## Section 2 — Backend Controllers + Models + Routes
 
-- [ ] `app/Http/Controllers/Api/V1/CommercialDocumentController.php` — document CRUD
-- [ ] `app/Http/Controllers/Api/V1/Portal/PortalOrderController.php` — portal orders
-- [ ] `app/Http/Controllers/Api/V1/Admin/AdminSystemSettingsController.php` — DB switch
-- [ ] `app/Http/Controllers/Api/V1/HealthController.php` — health endpoint
-- [ ] `app/Http/Controllers/Api/V1/PrintTemplateController.php` — print templates
-- [ ] `app/Models/CommercialDocument.php` — document model
-- [ ] `app/Models/Setting.php` — settings model
-- [ ] `app/Models/Product.php` — product model
-- [ ] `app/Models/Party.php` — party model
-- [ ] `app/Observers/CommercialDocumentObserver.php` — document observer
-- [ ] `app/Listeners/DataAuditSubscriber.php` — audit log
-- [ ] `routes/api.php` — API routes
-- [ ] `routes/api_admin.php` — admin routes
-- [ ] `app/Console/Commands/SwitchDatabaseCommand.php` — CLI DB switch
+- [x] `app/Http/Controllers/Api/V1/CommercialDocumentController.php` — document CRUD
+- [x] `app/Http/Controllers/Api/V1/Portal/PortalOrderController.php` — portal orders
+- [x] `app/Http/Controllers/Api/V1/Admin/AdminSystemSettingsController.php` — DB switch
+- [x] `app/Http/Controllers/Api/V1/HealthController.php` — health endpoint
+- [x] `app/Http/Controllers/Api/V1/PrintTemplateController.php` — print templates
+- [x] `app/Models/CommercialDocument.php` — document model
+- [x] `app/Models/Setting.php` — settings model
+- [x] `app/Models/Product.php` — product model
+- [x] `app/Models/Party.php` — party model
+- [x] `app/Observers/CommercialDocumentObserver.php` — document observer
+- [x] `app/Listeners/DataAuditSubscriber.php` — audit log
+- [x] `routes/api.php` — API routes
+- [x] `routes/api_admin.php` — admin routes
+- [x] `app/Console/Commands/SwitchDatabaseCommand.php` — CLI DB switch
 
 ## Section 3 — Frontend Core + Offline
 
@@ -207,6 +207,24 @@
 | 14 | 1 | Info | Observation | `InventoryValuationService.php` | FIFO/LIFO | FIFO and LIFO getters are near-duplicates (~40 lines) — candidate for extraction, left as-is (working money code) | Observation |
 | 15 | 1 | Info | Observation | `InventoryValuationService.php` | PMP | Weighted average intentionally excludes opening-balance stock (established design from Phase 49 era); getProductRecap excludes zero-cost lines from effective cost (margins slightly optimistic there) | Observation |
 | 16 | 1 | Info | Observation | `app/Models/Traits/HasCompany.php` | comments | Pre-existing mojibake in Arabic comments (unrecoverable bytes, cosmetic only). Trait itself is correct: global CompanyScope via bootHasCompany explains why Eloquent queries need no manual company_id filters | Observation |
+| 17 | 2 | High | Phantom columns | `Product.php` | is_low_stock accessor | Referenced non-existent `products.current_stock` / `type` columns (SQL error on every access). Rewritten atop `InventoryStockService::getStockAt` via `runAs` + per-company memoized map | Fixed |
+| 18 | 2 | High | Phantom columns | `AlertEngine.php` | checkLowStock | Phantom `products.current_stock` + `stock_movements.movement_type_id` columns (no such column — FK is `stock_movement_type_id`); unused `use App\Models\Product;`. Rewritten atop getStockAt rows via `runAs` | Fixed |
+| 19 | 2 | High | Phantom columns | `DashboardService.php` | getInventorySummary | Same phantom columns for low-stock count + monthly in/out sums. Rewritten: count from getStockAt rows, sums via join to `stock_movement_types` on `smt.direction` >0/<0 | Fixed |
+| 20 | 2 | High | Phantom columns | `InventoryReportService.php` | getStockSummary/getLowStockProducts | Same rewrite atop getStockAt (optional warehouse param, out/low/value/product counts) | Fixed |
+| 21 | 2 | Medium | Race condition | `PortalOrderController.php` | pay | Gateway intent creation ran outside any transaction — concurrent calls (double click / two tabs) could create two payment intents. Now `assertPayable` re-checked under `lockForUpdate` inside `DB::transaction`; pending-intent idempotent return moved under the lock | Fixed |
+| 22 | 2 | Medium | Validation gap | `PortalOrderController.php` | store (guest) | No max-length validation → MySQL strict-mode 1406 = 500 instead of 422. Added validate on customer_name/phone/address before any DB touch | Fixed |
+| 23 | 2 | Medium | Cross-tenant write | `PrintTemplateController.php` | store/update | Accepted client-sent `company_id`/`id` into fill — mass-assignment could move a template to another company. Both unset | Fixed |
+| 24 | 2 | Medium | Logic bug | `PrintTemplateController.php` | installLibrary | `CompanyContextService::get()?->id` read `->id` off an int (always null) so the duplicate-install check never matched. Now `(get() ?? 0)` | Fixed |
+| 25 | 2 | Low | Logic bug | `PrintTemplate.php` | saving hook | `where('id','!=', $model->id)` with null id on create matched nothing → old default stayed flagged (two defaults per doc type). exists-guard added | Fixed |
+| 26 | 2 | Medium | Cache invalidation | `AdminSystemSettingsController.php` | update | Raw `DB::table` upsert bypasses model events — `Setting::clearCacheForKey($key)` never fired, stale reads up to 24h TTL. Added after each key write | Fixed |
+| 27 | 2 | Medium | Wrong-driver count | `AdminSystemSettingsController.php` | pendingMigrations | `migrate:status` ran against the DEFAULT connection, not the target driver → DB-status card showed wrong pending count. Now `--database=$driver` | Fixed |
+| 28 | 2 | High | Scope bypass | `Setting.php` | getSetting/setSetting | Global CompanyScope invalidated explicit companyId lookups AND the global-null fallback (settings resolved against session company only). `withoutGlobalScopes()` + explicit filters (the methods manage company scope themselves) | Fixed |
+| 29 | 2 | Medium | Soft-delete guard | `CommercialDocumentController.php` | index | Party/warehouse name-match subqueries lacked `company_id` + `whereNull('deleted_at')` — cross-tenant names and soft-deleted rows could match document filters | Fixed |
+| 30 | 2 | Low | Error surface | `CommercialDocumentController.php` | checkNumber | Only handler without try/catch or authorization — wrapped with `authorizeAction(viewAny)` + `handleError` like its siblings | Fixed |
+| 31 | 2 | Medium | Route ordering | `routes/api.php` | print-templates | `GET print-templates/library` registered AFTER `{id}` → shadowed by `show('library')`, endpoint unreachable (probe proved resolution to @show). Moved before `{id}`; probe now resolves @library/@installLibrary | Fixed |
+| 32 | 2 | Low | Dead code | `HealthController.php` | buildChecks | Unused `$dbConnected`/`$dbError` params. Signature cleaned | Fixed |
+| 33 | 2 | Info | Observation | `SwitchDatabaseCommand.php` | — | Matches all Phase-82 hardening rules (auto-create DB, atomic .env write, subprocess DB_CONNECTION force, post-switch verify); sqlite backslash-doubling works on Windows paths, round-trip verified green | Observation |
+| 34 | 2 | Info | Observation | `app/Models/Traits/HasCompany.php` | writes | Cross-tenant write injection remains possible anywhere code sets `company_id` explicitly — mitigated locally at controllers (PrintTemplate unset) rather than hardening the trait mid-review | Observation |
 
 ---
 
@@ -215,3 +233,4 @@
 | Section | Date | Findings | Commit |
 |---------|------|----------|--------|
 | 1 — Backend Services | Aug 22, 2026 | 13 fixed + 3 observations (rows 1–16 above; rows 1–9 in `ea4eb22`, rows 10–13 this commit) | `ea4eb22` + section commit |
+| 2 — Backend Controllers + Models + Routes | Aug 22, 2026 | 16 fixed + 2 observations (rows 17–34 above). Clean: CommercialDocument model, Party model, CommercialDocumentObserver, DataAuditSubscriber, api_admin.php | section commit |

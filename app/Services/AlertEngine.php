@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\CommercialDocument;
 use App\Models\Check;
 use App\Models\UserAlert;
-use App\Models\Product;
 use App\Models\DocumentStatus;
 use Illuminate\Support\Facades\Log;
 
@@ -91,21 +90,25 @@ class AlertEngine
     {
         $alerts = [];
 
-        $lowStockProducts = Product::with('family')
-            ->where('company_id', $companyId)
-            ->where('type', '!=', 'service')
-            ->whereColumn('current_stock', '<=', 'min_stock_alert')
-            ->where('min_stock_alert', '>', 0)
-            ->get();
+        // جدول products لا يحتوي عمود current_stock — المخزون يُحسب من حركات
+        // المخزون عبر InventoryStockService (المصدر المرجعي، مخزَّن 60 ثانية).
+        $rows = app(CompanyContextService::class)->runAs(
+            $companyId,
+            fn () => app(InventoryStockService::class)->getStockAt(now()->toDateString())
+        );
 
-        foreach ($lowStockProducts as $product) {
-            $severity = $product->current_stock <= 0 ? 'critical' : 'medium';
+        foreach ($rows as $row) {
+            if ((float) $row['current_stock'] > (float) $row['min_stock_alert']) {
+                continue;
+            }
+
+            $severity = (float) $row['current_stock'] <= 0 ? 'critical' : 'medium';
 
             $alerts[] = [
                 'type' => 'low_stock',
                 'title' => 'مخزون منخفض',
-                'body' => "المنتج {$product->name} (المخزون: {$product->current_stock}, الحد الأدنى: {$product->min_stock_alert}).",
-                'product_id' => $product->id,
+                'body' => "المنتج {$row['name']} (المخزون: {$row['current_stock']}, الحد الأدنى: {$row['min_stock_alert']}).",
+                'product_id' => $row['id'],
                 'severity' => $severity,
             ];
 

@@ -18,6 +18,7 @@ use App\Services\Payments\Gateway\PaymentGatewayFactory;
 use App\Services\Portal\PortalOrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * PortalOrderController — طلبات السلع من بوابة الزبائن (مبنية على المستندات التجارية)
@@ -141,6 +142,13 @@ class PortalOrderController extends BaseApiController
                 $partyId = (int) $portal->party_id;
             } else {
                 $companyId = (int) app(CompanyContextService::class)->get();
+                // تحقق بطول الحقول قبل لمس قاعدة البيانات — القيم الأطول من
+                // حدود الأعمدة تُفشل MySQL الوضع الصارم بخطأ 1406 (500) بدل 422.
+                $request->validate([
+                    'customer_name'    => ['required', 'string', 'max:255'],
+                    'customer_phone'   => ['required', 'string', 'max:40'],
+                    'customer_address' => ['nullable', 'string', 'max:500'],
+                ]);
                 $customerName  = trim((string) $request->input('customer_name', ''));
                 $customerPhone = trim((string) $request->input('customer_phone', ''));
                 if ($customerName === '' || $customerPhone === '') {
@@ -427,75 +435,101 @@ class PortalOrderController extends BaseApiController
             $partyId = (int) ($portal->party_id ?? 0);
             $order   = $this->findOwnOrder($partyId);
 
-            if (in_array($order->status, PortalOrder::TERMINAL_STATUSES, true)) {
-                throw new BusinessRuleException('لا يمكن الدفع لطلب «' . $order->status_label . '».', 409);
-            }
-            if ($order->payment_status === PortalOrder::PAYMENT_SUCCEEDED) {
-                throw new BusinessRuleException('هذا الطلب مدفوع بالفعل.', 409);
-            }
-            if ($order->is_converted) {
-                throw new BusinessRuleException('تم تحويل هذا الطلب إلى فاتورة — لا يمكن دفع الطلب بعد التحويل.', 409);
-            }
-
-            // إعادة النية المعلّقة نفسها (idempotent) دون إنشاء بوابة جديدة —
-            // حتى لو أعاد الزبون ضغط «ادفع» يعود لنفس رابط الدفع.
-            if ($order->payment_status === PortalOrder::PAYMENT_PENDING && $order->payment_intent_id) {
-                $details = is_array($order->payment_details) ? $order->payment_details : [];
-
-                return $this->successResponse([
-                    'order_id'          => (int) $order->id,
-                    'order_reference'   => $order->reference,
-                    'payment_intent_id' => $order->payment_intent_id,
-                    'payment_status'    => $order->payment_status,
-                    'amount'            => (float) $order->payment_amount,
-                    'payment_url'       => (string) ($details['redirect_url'] ?? ''),
-                ], 'يوجد طلب دفع معلق بالفعل — تابع عبر رابط الدفع نفسه.');
-            }
+            // فحوص سريعة قبل فتح المعاملة (نفس الرسائل تُعاد تحت القفل أدناه)
+            $this->assertPayable($order);
 
             $company   = $request->input('_portal_company');
             $companyId = (int) app(CompanyContextService::class)->get();
-            $gateway   = PaymentGatewayFactory::resolve($companyId);
 
-            $amount = round((float) $order->total_ttc, 2);
-            if ($amount <= 0) {
-                throw new BusinessRuleException('المبلغ المطلوب دفعه غير صالح.', 422);
-            }
+            // القفل يمنع سباق الطلبات المتزامنة (نقر مزدوج / تبويبان) عن إنشاء
+            // نيتي دفع لنفس الطلب: الفائز الأول ينشئ النية ويحفظ، والثاني يجد
+            // النية المعلّقة تحت القفل فيُعاد توجيهه إلى الرابط نفسه (idempotent).
+            $response = DB::transaction(function () use ($company, $companyId, $order) {
+                /** @var PortalOrder $locked */
+                $locked = PortalOrder::query()
+                    ->whereKey($order->getKey())
+                    ->lockForUpdate()
+                    ->first() ?? $order;
 
-            $intent = $gateway->createPayment([
-                'company_id'      => $companyId,
-                'order_id'        => (int) $order->id,
-                'order_reference' => $order->reference,
-                'amount'          => $amount,
-                'currency'        => 'DZD',
-                'customer_name'   => $order->party?->name ?? $order->customer_name,
-                'customer_phone'  => $order->party?->phone ?? $order->customer_phone,
-                'return_url'      => $this->portalReturnUrl($company, $order, 'succeeded'),
-                'cancel_url'      => $this->portalReturnUrl($company, $order, 'cancelled'),
-            ]);
+                $this->assertPayable($locked);
 
-            $order->forceFill([
-                'payment_intent_id' => $intent['reference'],
-                'payment_provider'  => $gateway->name(),
-                'payment_status'    => PortalOrder::PAYMENT_PENDING,
-                'payment_amount'    => $amount,
-                'payment_details'   => [
-                    'redirect_url' => $intent['redirect_url'],
-                    'return_url'   => $this->portalReturnUrl($company, $order, 'succeeded'),
-                    'cancel_url'   => $this->portalReturnUrl($company, $order, 'cancelled'),
-                    'created_at'   => now()->toIso8601String(),
-                ],
-            ])->save();
+                // إعادة النية المعلّقة نفسها (idempotent) دون إنشاء بوابة جديدة —
+                // حتى لو أعاد الزبون ضغط «ادفع» يعود لنفس رابط الدفع.
+                if ($locked->payment_status === PortalOrder::PAYMENT_PENDING && $locked->payment_intent_id) {
+                    $details = is_array($locked->payment_details) ? $locked->payment_details : [];
 
-            return $this->successResponse([
-                'order_id'          => (int) $order->id,
-                'order_reference'   => $order->reference,
-                'payment_intent_id' => $intent['reference'],
-                'payment_status'    => $order->payment_status,
-                'amount'            => $amount,
-                'payment_url'       => $intent['redirect_url'],
-            ], 'تم إنشاء طلب الدفع بنجاح');
+                    return $this->successResponse([
+                        'order_id'          => (int) $locked->id,
+                        'order_reference'   => $locked->reference,
+                        'payment_intent_id' => $locked->payment_intent_id,
+                        'payment_status'    => $locked->payment_status,
+                        'amount'            => (float) $locked->payment_amount,
+                        'payment_url'       => (string) ($details['redirect_url'] ?? ''),
+                    ], 'يوجد طلب دفع معلق بالفعل — تابع عبر رابط الدفع نفسه.');
+                }
+
+                $gateway = PaymentGatewayFactory::resolve($companyId);
+
+                $amount = round((float) $locked->total_ttc, 2);
+                if ($amount <= 0) {
+                    throw new BusinessRuleException('المبلغ المطلوب دفعه غير صالح.', 422);
+                }
+
+                $intent = $gateway->createPayment([
+                    'company_id'      => $companyId,
+                    'order_id'        => (int) $locked->id,
+                    'order_reference' => $locked->reference,
+                    'amount'          => $amount,
+                    'currency'        => 'DZD',
+                    'customer_name'   => $locked->party?->name ?? $locked->customer_name,
+                    'customer_phone'  => $locked->party?->phone ?? $locked->customer_phone,
+                    'return_url'      => $this->portalReturnUrl($company, $locked, 'succeeded'),
+                    'cancel_url'      => $this->portalReturnUrl($company, $locked, 'cancelled'),
+                ]);
+
+                $locked->forceFill([
+                    'payment_intent_id' => $intent['reference'],
+                    'payment_provider'  => $gateway->name(),
+                    'payment_status'    => PortalOrder::PAYMENT_PENDING,
+                    'payment_amount'    => $amount,
+                    'payment_details'   => [
+                        'redirect_url' => $intent['redirect_url'],
+                        'return_url'   => $this->portalReturnUrl($company, $locked, 'succeeded'),
+                        'cancel_url'   => $this->portalReturnUrl($company, $locked, 'cancelled'),
+                        'created_at'   => now()->toIso8601String(),
+                    ],
+                ])->save();
+
+                return $this->successResponse([
+                    'order_id'          => (int) $locked->id,
+                    'order_reference'   => $locked->reference,
+                    'payment_intent_id' => $intent['reference'],
+                    'payment_status'    => $locked->payment_status,
+                    'amount'            => $amount,
+                    'payment_url'       => $intent['redirect_url'],
+                ], 'تم إنشاء طلب الدفع بنجاح');
+            });
+
+            return $response;
         } catch (\Throwable $e) {
             return $this->handleError($e, 'portal_orders.pay');
+        }
+    }
+
+    /**
+     * شروط قابلية الدفع السريعة — تُستدعى قبل المعاملة وأيضاً تحت القفل؛
+     * الفحص تحت القفل هو الذي يسد سباق الطلبات المتزامنة فعلياً.
+     */
+    private function assertPayable(PortalOrder $order): void
+    {
+        if (in_array($order->status, PortalOrder::TERMINAL_STATUSES, true)) {
+            throw new BusinessRuleException('لا يمكن الدفع لطلب «' . $order->status_label . '».', 409);
+        }
+        if ($order->payment_status === PortalOrder::PAYMENT_SUCCEEDED) {
+            throw new BusinessRuleException('هذا الطلب مدفوع بالفعل.', 409);
+        }
+        if ($order->is_converted) {
+            throw new BusinessRuleException('تم تحويل هذا الطلب إلى فاتورة — لا يمكن دفع الطلب بعد التحويل.', 409);
         }
     }
 

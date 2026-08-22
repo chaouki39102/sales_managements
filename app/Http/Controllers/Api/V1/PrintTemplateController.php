@@ -65,6 +65,9 @@ class PrintTemplateController extends BaseApiController
             }
 
             $data = $request->all();
+            // company_id لا يُقبل من العميل أبداً — HasCompany يملؤه من سياق
+            // الشركة فقط؛ قبوله يسمح بكتابة قوالب في شركة أخرى (cross-tenant).
+            unset($data['company_id'], $data['id']);
             if (!isset($data['config']) || !is_array($data['config'])) {
                 $data['config'] = [];
             }
@@ -101,6 +104,8 @@ class PrintTemplateController extends BaseApiController
             }
 
             $data = $request->all();
+            // نفس الحماية: لا نقل ملكية بين الشركات ولا تجاوز id عبر fill.
+            unset($data['company_id'], $data['id']);
             if (isset($data['config']) && !is_array($data['config'])) {
                 unset($data['config']);
             }
@@ -221,9 +226,11 @@ class PrintTemplateController extends BaseApiController
                 $payload['doc_type_code'] = $request->input('doc_type_code');
             }
 
+            // get() يُرجع ?int وليس Model — القراءة السابقة get()?->id كانت
+            // تُنتج null دائماً فلا يطابق فحص التكرار أي قالب مثبَّت مسبقاً.
             $duplicate = PrintTemplate::where('name', $payload['name'] ?? null)
                 ->where('doc_type_code', $payload['doc_type_code'] ?? null)
-                ->where('company_id', CompanyContextService::get()?->id)
+                ->where('company_id', CompanyContextService::get() ?? 0)
                 ->exists();
 
             if ($duplicate) {

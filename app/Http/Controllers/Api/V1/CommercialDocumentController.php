@@ -34,24 +34,30 @@ class CommercialDocumentController extends BaseApiController
 
     public function checkNumber(Request $request): JsonResponse
     {
-        $number = $request->input('document_number');
-        $typeId = $request->input('document_type_id');
-        $excludeId = $request->input('exclude_id');
+        try {
+            $this->authorizeAction('viewAny', CommercialDocument::class);
 
-        if (!$number || !$typeId) {
-            return response()->json(['exists' => false]);
+            $number = $request->input('document_number');
+            $typeId = $request->input('document_type_id');
+            $excludeId = $request->input('exclude_id');
+
+            if (!$number || !$typeId) {
+                return response()->json(['exists' => false]);
+            }
+
+            $query = CommercialDocument::where('document_number', $number)
+                ->where('document_type_id', $typeId);
+
+            if ($excludeId) {
+                $query->where('id', '!=', $excludeId);
+            }
+
+            $exists = $query->exists();
+
+            return response()->json(['exists' => $exists]);
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'checkNumber');
         }
-
-        $query = CommercialDocument::where('document_number', $number)
-            ->where('document_type_id', $typeId);
-
-        if ($excludeId) {
-            $query->where('id', '!=', $excludeId);
-        }
-
-        $exists = $query->exists();
-
-        return response()->json(['exists' => $exists]);
     }
 
     /**
@@ -98,7 +104,8 @@ class CommercialDocumentController extends BaseApiController
                 'validatedBy', 'user', 'documentType', 'currency', 'fiscalYear',
             ]);
 
-            $f = $request->input('filter', []);
+            $f = (array) $request->input('filter', []);
+            $companyId = (int) app(\App\Services\CompanyContextService::class)->get();
 
             foreach (['document_type_id','fiscal_year_id','document_status_id','party_id','warehouse_id','user_id','pos_session_id'] as $field) {
                 if (isset($f[$field]) && $f[$field] !== '') {
@@ -160,6 +167,8 @@ class CommercialDocumentController extends BaseApiController
                 $hasWildcard = fn(string $n) => str_contains($n, '%') || str_contains($n, '_');
                 if (count($names) === 1 && !$hasWildcard($names[0])) {
                     $query->whereIn('party_id', fn($q) => $q->select('id')->from('parties')
+                        ->where('company_id', $companyId)
+                        ->whereNull('deleted_at')
                         ->where('name', 'like', $names[0]));
                 } else {
                     $query->whereHas('party', function ($q) use ($names) {
@@ -177,6 +186,8 @@ class CommercialDocumentController extends BaseApiController
                 $hasWildcard = fn(string $n) => str_contains($n, '%') || str_contains($n, '_');
                 if (count($names) === 1 && !$hasWildcard($names[0])) {
                     $query->whereIn('warehouse_id', fn($q) => $q->select('id')->from('warehouses')
+                        ->where('company_id', $companyId)
+                        ->whereNull('deleted_at')
                         ->where('name', 'like', $names[0]));
                 } else {
                     $query->whereHas('warehouse', function ($q) use ($names) {
