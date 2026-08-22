@@ -109,7 +109,7 @@ class AdminSystemSettingsController extends Controller
 
         $envPath = base_path('.env');
         if (!is_file($envPath)) {
-            return response()->json(['error' => 'ملف .env غير موجود.'], 500);
+            return response()->json(['message' => 'ملف .env غير موجود.'], 500);
         }
 
         // ── Step 1: Compute target driver values ──
@@ -133,20 +133,21 @@ class AdminSystemSettingsController extends Controller
                     DB::connection('mysql')->getPdo();
                     $reachable = true;
                 } catch (\Throwable $e) {
-                    $msg = $e->getMessage();
-                    // MySQL error 1049 = Unknown database, error 2005 = Unknown server
-                    if (str_contains($msg, 'Unknown database') || str_contains($msg, '1049')) {
-                        $dbCreated = $this->createMysqlDatabase($mysqlDb);
-                        if ($dbCreated) {
-                            DB::connection('mysql')->getPdo();
-                            $reachable = true;
-                        } else {
-                            $reachableError = "فشل إنشاء قاعدة البيانات '{$mysqlDb}'. تأكد من أن MySQL يعمل والمستخدم root具有 صلاحية CREATE DATABASE.";
+                    $reachableError = $e->getMessage();
+                    // MySQL error 1049 = Unknown database → auto-create then retry once
+                    if (str_contains($reachableError, 'Unknown database') || str_contains($reachableError, '1049')) {
+                        $createFail     = $this->createMysqlDatabase($mysqlDb);
+                        $reachableError = $createFail ?? $reachableError;
+                        if ($createFail === null) {
+                            $dbCreated = true;
+                            try {
+                                DB::connection('mysql')->getPdo();
+                                $reachable      = true;
+                                $reachableError = null;
+                            } catch (\Throwable $e2) {
+                                $reachableError = $e2->getMessage();
+                            }
                         }
-                    } else {
-                        $reachableError = "فشل الاتصال بـ MySQL: {$msg}\nتأكد من أن MySQL يعمل على "
-                            . config('database.connections.mysql.host') . ':'
-                            . config('database.connections.mysql.port');
                     }
                 }
             } else {
@@ -170,12 +171,11 @@ class AdminSystemSettingsController extends Controller
         }
 
         if (!$reachable) {
+            $failure = $this->describeDbFailure($target, $reachableError);
             return response()->json([
-                'error'   => "الاتصال بـ {$target} فشل.",
-                'detail'  => $reachableError,
-                'hint'    => $target === 'mysql'
-                    ? 'تأكد من تشغيل MySQL/XAMPP ثم أعد المحاولة.'
-                    : 'تأكد من وجود مجلد database/ والملف قابل للكتابة.',
+                'message' => $failure['message'],
+                'detail'  => $failure['detail'],
+                'hint'    => $failure['hint'],
             ], 500);
         }
 
@@ -227,8 +227,8 @@ class AdminSystemSettingsController extends Controller
         if ($written === false) {
             @unlink($tmpPath);
             return response()->json([
-                'error' => 'فشل كتابة ملف .env (tmp).',
-                'hint'  => 'تأكد من صلاحيات الكتابة في مجلد المشروع.',
+                'message' => 'فشل كتابة ملف .env (tmp).',
+                'hint'    => 'تأكد من صلاحيات الكتابة في مجلد المشروع.',
             ], 500);
         }
 
@@ -263,15 +263,15 @@ class AdminSystemSettingsController extends Controller
             'migrated'        => $migrated,
             'migration_error' => $migrationError,
             'env_verified'    => $envOk,
-            'hint'            => "الطلب التالي سي工作任务 على {$target} تلقائياً.",
+            'hint'            => "الطلب التالي سيعمل على {$target} تلقائياً.",
         ]);
     }
 
     /**
      * Create a MySQL database via raw PDO (bypasses Laravel connection config).
-     * Returns true on success.
+     * Returns null on success, or the raw failure message.
      */
-    private function createMysqlDatabase(string $dbName): bool
+    private function createMysqlDatabase(string $dbName): ?string
     {
         try {
             $host = config('database.connections.mysql.host', '127.0.0.1');
@@ -288,10 +288,129 @@ class AdminSystemSettingsController extends Controller
                 . "CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
 
             $pdo = null;
-            return true;
-        } catch (\Throwable) {
-            return false;
+            return null;
+        } catch (\Throwable $e) {
+            return $e->getMessage();
         }
+    }
+
+    /**
+     * Classify a raw DB connection failure into an EXACT Arabic diagnosis
+     * (server down / wrong credentials / missing extension / locked file...).
+     * Returns ['message' => .., 'detail' => <raw>, 'hint' => ..].
+     */
+    private function describeDbFailure(string $target, ?string $raw): array
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            $raw = 'سبب غير معروف.';
+        }
+        $low = mb_strtolower($raw);
+
+        if ($target === 'mysql') {
+            $host = config('database.connections.mysql.host', '127.0.0.1');
+            $port = config('database.connections.mysql.port', '3306');
+
+            // 1) PHP extension missing
+            if (str_contains($low, 'could not find driver')) {
+                return [
+                    'message' => 'إضافة PDO MySQL غير مفعّلة في PHP الحالي.',
+                    'detail'  => $raw,
+                    'hint'    => 'فعّل السطر extension=pdo_mysql في php.ini ثم أعد تشغيل الخادم.',
+                ];
+            }
+
+            // 2) Server not running / unreachable (2002 = can't connect via socket/host,
+            //    2003 = can't connect on port; Windows wording varies)
+            foreach (['[2002]', '[2003]', 'no connection could be made', 'connection refused', 'actively refused', 'unable to connect', 'connection timed out'] as $needle) {
+                if (str_contains($low, $needle)) {
+                    return [
+                        'message' => "خادم MySQL/MariaDB غير مشغّل أو غير قابل للوصول على {$host}:{$port}.",
+                        'detail'  => $raw,
+                        'hint'    => 'شغّل MySQL من لوحة تحكم XAMPP (زر Start أمام MySQL) ثم أعد المحاولة.',
+                    ];
+                }
+            }
+
+            // 3) Wrong username/password
+            foreach (['[1045]', 'access denied for user'] as $needle) {
+                if (str_contains($low, $needle)) {
+                    return [
+                        'message' => 'بيانات الدخول إلى MySQL غير صحيحة (المستخدم أو كلمة المرور).',
+                        'detail'  => $raw,
+                        'hint'    => 'تحقق من القيمتين DB_USERNAME و DB_PASSWORD في ملف .env ثم أعد المحاولة.',
+                    ];
+                }
+            }
+
+            // 4) Privilege problem (incl. CREATE DATABASE denied)
+            foreach (['[1044]', 'command denied'] as $needle) {
+                if (str_contains($low, $needle)) {
+                    return [
+                        'message' => 'المستخدم لا يملك صلاحية كافية على MySQL لتنفيذ العملية المطلوبة.',
+                        'detail'  => $raw,
+                        'hint'    => 'امنح المستخدم صلاحية CREATE DATABASE أو أنشئ قاعدة البيانات يدوياً من phpMyAdmin.',
+                    ];
+                }
+            }
+
+            // 5) Wrong host name
+            foreach (['[2005]', 'unknown mysql server host'] as $needle) {
+                if (str_contains($low, $needle)) {
+                    return [
+                        'message' => "اسم مضيف MySQL غير صحيح: {$host}.",
+                        'detail'  => $raw,
+                        'hint'    => 'استخدم 127.0.0.1 أو localhost في DB_HOST داخل ملف .env.',
+                    ];
+                }
+            }
+
+            // 6) Unknown database (auto-create failed earlier)
+            foreach (['[1049]', 'unknown database'] as $needle) {
+                if (str_contains($low, $needle)) {
+                    return [
+                        'message' => "قاعدة البيانات غير موجودة وفشل إنشاؤها تلقائياً.",
+                        'detail'  => $raw,
+                        'hint'    => 'أنشئ قاعدة البيانات يدوياً من phpMyAdmin أو تأكد من صلاحية CREATE DATABASE للمستخدم.',
+                    ];
+                }
+            }
+        } else {
+            // ── SQLite ──
+            foreach (['[14]', 'unable to open database file'] as $needle) {
+                if (str_contains($low, $needle)) {
+                    return [
+                        'message' => 'تعذّر فتح ملف SQLite (قاعدة البيانات المحلية).',
+                        'detail'  => $raw,
+                        'hint'    => 'تأكد من وجود الملف داخل مجلد database/ وأن المجلد قابل للكتابة وأن الملف غير مقفل من برنامج آخر (مثل DB Browser).',
+                    ];
+                }
+            }
+            foreach (['readonly database', '[8]', 'attempt to write'] as $needle) {
+                if (str_contains($low, $needle)) {
+                    return [
+                        'message' => 'ملف SQLite للقراءة فقط — لا يمكن الكتابة عليه.',
+                        'detail'  => $raw,
+                        'hint'    => 'أعطِ صلاحية الكتابة على ملف database/database.sqlite ومجلد database/.',
+                    ];
+                }
+            }
+            if (str_contains($low, 'file is not a database') || str_contains($low, '[26]')) {
+                return [
+                    'message' => 'ملف SQLite تالف أو ليس ملف قاعدة بيانات صالحاً.',
+                    'detail'  => $raw,
+                    'hint'    => 'استعد نسخة احتياطية سليمة من قاعدة البيانات أو أنشئ ملفاً جديداً.',
+                ];
+            }
+        }
+
+        return [
+            'message' => "الاتصال بـ {$target} فشل.",
+            'detail'  => $raw,
+            'hint'    => $target === 'mysql'
+                ? 'تحقق من إعدادات MySQL (DB_HOST / DB_PORT / DB_USERNAME) في .env ثم أعد المحاولة.'
+                : 'تحقق من مسار ملف SQLite في .env ثم أعد المحاولة.',
+        ];
     }
 
     public function index(): JsonResponse

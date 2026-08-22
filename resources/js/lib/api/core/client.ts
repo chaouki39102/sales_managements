@@ -37,6 +37,8 @@ export interface ApiErrorPayload {
   message: string;
   code?:   string;
   errors?: Record<string, string[]>;
+  detail?: string;
+  hint?:   string;
 }
 
 export class ApiError extends Error {
@@ -45,6 +47,8 @@ export class ApiError extends Error {
     public readonly code:   string,
     public readonly errors: Record<string, string[]>,
     message: string,
+    public readonly detail?: string,
+    public readonly hint?:   string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -59,6 +63,8 @@ function makeError(status: number, p?: ApiErrorPayload): ApiError {
     p?.code   ?? 'UNKNOWN',
     p?.errors ?? {},
     p?.message ?? 'حدث خطأ غير متوقع',
+    p?.detail,
+    p?.hint,
   );
 }
 
@@ -253,7 +259,7 @@ client.interceptors.response.use(
     if (status === 405) return Promise.reject(makeError(405, { message: 'الإجراء غير مدعوم على هذا المسار',           code: 'METHOD_NOT_ALLOWED' }));
     if (status === 422) return Promise.reject(makeError(422, data));
     if (status === 429) return Promise.reject(makeError(429, { message: 'تجاوزت الحد المسموح',                        code: 'RATE_LIMITED' }));
-    if (status && status >= 500) return Promise.reject(makeError(status, { message: data?.message ?? 'خطأ في الخادم', code: 'SERVER_ERROR' }));
+    if (status && status >= 500) return Promise.reject(makeError(status, { message: data?.message ?? 'خطأ في الخادم', code: 'SERVER_ERROR', detail: (data as ApiErrorPayload | undefined)?.detail, hint: (data as ApiErrorPayload | undefined)?.hint }));
     if (!error.response) return Promise.reject(makeError(0, {
       message: error.code === 'ECONNABORTED' ? 'انتهت مهلة الطلب' : 'لا يوجد اتصال',
       code:    error.code === 'ECONNABORTED' ? 'TIMEOUT' : 'NETWORK_ERROR',

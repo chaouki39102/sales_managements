@@ -2,6 +2,9 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import { registerOfflineInterceptor } from '@/lib/offline/offlineAwareApi';
+import { onOtherTabMutation } from '@/lib/api/core/crossTab';
+import { queryClient } from '@/lib/api/core/queryClient';
+import { invalidatePosQueries } from '@/lib/api/core/queryKeys';
 import '@tabler/icons-webfont/dist/tabler-icons.min.css';
 
 if ('serviceWorker' in navigator) {
@@ -11,6 +14,12 @@ if ('serviceWorker' in navigator) {
 }
 
 registerOfflineInterceptor();
+
+// مزامنة التبويبات: mutation في تبويب آخر → إبطال بيانات POS هنا فوراً
+// (POS مفتوح في تبويب ثاني يُحدَّث مباشرة عند إضافة مخزون/منتج/مستند)
+onOtherTabMutation((slug) => {
+  invalidatePosQueries(queryClient, slug);
+});
 
 // تأجيل تسجيل الدوال المتقدمة للطباعة — لا تحتاج إلا عند أول طباعة
 // يُحوِّل 526 سطر من المسار الحرج إلى chunk منفصل يُحمَّل عند الطلب

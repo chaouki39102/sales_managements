@@ -155,10 +155,21 @@ export default function AdminSettingsPage() {
     staleTime: 30_000,
   });
 
+  const [dbSwitchError, setDbSwitchError] = useState<{ message: string; detail?: string; hint?: string } | null>(null);
+
   const dbSwitchMut = useMutation({
     mutationFn: (driver: string) => dbApi.switchTo(driver),
     onSuccess: (data) => {
+      setDbSwitchError(null);
       qc.invalidateQueries({ queryKey: ['admin', 'system', 'db-status'] });
+      if (data.migrated === false && data.migration_error) {
+        setDbSwitchError({
+          message: 'تم التبديل لكن فشل تشغيل الترحيلات (migrate) على القاعدة الجديدة.',
+          detail:  data.migration_error,
+        });
+        notify.error(data.message ?? 'تم التبديل مع أخطاء ترحيل');
+        return;
+      }
       notify.success(data.message ?? 'تم التبديل ✓');
       // Prompt for server restart after a short delay
       setTimeout(async () => {
@@ -168,9 +179,13 @@ export default function AdminSettingsPage() {
       }, 1500);
     },
     onError: (e: any) => {
-      const msg = e?.error ?? e?.message ?? 'فشل التبديل';
-      const detail = e?.detail ? `\n${e.detail}` : '';
-      notify.error(msg + detail);
+      const err = {
+        message: e?.message ?? e?.error ?? 'فشل التبديل',
+        detail:  e?.detail,
+        hint:    e?.hint,
+      };
+      setDbSwitchError(err);
+      notify.error(err.message);
     },
   });
 
@@ -527,6 +542,35 @@ export default function AdminSettingsPage() {
                 {dbStatus.current_driver === 'mysql' && <span style={{ fontSize: 10, opacity: 0.7 }}>(الحالية)</span>}
               </button>
             </div>
+
+            {dbSwitchError && (
+              <div style={{
+                marginTop: 12, padding: '10px 12px', borderRadius: 9,
+                background: '#ef444415', border: '1px solid #ef444440',
+                display: 'flex', gap: 10, alignItems: 'flex-start',
+              }}>
+                <i className="ti ti-alert-triangle" style={{ color: '#ef4444', fontSize: 16, marginTop: 2 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: '#ef4444', fontSize: 12.5, fontWeight: 700 }}>{dbSwitchError.message}</div>
+                  {dbSwitchError.detail && (
+                    <div style={{ color: 'var(--t3)', fontSize: 11.5, marginTop: 4, wordBreak: 'break-word', direction: 'ltr', textAlign: 'left' }}>
+                      {dbSwitchError.detail}
+                    </div>
+                  )}
+                  {dbSwitchError.hint && (
+                    <div style={{ color: '#f59e0b', fontSize: 11.5, marginTop: 6 }}>
+                      <i className="ti ti-bulb" style={{ marginInlineEnd: 4 }} />{dbSwitchError.hint}
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => setDbSwitchError(null)}
+                  title="إغلاق"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--t3)', padding: 2, lineHeight: 1 }}>
+                  <i className="ti ti-x" />
+                </button>
+              </div>
+            )}
           </>
         ) : (
           <div style={{ padding: '14px 0', color: 'var(--t4)', fontSize: 12 }}>تعذّر جلب الحالة</div>

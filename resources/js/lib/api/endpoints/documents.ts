@@ -17,6 +17,7 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiGet, apiPost, apiPut, apiDelete } from '../core/client';
 import { tenantKeys, invalidatePosQueries } from '../core/queryKeys';
+import { notifyOtherTabs } from '../core/crossTab';
 import { useActiveSlug } from '../../store/appStore';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 import type {
@@ -305,6 +306,7 @@ export function useDocumentMutations() {
       qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
       // المستندات تغيّر المخزون والأرصدة — حدّث بيانات POS مباشرة
       invalidatePosQueries(qc, slug);
+      notifyOtherTabs(slug);
     }
   };
 
@@ -313,6 +315,7 @@ export function useDocumentMutations() {
       qc.setQueryData(tenantKeys.documents.detail(slug, doc.id), doc);
       qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
       invalidatePosQueries(qc, slug);
+      notifyOtherTabs(slug);
     }
   };
 

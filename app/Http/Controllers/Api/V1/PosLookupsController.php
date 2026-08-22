@@ -20,22 +20,34 @@ class PosLookupsController extends Controller
     {
         $companyId = $ctx->get();
 
+        // NOTE: warehouses table has NO is_default column (both drivers).
+        // The default-warehouse SSOT is the setting default_warehouse_id
+        // (same source CommercialDocumentService uses) — computed per row below.
+        $defaultWarehouseId = Setting::getSetting('default_warehouse_id', null, $companyId);
+
+        $warehouses = Warehouse::select('id', 'name', 'code', 'active')
+            ->where('active', true)->orderBy('name')->get()
+            ->each(function (Warehouse $w) use ($defaultWarehouseId) {
+                $w->is_default = $defaultWarehouseId !== null
+                    && $defaultWarehouseId !== ''
+                    && (int) $w->id === (int) $defaultWarehouseId;
+            });
+
         $data = [
-            'warehouses'       => Warehouse::select('id', 'name', 'code', 'is_default', 'active')
-                ->where('active', true)->orderBy('name')->get(),
+            'warehouses'       => $warehouses,
             'documentTypes'    => DB::table('document_types as dt')
                 ->join('document_base_operations as dbo', 'dt.document_base_operation_id', '=', 'dbo.id')
                 ->where('dt.company_id', $companyId)
                 ->where('dt.active', true)
                 ->select('dt.id', 'dt.name', 'dt.code', 'dbo.name as operation', 'dt.affects_accounting', 'dt.requires_party')
                 ->orderBy('dt.name')->get(),
-            'priceLevels'      => PriceLevel::select('id', 'name', 'code', 'active')
+            'priceLevels'      => PriceLevel::select('id', 'name', 'active')
                 ->where('active', true)->orderBy('name')->get(),
-            'currencies'       => Currency::select('id', 'name', 'code', 'symbol', 'is_base_currency', 'exchange_rate', 'active')
+            'currencies'       => Currency::select('id', 'name', 'code', 'symbol', 'is_base_currency', 'active')
                 ->where('active', true)->orderBy('name')->get(),
             'paymentModes'     => PaymentMode::select('id', 'name', 'code', 'requires_reference', 'active')
                 ->where('active', true)->orderBy('name')->get(),
-            'treasuryAccounts' => TreasuryAccount::select('id', 'name', 'code', 'type', 'is_default', 'active')
+            'treasuryAccounts' => TreasuryAccount::select('id', 'name', 'code', 'is_default', 'active')
                 ->where('active', true)->orderBy('name')->get(),
             'fiscalYears'      => FiscalYear::select('id', 'name', 'start_date', 'end_date', 'is_current', 'is_closed')
                 ->where('is_closed', false)

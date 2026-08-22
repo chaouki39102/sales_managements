@@ -36,7 +36,15 @@ class InventoryStockService
      */
     public static function invalidateCache(int $companyId): void
     {
-        Cache::increment('stock-at-version:' . $companyId);
+        $key = 'stock-at-version:' . $companyId;
+
+        // ⚠️ Cache::increment على مخزن database لا يفعل شيئاً إذا كان المفتاح
+        // غير موجود (UPDATE بلا صفوف) — فيبقى الإصدار 0 للأبد وتُخدَم البيانات
+        // القديمة حتى انتهاء TTL. لذلك: مهّد المفتاح أولاً ثم زِده.
+        if (!Cache::increment($key)) {
+            $current = (int) Cache::get($key, 0);
+            Cache::put($key, $current + 1, now()->addDays(7));
+        }
     }
 
     private static function stockVersion(int $companyId): int

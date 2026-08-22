@@ -19,6 +19,7 @@ import {
 } from '@tanstack/react-query';
 import { apiGet, apiPost, apiPut, apiDelete, apiUpload } from '../core/client';
 import { tenantKeys, invalidatePosQueries } from '../core/queryKeys';
+import { notifyOtherTabs } from '../core/crossTab';
 import { useActiveSlug } from '../../store/appStore';
 import type {
   Product,
@@ -311,6 +312,7 @@ export function useProductMutations() {
     if (slug) {
       qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
       invalidatePosQueries(qc, slug);
+      notifyOtherTabs(slug);
     }
   };
 
@@ -319,6 +321,7 @@ export function useProductMutations() {
       qc.setQueryData(tenantKeys.products.detail(slug, product.id), product);
       qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
       invalidatePosQueries(qc, slug);
+      notifyOtherTabs(slug);
     }
   };
 
