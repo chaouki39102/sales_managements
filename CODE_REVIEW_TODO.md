@@ -1,6 +1,6 @@
 # CODE_REVIEW_TODO.md — Full Code Review Checklist
 
-> Status: **Section 3 COMPLETE** (Aug 22, 2026). Next up: **Section 4 — POS Classic + Pro + Mobile**. Pick up any time, task-by-task.
+> Status: **Section 4 COMPLETE** (Aug 22, 2026). Next up: **Section 5 — Portal (Admin + Customer)**. Pick up any time, task-by-task.
 
 ## How to use
 - Work task-by-task (one section at a time)
@@ -58,24 +58,24 @@
 
 ## Section 4 — POS Classic + Pro + Mobile
 
-- [ ] `resources/js/pages/pos/POSPage.tsx` — classic POS
-- [ ] `resources/js/pos-pro/POSProPage.tsx` — POS Pro desktop
-- [ ] `resources/js/pos-pro/POSProMobilePage.tsx` — POS Pro mobile
-- [ ] `resources/js/pages/pos/POSKioskPage.tsx` — kiosk POS
-- [ ] `resources/js/pos/utils/useCartStore.ts` — classic cart store
-- [ ] `resources/js/pos-pro/store/usePosProCart.ts` — Pro cart store
-- [ ] `resources/js/pos/hooks/usePOSStore.ts` — classic POS state
-- [ ] `resources/js/pos-pro/hooks/usePosPro.ts` — Pro state hook
-- [ ] `resources/js/pos-pro/hooks/usePosProKeyboardShortcuts.ts` — keyboard shortcuts
-- [ ] `resources/js/pos/components/ProfessionalCart.tsx` — classic cart
-- [ ] `resources/js/pos-pro/components/POSProCart.tsx` — Pro cart
-- [ ] `resources/js/pos/components/ProfessionalPaymentModal.tsx` — payment modal
-- [ ] `resources/js/pos-pro/components/POSProScanbar.tsx` — scanbar
-- [ ] `resources/js/pos/components/ProductGrid.tsx` — product grid
-- [ ] `resources/js/pos-pro/components/ReorderableTopCards.tsx` — draggable cards
-- [ ] `resources/js/pos-pro/components/POSProTopCards.tsx` — top cards
-- [ ] `resources/js/pos/utils/calculations.ts` — POS math
-- [ ] `resources/js/pos/utils/printService.ts` — print service
+- [x] `resources/js/pages/pos/POSPage.tsx` — classic POS
+- [x] `resources/js/pos-pro/POSProPage.tsx` — POS Pro desktop
+- [x] `resources/js/pos-pro/POSProMobilePage.tsx` — POS Pro mobile
+- [x] `resources/js/pages/pos/POSKioskPage.tsx` — kiosk POS
+- [x] `resources/js/pos/utils/useCartStore.ts` — classic cart store
+- [x] `resources/js/pos-pro/store/usePosProCart.ts` — Pro cart store
+- [x] `resources/js/pos/hooks/usePOSStore.ts` — classic POS state
+- [x] `resources/js/pos-pro/hooks/usePosPro.ts` — Pro state hook
+- [x] `resources/js/pos-pro/hooks/usePosProKeyboardShortcuts.ts` — keyboard shortcuts
+- [x] `resources/js/pos/components/ProfessionalCart.tsx` — classic cart
+- [x] `resources/js/pos-pro/components/POSProCart.tsx` — Pro cart
+- [x] `resources/js/pos/components/ProfessionalPaymentModal.tsx` — payment modal
+- [x] `resources/js/pos-pro/components/POSProScanbar.tsx` — scanbar
+- [x] `resources/js/pos/components/ProductGrid.tsx` — product grid
+- [x] `resources/js/pos-pro/components/ReorderableTopCards.tsx` — draggable cards
+- [x] `resources/js/pos-pro/components/POSProTopCards.tsx` — top cards
+- [x] `resources/js/pos/utils/calculations.ts` — POS math
+- [x] `resources/js/pos/utils/printService.ts` — print service
 
 ## Section 5 — Portal (Admin + Customer)
 
@@ -233,6 +233,15 @@
 | 40 | 3 | Info | Observation | `prepareOffline.ts` ↔ `useOfflineReadiness` | prefetch | Prefetch vs real POS queries build params objects independently — JSON.stringify key-order differences could produce offline-cache misses (pre-existing design risk, harmless: just a refetch when online) | Observation |
 | 41 | 3 | Info | Observation | `db.ts` | queue helpers | Minor notes: `markOpFailed` uses two transactions (race window moot under single-flight sync); `clearPendingOps()` is cross-tenant but only invoked by test specs (grep-verified); `scopedBySlug(undefined)` intentionally returns all rows (documented). DB_VERSION 2 + repair-in-place upgrade matches Phase 68 follow-up rules | Observation |
 | 42 | 3 | Info | Observation | `client.ts` | ~L253 | Cosmetic Chinese character 例 inside an Arabic comment; no functional impact | Observation |
+| 43 | 4 | Info | Observation | `useCartStore.ts` | ~267 | `clearCart()` correctly resets `invoiceDiscountPct: 0` — consistent with pro store (`usePosProCart.ts:301`). No bug | Verified |
+| 44 | 4 | Info | Observation | `useCartStore.ts` | 86–88 | Classic store has no `holdCart` method — hold/restore lifecycle lives entirely in POSPage component state (refs + `clearCart`/`restoreCart`). Separation is intentional, not a gap | Verified |
+| 45 | 4 | Info | Observation | `usePosProCart.ts` | 312–333 | `holdCart()` is atomic: single `set()` call snapshots entire state then pushes to `heldCarts`. No race window between snapshot and clear | Verified |
+| 46 | 4 | Info | Observation | `usePosProCart.ts` | 335–344 | `restoreCart()` correctly restores `documentId`, `documentNumber`, `documentDate` from held cart. Phase 46 fix (cart-store document provenance) is intact | Verified |
+| 47 | 4 | Info | Observation | `calculations.ts` | 86–88 | `recalcItem` fixed-amount early-return does not reset `discount_percentage` — correct by design because `discount_amount` is the sole input in this branch and totals derive from it | Verified |
+| 48 | 4 | Info | Observation | `ProfessionalPaymentModal.tsx` | 47–50 | `onConfirm` is required (not optional) in `ProfessionalPaymentModalProps` — no null-guard needed. `onClose` IS optional and correctly guarded via `onClose?.()` | Verified |
+| 49 | 4 | Info | Observation | `usePosProKeyboardShortcuts.ts` | 60–82 | Global event listener has `anyModalOpen` guard (checks modal overlays, customer sheet, held sheet, discount popover, etc.) — shortcuts correctly disabled when any UI panel is open | Verified |
+| 50 | 4 | Info | Observation | `POSPage.tsx` + `POSProPage.tsx` | 878 / 928 | Both pages compute `effectiveTotalHt/Tva` identically: `gross = qty × unitPrice × packQty`, `ht = gross − discount`, `tva = ht × tvaRate/100`. Classic reads `snapshot.totals`, Pro reads `pos.totals` — same underlying values | Verified |
+| 51 | 4 | Info | Observation | `ReorderableTopCards.tsx` | — | Pointer-based drag-swap with 6px threshold, `setPointerCapture`, localStorage persistence. Interactive elements (`button,a,input,select,textarea`) excluded via `closest()` — no click/swap conflict | Verified |
 
 ---
 
@@ -243,3 +252,4 @@
 | 1 — Backend Services | Aug 22, 2026 | 13 fixed + 3 observations (rows 1–16 above; rows 1–9 in `ea4eb22`, rows 10–13 this commit) | `ea4eb22` + section commit |
 | 2 — Backend Controllers + Models + Routes | Aug 22, 2026 | 16 fixed + 2 observations (rows 17–34 above). Clean: CommercialDocument model, Party model, CommercialDocumentObserver, DataAuditSubscriber, api_admin.php | section commit |
 | 3 — Frontend Core + Offline | Aug 22, 2026 | 3 fixed + 5 observations (rows 35–42 above). Clean: types.ts, queryKeys.ts, syncEngine.ts, AuthContext.tsx, FiscalYearContext.tsx, DashboardLayout.tsx. Verified: tsc clean, vitest 391/391 (21 files) | section commit |
+| 4 — POS Classic + Pro + Mobile | Aug 22, 2026 | 0 fixed + 9 observations (rows 43–51 above). Clean: all 18 files verified — cart stores, payment modal, keyboard shortcuts, calculations, product grid, scanbar, top cards, draggable cards, print service. Verified: tsc clean, vitest 391/391 | section commit |
