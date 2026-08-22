@@ -186,11 +186,15 @@ class PortalOrderService
 
         $this->documents->update($doc, $payload);
 
+        // قراءة واحدة بعد التحديث بدل ثلاث — fresh() يستعلم قاعدة البيانات
+        // في كل نداء، والقيم الثلاث تُقرأ من نفس الصف.
+        $freshDoc = $doc->fresh();
+
         $order->forceFill([
             'notes'      => $data['notes'] ?? $order->notes,
-            'total_ht'   => $doc->fresh()->total_ht,
-            'total_tva'  => $doc->fresh()->total_tva,
-            'total_ttc'  => $doc->fresh()->total_ttc,
+            'total_ht'   => $freshDoc->total_ht,
+            'total_tva'  => $freshDoc->total_tva,
+            'total_ttc'  => $freshDoc->total_ttc,
         ])->save();
 
         return $order->load('document.lines.product', 'party');
@@ -646,6 +650,17 @@ class PortalOrderService
         // التحويل (إنشاء الفاتورة) + تسجيل الدفعة الاختيارية + كتابة الحالة
         // في معاملة واحدة — لا يمكن أن يبقى الطلب محوّلاً دون دفعة/سجل تام.
         return DB::transaction(function () use ($order, $targetCode, $payment) {
+            // إعادة قراءة الطلب تحت قفل صفّي داخل المعاملة: الفحصان أعلاه
+            // (is_converted والحالة) جريا خارجها، وطلبا تحويل متزامنان قد
+            // يجتازانهما معاً قبل أن يكتب أحدهما. القفل يُجبر الثاني على رؤية
+            // النتيجة المكتوبة فيخرج بـ 409 بدل تحويل مزدوج.
+            // (lockForUpdate لا أثر له على SQLite في بيئة التطوير، ويعمل على MySQL.)
+            $locked = PortalOrder::query()->whereKey($order->getKey())->lockForUpdate()->first();
+            if (!$locked || $locked->is_converted) {
+                throw new BusinessRuleException('تم تحويل هذا الطلب إلى فاتورة مسبقاً — التحويل مسموح مرة واحدة فقط.', 409);
+            }
+            $order = $locked;
+
             $doc = $order->document ?? throw new ModelNotFoundException('المستند المرتبط بالطلب غير موجود');
 
             // لا تحقق مكرر من الهدف هنا: DocumentConversionService::convert يتحقق
@@ -992,6 +1007,11 @@ class PortalOrderService
         $transactionId = $verified['transaction_id'] ?? null;
 
         return DB::transaction(function () use ($order, $status, $transactionId) {
+            // قفل صفّي داخل المعاملة: إشعارا دفع متزامنان (إعادة تسليم من
+            // البوابة) قد يقرآن الحالة قبل كتابة أحدهما فيُطبَّقان معاً.
+            // القفل يجعل الثاني يرى النتيجة الأولى ويخرج idempotently.
+            $order = PortalOrder::query()->whereKey($order->getKey())->lockForUpdate()->first() ?? $order;
+
             if ($order->payment_status === PortalOrder::PAYMENT_SUCCEEDED) {
                 if ($transactionId && $order->payment_transaction_id
                     && (string) $transactionId !== (string) $order->payment_transaction_id) {

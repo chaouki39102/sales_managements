@@ -1,6 +1,6 @@
 # CODE_REVIEW_TODO.md — Full Code Review Checklist
 
-> Status: **PENDING** — Created Aug 21, 2026. Pick up any time, task-by-task.
+> Status: **Section 1 COMPLETE** (Aug 22, 2026). Next up: **Section 2 — Backend Controllers + Models + Routes**. Pick up any time, task-by-task.
 
 ## How to use
 - Work task-by-task (one section at a time)
@@ -12,16 +12,16 @@
 
 ## Section 1 — Backend Services
 
-- [ ] `app/Services/CommercialDocumentService.php` — core doc service (stock movements, payments, totals, integrity gate)
-- [ ] `app/Services/PaymentSynchronizer.php` — payment lifecycle
-- [ ] `app/Services/Portal/PortalOrderService.php` — portal order logic
-- [ ] `app/Services/ImportService.php` — product import + pending entities
-- [ ] `app/Services/InventoryStockService.php` — stock computation
-- [ ] `app/Services/InventoryValuationService.php` — weighted average PMP
-- [ ] `app/Services/TransactionIntegrityService.php` — money gate
-- [ ] `app/Services/ReportService.php` — all reports
-- [ ] `app/Services/PartyBalanceService.php` — party balance
-- [ ] `app/Services/SettingService.php` — settings cache
+- [x] `app/Services/CommercialDocumentService.php` — core doc service (stock movements, payments, totals, integrity gate)
+- [x] `app/Services/PaymentSynchronizer.php` — payment lifecycle
+- [x] `app/Services/Portal/PortalOrderService.php` — portal order logic
+- [x] `app/Services/ImportService.php` — product import + pending entities
+- [x] `app/Services/InventoryStockService.php` — stock computation
+- [x] `app/Services/InventoryValuationService.php` — weighted average PMP
+- [x] `app/Services/TransactionIntegrityService.php` — money gate
+- [x] `app/Services/ReportService.php` — all reports
+- [x] `app/Services/PartyBalanceService.php` — party balance
+- [x] `app/Services/SettingService.php` — settings cache
 
 ## Section 2 — Backend Controllers + Models + Routes
 
@@ -191,7 +191,22 @@
 
 | # | Section | Severity | Category | File | Line | Description | Fix Status |
 |---|---------|----------|----------|------|------|-------------|------------|
-| | | | | | | | |
+| 1 | 1 | High | Soft-delete guard | `ReportService.php` | many | 33 raw `DB::table` queries missing `whereNull('deleted_at')` — soft-deleted docs/lines/payments/movements polluted every report | Fixed (`ea4eb22`) |
+| 2 | 1 | Medium | Logic bug | `ReportService.php` | aging | Aging report bucketed by today instead of the report's ref date → wrong buckets for historical dates | Fixed (`ea4eb22`) |
+| 3 | 1 | High | Transaction boundary | `CommercialDocumentService.php` | validateDocument | Validation ran outside the create/update transaction — a failing doc could pass validation then fail mid-write with no re-check inside the transaction | Fixed (`ea4eb22`) |
+| 4 | 1 | High | State consistency | `CommercialDocumentService.php` | afterUpdate | Line edits did not refresh document amounts/status (validated_by, paid status) after line replacement | Fixed (`ea4eb22`) |
+| 5 | 1 | Low | Dead code | `CommercialDocumentService.php` | stock movements | Movement create payload carried a dead `commercial_document_id` key (`stock_movements` has only `commercial_document_line_id`) | Fixed (`ea4eb22`) |
+| 6 | 1 | Medium | Guard | `PaymentSynchronizer.php` | syncPayments | Switching a payment to a treasury mode kept stale cash fields; portal-context payments wrote null `user_id` | Fixed (`ea4eb22`) |
+| 7 | 1 | Medium | Robustness | `TransactionIntegrityService.php` | stamp check | Fiscal-stamp verification threw on corrupt totals (turning the gate into a crash); float clamp removed per spec | Fixed (`ea4eb22`) |
+| 8 | 1 | Medium | Cache invalidation | `SettingService.php` | set | Per-key writes did not forget that key's cache (only bulk forget existed) — stale reads for 24h TTL keys | Fixed (`ea4eb22`) |
+| 9 | 1 | Medium | Parsing | `ImportService.php` | mapWithKeys/parsers | String-cast row keys broke numeric lookups; number/date parsers mishandled locale formats and rc_date column | Fixed (`ea4eb22`) |
+| 10 | 1 | High | Fiscal-year scope | `PartyBalanceService.php` | getHistory/getDetailedHistory | Statement documents + payments queries missing `fiscal_year_id` filter — statement Σ never matched the balance endpoint for multi-year data (every other method in the class was scoped) | Fixed |
+| 11 | 1 | Medium | Race condition | `PortalOrderService.php` | convertToSale / settlePayment | `is_converted` / `payment_status` read outside the transaction — concurrent convert calls or webhook redeliveries could both pass the check on MySQL. Now: `lockForUpdate` row re-read inside each transaction (no-op on SQLite dev, enforced on MySQL) | Fixed |
+| 12 | 1 | Low | Performance | `PortalOrderService.php` | update() | `$doc->fresh()` called 3× = 3 redundant queries; single fresh instance reused | Fixed |
+| 13 | 1 | Low | Data safety + dead code | `InventoryValuationService.php` | updateWeightedAverage/getFIFOCost | PMP stored a NEGATIVE cost when value_out > value_in with qty > 0 (corrupt data) — now guarded; unused `$usedLots` accumulation removed | Fixed |
+| 14 | 1 | Info | Observation | `InventoryValuationService.php` | FIFO/LIFO | FIFO and LIFO getters are near-duplicates (~40 lines) — candidate for extraction, left as-is (working money code) | Observation |
+| 15 | 1 | Info | Observation | `InventoryValuationService.php` | PMP | Weighted average intentionally excludes opening-balance stock (established design from Phase 49 era); getProductRecap excludes zero-cost lines from effective cost (margins slightly optimistic there) | Observation |
+| 16 | 1 | Info | Observation | `app/Models/Traits/HasCompany.php` | comments | Pre-existing mojibake in Arabic comments (unrecoverable bytes, cosmetic only). Trait itself is correct: global CompanyScope via bootHasCompany explains why Eloquent queries need no manual company_id filters | Observation |
 
 ---
 
@@ -199,4 +214,4 @@
 
 | Section | Date | Findings | Commit |
 |---------|------|----------|--------|
-| | | | |
+| 1 — Backend Services | Aug 22, 2026 | 13 fixed + 3 observations (rows 1–16 above; rows 1–9 in `ea4eb22`, rows 10–13 this commit) | `ea4eb22` + section commit |

@@ -56,7 +56,9 @@ class InventoryValuationService
             $currentStockQty = $result->total_qty_in - ($result->total_qty_out ?? 0);
             $currentStockValue = $result->total_value_in - ($result->total_value_out ?? 0);
 
-            if ($currentStockQty > 0) {
+            // حارس سلامة: قيمة مخزون سالبة مع كمية موجبة تعني بيانات تالفة
+            // (قيمة خروج تفوق قيمة الدخول) — تخطَّ التحديث بدل تخزين PMP سامّ.
+            if ($currentStockQty > 0 && $currentStockValue > 0) {
                 $pmp = $currentStockValue / $currentStockQty;
                 $product->update(['current_cost_price' => round($pmp, 4)]);
             }
@@ -106,7 +108,6 @@ class InventoryValuationService
 
         $remainingQty = $quantity;
         $totalCost = 0.0;
-        $usedLots = [];
 
         foreach ($lots as $lot) {
             if ($remainingQty <= 0) break;
@@ -114,11 +115,6 @@ class InventoryValuationService
             $qtyFromLot = min($lot->remaining_quantity, $remainingQty);
             $totalCost += $qtyFromLot * $lot->purchase_price;
             $remainingQty -= $qtyFromLot;
-
-            $usedLots[] = [
-                'lot' => $lot,
-                'quantity' => $qtyFromLot
-            ];
         }
 
         if ($remainingQty > 0) {
