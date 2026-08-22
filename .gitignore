@@ -31,3 +31,7 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# machine-generated DB-switch backups + stray dump artifacts
+.env.bak-*
+public/sales_management/
