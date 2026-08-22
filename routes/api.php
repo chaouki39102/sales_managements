@@ -200,7 +200,7 @@ Route::prefix('v1')->group(function () {
         // خلف المصادقة. `throttle` يمنع إغراق إنشاء الطلبات من الزوار.
         Route::get('/orders/catalog', [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'catalog']);
         Route::post('/orders', [\App\Http\Controllers\Api\V1\Portal\PortalOrderController::class, 'store'])
-            ->middleware('throttle:20,1');
+            ->middleware('throttle:60,1');
         // تتبع طلب الزائر برقم هاتفه — بدون حساب، يُرجع طلباته العامة فقط.
         // حد مرتفع نسبياً: الزائر القادم من صفحة الطلب يبحث تلقائياً عند فتح
         // الصفحة وقد يعيد فتحها/البحث عدة مرات أثناء انتظار معالجة طلبه —

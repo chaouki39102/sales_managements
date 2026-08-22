@@ -158,6 +158,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
   const showNotes = cfg?.show_notes ?? true;
 
   const createOrder = useMutation({
+    retry: false,
     mutationFn: ({ items, note }: { items: { product_id: number; quantity: number; packaging_id?: number | null }[]; note?: string }) =>
       isPublic
         ? portalApi.createPublicOrder(
@@ -193,6 +194,7 @@ export default function PortalOrdersPage({ mode = 'portal' }: { mode?: 'portal' 
   });
 
   const updateOrder = useMutation({
+    retry: false,
     mutationFn: ({ id, items, note }: { id: number; items: { product_id: number; quantity: number; packaging_id?: number | null }[]; note?: string }) =>
       portalApi.updateOrder(id, items, note),
     onSuccess: (order) => {

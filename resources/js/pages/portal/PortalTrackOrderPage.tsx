@@ -59,6 +59,7 @@ export default function PortalTrackOrderPage() {
   }, [location.state]);
 
   const trackMutation = useMutation({
+    retry: false,
     mutationFn: ({ phone: p, reference: r }: { phone: string; reference?: string }) =>
       portalApi.trackOrder(p, r),
     onSuccess: (orders) => {
