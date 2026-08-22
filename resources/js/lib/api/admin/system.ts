@@ -56,8 +56,6 @@ export const maintenanceApi = {
   enable:    (msg?: string)  => apiPost('/admin/system/maintenance/enable',   { message: msg }),
   disable:   ()              => apiPost('/admin/system/maintenance/disable'),
   cache:     ()              => apiPost('/admin/system/maintenance/cache-clear'),
-  scheduler: ()              => apiPost<{ message: string }>('/admin/system/maintenance/scheduler'),
-  backup:    ()              => apiPost<{ message: string; path?: string }>('/admin/system/maintenance/backup'),
 } as const;
 
 export const systemBootApi = {

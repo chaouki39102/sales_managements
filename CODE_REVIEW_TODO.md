@@ -1,6 +1,6 @@
 # CODE_REVIEW_TODO.md — Full Code Review Checklist
 
-> Status: **Section 2 COMPLETE** (Aug 22, 2026). Next up: **Section 3 — Frontend Core + Offline**. Pick up any time, task-by-task.
+> Status: **Section 3 COMPLETE** (Aug 22, 2026). Next up: **Section 4 — POS Classic + Pro + Mobile**. Pick up any time, task-by-task.
 
 ## How to use
 - Work task-by-task (one section at a time)
@@ -42,19 +42,19 @@
 
 ## Section 3 — Frontend Core + Offline
 
-- [ ] `resources/js/lib/api/core/client.ts` — API client, interceptors, extractData
-- [ ] `resources/js/lib/api/core/types.ts` — core types
-- [ ] `resources/js/lib/api/core/queryKeys.ts` — query key factory
-- [ ] `resources/js/lib/api/admin/system.ts` — admin DB switch API
-- [ ] `resources/js/lib/offline/db.ts` — IndexedDB layer
-- [ ] `resources/js/lib/offline/offlineAwareApi.ts` — offline interceptor
-- [ ] `resources/js/lib/offline/syncEngine.ts` — sync engine
-- [ ] `resources/js/lib/offline/useOffline.ts` — offline hooks
-- [ ] `resources/js/lib/offline/queueMath.ts` — offline totals
-- [ ] `resources/js/lib/offline/prepareOffline.ts` — prefetch data
-- [ ] `resources/js/context/AuthContext.tsx` — auth context
-- [ ] `resources/js/context/FiscalYearContext.tsx` — fiscal year context
-- [ ] `resources/js/components/layouts/DashboardLayout.tsx` — main layout
+- [x] `resources/js/lib/api/core/client.ts` — API client, interceptors, extractData
+- [x] `resources/js/lib/api/core/types.ts` — core types
+- [x] `resources/js/lib/api/core/queryKeys.ts` — query key factory
+- [x] `resources/js/lib/api/admin/system.ts` — admin DB switch API
+- [x] `resources/js/lib/offline/db.ts` — IndexedDB layer
+- [x] `resources/js/lib/offline/offlineAwareApi.ts` — offline interceptor
+- [x] `resources/js/lib/offline/syncEngine.ts` — sync engine
+- [x] `resources/js/lib/offline/useOffline.ts` — offline hooks
+- [x] `resources/js/lib/offline/queueMath.ts` — offline totals
+- [x] `resources/js/lib/offline/prepareOffline.ts` — prefetch data
+- [x] `resources/js/context/AuthContext.tsx` — auth context
+- [x] `resources/js/context/FiscalYearContext.tsx` — fiscal year context
+- [x] `resources/js/components/layouts/DashboardLayout.tsx` — main layout
 
 ## Section 4 — POS Classic + Pro + Mobile
 
@@ -225,6 +225,14 @@
 | 32 | 2 | Low | Dead code | `HealthController.php` | buildChecks | Unused `$dbConnected`/`$dbError` params. Signature cleaned | Fixed |
 | 33 | 2 | Info | Observation | `SwitchDatabaseCommand.php` | — | Matches all Phase-82 hardening rules (auto-create DB, atomic .env write, subprocess DB_CONNECTION force, post-switch verify); sqlite backslash-doubling works on Windows paths, round-trip verified green | Observation |
 | 34 | 2 | Info | Observation | `app/Models/Traits/HasCompany.php` | writes | Cross-tenant write injection remains possible anywhere code sets `company_id` explicitly — mitigated locally at controllers (PrintTemplate unset) rather than hardening the trait mid-review | Observation |
+| 35 | 3 | High | Race condition | `useOffline.ts` | useSync | Single-flight guard was a per-instance `syncingRef`, but `useSync()` mounts in 3 components at once (OfflineIndicator, SyncDashboard, POS Pro Mobile) — one `online` event could start MULTIPLE concurrent replays of the same queue → duplicate document creates on the server. Lock is now module-level (`syncingGlobal`) — one replay per app, others no-op | Fixed |
+| 36 | 3 | Low | Dead state | `useOffline.ts` | useSync | `lastError` was never set (only reset to null) — consumers could never display a sync failure. Now try/catch around replay sets it via `errorMessage(e)` and rethrows (contract preserved) | Fixed |
+| 37 | 3 | Medium | Dead code / phantom endpoints | `system.ts` + `useAdminSystem.ts` + `lib/admin.ts` | maintenanceApi | `scheduler`/`backup` methods targeted routes that do not exist in `routes/api_admin.php`; the `runScheduler`/`exportBackup` mutations were unreachable. Removed across all three layers (grep-verified zero consumers) | Fixed |
+| 38 | 3 | Info | Observation | `offlineAwareApi.ts` | GET fallback | Offline GET fallback returns `data: []` even for uncached single-resource GETs — consumers see an empty result instead of an error; established design decision, left as-is. Also: offline mutations don't invalidate the local GET cache (replay/syncEngine owns invalidation) | Observation |
+| 39 | 3 | Info | Observation | `queueMath.ts` | computeQueuedDocumentTotals | Queued offline totals preview omits the fiscal stamp in `net_to_pay` — the server recomputes authoritatively on sync; documented local-preview limitation, intentional | Observation |
+| 40 | 3 | Info | Observation | `prepareOffline.ts` ↔ `useOfflineReadiness` | prefetch | Prefetch vs real POS queries build params objects independently — JSON.stringify key-order differences could produce offline-cache misses (pre-existing design risk, harmless: just a refetch when online) | Observation |
+| 41 | 3 | Info | Observation | `db.ts` | queue helpers | Minor notes: `markOpFailed` uses two transactions (race window moot under single-flight sync); `clearPendingOps()` is cross-tenant but only invoked by test specs (grep-verified); `scopedBySlug(undefined)` intentionally returns all rows (documented). DB_VERSION 2 + repair-in-place upgrade matches Phase 68 follow-up rules | Observation |
+| 42 | 3 | Info | Observation | `client.ts` | ~L253 | Cosmetic Chinese character 例 inside an Arabic comment; no functional impact | Observation |
 
 ---
 
@@ -234,3 +242,4 @@
 |---------|------|----------|--------|
 | 1 — Backend Services | Aug 22, 2026 | 13 fixed + 3 observations (rows 1–16 above; rows 1–9 in `ea4eb22`, rows 10–13 this commit) | `ea4eb22` + section commit |
 | 2 — Backend Controllers + Models + Routes | Aug 22, 2026 | 16 fixed + 2 observations (rows 17–34 above). Clean: CommercialDocument model, Party model, CommercialDocumentObserver, DataAuditSubscriber, api_admin.php | section commit |
+| 3 — Frontend Core + Offline | Aug 22, 2026 | 3 fixed + 5 observations (rows 35–42 above). Clean: types.ts, queryKeys.ts, syncEngine.ts, AuthContext.tsx, FiscalYearContext.tsx, DashboardLayout.tsx. Verified: tsc clean, vitest 391/391 (21 files) | section commit |

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   getPendingOpsCount,
   getFailedOpsCount,
@@ -8,7 +8,7 @@ import {
   type PendingOp,
 } from './db';
 import client from '@/lib/api/core/client';
-import { replayPendingOps, type SyncResult } from './syncEngine';
+import { replayPendingOps, errorMessage, type SyncResult } from './syncEngine';
 import { useActiveSlug, appActions } from '@/lib/store/appStore';
 import {
   offlineDatasetsFreshness,
@@ -155,6 +155,15 @@ export function useLastSyncedAt(): number | null {
   return ts;
 }
 
+/**
+ * App-wide single-flight guard for sync/replay. useSync() is mounted by several
+ * components at once (OfflineIndicator, SyncDashboard, POS Pro Mobile) — each
+ * instance used to own its own syncingRef, so one `online` event could start
+ * MULTIPLE concurrent replays of the same queue (duplicate document creates on
+ * the server). The lock is module-level: one replay per app, others no-op.
+ */
+let syncingGlobal = false;
+
 export function useSync(): {
   syncing: boolean;
   lastError: string | null;
@@ -162,16 +171,15 @@ export function useSync(): {
 } {
   const [syncing, setSyncing] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
-  const syncingRef = useRef(false);
 
   const run = useCallback(async (): Promise<SyncResult> => {
     // Replay ONLY the active company's ops — a stale queue from a previous
     // company (or surviving a `migrate:fresh`) must never hit this tenant.
     const slug = appActions.getActiveSlug() ?? undefined;
-    if (syncingRef.current) {
+    if (syncingGlobal) {
       return { replayed: 0, failed: 0, remaining: await getPendingOpsCount(slug) };
     }
-    syncingRef.current = true;
+    syncingGlobal = true;
     setSyncing(true);
     setLastError(null);
 
@@ -188,8 +196,12 @@ export function useSync(): {
       setLastSyncedAt();
       window.dispatchEvent(new CustomEvent('offline:synced', { detail: { replayed: report.replayed } }));
       return report;
+    } catch (e) {
+      // surface the failure to the consumer UI (lastError was dead state before)
+      setLastError(errorMessage(e));
+      throw e;
     } finally {
-      syncingRef.current = false;
+      syncingGlobal = false;
       setSyncing(false);
     }
   }, []);

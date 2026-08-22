@@ -84,11 +84,5 @@ export function useMaintenanceMutations() {
     clearCache: useMutation({
       mutationFn: maintenanceApi.cache,
     }),
-    runScheduler: useMutation({
-      mutationFn: maintenanceApi.scheduler,
-    }),
-    exportBackup: useMutation({
-      mutationFn: maintenanceApi.backup,
-    }),
   };
 }

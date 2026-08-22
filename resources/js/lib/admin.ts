@@ -114,8 +114,6 @@ export const adminApi = {
   enableMaintenance:  maintenanceApi.enable,
   disableMaintenance: maintenanceApi.disable,
   clearCache:         maintenanceApi.cache,
-  runScheduler:       maintenanceApi.scheduler,
-  exportBackup:       maintenanceApi.backup,
 
   // Database
   getDbStatus:  dbApi.status,
