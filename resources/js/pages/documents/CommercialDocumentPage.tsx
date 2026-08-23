@@ -200,11 +200,10 @@ export default function CommercialDocumentPage() {
       } else if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === 'n') {
         e.preventDefault();
         if (!h.isReadOnly) {
-          // أضف سطراً ثم ركّز خلية الكمية فيه مباشرة — الاختصار يجب أن
-          // "يتحكم بالصفحة": بدون التركيز لا يظهر أي أثر للضغط.
+          // أضف سطراً ثم ركّز منتقي المنتج فيه مباشرة (السطر الجديد بلا منتج).
           const newIdx = h.lineCount;
           h.addLine();
-          focusDocLineCell(newIdx, ['qty', 'total_qty']);
+          focusDocLineCell(newIdx, ['product', 'qty', 'total_qty']);
         }
       }
     };
