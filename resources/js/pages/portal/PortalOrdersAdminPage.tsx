@@ -522,7 +522,7 @@ export default function PortalOrdersAdminPage() {
     applyStatus(target);
   };
 
-  const openConvert = () => {
+  const openConvert = async () => {
     if (!order) return;
     if (order.is_converted) {
       notify.warning('تم تحويل هذا الطلب إلى فاتورة مسبقاً — التحويل مسموح مرة واحدة فقط.');
@@ -534,6 +534,8 @@ export default function PortalOrdersAdminPage() {
     setPayAmount('');
     setPayDate(new Date().toISOString().slice(0, 10));
     setPayReference('');
+    // تأمين ضد البيانات القديمة: أعد جلب تفاصيل الطلب قبل عرض نافذة التحويل
+    try { await detail.refetch(); } catch { /* نُكمل بالبيانات الحالية */ }
     setConvertOpen(true);
   };
 

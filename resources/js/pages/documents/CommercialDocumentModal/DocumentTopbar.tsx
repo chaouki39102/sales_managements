@@ -26,6 +26,8 @@ interface DocumentTopbarProps {
   handleDelete: () => void;
   onReturnClick?: () => void;
   RETURNABLE_CODES: Set<string>;
+  /** وضع الحاسب المحمول — أزرار أيقونية فقط وحشوات مضغوطة. */
+  compact?: boolean;
 }
 
 function useDismissibleMenu<T extends HTMLElement>(open: boolean, onDismiss: () => void) {
@@ -52,6 +54,7 @@ export default function DocumentTopbar({
   onBack, isPending, successMsg, isReadOnly, handleSave,
   onPrint, templates, selectedTemplateId, onTemplateChange,
   handleExport, handleDelete, onReturnClick, RETURNABLE_CODES,
+  compact = false,
 }: DocumentTopbarProps) {
 
   const [exportOpen, setExportOpen] = useState(false);
@@ -83,8 +86,8 @@ export default function DocumentTopbar({
 
   return (
     <div style={{
-      flexShrink: 0, height: 60, padding: '0 20px',
-      display: 'flex', alignItems: 'center', gap: 14,
+      flexShrink: 0, height: compact ? 52 : 60, padding: compact ? '0 12px' : '0 20px',
+      display: 'flex', alignItems: 'center', gap: compact ? 8 : 14,
       borderBottom: '1px solid var(--b1)',
       background: isCancelled ? 'var(--bg3)' : 'var(--bg2)',
     }}>
@@ -179,7 +182,7 @@ export default function DocumentTopbar({
                 style={{
                   padding: '6px 8px', borderRadius: 'var(--r2)',
                   border: '1px solid var(--b2)', background: 'var(--bg1)',
-                  fontSize: 12, color: 'var(--t2)', outline: 'none', cursor: 'pointer', maxWidth: 120,
+                  fontSize: 12, color: 'var(--t2)', outline: 'none', cursor: 'pointer', maxWidth: compact ? 90 : 120,
                 }}
               >
                 <option value="">القالب الافتراضي</option>
@@ -188,19 +191,35 @@ export default function DocumentTopbar({
                 ))}
               </select>
             )}
-            <button onClick={onPrint} style={actionBtnStyle('var(--em)')}>
-              <i className="ti ti-printer" />
-              طباعة
-            </button>
+            {compact ? (
+              <button onClick={onPrint} title="طباعة (F8)" style={{ ...actionBtnStyle('var(--em)'), padding: '8px 10px' }}>
+                <i className="ti ti-printer" />
+              </button>
+            ) : (
+              <button onClick={onPrint} style={actionBtnStyle('var(--em)')}>
+                <i className="ti ti-printer" />
+                طباعة
+              </button>
+            )}
           </>
         )}
 
         <div style={{ position: 'relative' }} ref={exportRef}>
-          <button onClick={() => setExportOpen((v) => !v)} style={actionBtnStyle('var(--t2)', true)}>
-            <i className="ti ti-download" />
-            تصدير
-            <i className="ti ti-chevron-down" style={{ fontSize: 11 }} />
-          </button>
+          {compact ? (
+            <button
+              onClick={() => setExportOpen((v) => !v)}
+              title="تصدير"
+              style={{ ...actionBtnStyle('var(--t2)', true), padding: '8px 10px' }}
+            >
+              <i className="ti ti-download" />
+            </button>
+          ) : (
+            <button onClick={() => setExportOpen((v) => !v)} style={actionBtnStyle('var(--t2)', true)}>
+              <i className="ti ti-download" />
+              تصدير
+              <i className="ti ti-chevron-down" style={{ fontSize: 11 }} />
+            </button>
+          )}
           {exportOpen && (
             <div style={menuStyle}>
               {[
@@ -262,7 +281,7 @@ export default function DocumentTopbar({
           onClick={onBack}
           disabled={!canDismiss}
           style={{
-            padding: '8px 18px', borderRadius: 'var(--r2)',
+            padding: compact ? '8px 12px' : '8px 18px', borderRadius: 'var(--r2)',
             border: '1px solid var(--b2)', background: 'var(--bg1)', color: 'var(--t2)',
             cursor: canDismiss ? 'pointer' : 'not-allowed', fontSize: 13, fontWeight: 600,
           }}
@@ -275,7 +294,7 @@ export default function DocumentTopbar({
             onClick={handleSave}
             disabled={!canDismiss}
             style={{
-              padding: '8px 22px', borderRadius: 'var(--r2)', border: 'none',
+              padding: compact ? '8px 14px' : '8px 22px', borderRadius: 'var(--r2)', border: 'none',
               background: successMsg ? 'var(--green)' : 'var(--em)', color: 'white',
               cursor: canDismiss ? 'pointer' : 'not-allowed', fontSize: 13, fontWeight: 700,
               display: 'flex', alignItems: 'center', gap: 7,

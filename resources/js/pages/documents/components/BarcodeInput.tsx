@@ -56,6 +56,7 @@ export function BarcodeInput({ products, onProductFound, disabled }: BarcodeInpu
       <i className="ti ti-scan" style={{ fontSize: 16, color: 'var(--t4)' }} />
       <input
         ref={inputRef}
+        id="doc-barcode-input"
         type="text"
         value={value}
         disabled={disabled}

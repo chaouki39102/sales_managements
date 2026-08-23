@@ -31,6 +31,15 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { useCommercialDocumentController } from './hooks/useCommercialDocumentController';
 import { isOfflineQueuedResponse } from '@/lib/offline/queueMath';
 
+/** زر طي/فتح لوحة المعلومات الجانبية. */
+const railBtnStyle: React.CSSProperties = {
+  width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+  border: '1px solid var(--b2)', background: 'var(--bg1)', color: 'var(--t3)',
+  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+};
+const formatMiniMoney = (v: unknown): string =>
+  Number(v ?? 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
+
 export default function CommercialDocumentPage() {
   const { typeCode, id } = useParams<{ typeCode: string; id: string }>();
   const navigate = useNavigate();
@@ -135,6 +144,67 @@ export default function CommercialDocumentPage() {
     if (file) setOcrFile(file);
   };
 
+  // ── وضع الحاسب المحمول (≤1500px): ضغط الأعمدة والأزرار تلقائياً ───────────
+  const [compact, setCompact] = useState<boolean>(
+    () => window.matchMedia('(max-width: 1500px)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1500px)');
+    const onChange = (e: MediaQueryListEvent) => setCompact(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  // ── طي لوحة المعلومات الجانبية (محفوظ لكل نوع مستند) ──────────────────────
+  const [infoCollapsed, setInfoCollapsedState] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(`doc_info_collapsed_${docCode}`);
+      if (saved !== null) return saved === '1';
+    } catch { /* ignore */ }
+    return window.innerWidth <= 1400;
+  });
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`doc_info_collapsed_${docCode}`);
+      setInfoCollapsedState(saved !== null ? saved === '1' : window.innerWidth <= 1400);
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docCode]);
+  const setInfoCollapsed = useCallback((v: boolean) => {
+    setInfoCollapsedState(v);
+    try { localStorage.setItem(`doc_info_collapsed_${docCode}`, v ? '1' : '0'); } catch { /* ignore */ }
+  }, [docCode]);
+
+  // ── اختصارات لوحة المفاتيح العامة: F2 باركود · F4 متعامل · F9/Ctrl+S حفظ · Alt+N سطر ──
+  const hotRef = useRef({ handleSave, isPending, successMsg, isReadOnly, addLine });
+  hotRef.current = { handleSave, isPending, successMsg, isReadOnly, addLine };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      // لا تسرق المفاتيح والنوافذ المنبثقة مفتوحة (Modal overlay / ماسح الكاميرا)
+      if (t && (t.closest('.ov') || t.closest('[style*="99999"]'))) return;
+      const h = hotRef.current;
+      if (e.key === 'F2') {
+        e.preventDefault();
+        const el = document.getElementById('doc-barcode-input') as HTMLInputElement | null;
+        if (el) { el.focus(); el.select(); }
+      } else if (e.key === 'F4') {
+        e.preventDefault();
+        document.getElementById('doc-party-select')?.focus();
+      } else if (
+        (e.key === 'F9' || ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 's'))
+      ) {
+        e.preventDefault();
+        if (!h.isPending && !h.successMsg && !h.isReadOnly) h.handleSave();
+      } else if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        if (!h.isReadOnly) h.addLine();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   if (!lookupsReady) {
     return (
       <div style={{
@@ -198,6 +268,7 @@ export default function CommercialDocumentPage() {
         handleDelete={handleDelete}
         onReturnClick={() => setShowReturnModal(true)}
         RETURNABLE_CODES={RETURNABLE_CODES}
+        compact={compact}
       />
 
       {infoAlerts.length > 0 && (
@@ -260,11 +331,37 @@ export default function CommercialDocumentPage() {
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
 
+        {infoCollapsed ? (
+          <div style={{
+            width: 44, flexShrink: 0, borderLeft: '1px solid var(--b1)',
+            background: 'var(--bg2)', display: 'flex', flexDirection: 'column',
+            alignItems: 'center', padding: '8px 0', gap: 12,
+          }}>
+            <button onClick={() => setInfoCollapsed(false)} title="إظهار لوحة المعلومات" style={railBtnStyle}>
+              <i className="ti ti-chevrons-left" style={{ fontSize: 15 }} />
+            </button>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <span style={{
+                writingMode: 'vertical-rl', fontSize: 11, fontWeight: 800,
+                color: 'var(--em)', whiteSpace: 'nowrap',
+              }}>
+                TTC {formatMiniMoney(totals?.ttc)}
+              </span>
+            </div>
+            <i className="ti ti-info-circle" style={{ fontSize: 14, color: 'var(--t4)' }} />
+          </div>
+        ) : (
         <div style={{
-          width: 300, flexShrink: 0, borderLeft: '1px solid var(--b1)',
+          width: compact ? 252 : 300, flexShrink: 0, borderLeft: '1px solid var(--b1)',
           background: 'var(--bg2)', display: 'flex', flexDirection: 'column', minHeight: 0,
         }}>
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: compact ? 10 : 16, display: 'flex', flexDirection: 'column', gap: compact ? 10 : 16 }}>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+              <button onClick={() => setInfoCollapsed(true)} title="طي لوحة المعلومات" style={railBtnStyle}>
+                <i className="ti ti-chevrons-right" style={{ fontSize: 14 }} />
+              </button>
+            </div>
 
             {isEdit && !!existingDoc && (
               <DocumentChainPanel
@@ -383,7 +480,7 @@ export default function CommercialDocumentPage() {
 
           <div style={{
             flexShrink: 0, borderTop: '1px solid var(--b1)',
-            background: 'var(--bg2)', maxHeight: '55vh', overflowY: 'auto',
+            background: 'var(--bg2)', maxHeight: compact ? '48vh' : '55vh', overflowY: 'auto',
           }}>
             <DocumentTotalsSection
               totals={totals}
@@ -396,8 +493,9 @@ export default function CommercialDocumentPage() {
             />
           </div>
         </div>
+        )}
 
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: 16 }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: compact ? 10 : 16 }}>
           <DocumentLinesSection
             lines={form.lines}
             isLinesReadOnly={isLinesReadOnly}
@@ -432,6 +530,7 @@ export default function CommercialDocumentPage() {
             affectsStock={affectsStock}
             stockDir={stockDir}
             warehouses={lookups.warehouses as Array<{ id: number; name: string }>}
+            compact={compact}
           />
         </div>
       </div>

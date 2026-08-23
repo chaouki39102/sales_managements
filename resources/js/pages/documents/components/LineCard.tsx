@@ -82,6 +82,7 @@ export function LineCard({
 
   return (
     <div
+      data-line-idx={idx}
       style={{
         background: bgTint,
         border: `1px solid ${borderColor}`,

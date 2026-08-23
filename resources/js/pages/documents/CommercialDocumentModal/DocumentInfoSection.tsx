@@ -119,6 +119,7 @@ export default function DocumentInfoSection({
           <div style={{ gridColumn: 'span 2' }}>
             <Label required>{isPurchase ? 'المورد' : 'الزبون'}</Label>
             <ComboBox
+              id="doc-party-select"
               options={partyOptions}
               value={form.party_id as string}
               onChange={handlePartyChangeWithWarning}

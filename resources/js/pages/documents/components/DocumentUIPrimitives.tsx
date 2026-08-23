@@ -237,10 +237,12 @@ interface ComboBoxProps {
   error?:        boolean;
   maxH?:         number;
   onAfterSelect?: () => void;
+  /** معرّف DOM لزر المشغّل — يُستخدم للوصول بلوحة المفاتيح (مثل F4 للمتعامل). */
+  id?:           string;
 }
-
 export function ComboBox({
-  options, value, onChange, placeholder, disabled, error, maxH = 260, onAfterSelect,
+  options, value, onChange, placeholder, 
+disabled, error, maxH = 260, onAfterSelect, id,
 }: ComboBoxProps) {
   const [open,       setOpen]       = useState(false);
   const [query,      setQuery]      = useState('');
@@ -321,6 +323,7 @@ export function ComboBox({
     <div ref={ref} style={{ position: 'relative', width: '100%' }}>
       <button
         type="button"
+        id={id}
         disabled={disabled}
         onClick={() => { if (disabled) return; setOpen((v) => !v); setTimeout(() => inputRef.current?.focus(), 50); }}
         style={{

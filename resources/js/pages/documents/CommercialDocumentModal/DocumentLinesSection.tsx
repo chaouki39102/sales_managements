@@ -51,6 +51,8 @@ interface DocumentLinesSectionProps {
   affectsStock: boolean;
   stockDir: 1 | -1 | 0;
   warehouses: Array<{ id: number; name: string }>;
+  /** وضع الحاسب المحمول — يضغط عروض أعمدة الجدول ليتسع على شاشات 1366px. */
+  compact?: boolean;
 }
 
 export default function DocumentLinesSection({
@@ -64,7 +66,7 @@ export default function DocumentLinesSection({
   needsParty, productSuggestions, isLoadingSuggestions,
   setShowBulkImport, onOcrInvoice, onOcrImage, slug,
   affectsStock, stockDir,
-  warehouses,
+  warehouses, compact = false,
 }: DocumentLinesSectionProps) {
   const [stockAlertOpen, setStockAlertOpen] = useState(true);
   const notify = useNotification();
@@ -91,9 +93,79 @@ export default function DocumentLinesSection({
   const linesContainerRef = useRef<HTMLDivElement>(null);
   const FOCUSABLE = 'input:not([disabled]), select:not([disabled]), textarea:not([disabled])';
 
+  /** تركيز خلية بنفس العمود في السطر التالي/السابق (نمط Excel — عرض الجدول). */
+  const focusAdjacentRowCell = (
+    container: HTMLDivElement,
+    origin: HTMLElement,
+    dir: 1 | -1,
+  ): boolean => {
+    const cell = origin.closest('td');
+    const row = origin.closest('tr[data-line-idx]') as HTMLTableRowElement | null;
+    if (!cell || !row) return false;
+    const colIdx = Array.from(row.children).indexOf(cell);
+    if (colIdx === -1) return false;
+    const rows = Array.from(container.querySelectorAll<HTMLElement>('tr[data-line-idx]'));
+    const next = rows[rows.indexOf(row) + dir];
+    if (!next) return false;
+    const nextCell = next.children[colIdx] as HTMLElement | undefined;
+    if (!nextCell) return false;
+    const field = nextCell.querySelector<HTMLElement>(FOCUSABLE);
+    const target = field ?? nextCell;
+    target.focus();
+    if (target instanceof HTMLInputElement && target.type !== 'checkbox' && target.type !== 'radio') {
+      target.select?.();
+    }
+    return true;
+  };
+
   const handleLinesKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== 'Enter') return;
     const target = e.target as HTMLElement;
+    const container = linesContainerRef.current;
+
+    // Escape داخل الأسطر: اترك الحقل فقط ولا تغلق المستند كله
+    // (المعالج العام في الشريط العلوي يستمع على window — نوقف الانتشار هنا).
+    if (e.key === 'Escape') {
+      const active = document.activeElement as HTMLElement | null;
+      if (container && active && container.contains(active)) {
+        e.preventDefault();
+        e.stopPropagation();
+        active.blur();
+      }
+      return;
+    }
+
+    // Ctrl+Delete حذف السطر المُركَّز · Ctrl+D تكراره (يعمل في الجدول والبطاقات)
+    if ((e.ctrlKey || e.metaKey) && !isLinesReadOnly) {
+      if (e.key === 'Delete') {
+        const row = target.closest('[data-line-idx]');
+        if (row && container?.contains(row)) {
+          e.preventDefault();
+          removeLine(Number(row.getAttribute('data-line-idx')));
+          return;
+        }
+      } else if (!e.shiftKey && !e.altKey && e.key.toLowerCase() === 'd') {
+        const row = target.closest('[data-line-idx]');
+        if (row && container?.contains(row)) {
+          e.preventDefault();
+          duplicateLine(Number(row.getAttribute('data-line-idx')));
+          return;
+        }
+      }
+    }
+
+    // أسهم أعلى/أسفل: التنقل بين الأسطر في نفس العمود (عرض الجدول)
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && lineMode === 'table' && container) {
+      if (target.closest('select')) {
+        // لا تسرق أسهم القوائم المنسدلة الأصلية
+        return;
+      }
+      if (focusAdjacentRowCell(container, target, e.key === 'ArrowDown' ? 1 : -1)) {
+        e.preventDefault();
+      }
+      return;
+    }
+
+    if (e.key !== 'Enter') return;
     const isFocusableField =
       target instanceof HTMLInputElement ||
       target instanceof HTMLSelectElement ||
@@ -104,7 +176,6 @@ export default function DocumentLinesSection({
     // preventDefault هنا لا يمنع ذلك السلوك الأصلي، فقط يمنع أي إرسال نموذج.
     e.preventDefault();
 
-    const container = linesContainerRef.current;
     if (!container) return;
     const focusables = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE));
     const currentIdx = focusables.indexOf(target);
@@ -228,9 +299,12 @@ export default function DocumentLinesSection({
               </button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 10.5, color: 'var(--t4)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span
+                title="Enter: الحقل التالي · ↑/↓: نفس العمود في السطر التالي/السابق · Ctrl+Delete: حذف السطر · Ctrl+D: تكرار السطر · Esc: ترك الحقل"
+                style={{ fontSize: 10.5, color: 'var(--t4)', display: 'flex', alignItems: 'center', gap: 4 }}
+              >
                 <i className="ti ti-keyboard" style={{ fontSize: 12 }} />
-                Enter للانتقال للحقل التالي
+                {compact ? 'اختصارات' : 'Enter للانتقال للحقل التالي'}
               </span>
               <button
                 onClick={() => setLineMode((m) => {
@@ -348,14 +422,14 @@ export default function DocumentLinesSection({
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: compact ? 11.5 : 12 }}>
                 <thead>
                   <tr style={{ background: 'var(--bg3)', borderBottom: '2px solid var(--b2)' }}>
                   {ALL_COLUMNS.filter((c) => visibleCols.has(c.key)).map((col) => (
                     <th key={col.key} style={{
-                      padding: '6px 8px', textAlign: 'right', fontWeight: 700,
+                      padding: compact ? '4px 6px' : '6px 8px', textAlign: 'right', fontWeight: 700,
                       color: 'var(--t3)', fontSize: 11, whiteSpace: 'nowrap',
-                      minWidth: col.w,
+                      minWidth: compact ? Math.round(col.w * 0.85) : col.w,
                     }}>
                       {col.label}
                     </th>

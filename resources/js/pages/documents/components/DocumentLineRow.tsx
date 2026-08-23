@@ -126,7 +126,9 @@ export const DocumentLineRow = memo(function DocumentLineRow({
 
   return (
     <>
-      <tr style={{
+      <tr
+        data-line-idx={idx}
+        style={{
         borderBottom: '1px solid var(--b1)',
         background:   rowBg,
         transition:   'background .15s',
