@@ -86,48 +86,108 @@ export async function printThermalViaWebUSBFromTemplate(
   return sendBytesToReceiptPrinter(bytes);
 }
 
+// ─── WebUSB lifecycle helpers ─────────────────────────────────────────────────
+
+/** رسائل عربية واضحة بدل DOMException الإنجليزية الخام. */
+export function describeUsbError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err ?? '');
+  if (/claim/i.test(msg)) {
+    return 'الطابعة مشغولة من برنامج آخر أو من نافذة متصفح أخرى — أغلق ما يستخدم الطابعة وأعد المحاولة، وإن استمر الخطأ افصل كابل الطابعة وأعد توصيله';
+  }
+  if (/open|already open/i.test(msg)) {
+    return 'تعذر فتح الاتصال بالطابعة — افصل كابل الطابعة وأعد توصيله ثم أعد المحاولة';
+  }
+  if (/transfer|stall/i.test(msg)) {
+    return 'انقطع الاتصال بالطابعة أثناء الطباعة — تحقق من الكابل وأعد المحاولة';
+  }
+  return msg || 'فشلت الطباعة';
+}
+
+function findThermalOutEndpoint(config: any): { ifaceNum: number; epNum: number } {
+  for (let i = 0; i < (config?.interfaces?.length ?? 0); i++) {
+    const iface = config.interfaces[i];
+    const alt = iface.alternates?.[0];
+    if (!alt || alt.interfaceClass === 0x02) continue;
+    const ep = alt.endpoints?.find(
+      (e: any) => e.direction === 'out' && (e.type === 'bulk' || e.type === 'interrupt'),
+    );
+    if (ep) return { ifaceNum: iface.interfaceNumber, epNum: ep.endpointNumber };
+  }
+  return { ifaceNum: 0, epNum: 2 };
+}
+
+async function ensureOpenConfigured(device: any): Promise<void> {
+  if (!device.opened) await device.open();
+  if (device.configuration === null) await device.selectConfiguration(1);
+}
+
+/**
+ * دورة WebUSB كاملة لجهاز واحد: open → claim (مع إعادة محاولة واحدة تعيد
+ * تدوير المقبض) → transfer → release → close.
+ *
+ * يغلق الجهاز دائماً حتى عند فشل claim/transfer — تسريب مقبض مفتوح هو ما
+ * يجعل كل محاولة طباعة لاحقة تفشل بـ "Unable to claim interface" حتى إعادة
+ * تحميل الصفحة.
+ */
+export async function sendBytesToUsbDevice(
+  device: any,
+  bytes: Uint8Array,
+): Promise<ThermalPrintResult> {
+  let ifaceNum: number | null = null;
+  try {
+    await ensureOpenConfigured(device);
+    const ep = findThermalOutEndpoint(device.configuration);
+
+    try {
+      await device.claimInterface(ep.ifaceNum);
+    } catch {
+      // مقبض قديم أو مشغول لحظياً: أغلقه وانتظر ثم أعد الفتح والمحاولة مرة
+      // واحدة — ينجح في معظم الحالات العابرة (spooler مشغول للتو، نافذة ثانية).
+      try { await device.close(); } catch { /* ignore */ }
+      await new Promise((r) => setTimeout(r, 400));
+      await ensureOpenConfigured(device);
+      await device.claimInterface(ep.ifaceNum);
+    }
+    ifaceNum = ep.ifaceNum;
+
+    const result = await device.transferOut(ep.epNum, bytes);
+    if (result.status !== 'ok') {
+      return { ok: false, method: 'webusb', message: `فشل الإرسال: ${result.status}` };
+    }
+    return { ok: true, method: 'webusb', message: 'تمت الطباعة بنجاح' };
+  } catch (err) {
+    return { ok: false, method: 'webusb', message: describeUsbError(err) };
+  } finally {
+    if (ifaceNum !== null) {
+      try { await device.releaseInterface(ifaceNum); } catch { /* ignore */ }
+    }
+    try { await device.close(); } catch { /* ignore */ }
+  }
+}
+
+const WEBUSB_TEST_BYTES = new Uint8Array([
+  0x1b, 0x40, 0x1b, 0x61, 0x01,
+  ...new TextEncoder().encode('--- TEST ---\nPrinter OK\n'),
+  0x1d, 0x56, 0x00,
+]);
+
+/** صفحة اختبار عبر جهاز USB محدد (يُستخدم في تبويب الطابعات بالإعدادات). */
+export async function printTestPageViaUsbDevice(device: any): Promise<ThermalPrintResult> {
+  return sendBytesToUsbDevice(device, WEBUSB_TEST_BYTES);
+}
+
 export async function sendBytesToReceiptPrinter(bytes: Uint8Array): Promise<ThermalPrintResult> {
   const usb = (navigator as any).usb;
   if (!usb) {
     return { ok: false, method: 'none', message: 'WebUSB غير مدعوم في هذا المتصفح' };
   }
-  try {
-    const devices: any[] = await usb.getDevices();
-    if (!devices.length) {
-      return { ok: false, method: 'none', message: 'لم يتم العثور على طابعة حرارية' };
-    }
 
-    const device = devices[0];
-    await device.open();
-
-    if (device.configuration === null) {
-      await device.selectConfiguration(1);
-    }
-    const config = device.configuration;
-    let ifaceNum = 0;
-    let epNum = 2;
-    for (let i = 0; i < (config?.interfaces?.length ?? 0); i++) {
-      const iface = config.interfaces[i];
-      const alt = iface.alternates?.[0];
-      if (!alt || alt.interfaceClass === 0x02) continue;
-      const ep = alt.endpoints?.find(
-        (e: any) => e.direction === 'out' && (e.type === 'bulk' || e.type === 'interrupt'),
-      );
-      if (ep) { ifaceNum = iface.interfaceNumber; epNum = ep.endpointNumber; break; }
-    }
-
-    await device.claimInterface(ifaceNum);
-    const result = await device.transferOut(epNum, bytes);
-    await device.releaseInterface(ifaceNum);
-    try { await device.close(); } catch {}
-
-    if (result.status !== 'ok') {
-      return { ok: false, method: 'webusb', message: `فشل الإرسال: ${result.status}` };
-    }
-    return { ok: true, method: 'webusb', message: 'تمت الطباعة بنجاح' };
-  } catch (err: any) {
-    return { ok: false, method: 'webusb', message: err?.message ?? 'فشلت الطباعة' };
+  const devices: any[] = await usb.getDevices();
+  if (!devices.length) {
+    return { ok: false, method: 'none', message: 'لم يتم العثور على طابعة حرارية' };
   }
+
+  return sendBytesToUsbDevice(devices[0], bytes);
 }
 
 export async function openCashDrawerViaWebUSB(): Promise<ThermalPrintResult> {

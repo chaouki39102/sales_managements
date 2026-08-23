@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import Card from "@/components/ui/Card";
-import { isWebUsbSupported, getConnectedPrinters } from "@/pos/utils/printService";
+import {
+    isWebUsbSupported,
+    getConnectedPrinters,
+    printTestPageViaUsbDevice,
+    describeUsbError,
+} from "@/pos/utils/printService";
 import { deviceGetPrinters, deviceSavePrinters } from "@/pos/store/printStore";
 import {
     useSystemPrinters,
@@ -45,6 +50,10 @@ export function PrintersTab({
 
     const sysPrinters = sysData?.printers ?? [];
     const savedNames = new Set(printers.map((p) => p.name.toLowerCase()));
+    const [usbTestMsg, setUsbTestMsg] = useState<{
+        ok: boolean;
+        text: string;
+    } | null>(null);
 
     useEffect(() => {
         setPrinters(deviceGetPrinters(slug));
@@ -160,6 +169,7 @@ export function PrintersTab({
 
     const handleTestPrint = useCallback(async (printer: DetectedPrinter) => {
         if (printer.source !== "usb") return;
+        setUsbTestMsg(null);
         try {
             const usb = (navigator as any).usb;
             const devices = await usb.getDevices();
@@ -167,43 +177,24 @@ export function PrintersTab({
                 const did = `usb:${d.vendorId}:${d.productId}:${d.serialNumber ?? "no-serial"}`;
                 return did === printer.id;
             });
-            if (!device) return;
-            await device.open();
-            if (device.configuration === null)
-                await device.selectConfiguration(1);
-            const config = device.configuration;
-            let ifaceNum = 0;
-            let epNum = 2;
-            for (let i = 0; i < (config?.interfaces?.length ?? 0); i++) {
-                const iface = config.interfaces[i];
-                const alt = iface.alternates?.[0];
-                if (!alt || alt.interfaceClass === 0x02) continue;
-                const ep = alt.endpoints?.find(
-                    (e: any) =>
-                        e.direction === "out" &&
-                        (e.type === "bulk" || e.type === "interrupt"),
-                );
-                if (ep) {
-                    ifaceNum = iface.interfaceNumber;
-                    epNum = ep.endpointNumber;
-                    break;
-                }
+            if (!device) {
+                setUsbTestMsg({
+                    ok: false,
+                    text: "لم يتم العثور على الطابعة المتصلة",
+                });
+                return;
             }
-            await device.claimInterface(ifaceNum);
-            const testBytes = new Uint8Array([
-                0x1b, 0x40, 0x1b, 0x61, 0x01,
-                ...new TextEncoder().encode("--- TEST ---\nPrinter OK\n"),
-                0x1d, 0x56, 0x00,
-            ]);
-            await device.transferOut(epNum, testBytes);
-            await device.releaseInterface(ifaceNum);
-            try {
-                await device.close();
-            } catch {
-                /* ignore */
-            }
-        } catch {
-            /* ignore */
+            const res = await printTestPageViaUsbDevice(device);
+            setUsbTestMsg({
+                ok: res.ok,
+                text: res.ok
+                    ? `تمت طباعة صفحة الاختبار على «${printer.name}»`
+                    : res.message,
+            });
+        } catch (e: unknown) {
+            setUsbTestMsg({ ok: false, text: describeUsbError(e) });
+        } finally {
+            setTimeout(() => setUsbTestMsg(null), 6000);
         }
     }, []);
 
@@ -614,6 +605,18 @@ export function PrintersTab({
                         <i className="ti ti-pencil" /> إضافة يدوية
                     </button>
                 </div>
+                {usbTestMsg && (
+                    <div
+                        style={{
+                            marginTop: 10,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: usbTestMsg.ok ? "var(--em)" : "var(--red)",
+                        }}
+                    >
+                        {usbTestMsg.text}
+                    </div>
+                )}
             </Card>
 
             {/* Printer list */}
