@@ -145,15 +145,17 @@ export const DocumentLineRow = memo(function DocumentLineRow({
         )}
 
         {col('product') && (
-          <td style={{ padding: '3px 4px' }}>
+          <td style={{ padding: '3px 4px', minWidth: 220, width: '26%' }}>
             <ProductSearch
               products={products}
-              value={line.product_id}
-              onChange={(id, p) => onUpdate(idx, { product_id: id }, p)}
+              value={line.product_id ? String(line.product_id) : ''}
+              onChange={(productId, product) => onUpdate(idx, { product_id: productId }, product)}
               disabled={disabled}
               error={!line.product_id}
               isPurchase={isPurchase}
               stockData={stockData}
+              triggerId={`doc-line-${idx}-product`}
+              afterSelectFocusId={`doc-line-${idx}-qty`}
             />
           </td>
         )}

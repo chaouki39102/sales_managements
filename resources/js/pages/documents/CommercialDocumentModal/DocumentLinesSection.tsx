@@ -94,11 +94,12 @@ export default function DocumentLinesSection({
   const linesContainerRef = useRef<HTMLDivElement>(null);
   const FOCUSABLE = 'input:not([disabled]), select:not([disabled]), textarea:not([disabled])';
 
-  /** أضف سطراً جديداً ثم ركّز خلية الكمية فيه (كمية ← كمية إجمالية كبديل). */
-  const addLineAndFocusQty = () => {
+  /** أضف سطراً فارغاً جديداً ثم ركّز منتقي المنتج فيه (السطر الجديد بلا منتج —
+   *  الكمية بلا معنى قبله). يهبط إلى الكمية إن لم يُوجد المنتقي. */
+  const addLineAndFocusNewRow = () => {
     const newIdx = lines.length;
     addLine();
-    focusDocLineCell(newIdx, ['qty', 'total_qty']);
+    focusDocLineCell(newIdx, ['product', 'qty', 'total_qty']);
   };
 
   /** ركّز حقل الكمية في سطر معين (يُستعمل بعد التكرار/الإضافة). */
@@ -214,11 +215,17 @@ export default function DocumentLinesSection({
     } else if (mPrice) {
       const i = Number(mPrice[1]);
       if (i < lines.length - 1) {
+        // السطر التالي فارغ (بلا منتج)؟ → منتقي المنتج أولاً، وإلا فالكمية.
+        const nextProd = document.getElementById(`doc-line-${i + 1}-product`);
+        if (nextProd && nextProd.getAttribute('data-has-product') === '0') {
+          focusEl(nextProd);
+          return;
+        }
         const nextQty = document.getElementById(`doc-line-${i + 1}-qty`)
           ?? document.getElementById(`doc-line-${i + 1}-total_qty`);
         if (nextQty) { focusEl(nextQty); return; }
       } else if (!isLinesReadOnly) {
-        addLineAndFocusQty();
+        addLineAndFocusNewRow();
         return;
       }
     }
@@ -233,13 +240,16 @@ export default function DocumentLinesSection({
       return;
     }
 
-    // آخر حقل في آخر سطر — أضف سطراً جديداً وركّز أول حقل فيه.
-    // setState غير متزامن: نُعيد المحاولة حتى يظهر حقل الصف الجديد فعلاً.
+    // آخر حقل في آخر سطر — أضف سطراً جديداً وركّز منتقي المنتج فيه.
+    // setState غير متزامن: نُعيد المحاولة حتى يظهر الصف الجديد فعلاً.
     if (isLinesReadOnly) return;
     const countBefore = focusables.length;
+    const newIdx = lines.length;
     addLine();
     let left = 10;
     const tick = () => {
+      const prodEl = document.getElementById(`doc-line-${newIdx}-product`);
+      if (prodEl) { prodEl.scrollIntoView({ block: 'nearest' }); prodEl.focus(); return; }
       const updated = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE));
       const el = updated[countBefore];
       if (el) {
@@ -527,7 +537,7 @@ export default function DocumentLinesSection({
         {!isLinesReadOnly && (
           <div style={{ marginTop: 10, display: 'flex', gap: 8, flexShrink: 0 }}>
             <button
-              onClick={addLineAndFocusQty}
+              onClick={addLineAndFocusNewRow}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '7px 14px', borderRadius: 'var(--r2)',

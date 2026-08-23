@@ -105,6 +105,8 @@ export function LineCard({
               disabled={disabled}
               isPurchase={isPurchase}
               stockData={stockData}
+              triggerId={`doc-line-${idx}-product`}
+              afterSelectFocusId={`doc-line-${idx}-qty`}
             />
             {stockBadge && (
               <span style={{

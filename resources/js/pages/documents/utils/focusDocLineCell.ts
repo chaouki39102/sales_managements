@@ -1,4 +1,4 @@
-export type DocLineField = 'qty' | 'total_qty' | 'price';
+export type DocLineField = 'product' | 'qty' | 'total_qty' | 'price';
 
 /**
  * ركّز خلية في شبكة الأسطر عبر مُعرّفها الثابت `doc-line-{idx}-{field}`.

@@ -49,6 +49,7 @@ export function ProductSearch({
   error,
   isPurchase  = false,
   stockData   = {},
+  triggerId,
   afterSelectFocusId,
 }: ProductSearchProps) {
   const [open,  setOpen]  = useState(false);
@@ -340,6 +341,8 @@ export function ProductSearch({
       <button
         ref={triggerRef}
         type="button"
+        id={triggerId}
+        data-has-product={value ? '1' : '0'}
         disabled={disabled}
         onClick={handleOpen}
         style={{
