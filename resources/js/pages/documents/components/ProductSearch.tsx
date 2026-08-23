@@ -25,6 +25,10 @@ interface ProductSearchProps {
   error?:      boolean;
   isPurchase?: boolean;
   stockData?:  Record<number, number>;
+  /** مُعرّف ثابت لزر الفتح (doc-line-{idx}-product) ليصل إليه التنقل بلوحة المفاتيح. */
+  triggerId?:  string;
+  /** مُعرّف الخلية التي يُعاد إليها التركيز بعد الاختيار (كمية السطر عادةً). */
+  afterSelectFocusId?: string;
 }
 
 // ─── Dropdown position ────────────────────────────────────────────────────────
@@ -45,6 +49,7 @@ export function ProductSearch({
   error,
   isPurchase  = false,
   stockData   = {},
+  afterSelectFocusId,
 }: ProductSearchProps) {
   const [open,  setOpen]  = useState(false);
   const [query, setQuery] = useState('');
@@ -117,7 +122,12 @@ export function ProductSearch({
     };
 
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setOpen(false); setQuery(''); }
+      if (e.key === 'Escape') {
+        // أوقف الانتشار حتى لا يغلق مستمع Escape على مستوى النافذة المحرّر كله
+        e.stopPropagation();
+        setOpen(false);
+        setQuery('');
+      }
     };
 
     // إعادة حساب الموضع عند التمرير أو تغيير الحجم
@@ -155,6 +165,17 @@ export function ProductSearch({
     onChange(String(p.id), p);
     setOpen(false);
     setQuery('');
+    // إكمال الدورة بلوحة المفاتيح: بعد الاختيار بالـ Enter ينتقل التركيز
+    // مباشرة إلى خلية الكمية في نفس السطر — بدون لمس الفأرة.
+    if (afterSelectFocusId) {
+      requestAnimationFrame(() => {
+        const el = document.getElementById(afterSelectFocusId);
+        if (el) {
+          el.focus();
+          if (el instanceof HTMLInputElement) el.select();
+        }
+      });
+    }
   };
 
   // إعادة تعيين المؤشر عند تغير الفلترة

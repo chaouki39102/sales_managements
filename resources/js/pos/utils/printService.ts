@@ -12,7 +12,7 @@ import { escposRenderer } from '@/pages/settings/print-settings/renderers/ESCPOS
 
 export interface ThermalPrintResult {
   ok:      boolean;
-  method:  'webusb' | 'blob' | 'none';
+  method:  'webusb' | 'blob' | 'none' | 'windows';
   message: string;
 }
 
@@ -92,7 +92,7 @@ export async function printThermalViaWebUSBFromTemplate(
 export function describeUsbError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err ?? '');
   if (/claim/i.test(msg)) {
-    return 'الطابعة مشغولة من برنامج آخر أو من نافذة متصفح أخرى — أغلق ما يستخدم الطابعة وأعد المحاولة، وإن استمر الخطأ افصل كابل الطابعة وأعد توصيله';
+    return 'تعذر الاتصال المباشر بالطابعة (تعريف ويندوز يحجز منفذها)';
   }
   if (/open|already open/i.test(msg)) {
     return 'تعذر فتح الاتصال بالطابعة — افصل كابل الطابعة وأعد توصيله ثم أعد المحاولة';
@@ -194,3 +194,5 @@ export async function openCashDrawerViaWebUSB(): Promise<ThermalPrintResult> {
   const KICK_DRAWER_PIN2 = new Uint8Array([0x1B, 0x70, 0x00, 0x19, 0xFA]);
   return sendBytesToReceiptPrinter(KICK_DRAWER_PIN2);
 }
+
+export const KICK_DRAWER_PIN2 = new Uint8Array([0x1B, 0x70, 0x00, 0x19, 0xFA]);

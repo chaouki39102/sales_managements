@@ -46,7 +46,7 @@ import { productToVariant, isVariantOutOfStock, getVariantPrice, makeFakeVariant
 import { usePOSSettings, checkDiscountAllowed } from '@/pos/hooks/usePOSSettings';
 import { usePrintSettings } from '@/pos/hooks/usePrintSettings';
 import { printReceiptDirect } from '@/pos/utils/printUtils';
-import { openCashDrawerViaWebUSB, isWebUsbSupported, printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
+import { printThermalSmart, openCashDrawerSmart } from '@/pos/utils/thermalPrint';
 import { playSaleSound, playAddSound } from '@/pos/utils/posSounds';
 import type { SoundPresetId } from '@/pos/utils/posSounds';
 import { htToTtc, ttcToHt } from '@/pos/utils/calculations';
@@ -429,10 +429,9 @@ export default function POSProPage() {
       const isThermalPaper = posTemplate.paper_size === '80mm' || posTemplate.paper_size === '58mm';
 
       if (opts?.silent) {
-        if (!isWebUsbSupported()) { safeToast.error('الطباعة المباشرة تتطلب متصفح يدعم WebUSB'); return; }
         if (!resolvedDocNum) { safeToast.error('رقم الفاتورة غير متوفر للطباعة المباشرة'); return; }
         const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
-        const result = await printThermalViaWebUSBFromTemplate(posTemplate, data, resolvedDocNum);
+        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug);
         if (result.ok) safeToast.success('تمت الطباعة');
         else safeToast.error(`خطأ في الطباعة: ${result.message}`);
         return;
@@ -446,9 +445,9 @@ export default function POSProPage() {
 
       if (settings.printMode === 'thermal' && resolvedDocNum && isThermalPaper) {
         const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
-        const result = await printThermalViaWebUSBFromTemplate(posTemplate, data, resolvedDocNum);
+        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug);
         if (result.ok) {
-          safeToast.success('تمت الطباعة الحرارية');
+          safeToast.success(result.method === 'windows' ? 'تمت الطباعة (ويندوز)' : 'تمت الطباعة الحرارية');
         } else {
           safeToast.error(`خطأ في الطباعة الحرارية: ${result.message}`);
           await printReceiptDirect({ html, paperWidth, copies: copies ?? 1, onError: (e) => safeToast.error(`خطأ في طباعة المتصفح: ${e.message}`) });
@@ -875,7 +874,7 @@ export default function POSProPage() {
           const mode = (paymentModes ?? []).find(m => m.id === p.payment_mode_id);
           return mode && /نقدا|نقداً|cash/i.test(mode.name);
         });
-        if (hasCash) openCashDrawerViaWebUSB();
+        if (hasCash) openCashDrawerSmart(slug);
       }
 
       return { ok: true, docNumber: res.document_number };
@@ -938,7 +937,7 @@ export default function POSProPage() {
 
   // ── فتح درج النقود ───────────────────────────────────────────────────────
   const handleOpenDrawer = useCallback(async () => {
-    const res = await openCashDrawerViaWebUSB();
+    const res = await openCashDrawerSmart(slug);
     if (!res.ok) safeToast.error(res.message ?? 'تعذّر فتح الدرج');
   }, [safeToast]);
 

@@ -74,12 +74,12 @@ import { useKbOverrides } from '@/pos/hooks/useKeyboardMap';
 import { useKeyboardShortcuts } from '@/pos/hooks/useKeyboardShortcuts';
 import { usePrintSettings }     from '@/pos/hooks/usePrintSettings';
 import { printReceiptDirect }   from '@/pos/utils/printUtils';
-import { openCashDrawerViaWebUSB } from '@/pos/utils/printService';
+import { openCashDrawerSmart } from '@/pos/utils/thermalPrint';
 import { playAddSound, playSaleSound } from '@/pos/utils/posSounds';
 import type { SoundPresetId } from '@/pos/utils/posSounds';
 import { renderPreviewToHtml }  from '@/pages/settings/print-settings/runtime/renderPreviewToHtml';
 import { mapCompany }           from '@/pages/settings/print-settings/runtime/PrintRuntimeAdapter';
-import { isWebUsbSupported, printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
+import { printThermalSmart } from '@/pos/utils/thermalPrint';
 import { useQueryClient }       from '@tanstack/react-query';
 import { partyBalancesApi } from '@/lib/api/endpoints/partyBalances';
 import { tenantKeys, invalidatePosQueries } from '@/lib/api/core/queryKeys';
@@ -724,9 +724,9 @@ function POSPage() {
   }, [safeToast]);
 
   const handleOpenDrawer = useCallback(async () => {
-    const res = await openCashDrawerViaWebUSB();
+    const res = await openCashDrawerSmart(slug);
     if (!res.ok) safeToast.error(res.message ?? 'تعذّر فتح الدرج');
-  }, [safeToast]);
+  }, [safeToast, slug]);
 
   const handleOpenInvoice = useCallback(async (docId: number) => {
     const cartState = useCartStore.getState();
@@ -1032,18 +1032,14 @@ function POSPage() {
       const resolvedDocNum = snap.docNumber;
       const isThermalPaper = posTemplate.paper_size === '80mm' || posTemplate.paper_size === '58mm';
 
-      // Silent mode (quick cash): try WebUSB thermal only, no browser fallback
+      // Silent mode (quick cash): thermal via WebUSB, fallback Windows spooler
       if (opts?.silent) {
-        if (!isWebUsbSupported()) {
-          safeToast.error('الطباعة المباشرة تتطلب متصفح يدعم WebUSB');
-          return;
-        }
         if (!resolvedDocNum) {
           safeToast.error('رقم الفاتورة غير متوفر للطباعة المباشرة');
           return;
         }
         const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
-        const result = await printThermalViaWebUSBFromTemplate(posTemplate, data, resolvedDocNum);
+        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug);
         if (result.ok) {
           safeToast.success('✅ تمت الطباعة');
         } else {
@@ -1060,9 +1056,9 @@ function POSPage() {
 
       if (settings.printMode === 'thermal' && resolvedDocNum && isThermalPaper) {
         const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
-        const result = await printThermalViaWebUSBFromTemplate(posTemplate, data, resolvedDocNum);
+        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug);
         if (result.ok) {
-          safeToast.success('✅ تمت الطباعة الحرارية');
+          safeToast.success(result.method === 'windows' ? '✅ تمت الطباعة (ويندوز)' : '✅ تمت الطباعة الحرارية');
         } else {
           safeToast.error(`خطأ في الطباعة الحرارية: ${result.message}`);
           await printReceiptDirect({
@@ -1407,7 +1403,7 @@ const handleCompleteSale = useCallback(async (params: {
           const mode = (paymentModes ?? []).find(m => m.id === p.payment_mode_id);
           return mode && /نقدا|نقداً|cash/i.test(mode.name);
         });
-        if (hasCash) openCashDrawerViaWebUSB();
+        if (hasCash) openCashDrawerSmart(slug);
       }
 
       const willShowPreview = params.skipPreview

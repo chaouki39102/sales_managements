@@ -55,4 +55,37 @@ class SystemPrinterController extends BaseApiController
             );
         }
     }
+
+    /**
+     * POST /{company}/system/printers/raw — إرسال بايتات خام (ESC/POS)
+     * إلى طابعة ويندوز عبر spooler. يُستخدم كمسار احتياطي عندما يفشل
+     * WebUSB (حجز تعريف النظام لواجهة الطابعة).
+     */
+    public function rawPrint(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name'   => ['required', 'string', 'max:255'],
+            'data'   => ['required', 'string'],
+            'copies' => ['sometimes', 'integer', 'min:1', 'max:10'],
+        ]);
+
+        try {
+            $this->service->rawPrint(
+                (string) $validated['name'],
+                (string) $validated['data'],
+                (int) ($validated['copies'] ?? 1),
+            );
+
+            return $this->successResponse(
+                ['printed' => true],
+                "تمت الطباعة على «" . $validated['name'] . "»",
+            );
+        } catch (\Throwable $e) {
+            return $this->errorResponse(
+                'فشل الإرسال إلى الطابعة: ' . $e->getMessage(),
+                422,
+                'PRINTER_RAW_FAILED',
+            );
+        }
+    }
 }

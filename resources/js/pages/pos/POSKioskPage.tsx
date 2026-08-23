@@ -22,7 +22,8 @@ import {
 } from '@/pos/utils/posHelpers';
 import { formatDZD }         from '@/pos/utils/calculations';
 import { settingsApi }                from '@/lib/api/endpoints/settings';
-import { isWebUsbSupported, getThermalAutoPrint, printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
+import { getThermalAutoPrint } from '@/pos/utils/printService';
+import { printThermalSmart } from '@/pos/utils/thermalPrint';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
 import { usePrintSettings }           from '@/pos/hooks/usePrintSettings';
 
@@ -251,12 +252,12 @@ export default function POSKioskPage() {
       pos.clearCart();
       setModal('receipt');
 
-      if (isWebUsbSupported() && getThermalAutoPrint()) {
+      if (getThermalAutoPrint()) {
         setTimeout(async () => {
           const snap = posSaleSnapshotRef.current;
           if (!snap || !template) return;
           const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? {} as any);
-          const r = await printThermalViaWebUSBFromTemplate(template, data, res.document_number);
+          const r = await printThermalSmart(template, data, res.document_number, slug);
           if (!r.ok) notify.error(r.message);
         }, 500);
       }

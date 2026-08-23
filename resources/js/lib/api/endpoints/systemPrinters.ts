@@ -33,6 +33,13 @@ export const systemPrintersApi = {
   list: () => apiGet<SystemPrintersPayload>('/system/printers'),
   testPrint: (name: string) =>
     apiPost<{ sent: boolean }>('/system/printers/test', { name }),
+  /** إرسال بايتات خام (base64) عبر spooler ويندوز — مسار احتياطي لـ WebUSB */
+  rawPrint: (name: string, dataBase64: string, copies = 1) =>
+    apiPost<{ printed: boolean }>('/system/printers/raw', {
+      name,
+      data: dataBase64,
+      copies,
+    }),
 } as const;
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────

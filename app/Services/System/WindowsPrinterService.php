@@ -84,6 +84,125 @@ class WindowsPrinterService
     }
 
     /**
+     * إرسال بايتات خام (ESC/POS) إلى طابعة عبر Windows Print Spooler.
+     *
+     * هذا هو الحل الجذري لفشل WebUSB على ويندوز: تعريف النظام (usbprint.sys)
+     * يحجز واجهة الطابعة من نوع printer-class فور توصيلها، وكروم لا يستطيع
+     * فك هذا الحجز على ويندوز — لذا تفشل claimInterface دائماً حتى لو لم
+     * يستهلك أي برنامج الطابعة ظاهرياً. الإرسال عبر الـ spooler يتجاوز
+     * هذا الحجز تماماً (نوع البيانات RAW يمرر البايتات كما هي للمنفذ).
+     *
+     * المسار: base64 → ملف مؤقت → P/Invoke winspool.drv
+     * (OpenPrinter/StartDocPrinter/WritePrinter) داخل PowerShell.
+     * الاسم يتحقق ضد قائمة النظام (allowlist) قبل التنفيذ.
+     */
+    public function rawPrint(string $name, string $base64Data, int $copies = 1): void
+    {
+        $known = array_map(
+            fn ($p) => mb_strtolower($p['name']),
+            $this->list()['printers'],
+        );
+        if (!in_array(mb_strtolower($name), $known, true)) {
+            throw new \RuntimeException('الطابعة غير موجودة في قائمة طابعات النظام.');
+        }
+
+        $bytes = base64_decode($base64Data, true);
+        if ($bytes === false || strlen($bytes) === 0) {
+            throw new \RuntimeException('بيانات الطباعة غير صالحة.');
+        }
+        if (strlen($bytes) > 1024 * 1024) {
+            throw new \RuntimeException('حجم بيانات الطباعة كبير جداً.');
+        }
+
+        $copies = max(1, min(10, $copies));
+
+        $path = rtrim(sys_get_temp_dir(), '\\/') . DIRECTORY_SEPARATOR
+            . 'posdz_raw_' . bin2hex(random_bytes(6)) . '.bin';
+        if (file_put_contents($path, $bytes) === false) {
+            throw new \RuntimeException('تعذر تجهيز ملف الطباعة المؤقت.');
+        }
+
+        try {
+            $escName = str_replace("'", "''", $name);
+            $escPath = str_replace("'", "''", $path);
+
+            // C# NOWDOC — لا استيفاء PHP، ويُحقن داخل here-string بسطر واحد
+            $cs = <<<'CS'
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+public static class RawPrinterHelper {
+  [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Ansi)]
+  public struct DOCINFOA {
+    [MarshalAs(UnmanagedType.LPStr)] public string pDocName;
+    [MarshalAs(UnmanagedType.LPStr)] public string pOutputFile;
+    [MarshalAs(UnmanagedType.LPStr)] public string pDataType;
+  }
+  [DllImport("winspool.Drv", SetLastError=true, CharSet=CharSet.Ansi)]
+  public static extern bool OpenPrinter([MarshalAs(UnmanagedType.LPStr)] string szPrinter, out IntPtr hPrinter, IntPtr pd);
+  [DllImport("winspool.Drv", SetLastError=true)]
+  public static extern bool ClosePrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", SetLastError=true, CharSet=CharSet.Ansi)]
+  public static extern bool StartDocPrinter(IntPtr hPrinter, int level, [In] DOCINFOA di);
+  [DllImport("winspool.Drv", SetLastError=true)]
+  public static extern bool EndDocPrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", SetLastError=true)]
+  public static extern bool StartPagePrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", SetLastError=true)]
+  public static extern bool EndPagePrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", SetLastError=true)]
+  public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, int dwCount, out int dwWritten);
+  public static bool SendFileToPrinter(string szPrinterName, string szFileName) {
+    bool ok = false;
+    FileStream fs = null;
+    try {
+      fs = new FileStream(szFileName, FileMode.Open, FileAccess.Read);
+      Byte[] bytes = new Byte[fs.Length];
+      fs.Read(bytes, 0, (int)fs.Length);
+      IntPtr pBytes = Marshal.AllocCoTaskMem(bytes.Length);
+      Marshal.Copy(bytes, 0, pBytes, bytes.Length);
+      IntPtr hPrinter = IntPtr.Zero;
+      DOCINFOA di = new DOCINFOA();
+      di.pDocName = "POSDZ Receipt";
+      di.pDataType = "RAW";
+      if (OpenPrinter(szPrinterName, out hPrinter, IntPtr.Zero)) {
+        if (StartDocPrinter(hPrinter, 1, di)) {
+          if (StartPagePrinter(hPrinter)) {
+            int dwWritten;
+            ok = WritePrinter(hPrinter, pBytes, bytes.Length, out dwWritten);
+            EndPagePrinter(hPrinter);
+          }
+          EndDocPrinter(hPrinter);
+        }
+        ClosePrinter(hPrinter);
+      }
+      Marshal.FreeCoTaskMem(pBytes);
+    } finally {
+      if (fs != null) { fs.Dispose(); }
+    }
+    return ok;
+  }
+}
+CS;
+
+            $csLines = explode("\n", str_replace("\r\n", "\n", $cs));
+            $csLiteral = "@'\n" . implode("\n", $csLines) . "\n'@";
+
+            $script = "\$ErrorActionPreference = 'Stop'\n"
+                . "Add-Type -TypeDefinition {$csLiteral}\n"
+                . "for (\$i = 0; \$i -lt {$copies}; \$i++) {\n"
+                . "  \$ok = [RawPrinterHelper]::SendFileToPrinter('{$escName}', '{$escPath}')\n"
+                . "  if (-not \$ok) { throw 'spooler write failed' }\n"
+                . "}\n"
+                . "Write-Output 'OK'\n";
+
+            $this->runPowerShell($script, 25);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    /**
      * تعداد الطابعات عبر WMI وتطبيعها إلى شكل موحّد للـ API.
      *
      * Win32_Printer.PrinterStatus:

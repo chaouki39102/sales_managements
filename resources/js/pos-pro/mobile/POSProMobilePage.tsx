@@ -47,7 +47,7 @@ import { productToVariant, isVariantOutOfStock } from '@/pos/utils/posHelpers';
 import { usePOSSettings, checkDiscountAllowed } from '@/pos/hooks/usePOSSettings';
 import { usePrintSettings } from '@/pos/hooks/usePrintSettings';
 import { printReceiptDirect } from '@/pos/utils/printUtils';
-import { openCashDrawerViaWebUSB, printThermalViaWebUSBFromTemplate } from '@/pos/utils/printService';
+import { printThermalSmart, openCashDrawerSmart } from '@/pos/utils/thermalPrint';
 import { playSaleSound, playAddSound } from '@/pos/utils/posSounds';
 import type { SoundPresetId } from '@/pos/utils/posSounds';
 import { htToTtc } from '@/pos/utils/calculations';
@@ -524,9 +524,9 @@ export default function POSProMobilePage() {
 
       if (settings.printMode === 'thermal' && resolvedDocNum && isThermalPaper) {
         const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
-        const result = await printThermalViaWebUSBFromTemplate(posTemplate, data, resolvedDocNum);
+        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug);
         if (result.ok) {
-          safeToast.success('تمت الطباعة الحرارية');
+          safeToast.success(result.method === 'windows' ? 'تمت الطباعة (ويندوز)' : 'تمت الطباعة الحرارية');
         } else {
           safeToast.error(`خطأ في الطباعة الحرارية: ${result.message}`);
           await printReceiptDirect({
@@ -543,7 +543,7 @@ export default function POSProMobilePage() {
     } catch (error: unknown) {
       safeToast.error(`خطأ في تجهيز الطباعة: ${error instanceof Error ? error.message : String(error)}`);
     }
-  }, [posTemplate, safeToast, companyData, settings.printMode, paperWidth, copies]);
+  }, [posTemplate, safeToast, companyData, settings.printMode, paperWidth, copies, slug]);
 
   // ── إتمام البيع (نفس صيغة سطح المكتب — الـ backend هو مصدر الحقيقة) ──────
   const handleCompleteSale = useCallback(async (params: {
@@ -742,7 +742,7 @@ export default function POSProMobilePage() {
           const mode = (paymentModes ?? []).find((m) => m.id === p.payment_mode_id);
           return mode && /نقدا|نقداً|cash/i.test(mode.name);
         });
-        if (hasCash) openCashDrawerViaWebUSB();
+        if (hasCash) openCashDrawerSmart(slug);
       }
 
       const st = (fn: () => void, ms: number) => {
