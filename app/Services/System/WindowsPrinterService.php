@@ -203,6 +203,89 @@ CS;
     }
 
     /**
+     * طباعة نص عادي (GDI) على أي طابعة مثبتة — صامتة تماماً: بدون معاينة
+     * ولا نافذة حوار، وتعمل على الطابعات العادية (ليزر/حبر) التي لا تفهم
+     * بايتات ESC/POS الخام (مثل Canon MF3010).
+     *
+     * المسار: base64(نص UTF-8) → ملف مؤقت → PowerShell + System.Drawing
+     * PrintDocument — نفس محرك الطباعة الذي تستعمله Word/Excel داخلياً
+     * عبر الـ GDI، فيُرسَل المستند مباشرة إلى الـ spooler.
+     */
+    public function rawTextPrint(string $name, string $base64Text, int $copies = 1): void
+    {
+        $known = array_map(
+            fn ($p) => mb_strtolower($p['name']),
+            $this->list()['printers'],
+        );
+        if (!in_array(mb_strtolower($name), $known, true)) {
+            throw new \RuntimeException('الطابعة غير موجودة في قائمة طابعات النظام.');
+        }
+
+        $bytes = base64_decode($base64Text, true);
+        if ($bytes === false || strlen($bytes) === 0) {
+            throw new \RuntimeException('بيانات الطباعة غير صالحة.');
+        }
+        if (strlen($bytes) > 512 * 1024) {
+            throw new \RuntimeException('حجم نص الطباعة كبير جداً.');
+        }
+
+        $copies = max(1, min(10, $copies));
+
+        $path = rtrim(sys_get_temp_dir(), '\\/') . DIRECTORY_SEPARATOR
+            . 'posdz_txt_' . bin2hex(random_bytes(6)) . '.txt';
+        if (file_put_contents($path, $bytes) === false) {
+            throw new \RuntimeException('تعذر تجهيز ملف الطباعة المؤقت.');
+        }
+
+        try {
+            $escName = str_replace("'", "''", $name);
+            $escPath = str_replace("'", "''", $path);
+
+            // PrintDocument عبر GDI: نفس مسار Word — يرسم النص ويسلّمه للـ spooler
+            // صامتةً. الأسطر تُقاس مسبقاً (MeasureString) لتقطيع السطور الطويلة،
+            // وخط Segoe UI يدعم العربية على كل نسخ ويندوز الحديثة.
+            $script = "\$ErrorActionPreference = 'Stop'\n"
+                . "Add-Type -AssemblyName System.Drawing\n"
+                . "\$pd = New-Object System.Drawing.Printing.PrintDocument\n"
+                . "\$pd.PrinterSettings.PrinterName = '{$escName}'\n"
+                . "\$pd.DocumentName = 'POSDZ Receipt'\n"
+                . "\$script:font = New-Object System.Drawing.Font('Segoe UI', 9)\n"
+                . "\$g = \$pd.PrinterSettings.CreateMeasurementGraphics()\n"
+                . "\$maxW = \$g.VisibleClipBounds.Width - 40\n"
+                . "\$script:flat = New-Object System.Collections.Generic.List[string]\n"
+                . "foreach (\$ln in [System.IO.File]::ReadAllLines('{$escPath}', [System.Text.Encoding]::UTF8)) {\n"
+                . "  \$rest = \$ln\n"
+                . "  while (\$rest.Length -gt 0) {\n"
+                . "    \$take = [Math]::Min(\$rest.Length, 200)\n"
+                . "    while ((\$take -gt 1) -and (\$g.MeasureString(\$rest.Substring(0, \$take), \$script:font).Width -gt \$maxW)) { \$take-- }\n"
+                . "    [void]\$script:flat.Add(\$rest.Substring(0, \$take))\n"
+                . "    \$rest = \$rest.Substring(\$take)\n"
+                . "  }\n"
+                . "}\n"
+                . "\$script:idx = 0\n"
+                . "\$h = { param(\$s, \$e)\n"
+                . "  \$lh = \$script:font.GetHeight(\$e.Graphics) + 3\n"
+                . "  \$bottom = \$e.Graphics.VisibleClipBounds.Height - 20\n"
+                . "  \$y = 20\n"
+                . "  while (\$script:idx -lt \$script:flat.Count) {\n"
+                . "    if ((\$y + \$lh) -gt \$bottom) { \$e.HasMorePages = \$true; return }\n"
+                . "    \$e.Graphics.DrawString(\$script:flat[\$script:idx], \$script:font, [System.Drawing.Brushes]::Black, 20, \$y)\n"
+                . "    \$y += \$lh\n"
+                . "    \$script:idx++\n"
+                . "  }\n"
+                . "  \$e.HasMorePages = \$false\n"
+                . "}\n"
+                . "\$pd.add_PrintPage(\$h)\n"
+                . "for (\$i = 0; \$i -lt {$copies}; \$i++) { \$script:idx = 0; \$pd.Print() }\n"
+                . "Write-Output 'OK'\n";
+
+            $this->runPowerShell($script, 40);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    /**
      * تعداد الطابعات عبر WMI وتطبيعها إلى شكل موحّد للـ API.
      *
      * Win32_Printer.PrinterStatus:

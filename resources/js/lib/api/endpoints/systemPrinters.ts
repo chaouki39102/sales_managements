@@ -40,6 +40,13 @@ export const systemPrintersApi = {
       data: dataBase64,
       copies,
     }),
+  /** طباعة نص عادي (GDI صامتة) على أي طابعة ويندوز — للطابعات غير الحرارية */
+  rawText: (name: string, textBase64: string, copies = 1) =>
+    apiPost<{ printed: boolean }>('/system/printers/raw-text', {
+      name,
+      data: textBase64,
+      copies,
+    }),
 } as const;
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
