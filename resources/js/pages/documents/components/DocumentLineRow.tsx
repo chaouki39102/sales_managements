@@ -30,7 +30,7 @@ interface DocumentLineRowProps {
 }
 
 function CellInput({
-  value, onChange, type = 'number', min, step, disabled, highlight, width,
+  value, onChange, type = 'number', min, step, disabled, highlight, width, id,
 }: {
   value:      number | string;
   onChange:   (v: string) => void;
@@ -40,9 +40,11 @@ function CellInput({
   disabled?:  boolean;
   highlight?: boolean;
   width?:     number;
+  id?:        string;
 }) {
   return (
     <input
+      id={id}
       type={type}
       value={value}
       min={min}
@@ -55,12 +57,13 @@ function CellInput({
 }
 
 function TotalQtyInput({
-  baseQty, disabled, onUpdate,
+  baseQty, disabled, onUpdate, id,
 }: {
   baseQty:  number;
   _packQty:  number;
   disabled: boolean;
   onUpdate: (totalQty: number) => void;
+  id?:      string;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const ref = useRef<HTMLInputElement>(null);
@@ -77,6 +80,7 @@ function TotalQtyInput({
   return (
     <input
       ref={ref}
+      id={id}
       type="text"
       inputMode="decimal"
       value={display}
@@ -223,6 +227,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
         {col('quantity') && (
           <td style={{ padding: '3px 4px' }}>
             <CellInput
+              id={`doc-line-${idx}-qty`}
               value={line.quantity}
               min={0.001}
               step={1}
@@ -235,7 +240,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
 
         {col('total_qty') && (
           <td style={{ padding: '3px 4px' }}>
-            <TotalQtyInput baseQty={baseQty} _packQty={line._packQty} disabled={disabled} onUpdate={(v) => {
+            <TotalQtyInput id={`doc-line-${idx}-total_qty`} baseQty={baseQty} _packQty={line._packQty} disabled={disabled} onUpdate={(v) => {
               const newQty = line._packQty > 1 ? v / line._packQty : v;
               onUpdate(idx, { quantity: newQty });
             }} />
@@ -252,6 +257,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
         {col('unit_price') && (
           <td style={{ padding: '3px 4px' }}>
             <CellInput
+              id={`doc-line-${idx}-price`}
               value={line.unit_price_ht}
               min={0}
               step={0.01}

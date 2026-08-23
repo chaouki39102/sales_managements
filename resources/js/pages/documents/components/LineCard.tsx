@@ -182,6 +182,7 @@ export function LineCard({
               −
             </button>
             <input
+              id={`doc-line-${idx}-qty`}
               type="number"
               min={0.001}
               step={1}
@@ -217,7 +218,7 @@ export function LineCard({
         {line._packQty > 1 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ color: 'var(--t4)', fontSize: 10, width: 56 }}>الكمية الإجمالية:</span>
-            <input type="number" defaultValue={baseQty * line._packQty} disabled={disabled}
+            <input id={`doc-line-${idx}-total_qty`} type="number" defaultValue={baseQty * line._packQty} disabled={disabled}
               onChange={(e) => {
                 const v = Number(e.target.value);
                 const newQty = line._packQty > 1 ? v / line._packQty : v;
@@ -231,6 +232,7 @@ export function LineCard({
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ color: 'var(--t4)', fontSize: 10 }}>السعر:</span>
           <input
+            id={`doc-line-${idx}-price`}
             type="number"
             min={0}
             step={0.01}

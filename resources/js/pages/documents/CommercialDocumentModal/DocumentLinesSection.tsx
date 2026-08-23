@@ -8,6 +8,7 @@ import type { LineItem, ColKey } from '../types/document.types';
 import { ALL_COLUMNS } from '../types/document.types';
 import type { ComputeLineWarning } from '../hooks/useComputeLine';
 import { validateLineStock } from '../utils/document.utils';
+import { focusDocLineCell } from '../utils/focusDocLineCell';
 import { useBarcodeScan } from '../../../hooks/useBarcodeScan';
 import { useNotification } from '../../../hooks/useNotification';
 
@@ -93,6 +94,27 @@ export default function DocumentLinesSection({
   const linesContainerRef = useRef<HTMLDivElement>(null);
   const FOCUSABLE = 'input:not([disabled]), select:not([disabled]), textarea:not([disabled])';
 
+  /** أضف سطراً جديداً ثم ركّز خلية الكمية فيه (كمية ← كمية إجمالية كبديل). */
+  const addLineAndFocusQty = () => {
+    const newIdx = lines.length;
+    addLine();
+    focusDocLineCell(newIdx, ['qty', 'total_qty']);
+  };
+
+  /** ركّز حقل الكمية في سطر معين (يُستعمل بعد التكرار/الإضافة). */
+  const focusLineQty = (idx: number) => {
+    focusDocLineCell(idx, ['qty', 'total_qty']);
+  };
+
+  /** ركّز عنصراً (مع تحديد النص إن كان input) — مساعد لمسار Enter السريع. */
+  const focusEl = (el: HTMLElement) => {
+    el.scrollIntoView({ block: 'nearest' });
+    el.focus();
+    if (el instanceof HTMLInputElement && el.type !== 'checkbox' && el.type !== 'radio') {
+      el.select();
+    }
+  };
+
   /** تركيز خلية بنفس العمود في السطر التالي/السابق (نمط Excel — عرض الجدول). */
   const focusAdjacentRowCell = (
     container: HTMLDivElement,
@@ -147,7 +169,9 @@ export default function DocumentLinesSection({
         const row = target.closest('[data-line-idx]');
         if (row && container?.contains(row)) {
           e.preventDefault();
-          duplicateLine(Number(row.getAttribute('data-line-idx')));
+          const srcIdx = Number(row.getAttribute('data-line-idx'));
+          duplicateLine(srcIdx);
+          focusLineQty(srcIdx + 1);
           return;
         }
       }
@@ -177,6 +201,28 @@ export default function DocumentLinesSection({
     e.preventDefault();
 
     if (!container) return;
+
+    // مسار سريع للمال: كمية ← سعر نفس السطر ← الكمية في السطر التالي
+    // (آخر سطر ⇒ أضف سطراً جديداً وركّز كميته). أي عمود مخفي ⇒ اسقط
+    // للمسار العام (Enter = الحقل التالي بترتيب DOM).
+    const tid = target.id || '';
+    const mQty = /^doc-line-(\d+)-qty$/.exec(tid);
+    const mPrice = /^doc-line-(\d+)-price$/.exec(tid);
+    if (mQty) {
+      const priceEl = document.getElementById(`doc-line-${mQty[1]}-price`);
+      if (priceEl) { focusEl(priceEl); return; }
+    } else if (mPrice) {
+      const i = Number(mPrice[1]);
+      if (i < lines.length - 1) {
+        const nextQty = document.getElementById(`doc-line-${i + 1}-qty`)
+          ?? document.getElementById(`doc-line-${i + 1}-total_qty`);
+        if (nextQty) { focusEl(nextQty); return; }
+      } else if (!isLinesReadOnly) {
+        addLineAndFocusQty();
+        return;
+      }
+    }
+
     const focusables = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE));
     const currentIdx = focusables.indexOf(target);
     if (currentIdx === -1) return;
@@ -187,14 +233,24 @@ export default function DocumentLinesSection({
       return;
     }
 
-    // آخر حقل في آخر سطر — أضف سطراً جديداً وركّز أول حقل فيه
+    // آخر حقل في آخر سطر — أضف سطراً جديداً وركّز أول حقل فيه.
+    // setState غير متزامن: نُعيد المحاولة حتى يظهر حقل الصف الجديد فعلاً.
     if (isLinesReadOnly) return;
     const countBefore = focusables.length;
     addLine();
-    requestAnimationFrame(() => {
+    let left = 10;
+    const tick = () => {
       const updated = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE));
-      updated[countBefore]?.focus();
-    });
+      const el = updated[countBefore];
+      if (el) {
+        el.scrollIntoView({ block: 'nearest' });
+        el.focus();
+        (el as HTMLInputElement)?.select?.();
+      } else if (--left > 0) {
+        setTimeout(tick, 30);
+      }
+    };
+    requestAnimationFrame(tick);
   };
 
   return (
@@ -300,7 +356,7 @@ export default function DocumentLinesSection({
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span
-                title="Enter: الحقل التالي · ↑/↓: نفس العمود في السطر التالي/السابق · Ctrl+Delete: حذف السطر · Ctrl+D: تكرار السطر · Esc: ترك الحقل"
+                title="Enter: كمية ← سعر ← السطر التالي · Alt+N: سطر جديد (يُركَّز كميته) · ↑/↓: نفس العمود · Ctrl+D: تكرار السطر · Ctrl+Delete: حذف السطر · Esc: ترك الحقل"
                 style={{ fontSize: 10.5, color: 'var(--t4)', display: 'flex', alignItems: 'center', gap: 4 }}
               >
                 <i className="ti ti-keyboard" style={{ fontSize: 12 }} />
@@ -471,7 +527,7 @@ export default function DocumentLinesSection({
         {!isLinesReadOnly && (
           <div style={{ marginTop: 10, display: 'flex', gap: 8, flexShrink: 0 }}>
             <button
-              onClick={addLine}
+              onClick={addLineAndFocusQty}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '7px 14px', borderRadius: 'var(--r2)',
@@ -539,6 +595,7 @@ export default function DocumentLinesSection({
             isLoading={isLoadingSuggestions}
             onAddProduct={(productId, suggestedPrice, suggestedTva) => {
               addLineWithProduct(String(productId), suggestedPrice ?? undefined, suggestedTva ?? undefined);
+              focusLineQty(lines.length);
             }}
             disabled={isReadOnly}
           />

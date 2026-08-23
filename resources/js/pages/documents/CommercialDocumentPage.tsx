@@ -29,6 +29,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useConfirm } from '@/hooks/useConfirm';
 
 import { useCommercialDocumentController } from './hooks/useCommercialDocumentController';
+import { focusDocLineCell } from './utils/focusDocLineCell';
 import { isOfflineQueuedResponse } from '@/lib/offline/queueMath';
 
 /** زر طي/فتح لوحة المعلومات الجانبية. */
@@ -176,8 +177,8 @@ export default function CommercialDocumentPage() {
   }, [docCode]);
 
   // ── اختصارات لوحة المفاتيح العامة: F2 باركود · F4 متعامل · F9/Ctrl+S حفظ · Alt+N سطر ──
-  const hotRef = useRef({ handleSave, isPending, successMsg, isReadOnly, addLine });
-  hotRef.current = { handleSave, isPending, successMsg, isReadOnly, addLine };
+  const hotRef = useRef({ handleSave, isPending, successMsg, isReadOnly, addLine, lineCount: form.lines.length });
+  hotRef.current = { handleSave, isPending, successMsg, isReadOnly, addLine, lineCount: form.lines.length };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -198,7 +199,13 @@ export default function CommercialDocumentPage() {
         if (!h.isPending && !h.successMsg && !h.isReadOnly) h.handleSave();
       } else if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === 'n') {
         e.preventDefault();
-        if (!h.isReadOnly) h.addLine();
+        if (!h.isReadOnly) {
+          // أضف سطراً ثم ركّز خلية الكمية فيه مباشرة — الاختصار يجب أن
+          // "يتحكم بالصفحة": بدون التركيز لا يظهر أي أثر للضغط.
+          const newIdx = h.lineCount;
+          h.addLine();
+          focusDocLineCell(newIdx, ['qty', 'total_qty']);
+        }
       }
     };
     window.addEventListener('keydown', onKey);
