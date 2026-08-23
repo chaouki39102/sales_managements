@@ -941,22 +941,11 @@ export function parseInvoiceText(input: string | OcrLine[], ctx: ParseContext = 
         if (qty === null && price === null && nums.length === 0) continue;
         if (qty === null) qty = 1;
       } else if (nums.length >= 2) {
-        if (layout?.hasQtyCol) {
-          // Layout-aware: price is the PU column, qty is the qty column.
-          // When totals follow the PU column (e.g. «PU HT Total»), the rightmost
-          // number is a line total, not the unit price.
-          let priceIdx = nums.length - 1;
-          if (layout.trailingTotalCols >= 1 && nums.length >= 3) priceIdx = nums.length - 2;
-          price = price ?? nums[priceIdx];
-          qty = qty ?? ((layout.qtyBeforeName || priceIdx === 0) ? nums[0] : nums[priceIdx - 1]);
-        } else if (layout && layout.trailingTotalCols >= 1) {
-          // «Désignation PU HT» — no qty column; first number is the unit price.
-          price = price ?? nums[0];
-          qty = qty ?? 1;
-        } else {
-          qty = qty ?? nums[0];
-          price = price ?? nums[nums.length - 1];
-        }
+        // Reached only when NO table header was detected (a detected layout
+        // always takes the column-driven branch above, which handles trailing
+        // totals internally via assignRowColumns): classic first/last heuristic.
+        qty = qty ?? nums[0];
+        price = price ?? nums[nums.length - 1];
       } else if (nums.length === 1) {
         price = price ?? nums[0];
         qty = qty ?? 1;

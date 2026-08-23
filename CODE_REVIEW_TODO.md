@@ -1,6 +1,6 @@
 # CODE_REVIEW_TODO.md — Full Code Review Checklist
 
-> Status: **Section 7 COMPLETE** (Aug 23, 2026). Next up: **Section 8 — Shared Hooks + Components** (final section). Pick up any time, task-by-task.
+> Status: **FULL REVIEW COMPLETE** — all 8 sections reviewed (Aug 23, 2026): 81 findings (46 fixed + 35 observations/verified).
 
 ## How to use
 - Work task-by-task (one section at a time)
@@ -122,15 +122,15 @@
 
 ## Section 8 — Shared Hooks + Components
 
-- [ ] `resources/js/hooks/useConfirm.ts` — confirm hook
-- [ ] `resources/js/hooks/useNotification.ts` — notification hook
-- [ ] `resources/js/hooks/useBarcodeScan.ts` — barcode scan hook
-- [ ] `resources/js/components/ui/ConfirmDialog.tsx` — confirm dialog
-- [ ] `resources/js/components/ui/Modal.tsx` — shared modal
-- [ ] `resources/js/components/ui/SimpleTable.tsx` — table component
-- [ ] `resources/js/lib/wa.ts` — WhatsApp utilities
-- [ ] `resources/js/lib/fiscalQr.ts` — QR parser
-- [ ] `resources/js/lib/invoiceOcr.ts` — OCR parser
+- [x] `resources/js/hooks/useConfirm.ts` — confirm hook
+- [x] `resources/js/hooks/useNotification.ts` — notification hook
+- [x] `resources/js/hooks/useBarcodeScan.ts` — barcode scan hook
+- [x] `resources/js/components/ui/ConfirmDialog.tsx` — confirm dialog
+- [x] `resources/js/components/ui/Modal.tsx` — shared modal
+- [x] `resources/js/components/ui/SimpleTable.tsx` — table component
+- [x] `resources/js/lib/wa.ts` — WhatsApp utilities
+- [x] `resources/js/lib/fiscalQr.ts` — QR parser
+- [x] `resources/js/lib/invoiceOcr.ts` — OCR parser
 
 ---
 
@@ -274,6 +274,9 @@
 | 76 | 7 | Info | Observation | `PrintSettingsPage.tsx` | left rail | Template count badges computed from `usePrintTemplates(activeDoc)` (active-doc-only list), so every other doc type shows 0 even when it has templates — cosmetic/misleading only; switching tabs loads the real list | Verified |
 | 77 | 7 | Info | Observation | `PrintSettingsPage.tsx` | 285/345 | Test-print popup-blocked fallback is raw `window.print()` (prints whole admin page); `handleToggleActive` optimistic local update isn't reverted on mutation failure. Both pre-existing minor UX edges, no data impact | Verified |
 | 78 | 7 | Info | Observation | `ElementProperties.tsx` + canvas refs | — | Number inputs don't clamp while typing and can't be cleared back to auto-size; canvas reads sibling offsetWidth during render (L421–426) which works because Moveable's updateRect re-anchors handles post-drag. Cosmetic notes only | Verified |
+| 79 | 8 | Low | Dead code | `invoiceOcr.ts` | parseInvoiceText | Unreachable fallback branches: the `else if (nums.length >= 2)` block tested `layout?.hasQtyCol` / `layout?.trailingTotalCols`, but it can only execute when `layout?.columns?.length` is falsy (a detected layout always has ≥2 columns) → both nested branches permanently dead; their comments described column-aware behavior that actually lives in `assignRowColumns`. Removed (~13 lines), plain first/last heuristic kept — behavior unchanged (82/82 spec green) | Fixed |
+| 80 | 8 | Info | Observation | `Modal.tsx` | — | Shared Modal does NOT unmount children when closed (`hidden` class on overlay, body stays mounted) — intentional for lightweight content; heavy-body callers must gate rendering themselves (CommercialDocumentModal post-B.1 is the reference pattern). Escape listener installs once globally, never removed (single harmless listener); stale `dims` if `storageKey` changes while open (next resize heals) | Verified |
+| 81 | 8 | Info | Observation | hooks + ui + pure libs | — | Clean: useConfirm (resolveRef promise pattern), useNotification (store wrapper matches contract), useBarcodeScan (refs-during-render = established B.1 pattern), ConfirmDialog (variant maps), SimpleTable (`?? '—'` renders 0/false correctly; expansion state persists across refreshes by key — benign), wa.ts (10 spec tests), fiscalQr.ts (5 spec tests), invoiceOcr.ts (82 spec tests; engine lazy + seam-gated intact) | Verified |
 
 ---
 
@@ -288,3 +291,6 @@
 | 5 — Portal (Admin + Customer) | Aug 22, 2026 | 4 fixed + 5 observations (rows 52–59 above). Fixed: payments summary (server-side SQL), duplicate useDebounce, portalStore typing, image proxy skip-CDN. Verified: tsc clean, vitest 391/391 (21 files), build 0 errors, 239 precache, SW MATCH | section commit |
 | 6 — Documents Module | Aug 23, 2026 | 6 fixed + 5 observations (rows 60–70 above). Fixed: convert double-navigation, chain-panel dead `?document=` feature, dead hook extraTab state, draft autosave bleed into edit mode, stale approvalBatch closure (N+1 approvals), dead `fill` prop. Verified: tsc clean, vitest 391/391 (21 files), build 0 errors, SW MATCH | section commit |
 | 7 — Settings + Print System | Aug 23, 2026 | 3 fixed + 5 observations (rows 71–78 above). Fixed: sticker print dropped unsaved-position elements (design/print divergence), dead Ctrl+wheel zoom (`\|\|`→`&&`), native `prompt()` → shared Modal + Input. Clean: SettingsRegistry/Serializer (spec-covered), PrintFieldResolver, TemplatePrintModal, ElementProperties. Verified: tsc clean, vitest + build + SW MATCH this commit | section commit |
+| 8 — Shared Hooks + Components | Aug 23, 2026 | 1 fixed + 2 observations (rows 79–81 above). Fixed: dead unreachable layout-fallback branches in OCR parser. Clean: all 9 files — hooks (useConfirm/useNotification/useBarcodeScan), ui (ConfirmDialog/Modal/SimpleTable), pure libs (wa/fiscalQr/invoiceOcr, all spec-covered). Verified: tsc clean, vitest + build + SW MATCH this commit | section commit |
+
+**Review finished** — no sections remain.
