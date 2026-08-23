@@ -78,10 +78,14 @@ class PrintFieldResolver {
     // (built-in doc-info rows, header info, and custom doc_info_rows layouts)
     // renders datetime without appending doc.time manually.
     if (fieldId === 'document.date') {
-      const date = getByPath(data, def.sourcePath);
-      if (!date || !template?.show_time) return date;
+      const raw = getByPath(data, def.sourcePath);
+      if (!raw || !template?.show_time) return raw;
       const time = getByPath(data, 'doc.time');
-      return time ? `${date} ${time}` : date;
+      if (!time) return raw;
+      // Normalize full ISO timestamps ("2026-08-23T16:45:00.000000Z", the shape
+      // reprints get from document_date) to their date part FIRST, so the
+      // composed value is always "YYYY-MM-DD HH:mm" and survives formatDate().
+      return `${String(raw).slice(0, 10)} ${time}`;
     }
 
     // 4) Simple data path
