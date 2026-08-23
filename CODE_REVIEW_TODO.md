@@ -1,6 +1,6 @@
 # CODE_REVIEW_TODO.md — Full Code Review Checklist
 
-> Status: **Section 6 COMPLETE** (Aug 23, 2026). Next up: **Section 7 — Settings + Print System**. Pick up any time, task-by-task.
+> Status: **Section 7 COMPLETE** (Aug 23, 2026). Next up: **Section 8 — Shared Hooks + Components** (final section). Pick up any time, task-by-task.
 
 ## How to use
 - Work task-by-task (one section at a time)
@@ -109,16 +109,16 @@
 
 ## Section 7 — Settings + Print System
 
-- [ ] `resources/js/pages/settings/print-settings/PrintSettingsPage.tsx` — print settings
-- [ ] `resources/js/pages/settings/print-settings/services/SettingsRegistry.ts` — settings registry
-- [ ] `resources/js/pages/settings/print-settings/services/SettingsSerializer.ts` — serializer
-- [ ] `resources/js/pages/settings/print-settings/services/PrintFieldResolver.ts` — field resolver
-- [ ] `resources/js/pages/settings/print-settings/components/preview/UniversalPreview.tsx` — preview
-- [ ] `resources/js/pages/settings/print-settings/components/preview/StickerLabel.tsx` — sticker renderer
-- [ ] `resources/js/pages/settings/sticker-designer/StickerCanvas.tsx` — sticker canvas
-- [ ] `resources/js/pages/settings/sticker-designer/StickerDesignerPage.tsx` — sticker designer
-- [ ] `resources/js/pages/settings/sticker-designer/ElementProperties.tsx` — element inspector
-- [ ] `resources/js/components/shared/TemplatePrintModal.tsx` — print modal
+- [x] `resources/js/pages/settings/print-settings/PrintSettingsPage.tsx` — print settings
+- [x] `resources/js/pages/settings/print-settings/services/SettingsRegistry.ts` — settings registry
+- [x] `resources/js/pages/settings/print-settings/services/SettingsSerializer.ts` — serializer
+- [x] `resources/js/pages/settings/print-settings/services/PrintFieldResolver.ts` — field resolver
+- [x] `resources/js/pages/settings/print-settings/components/preview/UniversalPreview.tsx` — preview
+- [x] `resources/js/pages/settings/print-settings/components/preview/StickerLabel.tsx` — sticker renderer
+- [x] `resources/js/pages/settings/sticker-designer/StickerCanvas.tsx` — sticker canvas
+- [x] `resources/js/pages/settings/sticker-designer/StickerDesignerPage.tsx` — sticker designer
+- [x] `resources/js/pages/settings/sticker-designer/ElementProperties.tsx` — element inspector
+- [x] `resources/js/pages/settings/print-settings/components/shared/TemplatePrintModal.tsx` — print modal
 
 ## Section 8 — Shared Hooks + Components
 
@@ -266,6 +266,14 @@
 | 68 | 6 | Info | Observation | `CommercialDocumentsPage.tsx` | rowActions | useCallback dep list missing `confirm`/`notify`/`approvalBatch`, but `muts` (TanStack v5 object identity) forces per-render recompute anyway — cosmetic only, no stale behavior | Verified |
 | 69 | 6 | Info | Observation | `approvals.ts` + `DocumentLinesSection.tsx` | — | `useApprovalCheckBatch` sorts the memoized docIds array in place — harmless (order irrelevant to consumers); line rows use `key={idx}` index keys with removable lines — benign for fully-controlled inputs (pre-existing app-wide pattern) | Verified |
 | 70 | 6 | Info | Observation | `useDocumentChain.ts` + modal lifecycle | — | Global modal correctly unmounts body when closed (Phase B.1 rule intact); convert onSuccess double-call (`onSaved(); onClose()`) IS correct inside the modal since it must dismiss the overlay before navigation | Verified |
+| 71 | 7 | High | Design/print divergence | `StickerLabel.tsx` | 222–224 | Absolute-position mode dropped ANY element without a saved position entry (`if (!p \|\| !node) return null;`) → a sticker designed with the default stacked layout printed WITHOUT logo/price/ref (canvas showed them, print silently omitted). Fallback `positions[id] ?? { x: 0, y: 0 }` renders at top-left, matching canvas defaults | Fixed |
+| 72 | 7 | Medium | Dead shortcut | `StickerCanvas.tsx` | 274 | Ctrl+wheel zoom guard was `if (!e.ctrlKey \|\| !e.metaKey) return;` — required Ctrl AND Meta pressed simultaneously, so zoom never fired. Fixed to `&&` (Ctrl OR Cmd) | Fixed |
+| 73 | 7 | Medium | Native dialog | `StickerDesignerPage.tsx` | ~238 | «قالب جديد» used native `prompt('اسم القالب الجديد:')` — violates the project's no-native-dialogs rule (blocking, unstyled, inconsistent with ConfirmDialog UX). Replaced with shared `Modal` (size sm) + print-settings `Input` + create/cancel buttons; same `createDefaultTpl(name)` + navigate flow on confirm | Fixed |
+| 74 | 7 | Info | Observation | `UniversalPreview.tsx` | 82/86 | Payments section intentionally reuses `section_header_width`/`align` dims for thermal receipts (no `section_payments_*` keys exist anywhere in registry/serializer) — deliberate reuse, dedicated keys would be feature work not a bug | Verified |
+| 75 | 7 | Info | Observation | `StickerLabel.tsx` | flow mode | Flow-mode root subtracts double margin (~296×146 vs 320×160 design space) — long-shipped legacy fallback behavior; changing it would alter existing users' printed output. Left as-is | Verified |
+| 76 | 7 | Info | Observation | `PrintSettingsPage.tsx` | left rail | Template count badges computed from `usePrintTemplates(activeDoc)` (active-doc-only list), so every other doc type shows 0 even when it has templates — cosmetic/misleading only; switching tabs loads the real list | Verified |
+| 77 | 7 | Info | Observation | `PrintSettingsPage.tsx` | 285/345 | Test-print popup-blocked fallback is raw `window.print()` (prints whole admin page); `handleToggleActive` optimistic local update isn't reverted on mutation failure. Both pre-existing minor UX edges, no data impact | Verified |
+| 78 | 7 | Info | Observation | `ElementProperties.tsx` + canvas refs | — | Number inputs don't clamp while typing and can't be cleared back to auto-size; canvas reads sibling offsetWidth during render (L421–426) which works because Moveable's updateRect re-anchors handles post-drag. Cosmetic notes only | Verified |
 
 ---
 
@@ -279,3 +287,4 @@
 | 4 — POS Classic + Pro + Mobile | Aug 22, 2026 | 0 fixed + 9 observations (rows 43–51 above). Clean: all 18 files verified — cart stores, payment modal, keyboard shortcuts, calculations, product grid, scanbar, top cards, draggable cards, print service. Verified: tsc clean, vitest 391/391 | section commit |
 | 5 — Portal (Admin + Customer) | Aug 22, 2026 | 4 fixed + 5 observations (rows 52–59 above). Fixed: payments summary (server-side SQL), duplicate useDebounce, portalStore typing, image proxy skip-CDN. Verified: tsc clean, vitest 391/391 (21 files), build 0 errors, 239 precache, SW MATCH | section commit |
 | 6 — Documents Module | Aug 23, 2026 | 6 fixed + 5 observations (rows 60–70 above). Fixed: convert double-navigation, chain-panel dead `?document=` feature, dead hook extraTab state, draft autosave bleed into edit mode, stale approvalBatch closure (N+1 approvals), dead `fill` prop. Verified: tsc clean, vitest 391/391 (21 files), build 0 errors, SW MATCH | section commit |
+| 7 — Settings + Print System | Aug 23, 2026 | 3 fixed + 5 observations (rows 71–78 above). Fixed: sticker print dropped unsaved-position elements (design/print divergence), dead Ctrl+wheel zoom (`\|\|`→`&&`), native `prompt()` → shared Modal + Input. Clean: SettingsRegistry/Serializer (spec-covered), PrintFieldResolver, TemplatePrintModal, ElementProperties. Verified: tsc clean, vitest + build + SW MATCH this commit | section commit |

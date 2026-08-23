@@ -13,6 +13,7 @@ import ElementProperties from './ElementProperties';
 import { Input } from '@/pages/settings/print-settings/components/ui';
 import { toolBtnStyle } from '@/pages/settings/print-settings/components/TinyBtn';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useNotification } from '@/hooks/useNotification';
@@ -108,6 +109,8 @@ export default function StickerDesignerPage() {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [editingName, setEditingName] = useState(false);
+  const [newNameOpen, setNewNameOpen] = useState(false);
+  const [newName, setNewName] = useState('');
 
   const historyRef = useRef<PrintTemplate[]>([]);
   const historyPos = useRef(-1);
@@ -234,16 +237,22 @@ export default function StickerDesignerPage() {
     navigate(`/settings/stickers?id=${tpl.id}`, { replace: true });
   }, [navigate]);
 
-  const handleNewTemplate = useCallback(async () => {
-    const name = prompt('اسم القالب الجديد:');
+  const handleNewTemplate = useCallback(() => {
+    setNewName('');
+    setNewNameOpen(true);
+  }, []);
+
+  const confirmCreateTemplate = useCallback(async () => {
+    const name = newName.trim();
     if (!name) return;
     try {
       const result = await mutations.create.mutateAsync(createDefaultTpl(name) as unknown as Record<string, unknown>);
+      setNewNameOpen(false);
       navigate(`/settings/stickers?id=${(result as { id: number }).id}`, { replace: true });
     } catch {
       notify.error('فشل إنشاء القالب');
     }
-  }, [mutations, navigate, notify]);
+  }, [newName, mutations, navigate, notify]);
 
   const handleDeleteTemplate = useCallback(async (id: number) => {
     if (!await deleteConfirm.confirm('حذف هذا القالب؟')) return;
@@ -564,6 +573,35 @@ export default function StickerDesignerPage() {
           )}
         </div>
       </div>
+
+      <Modal
+        open={newNameOpen}
+        onClose={() => setNewNameOpen(false)}
+        title="قالب ملصق جديد"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setNewNameOpen(false)}>إلغاء</Button>
+            <button
+              className="btn btn-p" type="button" disabled={!newName.trim()}
+              style={{ opacity: newName.trim() ? 1 : .5, cursor: newName.trim() ? 'pointer' : 'not-allowed' }}
+              onClick={confirmCreateTemplate}
+            >
+              إنشاء
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t3)' }}>اسم القالب</div>
+          <Input
+            value={newName}
+            onChange={setNewName}
+            onEnter={confirmCreateTemplate}
+            placeholder="مثال: ملصق 40×20"
+          />
+        </div>
+      </Modal>
 
       <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
     </div>

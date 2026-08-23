@@ -220,8 +220,8 @@ function StickerLabel({ tpl, data }: { tpl: PrintTemplate; data: UniversalDocume
       </div>
     );
     const el = (id: string, node: React.ReactNode) => {
-      const p = positions[id];
-      if (!p || !node) return null;
+      const p = positions[id] ?? { x: 0, y: 0 };
+      if (!node) return null;
       return (
         <div key={id} style={absBox(p)}>
           {scaled(p.scale, node)}

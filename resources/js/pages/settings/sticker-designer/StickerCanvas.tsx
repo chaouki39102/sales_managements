@@ -271,7 +271,7 @@ export default function StickerCanvas({ tpl, data, selected, onSelect, onTransfo
     const area = wheelAreaRef.current;
     if (!area) return;
     const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey || !e.metaKey) return;
+      if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
       setZoom(z => Math.round(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP))) * 100) / 100);
     };
