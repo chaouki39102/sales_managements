@@ -18,6 +18,33 @@
 - **Offline layer** (`lib/offline/`) sits on the SHARED `client` — its cache keys embed the full URL (slug included), so tenant isolation in the offline cache is automatic; never store cross-tenant keys. The **write queue** (`pendingOps` in IndexedDB) is now tenant-scoped too: every op carries `slug` (captured from the url's first segment at enqueue), and reads/counts/replay/clear filter by the ACTIVE slug via `useActiveSlug()`/`appActions.getActiveSlug()` — legacy rows without the field fall back to `opSlug(url)`, and tenant-less ops (empty slug) stay visible to every company.
 
 ## Date
+2026-08-23
+
+### Phase 83 — Document Editor: Keyboard-Only Entry + Laptop Layout (Aug 23)
+
+**Request**: make the commercial document editor (`CommercialDocumentPage`) fully usable without a mouse (keyboard-only data entry) and fix the cramped/"مكدسة" layout on laptop screens (1366×768–1500px). Plus a stale-total insurance fix: `openConvert` on `PortalOrdersAdminPage` must refetch the order detail before showing the convert modal.
+
+**What was built**:
+- **Global hotkeys** (`CommercialDocumentPage.tsx`, window keydown effect + `hotRef` refs pattern): **F2** → focus+select `#doc-barcode-input`; **F4** → focus `#doc-party-select` (ComboBox trigger button); **F9 / Ctrl+S** → save (guarded by `isPending`/`successMsg`/`isReadOnly`); **Alt+N** → add line. All skipped when the target is inside any modal overlay (`t.closest('.ov') || t.closest('[style*="99999"]')`) so open dialogs keep their keys.
+- **Lines-grid Excel-style keyboard** (`DocumentLinesSection.tsx` `handleLinesKeyDown`): Enter → next field (pre-existing), plus new **ArrowUp/ArrowDown** → move to the SAME column cell of prev/next row (table mode only; queries only `tr[data-line-idx]` so warning rows are skipped; early-return when target is inside a `<select>`); **Ctrl/Cmd+Delete** → remove row; **Ctrl/Cmd+D** → duplicate row (guarded `!shiftKey && !altKey`); **Escape** → blur the field + `stopPropagation` (React handler runs before the window-level Escape back-nav listener, so Esc in the grid never closes the document). All mutations guarded by `!isLinesReadOnly`.
+- **Stable DOM hooks**: `ComboBoxProps` gained `id?: string` forwarded to the trigger `<button>` (`DocumentUIPrimitives.tsx`); party ComboBox gets `id="doc-party-select"`; barcode input `id="doc-barcode-input"`; row roots carry `data-line-idx={idx}` on BOTH renderers (`DocumentLineRow.tsx` `<tr>`, `LineCard.tsx` card div). Safe because the globally-mounted quick-create modal unmounts its body when closed (duplicate-id rule already enforced by tests).
+- **Laptop compact mode**: `compact` state via `matchMedia('(max-width: 1500px)')` + change listener. Topbar (`DocumentTopbar.tsx`): height 60→52, paddings/gaps tightened, template select maxWidth 120→90, export & print become ICON-ONLY when compact. Sidebar width 300→252, scroll padding/gap 16→10; totals maxHeight 55vh→48vh; lines area padding 16→10. Lines table: fontSize 12→11.5, th padding 8→6px, column minWidth ×0.85.
+- **Collapsible info rail**: `infoCollapsed` persisted per doc type as `doc_info_collapsed_${docCode}` (default collapsed when `innerWidth <= 1400`; re-synced from localStorage on `docCode` change since the route component stays mounted). Collapsed = 44px vertical rail with expand chevron (`ti-chevrons-left/right`) + vertical-writing TTC mini summary.
+- **Portal convert insurance** (`PortalOrdersAdminPage.tsx`): `openConvert` is now async — `await detail.refetch()` (try/catch, proceeds with current data on failure) before `setConvertOpen(true)`, so the convert wizard never renders stale pre-edit quantities/totals.
+
+**Key architectural rules**:
+- Global hotkeys must read their callbacks through a **refs mirror** (`hotRef.current = {...}` every render) with an empty-dep effect — the handler is registered once but always sees fresh `handleSave`/state guards; never re-register per render and never capture stale closures.
+- Keyboard shortcuts must **yield to open modals**: gate on `target.closest('.ov') || target.closest('[style*="99999"]')` (shared Modal overlay class + camera-scanner inline z-index). Without this, F9 saves while a confirm dialog is open.
+- **Escape inside the grid must stopPropagation at the React level** — React synthetic events dispatch before the window-level listener, so `e.stopPropagation()` in the React onKeyDown reliably prevents the document-level Escape back-nav. A window-level handler added later would NOT see the event.
+- Arrow-nav targets rows via `tr[data-line-idx]` ONLY (never `tr` generally) — validation/warning rows are separate `<tr>`s and would corrupt the index math; same-column mapping comes from `Array.from(row.children).indexOf(cell)` of the origin `<td>`.
+- Route-param-driven pages persist per-doc UI state under keys embedding the param (`doc_info_collapsed_${docCode}`) AND re-sync via effect on that param — the component instance survives typeCode changes, so a useState initializer alone reads the WRONG key's value after navigation.
+- A "convert this order" wizard must refetch the entity right before opening — list-row snapshots go stale the moment any edit happened elsewhere; `refetch` is cheap insurance against converting with outdated qty/totals.
+
+**Files modified (9)**: `CommercialDocumentPage.tsx`, `CommercialDocumentModal/{DocumentLinesSection,DocumentInfoSection,DocumentTopbar}.tsx`, `components/{DocumentUIPrimitives,BarcodeInput,DocumentLineRow,LineCard}.tsx`, `pages/portal/PortalOrdersAdminPage.tsx`.
+
+**Verification**: `npx tsc --noEmit` clean · vitest **397/397** (22 files) · `npm run build` 0 errors, **239 precache entries** · **SW MATCH**. No PHP touched → pest not re-run. Commit `dc9159d`, pushed to `origin/main`.
+
+## Date
 2026-08-22
 
 ### Phase 82 — MySQL Migration + DB Switch UI (Aug 20)
