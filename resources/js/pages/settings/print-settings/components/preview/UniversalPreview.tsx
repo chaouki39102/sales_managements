@@ -206,7 +206,11 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
               const renderer = SECTION_RENDERERS[meta.key];
               if (!renderer) return null;
               const dims = SECTION_DIM_SETTINGS[meta.key];
-              const widthPct = dims ? Number((tpl as any)[dims.w]) || 100 : 100;
+              // Thermal strips are fixed-width hardware: every section spans the
+              // full printable area. The % width sliders are page-paper controls
+              // (registry gates them to PAGE), so a stored 60% default must never
+              // shrink an 80mm/58mm receipt's totals into a narrow column.
+              const widthPct = isThermal ? 100 : dims ? Number((tpl as any)[dims.w]) || 100 : 100;
               const align = dims ? ((tpl as any)[dims.a] as AlignOption) || 'right' : 'right';
               return (
                 <SectionWrap key={meta.key} highlight={sectionHighlight(meta.key)} style={{ marginTop: meta.marginTop ?? 0, marginBottom: meta.marginBottom ?? 0 }}>
