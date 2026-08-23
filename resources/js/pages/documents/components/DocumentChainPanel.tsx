@@ -14,18 +14,18 @@ interface DocumentChainPanelProps {
   currentId:       number;
   allowedTargets:  TargetType[];
   onConvert:       (targetCode: string) => void;
-  onNavigate:      (documentId: number) => void;
+  onNavigate:      (node: ChainNode) => void;
   isReadOnly:      boolean;
 }
 
 function ChainNodeCard({
   node, isCurrent, onNavigate,
-}: { node: ChainNode; isCurrent: boolean; onNavigate: (id: number) => void }) {
+}: { node: ChainNode; isCurrent: boolean; onNavigate: (node: ChainNode) => void }) {
   const statusCfg = STATUS_CONFIG[node.status] ?? { label: node.status_label, color: 'var(--t4)', bg: 'var(--bg3)' };
 
   return (
     <div
-      onClick={() => !isCurrent && onNavigate(node.id)}
+      onClick={() => !isCurrent && onNavigate(node)}
       style={{
         display: 'flex', alignItems: 'center', gap: 8,
         padding: '6px 10px', borderRadius: 'var(--r2)',
@@ -70,7 +70,7 @@ function ChainNodeCard({
 
 function NodeWithChildren({
   node, isCurrent, onNavigate,
-}: { node: ChainNode; isCurrent: boolean; onNavigate: (id: number) => void }) {
+}: { node: ChainNode; isCurrent: boolean; onNavigate: (node: ChainNode) => void }) {
   return (
     <div>
       <ChainNodeCard node={node} isCurrent={isCurrent} onNavigate={onNavigate} />

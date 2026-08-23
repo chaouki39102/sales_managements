@@ -1,6 +1,6 @@
 # CODE_REVIEW_TODO.md — Full Code Review Checklist
 
-> Status: **Section 5 COMPLETE** (Aug 22, 2026). Next up: **Section 6 — Documents Module**. Pick up any time, task-by-task.
+> Status: **Section 6 COMPLETE** (Aug 23, 2026). Next up: **Section 7 — Settings + Print System**. Pick up any time, task-by-task.
 
 ## How to use
 - Work task-by-task (one section at a time)
@@ -95,12 +95,17 @@
 
 ## Section 6 — Documents Module
 
-- [ ] `resources/js/pages/documents/CommercialDocumentPage.tsx` — doc editor
-- [ ] `resources/js/pages/documents/CommercialDocumentsPage.tsx` — doc list
-- [ ] `resources/js/pages/documents/hooks/useCommercialDocumentController.ts` — doc controller hook
-- [ ] `resources/js/pages/documents/components/DocumentLinesSection.tsx` — doc lines
-- [ ] `resources/js/pages/documents/components/InvoiceOcrModal.tsx` — OCR modal
-- [ ] `resources/js/components/GlobalDocumentFAB.tsx` — floating action button
+- [x] `resources/js/pages/documents/CommercialDocumentPage.tsx` — doc editor
+- [x] `resources/js/pages/documents/CommercialDocumentModal/index.tsx` — global quick-create modal (App-level provider)
+- [x] `resources/js/pages/documents/CommercialDocumentsPage.tsx` — doc list
+- [x] `resources/js/pages/documents/hooks/useCommercialDocumentController.ts` — doc controller hook
+- [x] `resources/js/pages/documents/hooks/useDocumentChain.ts` — document chain hook
+- [x] `resources/js/pages/documents/components/DocumentChainPanel.tsx` — chain panel
+- [x] `resources/js/pages/documents/components/DocumentLinesSection.tsx` — doc lines
+- [x] `resources/js/pages/documents/components/ApprovalWorkflow.tsx` — approval badge/actions
+- [x] `resources/js/lib/api/endpoints/approvals.ts` — approvals API + batch hook
+- [x] `resources/js/pages/documents/components/InvoiceOcrModal.tsx` — OCR modal
+- [x] `resources/js/components/global/GlobalDocumentFAB.tsx` — floating action button
 
 ## Section 7 — Settings + Print System
 
@@ -250,6 +255,17 @@
 | 57 | 5 | Info | Observation | `PortalOrdersAdminPage.tsx` | many | 3 inline `style=` props: WhatsApp brand green `#25D366` (one-off color, no CSS class needed), 2 dynamic width percentages (reactive to editing state). NOT a bug | Verified |
 | 58 | 5 | Info | Observation | `PortalMyOrdersPage.tsx` | ~211–212 | `from`/`to` vars used in `Pager` component — NOT dead code despite unused in page title | Verified |
 | 59 | 5 | Info | Observation | `PwaInstallBanner.tsx` | — | `beforeinstallprompt` warning is informational — banner correctly calls `preventDefault()` then `prompt()` on user click. Standard PWA pattern | Verified |
+| 60 | 6 | Medium | Navigation bug | `CommercialDocumentPage.tsx` | 280 | Convert onSuccess called `onSaved()` AND `onClose()` → after converting, user landed back on the stale source-doc editor. The modal's double-call is correct (overlay close), the page's is not — dropped `onClose()` in the page only | Fixed |
+| 61 | 6 | Medium | Dead feature | `DocumentChainPanel.tsx` + both callers | 17/28/283/233 | Chain-panel `onNavigate(docId)` went to ``?document=${docId}`` but ZERO consumers read `?document=` (grep-verified) → clicking a related doc silently did nothing. Signature changed to receive the full `ChainNode`; both callers navigate to `/documents/${type}/${id}/edit` (modal closes itself first; page navigates directly) | Fixed |
+| 62 | 6 | Low | Dead state | `useCommercialDocumentController.ts` | 268/683 | Hook-owned `extraTab` state was returned by the hook but never consumed — page (L110) and modal (L100) each keep their own local `extraTab`. Removed both lines | Fixed |
+| 63 | 6 | Medium | Draft bleed | `useCommercialDocumentController.ts` | 371-381 | `draftKey` (`doc-draft-{slug}-{code}`) is identical for new vs edit, and the autosave interval ran in EDIT mode too → editing an existing doc clobbered a pending new-doc draft of the same type. Autosave now skips when `isEdit` (+ dep); restore path was already new-only | Fixed |
+| 64 | 6 | Medium | Stale closure / N+1 | `CommercialDocumentsPage.tsx` | 1499 | `allColumns` useMemo deps `[isPurch, opColor]` depend only on the route param → `approvalBatch` frozen at mount-time `undefined` forever → STATUS-column badge fell back to its own per-row `useApprovalCheck(documentId)` = N+1 `/approvals/check/{id}` requests, defeating `useApprovalCheckBatch`. Added `approvalBatch` to deps. Performance defect only (badge still rendered correctly via fallback) | Fixed |
+| 65 | 6 | Low | Dead prop | `DocumentLinesSection.tsx` | interface | `fill?: boolean` declared + documented as "required for full-page layout" but never destructured, never consumed, and passed by NEITHER caller (page/modal). Removed from interface | Fixed |
+| 66 | 6 | Info | Observation | `CommercialDocumentsPage.tsx` | footer/actions | Footer «مرتجع»/«إرسال» buttons wired to onClose only (placeholder UX); PDF export uses raw `window.print()`; clipboard write optional-chained; deleteMut invalidates stock queries even for non-stock docs (over-invalidation is safe); POS edit nav `/pos?edit=` pre-existing pattern left as-is | Verified |
+| 67 | 6 | Info | Observation | `CommercialDocumentsPage.tsx` | table/virtual | Virtualization config `items.length > 100` rarely triggers with server pagination (perPage default 15) — harmless; `fetchAllForExport` caps at 10k rows; modals properly gated (`printDocId !== null && companyInfo`) | Verified |
+| 68 | 6 | Info | Observation | `CommercialDocumentsPage.tsx` | rowActions | useCallback dep list missing `confirm`/`notify`/`approvalBatch`, but `muts` (TanStack v5 object identity) forces per-render recompute anyway — cosmetic only, no stale behavior | Verified |
+| 69 | 6 | Info | Observation | `approvals.ts` + `DocumentLinesSection.tsx` | — | `useApprovalCheckBatch` sorts the memoized docIds array in place — harmless (order irrelevant to consumers); line rows use `key={idx}` index keys with removable lines — benign for fully-controlled inputs (pre-existing app-wide pattern) | Verified |
+| 70 | 6 | Info | Observation | `useDocumentChain.ts` + modal lifecycle | — | Global modal correctly unmounts body when closed (Phase B.1 rule intact); convert onSuccess double-call (`onSaved(); onClose()`) IS correct inside the modal since it must dismiss the overlay before navigation | Verified |
 
 ---
 
@@ -262,3 +278,4 @@
 | 3 — Frontend Core + Offline | Aug 22, 2026 | 3 fixed + 5 observations (rows 35–42 above). Clean: types.ts, queryKeys.ts, syncEngine.ts, AuthContext.tsx, FiscalYearContext.tsx, DashboardLayout.tsx. Verified: tsc clean, vitest 391/391 (21 files) | section commit |
 | 4 — POS Classic + Pro + Mobile | Aug 22, 2026 | 0 fixed + 9 observations (rows 43–51 above). Clean: all 18 files verified — cart stores, payment modal, keyboard shortcuts, calculations, product grid, scanbar, top cards, draggable cards, print service. Verified: tsc clean, vitest 391/391 | section commit |
 | 5 — Portal (Admin + Customer) | Aug 22, 2026 | 4 fixed + 5 observations (rows 52–59 above). Fixed: payments summary (server-side SQL), duplicate useDebounce, portalStore typing, image proxy skip-CDN. Verified: tsc clean, vitest 391/391 (21 files), build 0 errors, 239 precache, SW MATCH | section commit |
+| 6 — Documents Module | Aug 23, 2026 | 6 fixed + 5 observations (rows 60–70 above). Fixed: convert double-navigation, chain-panel dead `?document=` feature, dead hook extraTab state, draft autosave bleed into edit mode, stale approvalBatch closure (N+1 approvals), dead `fill` prop. Verified: tsc clean, vitest 391/391 (21 files), build 0 errors, SW MATCH | section commit |

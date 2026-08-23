@@ -230,9 +230,9 @@ export default function CommercialDocumentModal({
                   { onSuccess: () => { onSaved(); onClose(); } },
                 );
               }}
-              onNavigate={(docId) => {
+              onNavigate={(node) => {
                 onClose();
-                navigate(`?document=${docId}`, { replace: true });
+                navigate(`/documents/${node.document_type}/${node.id}/edit`);
               }}
             />
           )}

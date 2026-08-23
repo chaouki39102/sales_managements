@@ -51,13 +51,6 @@ interface DocumentLinesSectionProps {
   affectsStock: boolean;
   stockDir: 1 | -1 | 0;
   warehouses: Array<{ id: number; name: string }>;
-  /**
-   * 🆕 عند true: القسم يملأ كامل الارتفاع المتاح داخل حاوية flex عمودية
-   * (مطلوب في الصفحة الكاملة الجديدة CommercialDocumentPage حيث منطقة
-   * الأسطر تأخذ كل المساحة المتبقية بجانب الشريط الجانبي). اختياري —
-   * القيمة الافتراضية false تُبقي السلوك القديم كما هو داخل الـ Modal.
-   */
-  fill?: boolean;
 }
 
 export default function DocumentLinesSection({

@@ -277,13 +277,11 @@ export default function CommercialDocumentPage() {
                   if (!await confirm(`تحويل هذا المستند إلى ${targetCode}؟`)) return;
                   convertMutation.mutate(
                     { documentId: Number((existingDoc as Record<string, unknown>).id), targetTypeCode: targetCode },
-                    { onSuccess: () => { onSaved(); onClose(); } },
+                    // onSaved يُنقل للمستند الجديد — لا نستدعي onClose حتى لا يعيدنا لمحرر المستند المصدر القديم
+                    { onSuccess: () => { onSaved(); } },
                   );
                 }}
-                onNavigate={(docId) => {
-                  onClose();
-                  navigate(`?document=${docId}`, { replace: true });
-                }}
+                onNavigate={(node) => navigate(`/documents/${node.document_type}/${node.id}/edit`)}
               />
             )}
 

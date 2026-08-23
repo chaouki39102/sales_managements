@@ -265,7 +265,6 @@ export function useCommercialDocumentController({
 
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
-  const [extraTab, setExtraTab] = useState('shipping');
 
   // ─── Document chain ───────────────────────────────────────────────────────
   const { data: chain, isLoading: isLoadingChain } = useDocumentChain(
@@ -370,7 +369,9 @@ export function useCommercialDocumentController({
   // ─── Smart Memory — حفظ مسودة تلقائي ──────────────────────────────────────
   const draftKey = `doc-draft-${slug ?? 'default'}-${documentType?.code ?? 'new'}`;
   useEffect(() => {
-    if (!active || !form.lines.length) return;
+    // التعديل لا يكتب مسودة: draftKey مشترك بين «جديد» و«تعديل»، وكتابة
+    // المسودة أثناء تعديل مستند قائم تُتلف مسودة مستند جديد معلّق بنفس النوع.
+    if (!active || isEdit || !form.lines.length) return;
     const interval = setInterval(() => {
       try {
         const draft = { ...form, _savedAt: Date.now() };
@@ -378,7 +379,7 @@ export function useCommercialDocumentController({
       } catch { /* localStorage full */ }
     }, 30_000);
     return () => clearInterval(interval);
-  }, [active, form, draftKey]);
+  }, [active, form, draftKey, isEdit]);
 
   const restoreDraft = () => {
     try {
@@ -680,7 +681,6 @@ export function useCommercialDocumentController({
     // Modals
     showReturnModal, setShowReturnModal,
     showBulkImport, setShowBulkImport,
-    extraTab, setExtraTab,
 
     // Document chain
     chain, isLoadingChain, convertMutation, allowedTargets,

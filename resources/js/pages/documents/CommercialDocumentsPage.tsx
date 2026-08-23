@@ -1496,7 +1496,7 @@ export default function CommercialDocumentsPage() {
                     : <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
             },
         },
-    ], [isPurch, opColor]);
+    ], [isPurch, opColor, approvalBatch]);
 
     // ── إدارة الأعمدة المخفية — مُفوَّضة بالكامل لـ DataTable الداخلي ──────────
     // DataTable يتولى: قائمة الأعمدة + toggle + عرض القائمة
