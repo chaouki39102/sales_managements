@@ -2,6 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import Card from "@/components/ui/Card";
 import { isWebUsbSupported, getConnectedPrinters } from "@/pos/utils/printService";
 import { deviceGetPrinters, deviceSavePrinters } from "@/pos/store/printStore";
+import {
+    useSystemPrinters,
+    useTestSystemPrint,
+} from "@/lib/api/endpoints/systemPrinters";
+import type { SystemPrinter } from "@/lib/api/endpoints/systemPrinters";
 import type { DetectedPrinter } from "../print-settings/types";
 import { useActiveSlug } from "@/lib/store/appStore";
 import { SaveButton, useDirtyState } from "./_shared";
@@ -24,6 +29,22 @@ export function PrintersTab({
     const [manualName, setManualName] = useState("");
     const [manualId, setManualId] = useState("");
     const [webUsbSupported] = useState(() => isWebUsbSupported());
+
+    // ─── طابعات ويندوز (النظام) ────────────────────────────────────────────
+    const {
+        data: sysData,
+        isLoading: sysLoading,
+        refetch: refetchSystem,
+        isRefetching: sysRefetching,
+    } = useSystemPrinters();
+    const testMut = useTestSystemPrint();
+    const [testingName, setTestingName] = useState<string | null>(null);
+    const [sysMsg, setSysMsg] = useState<{ ok: boolean; text: string } | null>(
+        null,
+    );
+
+    const sysPrinters = sysData?.printers ?? [];
+    const savedNames = new Set(printers.map((p) => p.name.toLowerCase()));
 
     useEffect(() => {
         setPrinters(deviceGetPrinters(slug));
@@ -191,6 +212,61 @@ export function PrintersTab({
         : "غير مدعوم — يرجى استخدام Chrome أو Edge";
     const webUsbColor = webUsbSupported ? "var(--em)" : "var(--red)";
 
+    // ─── طابعات ويندوز: تحديث / اختبار / إضافة للقائمة ─────────────────────
+    const handleSysRefresh = useCallback(() => {
+        refetchSystem();
+    }, [refetchSystem]);
+
+    const handleSysTest = useCallback(
+        async (p: SystemPrinter) => {
+            setTestingName(p.name);
+            setSysMsg(null);
+            try {
+                await testMut.mutateAsync(p.name);
+                setSysMsg({
+                    ok: true,
+                    text: `تم إرسال صفحة اختبار إلى «${p.name}»`,
+                });
+            } catch (e: unknown) {
+                const err = e as { message?: string };
+                setSysMsg({
+                    ok: false,
+                    text:
+                        err.message ||
+                        `فشلت الطباعة التجريبية على «${p.name}»`,
+                });
+            } finally {
+                setTestingName(null);
+                setTimeout(() => setSysMsg(null), 5000);
+            }
+        },
+        [testMut],
+    );
+
+    const handleSysAdd = useCallback(
+        (p: SystemPrinter) => {
+            const id = `sys:${p.name}`;
+            const existing = deviceGetPrinters(slug);
+            if (existing.some((x) => x.id === id)) return;
+            save([
+                ...existing,
+                {
+                    id,
+                    name: p.name,
+                    isDefault: false,
+                    status:
+                        p.status === "offline"
+                            ? ("offline" as const)
+                            : p.status === "unknown"
+                              ? ("unknown" as const)
+                              : ("ready" as const),
+                    source: "system" as const,
+                },
+            ]);
+        },
+        [slug, save],
+    );
+
     return (
         <div
             style={{
@@ -200,6 +276,278 @@ export function PrintersTab({
                 maxWidth: 760,
             }}
         >
+            {/* طابعات ويندوز المثبتة (من النظام) */}
+            <Card
+                title="طابعات ويندوز المثبتة"
+                titleIcon="ti-devices-2"
+                actions={
+                    <button
+                        className="btn btn-xs"
+                        onClick={handleSysRefresh}
+                        disabled={sysLoading || sysRefetching}
+                        type="button"
+                    >
+                        {sysLoading || sysRefetching ? (
+                            <>
+                                <i className="ti ti-loader-2 spin" /> جارٍ
+                                الكشف...
+                            </>
+                        ) : (
+                            <>
+                                <i className="ti ti-refresh" /> تحديث
+                            </>
+                        )}
+                    </button>
+                }
+            >
+                {sysData?.platform && sysData.platform !== "Windows" && (
+                    <div
+                        style={{
+                            fontSize: 12,
+                            color: "var(--gold)",
+                            padding: "8px 12px",
+                            borderRadius: 8,
+                            background:
+                                "color-mix(in srgb, var(--gold) 10%, transparent)",
+                            border: "1px solid color-mix(in srgb, var(--gold) 30%, transparent)",
+                            marginBottom: 10,
+                        }}
+                    >
+                        كشف طابعات النظام متاح على خوادم ويندوز فقط (المنصة
+                        الحالية: {sysData.platform}).
+                    </div>
+                )}
+
+                {sysData?.error && (
+                    <div
+                        style={{
+                            fontSize: 12,
+                            color: "var(--red)",
+                            padding: "8px 12px",
+                            borderRadius: 8,
+                            background:
+                                "color-mix(in srgb, var(--red) 8%, transparent)",
+                            border: "1px solid color-mix(in srgb, var(--red) 25%, transparent)",
+                            marginBottom: 10,
+                        }}
+                    >
+                        تعذر قراءة طابعات النظام: {sysData.error}
+                    </div>
+                )}
+
+                {!(
+                    sysLoading ||
+                    sysRefetching ||
+                    sysData?.error ||
+                    sysData?.platform !== "Windows"
+                ) && sysPrinters.length === 0 ? (
+                    <div
+                        style={{
+                            textAlign: "center",
+                            padding: "18px 0",
+                            color: "var(--t4)",
+                            fontSize: 13,
+                        }}
+                    >
+                        لم يُعثر على أي طابعة مثبتة في ويندوز
+                    </div>
+                ) : (
+                    <div
+                        style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 8,
+                        }}
+                    >
+                        {sysPrinters.map((p) => {
+                            const inList = savedNames.has(p.name.toLowerCase());
+                            const dotColor =
+                                p.status === "ready"
+                                    ? "var(--em)"
+                                    : p.status === "printing"
+                                      ? "var(--gold)"
+                                      : p.status === "offline"
+                                        ? "var(--red)"
+                                        : "var(--t4)";
+                            return (
+                                <div
+                                    key={p.name}
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 12,
+                                        padding: "10px 14px",
+                                        borderRadius: 8,
+                                        border: `1.5px solid ${p.is_default ? "var(--em)" : "var(--b2)"}`,
+                                        background: p.is_default
+                                            ? "color-mix(in srgb, var(--em) 5%, transparent)"
+                                            : "var(--b1)",
+                                        transition: "all .15s",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            width: 8,
+                                            height: 8,
+                                            borderRadius: "50%",
+                                            background: dotColor,
+                                            flexShrink: 0,
+                                        }}
+                                    />
+                                    <i
+                                        className="ti ti-printer"
+                                        style={{
+                                            fontSize: 16,
+                                            color: "var(--t3)",
+                                        }}
+                                    />
+                                    <div
+                                        style={{ flex: 1, minWidth: 0 }}
+                                    >
+                                        <div
+                                            style={{
+                                                fontWeight: 600,
+                                                fontSize: 13,
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                whiteSpace: "nowrap",
+                                            }}
+                                        >
+                                            {p.name}
+                                        </div>
+                                        <div
+                                            style={{
+                                                fontSize: 11,
+                                                color: "var(--t4)",
+                                                display: "flex",
+                                                gap: 8,
+                                                marginTop: 2,
+                                                flexWrap: "wrap",
+                                            }}
+                                        >
+                                            <span>{p.status_label}</span>
+                                            {p.driver && (
+                                                <span
+                                                    style={{
+                                                        overflow: "hidden",
+                                                        textOverflow:
+                                                            "ellipsis",
+                                                        whiteSpace: "nowrap",
+                                                        maxWidth: 220,
+                                                    }}
+                                                    title={p.driver}
+                                                >
+                                                    {p.driver}
+                                                </span>
+                                            )}
+                                            {p.port && <span>{p.port}</span>}
+                                            {p.is_default && (
+                                                <span
+                                                    style={{
+                                                        color: "var(--em)",
+                                                        fontWeight: 600,
+                                                    }}
+                                                >
+                                                    افتراضية
+                                                </span>
+                                            )}
+                                            {p.local ? (
+                                                <span>محلية</span>
+                                            ) : (
+                                                <span>شبكية</span>
+                                            )}
+                                            {p.shared && <span>مشتركة</span>}
+                                            {inList && (
+                                                <span
+                                                    style={{
+                                                        color: "var(--em)",
+                                                    }}
+                                                >
+                                                    ✓ مُضافة للقائمة
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            gap: 4,
+                                            flexShrink: 0,
+                                        }}
+                                    >
+                                        <button
+                                            className="btn btn-xs"
+                                            onClick={() => handleSysTest(p)}
+                                            disabled={
+                                                testingName !== null ||
+                                                p.work_offline
+                                            }
+                                            title={
+                                                p.work_offline
+                                                    ? "الطابعة في وضع عدم الاتصال"
+                                                    : "طباعة صفحة اختبار"
+                                            }
+                                            type="button"
+                                            style={{
+                                                padding: "4px 8px",
+                                                fontSize: 11,
+                                            }}
+                                        >
+                                            {testingName === p.name ? (
+                                                <i className="ti ti-loader-2 spin" />
+                                            ) : (
+                                                <i className="ti ti-test-pipe" />
+                                            )}
+                                        </button>
+                                        {!inList && (
+                                            <button
+                                                className="btn btn-xs"
+                                                onClick={() =>
+                                                    handleSysAdd(p)
+                                                }
+                                                title="إضافة إلى قائمة الطابعات المحفوظة"
+                                                type="button"
+                                                style={{
+                                                    padding: "4px 8px",
+                                                    fontSize: 11,
+                                                }}
+                                            >
+                                                <i className="ti ti-plus" />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {sysMsg && (
+                    <div
+                        style={{
+                            marginTop: 10,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: sysMsg.ok ? "var(--em)" : "var(--red)",
+                        }}
+                    >
+                        {sysMsg.text}
+                    </div>
+                )}
+
+                <div
+                    style={{
+                        fontSize: 11,
+                        color: "var(--t4)",
+                        marginTop: 10,
+                    }}
+                >
+                    تُقرأ هذه القائمة مباشرة من نظام ويندوز (نفسها في إعدادات
+                    الطابعات والماسحات). زر الاختبار يطبع صفحة تجريبية عبر
+                    Windows Print Spooler.
+                </div>
+            </Card>
+
             {/* WebUSB Status */}
             <Card title=".hardware" titleIcon="ti-chip">
                 <div
@@ -329,7 +677,7 @@ export function PrintersTab({
                                     }}
                                 />
                                 <i
-                                    className={`ti ${p.source === "usb" ? "ti-plug-connected" : "ti-device-desktop"}`}
+                                    className={`ti ${p.source === "usb" ? "ti-plug-connected" : p.source === "system" ? "ti-printer" : "ti-device-desktop"}`}
                                     style={{ fontSize: 16, color: "var(--t3)" }}
                                 />
                                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -356,7 +704,9 @@ export function PrintersTab({
                                         <span>
                                             {p.source === "usb"
                                                 ? "USB"
-                                                : "يدوي"}
+                                                : p.source === "system"
+                                                  ? "نظام ويندوز"
+                                                  : "يدوي"}
                                         </span>
                                         <span>
                                             {p.status === "ready"
@@ -469,7 +819,13 @@ export function PrintersTab({
                         <option value="">— بدون افتراضي —</option>
                         {printers.map((p) => (
                             <option key={p.id} value={p.id}>
-                                {p.name} ({p.source === "usb" ? "USB" : "يدوي"})
+                                {p.name} (
+                                    {p.source === "usb"
+                                        ? "USB"
+                                        : p.source === "system"
+                                          ? "نظام ويندوز"
+                                          : "يدوي"}
+                                )
                             </option>
                         ))}
                     </select>

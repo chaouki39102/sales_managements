@@ -736,6 +736,10 @@ Route::prefix('v1')->group(function () {
                     Route::post('{file}/restore',   [\App\Http\Controllers\Api\V1\BackupController::class, 'doRestore']);
                     Route::delete('{file}',         [\App\Http\Controllers\Api\V1\BackupController::class, 'destroy']);
                 });
+
+                // ── طابعات النظام (اكتشاف طابعات ويندوز المثبتة) ───────────
+                Route::get('system/printers',       [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'index']);
+                Route::post('system/printers/test', [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'testPrint']);
             });
 
             // ── POS Sessions ──────────────────────────────────────

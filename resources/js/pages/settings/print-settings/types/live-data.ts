@@ -55,7 +55,7 @@ export interface DetectedPrinter {
   name:      string;
   isDefault: boolean;
   status:    'ready' | 'offline' | 'unknown';
-  source?:   'usb' | 'demo' | 'manual';
+  source?:   'usb' | 'demo' | 'manual' | 'system';
 }
 
 export interface DocumentPrintConfig {
