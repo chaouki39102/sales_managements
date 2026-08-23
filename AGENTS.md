@@ -20,6 +20,31 @@
 ## Date
 2026-08-23
 
+### Phase 84 — Keyboard Shortcuts Now Actually Drive the Doc Editor (Aug 23)
+
+**Request**: "the shortcut not control the page" — after Phase 83, Alt+N / add-line / Ctrl+D fired but the user SAW nothing: `addLine()` appended a row far below the viewport and focus never moved, so keyboard-only entry felt dead. "Set the best method" for add-a-line / change-qty / change-price.
+
+**Root cause**: every line-mutation path (`Alt+N`, إضافة سطر button, suggestions panel, Ctrl+D) called the store action but never moved focus into the new row. The only focus-follow was the generic Enter-on-last-field path with a single `requestAnimationFrame` — which races React's async commit (rAF can fire BEFORE the new row's DOM exists), so even that path intermittently focused nothing.
+
+**What was built**:
+- **New util** `resources/js/pages/documents/utils/focusDocLineCell.ts` (dependency-free): `DocLineField = 'qty' | 'total_qty' | 'price'`; `focusDocLineCell(idx, fields=['qty'], attempts=12)` — targets stable ids `doc-line-{idx}-{field}`, retries via `setTimeout(30ms)` until React commits the new row (never a lone rAF), then `scrollIntoView({block:'nearest'})` + `focus()` + `select()` on text inputs. The `fields` fallback chain handles the hidden-quantity-column case (`['qty','total_qty']` → total_qty when quantity column is off).
+- **Stable cell ids** on BOTH renderers: `DocumentLineRow.tsx` (`CellInput` + `TotalQtyInput` gained an optional `id` prop) → quantity `doc-line-${idx}-qty`, total_qty `doc-line-${idx}-total_qty`, unit_price `doc-line-${idx}-price`; `LineCard.tsx` same three ids in card mode. Safe: only one mode renders at a time; the quick-create modal unmounts its body when closed (no duplicate ids).
+- **Enter money path** (`handleLinesKeyDown`, runs BEFORE the generic next-field walk): Enter on `-qty` → same-row `-price` (missing id → fall through to generic); Enter on `-price` → next row `-qty`/`-total_qty`, or LAST row → `addLine()` + focus the new row's qty (guarded `!isLinesReadOnly`). Any hidden target drops to the generic DOM-order path. Result: type qty ↵ price ↵ … rows flow without touching the mouse.
+- **Focus follows EVERY add**: Alt+N (page hotkey — hotRef gained `lineCount: form.lines.length`; branch does `h.addLine(); focusDocLineCell(h.lineCount, ['qty','total_qty'])`), إضافة سطر button + SmartSuggestions panel add (`focusLineQty(lines.length)`), **Ctrl+D now focuses the DUPLICATED row's qty (`idx+1`)**. Barcode-scan adds deliberately UNCHANGED — keeping focus in the barcode input is correct for consecutive scans.
+- **Reliable last-row generic path**: replaced the rAF-only block with a retry loop (10 × 30ms) querying `FOCUSABLE` at `countBefore` so the new row's first field (product search) is focused once it actually exists.
+- Hint tooltip updated: "Enter: كمية ← سعر ← السطر التالي · Alt+N سطر جديد · ↑/↓ نفس العمود · Ctrl+D تكرار · Ctrl+Delete حذف · Esc ترك الحقل".
+
+**Key architectural rules**:
+- A keyboard action that mutates the form MUST move focus into the element it created — a shortcut whose only effect is a far-away DOM append reads as "not working" to the user.
+- Never focus-after-add with a single `requestAnimationFrame`: React state updates are async and rAF can fire before commit. Use a bounded retry loop (setTimeout ~30ms, ~10–12 attempts) polling for the target id/element.
+- Stable per-cell ids (`doc-line-{idx}-{field}`) shared by table AND card renderers are what make cross-renderer focus targeting trivial; keep them in lockstep whenever a column/input is added.
+- The Enter money path (qty→price→next-row qty) is a PRE-filter over the generic next-field walk — regexes anchored with `$` (`-qty$`) so `-total_qty` never matches as qty; a missing target id silently falls back to generic instead of swallowing the keypress.
+- Generic last-row Enter focuses the NEW ROW'S FIRST FIELD (product search), not qty — an empty row has no product yet; money-path qty-focus is reserved for explicit adds (Alt+N/button/Ctrl+D/suggestions) and price→next-row jumps.
+
+**Files modified (6)**: NEW `utils/focusDocLineCell.ts`; `CommercialDocumentPage.tsx`, `CommercialDocumentModal/DocumentLinesSection.tsx`, `components/{DocumentLineRow,LineCard}.tsx`, `public/sw.js`.
+
+**Verification**: `npx tsc --noEmit` clean · vitest **397/397** (22 files) · `npm run build` 0 errors, **239 precache entries** · **SW MATCH**. No PHP touched → pest not re-run. Commit `1e25781`, pushed to `origin/main`.
+
 ### Phase 83 — Document Editor: Keyboard-Only Entry + Laptop Layout (Aug 23)
 
 **Request**: make the commercial document editor (`CommercialDocumentPage`) fully usable without a mouse (keyboard-only data entry) and fix the cramped/"مكدسة" layout on laptop screens (1366×768–1500px). Plus a stale-total insurance fix: `openConvert` on `PortalOrdersAdminPage` must refetch the order detail before showing the convert modal.
