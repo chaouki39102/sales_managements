@@ -30,7 +30,7 @@ class PartyService extends \App\Core\Services\BaseService
             'advanced_filters' => [
                 AllowedFilter::callback('is_client', function (Builder $query, $value) {
                     $clientTypeIds = PartyType::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
-                        ->where(fn($q) => $q->where('name', 'client')->orWhere('slug', 'client'))
+                        ->where('name', 'client')
                         ->pluck('id')
                         ->toArray();
 
@@ -57,7 +57,7 @@ class PartyService extends \App\Core\Services\BaseService
                     ? ($isClient ? 'client' : 'supplier')
                     : ($isSupplier ? 'supplier' : 'client');
                 $type = PartyType::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
-                    ->where(fn($q) => $q->where('name', $typeName)->orWhere('slug', $typeName))
+                    ->where('name', $typeName)
                     ->first();
                 if ($type) {
                     $data['party_type_id'] = $type->id;
@@ -243,7 +243,7 @@ class PartyService extends \App\Core\Services\BaseService
     {
         $companyId    = $this->getCurrentCompanyId();
         $clientTypeIds = PartyType::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
-            ->where(fn($q) => $q->where('name', 'client')->orWhere('slug', 'client'))
+            ->where('name', 'client')
             ->pluck('id')
             ->toArray();
 
@@ -291,7 +291,7 @@ class PartyService extends \App\Core\Services\BaseService
     {
         $companyId      = $this->getCurrentCompanyId();
         $supplierTypeIds = PartyType::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
-            ->where(fn($q) => $q->where('name', 'supplier')->orWhere('slug', 'supplier'))
+            ->where('name', 'supplier')
             ->pluck('id')
             ->toArray();
 

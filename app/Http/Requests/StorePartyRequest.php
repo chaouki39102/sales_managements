@@ -138,7 +138,7 @@ class StorePartyRequest extends FormRequest
                     ? ($isClient ? 'client' : 'supplier')
                     : ($isSupplier ? 'supplier' : 'client');
                 $type = \App\Models\PartyType::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
-                    ->where(fn($q) => $q->where('name', $typeName)->orWhere('slug', $typeName))
+                    ->where('name', $typeName)
                     ->first();
                 if ($type) {
                     $this->merge(['party_type_id' => $type->id]);
