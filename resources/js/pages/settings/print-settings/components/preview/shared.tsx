@@ -17,7 +17,12 @@ import { printFieldResolver } from '../../services/PrintFieldResolver';
 
 export function formatDate(iso: string): string {
   if (!iso) return '';
-  return iso.slice(0, 10);
+  const s = String(iso);
+  const sp = s.indexOf(' ');
+  if (sp === -1 || sp > 10) return s.slice(0, 10);
+  // Composed "date time" value (PrintFieldResolver datetime composition when
+  // the template's show_time toggle is ON) — keep both parts.
+  return `${s.slice(0, 10)} ${s.slice(sp + 1)}`;
 }
 
 // ─── Styling helpers ────────────────────────────────────────────────────────────

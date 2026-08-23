@@ -73,6 +73,17 @@ class PrintFieldResolver {
       return numberToArabicWords(total);
     }
 
+    // 3.5) Datetime composition — when the template's «إظهار الوقت» (show_time)
+    // toggle is ON, the date field carries "date time" so EVERY consumer
+    // (built-in doc-info rows, header info, and custom doc_info_rows layouts)
+    // renders datetime without appending doc.time manually.
+    if (fieldId === 'document.date') {
+      const date = getByPath(data, def.sourcePath);
+      if (!date || !template?.show_time) return date;
+      const time = getByPath(data, 'doc.time');
+      return time ? `${date} ${time}` : date;
+    }
+
     // 4) Simple data path
     return getByPath(data, def.sourcePath);
   }

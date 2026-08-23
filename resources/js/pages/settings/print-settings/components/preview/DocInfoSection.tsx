@@ -45,7 +45,7 @@ function renderThermalDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
           ? renderLayoutRows(tpl.doc_info_rows, data, tpl, { sectionAlign: tpl.doc_info_align })
           : <>
               {tpl.show_doc_number && <DocRow label="رقم:" value={r('document.number', data, tpl) as string} mono />}
-              {tpl.show_date && <DocRow label="التاريخ:" value={`${formatDate(r('document.date', data, tpl) as string)}${tpl.show_time && r('document.time', data, tpl) ? ' ' + r('document.time', data, tpl) : ''}`} />}
+              {tpl.show_date && <DocRow label="التاريخ:" value={formatDate(r('document.date', data, tpl) as string)} />}
               {tpl.show_due_date && r('document.dueDate', data, tpl) && <DocRow label="تاريخ الاستحقاق:" value={r('document.dueDate', data, tpl) as string} />}
               {tpl.show_cashier && r('customer.cashierName', data, tpl) && (
                 <DocRow label="الكاشير:" value={r('customer.cashierName', data, tpl) as string} />

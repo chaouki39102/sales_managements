@@ -214,7 +214,7 @@ function renderPageHeader(tpl: PrintTemplate, data: UniversalDocumentData, paper
         <table style={{ fontSize: tpl.company_info_size, borderCollapse: 'collapse', width: '100%' }}>
           <tbody>
             {tpl.show_doc_number && <InfoRow label={isA4 ? 'رقم الفاتورة' : 'رقم'} value={r('document.number', data, tpl) as string} />}
-            {tpl.show_date && <InfoRow label="التاريخ" value={formatDate(r('document.date', data, tpl) as string) + (tpl.show_time && r('document.time', data, tpl) ? ' ' + r('document.time', data, tpl) : '')} />}
+            {tpl.show_date && <InfoRow label="التاريخ" value={formatDate(r('document.date', data, tpl) as string)} />}
             {tpl.show_due_date && r('document.dueDate', data, tpl) && <InfoRow label="تاريخ الاستحقاق" value={r('document.dueDate', data, tpl) as string} />}
             {tpl.show_cashier && (r('customer.cashierName', data, tpl)) && (
               <InfoRow label="الكاشير" value={r('customer.cashierName', data, tpl) as string} />
