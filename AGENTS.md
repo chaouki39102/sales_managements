@@ -18,6 +18,34 @@
 - **Offline layer** (`lib/offline/`) sits on the SHARED `client` — its cache keys embed the full URL (slug included), so tenant isolation in the offline cache is automatic; never store cross-tenant keys. The **write queue** (`pendingOps` in IndexedDB) is now tenant-scoped too: every op carries `slug` (captured from the url's first segment at enqueue), and reads/counts/replay/clear filter by the ACTIVE slug via `useActiveSlug()`/`appActions.getActiveSlug()` — legacy rows without the field fall back to `opSlug(url)`, and tenant-less ops (empty slug) stay visible to every company.
 
 ## Date
+2026-08-24
+
+### Phase 85 — POS Printing Without a Thermal Printer: Silent GDI Text Path + Zero-Config Windows Target (Aug 23–24)
+
+**Request**: the user has NO thermal printer — only a **Canon MF3010 laser** («Canon MF3010 (Copie 1)», Windows default, port USB001). POS sale printing must work immediately on this machine: silent, no preview dialog, no printer-picker.
+
+**Backend** (`app/Services/System/WindowsPrinterService.php` + `SystemPrinterController` + `routes/api.php:744`):
+- **`rawTextPrint(string $name, string $base64Text, int $copies = 1)`** — silent GDI text printing on ANY installed printer via PowerShell `System.Drawing.Printing.PrintDocument` (the same engine Word uses): pre-wraps ALL lines into a flat list with `MeasureString` shrink loop against `CreateMeasurementGraphics()` (so wrapping matches the target printer), `Font('Segoe UI', 9)` (Arabic-capable), PrintPage handler advances y by `GetHeight+3`, copies loop resets the page index, temp file (`poszd_txt_<hex>.txt`) unlinked in `finally`, timeout **40s**, ends `Write-Output 'OK'`. Guards: printer must be in the service's allowlist (`list()['printers']` — unknown → RuntimeException «الطابعة غير موجودة في قائمة طابعات النظام»), strict base64 decode + empty reject + **512 KB cap**, copies clamped 1–10.
+- **`POST /{company}/system/printers/raw-text`** (`SystemPrinterController::rawText`) — validates `name`(required|max:255)/`data`(required|string)/`copies`(1–10); failure → HTTP 422 code `PRINTER_RAW_TEXT_FAILED`; success message «تمت الطباعة على «name»».
+- Existing `rawPrint(name, base64Bytes)` stays the ESC/POS path for real thermal queues.
+
+**Frontend** (`resources/js/pos/utils/thermalPrint.ts` rewritten; exports unchanged so all 4 POS pages untouched):
+- **`resolveWindowsTarget(slug)`** zero-config chain: remembered `localStorage['print:win-target:{slug}']` → saved `source==='system'` printers from `deviceGetPrinters(slug)` (default first) → live `systemPrintersApi.list()` (first name matching `THERMAL_RE = /pos|thermal|receipt|xprinter|epson|gprinter|tm-\d|rp\d+|58mm|80mm/i` → `is_default` → any).
+- **`escPosToPlainLines(bytes)`** pure converter — strips ESC/POS commands to clean text lines: bracketed commands skip `5+pL+256*pH` (**declared-length header sits at offsets +3/+4, NOT +2/+3**), raster `GS v 0` skips `8+w*h`, barcode `GS k` scans to NUL, `DLE DC4` skips 5, `ESC @` and `FS &` are **2-byte** (default simple-command skip is 3), LF splits, CR dropped, HT→2 spaces, UTF-8 decode. Spec `escPosToPlainLines.spec.ts` (6 cases) caught BOTH bugs pre-commit (a leaked neighbor byte `'aAB'`; a swallowed payload after QR because of the wrong offset read).
+- **`windowsRawFallback(bytes, slug)`**: no Windows target → `{ok:false, method:'none'}` + hint «ثبّت الطابعة في النظام…»; thermal-looking target → `rawPrint` (raw bytes keep working on real receipt printers); otherwise → `rawText(utf8Base64(escPosToPlainLines(bytes)))`. Success remembers the target and sets `print:prefer-windows` so WebUSB claim attempts are skipped entirely afterward; failure containing «غير موجودة» clears the remembered target. Last-resort WebUSB retry preserved when the Windows path fails.
+- API surface: `systemPrintersApi.rawText(name, textBase64, copies=1)` in `lib/api/endpoints/systemPrinters.ts`.
+
+**Key architectural rules**:
+- A **laser cannot render ESC/POS** — receipts on such printers go as plain wrapped text through GDI; only queues whose NAME looks thermal receive raw bytes. Never send ESC/POS to a laser and never GDI-print to a thermal queue.
+- The bracketed-command length header (`ESC (`/`GS (`/`FS (` families) is at **+3/+4** relative to the escape byte (fn char occupies +2) — reading +2/+3 eats 100+ phantom bytes and swallows everything after the command.
+- Silent printing must stay inside the spooler allowlist and use `PrintDocument.Print()` — never a shell "printto" verb or visible print pipeline; the endpoint must reject unknown printers server-side (allowlist), not trust the client's name.
+- First successful Windows print is remembered per-slug and flips `print:prefer-windows`, making every later sale skip the USB attempt (~instant); clearing the remembered target re-runs auto-detection.
+
+**Files modified (7)**: `app/Services/System/WindowsPrinterService.php`, `app/Http/Controllers/Api/V1/SystemPrinterController.php`, `routes/api.php`, `resources/js/lib/api/endpoints/systemPrinters.ts`, `resources/js/pos/utils/thermalPrint.ts`, NEW `resources/js/pos/utils/__tests__/escPosToPlainLines.spec.ts`, `public/sw.js`. Commit `8360aba`.
+
+**Verification**: backend smoke green (unknown printer rejected with Arabic error; OneNote (Desktop) `nul:` port silent OK in 1.45s incl. Arabic line) · tsc clean · vitest **403/403** · build 0 errors, 239 precache · SW MATCH.
+
+## Date
 2026-08-23
 
 ### Phase 84 — Keyboard Shortcuts Now Actually Drive the Doc Editor (Aug 23)
