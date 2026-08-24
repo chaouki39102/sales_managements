@@ -431,7 +431,12 @@ export default function POSProPage() {
       if (opts?.silent) {
         if (!resolvedDocNum) { safeToast.error('رقم الفاتورة غير متوفر للطباعة المباشرة'); return; }
         const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
-        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug);
+        const html = await renderPreviewToHtml({
+          template: posTemplate,
+          company: companyData,
+          source: { type: 'pos-snapshot', snapshot: snap },
+        });
+        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug, html);
         if (result.ok) safeToast.success('تمت الطباعة');
         else safeToast.error(`خطأ في الطباعة: ${result.message}`);
         return;
@@ -445,7 +450,7 @@ export default function POSProPage() {
 
       if (settings.printMode === 'thermal' && resolvedDocNum && isThermalPaper) {
         const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
-        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug);
+        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug, html);
         if (result.ok) {
           safeToast.success(result.method === 'windows' ? 'تمت الطباعة (ويندوز)' : 'تمت الطباعة الحرارية');
         } else {

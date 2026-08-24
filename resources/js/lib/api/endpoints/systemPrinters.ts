@@ -47,6 +47,16 @@ export const systemPrintersApi = {
       data: textBase64,
       copies,
     }),
+  /**
+   * طباعة HTML بدقة كاملة (Edge headless ← لقطة PNG ← GDI PrintDocument) —
+   * للطابعات العادية حيث يُريد الإيصال بنفس تنسيق المعاينة.
+   */
+  html: (name: string, htmlBase64: string, copies = 1) =>
+    apiPost<{ printed: boolean }>('/system/printers/html', {
+      name,
+      data: htmlBase64,
+      copies,
+    }),
 } as const;
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────

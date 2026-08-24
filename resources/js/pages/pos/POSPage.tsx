@@ -1039,7 +1039,12 @@ function POSPage() {
           return;
         }
         const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
-        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug);
+        const html = await renderPreviewToHtml({
+          template: posTemplate,
+          company: companyData,
+          source: { type: 'pos-snapshot', snapshot: snap },
+        });
+        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug, html);
         if (result.ok) {
           safeToast.success('✅ تمت الطباعة');
         } else {
@@ -1056,7 +1061,7 @@ function POSPage() {
 
       if (settings.printMode === 'thermal' && resolvedDocNum && isThermalPaper) {
         const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
-        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug);
+        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug, html);
         if (result.ok) {
           safeToast.success(result.method === 'windows' ? '✅ تمت الطباعة (ويندوز)' : '✅ تمت الطباعة الحرارية');
         } else {

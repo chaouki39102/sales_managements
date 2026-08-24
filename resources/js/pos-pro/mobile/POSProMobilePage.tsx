@@ -524,7 +524,7 @@ export default function POSProMobilePage() {
 
       if (settings.printMode === 'thermal' && resolvedDocNum && isThermalPaper) {
         const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
-        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug);
+        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug, html);
         if (result.ok) {
           safeToast.success(result.method === 'windows' ? 'تمت الطباعة (ويندوز)' : 'تمت الطباعة الحرارية');
         } else {

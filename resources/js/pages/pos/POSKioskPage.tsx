@@ -25,6 +25,7 @@ import { settingsApi }                from '@/lib/api/endpoints/settings';
 import { getThermalAutoPrint } from '@/pos/utils/printService';
 import { printThermalSmart } from '@/pos/utils/thermalPrint';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
+import { renderPreviewToHtml } from '@/pages/settings/print-settings/runtime/renderPreviewToHtml';
 import { usePrintSettings }           from '@/pos/hooks/usePrintSettings';
 
 import type { PaginatedResponse }      from '@/lib/api/core/types';
@@ -257,7 +258,15 @@ export default function POSKioskPage() {
           const snap = posSaleSnapshotRef.current;
           if (!snap || !template) return;
           const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? {} as any);
-          const r = await printThermalSmart(template, data, res.document_number, slug);
+          let html: string | undefined;
+          try {
+            html = await renderPreviewToHtml({
+              template,
+              company: companyData,
+              source: { type: 'pos-snapshot', snapshot: snap },
+            });
+          } catch { /* النص العادي يبقى الاحتياط */ }
+          const r = await printThermalSmart(template, data, res.document_number, slug, html);
           if (!r.ok) notify.error(r.message);
         }, 500);
       }

@@ -7,7 +7,10 @@
 //
 // سلسلة الاحتياط عند فشل WebUSB (كلها صامتة — بدون معاينة أو حوار):
 // 1. طابعة حرارية مسجّلة/مكتشفة → بايتات ESC/POS خام عبر spooler ويندوز.
-// 2. أي طابعة ويندوز عادية (ليزر/حبر مثل Canon) → تحويل الإيصال إلى نص
+// 2. أي طابعة ويندوز عادية (ليزر/حبر مثل Canon) + HTML متوفر → طباعة HTML
+//    بدقة كاملة عبر Edge headless ← لقطة PNG ← GDI PrintDocument
+//    (نفس تنسيق المعاينة).
+// 3. أي طابعة عادية بلا HTML (أو فشل مسار HTML) → تحويل الإيصال إلى نص
 //    وطباعته GDI (نفس محرك Word) — لا معنى لإرسال ESC/POS لليزر.
 // الاختيار التلقائي بدون أي إعداد: المحفوظ ← طابعة النظام المسجّلة ←
 // حرارية-الاسم من كشف ويندوز ← الطابعة الافتراضية لويندوز ← أي طابعة.
@@ -242,6 +245,7 @@ export function escPosToPlainLines(bytes: Uint8Array): string[] {
 async function windowsRawFallback(
   bytes: Uint8Array,
   slug?: string | null,
+  html?: string,
 ): Promise<ThermalPrintResult> {
   const target = await resolveWindowsTarget(slug);
   if (!target) {
@@ -258,6 +262,19 @@ async function windowsRawFallback(
   try {
     if (isThermal) {
       await systemPrintersApi.rawPrint(target, bytesToBase64(bytes));
+    } else if (html) {
+      // مسار الدقة: نفس تنسيق المعاينة عبر Edge ← لقطة PNG ← GDI.
+      // عند فشله نتراجع للنص العادي حتى لا تُعطَل طباعة الفاتورة أبداً.
+      try {
+        await systemPrintersApi.html(target, utf8Base64(html));
+      } catch (htmlErr: any) {
+        console.warn(
+          '[print] html path failed, falling back to plain text:',
+          htmlErr?.response?.data?.message ?? htmlErr?.message,
+        );
+        const lines = escPosToPlainLines(bytes);
+        await systemPrintersApi.rawText(target, utf8Base64(lines.join('\n')));
+      }
     } else {
       const lines = escPosToPlainLines(bytes);
       await systemPrintersApi.rawText(target, utf8Base64(lines.join('\n')));
@@ -291,6 +308,7 @@ async function windowsRawFallback(
 export async function sendBytesToPrinterSmart(
   bytes: Uint8Array,
   slug?: string | null,
+  html?: string,
 ): Promise<ThermalPrintResult> {
   let usbRes: ThermalPrintResult | null = null;
 
@@ -299,7 +317,7 @@ export async function sendBytesToPrinterSmart(
     if (usbRes.ok) return usbRes;
   }
 
-  const winRes = await windowsRawFallback(bytes, slug);
+  const winRes = await windowsRawFallback(bytes, slug, html);
   if (winRes.ok) return winRes;
 
   if (!usbRes) usbRes = await sendBytesToReceiptPrinter(bytes);
@@ -314,9 +332,10 @@ export async function printThermalSmart(
   data: UniversalDocumentData,
   docNumber: string | undefined,
   slug?: string | null,
+  html?: string,
 ): Promise<ThermalPrintResult> {
   const bytes = await buildReceiptBytesFromTemplate(template, data, docNumber);
-  return sendBytesToPrinterSmart(bytes, slug);
+  return sendBytesToPrinterSmart(bytes, slug, html);
 }
 
 /** فتح الدرج — WebUSB ثم ويندوز تلقائياً (صامت: لا رسائل خطأ مزعجة). */

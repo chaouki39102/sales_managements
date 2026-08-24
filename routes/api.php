@@ -742,6 +742,7 @@ Route::prefix('v1')->group(function () {
                 Route::post('system/printers/test', [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'testPrint']);
                 Route::post('system/printers/raw',  [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'rawPrint']);
                 Route::post('system/printers/raw-text', [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'rawText']);
+                Route::post('system/printers/html', [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'htmlPrint']);
             });
 
             // ── POS Sessions ──────────────────────────────────────

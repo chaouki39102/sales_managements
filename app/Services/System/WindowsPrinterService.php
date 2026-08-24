@@ -768,6 +768,168 @@ CS;
     }
 
     /**
+     * طباعة HTML بدقة كاملة على أي طابعة ويندوز عادية (ليزر/حبر):
+     * Edge headless يلتقط لقطة PNG كاملة للصفحة (نفس عرض المعاينة)، ثم
+     * تُطبع الصورة عبر GDI PrintDocument — نفس المسار المُثبت لطباعة النص.
+     * (SumatraPDF استُبعد: يفشل exit=1 بصمت حين يُستدعى من شجرة عملية الخادم
+     * بينما يعمل من الطرفية — غير قابل للاعتماد من سياق الويب.)
+     */
+    public function htmlPrint(string $name, string $base64Html, int $copies = 1): void
+    {
+        $known = array_map(
+            fn ($p) => mb_strtolower($p['name']),
+            $this->list()['printers'],
+        );
+        if (!in_array(mb_strtolower($name), $known, true)) {
+            throw new \RuntimeException('الطابعة غير موجودة في قائمة طابعات النظام.');
+        }
+
+        $bytes = base64_decode($base64Html, true);
+        if ($bytes === false || strlen($bytes) === 0) {
+            throw new \RuntimeException('بيانات الطباعة غير صالحة.');
+        }
+        if (strlen($bytes) > 4 * 1024 * 1024) {
+            throw new \RuntimeException('حجم HTML الطباعة كبير جداً.');
+        }
+
+        $copies = max(1, min(10, $copies));
+
+        $tmp = rtrim(sys_get_temp_dir(), '\\/');
+        $hex = bin2hex(random_bytes(6));
+        $htmlPath = $tmp . DIRECTORY_SEPARATOR . 'posdz_html_' . $hex . '.html';
+        $pngPath = $tmp . DIRECTORY_SEPARATOR . 'posdz_png_' . $hex . '.png';
+        $profileDir = $tmp . DIRECTORY_SEPARATOR . 'posdz_edge_' . $hex;
+
+        if (file_put_contents($htmlPath, $bytes) === false) {
+            throw new \RuntimeException('تعذر تجهيز ملف الطباعة المؤقت.');
+        }
+
+        try {
+            $edge = self::locateEdge();
+
+            // 1) Edge headless ← لقطة PNG (ملف تعريف مؤقت خاص حتى لا يتصادم مع
+            //    نسخة Edge المفتوحة لدى المستخدم — بدون هذا قد يفشل بصمت).
+            //    نافذة 900x3600 CSS px تغطي إيصالات حرارية طويلة وصفحات A4،
+            //    وعامل التكبير 2 يعطي ~192dpi حدة جيدة على الليزر.
+            try {
+                $proc = new Process([
+                    $edge,
+                    '--headless',
+                    '--disable-gpu',
+                    '--no-first-run',
+                    '--disable-extensions',
+                    '--hide-scrollbars',
+                    '--force-device-scale-factor=2',
+                    '--user-data-dir=' . $profileDir,
+                    '--screenshot=' . $pngPath,
+                    '--window-size=900,3600',
+                    'file:///' . str_replace('\\', '/', $htmlPath),
+                ], $tmp);
+                $proc->setTimeout(60);
+                $proc->run();
+            } catch (\Symfony\Component\Process\Exception\ProcessTimedOutException $e) {
+                throw new \RuntimeException('تجاوز تحويل الإيصال إلى صورة مهلته.', 0, $e);
+            }
+
+            if (!is_file($pngPath) || filesize($pngPath) < 500) {
+                $noise = mb_substr($proc->getErrorOutput() . ' ' . $proc->getOutput(), -600);
+                \Log::debug('[WinPrint] edge screenshot failed', ['out' => $noise]);
+                throw new \RuntimeException('فشل تجهيز الإيصال (صورة).');
+            }
+
+            // 2) قصّ الحواف البيضاء + طباعة الصورة صامتاً عبر GDI PrintDocument.
+            $nameEsc = str_replace("'", "''", $name);
+            $pngEsc = str_replace("'", "''", $pngPath);
+
+            $script =
+                "Add-Type -AssemblyName System.Drawing\n"
+                . "\$src = [System.Drawing.Bitmap]::FromFile('$pngEsc')\n"
+                . "\$w = \$src.Width; \$hh = \$src.Height\n"
+                // حدّ أدنى: صف/عمود فيه أي بكسل غير أبيض يوقف البحث. خطوة 3 تكفي
+                // عملياً (أعرض عنصر خط ~2px عند sf=2) والحشو 16px يمنع القص الزائد.
+                . "\$b = -1\n"
+                . "for (\$y = \$hh - 1; \$y -ge 0; \$y--) {\n"
+                . "  for (\$x = 0; \$x -lt \$w; \$x += 3) {\n"
+                . "    \$c = \$src.GetPixel(\$x, \$y)\n"
+                . "    if (-not (\$c.R -ge 246 -and \$c.G -ge 246 -and \$c.B -ge 246)) { \$b = \$y; break }\n"
+                . "  }\n"
+                . "  if (\$b -ge 0) { break }\n"
+                . "}\n"
+                . "if (\$b -lt 0) { \$b = \$hh - 1 }\n"
+                . "\$r = -1\n"
+                . "for (\$x = \$w - 1; \$x -ge 0; \$x--) {\n"
+                . "  for (\$y = 0; \$y -le \$b; \$y += 3) {\n"
+                . "    \$c = \$src.GetPixel(\$x, \$y)\n"
+                . "    if (-not (\$c.R -ge 246 -and \$c.G -ge 246 -and \$c.B -ge 246)) { \$r = \$x; break }\n"
+                . "  }\n"
+                . "  if (\$r -ge 0) { break }\n"
+                . "}\n"
+                . "if (\$r -lt 0) { \$r = \$w - 1 }\n"
+                . "\$cw = [Math]::Min(\$r + 17, \$w); \$ch = [Math]::Min(\$b + 17, \$hh)\n"
+                . "\$img = New-Object System.Drawing.Bitmap(\$cw, \$ch)\n"
+                . "\$g = [System.Drawing.Graphics]::FromImage(\$img)\n"
+                . "\$g.Clear([System.Drawing.Color]::White)\n"
+                . "\$dstR = New-Object System.Drawing.Rectangle(0, 0, \$cw, \$ch)\n"
+                . "\$srcR = New-Object System.Drawing.Rectangle(0, 0, \$cw, \$ch)\n"
+                . "\$g.DrawImage(\$src, \$dstR, \$srcR, [System.Drawing.GraphicsUnit]::Pixel)\n"
+                . "\$g.Dispose(); \$src.Dispose()\n"
+                . "\$pd = New-Object System.Drawing.Printing.PrintDocument\n"
+                . "\$pd.PrinterSettings.PrinterName = '$nameEsc'\n"
+                . "\$pd.DocumentName = 'POSDZ Receipt'\n"
+                . "\$pd.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(20, 20, 20, 20)\n"
+                . "\$h = {\n"
+                . "  param(\$s, \$e)\n"
+                . "  \$area = \$e.MarginBounds\n"
+                . "  \$ratio = [Math]::Min(\$area.Width / \$img.Width, \$area.Height / \$img.Height)\n"
+                . "  \$dw = [int](\$img.Width * \$ratio); \$dh = [int](\$img.Height * \$ratio)\n"
+                . "  \$e.Graphics.DrawImage(\$img, \$area.X, \$area.Y, \$dw, \$dh)\n"
+                . "  \$e.HasMorePages = \$false\n"
+                . "}\n"
+                . "\$pd.add_PrintPage(\$h)\n"
+                . "for (\$i = 0; \$i -lt {$copies}; \$i++) { \$pd.Print() }\n"
+                . "\$img.Dispose()\n"
+                . "Write-Output 'OK'\n";
+
+            $this->runPowerShell($script, 90);
+        } finally {
+            @unlink($htmlPath);
+            @unlink($pngPath ?? '');
+            self::rrmdir($profileDir);
+        }
+    }
+
+    /** أول مسار متاح لمتصفح Edge (موجود افتراضياً على ويندوز 10/11). */
+    private static function locateEdge(): string
+    {
+        $candidates = [
+            'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+            'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+        ];
+        foreach ($candidates as $c) {
+            if (is_file($c)) {
+                return $c;
+            }
+        }
+        throw new \RuntimeException('لم يتم العثور على متصفح Edge على الجهاز.');
+    }
+
+    /** حذف مجلد recursively (ملف تعريف Edge المؤقت). */
+    private static function rrmdir(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+        $items = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST,
+        );
+        foreach ($items as $item) {
+            $item->isDir() ? @rmdir($item->getPathname()) : @unlink($item->getPathname());
+        }
+        @rmdir($dir);
+    }
+
+    /**
      * تعداد الطابعات عبر WMI وتطبيعها إلى شكل موحّد للـ API.
      *
      * Win32_Printer.PrinterStatus:

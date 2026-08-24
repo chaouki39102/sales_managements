@@ -121,4 +121,37 @@ class SystemPrinterController extends BaseApiController
             );
         }
     }
+
+    /**
+     * POST /{company}/system/printers/html — طباعة HTML بدقة كاملة
+     * (Edge headless → PDF → SumatraPDF صامتاً). للطابعات العادية
+     * حيث يُريد الإيصال بنفس تنسيق المعاينة وليس نصاً عادياً.
+     */
+    public function htmlPrint(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name'   => ['required', 'string', 'max:255'],
+            'data'   => ['required', 'string'],
+            'copies' => ['sometimes', 'integer', 'min:1', 'max:10'],
+        ]);
+
+        try {
+            $this->service->htmlPrint(
+                (string) $validated['name'],
+                (string) $validated['data'],
+                (int) ($validated['copies'] ?? 1),
+            );
+
+            return $this->successResponse(
+                ['printed' => true],
+                "تمت الطباعة على «" . $validated['name'] . "»",
+            );
+        } catch (\Throwable $e) {
+            return $this->errorResponse(
+                'فشل الإرسال إلى الطابعة: ' . $e->getMessage(),
+                422,
+                'PRINTER_HTML_FAILED',
+            );
+        }
+    }
 }
