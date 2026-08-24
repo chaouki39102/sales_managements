@@ -46,6 +46,27 @@
 
 **Verification**: backend smoke green (unknown printer rejected with Arabic error; OneNote (Desktop) `nul:` port silent OK in 1.45s incl. Arabic line) · tsc clean · vitest **403/403** · build 0 errors, 239 precache · SW MATCH.
 
+### Phase 85 follow-up — HTML-Fidelity Receipts on Regular Printers (Edge screenshot → GDI image print) (Aug 24)
+
+**Request**: plain-text receipts on the Canon laser lose the designed layout — print the receipt **exactly as the preview shows** on any non-thermal Windows printer, with a graceful fallback so printing never blocks.
+
+**Final architecture** (`htmlPrint()` in `WindowsPrinterService.php` + `POST /{company}/system/printers/html`):
+- **Edge headless → PNG**: `msedge --headless --screenshot=<png> --window-size=900,3600 --force-device-scale-factor=2 --hide-scrollbars` over a temp HTML file + fresh `--user-data-dir=<temp>` profile (without it Edge silently fails when another Edge instance is open). Window covers long thermal receipts and A4; scale 2 ≈ 192dpi on laser.
+- **PowerShell → GDI**: pure-PS white-border trim (bottom/right scan via `GetPixel`, step 3 + 17px pad), then `PrintDocument` draws the bitmap fit-to-`MarginBounds` (`Margins(20,20,20,20)` = 5mm) through `runPowerShell()` — the SAME invocation pattern proven for rawText. Copies loop resets page index.
+- **FE**: `systemPrintersApi.html(name, htmlBase64)`; `windowsRawFallback(bytes, slug, html?)` tries html path on non-thermal targets and falls back to rawText GDI on ANY error. Wired into all 4 POS pages (POSPro, classic POS, mobile, kiosk).
+
+**SumatraPDF was REMOVED — do not reintroduce**: it exits **1 silently** when spawned from the artisan-serve process tree while the byte-identical command succeeds from an interactive shell. Disproven theories: stripped env vars (CLI smoke with blanked `LOCALAPPDATA`/`APPDATA`/`USERPROFILE` still succeeded), OneNote sink quirk (Canon fails identically), temp dir (server's `sys_temp_dir` = `C:\xampp\php84\tmp` works fine), Defender (no block events), argument quoting (fixed exit 2 but exit 1 remained). Every component of the final chain is individually proven FROM web context.
+- **PowerShell gotcha worth remembering**: `Start-Process -ArgumentList @('-print-to','Name With Spaces',…)` splits values at spaces — wrap in embedded literal double quotes inside single-quoted strings: `'"' + $v + '"'`.
+
+**Key rules added**:
+- When a native helper behaves differently under the server process tree vs an interactive shell, don't chase env theories one by one — prefer rebuilding the chain from components ALREADY proven to work from web context (here: Edge headless ran fine from HTTP for PDF generation; `PrintDocument` runs fine from HTTP for raw-text).
+- The endpoint contract stays allowlist-guarded (`الطابعة غير موجودة في قائمة طابعات النظام.` on unknown names) and copies clamped 1–10 like the text/raw paths.
+- Timing: full chain ~27–32s per receipt under HTTP (Edge cold start + GetPixel trim scan + spool). Acceptable for occasional prints; optimize the trim scan first if ever needed.
+
+**Files modified (9)**: `app/Services/System/WindowsPrinterService.php`, `app/Http/Controllers/Api/V1/SystemPrinterController.php`, `routes/api.php`, `resources/js/lib/api/endpoints/systemPrinters.ts`, `resources/js/pos/utils/thermalPrint.ts`, `resources/js/pages/pos/{POSPage,POSKioskPage}.tsx`, `resources/js/pos-pro/POSProPage.tsx`, `resources/js/pos-pro/mobile/POSProMobilePage.tsx`. Commits `df9e1d5` (+ AGENTS.md docs commit).
+
+**Verification**: CLI smoke green (`HTML_OK` OneNote sink + guard 422 Arabic) · HTTP smoke green under artisan-serve: **OneNote 200 / 32s**, **Canon MF3010 (Copie 1) 200 / 27s**, guard 422 «الطابعة غير موجودة…» · vitest **405/405** (23 files) · build 0 errors, 239 precache · SW MATCH.
+
 ## Date
 2026-08-23
 
