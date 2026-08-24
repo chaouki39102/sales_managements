@@ -138,7 +138,33 @@ async function resolveWindowsTarget(
  * القواعد: أوامر الأقواس GS ( k تُتخطى بطولها المعلَن (pL pH)، الباركود
  * GS k يُقرأ حتى NUL، الصورة النقطية GS v 0 بطولها المحسوب، وأغلب الأوامر
  * البسيطة طولها 3 بايتات. LF يفصل الأسطر وHT يصبح فراغين.
+ * النص العربي داخل التدفق مرمّز Windows-1256 (من encodeArabic) فيُفكّ
+ * عبر الجدول العكسي — وليس UTF-8 — وإلا طُبعت رموزاً مشوّهة على الليزر.
  */
+/**
+ * عكس جدول Windows-1256 المستعمل في EscPosBuilder.encodeArabic — البايتات
+ * العالية في تدفق ESC/POS هي ترميز 1256 وليست UTF-8، وفكّها كـ UTF-8 يُنتج
+ * رموزاً غير مقروءة على الطابعة العادية (ليزر/حبر).
+ */
+const WIN1256_REV: Record<number, string> = {
+  0xc1: '\u0621', 0xc2: '\u0622', 0xc3: '\u0623', 0xc4: '\u0624',
+  0xc5: '\u0625', 0xc6: '\u0626', 0xc7: '\u0627', 0xc8: '\u0628',
+  0xc9: '\u0629', 0xca: '\u062a', 0xcb: '\u062b', 0xcc: '\u062c',
+  0xcd: '\u062d', 0xce: '\u062e', 0xcf: '\u062f', 0xd0: '\u0630',
+  0xd1: '\u0631', 0xd2: '\u0632', 0xd3: '\u0633', 0xd4: '\u0634',
+  0xd5: '\u0635', 0xd6: '\u0636', 0xd8: '\u0637', 0xd9: '\u0638',
+  0xda: '\u0639', 0xdb: '\u063a', 0xdd: '\u0641', 0xde: '\u0642',
+  0xdf: '\u0643', 0xe1: '\u0644', 0xe3: '\u0645', 0xe4: '\u0646',
+  0xe5: '\u0647', 0xe6: '\u0648', 0xec: '\u0649', 0xed: '\u064a',
+  0xf2: '\u064b', 0xf3: '\u064c', 0xf4: '\u064d', 0xf5: '\u064e',
+  0xf6: '\u064f', 0xf7: '\u0650', 0xf8: '\u0651', 0xf9: '\u0652',
+  0xb0: '\u0660', 0xb1: '\u0661', 0xb2: '\u0662', 0xb3: '\u0663',
+  0xb4: '\u0664', 0xb5: '\u0665', 0xb6: '\u0666', 0xb7: '\u0667',
+  0xb8: '\u0668', 0xb9: '\u0669',
+  0xac: '\u060c', 0xbb: '\u061b', 0xbf: '\u061f',
+  0xe2: '\ufefb',
+};
+
 export function escPosToPlainLines(bytes: Uint8Array): string[] {
   const text: number[] = [];
   const len = bytes.length;
@@ -205,11 +231,10 @@ export function escPosToPlainLines(bytes: Uint8Array): string[] {
     i++;
   }
 
+  // بايتات عالية = ترميز Windows-1256 (من encodeArabic) وليست UTF-8
   let out = '';
-  try {
-    out = new TextDecoder('utf-8').decode(new Uint8Array(text));
-  } catch {
-    out = '';
+  for (const b of text) {
+    out += b < 0x80 ? String.fromCharCode(b) : (WIN1256_REV[b] ?? '?');
   }
   return out.replace(/\r/g, '').split('\n');
 }

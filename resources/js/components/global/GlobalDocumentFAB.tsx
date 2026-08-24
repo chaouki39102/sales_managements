@@ -137,6 +137,7 @@ export function GlobalDocumentFAB() {
       style={{
         position: 'fixed', left: 24, zIndex: 900,
         display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8,
+        pointerEvents: 'none',
       }}
     >
       {menuOpen && !minimized && (
@@ -146,7 +147,7 @@ export function GlobalDocumentFAB() {
             minWidth: 220, maxHeight: 320, overflowY: 'auto',
             background: 'var(--bg1)', border: '1px solid var(--b2)',
             borderRadius: 'var(--r2)', boxShadow: '0 10px 30px rgba(0,0,0,.25)',
-            padding: 6, direction: 'rtl',
+            padding: 6, direction: 'rtl', pointerEvents: 'auto',
           }}
         >
           <div style={{
@@ -201,13 +202,14 @@ export function GlobalDocumentFAB() {
             background: 'var(--bg1)', color: 'var(--t3)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 2px 8px rgba(0,0,0,.15)', fontSize: 14, opacity: 0.5,
+            pointerEvents: 'auto',
           }}
         >
           <i className="ti ti-plus" />
         </button>
       ) : (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, pointerEvents: 'auto' }}>
             <button
               onClick={triggerQuickAction}
               title={lastType ? `مستند جديد: ${lastType.name} (Ctrl+Alt+N)` : 'مستند جديد (Ctrl+Alt+N)'}
@@ -248,7 +250,7 @@ export function GlobalDocumentFAB() {
               border: 'none', cursor: 'pointer',
               background: 'var(--bg3)', color: 'var(--t4)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 10, opacity: 0.5, marginTop: 2,
+              fontSize: 10, opacity: 0.5, marginTop: 2, pointerEvents: 'auto',
             }}
           >
             <i className="ti ti-chevron-down" />

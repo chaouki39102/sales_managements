@@ -45,8 +45,38 @@ describe('escPosToPlainLines', () => {
     expect(escPosToPlainLines(bytes)).toEqual(['A', 'B  C']);
   });
 
-  it('decodes UTF-8 Arabic text intact', () => {
-    const bytes = new Uint8Array([...enc('منتج'), 10, ...enc('120')]);
+  // يعكس EscPosBuilder.encodeArabic — البايتات العالية في تدفق ESC/POS هي
+  // Windows-1256 وليست UTF-8 (فكّها كـ UTF-8 هو سبب «الرموز غير المقروءة»).
+  const w1256 = (s: string): number[] => {
+    const map: Record<string, number> = {
+      ا: 0xc7, ب: 0xc8, ت: 0xca, ج: 0xcc, ح: 0xcd, د: 0xcf,
+      ر: 0xd1, س: 0xd3, ك: 0xdf, ل: 0xe1, م: 0xe3, ن: 0xe4,
+      ه: 0xe5, و: 0xe6, ي: 0xed, ع: 0xda, ق: 0xde, ة: 0xc9,
+    };
+    return Array.from(s).map((ch) => {
+      const cp = ch.codePointAt(0)!;
+      if (cp < 0x80) return cp;
+      if (map[ch] !== undefined) return map[ch]!;
+      return 0x3f;
+    });
+  };
+
+  it('decodes Windows-1256 Arabic text intact', () => {
+    const bytes = new Uint8Array([...w1256('منتج'), 10, ...enc('120')]);
     expect(escPosToPlainLines(bytes)).toEqual(['منتج', '120']);
+  });
+
+  it('round-trips a receipt line: Arabic name + ASCII price', () => {
+    const bytes = new Uint8Array([
+      0x1b, 0x40, // ESC @
+      ...w1256('سكر'),
+      0x20, ...enc('86.60'),
+    ]);
+    expect(escPosToPlainLines(bytes)).toEqual(['سكر 86.60']);
+  });
+
+  it('replaces unknown high bytes with ? instead of mojibake', () => {
+    const bytes = new Uint8Array([0xff, 0xfe, 10, ...enc('OK')]);
+    expect(escPosToPlainLines(bytes)).toEqual(['??', 'OK']);
   });
 });
