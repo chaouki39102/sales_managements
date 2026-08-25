@@ -77,14 +77,7 @@ function defaultDocDate(selectedYear?: { start_date?: string; end_date?: string 
   return d;
 }
 
-function fmtDZD(n: number | string | null | undefined): string {
-  const v = parseFloat(String(n ?? 0));
-  if (isNaN(v)) return '—';
-  return new Intl.NumberFormat('fr-DZ', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(v);
-}
+import { fmtDZD } from '@/lib/format';
 
 function extractList(d: unknown): unknown[] {
   if (!d) return [];

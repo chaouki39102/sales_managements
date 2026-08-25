@@ -735,11 +735,14 @@ export interface Employee extends BaseModel {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 export interface DashboardStats {
   today_sales:          number;
+  today_invoices_count: number;
   month_sales:          number;
   month_invoices_count: number;
   pending_invoices:     number;
-  new_clients_month:    number;
-  total_clients:        number;
+  customers_count:      number;
+  suppliers_count:      number;
+  products_count:       number;
+  new_customers_month:  number;
   low_stock_count:      number;
   out_of_stock_count:   number;
   month_profit:         number;
@@ -749,6 +752,7 @@ export interface DashboardStats {
   tva_due:              number;
   total_debts:          number;
   debtors_count:        number;
+  purchases_this_month: number;
 }
 
 // ─── POS (Cart) ───────────────────────────────────────────────────────────────

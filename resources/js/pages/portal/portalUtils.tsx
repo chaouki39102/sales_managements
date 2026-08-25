@@ -3,6 +3,9 @@
 // ════════════════════════════════════════════════════════════════════════════
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { PortalOrder } from '@/lib/api/portal/portal';
+import { fmtMoney, fmtMoneySigned, fmtMoneyShort, fmtDate } from '@/lib/format';
+
+export { fmtMoney, fmtMoneySigned, fmtMoneyShort, fmtDate };
 
 // ─── لون تمييز ثابت لكل منتج ────────────────────────────────────────────────
 // كل بطاقة منتج (وسطر السلة المطابق لها) تأخذ لوناً ثابتاً ومميزاً — مشتق من
@@ -25,29 +28,6 @@ export function accentStyleFor(id: number | string): CSSProperties {
     ['--prod-accent' as string]: `var(${main})`,
     ['--prod-accent-bg' as string]: `var(${bg})`,
   } as CSSProperties;
-}
-
-export function fmtMoney(n: number | null | undefined): string {
-  const v = Number(n ?? 0);
-  return new Intl.NumberFormat('fr-DZ', { maximumFractionDigits: 2 }).format(v) + ' دج';
-}
-
-export function fmtMoneySigned(n: number | null | undefined): string {
-  const v = Number(n ?? 0);
-  const s = new Intl.NumberFormat('fr-DZ', { maximumFractionDigits: 2 }).format(Math.abs(v));
-  return (v < 0 ? '- ' : '') + s + ' دج';
-}
-
-export function fmtMoneyShort(n: number | null | undefined): string {
-  const v = Number(n ?? 0);
-  if (Math.abs(v) >= 1_000_000) return (v / 1_000_000).toFixed(1).replace('.0', '') + 'M';
-  if (Math.abs(v) >= 1_000) return (v / 1_000).toFixed(1).replace('.0', '') + 'K';
-  return new Intl.NumberFormat('fr-DZ', { maximumFractionDigits: 0 }).format(v);
-}
-
-export function fmtDate(d: string | null | undefined): string {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('ar-DZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export function fmtDateTime(d: string | null | undefined): string {

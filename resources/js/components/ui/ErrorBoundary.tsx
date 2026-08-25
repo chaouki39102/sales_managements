@@ -15,7 +15,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
       return this.props.fallback ?? (
         <div className="err-bd">
           <i className="ti ti-alert-triangle err-bd-ic" />
-          <span className="err-bd-msg">تعذر عرض المعاينة</span>
+          <span className="err-bd-msg">حدث خطأ غير متوقع</span>
           <button className="err-bd-btn" onClick={() => this.setState({ hasError: false })} type="button">إعادة المحاولة</button>
         </div>
       );

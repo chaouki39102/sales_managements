@@ -14,8 +14,7 @@ import Skeleton from '@/components/ui/Skeleton';
 import { useConfirm } from '@/hooks/useConfirm';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
-const fmtDZD = (n: number) =>
-  n.toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+import { fmtDZD } from '@/lib/format';
 
 export default function BankReconciliationPage() {
   const { unreconciled, reconciled } = useReconciliationQueries();

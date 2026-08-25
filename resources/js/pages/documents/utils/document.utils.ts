@@ -53,14 +53,7 @@ export function toNum(v: number | string | null | undefined): number {
   return isNaN(p) ? 0 : p;
 }
 
-export function fmtDZD(v: number | string | null | undefined): string {
-  const num = toNum(v);
-  const formatted = new Intl.NumberFormat('fr-DZ', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(num);
-  return formatted.startsWith('-') ? '\u200E' + formatted : formatted;
-}
+export { fmtDZD } from '@/lib/format';
 
 export function fmtDate(d?: string | null): string {
   if (!d) return '—';

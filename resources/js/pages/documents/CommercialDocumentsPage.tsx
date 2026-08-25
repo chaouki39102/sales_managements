@@ -111,11 +111,7 @@ function fmtDateTime(d?: string | null): string {
     return `${date} ${time}`;
 }
 
-function fmtMoney(n?: number | string | null): string {
-    const v = parseFloat(String(n ?? 0));
-    if (isNaN(v)) return "—";
-    return v.toLocaleString("fr-DZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+import { fmtDZD as fmtMoney } from '@/lib/format';
 
 function getDocStatus(doc: CommercialDocument): string {
     return (

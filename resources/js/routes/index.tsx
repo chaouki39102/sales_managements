@@ -5,6 +5,7 @@ import React, { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useActiveCompany } from '@/lib/store/appStore';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 
 // â”€â”€ Layouts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const DashboardLayout = lazy(() => import('@/components/layouts/DashboardLayout'));
@@ -204,9 +205,9 @@ function RequireSuperAdmin({ children }: { children: React.ReactNode }) {
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// AppRoutes
+// AppRoutesInner
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-export function AppRoutes() {
+function AppRoutesInner() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
@@ -444,5 +445,15 @@ export function AppRoutes() {
 
       </Routes>
     </Suspense>
+  );
+}
+
+/** Top-level error boundary that catches any page-level render crash and shows
+ *  an Arabic "إعادة المحاولة" fallback instead of a blank white screen. */
+export function AppRoutes() {
+  return (
+    <ErrorBoundary>
+      <AppRoutesInner />
+    </ErrorBoundary>
   );
 }

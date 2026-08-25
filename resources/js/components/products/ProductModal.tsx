@@ -165,10 +165,7 @@ const PRICING_METHODS = [
 // HELPERS
 // ═══════════════════════════════════════════════════════════════════════════
 
-const fmtDZD = (n: number | '' | null | undefined) =>
-  n !== '' && n !== null && n !== undefined
-    ? new Intl.NumberFormat('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n)) + ' دج'
-    : '—';
+import { fmtMoneyOrDash as fmtDZD } from '@/lib/format';
 
 const fmtPct = (n: number) => n.toFixed(2) + '%';
 

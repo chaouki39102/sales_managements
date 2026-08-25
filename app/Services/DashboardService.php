@@ -17,37 +17,121 @@ class DashboardService
     {
         $currentYear = Carbon::now()->year;
         $currentMonth = Carbon::now()->month;
+        $now = Carbon::now();
 
+        // ── Sales scope (sale doc types) ──
+        $saleScope = fn($q) => $q->whereIn('code', ['FV', 'AV', 'POS']);
+        $purchaseScope = fn($q) => $q->whereIn('code', ['FA', 'AA']);
+
+        // Today's sales
+        $todaySales = CommercialDocument::whereDate('document_date', $now)
+            ->whereHas('documentType', $saleScope)
+            ->sum('total_ttc');
+
+        // Today's invoices count
+        $todayInvoicesCount = CommercialDocument::whereDate('document_date', $now)
+            ->whereHas('documentType', $saleScope)
+            ->count();
+
+        // Month sales
         $salesTotal = CommercialDocument::whereYear('document_date', $currentYear)
             ->whereMonth('document_date', $currentMonth)
-            ->whereHas('documentType', fn($q) => $q->whereIn('code', ['FV', 'AV', 'POS']))
+            ->whereHas('documentType', $saleScope)
             ->sum('total_ttc');
 
+        // Month purchases
         $purchasesTotal = CommercialDocument::whereYear('document_date', $currentYear)
             ->whereMonth('document_date', $currentMonth)
-            ->whereHas('documentType', fn($q) => $q->whereIn('code', ['FA', 'AA']))
+            ->whereHas('documentType', $purchaseScope)
             ->sum('total_ttc');
 
+        // Month invoices count
+        $monthInvoicesCount = CommercialDocument::whereYear('document_date', $currentYear)
+            ->whereMonth('document_date', $currentMonth)
+            ->whereHas('documentType', $saleScope)
+            ->count();
+
+        // Month pending invoices
+        $pendingInvoices = CommercialDocument::where('remaining_amount', '>', 0)
+            ->whereHas('documentType', $saleScope)
+            ->count();
+
+        // Customers / suppliers / products
         $customersCount = Party::where('party_type_id', 1)->count();
         $suppliersCount = Party::where('party_type_id', 2)->count();
         $productsCount = Product::count();
 
-        $unpaidInvoices = CommercialDocument::where('remaining_amount', '>', 0)
-            ->whereHas('documentType', fn($q) => $q->whereIn('code', ['FV', 'AV', 'POS']))
+        // New customers this month
+        $newCustomersMonth = Party::where('party_type_id', 1)
+            ->whereYear('created_at', $currentYear)
+            ->whereMonth('created_at', $currentMonth)
             ->count();
 
-        $overdueInvoices = CommercialDocument::where('due_date', '<', Carbon::now())
-            ->where('remaining_amount', '>', 0)
-            ->count();
+        // Out-of-stock products
+        $stockData = app(InventoryStockService::class)->getStockAt(now()->toDateString());
+        $outOfStockCount = collect($stockData)->filter(fn($r) => (float) $r['current_stock'] <= 0 && (bool) $r['manages_stock'])->count();
+
+        // Month profit (sales HT - cost of goods sold)
+        $monthSalesHt = CommercialDocument::whereYear('document_date', $currentYear)
+            ->whereMonth('document_date', $currentMonth)
+            ->whereHas('documentType', $saleScope)
+            ->sum('total_ht');
+
+        $monthCogs = DB::table('commercial_document_lines as cdl')
+            ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+            ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->whereNull('cd.deleted_at')
+            ->whereYear('cd.document_date', $currentYear)
+            ->whereMonth('cd.document_date', $currentMonth)
+            ->whereIn('dt.code', ['FV', 'POS'])
+            ->sum(DB::raw('cdl.quantity * cdl.cost_price_ht'));
+
+        $monthProfit = $monthSalesHt - $monthCogs;
+        $profitMargin = $monthSalesHt > 0 ? round(($monthProfit / $monthSalesHt) * 100, 1) : 0;
+
+        // TVA collected (from sales) and deductible (from purchases)
+        $monthTvaCollected = CommercialDocument::whereYear('document_date', $currentYear)
+            ->whereMonth('document_date', $currentMonth)
+            ->whereHas('documentType', $saleScope)
+            ->sum('total_tva');
+
+        $monthTvaDeductible = CommercialDocument::whereYear('document_date', $currentYear)
+            ->whereMonth('document_date', $currentMonth)
+            ->whereHas('documentType', $purchaseScope)
+            ->sum('total_tva');
+
+        $tvaDue = max(0, $monthTvaCollected - $monthTvaDeductible);
+
+        // Debts
+        $totalDebts = CommercialDocument::where('remaining_amount', '>', 0)
+            ->whereHas('documentType', $saleScope)
+            ->sum('remaining_amount');
+
+        $debtorsCount = CommercialDocument::where('remaining_amount', '>', 0)
+            ->whereHas('documentType', $saleScope)
+            ->distinct('party_id')
+            ->count('party_id');
 
         return [
-            'sales_this_month' => round($salesTotal, 2),
+            'today_sales'          => round($todaySales, 2),
+            'today_invoices_count' => $todayInvoicesCount,
+            'month_sales'          => round($salesTotal, 2),
+            'month_invoices_count' => $monthInvoicesCount,
+            'pending_invoices'     => $pendingInvoices,
+            'customers_count'      => $customersCount,
+            'suppliers_count'      => $suppliersCount,
+            'products_count'       => $productsCount,
+            'new_customers_month'  => $newCustomersMonth,
+            'low_stock_count'      => collect($stockData)->filter(fn($r) => (float) $r['current_stock'] > 0 && (float) $r['current_stock'] <= (float) $r['min_stock_alert'])->count(),
+            'out_of_stock_count'   => $outOfStockCount,
+            'month_profit'         => round($monthProfit, 2),
+            'profit_margin'        => $profitMargin,
+            'month_tva_collected'  => round($monthTvaCollected, 2),
+            'month_tva_deductible' => round($monthTvaDeductible, 2),
+            'tva_due'              => round($tvaDue, 2),
+            'total_debts'          => round($totalDebts, 2),
+            'debtors_count'        => $debtorsCount,
             'purchases_this_month' => round($purchasesTotal, 2),
-            'customers_count' => $customersCount,
-            'suppliers_count' => $suppliersCount,
-            'products_count' => $productsCount,
-            'unpaid_invoices' => $unpaidInvoices,
-            'overdue_invoices' => $overdueInvoices,
         ];
     }
 

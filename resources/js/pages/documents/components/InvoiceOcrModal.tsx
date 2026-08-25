@@ -57,8 +57,7 @@ const TIER_META: Record<MatchTier, { label: string; color: string }> = {
   price: { label: 'حسب السعر', color: 'var(--blue)' },
 };
 
-const fmtMoney = (n: number) =>
-  n.toLocaleString('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+import { fmtDZD as fmtMoney } from '@/lib/format';
 
 /** ppu-paddle-ocr emits English status strings — map them to Arabic for the UI. */
 const OCR_STATUS_LABELS: Record<string, string> = {

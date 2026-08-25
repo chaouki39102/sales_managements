@@ -44,8 +44,7 @@ interface ShareDocumentData {
   expires_at: string | null;
 }
 
-const fmtMoney = (n: number) =>
-  new Intl.NumberFormat('fr-DZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+import { fmtDZD as fmtMoney } from '@/lib/format';
 
 export default function ShareDocumentPage() {
   const { token } = useParams<{ token: string }>();
