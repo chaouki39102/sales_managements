@@ -9,7 +9,7 @@ import {
     keepPreviousData,
 } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPut, apiDelete } from "../core/client";
-import { tenantKeys, invalidatePosQueries } from "../core/queryKeys";
+import { tenantKeys, invalidatePosQueries, invalidateDashboardQueries } from "../core/queryKeys";
 import { notifyOtherTabs } from "../core/crossTab";
 import { useActiveSlug, useSelectedYearId } from "../../store/appStore";
 import type {
@@ -249,6 +249,8 @@ export function useInventoryMutations() {
         qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
         // إبطال بيانات POS — المخزون والمنتجات تظهر مباشرة في نقاط البيع
         invalidatePosQueries(qc, slug);
+        // إبطال لوحة التحكم — إحصائيات المخزون تتغير
+        invalidateDashboardQueries(qc, slug);
         // مزامنة التبويبات الأخرى (POS مفتوح في تبويب ثاني)
         notifyOtherTabs(slug);
     };

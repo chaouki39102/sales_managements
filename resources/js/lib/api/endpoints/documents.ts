@@ -16,7 +16,7 @@
 
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiGet, apiPost, apiPut, apiDelete } from '../core/client';
-import { tenantKeys, invalidatePosQueries } from '../core/queryKeys';
+import { tenantKeys, invalidatePosQueries, invalidateDashboardQueries } from '../core/queryKeys';
 import { notifyOtherTabs } from '../core/crossTab';
 import { useActiveSlug } from '../../store/appStore';
 import { useFiscalYear } from '@/context/FiscalYearContext';
@@ -304,8 +304,9 @@ export function useDocumentMutations() {
   const invalidateAll = () => {
     if (slug) {
       qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
-      // المستندات تغيّر المخزون والأرصدة — حدّث بيانات POS مباشرة
+      // المستندات تغيّر المخزون والأرصدة — حدّث بيانات POS واللوحة مباشرة
       invalidatePosQueries(qc, slug);
+      invalidateDashboardQueries(qc, slug);
       notifyOtherTabs(slug);
     }
   };
@@ -315,6 +316,7 @@ export function useDocumentMutations() {
       qc.setQueryData(tenantKeys.documents.detail(slug, doc.id), doc);
       qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
       invalidatePosQueries(qc, slug);
+      invalidateDashboardQueries(qc, slug);
       notifyOtherTabs(slug);
     }
   };

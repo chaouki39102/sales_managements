@@ -8,6 +8,7 @@ import {
 } from '@/lib/api/endpoints/lookups';
 import { productsApi }                from '@/lib/api/endpoints/products';
 import { useSelectedFiscalYear, useFiscalYears } from '@/lib/api/endpoints/fiscalYears';
+import { invalidateDashboardQueries } from '@/lib/api/core/queryKeys';
 import { documentsApi }               from '@/lib/api/endpoints/documents';
 import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
 import {
@@ -243,6 +244,7 @@ export default function POSKioskPage() {
       }
 
       if (slug) qc.invalidateQueries({ queryKey: [slug, 'pos-stock'] });
+      if (slug) invalidateDashboardQueries(qc, slug);
 
       setReceiptSnapshot({
         items:  snapshot.items,

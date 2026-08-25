@@ -256,3 +256,13 @@ export function invalidatePosQueries(qc: QueryClient, slug: string | null | unde
   qc.invalidateQueries({ queryKey: posKeys.balances(slug) });
 }
 
+/**
+ * إبطال كل مفاتيح لوحة التحكم (dashboard) لشركة معينة.
+ * يُستدعى عند إنشاء/تعديل/حذف مستند أو إتمام عملية بيع — لأن
+ * الإحصائيات (مبيعات، أرباح، أرصدة، حركات مخزون) تتغير فوراً.
+ */
+export function invalidateDashboardQueries(qc: QueryClient, slug: string | null | undefined) {
+  if (!slug) return;
+  qc.invalidateQueries({ queryKey: tenantKeys.dashboard.all(slug) });
+}
+

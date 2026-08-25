@@ -82,7 +82,7 @@ import { mapCompany }           from '@/pages/settings/print-settings/runtime/Pr
 import { printThermalSmart } from '@/pos/utils/thermalPrint';
 import { useQueryClient }       from '@tanstack/react-query';
 import { partyBalancesApi } from '@/lib/api/endpoints/partyBalances';
-import { tenantKeys, invalidatePosQueries } from '@/lib/api/core/queryKeys';
+import { tenantKeys, invalidatePosQueries, invalidateDashboardQueries } from '@/lib/api/core/queryKeys';
 import { toLocalDateKey } from '@/lib/utils';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
 import type { POSSaleSnapshot } from '@/pages/settings/print-settings/types/data';
@@ -1319,6 +1319,9 @@ const handleCompleteSale = useCallback(async (params: {
       queryClient.invalidateQueries({
         queryKey: [slug, 'warehouse-stock'],
       });
+
+      // Invalidate dashboard so KPIs, charts, recent transactions refresh
+      invalidateDashboardQueries(queryClient, slug);
 
       const prevBalance = res?.balance_data?.previous_balance ?? editingPrevBalanceRef.current;
 

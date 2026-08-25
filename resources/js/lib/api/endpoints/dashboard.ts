@@ -66,7 +66,7 @@ export function useDashboardStats() {
     queryKey: tenantKeys.dashboard.stats(slug ?? '', yearId ?? 0),
     queryFn:  () => dashboardApi.stats(yearId!),
     enabled:  !!slug && !!yearId,
-    staleTime: 2 * 60_000,
+    staleTime: 30_000,
   });
 }
 

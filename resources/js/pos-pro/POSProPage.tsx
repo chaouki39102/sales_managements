@@ -52,7 +52,7 @@ import type { SoundPresetId } from '@/pos/utils/posSounds';
 import { htToTtc, ttcToHt } from '@/pos/utils/calculations';
 import { renderPreviewToHtml } from '@/pages/settings/print-settings/runtime/renderPreviewToHtml';
 import { mapCompany } from '@/pages/settings/print-settings/runtime/PrintRuntimeAdapter';
-import { tenantKeys, invalidatePosQueries } from '@/lib/api/core/queryKeys';
+import { tenantKeys, invalidatePosQueries, invalidateDashboardQueries } from '@/lib/api/core/queryKeys';
 import { toLocalDateKey } from '@/lib/utils';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
 import type { POSSaleSnapshot } from '@/pages/settings/print-settings/types/data';
@@ -808,6 +808,9 @@ export default function POSProPage() {
         queryClient.invalidateQueries({ queryKey: qk });
       }
       queryClient.invalidateQueries({ queryKey: [slug, 'documents'] });
+
+      // Invalidate dashboard so KPIs, charts, recent transactions refresh
+      invalidateDashboardQueries(queryClient, slug);
 
       const fullSnapshot: POSSaleSnapshot = {
         items: snapshot.items.map(i => ({
