@@ -418,12 +418,15 @@ export default function DashboardPage() {
     return { dot: 'b' as const, time: timeAgo, text: <><strong>{tx.document_number}</strong> — {fmt(tx.total)} دج {tx.party_name ?? ''}</> };
   });
 
-  // Donut chart data — tab-aware
-  const donutRows = productTab === 'qty'
-    ? topProducts.map(p => ({ name: p.product_name ?? `#${p.product_id}`, value: p.total_quantity, suffix: 'وحدة' }))
-    : productTab === 'amount'
-    ? topProducts.map(p => ({ name: p.product_name ?? `#${p.product_id}`, value: p.total_amount, suffix: 'دج' }))
-    : topProfitable.map(p => ({ name: p.product_name ?? `#${p.product_id}`, value: p.total_profit, suffix: 'دج', margin: p.margin_pct }));
+  // Donut chart data — tab-aware, filtered + sorted by the active metric
+  const donutRows = (() => {
+    const raw = productTab === 'qty'
+      ? topProducts.map(p => ({ name: p.product_name ?? `#${p.product_id}`, value: Math.round(p.total_quantity), suffix: 'وحدة' }))
+      : productTab === 'amount'
+      ? topProducts.map(p => ({ name: p.product_name ?? `#${p.product_id}`, value: Math.round(p.total_amount), suffix: 'دج' }))
+      : topProfitable.map(p => ({ name: p.product_name ?? `#${p.product_id}`, value: Math.round(p.total_profit), suffix: 'دج', margin: p.margin_pct }));
+    return raw.filter(r => r.value > 0).sort((a, b) => b.value - a.value).slice(0, 6);
+  })();
   const donutTotal = donutRows.reduce((s, r) => s + r.value, 0);
   const donutData = donutRows;
   const donutLoading = productTab === 'profit' ? topProfitableQ.isLoading : topProductsQ.isLoading;
@@ -568,7 +571,7 @@ export default function DashboardPage() {
         />
       </Card>
 
-      {/* ── Charts + Donut Row ── */}
+      {/* ── Charts + Financial Row ── */}
       <div className="g65 mb-5">
         {/* Sales bar chart (live) */}
         <Card
@@ -599,7 +602,7 @@ export default function DashboardPage() {
           </div>
         </Card>
 
-        {/* Side column: Donut + Top Products */}
+        {/* Side column: Donut + Financial Summary + Debt */}
         <div className="flex flex-col gap-4">
 
           {/* Top products donut chart */}
@@ -641,60 +644,19 @@ export default function DashboardPage() {
           >
             <DonutChart data={donutData} total={donutTotal} isLoading={donutLoading} />
           </Card>
+
+          {/* Financial Summary */}
+          <FinancialSummary stats={s} isLoading={statsQuery.isLoading} />
+
+          {/* Customer Debts */}
+          <DebtCard
+            debtors={topDebtors}
+            stats={s}
+            isLoading={topDebtorsQ.isLoading}
+            onNavigate={navigate}
+          />
         </div>
       </div>
-
-      {/* ── Financial Summary + Debt Card Row ── */}
-      <div className="g65 mb-5">
-        <FinancialSummary stats={s} isLoading={statsQuery.isLoading} />
-        <DebtCard
-          debtors={topDebtors}
-          stats={s}
-          isLoading={topDebtorsQ.isLoading}
-          onNavigate={navigate}
-        />
-      </div>
-
-      {/* ── Latest portal orders (live) ── */}
-      <Card
-        style={{ marginBottom: 16 }}
-        title={
-          <>
-            <span className="ic ic-sm" style={{ color: 'var(--gold)' }}>
-              <i className="ti ti-clipboard-list"/>
-            </span>
-            أحدث طلبات البوابة
-          </>
-        }
-        actions={
-          <Button size="xs" onClick={() => navigate('/portal-orders')}>
-            إدارة الطلبات
-          </Button>
-        }
-      >
-        <SimpleTable
-          columns={[
-            { key: 'reference', label: 'المرجع' },
-            { key: 'party', label: 'الزبون', render: (_v, row) => (row.party as { name: string } | null)?.name ?? '—' },
-            { key: 'status', label: 'الحالة', render: (v) => {
-              const s = v as PortalAdminOrder['status'];
-              const cfg = PORTAL_ORDER_STATUSES.find((x) => x.value === s);
-              return <span className={`badge ${cfg?.cls ?? 'badge--t4'}`}>{cfg?.label ?? s}</span>;
-            }},
-            { key: 'items_count', label: 'الأصناف', render: (v) => <span className="m">{String(v)}</span> },
-            { key: 'total_ttc', label: 'المبلغ (TTC)', render: (v) => <span className="e">{fmt(Number(v))} دج</span> },
-            { key: 'requested_at', label: 'التاريخ', render: (v) => {
-              const d = v ? new Date(String(v)) : null;
-              return <span className="text-xs text-t4">{d ? d.toLocaleDateString('fr-DZ') : '—'}</span>;
-            }},
-          ]}
-          data={recent as unknown as Record<string, unknown>[]}
-          rowKey="id"
-        />
-        {recent.length === 0 && !recentOrders.isLoading && (
-          <div className="text-sm text-t4 text-center py-3">لا توجد طلبات سلع بعد</div>
-        )}
-      </Card>
 
       {/* ── Last Transactions (full-width) ── */}
       <Card
@@ -788,6 +750,47 @@ export default function DashboardPage() {
               );
             })}
           </div>
+        )}
+      </Card>
+
+      {/* ── Latest portal orders (live) ── */}
+      <Card
+        style={{ marginBottom: 16 }}
+        title={
+          <>
+            <span className="ic ic-sm" style={{ color: 'var(--gold)' }}>
+              <i className="ti ti-clipboard-list"/>
+            </span>
+            أحدث طلبات البوابة
+          </>
+        }
+        actions={
+          <Button size="xs" onClick={() => navigate('/portal-orders')}>
+            إدارة الطلبات
+          </Button>
+        }
+      >
+        <SimpleTable
+          columns={[
+            { key: 'reference', label: 'المرجع' },
+            { key: 'party', label: 'الزبون', render: (_v, row) => (row.party as { name: string } | null)?.name ?? '—' },
+            { key: 'status', label: 'الحالة', render: (v) => {
+              const s = v as PortalAdminOrder['status'];
+              const cfg = PORTAL_ORDER_STATUSES.find((x) => x.value === s);
+              return <span className={`badge ${cfg?.cls ?? 'badge--t4'}`}>{cfg?.label ?? s}</span>;
+            }},
+            { key: 'items_count', label: 'الأصناف', render: (v) => <span className="m">{String(v)}</span> },
+            { key: 'total_ttc', label: 'المبلغ (TTC)', render: (v) => <span className="e">{fmt(Number(v))} دج</span> },
+            { key: 'requested_at', label: 'التاريخ', render: (v) => {
+              const d = v ? new Date(String(v)) : null;
+              return <span className="text-xs text-t4">{d ? d.toLocaleDateString('fr-DZ') : '—'}</span>;
+            }},
+          ]}
+          data={recent as unknown as Record<string, unknown>[]}
+          rowKey="id"
+        />
+        {recent.length === 0 && !recentOrders.isLoading && (
+          <div className="text-sm text-t4 text-center py-3">لا توجد طلبات سلع بعد</div>
         )}
       </Card>
 
