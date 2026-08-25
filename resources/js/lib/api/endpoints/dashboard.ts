@@ -47,6 +47,13 @@ export interface InventorySummary {
   stock_out_this_month: number;
 }
 
+export interface TopDebtorRow {
+  party_id:         number;
+  party_name:       string | null;
+  total_remaining:  number;
+  invoice_count:    number;
+}
+
 // ── API object ───────────────────────────────────────────────────────────────
 export const dashboardApi = {
   stats:              (yearId: number)    => apiGet<DashboardStats>('/dashboard', { year_id: yearId }),
@@ -55,6 +62,7 @@ export const dashboardApi = {
   topCustomers:       (limit = 5)         => apiGet<TopCustomerRow[]>('/dashboard/top-customers', { limit }),
   recentTransactions: (limit = 10)        => apiGet<RecentTransaction[]>('/dashboard/recent-transactions', { limit }),
   inventory:          ()                  => apiGet<InventorySummary>('/dashboard/inventory'),
+  topDebtors:         (limit = 5)         => apiGet<TopDebtorRow[]>('/dashboard/top-debtors', { limit }),
 } as const;
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
@@ -121,5 +129,15 @@ export function useDashboardInventory() {
     queryFn:  dashboardApi.inventory,
     enabled:  !!slug,
     staleTime: 2 * 60_000,
+  });
+}
+
+export function useTopDebtors(limit = 5) {
+  const slug = useActiveSlug();
+  return useQuery({
+    queryKey: [slug, 'dashboard', 'top-debtors', limit],
+    queryFn:  () => dashboardApi.topDebtors(limit),
+    enabled:  !!slug,
+    staleTime: 60_000,
   });
 }

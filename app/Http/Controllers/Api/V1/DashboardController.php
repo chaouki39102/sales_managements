@@ -82,4 +82,16 @@ class DashboardController extends Controller
             'data' => $data,
         ]);
     }
+
+    public function topDebtors(Request $request): JsonResponse
+    {
+        $limit = $request->get('limit', 10);
+        $data = $this->dashboardService->getTopDebtors($limit);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'تم جلب المدينين بنجاح',
+            'data' => $data,
+        ]);
+    }
 }

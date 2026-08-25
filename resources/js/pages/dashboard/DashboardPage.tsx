@@ -1,5 +1,5 @@
 // pages/dashboard/DashboardPage.tsx
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import KpiCard      from '@/components/ui/KpiCard';
 import Card         from '@/components/ui/Card';
@@ -10,7 +10,7 @@ import SimpleTable  from '@/components/ui/SimpleTable';
 import AlertBar     from '@/components/ui/AlertBar';
 import Avatar       from '@/components/ui/Avatar';
 import { usePortalOrders, usePortalOrdersSummary, PORTAL_ORDER_STATUSES, type PortalAdminOrder } from '@/lib/api/endpoints/portalOrders';
-import { useDashboardStats, useSalesChart, useTopProducts, useRecentTransactions } from '@/lib/api/endpoints/dashboard';
+import { useDashboardStats, useSalesChart, useTopProducts, useTopDebtors, useRecentTransactions } from '@/lib/api/endpoints/dashboard';
 import { useStockAt, type StockAtRow } from '@/lib/api/endpoints/inventory';
 import OrderPipeline from '@/pages/portal/OrderPipeline';
 import { useActiveCompany } from '@/lib/store/appStore';
@@ -29,11 +29,95 @@ const statusBadge = (status: string | null) => {
   }
 };
 
-const COLORS = ['var(--em)', 'var(--blue)', 'var(--gold)', 'var(--purple)', 'var(--teal)', 'var(--red)'] as const;
+const COLORS_FLAT = ['#0a8a5c', '#3b82f6', '#d9a027', '#9333ea', '#14b8a6', '#ef4444'];
 const avatarColor = (i: number) => (1 + (i % 7)) as 1|2|3|4|5|6|7;
 
-// ── BarChart: live sales data ────────────────────────────────────────────────
-function BarChart({ points, isLoading }: { points: { label: string; total: number }[]; isLoading: boolean }) {
+// ── SVG Donut Chart ──────────────────────────────────────────────────────────
+function DonutChart({ data, total, isLoading }: { data: { name: string; value: number }[]; total: number; isLoading: boolean }) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+  if (isLoading) return <div className="text-sm text-t4 text-center py-6">جاري تحميل البيانات…</div>;
+  if (!data.length || total === 0) return <div className="text-sm text-t4 text-center py-6">لا توجد بيانات مبيعات</div>;
+
+  const R = 42;
+  const C = 2 * Math.PI * R;
+  let accumulated = 0;
+
+  const slices = data.map((item, i) => {
+    const pct = item.value / total;
+    const dashArray = `${pct * C} ${(1 - pct) * C}`;
+    const dashOffset = -accumulated * C;
+    accumulated += pct;
+    return { ...item, pct, dashArray, dashOffset, color: COLORS_FLAT[i % COLORS_FLAT.length] };
+  });
+
+  return (
+    <div className="donut-w">
+      <div style={{ position: 'relative', width: 110, height: 110, flexShrink: 0 }}>
+        <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+          {slices.map((s, i) => (
+            <circle
+              key={i}
+              cx="50" cy="50" r={R}
+              fill="none"
+              stroke={s.color}
+              strokeWidth={hoveredIdx === i ? 16 : 12}
+              strokeDasharray={s.dashArray}
+              strokeDashoffset={s.dashOffset}
+              style={{ transition: 'stroke-width .15s', opacity: hoveredIdx !== null && hoveredIdx !== i ? 0.45 : 1 }}
+              onMouseEnter={() => setHoveredIdx(i)}
+              onMouseLeave={() => setHoveredIdx(null)}
+            />
+          ))}
+        </svg>
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexDirection: 'column', pointerEvents: 'none',
+        }}>
+          {hoveredIdx !== null ? (
+            <>
+              <div style={{ fontSize: 13, fontWeight: 800, color: COLORS_FLAT[hoveredIdx] }}>
+                {Math.round(slices[hoveredIdx].pct * 100)}%
+              </div>
+              <div style={{ fontSize: 9, color: 'var(--t4)', maxWidth: 50, textAlign: 'center', lineHeight: 1.2 }}>
+                {slices[hoveredIdx].name}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--t1)' }}>{data.length}</div>
+              <div style={{ fontSize: 9, color: 'var(--t4)' }}>منتج</div>
+            </>
+          )}
+        </div>
+      </div>
+      <div className="d-legend">
+        {slices.map((s, i) => (
+          <div className="d-item" key={i}
+            onMouseEnter={() => setHoveredIdx(i)}
+            onMouseLeave={() => setHoveredIdx(null)}
+            style={{ opacity: hoveredIdx !== null && hoveredIdx !== i ? 0.5 : 1, cursor: 'default', transition: 'opacity .15s' }}
+          >
+            <div className="d-dot" style={{ background: s.color }} />
+            <span className="flex-1" style={{ fontSize: 11, fontWeight: 600 }}>{s.name}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: s.color }}>{Math.round(s.pct * 100)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── BarChart: live sales data with tooltips + click ──────────────────────────
+function BarChart({ points, isLoading, onBarClick }: {
+  points: { label: string; total: number; date?: string }[];
+  isLoading: boolean;
+  onBarClick?: (point: { label: string; total: number; date?: string }) => void;
+}) {
+  const [tooltip, setTooltip] = useState<{ idx: number; x: number; y: number } | null>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
+
   if (isLoading) return <div className="text-sm text-t4 text-center py-6">جاري تحميل البيانات…</div>;
   if (!points.length) return <div className="text-sm text-t4 text-center py-6">لا توجد بيانات مبيعات</div>;
 
@@ -41,17 +125,64 @@ function BarChart({ points, isLoading }: { points: { label: string; total: numbe
   const maxEntry = points.reduce((a, b) => a.total > b.total ? a : b);
   const avg = Math.round(points.reduce((s, p) => s + p.total, 0) / points.length);
   const minEntry = points.reduce((a, b) => a.total < b.total ? a : b);
+  const sum = points.reduce((s, p) => s + p.total, 0);
+
+  const handleMouse = (e: React.MouseEvent, idx: number) => {
+    const rect = chartRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setTooltip({ idx, x: e.clientX - rect.left, y: e.clientY - rect.top });
+  };
 
   return (
     <>
-      <div className="barchart">
-        {points.map((m) => {
+      <div ref={chartRef} className="barchart" style={{ position: 'relative' }}>
+        {tooltip !== null && (
+          <div style={{
+            position: 'absolute',
+            left: Math.min(Math.max(tooltip.x - 60, 8), (chartRef.current?.offsetWidth ?? 200) - 130),
+            top: Math.max(tooltip.y - 52, 4),
+            background: 'var(--bg1)',
+            border: '1px solid var(--b2)',
+            borderRadius: 8,
+            padding: '8px 12px',
+            fontSize: 11,
+            boxShadow: 'var(--shadow2)',
+            zIndex: 10,
+            pointerEvents: 'none',
+            minWidth: 100,
+            textAlign: 'center',
+          }}>
+            <div style={{ fontWeight: 700, color: 'var(--t1)', marginBottom: 2 }}>{points[tooltip.idx].label}</div>
+            <div style={{ color: 'var(--em)', fontWeight: 800 }}>{fmt(points[tooltip.idx].total)} دج</div>
+            <div style={{ color: 'var(--t4)', fontSize: 10 }}>
+              {Math.round((points[tooltip.idx].total / sum) * 100)}% من الإجمالي
+            </div>
+          </div>
+        )}
+        {points.map((m, i) => {
           const pct = Math.max(4, Math.round((m.total / max) * 100));
           const hi = m === maxEntry;
+          const isHovered = tooltip?.idx === i;
           return (
-            <div className="bc-col" key={m.label}>
-              <div className={`bc-bar ${hi ? 'hi' : ''}`} style={{ height: `${pct}%` }}>
-                <span className={`bc-v ${hi ? 'text-gold' : ''}`}>{fmt(m.total)}</span>
+            <div className="bc-col" key={m.label}
+              onMouseMove={(e) => handleMouse(e, i)}
+              onMouseLeave={() => setTooltip(null)}
+              onClick={() => onBarClick?.(m)}
+              style={{ cursor: onBarClick ? 'pointer' : undefined }}
+            >
+              <div
+                className={`bc-bar ${hi ? 'hi' : ''}`}
+                style={{
+                  height: `${pct}%`,
+                  opacity: tooltip !== null && !isHovered ? 0.6 : 1,
+                  transform: isHovered ? 'scaleY(1.03)' : undefined,
+                  transformOrigin: 'bottom',
+                  transition: 'opacity .15s, transform .15s',
+                }}
+              >
+                <span className={`bc-v ${hi ? 'text-gold' : ''}`} style={{ opacity: isHovered ? 1 : undefined }}>
+                  {fmt(m.total)}
+                </span>
               </div>
               <div className={`bc-lbl ${hi ? 'text-gold font-extrabold' : ''}`}>{m.label}</div>
             </div>
@@ -61,9 +192,151 @@ function BarChart({ points, isLoading }: { points: { label: string; total: numbe
       <div className="flex justify-between mt-3 px-3 py-2 bg-3 rounded-md">
         <span className="text-sm text-t4">أدنى <strong className="text-t2">{fmt(minEntry.total)}</strong></span>
         <span className="text-sm text-t4">متوسط <strong className="text-t2">{fmt(avg)}</strong></span>
+        <span className="text-sm text-t4">إجمالي <strong className="text-em">{fmt(sum)} دج</strong></span>
         <span className="text-sm text-t4">أعلى <strong className="text-gold">{fmt(maxEntry.total)} دج</strong></span>
       </div>
     </>
+  );
+}
+
+// ── Financial Summary card ───────────────────────────────────────────────────
+function FinancialSummary({ stats, isLoading }: { stats: NonNullable<ReturnType<typeof useDashboardStats>['data']> | undefined; isLoading: boolean }) {
+  if (isLoading) return <div className="text-sm text-t4 text-center py-6">جاري التحميل…</div>;
+  if (!stats) return null;
+
+  const totalPurchases = stats.purchases_this_month;
+  const totalSales = stats.month_sales;
+  const profit = stats.month_profit;
+  const margin = stats.profit_margin;
+
+  const salesBar = totalSales > 0 ? 100 : 0;
+  const purchaseBar = totalSales > 0 ? Math.min(100, Math.round((totalPurchases / totalSales) * 100)) : 0;
+  const profitBar = totalSales > 0 ? Math.min(100, Math.round((Math.max(0, profit) / totalSales) * 100)) : 0;
+
+  return (
+    <Card
+      padding={14}
+      title={
+        <>
+          <span className="ic ic-sm" style={{ color: 'var(--teal)' }}>
+            <i className="ti ti-chart-donut-2" />
+          </span>
+          ملخص مالي
+        </>
+      }
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {/* Sales vs Purchases visual bar */}
+        <div>
+          <div className="flex justify-between items-center mb-1">
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--t3)' }}>المبيعات</span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--em)' }}>{fmt(totalSales)} دج</span>
+          </div>
+          <div style={{ height: 8, borderRadius: 4, background: 'var(--b1)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${salesBar}%`, borderRadius: 4, background: 'linear-gradient(90deg, var(--em), var(--em3))', transition: 'width .4s' }} />
+          </div>
+        </div>
+
+        <div>
+          <div className="flex justify-between items-center mb-1">
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--t3)' }}>المشتريات</span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--blue)' }}>{fmt(totalPurchases)} دج</span>
+          </div>
+          <div style={{ height: 8, borderRadius: 4, background: 'var(--b1)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${purchaseBar}%`, borderRadius: 4, background: 'linear-gradient(90deg, var(--blue), #93c5fd)', transition: 'width .4s' }} />
+          </div>
+        </div>
+
+        <div>
+          <div className="flex justify-between items-center mb-1">
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--t3)' }}>صافي الربح</span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: profit >= 0 ? 'var(--gold)' : 'var(--red)' }}>
+              {fmt(profit)} دج — {margin}%
+            </span>
+          </div>
+          <div style={{ height: 8, borderRadius: 4, background: 'var(--b1)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${profitBar}%`, borderRadius: 4, background: profit >= 0 ? 'linear-gradient(90deg, var(--gold), #fbbf24)' : 'linear-gradient(90deg, var(--red), #f87171)', transition: 'width .4s' }} />
+          </div>
+        </div>
+
+        {/* TVA line */}
+        <div className="flex justify-between items-center pt-2" style={{ borderTop: '1px solid var(--b2)' }}>
+          <span style={{ fontSize: 11, color: 'var(--t4)' }}>TVA مستحقة للدولة</span>
+          <Badge variant="danger">{fmt(stats.tva_due)} دج</Badge>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ── Customer Debt Card ───────────────────────────────────────────────────────
+function DebtCard({ debtors, stats, isLoading, onNavigate }: {
+  debtors: NonNullable<ReturnType<typeof useTopDebtors>['data']>;
+  stats: NonNullable<ReturnType<typeof useDashboardStats>['data']> | undefined;
+  isLoading: boolean;
+  onNavigate: (path: string) => void;
+}) {
+  const maxDebt = debtors.length > 0 ? debtors[0].total_remaining : 1;
+
+  return (
+    <Card
+      padding={14}
+      title={
+        <>
+          <span className="ic ic-sm" style={{ color: 'var(--red)' }}>
+            <i className="ti ti-user-dollar" />
+          </span>
+          ديون الزبائن
+        </>
+      }
+      actions={
+        <Button size="xs" onClick={() => onNavigate('/dashboard/debts')}>
+          عرض الكل
+        </Button>
+      }
+    >
+      {isLoading && <div className="text-sm text-t4 text-center py-3">جاري التحميل…</div>}
+
+      {/* Summary bar */}
+      {stats && (
+        <div className="flex gap-3 mb-3">
+          <div className="flex-1 p-2 rounded" style={{ background: 'rgba(239,68,68,.08)' }}>
+            <div style={{ fontSize: 10, color: 'var(--t4)' }}>الإجمالي</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--red)' }}>{fmt(stats.total_debts)} دج</div>
+          </div>
+          <div className="flex-1 p-2 rounded" style={{ background: 'rgba(217,160,39,.08)' }}>
+            <div style={{ fontSize: 10, color: 'var(--t4)' }}>عدد المدينين</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--gold)' }}>{stats.debtors_count}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Debtor list */}
+      {debtors.map((d) => {
+        const pct = maxDebt > 0 ? Math.round((d.total_remaining / maxDebt) * 100) : 0;
+        return (
+          <div className="sr" key={d.party_id}>
+            <div className="flex-1">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-bold text-t1">{d.party_name ?? `زبون #${d.party_id}`}</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--red)' }}>{fmt(d.total_remaining)} دج</span>
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <ProgressBar value={Math.min(pct, 100)} color="var(--red)" height={4} />
+                <span className="text-xs text-t4" style={{ minWidth: 50 }}>{d.invoice_count} فاتورة</span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      {!isLoading && debtors.length === 0 && (
+        <div className="text-sm text-center py-3" style={{ color: 'var(--em)' }}>
+          <i className="ti ti-circle-check" style={{ marginLeft: 4 }} />
+          لا توجد ديون مستحقة — ممتاز!
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -102,7 +375,8 @@ export default function DashboardPage() {
   // ── Live data hooks ───────────────────────────────────────────────
   const statsQuery      = useDashboardStats();
   const chartQuery      = useSalesChart(chartMode === 'monthly' ? 'month' : 'year');
-  const topProductsQ    = useTopProducts(3);
+  const topProductsQ    = useTopProducts(6);
+  const topDebtorsQ     = useTopDebtors(5);
   const recentTxQ       = useRecentTransactions(5);
 
   const stockAtQ        = useStockAt({});
@@ -112,6 +386,7 @@ export default function DashboardPage() {
   const s = statsQuery.data;
   const chartPoints = chartQuery.data ?? [];
   const topProducts = topProductsQ.data ?? [];
+  const topDebtors  = topDebtorsQ.data ?? [];
   const recentTx    = recentTxQ.data ?? [];
   const recent      = recentOrders.data?.data ?? [];
   const summary     = ordersSummary.data;
@@ -138,6 +413,22 @@ export default function DashboardPage() {
     if (tx.status === 'paid')      return { dot: 'g' as const, time: timeAgo, text: <><strong>{tx.document_number}</strong> — {fmt(tx.total)} دج مدفوعة</> };
     return { dot: 'b' as const, time: timeAgo, text: <><strong>{tx.document_number}</strong> — {fmt(tx.total)} دج {tx.party_name ?? ''}</> };
   });
+
+  // Donut chart data from top products
+  const donutTotal = topProducts.reduce((s, p) => s + p.total_amount, 0);
+  const donutData = topProducts.map(p => ({
+    name: p.product_name ?? `#${p.product_id}`,
+    value: p.total_amount,
+  }));
+
+  // Bar chart click handler — navigate to documents page
+  const handleBarClick = (point: { label: string; total: number; date?: string }) => {
+    if (chartMode === 'monthly' && point.date) {
+      navigate(`/documents/FV?filter[document_date]=${point.date}`);
+    } else {
+      navigate('/documents/FV');
+    }
+  };
 
   return (
     <div className="page on" id="p-dashboard">
@@ -270,7 +561,7 @@ export default function DashboardPage() {
         />
       </Card>
 
-      {/* ── Charts Row ── */}
+      {/* ── Charts + Donut Row ── */}
       <div className="g65 mb-5">
         {/* Sales bar chart (live) */}
         <Card
@@ -295,47 +586,41 @@ export default function DashboardPage() {
             </>
           }
         >
-          <BarChart points={chartPoints} isLoading={chartQuery.isLoading} />
+          <BarChart points={chartPoints} isLoading={chartQuery.isLoading} onBarClick={handleBarClick} />
+          <div className="text-xs text-t4 mt-2" style={{ textAlign: 'center' }}>
+            اضغط على عمود لعرض الفواتير — مرر للتفاصيل
+          </div>
         </Card>
 
-        {/* Side column */}
+        {/* Side column: Donut + Top Products */}
         <div className="flex flex-col gap-4">
 
-          {/* Top products (live) */}
+          {/* Top products donut chart */}
           <Card
             padding={14}
             title={
               <>
                 <span className="ic ic-sm" style={{color:'var(--gold)'}}>
-                  <i className="ti ti-star"/>
+                  <i className="ti ti-chart-donut"/>
                 </span>
-                أكثر مبيعاً
+                أكثر المنتجات مبيعاً
               </>
             }
           >
-            {topProductsQ.isLoading && <div className="text-sm text-t4 text-center py-3">جاري التحميل…</div>}
-            {topProducts.map((p, i) => (
-              <div className="sr" key={p.product_id}>
-                <div className="flex-1">
-                  <div className="text-sm font-bold text-t1 mb-1">
-                    {p.product_name ?? `منتج #${p.product_id}`}
-                  </div>
-                  <ProgressBar
-                    value={topProducts[0]?.total_amount ? Math.round((p.total_amount / topProducts[0].total_amount) * 100) : 0}
-                    color={COLORS[i % COLORS.length]}
-                    height={4}
-                  />
-                </div>
-                <span className="text-xs text-t4" style={{minWidth:72,textAlign:'left'}}>
-                  {fmt(p.total_quantity)} وحدة
-                </span>
-              </div>
-            ))}
-            {!topProductsQ.isLoading && topProducts.length === 0 && (
-              <div className="text-sm text-t4 text-center py-3">لا توجد بيانات مبيعات</div>
-            )}
+            <DonutChart data={donutData} total={donutTotal} isLoading={topProductsQ.isLoading} />
           </Card>
         </div>
+      </div>
+
+      {/* ── Financial Summary + Debt Card Row ── */}
+      <div className="g65 mb-5">
+        <FinancialSummary stats={s} isLoading={statsQuery.isLoading} />
+        <DebtCard
+          debtors={topDebtors}
+          stats={s}
+          isLoading={topDebtorsQ.isLoading}
+          onNavigate={navigate}
+        />
       </div>
 
       {/* ── Latest portal orders (live) ── */}

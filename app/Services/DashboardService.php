@@ -221,6 +221,24 @@ class DashboardService
             ->toArray();
     }
 
+    public function getTopDebtors(int $limit = 10): array
+    {
+        return CommercialDocument::select('party_id', DB::raw('SUM(remaining_amount) as total_remaining'), DB::raw('COUNT(*) as invoice_count'))
+            ->where('remaining_amount', '>', 0)
+            ->whereHas('documentType', fn($q) => $q->whereIn('code', ['FV', 'AV', 'POS']))
+            ->groupBy('party_id')
+            ->orderByDesc('total_remaining')
+            ->limit($limit)
+            ->get()
+            ->map(fn($item) => [
+                'party_id'        => $item->party_id,
+                'party_name'      => $item->party?->name,
+                'total_remaining' => round($item->total_remaining, 2),
+                'invoice_count'   => $item->invoice_count,
+            ])
+            ->toArray();
+    }
+
     public function getInventorySummary(): array
     {
         $totalProducts = Product::count();
