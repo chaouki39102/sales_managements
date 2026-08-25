@@ -796,10 +796,8 @@ export default function DashboardPage() {
 
       {/* ── Bottom Row ── */}
       <div className="g73">
-        {/* Stock alerts (live from stock-at) */}
+        {/* Left: Stock alerts + Activity timeline stacked */}
         <div className="flex flex-col gap-4">
-
-          {/* Stock alerts (live from stock-at) */}
           <Card
             padding={14}
             title={
@@ -846,7 +844,6 @@ export default function DashboardPage() {
             </Button>
           </Card>
 
-          {/* Activity timeline (live from recent transactions) */}
           <Card
             padding={14}
             title={
@@ -871,46 +868,47 @@ export default function DashboardPage() {
               )}
             </div>
           </Card>
-
-          {/* TVA summary (live) */}
-          <Card
-            padding={14}
-            style={{
-              background: 'linear-gradient(135deg,var(--emb),rgba(10,138,92,.04))',
-              borderColor: 'var(--embo)',
-            }}
-            noHeader
-          >
-            <div className="text-sm font-bold text-em mb-2 flex items-center gap-2">
-              <i className="ti ti-landmark"/> TVA مستحقة
-            </div>
-            <div className="sr">
-              <div className="sr-l">TVA محصّلة</div>
-              <div className="sr-v text-gold">{s ? `${fmt(s.month_tva_collected)} دج` : '…'}</div>
-            </div>
-            <div className="sr">
-              <div className="sr-l">TVA مستردة</div>
-              <div className="sr-v text-blue">− {s ? `${fmt(s.month_tva_deductible)} دج` : '…'}</div>
-            </div>
-            <div className="sr border-t border-embo pt-2 mt-1">
-              <div className="sr-l font-extrabold text-red">المستحق للدولة</div>
-              <div className="sr-v text-red" style={{fontSize:16}}>{s ? `${fmt(s.tva_due)} دج` : '…'}</div>
-            </div>
-            <div className="text-xs text-em mt-2 px-2 py-1 rounded" style={{
-              background:'rgba(10,138,92,.08)',
-            }}>
-              ⏰ الاستحقاق: 20 من الشهر القادم — G50
-            </div>
-            <Button
-              variant="primary" size="sm" fullWidth
-              icon={<i className="ti ti-calculator"/>}
-              className="mt-2"
-              onClick={() => navigate('/dashboard/tva')}
-            >
-              إقرار G50
-            </Button>
-          </Card>
         </div>
+
+        {/* Right: TVA summary */}
+        <Card
+          padding={14}
+          style={{
+            background: 'linear-gradient(135deg,var(--emb),rgba(10,138,92,.04))',
+            borderColor: 'var(--embo)',
+            alignSelf: 'start',
+          }}
+          noHeader
+        >
+          <div className="text-sm font-bold text-em mb-2 flex items-center gap-2">
+            <i className="ti ti-landmark"/> TVA مستحقة
+          </div>
+          <div className="sr">
+            <div className="sr-l">TVA محصّلة</div>
+            <div className="sr-v text-gold">{s ? `${fmt(s.month_tva_collected)} دج` : '…'}</div>
+          </div>
+          <div className="sr">
+            <div className="sr-l">TVA مستردة</div>
+            <div className="sr-v text-blue">− {s ? `${fmt(s.month_tva_deductible)} دج` : '…'}</div>
+          </div>
+          <div className="sr border-t border-embo pt-2 mt-1">
+            <div className="sr-l font-extrabold text-red">المستحق للدولة</div>
+            <div className="sr-v text-red" style={{fontSize:16}}>{s ? `${fmt(s.tva_due)} دج` : '…'}</div>
+          </div>
+          <div className="text-xs text-em mt-2 px-2 py-1 rounded" style={{
+            background:'rgba(10,138,92,.08)',
+          }}>
+            ⏰ الاستحقاق: 20 من الشهر القادم — G50
+          </div>
+          <Button
+            variant="primary" size="sm" fullWidth
+            icon={<i className="ti ti-calculator"/>}
+            className="mt-2"
+            onClick={() => navigate('/dashboard/tva')}
+          >
+            إقرار G50
+          </Button>
+        </Card>
       </div>
 
     </div>
