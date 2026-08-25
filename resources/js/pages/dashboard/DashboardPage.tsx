@@ -8,7 +8,6 @@ import Button       from '@/components/ui/Button';
 import ProgressBar  from '@/components/ui/ProgressBar';
 import SimpleTable  from '@/components/ui/SimpleTable';
 import AlertBar     from '@/components/ui/AlertBar';
-import Avatar       from '@/components/ui/Avatar';
 import { usePortalOrders, usePortalOrdersSummary, PORTAL_ORDER_STATUSES, type PortalAdminOrder } from '@/lib/api/endpoints/portalOrders';
 import { useDashboardStats, useSalesChart, useTopProducts, useTopDebtors, useTopProfitable, useRecentTransactions } from '@/lib/api/endpoints/dashboard';
 import { useStockAt, type StockAtRow } from '@/lib/api/endpoints/inventory';
@@ -30,7 +29,6 @@ const statusBadge = (status: string | null) => {
 };
 
 const COLORS_FLAT = ['#0a8a5c', '#3b82f6', '#d9a027', '#9333ea', '#14b8a6', '#ef4444'];
-const avatarColor = (i: number) => (1 + (i % 7)) as 1|2|3|4|5|6|7;
 
 // ── SVG Donut Chart ──────────────────────────────────────────────────────────
 function DonutChart({ data, total, isLoading }: { data: { name: string; value: number; suffix?: string; margin?: number }[]; total: number; isLoading: boolean }) {
@@ -698,51 +696,104 @@ export default function DashboardPage() {
         )}
       </Card>
 
+      {/* ── Last Transactions (full-width) ── */}
+      <Card
+        style={{ marginBottom: 16 }}
+        title={
+          <span className="flex items-center gap-2">
+            <span className="ic ic-sm" style={{ color: 'var(--em)' }}>
+              <i className="ti ti-file-invoice"/>
+            </span>
+            آخر المعاملات
+          </span>
+        }
+        actions={
+          <Button size="xs" variant="primary" onClick={() => navigate('/documents/FV')}>
+            عرض الكل
+          </Button>
+        }
+      >
+        {recentTxQ.isLoading ? (
+          <div className="text-sm text-t4 text-center py-4">جاري التحميل…</div>
+        ) : recentTx.length === 0 ? (
+          <div className="text-sm text-t4 text-center py-4">لا توجد معاملات حديثة</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {/* Header row */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '48px 1fr 90px 80px 80px 90px 80px',
+              gap: 8, padding: '4px 10px',
+              fontSize: 10, fontWeight: 700, color: 'var(--t4)',
+              borderBottom: '1px solid var(--b2)',
+            }}>
+              <span>النوع</span><span>الزبون</span><span style={{ textAlign: 'center' }}>رقم</span>
+              <span style={{ textAlign: 'end' }}>المبلغ TTC</span><span style={{ textAlign: 'center' }}>الحالة</span>
+              <span style={{ textAlign: 'center' }}>الدفع</span><span style={{ textAlign: 'center' }}>التاريخ</span>
+            </div>
+            {recentTx.map((tx) => {
+              const isPaid = tx.status === 'paid';
+              const isCancelled = tx.status === 'cancelled' || tx.status === 'annulled';
+              const docCode = (tx.document_type ?? '').slice(0, 3);
+              const typeColor = docCode === 'FV' ? 'var(--em)' : docCode === 'AV' ? 'var(--red)' : docCode === 'FA' ? 'var(--blue)' : docCode === 'POS' ? 'var(--gold)' : 'var(--t3)';
+              return (
+                <div
+                  key={tx.id}
+                  onClick={() => navigate(`/documents/FV?highlight=${tx.id}`)}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '48px 1fr 90px 80px 80px 90px 80px',
+                    gap: 8, padding: '8px 10px',
+                    fontSize: 12,
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    background: 'var(--b0)',
+                    opacity: isCancelled ? 0.55 : 1,
+                    textDecoration: isCancelled ? 'line-through' : 'none',
+                    transition: 'background .12s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--b1)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'var(--b0)'; }}
+                >
+                  {/* Type badge */}
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '2px 6px', borderRadius: 4, fontSize: 9, fontWeight: 800,
+                    background: `${typeColor}18`, color: typeColor,
+                  }}>
+                    {docCode || '—'}
+                  </span>
+                  {/* Party */}
+                  <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--t1)' }}>
+                    {tx.party_name ?? '—'}
+                  </span>
+                  {/* Doc number */}
+                  <span className="m" style={{ textAlign: 'center', fontSize: 11 }}>{tx.document_number}</span>
+                  {/* Amount */}
+                  <span className="e" style={{ textAlign: 'end', fontWeight: 700 }}>
+                    {fmt(tx.total)} <span style={{ fontSize: 9, color: 'var(--t4)' }}>دج</span>
+                  </span>
+                  {/* Status */}
+                  <span style={{ textAlign: 'center' }}>{statusBadge(tx.status)}</span>
+                  {/* Paid indicator */}
+                  <span style={{ textAlign: 'center' }}>
+                    {isPaid
+                      ? <i className="ti ti-circle-check" style={{ color: 'var(--em)', fontSize: 14 }} />
+                      : <i className="ti ti-clock" style={{ color: 'var(--t4)', fontSize: 14 }} />
+                    }
+                  </span>
+                  {/* Date */}
+                  <span className="text-xs text-t4" style={{ textAlign: 'center' }}>{tx.date ?? '—'}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
       {/* ── Bottom Row ── */}
       <div className="g73">
-        {/* Recent transactions (live) */}
-        <Card
-          title={
-            <>
-              <span className="ic ic-sm" style={{color:'var(--em)'}}>
-                <i className="ti ti-file-invoice"/>
-              </span>
-              آخر الفواتير
-            </>
-          }
-          actions={
-            <Button size="xs" onClick={() => navigate('/documents/FV')}>
-              عرض الكل
-            </Button>
-          }
-        >
-          {recentTxQ.isLoading && <div className="text-sm text-t4 text-center py-4">جاري التحميل…</div>}
-          <SimpleTable
-            columns={[
-              { key: 'document_number', label: 'رقم', className: 'm' },
-              { key: 'party_name', label: 'الزبون', render: (v, row) => (
-                <div className="flex items-center gap-2">
-                  <Avatar initials={String(v ?? '?')[0] ?? '?'} color={avatarColor(row._idx as number ?? 0)} size={26} />
-                  <span className={row.status === 'cancelled' ? 'line-through text-t4' : ''}>
-                    {String(v ?? '—')}
-                  </span>
-                </div>
-              )},
-              { key: 'total', label: 'المبلغ', render: (v, row) => (
-                <span className={row.status === 'cancelled' ? 'r line-through' : 'e'}>{fmt(Number(v))} دج</span>
-              )},
-              { key: 'status', label: 'الحالة', render: (v) => statusBadge(v as string | null) },
-              { key: 'date', label: 'التاريخ', className: 'text-xs text-t4' },
-            ]}
-            data={recentTx.map((tx, i) => ({ ...tx, _idx: i }))}
-            rowKey="id"
-          />
-          {!recentTxQ.isLoading && recentTx.length === 0 && (
-            <div className="text-sm text-t4 text-center py-4">لا توجد فواتير حديثة</div>
-          )}
-        </Card>
-
-        {/* Right column */}
+        {/* Stock alerts (live from stock-at) */}
         <div className="flex flex-col gap-4">
 
           {/* Stock alerts (live from stock-at) */}
