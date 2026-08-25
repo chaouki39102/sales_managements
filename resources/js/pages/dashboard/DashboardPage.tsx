@@ -10,7 +10,7 @@ import SimpleTable  from '@/components/ui/SimpleTable';
 import AlertBar     from '@/components/ui/AlertBar';
 import Avatar       from '@/components/ui/Avatar';
 import { usePortalOrders, usePortalOrdersSummary, PORTAL_ORDER_STATUSES, type PortalAdminOrder } from '@/lib/api/endpoints/portalOrders';
-import { useDashboardStats, useSalesChart, useTopProducts, useTopDebtors, useRecentTransactions } from '@/lib/api/endpoints/dashboard';
+import { useDashboardStats, useSalesChart, useTopProducts, useTopDebtors, useTopProfitable, useRecentTransactions } from '@/lib/api/endpoints/dashboard';
 import { useStockAt, type StockAtRow } from '@/lib/api/endpoints/inventory';
 import OrderPipeline from '@/pages/portal/OrderPipeline';
 import { useActiveCompany } from '@/lib/store/appStore';
@@ -33,11 +33,11 @@ const COLORS_FLAT = ['#0a8a5c', '#3b82f6', '#d9a027', '#9333ea', '#14b8a6', '#ef
 const avatarColor = (i: number) => (1 + (i % 7)) as 1|2|3|4|5|6|7;
 
 // ── SVG Donut Chart ──────────────────────────────────────────────────────────
-function DonutChart({ data, total, isLoading }: { data: { name: string; value: number }[]; total: number; isLoading: boolean }) {
+function DonutChart({ data, total, isLoading }: { data: { name: string; value: number; suffix?: string; margin?: number }[]; total: number; isLoading: boolean }) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   if (isLoading) return <div className="text-sm text-t4 text-center py-6">جاري تحميل البيانات…</div>;
-  if (!data.length || total === 0) return <div className="text-sm text-t4 text-center py-6">لا توجد بيانات مبيعات</div>;
+  if (!data.length || total === 0) return <div className="text-sm text-t4 text-center py-6">لا توجد بيانات</div>;
 
   const R = 42;
   const C = 2 * Math.PI * R;
@@ -101,7 +101,10 @@ function DonutChart({ data, total, isLoading }: { data: { name: string; value: n
           >
             <div className="d-dot" style={{ background: s.color }} />
             <span className="flex-1" style={{ fontSize: 11, fontWeight: 600 }}>{s.name}</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: s.color }}>{Math.round(s.pct * 100)}%</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: s.color }}>
+              {fmt(s.value)} {s.suffix ?? ''}
+              {s.margin != null && <span style={{ fontSize: 9, fontWeight: 500, color: 'var(--t4)', marginRight: 3 }}>({s.margin}%)</span>}
+            </span>
           </div>
         ))}
       </div>
@@ -344,6 +347,7 @@ function DebtCard({ debtors, stats, isLoading, onNavigate }: {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [chartMode, setChartMode] = useState<'monthly' | 'yearly'>('monthly');
+  const [productTab, setProductTab] = useState<'qty' | 'amount' | 'profit'>('qty');
   const company = useActiveCompany();
 
   // Preload popular pages in background
@@ -376,6 +380,7 @@ export default function DashboardPage() {
   const statsQuery      = useDashboardStats();
   const chartQuery      = useSalesChart(chartMode === 'monthly' ? 'month' : 'year');
   const topProductsQ    = useTopProducts(6);
+  const topProfitableQ  = useTopProfitable(6);
   const topDebtorsQ     = useTopDebtors(5);
   const recentTxQ       = useRecentTransactions(5);
 
@@ -386,6 +391,7 @@ export default function DashboardPage() {
   const s = statsQuery.data;
   const chartPoints = chartQuery.data ?? [];
   const topProducts = topProductsQ.data ?? [];
+  const topProfitable = topProfitableQ.data ?? [];
   const topDebtors  = topDebtorsQ.data ?? [];
   const recentTx    = recentTxQ.data ?? [];
   const recent      = recentOrders.data?.data ?? [];
@@ -414,12 +420,15 @@ export default function DashboardPage() {
     return { dot: 'b' as const, time: timeAgo, text: <><strong>{tx.document_number}</strong> — {fmt(tx.total)} دج {tx.party_name ?? ''}</> };
   });
 
-  // Donut chart data from top products
-  const donutTotal = topProducts.reduce((s, p) => s + p.total_amount, 0);
-  const donutData = topProducts.map(p => ({
-    name: p.product_name ?? `#${p.product_id}`,
-    value: p.total_amount,
-  }));
+  // Donut chart data — tab-aware
+  const donutRows = productTab === 'qty'
+    ? topProducts.map(p => ({ name: p.product_name ?? `#${p.product_id}`, value: p.total_quantity, suffix: 'وحدة' }))
+    : productTab === 'amount'
+    ? topProducts.map(p => ({ name: p.product_name ?? `#${p.product_id}`, value: p.total_amount, suffix: 'دج' }))
+    : topProfitable.map(p => ({ name: p.product_name ?? `#${p.product_id}`, value: p.total_profit, suffix: 'دج', margin: p.margin_pct }));
+  const donutTotal = donutRows.reduce((s, r) => s + r.value, 0);
+  const donutData = donutRows;
+  const donutLoading = productTab === 'profit' ? topProfitableQ.isLoading : topProductsQ.isLoading;
 
   // Bar chart click handler — navigate to documents page
   const handleBarClick = (point: { label: string; total: number; date?: string }) => {
@@ -599,15 +608,40 @@ export default function DashboardPage() {
           <Card
             padding={14}
             title={
-              <>
+              <span className="flex items-center gap-2">
                 <span className="ic ic-sm" style={{color:'var(--gold)'}}>
                   <i className="ti ti-chart-donut"/>
                 </span>
-                أكثر المنتجات مبيعاً
-              </>
+                الأكثر مبيعاً
+              </span>
+            }
+            actions={
+              <div style={{ display: 'flex', gap: 2, background: 'var(--b1)', borderRadius: 6, padding: 2 }}>
+                {([
+                  { key: 'qty' as const,     label: 'كمياً',       icon: 'ti-stack' },
+                  { key: 'amount' as const,  label: 'المبلغ',     icon: 'ti-cash' },
+                  { key: 'profit' as const,  label: 'الربح',      icon: 'ti-trending-up' },
+                ]).map(t => (
+                  <button
+                    key={t.key}
+                    onClick={() => setProductTab(t.key)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 3,
+                      padding: '3px 8px', borderRadius: 4, border: 'none', cursor: 'pointer',
+                      fontSize: 10, fontWeight: 700,
+                      background: productTab === t.key ? 'var(--em)' : 'transparent',
+                      color: productTab === t.key ? '#fff' : 'var(--t3)',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    <i className={`ti ${t.icon}`} style={{ fontSize: 10 }} />
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             }
           >
-            <DonutChart data={donutData} total={donutTotal} isLoading={topProductsQ.isLoading} />
+            <DonutChart data={donutData} total={donutTotal} isLoading={donutLoading} />
           </Card>
         </div>
       </div>

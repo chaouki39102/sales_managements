@@ -54,6 +54,16 @@ export interface TopDebtorRow {
   invoice_count:    number;
 }
 
+export interface TopProfitableRow {
+  product_id:     number;
+  product_name:   string | null;
+  total_profit:   number;
+  total_revenue:  number;
+  total_qty:      number;
+  avg_cost:       number;
+  margin_pct:     number;
+}
+
 // ── API object ───────────────────────────────────────────────────────────────
 export const dashboardApi = {
   stats:              (yearId: number)    => apiGet<DashboardStats>('/dashboard', { year_id: yearId }),
@@ -63,6 +73,7 @@ export const dashboardApi = {
   recentTransactions: (limit = 10)        => apiGet<RecentTransaction[]>('/dashboard/recent-transactions', { limit }),
   inventory:          ()                  => apiGet<InventorySummary>('/dashboard/inventory'),
   topDebtors:         (limit = 5)         => apiGet<TopDebtorRow[]>('/dashboard/top-debtors', { limit }),
+  topProfitable:      (limit = 6)         => apiGet<TopProfitableRow[]>('/dashboard/top-profitable', { limit }),
 } as const;
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
@@ -137,6 +148,16 @@ export function useTopDebtors(limit = 5) {
   return useQuery({
     queryKey: [slug, 'dashboard', 'top-debtors', limit],
     queryFn:  () => dashboardApi.topDebtors(limit),
+    enabled:  !!slug,
+    staleTime: 60_000,
+  });
+}
+
+export function useTopProfitable(limit = 6) {
+  const slug = useActiveSlug();
+  return useQuery({
+    queryKey: [slug, 'dashboard', 'top-profitable', limit],
+    queryFn:  () => dashboardApi.topProfitable(limit),
     enabled:  !!slug,
     staleTime: 60_000,
   });

@@ -94,4 +94,16 @@ class DashboardController extends Controller
             'data' => $data,
         ]);
     }
+
+    public function topProfitable(Request $request): JsonResponse
+    {
+        $limit = $request->get('limit', 10);
+        $data = $this->dashboardService->getTopProfitable($limit);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'تم جلب الأكثر ربحاً بنجاح',
+            'data' => $data,
+        ]);
+    }
 }

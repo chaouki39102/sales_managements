@@ -221,6 +221,33 @@ class DashboardService
             ->toArray();
     }
 
+    public function getTopProfitable(int $limit = 10): array
+    {
+        return CommercialDocumentLine::select(
+                'product_id',
+                DB::raw('SUM(total_ht - (quantity * cost_price_ht)) as total_profit'),
+                DB::raw('SUM(total_ht) as total_revenue'),
+                DB::raw('SUM(quantity) as total_qty'),
+                DB::raw('AVG(cost_price_ht) as avg_cost')
+            )
+            ->whereHas('commercialDocument', fn($q) => $q->whereHas('documentType', fn($q) => $q->whereIn('code', ['FV', 'AV', 'POS'])))
+            ->where('cost_price_ht', '>', 0)
+            ->groupBy('product_id')
+            ->orderByDesc('total_profit')
+            ->limit($limit)
+            ->get()
+            ->map(fn($item) => [
+                'product_id'   => $item->product_id,
+                'product_name' => $item->product?->name,
+                'total_profit' => round($item->total_profit, 2),
+                'total_revenue'=> round($item->total_revenue, 2),
+                'total_qty'    => $item->total_qty,
+                'avg_cost'     => round($item->avg_cost, 2),
+                'margin_pct'   => $item->total_revenue > 0 ? round(($item->total_profit / $item->total_revenue) * 100, 1) : 0,
+            ])
+            ->toArray();
+    }
+
     public function getTopDebtors(int $limit = 10): array
     {
         return CommercialDocument::select('party_id', DB::raw('SUM(remaining_amount) as total_remaining'), DB::raw('COUNT(*) as invoice_count'))

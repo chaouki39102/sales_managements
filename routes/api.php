@@ -328,6 +328,7 @@ Route::prefix('v1')->group(function () {
             Route::get('dashboard/recent-transactions', [DashboardController::class, 'recentTransactions']);
             Route::get('dashboard/inventory',           [DashboardController::class, 'inventory']);
             Route::get('dashboard/top-debtors',          [DashboardController::class, 'topDebtors']);
+            Route::get('dashboard/top-profitable',        [DashboardController::class, 'topProfitable']);
 
             Route::prefix('reports')->group(function () {
                 Route::get('sales',     [ReportController::class, 'sales']);
