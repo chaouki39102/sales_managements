@@ -26,6 +26,8 @@ interface LineCardProps {
   tvas?:           Tva[];
   units?:          Unit[];
   isLoadingProducts?: boolean;
+  selected?:       boolean;
+  onToggleSelect?: (idx: number) => void;
 }
 
 export function LineCard({
@@ -33,6 +35,7 @@ export function LineCard({
   isTvaExempt, lineWarnings, warehouses,
   onUpdate, onRemove, onDuplicate,
   onQuickCreate, productTypes, tvas, units, isLoadingProducts,
+  selected, onToggleSelect,
 }: LineCardProps) {
   const prod = products.find((p) => String(p.id) === line.product_id) ?? line._product;
   const { baseQty, gross: _gross, ht, tva, ttc, discountAmt, discPct: _discPct } = calcLineTotal(line);
@@ -75,12 +78,16 @@ export function LineCard({
   }
   const hasLowMarginWarning = (line._warnings ?? []).some(w => w.type === 'low_margin');
   const hasLowMargin = hasLowMarginWarning || (!isPurchase && marginPct !== null && marginPct < lowMarginThreshold);
-  const borderColor = hasLowMargin
+  const borderColor = selected
+    ? 'var(--em)'
+    : hasLowMargin
     ? 'var(--red)'
     : hasWarning
       ? (stockValidation && 'blocking' in stockValidation && stockValidation.blocking ? 'var(--red)' : 'var(--orange)')
       : 'var(--b2)';
-  const bgTint = hasLowMargin
+  const bgTint = selected
+    ? 'color-mix(in srgb, var(--em) 8%, var(--bg2))'
+    : hasLowMargin
     ? `color-mix(in srgb, var(--red) 18%, var(--bg2))`
     : hasWarning
       ? (stockValidation && 'blocking' in stockValidation && stockValidation.blocking
@@ -104,6 +111,14 @@ export function LineCard({
     >
       {/* ── Header ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+        {onToggleSelect && (
+          <input
+            type="checkbox"
+            checked={!!selected}
+            onChange={() => onToggleSelect(idx)}
+            style={{ cursor: 'pointer', accentColor: 'var(--em)', marginTop: 2, flexShrink: 0 }}
+          />
+        )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <ProductSearch

@@ -35,11 +35,12 @@ Save current lines as a reusable template, load template into current doc.
 - Frontend: "حفظ كقالب" + "تحميل قالب" buttons above lines.
 - Commit: `b8fe0d1`
 
-## Task 4 — Line Notes / Internal Comments
+## Task 4 — Line Notes / Internal Comments ✅ DONE
 Each line gets an optional internal note (not printed on invoice, visible to admin only).
-- Add `notes` textarea per line (collapsible, icon toggle).
-- Stored as `line_notes` JSON field on `commercial_document_lines`.
-- Status: ⏳
+- Backend: migration adding `notes` text nullable column to `commercial_document_lines`.
+- Model `$fillable` + `CommercialDocumentService::createDocumentLines()` + `CommercialDocumentLineResource` wired.
+- Frontend already had full UI (table row + card input + payload builder) — just needed backend storage.
+- Commit: `38148ef`
 
 ## Task 5 — Bulk Price Override
 Select multiple lines (checkbox column) and apply a flat discount % or price change.

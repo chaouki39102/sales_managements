@@ -34,6 +34,8 @@ interface DocumentLineRowProps {
   tvas?:          Tva[];
   units?:         Unit[];
   isLoadingProducts?: boolean;
+  selected?:      boolean;
+  onToggleSelect?: (idx: number) => void;
 }
 
 function CellInput({
@@ -104,6 +106,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
   line, idx, visibleCols, isPurchase, disabled, products, stockData,
   stockValidation, onUpdate, onRemove, onDuplicate, isTvaExempt, lineWarnings, warehouses,
   onQuickCreate, productTypes, tvas, units, isLoadingProducts,
+  selected, onToggleSelect,
 }: DocumentLineRowProps) {
 
   const { baseQty, gross: _gross, discountAmt, discPct: _discPct, ht, tva: _lineTva, ttc } = calcLineTotal(line);
@@ -128,7 +131,9 @@ export const DocumentLineRow = memo(function DocumentLineRow({
       lowMarginRow = ((line.unit_price_ht - cp) / line.unit_price_ht) * 100 < threshold;
     }
   }
-  const rowBg = lowMarginRow
+  const rowBg = selected
+    ? 'color-mix(in srgb, var(--em) 8%, transparent)'
+    : lowMarginRow
     ? `color-mix(in srgb, var(--red) 15%, transparent)`
     : hasStockWarning || activeComputeWarnings.length > 0
       ? `color-mix(in srgb, ${(stockValidation as any).blocking ? 'var(--red)' : 'var(--orange)'} 5%, transparent)`
@@ -145,6 +150,17 @@ export const DocumentLineRow = memo(function DocumentLineRow({
         background:   rowBg,
         transition:   'background .15s',
       }}>
+        {onToggleSelect && (
+          <td style={{ padding: '4px 6px', textAlign: 'center', width: 32 }}>
+            <input
+              type="checkbox"
+              checked={!!selected}
+              onChange={() => onToggleSelect(idx)}
+              style={{ cursor: 'pointer', accentColor: 'var(--em)' }}
+            />
+          </td>
+        )}
+
         {col('idx') && (
           <td style={{ padding: '4px 6px', textAlign: 'center',
             color: 'var(--t4)', fontSize: 11 }}>

@@ -85,6 +85,55 @@ export default function DocumentLinesSection({
   const [stockAlertOpen, setStockAlertOpen] = useState(true);
   const notify = useNotification();
 
+  // ── تحديد أسطر جماعي ─────────────────────────────────────────────────────
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+  const [bulkMode, setBulkMode] = useState<'percent' | 'fixed'>('percent');
+  const [bulkValue, setBulkValue] = useState('');
+
+  const toggleSelect = (idx: number) => {
+    setSelectedIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIndices((prev) =>
+      prev.size === lines.length ? new Set() : new Set(lines.map((_, i) => i)),
+    );
+  };
+
+  const clearSelection = () => setSelectedIndices(new Set());
+
+  const handleBulkApply = () => {
+    if (selectedIndices.size === 0 || isLinesReadOnly) return;
+    const val = Number(bulkValue);
+    if (!Number.isFinite(val) || val < 0) {
+      notify.error('أدخل قيمة صحيحة');
+      return;
+    }
+    selectedIndices.forEach((idx) => {
+      if (bulkMode === 'percent') {
+        updateLine(idx, {
+          discount_mode: 'percent',
+          discount_percentage: Math.min(val, 100),
+          discount_amount_fixed: 0,
+        });
+      } else {
+        updateLine(idx, {
+          discount_mode: 'fixed',
+          discount_amount_fixed: val,
+          discount_percentage: 0,
+        });
+      }
+    });
+    notify.success(`تم تطبيق الخصم على ${selectedIndices.size} سطر`);
+    setBulkValue('');
+    clearSelection();
+  };
+
   // ── قوالب الأسطر ──────────────────────────────────────────────────────────
   const { data: templates, isLoading: isLoadingTemplates } = useLineTemplates();
   const templateMut = useLineTemplateMutations();
@@ -650,6 +699,8 @@ export default function DocumentLinesSection({
                     tvas={tvas}
                     units={units}
                     isLoadingProducts={isLoadingProducts}
+                    selected={selectedIndices.has(idx)}
+                    onToggleSelect={toggleSelect}
                   />
                 );
               })}
@@ -659,6 +710,15 @@ export default function DocumentLinesSection({
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: compact ? 11.5 : 12 }}>
                 <thead>
                   <tr style={{ background: 'var(--bg3)', borderBottom: '2px solid var(--b2)' }}>
+                    <th style={{ padding: '4px 6px', textAlign: 'center', width: 32 }}>
+                      <input
+                        type="checkbox"
+                        checked={lines.length > 0 && selectedIndices.size === lines.length}
+                        ref={(el) => { if (el) el.indeterminate = selectedIndices.size > 0 && selectedIndices.size < lines.length; }}
+                        onChange={toggleSelectAll}
+                        style={{ cursor: 'pointer', accentColor: 'var(--em)' }}
+                      />
+                    </th>
                   {ALL_COLUMNS.filter((c) => visibleCols.has(c.key)).map((col) => (
                     <th key={col.key} style={{
                       padding: compact ? '4px 6px' : '6px 8px', textAlign: 'right', fontWeight: 700,
@@ -698,6 +758,8 @@ export default function DocumentLinesSection({
                         tvas={tvas}
                         units={units}
                         isLoadingProducts={isLoadingProducts}
+                        selected={selectedIndices.has(idx)}
+                        onToggleSelect={toggleSelect}
                       />
                     );
                   })}
@@ -706,6 +768,75 @@ export default function DocumentLinesSection({
             </div>
           )}
         </div>
+
+        {selectedIndices.size > 0 && !isLinesReadOnly && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+            margin: '8px 0', borderRadius: 'var(--r2)',
+            background: 'color-mix(in srgb, var(--em) 6%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--em) 20%, transparent)',
+            flexShrink: 0, flexWrap: 'wrap',
+          }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--em)' }}>
+              <i className="ti ti-checklist" style={{ marginLeft: 4 }} />
+              {selectedIndices.size} سطر محدد
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--bg1)', borderRadius: 'var(--r1)', border: '1px solid var(--b2)' }}>
+              <button
+                onClick={() => setBulkMode('percent')}
+                style={{
+                  padding: '4px 8px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                  border: 'none', borderRadius: 'var(--r1)', cursor: 'pointer',
+                  background: bulkMode === 'percent' ? 'var(--em)' : 'transparent',
+                  color: bulkMode === 'percent' ? '#fff' : 'var(--t3)',
+                }}
+              >%</button>
+              <button
+                onClick={() => setBulkMode('fixed')}
+                style={{
+                  padding: '4px 8px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                  border: 'none', borderRadius: 'var(--r1)', cursor: 'pointer',
+                  background: bulkMode === 'fixed' ? 'var(--em)' : 'transparent',
+                  color: bulkMode === 'fixed' ? '#fff' : 'var(--t3)',
+                }}
+              >دج</button>
+            </div>
+            <input
+              type="number"
+              min={0}
+              max={bulkMode === 'percent' ? 100 : undefined}
+              step={bulkMode === 'percent' ? 0.5 : 1}
+              value={bulkValue}
+              onChange={(e) => setBulkValue(e.target.value)}
+              placeholder={bulkMode === 'percent' ? 'نسبة الخصم %' : 'مبلغ الخصم (دج)'}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleBulkApply(); }}
+              style={{
+                width: 120, padding: '5px 8px', borderRadius: 'var(--r1)',
+                border: '1px solid var(--b3)', fontSize: 12,
+              }}
+            />
+            <button
+              onClick={handleBulkApply}
+              disabled={!bulkValue}
+              className="btn btn-p"
+              style={{ padding: '5px 12px', fontSize: 11.5, opacity: bulkValue ? 1 : 0.5, cursor: bulkValue ? 'pointer' : 'default' }}
+            >
+              <i className="ti ti-check" style={{ marginLeft: 4 }} />
+              تطبيق على المحدد
+            </button>
+            <button
+              onClick={clearSelection}
+              style={{
+                padding: '5px 10px', borderRadius: 'var(--r1)',
+                border: '1px solid var(--b3)', background: 'transparent',
+                color: 'var(--t3)', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit',
+              }}
+            >
+              <i className="ti ti-x" style={{ marginLeft: 2 }} />
+              إلغاء التحديد
+            </button>
+          </div>
+        )}
 
         {!isLinesReadOnly && (
           <div style={{ marginTop: 10, display: 'flex', gap: 8, flexShrink: 0 }}>
