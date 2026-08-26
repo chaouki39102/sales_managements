@@ -95,6 +95,31 @@ export default function CommercialDocumentModal({
     savedDraft, draftKey, restoreDraft,
   } = ctrl;
 
+  // ── إنشاء منتج سريع من بحث المنتجات ──────────────────────────────────────
+  const handleQuickCreateProduct = React.useCallback(async (payload: import('../components/ProductSearch').QuickCreatePayload) => {
+    const { productsApi } = await import('@/lib/api/endpoints/products');
+    try {
+      const saved = await productsApi.create({
+        name:               payload.name,
+        ref:                payload.ref,
+        product_type_id:    payload.product_type_id,
+        purchase_price_ht:  payload.purchase_price_ht,
+        tva_id:             payload.tva_id,
+        unit_id:            payload.unit_id,
+      });
+      if (slug) {
+        await qc.invalidateQueries({ queryKey: [slug, 'modal-products-v3'] });
+        await qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
+      }
+      if (saved && (saved as any).id) {
+        addLineWithProduct(String((saved as any).id), payload.purchase_price_ht);
+      }
+    } catch (err) {
+      console.error('Quick create product failed:', err);
+      throw err;
+    }
+  }, [slug, qc, addLineWithProduct]);
+
   // ✅ تذكّر آخر تبويب مُستخدَم لكل نوع مستند على حدة — يخدم سير العمل المتكرر
   const DOC_TAB_KEY = `doc-tab:${docCode}`;
   const [extraTab, setExtraTabState] = useState<string>(() => {
@@ -399,6 +424,10 @@ export default function CommercialDocumentModal({
             affectsStock={affectsStock}
             stockDir={stockDir}
             warehouses={lookups.warehouses as Array<{ id: number; name: string }>}
+            onQuickCreate={handleQuickCreateProduct}
+            productTypes={lookups.productTypes}
+            tvas={lookups.tvas}
+            units={lookups.units}
           />
 
           {/* ═══ SECTION 3: الدفعات ═══ */}

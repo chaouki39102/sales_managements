@@ -4,6 +4,7 @@ import { BarcodeInput } from '../components/BarcodeInput';
 import { LineCard } from '../components/LineCard';
 import { DocumentLineRow } from '../components/DocumentLineRow';
 import { SmartSuggestionsPanel } from '../components/SmartSuggestionsPanel';
+import type { QuickCreatePayload } from '../components/ProductSearch';
 import type { LineItem, ColKey } from '../types/document.types';
 import { ALL_COLUMNS } from '../types/document.types';
 import type { ComputeLineWarning } from '../hooks/useComputeLine';
@@ -11,6 +12,7 @@ import { validateLineStock } from '../utils/document.utils';
 import { focusDocLineCell } from '../utils/focusDocLineCell';
 import { useBarcodeScan } from '../../../hooks/useBarcodeScan';
 import { useNotification } from '../../../hooks/useNotification';
+import type { ProductType, Tva, Unit } from '@/lib/api/core/types';
 
 const BarcodeScannerModal = React.lazy(() => import('../../../components/BarcodeScannerModal'));
 
@@ -56,6 +58,10 @@ interface DocumentLinesSectionProps {
   warehouses: Array<{ id: number; name: string }>;
   /** وضع الحاسب المحمول — يضغط عروض أعمدة الجدول ليتسع على شاشات 1366px. */
   compact?: boolean;
+  onQuickCreate?: (payload: QuickCreatePayload) => void;
+  productTypes?: ProductType[];
+  tvas?: Tva[];
+  units?: Unit[];
 }
 
 export default function DocumentLinesSection({
@@ -70,6 +76,7 @@ export default function DocumentLinesSection({
   setShowBulkImport, onOcrInvoice, onOcrImage, slug,
   affectsStock, stockDir, onRefreshStock,
   warehouses, compact = false,
+  onQuickCreate, productTypes, tvas, units,
 }: DocumentLinesSectionProps) {
   const [stockAlertOpen, setStockAlertOpen] = useState(true);
   const notify = useNotification();
@@ -574,6 +581,11 @@ export default function DocumentLinesSection({
                     onUpdate={updateLine}
                     onRemove={removeLine}
                     onDuplicate={duplicateLine}
+                    onQuickCreate={onQuickCreate}
+                    productTypes={productTypes}
+                    tvas={tvas}
+                    units={units}
+                    isLoadingProducts={isLoadingProducts}
                   />
                 );
               })}
@@ -617,6 +629,11 @@ export default function DocumentLinesSection({
                         isTvaExempt={!isPurchase && isPartyExempt}
                         lineWarnings={lineIdxWarnings}
                         warehouses={warehouses}
+                        onQuickCreate={onQuickCreate}
+                        productTypes={productTypes}
+                        tvas={tvas}
+                        units={units}
+                        isLoadingProducts={isLoadingProducts}
                       />
                     );
                   })}

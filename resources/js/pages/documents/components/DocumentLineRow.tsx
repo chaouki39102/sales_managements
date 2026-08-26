@@ -1,9 +1,11 @@
 import { memo, useState, useRef, useCallback } from 'react';
 import { calcLineTotal, fmtDZD, toNum } from '../utils/document.utils';
 import { ProductSearch } from './ProductSearch';
+import type { QuickCreatePayload } from './ProductSearch';
 import { LotCell } from './LotCell';
 import { cellStyle } from './DocumentUIPrimitives';
 import type { LineItem, Product, ColKey } from '../types/document.types';
+import type { ProductType, Tva, Unit } from '@/lib/api/core/types';
 import type { LineStockValidation } from '../utils/document.utils';
 import type { ComputeLineWarning } from '../hooks/useComputeLine';
 
@@ -27,6 +29,11 @@ interface DocumentLineRowProps {
   isTvaExempt?:   boolean;
   lineWarnings?:  ComputeLineWarning[];
   warehouses?:    WarehouseOption[];
+  onQuickCreate?: (payload: QuickCreatePayload) => void;
+  productTypes?:  ProductType[];
+  tvas?:          Tva[];
+  units?:         Unit[];
+  isLoadingProducts?: boolean;
 }
 
 function CellInput({
@@ -96,6 +103,7 @@ function TotalQtyInput({
 export const DocumentLineRow = memo(function DocumentLineRow({
   line, idx, visibleCols, isPurchase, disabled, products, stockData,
   stockValidation, onUpdate, onRemove, onDuplicate, isTvaExempt, lineWarnings, warehouses,
+  onQuickCreate, productTypes, tvas, units, isLoadingProducts,
 }: DocumentLineRowProps) {
 
   const { baseQty, gross: _gross, discountAmt, discPct: _discPct, ht, tva: _lineTva, ttc } = calcLineTotal(line);
@@ -156,6 +164,11 @@ export const DocumentLineRow = memo(function DocumentLineRow({
               stockData={stockData}
               triggerId={`doc-line-${idx}-product`}
               afterSelectFocusId={`doc-line-${idx}-qty`}
+              onQuickCreate={onQuickCreate}
+              productTypes={productTypes}
+              tvas={tvas}
+              units={units}
+              isLoadingProducts={isLoadingProducts}
             />
           </td>
         )}

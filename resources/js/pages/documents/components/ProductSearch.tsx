@@ -14,6 +14,18 @@ import { createPortal } from 'react-dom';
 import { getProductStock } from '../utils/document.utils';
 import { cellStyle } from './DocumentUIPrimitives';
 import type { Product } from '../types/document.types';
+import type { ProductType, Tva, Unit } from '@/lib/api/core/types';
+
+// ─── Quick-Create Payload ─────────────────────────────────────────────────────
+
+export interface QuickCreatePayload {
+  name:             string;
+  ref?:             string;
+  product_type_id:  number;
+  purchase_price_ht?: number;
+  tva_id?:          number;
+  unit_id?:         number;
+}
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -29,6 +41,16 @@ interface ProductSearchProps {
   triggerId?:  string;
   /** مُعرّف الخلية التي يُعاد إليها التركيز بعد الاختيار (كمية السطر عادةً). */
   afterSelectFocusId?: string;
+  /** إنشاء منتج جديد سريع — يُمرَّر مع بيانات المنتج الجديد. */
+  onQuickCreate?: (payload: QuickCreatePayload) => void;
+  /** أنواع المنتجات المتاحة (مطلوب عند وجود onQuickCreate). */
+  productTypes?: ProductType[];
+  /** نسب TVA المتاحة. */
+  tvas?: Tva[];
+  /** الوحدات المتاحة. */
+  units?: Unit[];
+  /** هل لا تزال قائمة المنتجات قيد التحميل؟ */
+  isLoadingProducts?: boolean;
 }
 
 // ─── Dropdown position ────────────────────────────────────────────────────────
@@ -51,11 +73,28 @@ export function ProductSearch({
   stockData   = {},
   triggerId,
   afterSelectFocusId,
+  onQuickCreate,
+  productTypes = [],
+  tvas         = [],
+  units        = [],
+  isLoadingProducts = false,
 }: ProductSearchProps) {
   const [open,  setOpen]  = useState(false);
   const [query, setQuery] = useState('');
   const [pos,   setPos]   = useState<DropdownPos>({ top: 0, right: 0, width: 320 });
   const [highlightedIdx, setHighlightedIdx] = useState(0);
+
+  // ── Quick-create form state ───────────────────────────────────────────────
+  const [showQuickCreate, setShowQuickCreate] = useState(false);
+  const [qcName, setQcName]             = useState('');
+  const [qcRef, setQcRef]               = useState('');
+  const [qcProductTypeId, setQcProductTypeId] = useState<number | ''>('');
+  const [qcPriceHt, setQcPriceHt]       = useState('');
+  const [qcTvaId, setQcTvaId]           = useState<number | ''>('');
+  const [qcUnitId, setQcUnitId]         = useState<number | ''>('');
+  const [qcSubmitting, setQcSubmitting] = useState(false);
+  const [qcError, setQcError]           = useState('');
+  const qcFormRef = useRef<HTMLFormElement>(null);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropRef    = useRef<HTMLDivElement>(null);
@@ -99,10 +138,13 @@ export function ProductSearch({
     if (!open) {
       calcPos();
       setOpen(true);
+      setShowQuickCreate(false);
+      setQcError('');
       setTimeout(() => inputRef.current?.focus(), 50);
     } else {
       setOpen(false);
       setQuery('');
+      setShowQuickCreate(false);
     }
   };
 
@@ -184,6 +226,53 @@ export function ProductSearch({
     setHighlightedIdx(0);
   }, [filtered.length]);
 
+  // ─── Quick-create handlers ────────────────────────────────────────────────
+
+  const startQuickCreate = () => {
+    setQcName(query.trim());
+    setQcRef('');
+    setQcProductTypeId(productTypes.length === 1 ? productTypes[0].id : '');
+    setQcPriceHt('');
+    setQcTvaId('');
+    setQcUnitId('');
+    setQcError('');
+    setShowQuickCreate(true);
+    setTimeout(() => qcFormRef.current?.querySelector<HTMLInputElement>('input')?.focus(), 50);
+  };
+
+  const handleQuickCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!qcName.trim() || !qcProductTypeId || !onQuickCreate) return;
+    setQcSubmitting(true);
+    setQcError('');
+    try {
+      onQuickCreate({
+        name:               qcName.trim(),
+        ref:                qcRef.trim() || undefined,
+        product_type_id:    Number(qcProductTypeId),
+        purchase_price_ht:  qcPriceHt ? Number(qcPriceHt) : undefined,
+        tva_id:             qcTvaId ? Number(qcTvaId) : undefined,
+        unit_id:            qcUnitId ? Number(qcUnitId) : undefined,
+      });
+      setShowQuickCreate(false);
+      setQuery('');
+      setOpen(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'حدث خطأ أثناء الإنشاء';
+      setQcError(msg);
+    } finally {
+      setQcSubmitting(false);
+    }
+  };
+
+  const defaultTva = tvas.find(t => t.is_default);
+  const canQuickCreate = !!onQuickCreate && query.trim().length > 0 && !isLoadingProducts;
+
+  const qcLabelStyle: React.CSSProperties = { display: 'block', fontSize: 10.5, fontWeight: 600, color: 'var(--t3)', marginBottom: 2 };
+  const qcInputStyle: React.CSSProperties = {
+    width: '100%', padding: '5px 7px', fontSize: 12, borderRadius: 6,
+    border: '1px solid var(--b2)', background: 'var(--bg1)', color: 'var(--t1)',
+  };
   // ─── Badge المخزون ────────────────────────────────────────────────────────
 
   const stockBadge = (p: Product): { label: string; color: string } | null => {
@@ -259,16 +348,164 @@ export function ProductSearch({
 
       {/* النتائج */}
       <div ref={listRef} style={{ maxHeight: 260, overflowY: 'auto' }}>
-        {filtered.length === 0
+        {filtered.length === 0 && !showQuickCreate
           ? (
-            <div style={{
-              padding: 16, textAlign: 'center',
-              color: 'var(--t4)', fontSize: 12,
-            }}>
-              لا توجد نتائج
+            <div style={{ padding: '10px 10px 6px' }}>
+              <div style={{ fontSize: 12, color: 'var(--t4)', textAlign: 'center', marginBottom: 6 }}>
+                لا توجد نتائج
+              </div>
+              {canQuickCreate && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); startQuickCreate(); }}
+                  style={{
+                    width: '100%', padding: '7px 10px',
+                    borderRadius: 'var(--r1)',
+                    border: '1px dashed var(--em)',
+                    background: 'color-mix(in srgb, var(--em) 6%, transparent)',
+                    color: 'var(--em)', fontSize: 12.5, fontWeight: 600,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                    justifyContent: 'center',
+                  }}
+                >
+                  <i className="ti ti-plus" style={{ fontSize: 14 }} />
+                  إنشاء منتج جديد: «{query.trim()}»
+                </button>
+              )}
             </div>
           )
-          : filtered.map((p, i) => {
+          : showQuickCreate
+            ? (
+              /* ── Quick-create inline form ── */
+              <form
+                ref={qcFormRef}
+                onSubmit={handleQuickCreateSubmit}
+                style={{ padding: '8px 10px 10px', borderBottom: '1px solid var(--b1)' }}
+              >
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--em)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <i className="ti ti-package" style={{ fontSize: 13 }} />
+                  إنشاء منتج جديد
+                </div>
+
+                {/* الاسم */}
+                <div style={{ marginBottom: 5 }}>
+                  <label style={qcLabelStyle}>الاسم *</label>
+                  <input
+                    value={qcName}
+                    onChange={e => setQcName(e.target.value)}
+                    required
+                    maxLength={150}
+                    style={qcInputStyle}
+                  />
+                </div>
+
+                {/* المرجع + نوع المنتج */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginBottom: 5 }}>
+                  <div>
+                    <label style={qcLabelStyle}>المرجع</label>
+                    <input
+                      value={qcRef}
+                      onChange={e => setQcRef(e.target.value)}
+                      maxLength={50}
+                      style={qcInputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={qcLabelStyle}>النوع *</label>
+                    <select
+                      value={qcProductTypeId}
+                      onChange={e => setQcProductTypeId(e.target.value ? Number(e.target.value) : '')}
+                      required
+                      style={qcInputStyle}
+                    >
+                      <option value="">— اختر —</option>
+                      {productTypes.map(pt => (
+                        <option key={pt.id} value={pt.id}>{pt.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* السعر + TVA + الوحدة */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
+                  <div>
+                    <label style={qcLabelStyle}>سعر HT</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={qcPriceHt}
+                      onChange={e => setQcPriceHt(e.target.value)}
+                      style={qcInputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={qcLabelStyle}>TVA</label>
+                    <select
+                      value={qcTvaId}
+                      onChange={e => setQcTvaId(e.target.value ? Number(e.target.value) : '')}
+                      style={qcInputStyle}
+                    >
+                      <option value="">{defaultTva ? `${defaultTva.rate}%` : '—'}</option>
+                      {tvas.filter(t => t.id !== defaultTva?.id).map(t => (
+                        <option key={t.id} value={t.id}>{t.name} ({t.rate}%)</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={qcLabelStyle}>الوحدة</label>
+                    <select
+                      value={qcUnitId}
+                      onChange={e => setQcUnitId(e.target.value ? Number(e.target.value) : '')}
+                      style={qcInputStyle}
+                    >
+                      <option value="">—</option>
+                      {units.map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {qcError && (
+                  <div style={{ fontSize: 11, color: 'var(--red)', marginBottom: 6 }}>
+                    {qcError}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 5 }}>
+                  <button
+                    type="submit"
+                    disabled={qcSubmitting || !qcName.trim() || !qcProductTypeId}
+                    style={{
+                      flex: 1, padding: '6px 0',
+                      borderRadius: 'var(--r1)',
+                      border: 'none',
+                      background: 'var(--em)', color: '#fff',
+                      fontSize: 12, fontWeight: 600,
+                      cursor: qcSubmitting ? 'wait' : 'pointer',
+                      opacity: qcSubmitting || !qcName.trim() || !qcProductTypeId ? 0.6 : 1,
+                    }}
+                  >
+                    {qcSubmitting ? 'جاري الإنشاء...' : 'إنشاء وتحديد'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowQuickCreate(false); setQcError(''); }}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 'var(--r1)',
+                      border: '1px solid var(--b2)',
+                      background: 'var(--bg2)', color: 'var(--t3)',
+                      fontSize: 12, cursor: 'pointer',
+                    }}
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </form>
+            )
+            : filtered.map((p, i) => {
               const badge      = stockBadge(p);
               const isSelected = String(p.id) === value;
               const isHighlighted = i === highlightedIdx;

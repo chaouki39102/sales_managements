@@ -1,7 +1,9 @@
 
 import { fmtDZD, calcLineTotal, getProductStock, toNum } from '../utils/document.utils';
 import { ProductSearch } from './ProductSearch';
+import type { QuickCreatePayload } from './ProductSearch';
 import type { LineItem, Product } from '../types/document.types';
+import type { ProductType, Tva, Unit } from '@/lib/api/core/types';
 import type { LineStockValidation } from '../utils/document.utils';
 import type { ComputeLineWarning } from '../hooks/useComputeLine';
 
@@ -19,12 +21,18 @@ interface LineCardProps {
   onUpdate:        (idx: number, patch: Partial<LineItem>, product?: Product | null) => void;
   onRemove:        (idx: number) => void;
   onDuplicate:     (idx: number) => void;
+  onQuickCreate?:  (payload: QuickCreatePayload) => void;
+  productTypes?:   ProductType[];
+  tvas?:           Tva[];
+  units?:          Unit[];
+  isLoadingProducts?: boolean;
 }
 
 export function LineCard({
   line, idx, products, isPurchase, disabled, stockData, stockValidation,
   isTvaExempt, lineWarnings, warehouses,
   onUpdate, onRemove, onDuplicate,
+  onQuickCreate, productTypes, tvas, units, isLoadingProducts,
 }: LineCardProps) {
   const prod = products.find((p) => String(p.id) === line.product_id) ?? line._product;
   const { baseQty, gross: _gross, ht, tva, ttc, discountAmt, discPct: _discPct } = calcLineTotal(line);
@@ -107,6 +115,11 @@ export function LineCard({
               stockData={stockData}
               triggerId={`doc-line-${idx}-product`}
               afterSelectFocusId={`doc-line-${idx}-qty`}
+              onQuickCreate={onQuickCreate}
+              productTypes={productTypes}
+              tvas={tvas}
+              units={units}
+              isLoadingProducts={isLoadingProducts}
             />
             {stockBadge && (
               <span style={{

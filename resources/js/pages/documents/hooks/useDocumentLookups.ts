@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
 import type { Product, Party, PaymentMode, TreasuryAccount } from '../types/document.types';
+import type { ProductType, Unit, Tva } from '@/lib/api/core/types';
 
 function extractList(data: unknown): unknown[] {
   if (!data) return [];
@@ -126,6 +127,33 @@ export function useDocumentLookups({
     staleTime: 2 * 60_000,
   });
 
+  // ── Product Types (for quick-create) ────────────────────────────────────
+  const { data: productTypesRaw = [] } = useQuery({
+    queryKey:  [slug, 'modal-product-types'],
+    queryFn:   () => apiGet<unknown>('/product-types', { per_page: 100 }).then(extractList),
+    enabled:   open && !!slug,
+    staleTime: 30 * 60_000,
+  });
+  const productTypes = productTypesRaw as ProductType[];
+
+  // ── TVA rates (for quick-create) ────────────────────────────────────────
+  const { data: tvasRaw = [] } = useQuery({
+    queryKey:  [slug, 'modal-tvas'],
+    queryFn:   () => apiGet<unknown>('/tvas', { per_page: 50 }).then(extractList),
+    enabled:   open && !!slug,
+    staleTime: 30 * 60_000,
+  });
+  const tvas = tvasRaw as Tva[];
+
+  // ── Units (for quick-create) ────────────────────────────────────────────
+  const { data: unitsRaw = [] } = useQuery({
+    queryKey:  [slug, 'modal-units'],
+    queryFn:   () => apiGet<unknown>('/units', { per_page: 50 }).then(extractList),
+    enabled:   open && !!slug,
+    staleTime: 30 * 60_000,
+  });
+  const units = unitsRaw as Unit[];
+
   // ── Derived Defaults ──────────────────────────────────────────────────────
   const defaultWarehouseId = useMemo(() => {
     const dw = warehouses.find(w => w.is_default) ?? warehouses[0];
@@ -147,6 +175,7 @@ export function useDocumentLookups({
     paymentModes, priceLevels, treasuryAccounts,
     stockData, refetchStock,
     isLoadingProducts,
+    productTypes, tvas, units,
     defaultWarehouseId, baseCurrencyId, defaultTvaRate,
   };
 }

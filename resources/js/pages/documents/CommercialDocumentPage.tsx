@@ -145,6 +145,34 @@ export default function CommercialDocumentPage() {
     if (file) setOcrFile(file);
   };
 
+  // ── إنشاء منتج سريع من بحث المنتجات ──────────────────────────────────────
+  const handleQuickCreateProduct = useCallback(async (payload: import('./components/ProductSearch').QuickCreatePayload) => {
+    const { productsApi } = await import('@/lib/api/endpoints/products');
+    try {
+      const saved = await productsApi.create({
+        name:               payload.name,
+        ref:                payload.ref,
+        product_type_id:    payload.product_type_id,
+        purchase_price_ht:  payload.purchase_price_ht,
+        tva_id:             payload.tva_id,
+        unit_id:            payload.unit_id,
+      });
+      // تحديث ذاكرة التخزين المؤقت للمنتجات
+      if (slug) {
+        await qc.invalidateQueries({ queryKey: [slug, 'modal-products-v3'] });
+        await qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
+      }
+      // تحديد المنتج الجديد في السطر
+      if (saved && (saved as any).id) {
+        addLineWithProduct(String((saved as any).id), payload.purchase_price_ht);
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Quick create product failed:', err);
+      throw err;
+    }
+  }, [slug, qc, addLineWithProduct]);
+
   // ── وضع الحاسب المحمول (≤1500px): ضغط الأعمدة والأزرار تلقائياً ───────────
   const [compact, setCompact] = useState<boolean>(
     () => window.matchMedia('(max-width: 1500px)').matches,
@@ -539,6 +567,10 @@ export default function CommercialDocumentPage() {
             warehouses={lookups.warehouses as Array<{ id: number; name: string }>}
             compact={compact}
             onRefreshStock={refetchStock}
+            onQuickCreate={handleQuickCreateProduct}
+            productTypes={lookups.productTypes}
+            tvas={lookups.tvas}
+            units={lookups.units}
           />
         </div>
       </div>
