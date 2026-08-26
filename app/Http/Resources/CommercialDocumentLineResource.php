@@ -36,6 +36,7 @@ class CommercialDocumentLineResource extends JsonResource
             'is_auto_split'            => $this->is_auto_split,
             'parent_line_id'           => $this->parent_line_id,
             'line_attributes'          => $this->line_attributes,
+            'notes'                    => $this->notes,
             'created_at'               => $this->created_at,
             'updated_at'               => $this->updated_at,
 

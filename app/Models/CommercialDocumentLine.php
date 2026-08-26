@@ -45,6 +45,7 @@ class CommercialDocumentLine extends Model
         'line_attributes',
         'packaging_id',
         'packaging_units_snapshot',
+        'notes',
     ];
 
     protected $casts = [

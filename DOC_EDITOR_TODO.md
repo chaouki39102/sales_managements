@@ -29,11 +29,11 @@ Add "إنشاء منتج جديد" button at bottom of product search dropdown w
 - **Files**: `ProductSearch.tsx` (inline form + `QuickCreatePayload`), `useDocumentLookups.ts` (+productTypes/tvas/units queries), `DocumentLineRow.tsx`/`LineCard.tsx` (+props), `DocumentLinesSection.tsx` (+props passthrough), `CommercialDocumentPage.tsx`/`CommercialDocumentModal/index.tsx` (creation callback + cache invalidation).
 - Commit: `ab01d09`
 
-## Task 3 — Line Templates / Frequently Bought Together
+## Task 3 — Line Templates / Frequently Bought Together ✅ DONE
 Save current lines as a reusable template, load template into current doc.
 - Backend: `document_line_templates` table (company_id, name, lines JSON).
 - Frontend: "حفظ كقالب" + "تحميل قالب" buttons above lines.
-- Status: ⏳
+- Commit: `b8fe0d1`
 
 ## Task 4 — Line Notes / Internal Comments
 Each line gets an optional internal note (not printed on invoice, visible to admin only).

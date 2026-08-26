@@ -673,6 +673,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 'packaging_units_snapshot' => $packagingUnitsSnapshot,
                 'stock_lot_id'           => $lineData['stock_lot_id'] ?? null,
                 'line_attributes'        => $this->buildLineAttributes($lineData),
+                'notes'                  => $lineData['notes'] ?? null,
             ]);
         }
     }
