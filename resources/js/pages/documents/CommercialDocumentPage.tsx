@@ -82,7 +82,7 @@ export default function CommercialDocumentPage() {
     lookups, lookupsReady,
     form, errors, lineErr, apiErr,
     set, handlePriceLevelChange,
-    addLine, addLineWithProduct, removeLine, duplicateLine, updateLine,
+    addLine, addLineWithProduct, removeLine, duplicateLine, moveLine, updateLine,
     pmMode, payments,
     bulkAddLines, addPayment, addPaymentWithValues, removePayment, updatePayment,
     partyBalance, isLoadingBalance,
@@ -92,7 +92,7 @@ export default function CommercialDocumentPage() {
     lineWarnings,
     priceLevelSwitchMsg,
     isLocked, isCancelled, isValidated,
-    stockData, warehouseIdNum,
+    stockData, warehouseIdNum, refetchStock,
     docNumber, docNumberErr, checkingDocNumber, handleDocNumberChange,
     partyChangeWarning, setPartyChangeWarning,
     showReturnModal, setShowReturnModal,
@@ -520,6 +520,7 @@ export default function CommercialDocumentPage() {
             addLineWithProduct={addLineWithProduct}
             removeLine={removeLine}
             duplicateLine={duplicateLine}
+            moveLine={moveLine}
             updateLine={updateLine as any}
             lineErr={lineErr}
             savedDraft={savedDraft}
@@ -537,6 +538,7 @@ export default function CommercialDocumentPage() {
             stockDir={stockDir}
             warehouses={lookups.warehouses as Array<{ id: number; name: string }>}
             compact={compact}
+            onRefreshStock={refetchStock}
           />
         </div>
       </div>

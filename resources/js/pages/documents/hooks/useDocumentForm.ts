@@ -142,6 +142,7 @@ export interface UseDocumentFormReturn {
   bulkAddLines:           (importedLines: Array<{product_id?: string; description?: string; unit_price_ht?: number; quantity?: number; tva_rate?: number; line_note?: string}>) => void;
   removeLine:             (idx: number) => void;
   duplicateLine:          (idx: number) => void;
+  moveLine:               (fromIdx: number, toIdx: number) => void;
   updateLine:             (idx: number, patch: Partial<LineItem>, product?: Product | null) => void;
   paymentMode:            PaymentMode;
   payments:               PaymentEntry[];
@@ -998,6 +999,17 @@ export function useDocumentForm({
     });
   }, []);
 
+  const moveLine = useCallback((fromIdx: number, toIdx: number) => {
+    setForm((f) => {
+      if (fromIdx < 0 || fromIdx >= f.lines.length) return f;
+      if (toIdx < 0 || toIdx >= f.lines.length) return f;
+      const lines = [...f.lines];
+      const [moved] = lines.splice(fromIdx, 1);
+      lines.splice(toIdx, 0, moved);
+      return { ...f, lines };
+    });
+  }, []);
+
   // ── _clientRef generator (frontend-only idempotency token) ────────────────
 
   function genClientRef(): string {
@@ -1239,7 +1251,7 @@ export function useDocumentForm({
   return {
     form, errors, lineErr, apiErr, setApiErr,
     set, handlePartyChange, handlePriceLevelChange, priceLevelId,
-    addLine, addLineWithProduct, bulkAddLines, removeLine, duplicateLine, updateLine,
+    addLine, addLineWithProduct, bulkAddLines, removeLine, duplicateLine, moveLine, updateLine,
     paymentMode: pmMode,
     payments,
     addPayment, addPaymentWithValues, removePayment, updatePayment,

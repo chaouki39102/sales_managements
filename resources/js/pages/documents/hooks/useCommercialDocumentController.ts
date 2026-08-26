@@ -156,7 +156,7 @@ export function useCommercialDocumentController({
   const {
     form, errors, lineErr, apiErr, setApiErr,
     set, handlePartyChange, handlePriceLevelChange, priceLevelId,
-    addLine, addLineWithProduct, removeLine, duplicateLine, updateLine,
+    addLine, addLineWithProduct, removeLine, duplicateLine, moveLine, updateLine,
     paymentMode: pmMode,
     payments,
     bulkAddLines,
@@ -203,7 +203,7 @@ export function useCommercialDocumentController({
   // ─── Stock query ──────────────────────────────────────────────────────────
 
   const warehouseIdNum = form.warehouse_id ? parseInt(form.warehouse_id) : null;
-  const { data: stockData = {} } = useQuery<Record<number, number>>({
+  const { data: stockData = {}, refetch: refetchStock } = useQuery<Record<number, number>>({
     queryKey: [slug, 'warehouse-stock', warehouseIdNum, selectedYear?.id],
     queryFn:  () =>
       apiGet<unknown[]>('/inventory/stock-at', {
@@ -656,7 +656,7 @@ export function useCommercialDocumentController({
     // Form
     form, errors, lineErr, apiErr, setApiErr,
     set, handlePartyChange, handlePriceLevelChange, priceLevelId,
-    addLine, addLineWithProduct, removeLine, duplicateLine, updateLine,
+    addLine, addLineWithProduct, removeLine, duplicateLine, moveLine, updateLine,
     pmMode, payments,
     bulkAddLines, addPayment, addPaymentWithValues, removePayment, updatePayment,
     partyBalance, isLoadingBalance,
@@ -670,7 +670,7 @@ export function useCommercialDocumentController({
     docStatusName, isLocked, isCancelled, isValidated,
 
     // Stock
-    stockData, warehouseIdNum,
+    stockData, warehouseIdNum, refetchStock,
 
     // Document number
     docNumber, docNumberErr, checkingDocNumber, handleDocNumberChange,

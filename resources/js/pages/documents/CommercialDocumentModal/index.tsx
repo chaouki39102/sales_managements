@@ -61,7 +61,7 @@ export default function CommercialDocumentModal({
     lookups, lookupsReady,
     form, errors, lineErr, apiErr,
     set, handlePriceLevelChange,
-    addLine, addLineWithProduct, removeLine, duplicateLine, updateLine,
+    addLine, addLineWithProduct, removeLine, duplicateLine, moveLine, updateLine,
     pmMode, payments,
     bulkAddLines, addPayment, addPaymentWithValues, removePayment, updatePayment,
     partyBalance, isLoadingBalance,
@@ -384,6 +384,7 @@ export default function CommercialDocumentModal({
             addLineWithProduct={addLineWithProduct}
             removeLine={removeLine}
             duplicateLine={duplicateLine}
+            moveLine={moveLine}
             updateLine={updateLine as any}
             lineErr={lineErr}
             savedDraft={savedDraft}

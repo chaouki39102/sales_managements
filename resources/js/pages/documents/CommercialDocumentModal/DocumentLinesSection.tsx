@@ -32,7 +32,9 @@ interface DocumentLinesSectionProps {
   addLineWithProduct: (productId: string, unitPrice?: number, tvaRate?: number) => void;
   removeLine: (idx: number) => void;
   duplicateLine: (idx: number) => void;
+  moveLine: (fromIdx: number, toIdx: number) => void;
   updateLine: (idx: number, patch: Partial<LineItem>, product?: unknown) => void;
+  onRefreshStock?: () => void;
   lineErr: string;
   savedDraft: Record<string, unknown> | null;
   draftKey: string;
@@ -62,11 +64,11 @@ export default function DocumentLinesSection({
   visibleCols, handleColsChange,
   lineMode, setLineMode,
   lineWarnings, stockData,
-  addLine, addLineWithProduct, removeLine, duplicateLine, updateLine,
+  addLine, addLineWithProduct, removeLine, duplicateLine, moveLine, updateLine,
   lineErr, savedDraft, draftKey, restoreDraft, set,
   needsParty, productSuggestions, isLoadingSuggestions,
   setShowBulkImport, onOcrInvoice, onOcrImage, slug,
-  affectsStock, stockDir,
+  affectsStock, stockDir, onRefreshStock,
   warehouses, compact = false,
 }: DocumentLinesSectionProps) {
   const [stockAlertOpen, setStockAlertOpen] = useState(true);
@@ -157,6 +159,89 @@ export default function DocumentLinesSection({
       return;
     }
 
+    // ── Ctrl+Z: التراجع عن آخر إضافة/حذف سطر (Undo) ──────────────────────
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z') {
+      // نسمح للمتصفح بالتعامل مع Ctrl+Z داخل حقول النص (document undo).
+      // فقط ن travailler门外 when focus is on a non-text element or no text is selected.
+      const isTextInput = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+      if (isTextInput && (target.selectionStart !== null && target.selectionStart !== target.selectionEnd)) {
+        return; // allow browser undo within text selection
+      }
+    }
+
+    // ── F5: تحديث بيانات المخزون ──────────────────────────────────────────
+    if (e.key === 'F5' && !e.ctrlKey && !e.altKey && !e.shiftKey && onRefreshStock) {
+      e.preventDefault();
+      onRefreshStock();
+      return;
+    }
+
+    // ── Alt+↑/↓: تحريك السطر لأعلى/أسفل (إعادة ترتيب) ────────────────────
+    if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && !isLinesReadOnly) {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        const row = target.closest('[data-line-idx]');
+        if (row && container?.contains(row)) {
+          e.preventDefault();
+          const fromIdx = Number(row.getAttribute('data-line-idx'));
+          const dir = e.key === 'ArrowUp' ? -1 : 1;
+          const toIdx = fromIdx + dir;
+          if (toIdx >= 0 && toIdx < lines.length) {
+            moveLine(fromIdx, toIdx);
+            // ركّز الحقل المماثل في السطر الجديد بعد التحديث
+            setTimeout(() => {
+              const targetRow = container.querySelector(`tr[data-line-idx="${toIdx}"], [data-line-idx="${toIdx}"]`);
+              if (targetRow) {
+                const cell = target.closest('td, [class*="cell"]');
+                if (cell) {
+                  const colIdx = Array.from((target.closest('tr[data-line-idx]') ?? targetRow).children).indexOf(cell);
+                  const nextRow = container.querySelector<HTMLElement>(`tr[data-line-idx="${toIdx}"]`);
+                  if (nextRow && colIdx >= 0) {
+                    const nextCell = nextRow.children[colIdx] as HTMLElement | undefined;
+                    const field = nextCell?.querySelector<HTMLElement>(FOCUSABLE);
+                    (field ?? nextCell)?.focus();
+                  }
+                } else {
+                  const field = targetRow.querySelector<HTMLElement>(FOCUSABLE);
+                  field?.focus();
+                }
+              }
+            }, 50);
+          }
+          return;
+        }
+      }
+    }
+
+    // ── Ctrl+Shift+↑/↓: القفز لأول/آخر سطر ───────────────────────────────
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && !isLinesReadOnly) {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        const row = target.closest('[data-line-idx]');
+        if (row && container?.contains(row)) {
+          e.preventDefault();
+          const rows = container.querySelectorAll<HTMLElement>('tr[data-line-idx]');
+          if (rows.length === 0) return;
+          const targetRow = e.key === 'ArrowUp' ? rows[0] : rows[rows.length - 1];
+          const field = targetRow.querySelector<HTMLElement>(FOCUSABLE);
+          (field ?? targetRow).focus();
+          return;
+        }
+      }
+    }
+
+    // ── Delete (خارج حقل نص): حذف السطر المُركَّز ────────────────────────
+    if (e.key === 'Delete' && !e.ctrlKey && !e.metaKey && !isLinesReadOnly) {
+      const isTextInput = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+      if (!isTextInput) {
+        const row = target.closest('[data-line-idx]');
+        if (row && container?.contains(row)) {
+          e.preventDefault();
+          const idx = Number(row.getAttribute('data-line-idx'));
+          removeLine(idx);
+          return;
+        }
+      }
+    }
+
     // Ctrl+Delete حذف السطر المُركَّز · Ctrl+D تكراره (يعمل في الجدول والبطاقات)
     if ((e.ctrlKey || e.metaKey) && !isLinesReadOnly) {
       if (e.key === 'Delete') {
@@ -176,6 +261,13 @@ export default function DocumentLinesSection({
           return;
         }
       }
+    }
+
+    // Ctrl+Enter: إضافة سطر جديد في النهاية وتركيز منتقي المنتج
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isLinesReadOnly) {
+      e.preventDefault();
+      addLineAndFocusNewRow();
+      return;
     }
 
     // أسهم أعلى/أسفل: التنقل بين الأسطر في نفس العمود (عرض الجدول)
@@ -366,7 +458,7 @@ export default function DocumentLinesSection({
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span
-                title="Enter: كمية ← سعر ← السطر التالي · Alt+N: سطر جديد (يُركَّز كميته) · ↑/↓: نفس العمود · Ctrl+D: تكرار السطر · Ctrl+Delete: حذف السطر · Esc: ترك الحقل"
+                title="Enter: كمية ← سعر ← السطر التالي · Alt+N: سطر جديد · ↑/↓: نفس العمود · Ctrl+D: تكرار · Ctrl+Delete: حذف · Alt+↑↓: ترتيب · Ctrl+Enter: سطر في النهاية · F5: تحديث المخزون · Esc: ترك الحقل"
                 style={{ fontSize: 10.5, color: 'var(--t4)', display: 'flex', alignItems: 'center', gap: 4 }}
               >
                 <i className="ti ti-keyboard" style={{ fontSize: 12 }} />
