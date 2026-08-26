@@ -428,6 +428,7 @@ export default function CommercialDocumentModal({
             productTypes={lookups.productTypes}
             tvas={lookups.tvas}
             units={lookups.units}
+            bulkAddLines={bulkAddLines}
           />
 
           {/* ═══ SECTION 3: الدفعات ═══ */}

@@ -12,6 +12,8 @@ import { validateLineStock } from '../utils/document.utils';
 import { focusDocLineCell } from '../utils/focusDocLineCell';
 import { useBarcodeScan } from '../../../hooks/useBarcodeScan';
 import { useNotification } from '../../../hooks/useNotification';
+import { useLineTemplates, useLineTemplateMutations } from '@/lib/api/endpoints/lineTemplates';
+import type { LineTemplate, LineTemplateLine } from '@/lib/api/endpoints/lineTemplates';
 import type { ProductType, Tva, Unit } from '@/lib/api/core/types';
 
 const BarcodeScannerModal = React.lazy(() => import('../../../components/BarcodeScannerModal'));
@@ -62,6 +64,7 @@ interface DocumentLinesSectionProps {
   productTypes?: ProductType[];
   tvas?: Tva[];
   units?: Unit[];
+  bulkAddLines?: (lines: Array<{ product_id?: string; description?: string; unit_price_ht?: number; quantity?: number; tva_rate?: number; line_note?: string }>) => void;
 }
 
 export default function DocumentLinesSection({
@@ -77,9 +80,70 @@ export default function DocumentLinesSection({
   affectsStock, stockDir, onRefreshStock,
   warehouses, compact = false,
   onQuickCreate, productTypes, tvas, units,
+  bulkAddLines,
 }: DocumentLinesSectionProps) {
   const [stockAlertOpen, setStockAlertOpen] = useState(true);
   const notify = useNotification();
+
+  // ── قوالب الأسطر ──────────────────────────────────────────────────────────
+  const { data: templates, isLoading: isLoadingTemplates } = useLineTemplates();
+  const templateMut = useLineTemplateMutations();
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateModalMode, setTemplateModalMode] = useState<'save' | 'load'>('save');
+  const saveTemplateDisabled = !templateName.trim() || !lines.length || templateMut.create.isPending;
+
+  const handleSaveTemplate = async () => {
+    const name = templateName.trim();
+    if (!name) return;
+    const payload: LineTemplateLine[] = lines.map((l) => ({
+      product_id:            l.product_id,
+      description:           l.description,
+      quantity:              l.quantity,
+      unit_price_ht:         l.unit_price_ht,
+      discount_percentage:   l.discount_percentage,
+      discount_amount_fixed: l.discount_amount_fixed || 0,
+      tva_rate:              l.tva_rate,
+      packaging_id:          l.packaging_id || '',
+      line_note:             l.line_note || '',
+      _packQty:              l._packQty || 1,
+    }));
+    try {
+      await templateMut.create.mutateAsync({ name, lines: payload });
+      notify.success(`تم حفظ القالب «${name}»`);
+      setShowTemplateModal(false);
+      setTemplateName('');
+    } catch {
+      notify.error('فشل حفظ القالب');
+    }
+  };
+
+  const handleLoadTemplate = (tpl: LineTemplate) => {
+    if (!bulkAddLines) return;
+    bulkAddLines(tpl.lines);
+    notify.success(`تم تحميل القالب «${tpl.name}»`);
+    setShowTemplateModal(false);
+  };
+
+  const handleDeleteTemplate = async (tpl: LineTemplate) => {
+    try {
+      await templateMut.remove.mutateAsync(tpl.id);
+      notify.success(`تم حذف القالب «${tpl.name}»`);
+    } catch {
+      notify.error('فشل حذف القالب');
+    }
+  };
+
+  const openSaveModal = () => {
+    setTemplateModalMode('save');
+    setTemplateName('');
+    setShowTemplateModal(true);
+  };
+
+  const openLoadModal = () => {
+    setTemplateModalMode('load');
+    setShowTemplateModal(true);
+  };
 
   // ── مسح الباركود بالكاميرا: إضافة المنتج الممسوح كسطر مباشرة ──────────────
   const scanner = useBarcodeScan<{ id: number; name: string; ref?: string | null; barcode?: string | null }>({
@@ -705,6 +769,40 @@ export default function DocumentLinesSection({
                 استيراد من صورة
               </button>
             )}
+            {!isLinesReadOnly && (
+              <>
+                <button
+                  onClick={openLoadModal}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '7px 14px', borderRadius: 'var(--r2)',
+                    border: '1px dashed var(--b3)', background: 'transparent',
+                    color: 'var(--t3)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--teal)'; e.currentTarget.style.color = 'var(--teal)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--b3)'; e.currentTarget.style.color = 'var(--t3)'; }}
+                >
+                  <i className="ti ti-template" />
+                  تحميل قالب
+                </button>
+                {lines.length > 0 && (
+                  <button
+                    onClick={openSaveModal}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '7px 14px', borderRadius: 'var(--r2)',
+                      border: '1px dashed var(--b3)', background: 'transparent',
+                      color: 'var(--t3)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--em)'; e.currentTarget.style.color = 'var(--em)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--b3)'; e.currentTarget.style.color = 'var(--t3)'; }}
+                  >
+                    <i className="ti ti-bookmark" />
+                    حفظ كقالب
+                  </button>
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -730,6 +828,91 @@ export default function DocumentLinesSection({
             hint="صوّب الكاميرا على باركود المنتج ليُضاف كسطر تلقائياً"
           />
         </React.Suspense>
+      )}
+
+      {/* ═══ قالب الأسطر — حفظ / تحميل ═══ */}
+      {showTemplateModal && (
+        <div className="ov" style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowTemplateModal(false); }}>
+          <div style={{ background: 'var(--bg1)', borderRadius: 'var(--r3)', width: '100%', maxWidth: 520, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 32px rgba(0,0,0,.25)' }}
+            onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--b2)' }}>
+              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--t1)' }}>
+                {templateModalMode === 'save' ? 'حفظ الأسطر كقالب' : 'تحميل قالب'}
+              </h3>
+              <button onClick={() => setShowTemplateModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--t3)', padding: 4 }}>
+                <i className="ti ti-x" />
+              </button>
+            </div>
+            {/* Body */}
+            <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
+              {templateModalMode === 'save' ? (
+                <div>
+                  <label style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--t2)', marginBottom: 6 }}>
+                    اسم القالب
+                  </label>
+                  <input
+                    autoFocus
+                    value={templateName}
+                    onChange={(e) => setTemplateName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !saveTemplateDisabled) handleSaveTemplate(); }}
+                    placeholder="مثال: منتجات مكتبية، طلبات شهرية…"
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 'var(--r2)', border: '1px solid var(--b3)', fontSize: 13, boxSizing: 'border-box' }}
+                  />
+                  <div style={{ marginTop: 8, fontSize: 12, color: 'var(--t3)' }}>
+                    سيتم حفظ {lines.length} سطر/سطور في القالب.
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  {isLoadingTemplates ? (
+                    <div style={{ textAlign: 'center', padding: 24, color: 'var(--t3)' }}>جاري التحميل…</div>
+                  ) : !templates?.length ? (
+                    <div style={{ textAlign: 'center', padding: 24, color: 'var(--t3)' }}>
+                      <i className="ti ti-template-off" style={{ fontSize: 28, display: 'block', marginBottom: 8, opacity: 0.4 }} />
+                      لا توجد قوالب محفوظة بعد
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {templates.map((tpl) => (
+                        <div key={tpl.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 'var(--r2)', border: '1px solid var(--b2)', cursor: 'pointer', transition: 'border-color .15s' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--em)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--b2)'; }}>
+                          <div onClick={() => handleLoadTemplate(tpl)} style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--t1)' }}>{tpl.name}</div>
+                            <div style={{ fontSize: 11.5, color: 'var(--t3)', marginTop: 2 }}>
+                              {tpl.lines.length} سطر · {new Date(tpl.created_at).toLocaleDateString('ar-DZ')}
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(tpl); }}
+                            title="حذف القالب"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', padding: 4, fontSize: 14 }}
+                          >
+                            <i className="ti ti-trash" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            {/* Footer */}
+            {templateModalMode === 'save' && (
+              <div style={{ padding: '10px 16px', borderTop: '1px solid var(--b2)', display: 'flex', justifyContent: 'flex-start', gap: 8 }}>
+                <button onClick={handleSaveTemplate} disabled={saveTemplateDisabled}
+                  className="btn btn-p"
+                  style={{ opacity: saveTemplateDisabled ? 0.5 : 1, cursor: saveTemplateDisabled ? 'default' : 'pointer' }}>
+                  {templateMut.create.isPending ? 'جاري الحفظ…' : 'حفظ القالب'}
+                </button>
+                <button onClick={() => setShowTemplateModal(false)} className="btn btn-b">إلغاء</button>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </Section>
   );

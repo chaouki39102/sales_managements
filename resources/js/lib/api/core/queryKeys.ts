@@ -132,6 +132,13 @@ export const tenantKeys = {
       [slug, 'documents', code, p]                                                                  as const,
   },
 
+  // ── Line Templates (قوالب أسطر المستندات) ───────────────────────────────
+  lineTemplates: {
+    all:    (slug: string)                              => [slug, 'line-templates']                 as const,
+    list:   (slug: string)                              => [slug, 'line-templates', 'list']         as const,
+    detail: (slug: string, id: number)                  => [slug, 'line-templates', id]             as const,
+  },
+
   // ── Payments ──────────────────────────────────────────────────────────────
   payments: {
     all:  (slug: string)                              => [slug, 'payments']                         as const,

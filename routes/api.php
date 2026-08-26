@@ -51,6 +51,7 @@ use App\Http\Controllers\Api\V1\G50DeclarationController;
 use App\Http\Controllers\Api\V1\IFUDeclarationController;
 use App\Http\Controllers\Api\V1\PrintTemplateController;
 use App\Http\Controllers\Api\V1\PdfExportController;
+use App\Http\Controllers\Api\V1\DocumentLineTemplateController;
 use App\Http\Controllers\Api\V1\Portal\PortalAuthController;
 use App\Http\Controllers\Api\V1\Portal\PortalController;
 use App\Http\Controllers\Api\V1\Portal\PortalAccessController;
@@ -785,6 +786,9 @@ Route::prefix('v1')->group(function () {
             Route::post('print-templates/{id}/set-default',  [PrintTemplateController::class, 'setDefault']);
             Route::post('print-templates/{id}/duplicate',    [PrintTemplateController::class, 'duplicate']);
             Route::post('print-templates/upload-logo',       [PrintTemplateController::class, 'uploadLogo']);
+
+            // line-templates: قوالب أسطر المستندات — CRUD كامل
+            Route::apiResource('line-templates', DocumentLineTemplateController::class);
 
             // pdf-export: تصدير PDF من HTML معبأ
             Route::post('pdf/export',                        [PdfExportController::class, 'export']);

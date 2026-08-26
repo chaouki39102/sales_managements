@@ -22,11 +22,12 @@ Full keyboard control for line management without mouse.
 
 ---
 
-## Task 2 — Quick Product Inline Create
+## Task 2 — Quick Product Inline Create ✅ DONE
 Add "إنشاء منتج جديد" button at bottom of product search dropdown when no match found.
 - Opens a small inline form (name, ref, price, unit, tva) — creates via `POST /products` without leaving the page.
 - Auto-fills the new product into the current line.
-- Status: ⏳
+- **Files**: `ProductSearch.tsx` (inline form + `QuickCreatePayload`), `useDocumentLookups.ts` (+productTypes/tvas/units queries), `DocumentLineRow.tsx`/`LineCard.tsx` (+props), `DocumentLinesSection.tsx` (+props passthrough), `CommercialDocumentPage.tsx`/`CommercialDocumentModal/index.tsx` (creation callback + cache invalidation).
+- Commit: `ab01d09`
 
 ## Task 3 — Line Templates / Frequently Bought Together
 Save current lines as a reusable template, load template into current doc.

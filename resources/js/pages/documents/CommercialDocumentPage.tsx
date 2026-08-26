@@ -571,6 +571,7 @@ export default function CommercialDocumentPage() {
             productTypes={lookups.productTypes}
             tvas={lookups.tvas}
             units={lookups.units}
+            bulkAddLines={bulkAddLines}
           />
         </div>
       </div>
