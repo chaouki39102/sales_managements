@@ -73,7 +73,7 @@ export function LineCard({
       unitMargin = line.unit_price_ht - costPrice;
       marginPct = (unitMargin / line.unit_price_ht) * 100;
       totalMargin = unitMargin * baseQty;
-      marginColor = marginPct < lowMarginThreshold ? 'var(--red)' : marginPct < 10 ? 'var(--orange)' : 'var(--green)';
+      marginColor = marginPct < 0 ? 'var(--red)' : marginPct < lowMarginThreshold ? 'var(--orange)' : 'var(--green)';
     }
   }
   const hasLowMarginWarning = (line._warnings ?? []).some(w => w.type === 'low_margin');
@@ -350,7 +350,7 @@ export function LineCard({
       }}>
         <div>
           <span style={{ color: 'var(--t4)', fontSize: 10 }}>المبلغ HT: </span>
-          <span style={{ fontWeight: 700, color: 'var(--t2)' }}>{fmtDZD(ht)} دج</span>
+          <span style={{ fontWeight: 700, color: marginPct !== null ? marginColor : 'var(--t2)' }}>{fmtDZD(ht)} دج</span>
         </div>
         <div>
           <span style={{ color: 'var(--t4)', fontSize: 10 }}>TVA ({line.tva_rate}%): </span>

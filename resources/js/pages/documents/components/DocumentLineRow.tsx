@@ -385,7 +385,14 @@ export const DocumentLineRow = memo(function DocumentLineRow({
 
         {col('total_ht') && (
           <td style={{ padding: '3px 6px', textAlign: 'left', direction: 'ltr',
-            fontSize: 11, color: 'var(--t2)' }}>
+            fontSize: 11, color: (() => {
+              if (isPurchase || !prod) return 'var(--t2)';
+              const costPrice = toNum(prod.current_cost_price) || toNum(prod.purchase_price_ht);
+              if (!costPrice || !line.unit_price_ht) return 'var(--t2)';
+              const marginPct = ((line.unit_price_ht - costPrice) / line.unit_price_ht) * 100;
+              const marginThreshold = (prod as any)?.min_margin_percentage ?? 5;
+              return marginPct < 0 ? 'var(--red)' : marginPct < marginThreshold ? 'var(--orange)' : 'var(--green)';
+            })() }}>
             {fmtDZD(ht)}
           </td>
         )}

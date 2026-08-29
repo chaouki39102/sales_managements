@@ -61,7 +61,8 @@ Button "نسخ كمستند جديد" on edit page — clones lines to a fresh d
 ## Task 8 — Line Total Color Coding
 Subtle color on line total column: green when margin > threshold, red when below cost.
 - Needs `cost_price_ht` per line (already stored). Compare `unit_price_ht` vs `cost_price_ht`.
-- Status: ⏳
+- Implemented: both renderers now tint the line `total_ht` by margin — red when margin < 0 (below cost), orange when below `min_margin_percentage` (default 5), green otherwise; neutral `--t2` for purchase lines or products without a cost. Uses the existing `prod.current_cost_price`/`purchase_price_ht` + `min_margin_percentage` values already consumed by the standalone margin column.
+- Status: ✅
 
 ## Task 9 — Party Quick-Create
 Inline "إنشاء متعامل جديد" in party search dropdown when no match.
