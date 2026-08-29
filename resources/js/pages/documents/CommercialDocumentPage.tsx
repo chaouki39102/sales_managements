@@ -20,6 +20,7 @@ import DocumentPaymentsSection from './CommercialDocumentModal/DocumentPaymentsS
 import DocumentTotalsSection from './CommercialDocumentModal/DocumentTotalsSection';
 
 import { DocumentChainPanel } from './components/DocumentChainPanel';
+import MiniPrintPreview from './components/MiniPrintPreview';
 import { ReturnDocumentModal } from './components/ReturnDocumentModal';
 import { BulkImportModal } from './components/BulkImportModal';
 import { InvoiceOcrModal } from './components/InvoiceOcrModal';
@@ -230,6 +231,26 @@ export default function CommercialDocumentPage() {
   const setInfoCollapsed = useCallback((v: boolean) => {
     setInfoCollapsedState(v);
     try { localStorage.setItem(`doc_info_collapsed_${docCode}`, v ? '1' : '0'); } catch { /* ignore */ }
+  }, [docCode]);
+
+  // ── طي معاينة الطباعة (محفوظ لكل نوع مستند، مفتوحة افتراضياً) ──────────────
+  const [previewCollapsed, setPreviewCollapsedState] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(`doc_preview_collapsed_${docCode}`);
+      if (saved !== null) return saved === '1';
+    } catch { /* ignore */ }
+    return false;
+  });
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`doc_preview_collapsed_${docCode}`);
+      setPreviewCollapsedState(saved !== null ? saved === '1' : false);
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docCode]);
+  const setPreviewCollapsed = useCallback((v: boolean) => {
+    setPreviewCollapsedState(v);
+    try { localStorage.setItem(`doc_preview_collapsed_${docCode}`, v ? '1' : '0'); } catch { /* ignore */ }
   }, [docCode]);
 
   // ── اختصارات لوحة المفاتيح العامة: F2 باركود · F4 متعامل · F9/Ctrl+S حفظ · Alt+N سطر ──
@@ -545,6 +566,40 @@ export default function CommercialDocumentPage() {
               totals={totals}
               affectsAccounting={docType?.affects_accounting ?? false}
             />
+          </div>
+
+          <div style={{
+            flexShrink: 0, borderTop: '1px solid var(--b1)', background: 'var(--bg2)',
+            padding: compact ? '6px 10px' : '8px 16px',
+          }}>
+            <button
+              onClick={() => setPreviewCollapsed(!previewCollapsed)}
+              title={previewCollapsed ? 'إظهار معاينة الطباعة' : 'إخفاء معاينة الطباعة'}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, width: '100%',
+                border: 'none', background: 'transparent', cursor: 'pointer',
+                fontSize: 11, fontWeight: 700, color: 'var(--em)', padding: 0,
+              }}
+            >
+              <i className={`ti ${previewCollapsed ? 'ti-chevron-up' : 'ti-chevron-down'}`} style={{ fontSize: 12 }} />
+              <span>معاينة الطباعة</span>
+            </button>
+            {!previewCollapsed && (
+              <div style={{ marginTop: 6, display: 'flex', justifyContent: 'center' }}>
+                <MiniPrintPreview
+                  company={companyInfo}
+                  docTypeName={docType?.name ?? ''}
+                  docNumber={docNumber}
+                  date={form.document_date}
+                  partyLabel={isPurchase ? 'المورد' : 'الزبون'}
+                  partyName={selectedParty?.name ?? ''}
+                  lines={form.lines}
+                  totals={totals}
+                  notes={form.notes}
+                  availableWidth={(compact ? 252 : 300) - (compact ? 10 : 16) * 2}
+                />
+              </div>
+            )}
           </div>
 
           <div style={{

@@ -81,7 +81,8 @@ Drag handle per row for manual reordering (priority: low — keyboard reorder co
 
 ## Task 12 — Print Preview Inline Toggle
 Toggle mini A4 preview in sidebar (live-rendered as you type).
-- Status: ⏳
+- Implemented: lightweight `MiniPrintPreview.tsx` (dedicated A4 sheet at 300×424.3px, scaled to the sidebar width; company/doc header, doc number, date, party, items lines with per-line qty/unit/HT/TVA/TTC, totals block incl. discount/TVA/fiscal stamp, notes footer — no UniversalPreview dependency). Pinned collapsible sidebar panel OUTSIDE the scroll div, between scrollable content and the pinned totals block; toggle header «معاينة الطباعة» + chevron, persisted per doc type as `doc_preview_collapsed_{docCode}` (default open); responsive to compact mode width. Wired in `CommercialDocumentPage.tsx` only (not the quick-create modal).
+- Status: ✅
 
 ## Task 13 — Document Attachments
 File upload (photos, signed papers) stored against the document.
