@@ -765,6 +765,7 @@ Route::prefix('v1')->group(function () {
             // ── ⑤-د: فردية (المستخدم نفسه) ─────────────────────
             Route::apiResource('attachments', AttachmentController::class);
             Route::get('attachments/{attachment}/download', [AttachmentController::class, 'download']);
+            Route::get('attachments/{attachment}/view',     [AttachmentController::class, 'view']);
 
             // ✅ settings: المسارات المحددة قبل apiResource
             // ① المسارات المحددة أولاً (قبل أي {wildcard})

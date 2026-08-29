@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Builder;
 use App\Core\Attributes\Cacheable;
@@ -197,6 +198,9 @@ class CommercialDocument extends Model
         'payments.treasuryAccount',
         // حركات المخزن
         'stockMovements',
+        // الإرفاقات — ملفات/مستندات مرفقة بالمستند
+        'attachments',
+        'attachments.uploadedBy',
         // audit
         'createdBy',
         'updatedBy',
@@ -270,6 +274,10 @@ class CommercialDocument extends Model
     public function lines(): HasMany
     {
         return $this->hasMany(CommercialDocumentLine::class);
+    }
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(Attachment::class, 'attachable');
     }
     public function payments(): BelongsToMany
     {

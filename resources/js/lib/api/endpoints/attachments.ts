@@ -3,9 +3,23 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiDelete, apiUpload } from '../core/client';
+import { apiGet, apiDelete, apiUpload, apiDownload } from '../core/client';
 import { tenantKeys } from '../core/queryKeys';
 import { useActiveSlug } from '../../store/appStore';
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+/** Exact class-string stored in `attachments.attachable_type` for documents. */
+export const COMMERCIAL_DOCUMENT_ATTACHABLE = 'App\\Models\\CommercialDocument';
+
+/** امتدادات مطابقة للسماحات الخلفية — keep in sync with AttachmentService::ALLOWED_EXTENSIONS. */
+export const ATTACHMENT_ALLOWED_EXTENSIONS = [
+  'png', 'jpg', 'jpeg', 'gif', 'webp',
+  'pdf', 'doc', 'docx', 'xls', 'xlsx',
+  'txt',
+] as const;
+
+export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -52,8 +66,33 @@ export const attachmentsApi = {
   delete: (id: number) =>
     apiDelete(`/attachments/${id}`),
 
+  /** Builds the multipart FormData for `POST /attachments` (tenant-scoped via interceptor). */
+  buildUploadFormData: (attachableType: string, attachableId: number, file: File, extras?: Record<string, string>) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('attachable_type', attachableType);
+    fd.append('attachable_id', String(attachableId));
+    fd.append('is_public', '0');
+    if (extras) {
+      for (const [k, v] of Object.entries(extras)) fd.append(k, v);
+    }
+    return fd;
+  },
+
+  // NOTE: paths are relative to the axios baseURL (`/api/v1`); the request
+  // interceptor prepends `/{slug}/`. Never pass an absolute `/api/v1/...` here
+  // (it would double-prefix).
   downloadUrl: (id: number) =>
-    `/api/v1/attachments/${id}/download`,
+    `/attachments/${id}/download`,
+
+  viewUrl: (id: number) =>
+    `/attachments/${id}/view`,
+
+  download: (id: number): Promise<Blob> =>
+    apiDownload(attachmentsApi.downloadUrl(id)),
+
+  view: (id: number): Promise<Blob> =>
+    apiDownload(attachmentsApi.viewUrl(id)),
 } as const;
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────

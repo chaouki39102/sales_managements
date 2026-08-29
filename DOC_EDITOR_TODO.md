@@ -86,8 +86,9 @@ Toggle mini A4 preview in sidebar (live-rendered as you type).
 
 ## Task 13 — Document Attachments
 File upload (photos, signed papers) stored against the document.
-- Backend: `document_attachments` table + storage disk.
-- Status: ⏳
+- Implemented: `document_attachments` table + `public` disk; `AttachmentService` (validates allowlist, ≤10MB, attachable existence + company scope, deletes stored file on delete) + `Attachment` model (`filterable` includes `attachable_id`); `AttachmentResource` (emits `file_url`); routes `attachments` apiResource + GET `/{id}/view` + `/{id}/download`; controller `download`/`view` use `extractId($id)` (no `int` — avoids the Phase 17 `{company}` model-splice TypeError). Frontend: `lib/api/endpoints/attachments.ts` (+`useAttachmentsByAttachable`, `useAttachmentMutations`, view/download blob helpers) + `DocumentAttachmentsPanel.tsx` (collapsible panel, `useConfirm` delete, upload progress, `readOnly` gate) mounted in `CommercialDocumentPage.tsx` edit mode between `MiniPrintPreview` and `DocumentTotalsSection`.
+- Smoke verified live (`attachment_smoke.php`): UPLOAD 201 / LIST 200 count=1 / VIEW 200 PNG inline / DOWNLOAD 200 / DELETE 200 (row+file cleaned) / BAD_EXT 422 (Arabic allowlist) / BAD_ATTACHABLE 422. NOTE: model-config cache (`ModelConfigService`, 1h) required `php artisan cache:clear` after adding `attachable_id` to `$filterable`.
+- Status: ✅
 
 ## Task 14 — Quick-Fill from Last Invoice
 "ملء من آخر فاتورة" button — clones last FV's lines for the same party.

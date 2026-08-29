@@ -21,6 +21,7 @@ import DocumentTotalsSection from './CommercialDocumentModal/DocumentTotalsSecti
 
 import { DocumentChainPanel } from './components/DocumentChainPanel';
 import MiniPrintPreview from './components/MiniPrintPreview';
+import DocumentAttachmentsPanel from './components/DocumentAttachmentsPanel';
 import { ReturnDocumentModal } from './components/ReturnDocumentModal';
 import { BulkImportModal } from './components/BulkImportModal';
 import { InvoiceOcrModal } from './components/InvoiceOcrModal';
@@ -601,6 +602,13 @@ export default function CommercialDocumentPage() {
               </div>
             )}
           </div>
+
+          {(() => {
+            const docId = id ? Number(id) : NaN;
+            return Number.isFinite(docId) && docId > 0 ? (
+              <DocumentAttachmentsPanel docId={docId} readOnly={isReadOnly} />
+            ) : null;
+          })()}
 
           <div style={{
             flexShrink: 0, borderTop: '1px solid var(--b1)',

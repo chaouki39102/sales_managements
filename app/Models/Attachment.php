@@ -39,7 +39,7 @@ class Attachment extends Model
     ];
 
     public static array $searchableFields = ['file_name', 'title', 'description'];
-    public static array $filterable = ['attachable_type', 'category', 'is_public'];
+    public static array $filterable = ['attachable_type', 'attachable_id', 'category', 'is_public'];
     public static array $sortable = ['id', 'file_name', 'created_at', 'file_size'];
     public static array $defaultWith = [];
     public static array $allowedIncludes = ['attachable', 'uploadedBy'];

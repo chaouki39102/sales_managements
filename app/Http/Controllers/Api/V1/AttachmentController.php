@@ -8,6 +8,7 @@ use App\Services\AttachmentService;
 use App\Models\Attachment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class AttachmentController extends BaseApiController
 {
@@ -19,16 +20,39 @@ class AttachmentController extends BaseApiController
         parent::__construct();
     }
 
-    public function download(Request $request, int $id)
+    public function download(Request $request, $id)
     {
         try {
+            $id = $this->extractId($id);
             $attachment = $this->attachmentService->findById($id);
-            return response()->download(
-                storage_path('app/' . $this->attachmentService->getFilePath($attachment)),
-                $attachment->file_name
-            );
+            $path = Storage::disk($attachment->disk)->path($attachment->file_path);
+
+            if ($path === false || !file_exists($path)) {
+                return $this->errorResponse('الملف المطلوب غير موجود على الخادم.', 404);
+            }
+
+            return response()->download($path, $attachment->file_name);
         } catch (\Throwable $e) {
             return $this->handleError($e, 'download');
+        }
+    }
+
+    public function view(Request $request, $id)
+    {
+        try {
+            $id = $this->extractId($id);
+            $attachment = $this->attachmentService->findById($id);
+            $path = Storage::disk($attachment->disk)->path($attachment->file_path);
+
+            if ($path === false || !file_exists($path)) {
+                return $this->errorResponse('الملف المطلوب غير موجود على الخادم.', 404);
+            }
+
+            $mime = $attachment->file_type ?: 'application/octet-stream';
+
+            return response()->file($path, ['Content-Type' => $mime, 'Content-Disposition' => 'inline']);
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'view');
         }
     }
 
