@@ -43,6 +43,9 @@ export function BarcodeInput({ products, onProductFound, disabled }: BarcodeInpu
       if (product) {
         onProductFound(product.id);
         setValue('');
+        // أبقِ التركيز في حقل المسح بعد كل مسحة (ضروري للمسح المتسلسل) —
+        // rAF يضمن التركيز بعد التزام React بتحديث الأسطر.
+        requestAnimationFrame(() => inputRef.current?.focus());
       } else {
         setNotFound(true);
         if (notFoundTimerRef.current) clearTimeout(notFoundTimerRef.current);

@@ -90,6 +90,31 @@ export default function DocumentLinesSection({
   const [stockAlertOpen, setStockAlertOpen] = useState(true);
   const notify = useNotification();
 
+  // ── وضع المسح المتسلسل (Task 15): يبقي حقل الباركود مركّزاً بعد كل مسحة
+  //    ويضيف سطراً تلقائياً مع عدّاد — لقولبة مخزون بالباركود دون لمس الفأرة. ──
+  const [scanMode, setScanMode] = useState<boolean>(() => {
+    try { return localStorage.getItem(`doc_scan_mode_${slug ?? 'default'}`) === '1'; }
+    catch { return false; }
+  });
+  const [scanCount, setScanCount] = useState(0);
+
+  const toggleScanMode = () => {
+    setScanMode((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(`doc_scan_mode_${slug ?? 'default'}`, next ? '1' : '0'); }
+      catch {}
+      return next;
+    });
+    setScanCount(0);
+  };
+
+  /** استدعى عند كل مسحة ناجحة: إضافة السطر + عدّاد في وضع المسح المتسلسل.
+   *  التركيز يُحفظ داخل BarcodeInput نفسه (rAF) — هنا فقط نحصي. */
+  const handleBarcodeFound = (productId: number) => {
+    addLineWithProduct(String(productId));
+    if (scanMode) setScanCount((n) => n + 1);
+  };
+
   // ── سحب/إسقاط لإعادة ترتيب الأسطر ───────────────────────────────────────
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
@@ -241,7 +266,7 @@ export default function DocumentLinesSection({
       products.find(
         (p) => p.barcode === code || p.ref === code || String(p.id) === code,
       ) ?? null,
-    onFound: (p) => addLineWithProduct(String(p.id)),
+    onFound: (p) => handleBarcodeFound(Number(p.id)),
     onNotFound: () => notify.error('لم يتم العثور على منتج بهذا الباركود'),
   });
 
@@ -624,9 +649,7 @@ export default function DocumentLinesSection({
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <BarcodeInput
                 products={products}
-                onProductFound={(productId) => {
-                  addLineWithProduct(String(productId));
-                }}
+                onProductFound={handleBarcodeFound}
                 disabled={isLinesReadOnly}
               />
               <button
@@ -643,6 +666,48 @@ export default function DocumentLinesSection({
               >
                 <i className="ti ti-camera" style={{ fontSize: 16 }} />
               </button>
+              <button
+                onClick={toggleScanMode}
+                title={scanMode
+                  ? 'وضع المسح المتسلسل مفعّل — أطفئه لإيقاف القولبة المتتابعة'
+                  : 'وضع المسح المتسلسل: يبقي حقل الباركود مركّزاً ويضيف سطراً بعد كل مسحة'}
+                style={{
+                  height: 32, flexShrink: 0, borderRadius: 'var(--r1)',
+                  border: `1px solid ${scanMode ? 'var(--em)' : 'var(--b3)'}`,
+                  background: scanMode ? 'color-mix(in srgb, var(--em) 14%, transparent)' : 'transparent',
+                  color: scanMode ? 'var(--em)' : 'var(--t3)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '0 9px', fontSize: 11, fontFamily: 'inherit', lineHeight: 1,
+                }}
+              >
+                <i className={`ti ${scanMode ? 'ti-scan' : 'ti-barcode'}`} style={{ fontSize: 14 }} />
+                مسح متسلسل
+                {scanMode && (
+                  <span
+                    style={{
+                      minWidth: 18, height: 16, borderRadius: 8, display: 'inline-flex',
+                      alignItems: 'center', justifyContent: 'center', padding: '0 5px',
+                      background: 'var(--em)', color: '#fff', fontSize: 10, fontWeight: 700,
+                    }}
+                  >
+                    {scanCount}
+                  </span>
+                )}
+              </button>
+              {scanMode && scanCount > 0 && (
+                <button
+                  onClick={() => setScanCount(0)}
+                  title="تصفير العدّاد"
+                  style={{
+                    height: 32, flexShrink: 0, borderRadius: 'var(--r1)',
+                    border: '1px solid var(--b3)', background: 'transparent',
+                    color: 'var(--t4)', cursor: 'pointer', display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit', width: 28,
+                  }}
+                >
+                  <i className="ti ti-rotate-clockwise-2" style={{ fontSize: 14 }} />
+                </button>
+              )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span

@@ -96,4 +96,5 @@ File upload (photos, signed papers) stored against the document.
 
 ## Task 15 — Barcode Bulk Scan Mode
 Toggle that keeps barcode input focused after each scan, auto-adds lines with counter.
-- Status: ⏳
+- Implemented: `BarcodeInput.tsx` now calls `requestAnimationFrame(() => inputRef.current?.focus())` on every successful scan (deterministic refocus — the input already cleared its value, so consecutive physical scans flow without touching the mouse). `DocumentLinesSection.tsx` gained a «مسح متسلسل» toggle (persisted per slug in `localStorage` key `doc_scan_mode_{slug}`, resets the counter when toggled) + a live count badge; barcode and camera scans both route through `handleBarcodeFound` → `addLineWithProduct` + `setScanCount(n+1)` only while scanMode is ON; a small reset («تصفير») button clears the badge. Both editor surfaces share this section (page + quick-create modal).
+- Status: ✅
