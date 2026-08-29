@@ -88,6 +88,8 @@ export default function CommercialDocumentModal({
     visibleCols, lineMode, handleColsChange, setLineMode,
     deleteConfirm,
     handleSave, handleDelete, handleExport, handlePartyChangeWithWarning,
+    handleQuickCreateParty, creatingParty,
+    partyTypes,
     isPending,
     isPartyExempt, partyOptions, priceLevelOptions,
     paymentModeOptions, treasuryAccountMap, selectedParty,
@@ -330,6 +332,9 @@ export default function CommercialDocumentModal({
             qc={qc}
             slug={slug}
             warehouseIdNum={warehouseIdNum}
+            partyTypes={partyTypes}
+            onQuickCreateParty={handleQuickCreateParty}
+            creatingParty={creatingParty}
           />
 
           {/* ═══ خيارات إضافية + الشحن + شروط الدفع — شريط تبويب واحد،

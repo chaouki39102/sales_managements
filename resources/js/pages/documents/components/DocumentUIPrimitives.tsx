@@ -239,10 +239,17 @@ interface ComboBoxProps {
   onAfterSelect?: () => void;
   /** معرّف DOM لزر المشغّل — يُستخدم للوصول بلوحة المفاتيح (مثل F4 للمتعامل). */
   id?:           string;
+  /** إظهار زر «إنشاء ...» في الحالة الفارغة عند كتابة نص بحث (نمط إنشاء سريع). */
+  showCreate?:   boolean;
+  /** نص زر الإنشاء (يُرفق معه نص البحث المُدخل). */
+  createLabel?:  string;
+  /** يُستدعى عند الضغط على زر الإنشاء مع نص البحث المُدخل. */
+  onCreate?:     (query: string) => void;
 }
 export function ComboBox({
   options, value, onChange, placeholder, 
 disabled, error, maxH = 260, onAfterSelect, id,
+  showCreate, createLabel = 'إنشاء', onCreate,
 }: ComboBoxProps) {
   const [open,       setOpen]       = useState(false);
   const [query,      setQuery]      = useState('');
@@ -374,7 +381,23 @@ disabled, error, maxH = 260, onAfterSelect, id,
           </div>
           <div ref={listRef} style={{ maxHeight: maxH, overflowY: 'auto' }}>
             {filtered.length === 0
-              ? <div style={{ padding: 16, textAlign: 'center', color: 'var(--t4)', fontSize: 12 }}>لا توجد نتائج</div>
+              ? (showCreate && query.trim()
+                  ? <button
+                      type="button"
+                      onClick={() => onCreate?.(query)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                        padding: '10px 14px', cursor: 'pointer', textAlign: 'right',
+                        background: 'transparent', border: 'none', color: 'var(--em)',
+                        fontSize: 13, fontWeight: 600,
+                      }}
+                    >
+                      <i className="ti ti-plus" style={{ fontSize: 14, flexShrink: 0 }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        إنشاء {createLabel} جديد: «{query.trim()}»
+                      </span>
+                    </button>
+                  : <div style={{ padding: 16, textAlign: 'center', color: 'var(--t4)', fontSize: 12 }}>لا توجد نتائج</div>)
               : filtered.map((o, i) => (
                 <div
                   key={o.id}

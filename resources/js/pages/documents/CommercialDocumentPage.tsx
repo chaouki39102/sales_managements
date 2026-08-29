@@ -110,6 +110,8 @@ export default function CommercialDocumentPage() {
     visibleCols, lineMode, handleColsChange, setLineMode,
     deleteConfirm,
     handleSave, handleDelete, handleExport, handlePartyChangeWithWarning,
+    handleQuickCreateParty, creatingParty,
+    partyTypes,
     isPending,
     isPartyExempt, partyOptions, priceLevelOptions,
     paymentModeOptions, treasuryAccountMap, selectedParty,
@@ -480,6 +482,9 @@ export default function CommercialDocumentPage() {
               qc={qc}
               slug={slug}
               warehouseIdNum={warehouseIdNum}
+              partyTypes={partyTypes}
+              onQuickCreateParty={handleQuickCreateParty}
+              creatingParty={creatingParty}
             />
 
             <Tabs tabs={docTabs} activeKey={extraTab} onChange={setExtraTab}>

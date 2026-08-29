@@ -67,7 +67,8 @@ Subtle color on line total column: green when margin > threshold, red when below
 ## Task 9 — Party Quick-Create
 Inline "إنشاء متعامل جديد" in party search dropdown when no match.
 - Small form: name, phone, NIF, party type. Creates via `POST /parties`.
-- Status: ⏳
+- Implemented: `ComboBox` gained lazy `showCreate`/`createLabel`/`onCreate` — the empty state renders «إنشاء {زبون/مورد} جديد: «query»» when a query is typed (no-op for other ComboBox consumers). `DocumentInfoSection` opens an inline create form (name*, phone, NIF, party type*) pre-seeding the name from the query; `useCommercialDocumentController.handleQuickCreateParty` POSTs via `partiesApi.create`, invalidates the editor's `[slug,'modal-parties']` lookups key, and selects the new party. `useDocumentLookups` added a `partyTypes` lookup for the form's type select. Threaded through both the page and the quick-create modal.
+- Status: ✅
 
 ## Task 10 — Stock Alert Summary Bar
 Compact bar above lines: "⚠ 3 أسطر تتجاوز المخزون المتاح" — click to jump to flagged lines.

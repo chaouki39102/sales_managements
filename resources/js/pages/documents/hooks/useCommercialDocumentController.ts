@@ -6,6 +6,7 @@ import { invalidateStockQueries } from '@/lib/api/core/queryClient';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
 import { settingsApi } from '@/lib/api/endpoints/settings';
+import { partiesApi } from '@/lib/api/endpoints/parties';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 import { useConfirm } from '@/hooks/useConfirm';
 import type { DocumentType } from '@/lib/api/core/types';
@@ -15,6 +16,7 @@ import { isOfflineQueuedResponse } from '@/lib/offline/queueMath';
 
 import { useDocumentLookups }  from './useDocumentLookups';
 import { useDocumentForm }     from './useDocumentForm';
+import type { PartyQuickCreatePayload } from '../CommercialDocumentModal/DocumentInfoSection';
 import type { PartyChangeResult } from './useDocumentForm';
 import { useDocumentChain, useConvertDocument } from './useDocumentChain';
 import { useCreditCheck }      from './useCreditCheck';
@@ -323,6 +325,31 @@ export function useCommercialDocumentController({
       });
     }
   };
+
+  // ─── Quick-create a party (Task 9) ────────────────────────────────────────
+  const [creatingParty, setCreatingParty] = useState(false);
+  const handleQuickCreateParty = useCallback(async (payload: PartyQuickCreatePayload) => {
+    if (!slug) return;
+    setCreatingParty(true);
+    try {
+      const saved = await partiesApi.create({
+        name:            payload.name,
+        phone:           payload.phone,
+        nif:             payload.nif,
+        party_type_id:   payload.party_type_id,
+      });
+      // تحديث قائمة الأطراف في محرر المستندات ثم تحديد المتعامل الجديد.
+      qc.invalidateQueries({ queryKey: [slug, 'modal-parties'], refetchType: 'active' });
+      setPartyChangeWarning(null);
+      handlePartyChangeWithWarning(String(saved.id));
+    } catch (e) {
+      const msg = (e as { response?: { data?: { message?: string } } })
+        ?.response?.data?.message ?? 'تعذر إنشاء المتعامل';
+      setApiErr(msg);
+    } finally {
+      setCreatingParty(false);
+    }
+  }, [slug, qc, handlePartyChangeWithWarning, setApiErr]);
 
   // ─── Success state ────────────────────────────────────────────────────────
 
@@ -686,6 +713,9 @@ export function useCommercialDocumentController({
     // Lookups
     lookups,
     lookupsReady,
+    partyTypes: lookups.partyTypes,
+    creatingParty,
+    handleQuickCreateParty,
 
     // Form
     form, errors, lineErr, apiErr, setApiErr,

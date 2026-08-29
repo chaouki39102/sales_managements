@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
 import type { Product, Party, PaymentMode, TreasuryAccount } from '../types/document.types';
-import type { ProductType, Unit, Tva } from '@/lib/api/core/types';
+import type { ProductType, Unit, Tva, PartyType } from '@/lib/api/core/types';
 
 function extractList(data: unknown): unknown[] {
   if (!data) return [];
@@ -136,6 +136,15 @@ export function useDocumentLookups({
   });
   const productTypes = productTypesRaw as ProductType[];
 
+  // ── Party Types (for quick-create) ────────────────────────────────────────
+  const { data: partyTypesRaw = [] } = useQuery({
+    queryKey:  [slug, 'modal-party-types'],
+    queryFn:   () => apiGet<unknown>('/party-types', { per_page: 50 }).then(extractList),
+    enabled:   open && needsParty && !!slug,
+    staleTime: 30 * 60_000,
+  });
+  const partyTypes = partyTypesRaw as PartyType[];
+
   // ── TVA rates (for quick-create) ────────────────────────────────────────
   const { data: tvasRaw = [] } = useQuery({
     queryKey:  [slug, 'modal-tvas'],
@@ -175,7 +184,7 @@ export function useDocumentLookups({
     paymentModes, priceLevels, treasuryAccounts,
     stockData, refetchStock,
     isLoadingProducts,
-    productTypes, tvas, units,
+    productTypes, partyTypes, tvas, units,
     defaultWarehouseId, baseCurrencyId, defaultTvaRate,
   };
 }
