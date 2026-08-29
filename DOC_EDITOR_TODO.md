@@ -90,7 +90,7 @@ File upload (photos, signed papers) stored against the document.
 
 ## Task 14 — Quick-Fill from Last Invoice
 "ملء من آخر فاتورة" button — clones last FV's lines for the same party.
-- Status: ⏳
+- Status: ✅ — backend `GET documents/last-for-party` (`lastForParty` in `CommercialDocumentController`, routes/api.php:589, company-scoped via HasCompany, orders document_date desc/id desc, eager-loads lines.product/packaging, returns `CommercialDocumentResource`) + controller hook `fillFromLastDoc`/`fillLastLoading` (`useCommercialDocumentController`) that GETs the last doc (`{party_id, doc_type_code, fiscal_year_id}`), maps lines via `buildLineFromApi(l, defaultTvaRate, products)` (preserving `packaging_id`/`_packQty` from frozen `packaging_units_snapshot`, sends `pack_qty` on save), `bulkAddLines` + toasts; toolbar «ملء من آخر مستند» button in `DocumentLinesSection` (gated `!isPurchase` + party, «يجري الملء…» spinner while loading); wired through `CommercialDocumentPage` + `CommercialDocumentModal`. Backend smoke verified (party 774 → FV-2026-000003, 4 lines, packaged snap '12'/pkg 28); tsc clean; 405/405; build 0 errors; SW MATCH.
 
 ## Task 15 — Barcode Bulk Scan Mode
 Toggle that keeps barcode input focused after each scan, auto-adds lines with counter.

@@ -586,6 +586,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('documents/overdue',      [CommercialDocumentController::class, 'overdue']);
                 Route::get('documents/check-number', [CommercialDocumentController::class, 'checkNumber']);
                 Route::get('documents/next-number',  [CommercialDocumentController::class, 'nextNumber']);
+                Route::get('documents/last-for-party', [CommercialDocumentController::class, 'lastForParty']);
                 Route::post('documents/{commercialDocument}/share', [CommercialDocumentController::class, 'share']);
                 Route::post('documents/{commercialDocument}/clone', [CommercialDocumentController::class, 'cloneDocument']);
                 Route::post('documents/compute-line',   [DocumentComputeController::class, 'computeLine']);

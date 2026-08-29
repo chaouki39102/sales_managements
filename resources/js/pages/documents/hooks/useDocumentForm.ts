@@ -70,6 +70,17 @@ import type { LineStockValidation } from '../utils/document.utils';
 
 export type FormErrors = Record<string, string>;
 
+export interface BulkLineInput {
+  product_id?: string;
+  description?: string;
+  unit_price_ht?: number;
+  quantity?: number;
+  tva_rate?: number;
+  line_note?: string;
+  packaging_id?: string | number | null;
+  packQty?: number;
+}
+
 export interface PartyBalanceInfo {
   party_id:          number;
   current_balance:   number;
@@ -139,7 +150,7 @@ export interface UseDocumentFormReturn {
   priceLevelId:           number | null;
   addLine:                () => void;
   addLineWithProduct:     (productId: string, unitPrice?: number, tvaRate?: number) => void;
-  bulkAddLines:           (importedLines: Array<{product_id?: string; description?: string; unit_price_ht?: number; quantity?: number; tva_rate?: number; line_note?: string}>) => void;
+  bulkAddLines:           (importedLines: Array<BulkLineInput>) => void;
   removeLine:             (idx: number) => void;
   duplicateLine:          (idx: number) => void;
   moveLine:               (fromIdx: number, toIdx: number) => void;
@@ -259,7 +270,7 @@ function resolvePackQty(
  *   quantity      = عدد العبوات = db.quantity / packQty
  *   discount_amount_fixed = خصم العبوة الواحدة = db.discount_amount × packQty
  */
-function buildLineFromApi(
+export function buildLineFromApi(
   l:              any,
   defaultTvaRate: number,
   products?:      Product[],
@@ -967,22 +978,27 @@ export function useDocumentForm({
     }));
   }, [defaultTvaRate]);
 
-  const bulkAddLines = useCallback((importedLines: Array<{
-    product_id?: string; description?: string; unit_price_ht?: number; quantity?: number; tva_rate?: number; line_note?: string;
-  }>) => {
+  const bulkAddLines = useCallback((importedLines: BulkLineInput[]) => {
     setForm((f) => ({
       ...f,
       lines: [
         ...f.lines,
-        ...importedLines.map((line) => ({
-          ...makeLine(defaultTvaRate),
-          product_id: line.product_id ?? '',
-          description: line.description ?? '',
-          unit_price_ht: line.unit_price_ht ?? 0,
-          quantity: line.quantity ?? 1,
-          tva_rate: line.tva_rate ?? defaultTvaRate,
-          line_note: line.line_note ?? '',
-        })),
+        ...importedLines.map((line) => {
+          const packQty = line.packQty && line.packQty > 1 ? line.packQty : 1;
+          const unitPrice = line.unit_price_ht ?? 0;
+          return {
+            ...makeLine(defaultTvaRate),
+            product_id:     line.product_id ?? '',
+            description:    line.description ?? '',
+            unit_price_ht:  unitPrice,
+            quantity:       line.quantity ?? 1,
+            tva_rate:       line.tva_rate ?? defaultTvaRate,
+            line_note:      line.line_note ?? '',
+            packaging_id:   line.packaging_id ? String(line.packaging_id) : '',
+            _packQty:       packQty,
+            price_per_pack: packQty > 1 ? Math.round(unitPrice * packQty * 10_000) / 10_000 : 0,
+          };
+        }),
       ],
     }));
   }, [defaultTvaRate]);

@@ -56,6 +56,9 @@ interface DocumentLinesSectionProps {
   onOcrInvoice?: () => void;
   /** فتح منتقي صور الجهاز لإرسال صورة فاتورة موجودة مباشرة إلى OCR (بدون كاميرا). */
   onOcrImage?: () => void;
+  /** ملء الأسطر من آخر فاتورة لنفس المتعامل (Task 14). */
+  fillFromLastDoc?: () => Promise<void>;
+  fillLastLoading?: boolean;
   slug: string | null | undefined;
   affectsStock: boolean;
   stockDir: 1 | -1 | 0;
@@ -82,7 +85,7 @@ export default function DocumentLinesSection({
   affectsStock, stockDir, onRefreshStock,
   warehouses, compact = false,
   onQuickCreate, productTypes, tvas, units,
-  bulkAddLines, onDiscardDraft,
+  bulkAddLines, onDiscardDraft, fillFromLastDoc, fillLastLoading = false,
 }: DocumentLinesSectionProps) {
   const [stockAlertOpen, setStockAlertOpen] = useState(true);
   const notify = useNotification();
@@ -919,6 +922,25 @@ export default function DocumentLinesSection({
               <i className="ti ti-upload" />
               استيراد من Excel
             </button>
+            {fillFromLastDoc && (
+              <button
+                onClick={() => { void fillFromLastDoc(); }}
+                disabled={fillLastLoading}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '7px 14px', borderRadius: 'var(--r2)',
+                  border: '1px dashed var(--b3)', background: 'transparent',
+                  color: 'var(--t3)', cursor: fillLastLoading ? 'default' : 'pointer',
+                  fontSize: 12.5, fontWeight: 600, opacity: fillLastLoading ? 0.6 : 1,
+                }}
+                title="إضافة أسطر من آخر فاتورة/مستند لنفس المتعامل"
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--gold)'; e.currentTarget.style.color = 'var(--gold)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--b3)'; e.currentTarget.style.color = 'var(--t3)'; }}
+              >
+                <i className={`ti ${fillLastLoading ? 'ti-loader' : 'ti-history'}`} />
+                {fillLastLoading ? 'يجري الملء…' : 'ملء من آخر مستند'}
+              </button>
+            )}
             {isPurchase && onOcrInvoice && (
               <button
                 onClick={onOcrInvoice}

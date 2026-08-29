@@ -9,6 +9,8 @@ import { settingsApi } from '@/lib/api/endpoints/settings';
 import { partiesApi } from '@/lib/api/endpoints/parties';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 import { useConfirm } from '@/hooks/useConfirm';
+import { useNotification } from '@/hooks/useNotification';
+import { buildLineFromApi, type BulkLineInput } from './useDocumentForm';
 import type { DocumentType } from '@/lib/api/core/types';
 import { usePrintTemplatesList, mapCompany } from '@/pages/settings/print-settings/runtime';
 import { resolveTemplateById } from '@/pages/settings/print-settings/runtime/TemplateResolver';
@@ -699,6 +701,66 @@ export function useCommercialDocumentController({
     return null;
   }, [partyBalance, totals.netToPay, selectedParty]);
 
+  // ─── ملء من آخر فاتورة (Task 14) ──────────────────────────────────────────
+
+  const [fillLastLoading, setFillLastLoading] = useState(false);
+  const notify = useNotification();
+
+  const fillFromLastDoc = useCallback(async (partyId?: string) => {
+    const pid = String(partyId ?? form.party_id ?? '').trim();
+    if (!pid) {
+      notify.error('اختر المتعامل أولاً قبل ملء الأسطر من آخر فاتورة');
+      return;
+    }
+    if (isLinesReadOnly || isReadOnly) {
+      notify.error('لا يمكن تعديل أسطر هذا المستند');
+      return;
+    }
+    if (!slug) {
+      notify.error('لا تتوفر شركة نشطة');
+      return;
+    }
+    setFillLastLoading(true);
+    try {
+      const doc = await apiGet<any>('/documents/last-for-party', {
+        party_id:       pid,
+        doc_type_code:  docCode || 'FV',
+        fiscal_year_id: selectedYear?.id,
+      });
+      if (!doc) {
+        notify.info('لا توجد فاتورة سابقة لهذا المتعامل');
+        return;
+      }
+      const lines: BulkLineInput[] = (doc.lines ?? []).map((l: any) => {
+        const line = buildLineFromApi(l, lookups.defaultTvaRate ?? 0, lookups.products);
+        const out: BulkLineInput = {
+          product_id:     line.product_id || undefined,
+          description:    line.description || undefined,
+          unit_price_ht:  line.unit_price_ht,
+          quantity:       line.quantity,
+          tva_rate:       line.tva_rate,
+          line_note:      line.line_note || undefined,
+        };
+        if (line.packaging_id && line._packQty && line._packQty > 1) {
+          out.packaging_id = line.packaging_id;
+          out.packQty      = line._packQty;
+        }
+        return out;
+      });
+      if (lines.length === 0) {
+        notify.info('لا توجد أسطر في آخر فاتورة لهذا المتعامل');
+        return;
+      }
+      bulkAddLines(lines);
+      notify.success(`أُضيف ${lines.length} سطراً من آخر فاتورة (${doc.document_number || ''})`);
+    } catch (e: any) {
+      notify.error(e?.message ?? 'تعذر جلب آخر فاتورة لهذا المتعامل');
+    } finally {
+      setFillLastLoading(false);
+    }
+  }, [form.party_id, isLinesReadOnly, isReadOnly, slug, docCode, selectedYear?.id,
+      lookups.defaultTvaRate, lookups.products, bulkAddLines, notify]);
+
   return {
     // Basic
     slug, qc, navigate, docCode, isPurchase, isEdit,
@@ -780,6 +842,7 @@ export function useCommercialDocumentController({
 
     // Actions
     handleSave, handleDelete, handleExport, handlePartyChangeWithWarning,
+    fillFromLastDoc, fillLastLoading,
 
     // State
     isPending,

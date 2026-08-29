@@ -383,6 +383,46 @@ class CommercialDocumentController extends BaseApiController
         }
     }
 
+    public function lastForParty(Request $request): JsonResponse
+    {
+        try {
+            $this->authorizeAction('viewAny', CommercialDocument::class);
+            $request->validate([
+                'party_id'       => ['required', 'integer'],
+                'doc_type_code'  => ['nullable', 'string', 'max:10'],
+                'fiscal_year_id' => ['nullable', 'integer'],
+            ]);
+
+            $partyId    = (int) $request->input('party_id');
+            $typeCode   = (string) ($request->input('doc_type_code') ?: 'FV');
+            $fiscalYear = $request->integer('fiscal_year_id') ?: null;
+
+            $query = CommercialDocument::query()
+                ->where('party_id', $partyId)
+                ->whereHas('documentType', function ($q) use ($typeCode) {
+                    $q->where('code', $typeCode);
+                })
+                ->orderByDesc('document_date')
+                ->orderByDesc('id');
+
+            if ($fiscalYear) {
+                $query->where('fiscal_year_id', $fiscalYear);
+            }
+
+            $doc = $query->first();
+
+            if (!$doc) {
+                return $this->successResponse(null, 'لا توجد فاتورة سابقة لهذا المتعامل');
+            }
+
+            $doc->load(['lines.product', 'lines.packaging', 'documentType', 'party']);
+
+            return $this->successResponse(new CommercialDocumentResource($doc));
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'lastForParty');
+        }
+    }
+
     public function update(Request $request, $id): JsonResponse
     {
         try {

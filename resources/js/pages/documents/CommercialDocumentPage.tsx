@@ -86,6 +86,7 @@ export default function CommercialDocumentPage() {
     addLine, addLineWithProduct, removeLine, duplicateLine, moveLine, updateLine,
     pmMode, payments,
     bulkAddLines, addPayment, addPaymentWithValues, removePayment, updatePayment,
+    fillFromLastDoc, fillLastLoading,
     partyBalance, isLoadingBalance,
     totals,
     needsParty, affectsStock, stockDir,
@@ -607,6 +608,8 @@ export default function CommercialDocumentPage() {
             tvas={lookups.tvas}
             units={lookups.units}
             bulkAddLines={bulkAddLines}
+            fillFromLastDoc={isPurchase ? undefined : () => fillFromLastDoc()}
+            fillLastLoading={fillLastLoading}
           />
         </div>
       </div>
