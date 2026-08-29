@@ -19,7 +19,30 @@
 - **Offline layer** (`lib/offline/`) sits on the SHARED `client` — its cache keys embed the full URL (slug included), so tenant isolation in the offline cache is automatic; never store cross-tenant keys. The **write queue** (`pendingOps` in IndexedDB) is now tenant-scoped too: every op carries `slug` (captured from the url's first segment at enqueue), and reads/counts/replay/clear filter by the ACTIVE slug via `useActiveSlug()`/`appActions.getActiveSlug()` — legacy rows without the field fall back to `opSlug(url)`, and tenant-less ops (empty slug) stay visible to every company.
 
 ## Date
-2026-08-24
+2026-08-29
+
+### Phase 86 — Commercial Document Editor Responsive Rework (Aug 29)
+
+**Request**: "I DONT LIKE THE CURRENT [editor] IT NOT RESPONSIVE NOT WELL POSISIONNED THE LAYOUT ALL THINGS MUST BE RESPONSIVE AND WELL POSIONNED REFRESH ALL" — the Add/Edit document page (`CommercialDocumentPage`) was a fixed row layout (sidebar + lines) that cramped on laptop/tablet widths. Fix: a true responsive layout that keeps the desktop golden layout intact and stacks vertically on narrow viewports.
+
+**What was built** (all in `resources/js/pages/documents/CommercialDocumentPage.tsx`):
+- **Three-tier breakpoint state**: `compact` ≤1500px (sidebar 252px, tightened paddings — pre-existing) + NEW **`narrow` ≤1180px** via `matchMedia('(max-width: 1180px)')` driven by the same `compact`-style `isNarrow` pattern.
+- **Sidebar width is measured, not assumed**: `sidebarRef` + `ResizeObserver` → `sidebarW` state (effect deps `[infoCollapsed]`, init `compact ? 252 : 300`). The `MiniPrintPreview` `availableWidth` now tracks the REAL rendered sidebar width (`Math.max(160, (narrow ? Math.min(sidebarW, 440) : sidebarW) - (compact ? 10 : 16) * 2)`) — the mini sheet scales with the actual panel and is **capped at 440px on narrow** so a full-width stacked sidebar never balloons the A4 preview.
+- **Narrow layout** (`flexDirection: 'column'`, body `overflowY: 'auto'`):
+  - Sidebar becomes **full-width** (`width: '100%'`, `flex: 'none'`, `borderLeft: 'none'`, `borderTop` instead) and its inner scroll container switches to `overflowY: 'visible'` (content flows; no nested scroll).
+  - Collapsed **rail becomes a horizontal 42px bar** (full-width, `borderTop`, chevrons-up, horizontal TTC).
+  - Totals footer loses its internal scroll (`maxHeight: 'none'`, `overflowY: 'visible'`).
+  - Main lines area gets a **bounded `minHeight: 'min(72vh, 640px)'`** so `DocumentLinesSection`'s internal `flex:1; minHeight:0` grid keeps a usable height inside the vertically-scrolling body (this was the one place that required an explicit bound — its root is a column with `flex:1; minHeight:0`).
+- Wide layout (row, 252/300px sidebar, vertical rail, internal scrolling) is byte-identical in behavior — the golden baseline is preserved.
+
+**Key architectural rules**:
+- A fixed two-column editor doesn't scale: introduce a **measured-responsive sidebar** (`ResizeObserver` on the panel element) rather than hardcoding widths for the preview — `availableWidth` must follow the panel's real rendered size, and NARROW stacking must CAP it (a full-width stacked sidebar would otherwise upscale an A4 mini-sheet to page width).
+- A stacked editor body must be `overflowY: auto` (page-level scroll) and de-**nested** every inner scroll: sidebar container, its scroll area, and the totals footer all flip to `overflow: visible` — otherwise you get double scrollbars / invisible content. The ONLY inner element that keeps a bounded box is the lines grid, which gets an explicit `minHeight: min(72vh, 640px)` because its internal layout contract (`flex:1; minHeight:0`) needs a sized parent.
+- MatchMedia breakpoints layer: keep `compact` (≤1500px) and add `narrow` (≤1180px) as independent booleans — never merge them, because wide-compact still needs the row layout just tighter.
+
+**Files modified (1)**: `resources/js/pages/documents/CommercialDocumentPage.tsx` (+ `public/sw.js` refreshed by the build). Commit `f775e8d`, pushed to `origin/main`.
+
+**Verification**: `npx tsc --noEmit` clean · vitest **405/405** (23 files) · `npm run build` 0 errors, **240 precache entries** · **SW MATCH** (`public/sw.js` hash == `public/build/sw.js` hash).
 
 ### Phase 85 — POS Printing Without a Thermal Printer: Silent GDI Text Path + Zero-Config Windows Target (Aug 23–24)
 
