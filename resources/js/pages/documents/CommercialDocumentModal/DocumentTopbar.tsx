@@ -28,6 +28,12 @@ interface DocumentTopbarProps {
   RETURNABLE_CODES: Set<string>;
   /** وضع الحاسب المحمول — أزرار أيقونية فقط وحشوات مضغوطة. */
   compact?: boolean;
+  /** مؤشر مسودة تلقائي — آخر لحظة كُتبت المسودة (مستند جديد فقط). */
+  draftSavedAt?: number | null;
+  /** حفظ المسودة الآن يدوياً. */
+  onSaveDraft?: () => void;
+  /** تجاهل/حذف المسودة المحفوظة. */
+  onDiscardDraft?: () => void;
 }
 
 function useDismissibleMenu<T extends HTMLElement>(open: boolean, onDismiss: () => void) {
@@ -55,6 +61,7 @@ export default function DocumentTopbar({
   onPrint, templates, selectedTemplateId, onTemplateChange,
   handleExport, handleDelete, onReturnClick, RETURNABLE_CODES,
   compact = false,
+  draftSavedAt = null, onSaveDraft, onDiscardDraft,
 }: DocumentTopbarProps) {
 
   const [exportOpen, setExportOpen] = useState(false);
@@ -142,6 +149,45 @@ export default function DocumentTopbar({
             }}>
               <i className={`ti ${statusPill.icon}`} style={{ fontSize: 10 }} />
               {statusPill.label}
+            </span>
+          )}
+          {!isEdit && draftSavedAt && (
+            <span style={{
+              padding: '2px 8px', borderRadius: 'var(--r1)',
+              background: 'color-mix(in srgb, var(--orange) 12%, transparent)',
+              border: `1px solid var(--orange)`,
+              fontSize: 10.5, fontWeight: 700, color: 'var(--orange)',
+              display: 'flex', alignItems: 'center', gap: 4,
+            }}>
+              <i className="ti ti-device-floppy" style={{ fontSize: 10 }} />
+              مسودة محفوظة
+              <span style={{ fontWeight: 500, opacity: 0.85 }}>
+                {new Date(draftSavedAt).toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+              {onSaveDraft && (
+                <button
+                  onClick={onSaveDraft}
+                  title="حفظ المسودة الآن"
+                  style={{
+                    border: 'none', background: 'transparent', color: 'var(--orange)',
+                    cursor: 'pointer', padding: 0, display: 'inline-flex', fontFamily: 'inherit',
+                  }}
+                >
+                  <i className="ti ti-refresh" style={{ fontSize: 11 }} />
+                </button>
+              )}
+              {onDiscardDraft && (
+                <button
+                  onClick={onDiscardDraft}
+                  title="تجاهل المسودة"
+                  style={{
+                    border: 'none', background: 'transparent', color: 'var(--orange)',
+                    cursor: 'pointer', padding: 0, display: 'inline-flex', fontFamily: 'inherit',
+                  }}
+                >
+                  <i className="ti ti-x" style={{ fontSize: 11 }} />
+                </button>
+              )}
             </span>
           )}
           {pmMode === 'additive' && (

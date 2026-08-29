@@ -114,6 +114,7 @@ export default function CommercialDocumentPage() {
     paymentModeOptions, treasuryAccountMap, selectedParty,
     stockBadge, paymentsExceedWarning, balanceWarning,
     savedDraft, draftKey, restoreDraft,
+    draftSavedAt, discardDraft, saveDraftNow,
   } = ctrl;
 
   const DOC_TAB_KEY = `doc-tab:${docCode}`;
@@ -303,6 +304,9 @@ export default function CommercialDocumentPage() {
         onReturnClick={() => setShowReturnModal(true)}
         RETURNABLE_CODES={RETURNABLE_CODES}
         compact={compact}
+        draftSavedAt={draftSavedAt}
+        onSaveDraft={saveDraftNow}
+        onDiscardDraft={discardDraft}
       />
 
       {infoAlerts.length > 0 && (
@@ -554,6 +558,7 @@ export default function CommercialDocumentPage() {
             savedDraft={savedDraft}
             draftKey={draftKey}
             restoreDraft={restoreDraft}
+            onDiscardDraft={discardDraft}
             set={set}
             needsParty={needsParty}
             productSuggestions={productSuggestions}

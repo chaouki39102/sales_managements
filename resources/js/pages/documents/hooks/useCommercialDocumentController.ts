@@ -368,20 +368,35 @@ export function useCommercialDocumentController({
 
   // ─── Smart Memory — حفظ مسودة تلقائي ──────────────────────────────────────
   const draftKey = `doc-draft-${slug ?? 'default'}-${documentType?.code ?? 'new'}`;
+  /** آخر لحظة كُتبت فيها المسودة إلى التخزين المحلي (مؤشر مرئي). */
+  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
+  const [draftRevision, setDraftRevision] = useState(0);
+
+  const writeDraft = useCallback(() => {
+    if (!form.lines.length) return;
+    try {
+      const draft = { ...form, _savedAt: Date.now() };
+      localStorage.setItem(draftKey, btoa(unescape(encodeURIComponent(JSON.stringify(draft)))));
+      setDraftSavedAt(Date.now());
+      setDraftRevision((r) => r + 1);
+    } catch { /* localStorage full */ }
+  }, [form, draftKey]);
+
+  const discardDraft = useCallback(() => {
+    try { localStorage.removeItem(draftKey); } catch {}
+    setDraftSavedAt(null);
+    setDraftRevision(0);
+  }, [draftKey]);
+
   useEffect(() => {
     // التعديل لا يكتب مسودة: draftKey مشترك بين «جديد» و«تعديل»، وكتابة
     // المسودة أثناء تعديل مستند قائم تُتلف مسودة مستند جديد معلّق بنفس النوع.
     if (!active || isEdit || !form.lines.length) return;
-    const interval = setInterval(() => {
-      try {
-        const draft = { ...form, _savedAt: Date.now() };
-        localStorage.setItem(draftKey, btoa(unescape(encodeURIComponent(JSON.stringify(draft)))));
-      } catch { /* localStorage full */ }
-    }, 30_000);
+    const interval = setInterval(writeDraft, 30_000);
     return () => clearInterval(interval);
-  }, [active, form, draftKey, isEdit]);
+  }, [active, form, draftKey, isEdit, writeDraft]);
 
-  const restoreDraft = () => {
+  const restoreDraft = useCallback(() => {
     try {
       const raw = localStorage.getItem(draftKey);
       if (!raw) return null;
@@ -391,7 +406,25 @@ export function useCommercialDocumentController({
       if (elapsed > 86_400_000) { localStorage.removeItem(draftKey); return null; }
       return draft;
     } catch { return null; }
-  };
+  }, [draftKey]);
+
+  const readDraftSavedAt = useCallback((): number | null => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return null;
+      const draft = JSON.parse(decodeURIComponent(escape(atob(raw))));
+      if (!draft.lines?.length) return null;
+      const saved = Number(draft._savedAt ?? 0);
+      if (!saved || Date.now() - saved > 86_400_000) return null;
+      return saved;
+    } catch { return null; }
+  }, [draftKey]);
+
+  // إعادة قراءة تاريخ المسودة عند التغيير (حفظ/تجاهل) وعند بدء الجلسة.
+  useEffect(() => {
+    if (!active || isEdit) return;
+    setDraftSavedAt(readDraftSavedAt());
+  }, [active, isEdit, draftKey, draftRevision, readDraftSavedAt]);
 
   const savedDraft = !isEdit && active && !form.lines.length ? restoreDraft() : null;
 
@@ -423,6 +456,7 @@ export function useCommercialDocumentController({
       }
       const docNum = String((savedDoc as Record<string, unknown>)?.document_number ?? '');
       const queued = isOfflineQueuedResponse(savedDoc);
+      if (!isEdit) discardDraft();
       setSuccessMsg(
         queued
           ? isEdit
@@ -727,6 +761,7 @@ export function useCommercialDocumentController({
 
     // Draft
     savedDraft, draftKey, restoreDraft,
+    draftSavedAt, discardDraft, saveDraftNow: writeDraft,
   };
 }
 

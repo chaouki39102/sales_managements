@@ -92,7 +92,7 @@ export default function CommercialDocumentModal({
     isPartyExempt, partyOptions, priceLevelOptions,
     paymentModeOptions, treasuryAccountMap, selectedParty,
     stockBadge, paymentsExceedWarning, balanceWarning,
-    savedDraft, draftKey, restoreDraft,
+    savedDraft, draftKey, restoreDraft, discardDraft,
   } = ctrl;
 
   // ── إنشاء منتج سريع من بحث المنتجات ──────────────────────────────────────
@@ -415,6 +415,7 @@ export default function CommercialDocumentModal({
             savedDraft={savedDraft}
             draftKey={draftKey}
             restoreDraft={restoreDraft}
+            onDiscardDraft={discardDraft}
             set={set}
             needsParty={needsParty}
             productSuggestions={productSuggestions}

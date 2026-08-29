@@ -43,6 +43,8 @@ interface DocumentLinesSectionProps {
   savedDraft: Record<string, unknown> | null;
   draftKey: string;
   restoreDraft: () => Record<string, unknown> | null;
+  /** محو المسودة من التخزين (يعيد قراءة مؤشر المسودة في الشريط العلوي). */
+  onDiscardDraft?: () => void;
   set: (field: string, value: unknown) => void;
   needsParty: boolean;
   productSuggestions: unknown;
@@ -80,7 +82,7 @@ export default function DocumentLinesSection({
   affectsStock, stockDir, onRefreshStock,
   warehouses, compact = false,
   onQuickCreate, productTypes, tvas, units,
-  bulkAddLines,
+  bulkAddLines, onDiscardDraft,
 }: DocumentLinesSectionProps) {
   const [stockAlertOpen, setStockAlertOpen] = useState(true);
   const notify = useNotification();
@@ -640,7 +642,7 @@ export default function DocumentLinesSection({
                             (set as (field: string, value: unknown) => void)(k, draft[k]);
                           }
                         });
-                        try { localStorage.removeItem(draftKey); } catch {}
+                        try { localStorage.removeItem(draftKey); onDiscardDraft?.(); } catch {}
                       }
                     }}
                     style={{
@@ -653,7 +655,7 @@ export default function DocumentLinesSection({
                     استعادة
                   </button>
                   <button
-                    onClick={() => { try { localStorage.removeItem(draftKey); } catch {} }}
+                    onClick={() => { try { localStorage.removeItem(draftKey); onDiscardDraft?.(); } catch {} }}
                     style={{
                       padding: '5px 10px', borderRadius: 'var(--r1)',
                       border: '1px solid var(--b3)', background: 'transparent',
