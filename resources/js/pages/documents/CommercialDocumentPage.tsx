@@ -214,18 +214,29 @@ export default function CommercialDocumentPage() {
     return () => mq.removeEventListener('change', onChange);
   }, []);
 
-  // ── طي لوحة المعلومات الجانبية (محفوظ لكل نوع مستند) ──────────────────────
+  // ── الوضع الضيق (≤1180px): تكديس عمودي — الأسطر أعلى ولوحة المعلومات أسفل ─
+  const [narrow, setNarrow] = useState<boolean>(
+    () => window.matchMedia('(max-width: 1180px)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1180px)');
+    const onChange = (e: MediaQueryListEvent) => setNarrow(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  // ── طي لوحة المعلومات الجانبية (محفوظ لكل نوع مستند، مفتوحة افتراضياً) ────
   const [infoCollapsed, setInfoCollapsedState] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem(`doc_info_collapsed_${docCode}`);
       if (saved !== null) return saved === '1';
     } catch { /* ignore */ }
-    return window.innerWidth <= 1400;
+    return false;
   });
   useEffect(() => {
     try {
       const saved = localStorage.getItem(`doc_info_collapsed_${docCode}`);
-      setInfoCollapsedState(saved !== null ? saved === '1' : window.innerWidth <= 1400);
+      setInfoCollapsedState(saved !== null ? saved === '1' : false);
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docCode]);
@@ -233,6 +244,20 @@ export default function CommercialDocumentPage() {
     setInfoCollapsedState(v);
     try { localStorage.setItem(`doc_info_collapsed_${docCode}`, v ? '1' : '0'); } catch { /* ignore */ }
   }, [docCode]);
+
+  // ── قياس عرض لوحة المعلومات فعليةً (لمعاينة الطباعة المتجاوبة) ────────────
+  const sidebarRef = useRef<HTMLDivElement | null>(null);
+  const [sidebarW, setSidebarW] = useState(compact ? 252 : 300);
+  useEffect(() => {
+    const el = sidebarRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (w && w > 40) setSidebarW(Math.round(w));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [infoCollapsed]);
 
   // ── طي معاينة الطباعة (محفوظ لكل نوع مستند، مفتوحة افتراضياً) ──────────────
   const [previewCollapsed, setPreviewCollapsedState] = useState<boolean>(() => {
@@ -417,21 +442,34 @@ export default function CommercialDocumentPage() {
         </div>
       )}
 
-      <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+      <div style={{
+        flex: 1, minHeight: 0, display: 'flex',
+        flexDirection: narrow ? 'column' : 'row',
+        overflowY: narrow ? 'auto' : 'hidden',
+      }}>
 
         {infoCollapsed ? (
           <div style={{
-            width: 44, flexShrink: 0, borderLeft: '1px solid var(--b1)',
-            background: 'var(--bg2)', display: 'flex', flexDirection: 'column',
-            alignItems: 'center', padding: '8px 0', gap: 12,
+            width: narrow ? '100%' : 44, flexShrink: 0,
+            borderLeft: narrow ? 'none' : '1px solid var(--b1)',
+            borderTop: narrow ? '1px solid var(--b1)' : 'none',
+            background: 'var(--bg2)', display: 'flex',
+            flexDirection: narrow ? 'row' : 'column',
+            alignItems: 'center', gap: 10,
+            padding: narrow ? '0 12px' : '8px 0',
+            height: narrow ? 42 : undefined,
           }}>
             <button onClick={() => setInfoCollapsed(false)} title="إظهار لوحة المعلومات" style={railBtnStyle}>
-              <i className="ti ti-chevrons-left" style={{ fontSize: 15 }} />
+              <i className={narrow ? 'ti ti-chevrons-up' : 'ti ti-chevrons-left'} style={{ fontSize: 15 }} />
             </button>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <div style={
+              narrow
+                ? { flex: 1, display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }
+                : { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 0 }
+            }>
               <span style={{
-                writingMode: 'vertical-rl', fontSize: 11, fontWeight: 800,
-                color: 'var(--em)', whiteSpace: 'nowrap',
+                writingMode: narrow ? 'horizontal-tb' : 'vertical-rl',
+                fontSize: 11, fontWeight: 800, color: 'var(--em)', whiteSpace: 'nowrap',
               }}>
                 TTC {formatMiniMoney(totals?.ttc)}
               </span>
@@ -439,11 +477,21 @@ export default function CommercialDocumentPage() {
             <i className="ti ti-info-circle" style={{ fontSize: 14, color: 'var(--t4)' }} />
           </div>
         ) : (
-        <div style={{
-          width: compact ? 252 : 300, flexShrink: 0, borderLeft: '1px solid var(--b1)',
-          background: 'var(--bg2)', display: 'flex', flexDirection: 'column', minHeight: 0,
+        <div ref={sidebarRef} style={{
+          width: narrow ? '100%' : (compact ? 252 : 300),
+          flex: narrow ? 'none' : undefined,
+          flexShrink: 0,
+          borderLeft: narrow ? 'none' : '1px solid var(--b1)',
+          borderTop: narrow ? '1px solid var(--b1)' : 'none',
+          background: 'var(--bg2)', display: 'flex', flexDirection: 'column',
+          minHeight: narrow ? undefined : 0,
         }}>
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: compact ? 10 : 16, display: 'flex', flexDirection: 'column', gap: compact ? 10 : 16 }}>
+          <div style={{
+            flex: narrow ? undefined : 1,
+            minHeight: narrow ? undefined : 0,
+            overflowY: narrow ? 'visible' : 'auto',
+            padding: compact ? 10 : 16, display: 'flex', flexDirection: 'column', gap: compact ? 10 : 16,
+          }}>
 
             <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
               <button onClick={() => setInfoCollapsed(true)} title="طي لوحة المعلومات" style={railBtnStyle}>
@@ -570,6 +618,23 @@ export default function CommercialDocumentPage() {
           </div>
 
           <div style={{
+            flexShrink: 0, borderTop: '1px solid var(--b1)',
+            background: 'var(--bg2)',
+            maxHeight: narrow ? 'none' : (compact ? '48vh' : '55vh'),
+            overflowY: narrow ? 'visible' : 'auto',
+          }}>
+            <DocumentTotalsSection
+              totals={totals}
+              payments={payments}
+              partyBalance={partyBalance}
+              form={form}
+              selectedParty={selectedParty!}
+              isPurchase={isPurchase}
+              isEdit={isEdit}
+            />
+          </div>
+
+          <div style={{
             flexShrink: 0, borderTop: '1px solid var(--b1)', background: 'var(--bg2)',
             padding: compact ? '6px 10px' : '8px 16px',
           }}>
@@ -597,7 +662,10 @@ export default function CommercialDocumentPage() {
                   lines={form.lines}
                   totals={totals}
                   notes={form.notes}
-                  availableWidth={(compact ? 252 : 300) - (compact ? 10 : 16) * 2}
+                  availableWidth={Math.max(
+                    160,
+                    (narrow ? Math.min(sidebarW, 440) : sidebarW) - (compact ? 10 : 16) * 2,
+                  )}
                 />
               </div>
             )}
@@ -609,25 +677,14 @@ export default function CommercialDocumentPage() {
               <DocumentAttachmentsPanel docId={docId} readOnly={isReadOnly} />
             ) : null;
           })()}
-
-          <div style={{
-            flexShrink: 0, borderTop: '1px solid var(--b1)',
-            background: 'var(--bg2)', maxHeight: compact ? '48vh' : '55vh', overflowY: 'auto',
-          }}>
-            <DocumentTotalsSection
-              totals={totals}
-              payments={payments}
-              partyBalance={partyBalance}
-              form={form}
-              selectedParty={selectedParty!}
-              isPurchase={isPurchase}
-              isEdit={isEdit}
-            />
-          </div>
         </div>
         )}
 
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: compact ? 10 : 16 }}>
+        <div style={{
+          flex: 1,
+          minHeight: narrow ? 'min(72vh, 640px)' : 0,
+          display: 'flex', flexDirection: 'column', padding: compact ? 10 : 16,
+        }}>
           <DocumentLinesSection
             lines={form.lines}
             isLinesReadOnly={isLinesReadOnly}
