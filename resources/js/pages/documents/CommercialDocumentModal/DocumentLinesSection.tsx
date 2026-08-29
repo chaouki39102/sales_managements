@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Section, AlertBanner, ColumnManager } from '../components/DocumentUIPrimitives';
 import { BarcodeInput } from '../components/BarcodeInput';
 import { LineCard } from '../components/LineCard';
@@ -217,6 +217,33 @@ export default function DocumentLinesSection({
   // ═══════════════════════════════════════════════════════════════════════
   const linesContainerRef = useRef<HTMLDivElement>(null);
   const FOCUSABLE = 'input:not([disabled]), select:not([disabled]), textarea:not([disabled])';
+
+  // ═══ شريط ملخص التحذيرات — سطر واحد فوق الأسطر؛ نقرة = قفز إلى أول/تالي سطر مُعلَّم ═══
+  // يجمع فهارس الأسطر التي تحمل على الأقل تحذيراً غير info (مخزون/تسعير/هامش/تقيد).
+  const flaggedIdx = useMemo<number[]>(() => {
+    const out: number[] = [];
+    lineWarnings.forEach((warns, idx) => {
+      if (warns.some((w) => w.level !== 'info')) out.push(idx);
+    });
+    return out.sort((a, b) => a - b);
+  }, [lineWarnings]);
+
+  const [warnJump, setWarnJump] = useState(0);
+
+  const scrollToNextFlagged = () => {
+    if (flaggedIdx.length === 0 || !linesContainerRef.current) return;
+    const target = flaggedIdx[warnJump % flaggedIdx.length];
+    setWarnJump((n) => n + 1);
+    const el = linesContainerRef.current.querySelector<HTMLElement>(
+      `tr[data-line-idx="${target}"], [data-line-idx="${target}"]`,
+    );
+    if (el) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el.style.outline = '2px solid var(--orange)';
+      el.style.outlineOffset = '2px';
+      window.setTimeout(() => { el.style.outline = ''; el.style.outlineOffset = ''; }, 1400);
+    }
+  };
 
   /** أضف سطراً فارغاً جديداً ثم ركّز منتقي المنتج فيه (السطر الجديد بلا منتج —
    *  الكمية بلا معنى قبله). يهبط إلى الكمية إن لم يُوجد المنتقي. */
@@ -605,6 +632,28 @@ export default function DocumentLinesSection({
               </button>
             </div>
           </div>
+        )}
+
+        {flaggedIdx.length > 0 && (
+          <button
+            type="button"
+            onClick={scrollToNextFlagged}
+            title={`اضغط للانتقال إلى ${flaggedIdx.length > 1 ? 'التحذير التالي' : 'السطر المعلَّم'}`}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+              marginBottom: 6, padding: '6px 12px', cursor: 'pointer',
+              borderRadius: 'var(--r1)', textAlign: 'right', fontFamily: 'inherit',
+              background: 'color-mix(in srgb, var(--orange) 10%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--orange) 28%, transparent)',
+              color: 'var(--orange)', fontSize: 11.5, fontWeight: 600,
+            }}
+          >
+            <i className="ti ti-alert-triangle" style={{ fontSize: 15, flexShrink: 0 }} />
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              ⚠ {flaggedIdx.length} عناصر تحتاج مراجعة (مخزون / تسعير / هامش)
+            </span>
+            <i className="ti ti-arrow-down" style={{ fontSize: 13, flexShrink: 0 }} />
+          </button>
         )}
 
         <div

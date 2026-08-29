@@ -73,7 +73,7 @@ Inline "إنشاء متعامل جديد" in party search dropdown when no match
 ## Task 10 — Stock Alert Summary Bar
 Compact bar above lines: "⚠ 3 أسطر تتجاوز المخزون المتاح" — click to jump to flagged lines.
 - Already has `lineWarnings` per line. Needs aggregation bar + scroll-to-warnings.
-- Status: ⏳
+- Status: ✅ — `DocumentLinesSection` aggregates non-info warnings across all lines via a `flaggedIdx` memo; a compact amber bar renders above the lines («⚠ N عناصر تحتاج مراجعة») when any exist. Click cycles to the next flagged line (`scrollToNextFlagged`), smooth-scrolling the `[data-line-idx]` row into center view and flashing an orange outline. Works in both table and card modes (selector covers `tr[data-line-idx]` and `[data-line-idx]`).
 
 ## Task 11 — Line Reorder via Drag
 Drag handle per row for manual reordering (priority: low — keyboard reorder covers most cases).
