@@ -55,7 +55,8 @@ Show draft status pill in topbar ("مسودة محفوظة" + timestamp) + delib
 ## Task 7 — Duplicate Document as New
 Button "نسخ كمستند جديد" on edit page — clones lines to a fresh doc with today's date.
 - Backend: new endpoint `POST /documents/{id}/clone` — creates new doc from existing.
-- Status: ⏳
+- Implemented: `CommercialDocumentService::clone()` (same doc type, fresh date today, lines copied verbatim incl. pack snapshot + notes, `internal_notes` = "منسوخ من {num}", NO `source_document_id` → independent doc avoids double-stock/integrity chain); `cloneDocument()` controller (authorizes create+update, attachBalanceData + transformItem); route before `apiResource`. Frontend: `documentsApi.clone(id)` + "نسخ كمستند جديد" menu item in `DocumentTopbar` (edit mode only) → confirms → navigates to the new doc's edit page.
+- Status: ✅
 
 ## Task 8 — Line Total Color Coding
 Subtle color on line total column: green when margin > threshold, red when below cost.

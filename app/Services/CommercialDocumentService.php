@@ -822,6 +822,70 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         }
     }
 
+    /**
+     * نسخ مستند كنسخة مستقلة جديدة (Task 7).
+     *
+     * ينشئ مستنداً جديداً من نفس نوع المستند المصدر بكل أسطره (مع القيمة
+     * المجمّدة لمعامل التعبئة والملاحظات الداخلية للسطر)، بتاريخ اليوم، وبدون
+     * أي ارتباط source_document_id — فهو مستند جديد مستقل يخضع لكامل مسار
+     * الإنشاء (التحقق، الطابع، حركة المخزون، snapshot الرصيد، الترقيم).
+     *
+     * مفتاح الخريطة مطابق تماماً لخريطة DocumentConversionService::convert:
+     * يُمرَّر unit_price_ht المخزّن (سعر العبوة) + packaging_units_snapshot
+     * (وليس pack_qty) — فيحتفظ createDocumentLines بسعر العبوة دون مضاعفة.
+     */
+    public function clone(CommercialDocument $source, ?array $includeLineIds = null): CommercialDocument
+    {
+        $companyId = $source->company_id;
+
+        if (!$source->document_type_id) {
+            throw new BusinessRuleException('لا يمكن نسخ مستند دون نوع.', 422);
+        }
+
+        $sourceLines = $source->lines()
+            ->when($includeLineIds, fn($q) => $q->whereIn('id', $includeLineIds))
+            ->get();
+
+        if ($sourceLines->isEmpty()) {
+            throw new BusinessRuleException('لا توجد أسطر لنسخها.', 422);
+        }
+
+        $linesData = $sourceLines->map(fn($line) => [
+            'product_id'               => $line->product_id,
+            'description'              => $line->description,
+            'quantity'                 => $line->quantity,
+            'unit_price_ht'            => $line->unit_price_ht,
+            'discount_percentage'      => $line->discount_percentage,
+            'discount_amount_per_unit' => $line->discount_amount_per_unit,
+            'tva_rate'                 => $line->tva_rate,
+            'packaging_id'             => $line->packaging_id,
+            'packaging_units_snapshot' => $line->packaging_units_snapshot,
+            'notes'                    => $line->notes,
+        ])->toArray();
+
+        return DB::transaction(function () use ($source, $companyId, $linesData) {
+            $newDoc = $this->create([
+                'document_type_id' => $source->document_type_id,
+                'party_id'         => $source->party_id,
+                'warehouse_id'     => $source->warehouse_id,
+                'fiscal_year_id'   => $source->fiscal_year_id,
+                'currency_id'      => $source->currency_id,
+                'exchange_rate'    => $source->exchange_rate,
+                'document_date'    => now()->toDateString(),
+                'due_date'         => $source->due_date?->format('Y-m-d'),
+                'notes'            => $source->notes,
+                'internal_notes'   => "منسوخ من {$source->document_number}",
+                'payment_terms'    => $source->payment_terms,
+                'shipping_info'    => $source->shipping_info,
+            ], null);
+
+            $this->addLinesToDocument($newDoc, $linesData);
+            $this->persistBalanceSnapshots($newDoc);
+
+            return $newDoc->fresh(['lines.product', 'documentType', 'party']);
+        });
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // PUBLIC: إضافة أسطر لمستند موجود + إعادة حساب الإجماليات + حركات المخزون
     // يُستخدم من DocumentConversionService: يُنشئ المستند بالعنوان أولاً ثم

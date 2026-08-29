@@ -24,6 +24,8 @@ interface DocumentTopbarProps {
   onTemplateChange?: (id: number | null) => void;
   handleExport: (format: 'excel' | 'pdf' | 'json' | 'xml') => void;
   handleDelete: () => void;
+  /** نسخ المستند كنسخة جديدة مستقلة (Task 7) — يُعرض في وضع التعديل فقط. */
+  onClone?: () => void;
   onReturnClick?: () => void;
   RETURNABLE_CODES: Set<string>;
   /** وضع الحاسب المحمول — أزرار أيقونية فقط وحشوات مضغوطة. */
@@ -59,7 +61,7 @@ export default function DocumentTopbar({
   docCode, docNumber, existingDocument, pmMode, stockBadge,
   onBack, isPending, successMsg, isReadOnly, handleSave,
   onPrint, templates, selectedTemplateId, onTemplateChange,
-  handleExport, handleDelete, onReturnClick, RETURNABLE_CODES,
+  handleExport, handleDelete, onClone, onReturnClick, RETURNABLE_CODES,
   compact = false,
   draftSavedAt = null, onSaveDraft, onDiscardDraft,
 }: DocumentTopbarProps) {
@@ -316,6 +318,17 @@ export default function DocumentTopbar({
                   >
                     <i className="ti ti-trash" style={{ fontSize: 15 }} />
                     حذف
+                  </button>
+                )}
+                {isEdit && !!onClone && (
+                  <button
+                    onClick={() => { setMoreOpen(false); onClone(); }}
+                    style={{ ...menuItemStyle, color: 'var(--em)' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--b1)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <i className="ti ti-copy" style={{ fontSize: 15 }} />
+                    نسخ كمستند جديد
                   </button>
                 )}
               </div>

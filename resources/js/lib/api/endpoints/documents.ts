@@ -223,6 +223,9 @@ export const documentsApi = {
   share: (id: number) =>
     apiPost<{ share_url: string; expires_at: string }>(`/documents/${id}/share`),
 
+  clone: (id: number) =>
+    apiPost<CommercialDocument>(`/documents/${id}/clone`),
+
   // ── Lines ──────────────────────────────────────────────────────────────────
 
   lines: {

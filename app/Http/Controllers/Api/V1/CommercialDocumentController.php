@@ -360,6 +360,29 @@ class CommercialDocumentController extends BaseApiController
         }
     }
 
+    /**
+     * نسخ مستند كنسخة جديدة مستقلة (Task 7) — يستنسخ الأسطر في مستند جديد
+     * من نفس النوع بتاريخ اليوم من خلال CommercialDocumentService::clone().
+     */
+    public function cloneDocument(Request $request, CommercialDocument $commercialDocument): JsonResponse
+    {
+        try {
+            $this->authorizeAction('create', CommercialDocument::class);
+            $this->authorizeAction('update', $commercialDocument);
+
+            $item = $this->commercialDocumentService->clone($commercialDocument);
+            $this->attachBalanceData($item);
+
+            return $this->successResponse(
+                $this->transformItem($item),
+                'تم نسخ الوثيقة كمستند جديد بنجاح',
+                201
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'clone');
+        }
+    }
+
     public function update(Request $request, $id): JsonResponse
     {
         try {

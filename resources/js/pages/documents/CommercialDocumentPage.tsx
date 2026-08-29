@@ -1,10 +1,11 @@
 import React, { Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
 import { apiGet } from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
 import type { DocumentType } from '@/lib/api/core/types';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
+import { documentsApi } from '@/lib/api/endpoints/documents';
 
 const TemplatePrintModal = React.lazy(() => import('@/pages/settings/print-settings/components/shared/TemplatePrintModal'));
 
@@ -116,6 +117,29 @@ export default function CommercialDocumentPage() {
     savedDraft, draftKey, restoreDraft,
     draftSavedAt, discardDraft, saveDraftNow,
   } = ctrl;
+
+  // نسخ المستند كنسخة جديدة مستقلة (Task 7)
+  const cloneMutation = useMutation({
+    mutationFn: (docId: number) => documentsApi.clone(docId),
+    onSuccess: (res) => {
+      const newId = res?.id;
+      qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug ?? '') });
+      if (newId) {
+        navigate(`/documents/${typeCode}/${newId}/edit`);
+      } else {
+        navigate(`/documents/${typeCode}`);
+      }
+    },
+  });
+
+  const handleClone = useCallback(async () => {
+    const ok = await confirm(
+      `نسخ المستند ${docNumber || ''} كمستند جديد (بأسطره وتاريخ اليوم)؟`,
+      { variant: 'info', confirmText: 'نسخ', title: 'نسخ كمستند جديد' },
+    );
+    if (ok && id) cloneMutation.mutate(Number(id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [confirm, docNumber, id, cloneMutation]);
 
   const DOC_TAB_KEY = `doc-tab:${docCode}`;
   const [extraTab, setExtraTabState] = useState<string>(() => {
@@ -301,6 +325,7 @@ export default function CommercialDocumentPage() {
         onTemplateChange={setSelectedTemplateId}
         handleExport={handleExport}
         handleDelete={handleDelete}
+        onClone={isEdit ? handleClone : undefined}
         onReturnClick={() => setShowReturnModal(true)}
         RETURNABLE_CODES={RETURNABLE_CODES}
         compact={compact}
