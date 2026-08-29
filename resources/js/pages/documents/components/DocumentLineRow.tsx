@@ -36,6 +36,14 @@ interface DocumentLineRowProps {
   isLoadingProducts?: boolean;
   selected?:      boolean;
   onToggleSelect?: (idx: number) => void;
+  /** مقبض السحب لإعادة الترتيب (Task 11) — يعرض مقبضاً حين يكون السطر قابلاً للتعديل. */
+  onRowDragStart?: (idx: number, e: React.DragEvent) => void;
+  onRowDragEnd?: () => void;
+  onRowDragOver?: (idx: number, e: React.DragEvent) => void;
+  onRowDragLeave?: (idx: number, e: React.DragEvent) => void;
+  onRowDrop?: (idx: number, e: React.DragEvent) => void;
+  isDragSource?: boolean;
+  isDropTarget?: boolean;
 }
 
 function CellInput({
@@ -107,6 +115,8 @@ export const DocumentLineRow = memo(function DocumentLineRow({
   stockValidation, onUpdate, onRemove, onDuplicate, isTvaExempt, lineWarnings, warehouses,
   onQuickCreate, productTypes, tvas, units, isLoadingProducts,
   selected, onToggleSelect,
+  onRowDragStart, onRowDragEnd, onRowDragOver, onRowDragLeave, onRowDrop,
+  isDragSource, isDropTarget,
 }: DocumentLineRowProps) {
 
   const { baseQty, gross: _gross, discountAmt, discPct: _discPct, ht, tva: _lineTva, ttc } = calcLineTotal(line);
@@ -141,15 +151,59 @@ export const DocumentLineRow = memo(function DocumentLineRow({
 
   const col = (key: ColKey) => visibleCols.has(key);
 
+  const dragEnabled = !!onRowDragStart && !disabled;
+  const subRowColSpan = visibleCols.size + (onToggleSelect ? 1 : 0) + (dragEnabled ? 1 : 0);
+
+  const rowDragOver = (e: React.DragEvent) => {
+    if (!dragEnabled) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    onRowDragOver?.(idx, e);
+  };
+  const rowDragLeave = (e: React.DragEvent) => {
+    const rel = e.relatedTarget as Node | null;
+    if (rel && e.currentTarget.contains(rel)) return;
+    onRowDragLeave?.(idx, e);
+  };
+  const rowDrop = (e: React.DragEvent) => {
+    if (!dragEnabled) return;
+    e.preventDefault();
+    onRowDrop?.(idx, e);
+  };
+
   return (
     <>
       <tr
         data-line-idx={idx}
+        onDragOver={rowDragOver}
+        onDragLeave={rowDragLeave}
+        onDrop={rowDrop}
         style={{
         borderBottom: '1px solid var(--b1)',
         background:   rowBg,
         transition:   'background .15s',
+        opacity: isDragSource ? 0.4 : 1,
+        outline: isDropTarget ? '2px dashed var(--em)' : 'none',
+        outlineOffset: -2,
       }}>
+        {dragEnabled && (
+          <td style={{ padding: '4px 2px', textAlign: 'center', width: 28 }}>
+            <span
+              draggable
+              onDragStart={(e) => onRowDragStart?.(idx, e)}
+              onDragEnd={onRowDragEnd}
+              title="اسحب لإعادة الترتيب"
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 20, height: 20, cursor: 'grab', userSelect: 'none',
+                color: 'var(--t4)', borderRadius: 'var(--r1)',
+              }}
+            >
+              <i className="ti ti-grip-vertical" style={{ fontSize: 13 }} />
+            </span>
+          </td>
+        )}
+
         {onToggleSelect && (
           <td style={{ padding: '4px 6px', textAlign: 'center', width: 32 }}>
             <input
@@ -492,7 +546,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
       {hasStockWarning && (
         <tr style={{ background: rowBg }}>
           <td
-            colSpan={visibleCols.size}
+            colSpan={subRowColSpan}
             style={{ padding: '3px 10px 6px', fontSize: 11,
               color: stockValidation.blocking ? 'var(--red)' : 'var(--orange)' }}
           >
@@ -507,7 +561,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
       {activeComputeWarnings.map((w, wi) => (
         <tr key={wi} style={{ background: rowBg }}>
           <td
-            colSpan={visibleCols.size}
+            colSpan={subRowColSpan}
             style={{
               padding: '3px 10px 6px', fontSize: 11,
               color: w.level === 'error' ? 'var(--red)' : 'var(--orange)',

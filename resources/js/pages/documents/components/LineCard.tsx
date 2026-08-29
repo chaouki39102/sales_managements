@@ -28,6 +28,13 @@ interface LineCardProps {
   isLoadingProducts?: boolean;
   selected?:       boolean;
   onToggleSelect?: (idx: number) => void;
+  onRowDragStart?: (idx: number, e: React.DragEvent) => void;
+  onRowDragEnd?:   () => void;
+  onRowDragOver?:  (idx: number, e: React.DragEvent) => void;
+  onRowDragLeave?: (idx: number, e: React.DragEvent) => void;
+  onRowDrop?:      (idx: number, e: React.DragEvent) => void;
+  isDragSource?:   boolean;
+  isDropTarget?:   boolean;
 }
 
 export function LineCard({
@@ -36,6 +43,8 @@ export function LineCard({
   onUpdate, onRemove, onDuplicate,
   onQuickCreate, productTypes, tvas, units, isLoadingProducts,
   selected, onToggleSelect,
+  onRowDragStart, onRowDragEnd, onRowDragOver, onRowDragLeave, onRowDrop,
+  isDragSource, isDropTarget,
 }: LineCardProps) {
   const prod = products.find((p) => String(p.id) === line.product_id) ?? line._product;
   const { baseQty, gross: _gross, ht, tva, ttc, discountAmt, discPct: _discPct } = calcLineTotal(line);
@@ -98,6 +107,22 @@ export function LineCard({
   return (
     <div
       data-line-idx={idx}
+      onDragOver={(e) => {
+        if (!onRowDragOver) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        onRowDragOver(idx, e);
+      }}
+      onDragLeave={(e) => {
+        const rel = e.relatedTarget as Node | null;
+        if (rel && e.currentTarget.contains(rel)) return;
+        onRowDragLeave?.(idx, e);
+      }}
+      onDrop={(e) => {
+        if (!onRowDrop) return;
+        e.preventDefault();
+        onRowDrop(idx, e);
+      }}
       style={{
         background: bgTint,
         border: `1px solid ${borderColor}`,
@@ -107,6 +132,9 @@ export function LineCard({
         fontSize: 12,
         position: 'relative',
         transition: 'border-color .15s, box-shadow .15s',
+        opacity: isDragSource ? 0.4 : 1,
+        outline: isDropTarget ? '2px dashed var(--em)' : 'none',
+        outlineOffset: -2,
       }}
     >
       {/* ── Header ── */}
@@ -160,6 +188,22 @@ export function LineCard({
         </div>
 
         <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          {!disabled && onRowDragStart && (
+            <span
+              draggable
+              onDragStart={(e) => onRowDragStart(idx, e)}
+              onDragEnd={onRowDragEnd || undefined}
+              title="اسحب لإعادة الترتيب"
+              style={{
+                width: 28, height: 28, cursor: 'grab', userSelect: 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--t4)', borderRadius: 'var(--r1)',
+              }}
+            >
+              <i className="ti ti-grip-vertical" style={{ fontSize: 13 }} />
+            </span>
+          )}
+
           {!disabled && (
             <button
               onClick={() => onDuplicate(idx)}

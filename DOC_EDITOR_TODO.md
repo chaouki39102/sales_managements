@@ -42,15 +42,15 @@ Each line gets an optional internal note (not printed on invoice, visible to adm
 - Frontend already had full UI (table row + card input + payload builder) — just needed backend storage.
 - Commit: `38148ef`
 
-## Task 5 — Bulk Price Override
+## Task 5 — Bulk Price Override ✅ DONE
 Select multiple lines (checkbox column) and apply a flat discount % or price change.
 - New toolbar: "تطبيق على المحدد" with discount % and amount inputs.
-- Status: ⏳
+- Status: ✅ — Commit: `8331a05` (checkbox selection column + bulk discount %/amount toolbar applied to selected lines).
 
-## Task 6 — Draft Auto-Save Visual Indicator
+## Task 6 — Draft Auto-Save Visual Indicator ✅ DONE
 Show draft status pill in topbar ("مسودة محفوظة" + timestamp) + deliberate save/revert buttons.
 - Currently hidden behind `savedDraft`/`draftKey`/`restoreDraft` — needs visible affordance.
-- Status: ⏳
+- Status: ✅ — Commit: `1138a68` (visible «مسودة محفوظة» pill + timestamp in topbar with manual save/discard buttons).
 
 ## Task 7 — Duplicate Document as New
 Button "نسخ كمستند جديد" on edit page — clones lines to a fresh doc with today's date.
@@ -77,7 +77,7 @@ Compact bar above lines: "⚠ 3 أسطر تتجاوز المخزون المتا�
 
 ## Task 11 — Line Reorder via Drag
 Drag handle per row for manual reordering (priority: low — keyboard reorder covers most cases).
-- Status: ⏳
+- Status: ✅ — HTML5 drag-and-drop (no new deps): draggable grip (grip `ti-grip-vertical`) in table-cell and card-header modes (`DocumentLineRow` + `LineCard`), drop handled in `DocumentLinesSection` (dragIdx/dragOverIdx state, `useCallback` handlers, `moveLine(from, to)` via controller) → row reorder via the grip only (never whole-row, so text selection isn't broken); `e.dataTransfer.setData('text/plain')` for Firefox; relatedTarget guard against dragleave flicker; source opacity 0.4 + dashed em drop-target outline; empty grip `<th>` added when not read-only. tsc clean; 405/405; build 0 errors; SW MATCH.
 
 ## Task 12 — Print Preview Inline Toggle
 Toggle mini A4 preview in sidebar (live-rendered as you type).

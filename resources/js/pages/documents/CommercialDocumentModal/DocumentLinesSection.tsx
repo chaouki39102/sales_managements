@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Section, AlertBanner, ColumnManager } from '../components/DocumentUIPrimitives';
 import { BarcodeInput } from '../components/BarcodeInput';
 import { LineCard } from '../components/LineCard';
@@ -89,6 +89,42 @@ export default function DocumentLinesSection({
 }: DocumentLinesSectionProps) {
   const [stockAlertOpen, setStockAlertOpen] = useState(true);
   const notify = useNotification();
+
+  // ── سحب/إسقاط لإعادة ترتيب الأسطر ───────────────────────────────────────
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
+  const handleRowDragStart = useCallback((fromIdx: number, e: React.DragEvent) => {
+    if (isLinesReadOnly) return;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(fromIdx));
+    setDragIdx(fromIdx);
+  }, [isLinesReadOnly]);
+
+  const handleRowDragEnd = useCallback(() => {
+    setDragIdx(null);
+    setDragOverIdx(null);
+  }, []);
+
+  const handleRowDragOver = useCallback((overIdx: number, _e?: React.DragEvent) => {
+    if (dragIdx === null || dragIdx === overIdx) return;
+    setDragOverIdx((d) => (d === overIdx ? d : overIdx));
+  }, [dragIdx]);
+
+  const handleRowDragLeave = useCallback((overIdx: number, _e?: React.DragEvent) => {
+    setDragOverIdx((d) => (d === overIdx ? null : d));
+  }, []);
+
+  const handleRowDrop = useCallback((overIdx: number, _e?: React.DragEvent) => {
+    if (dragIdx === null || dragIdx === overIdx || isLinesReadOnly) {
+      setDragIdx(null);
+      setDragOverIdx(null);
+      return;
+    }
+    moveLine(dragIdx, overIdx);
+    setDragIdx(null);
+    setDragOverIdx(null);
+  }, [dragIdx, isLinesReadOnly, moveLine]);
 
   // ── تحديد أسطر جماعي ─────────────────────────────────────────────────────
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
@@ -755,6 +791,13 @@ export default function DocumentLinesSection({
                     isLoadingProducts={isLoadingProducts}
                     selected={selectedIndices.has(idx)}
                     onToggleSelect={toggleSelect}
+                    onRowDragStart={isLinesReadOnly ? undefined : handleRowDragStart}
+                    onRowDragEnd={handleRowDragEnd}
+                    onRowDragOver={handleRowDragOver}
+                    onRowDragLeave={handleRowDragLeave}
+                    onRowDrop={handleRowDrop}
+                    isDragSource={dragIdx === idx}
+                    isDropTarget={dragOverIdx === idx}
                   />
                 );
               })}
@@ -764,6 +807,9 @@ export default function DocumentLinesSection({
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: compact ? 11.5 : 12 }}>
                 <thead>
                   <tr style={{ background: 'var(--bg3)', borderBottom: '2px solid var(--b2)' }}>
+                    {!isLinesReadOnly && (
+                      <th style={{ padding: '4px 6px', textAlign: 'center', width: 28 }} />
+                    )}
                     <th style={{ padding: '4px 6px', textAlign: 'center', width: 32 }}>
                       <input
                         type="checkbox"
@@ -814,6 +860,13 @@ export default function DocumentLinesSection({
                         isLoadingProducts={isLoadingProducts}
                         selected={selectedIndices.has(idx)}
                         onToggleSelect={toggleSelect}
+                        onRowDragStart={isLinesReadOnly ? undefined : handleRowDragStart}
+                        onRowDragEnd={handleRowDragEnd}
+                        onRowDragOver={handleRowDragOver}
+                        onRowDragLeave={handleRowDragLeave}
+                        onRowDrop={handleRowDrop}
+                        isDragSource={dragIdx === idx}
+                        isDropTarget={dragOverIdx === idx}
                       />
                     );
                   })}
