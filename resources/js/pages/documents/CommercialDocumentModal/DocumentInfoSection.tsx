@@ -5,9 +5,16 @@ import type { PartyType } from '@/lib/api/core/types';
 import PartyBalanceBadge from './PartyBalanceBadge';
 import { CreditCheckBar } from '../components/CreditCheckBar';
 import { CustomerInsightPanel } from '../components/CustomerInsightPanel';
+import PartyQuickCreateForm, { type PartyQuickCreatePayload } from '../components/PartyQuickCreateForm';
 import type { PartyBalanceInfo } from '../hooks/useDocumentForm';
 import type { CreditCheckResult } from '../hooks/useCreditCheck';
 import type { CustomerInsightsData } from '../hooks/useCustomerInsights';
+
+/**
+ * حمولة نموذج الإنشاء السريع لمتعامل جديد — تُعاد تصديرها هنا ليبقى استيراد
+ * وحدة التحكم (`useCommercialDocumentController`) صالحاً عبر هذا المسار.
+ */
+export type { PartyQuickCreatePayload } from '../components/PartyQuickCreateForm';
 
 interface DocumentInfoSectionProps {
   form: Record<string, unknown>;
@@ -88,39 +95,18 @@ export default function DocumentInfoSection({
   partyTypes, onQuickCreateParty, creatingParty,
 }: DocumentInfoSectionProps) {
   const [creating, setCreating] = useState(false);
-  const [qcName, setQcName] = useState('');
-  const [qcPhone, setQcPhone] = useState('');
-  const [qcNif, setQcNif] = useState('');
-  const [qcPartyTypeId, setQcPartyTypeId] = useState<number | ''>('');
-  const [qcErr, setQcErr] = useState('');
+  const [qcInitialName, setQcInitialName] = useState('');
 
   const quickCreateEnabled = !!onQuickCreateParty && !isReadOnly;
 
   const openQuickCreate = (query: string) => {
     if (!quickCreateEnabled) return;
-    setQcName(query.trim());
-    setQcPhone('');
-    setQcNif('');
-    setQcPartyTypeId(partyTypes?.[0]?.id ?? '');
-    setQcErr('');
+    setQcInitialName(query.trim());
     setCreating(true);
   };
 
   const cancelQuickCreate = () => {
     setCreating(false);
-    setQcErr('');
-  };
-
-  const submitQuickCreate = () => {
-    if (!onQuickCreateParty) return;
-    if (!qcName.trim()) { setQcErr('اسم المتعامل مطلوب'); return; }
-    if (!qcPartyTypeId) { setQcErr('نوع المتعامل مطلوب'); return; }
-    onQuickCreateParty({
-      name: qcName.trim(),
-      phone: qcPhone.trim() || undefined,
-      nif: qcNif.trim() || undefined,
-      party_type_id: Number(qcPartyTypeId),
-    });
   };
 
   return (
@@ -177,87 +163,15 @@ export default function DocumentInfoSection({
             <FieldError msg={errors.party_id} />
 
             {creating && quickCreateEnabled && (
-              <div style={{
-                marginTop: 8, padding: '10px 12px', border: '1px dashed var(--em)',
-                borderRadius: 'var(--r2)', background: 'var(--bg3)',
-              }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--em)',
-                  marginBottom: 8 }}>
-                  إنشاء {isPurchase ? 'مورد' : 'زبون'} جديد
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
-                  <div>
-                    <Label>الاسم *</Label>
-                    <input
-                      type="text"
-                      value={qcName}
-                      disabled={creatingParty}
-                      autoFocus
-                      onChange={(e) => setQcName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') submitQuickCreate(); }}
-                      style={fieldInputStyle(false)}
-                      placeholder="اسم المتعامل..."
-                    />
-                  </div>
-                  <div>
-                    <Label>{isPurchase ? 'الهاتف' : 'الهاتف'} </Label>
-                    <input
-                      type="text"
-                      value={qcPhone}
-                      disabled={creatingParty}
-                      onChange={(e) => setQcPhone(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') submitQuickCreate(); }}
-                      style={fieldInputStyle(false)}
-                      placeholder="الهاتف..."
-                    />
-                  </div>
-                  <div>
-                    <Label>NIF </Label>
-                    <input
-                      type="text"
-                      value={qcNif}
-                      disabled={creatingParty}
-                      onChange={(e) => setQcNif(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') submitQuickCreate(); }}
-                      style={fieldInputStyle(false)}
-                      placeholder="رقم التعريف الجبائي..."
-                    />
-                  </div>
-                  <div>
-                    <Label>النوع *</Label>
-                    <select
-                      value={qcPartyTypeId}
-                      disabled={creatingParty}
-                      onChange={(e) => setQcPartyTypeId(e.target.value ? Number(e.target.value) : '')}
-                      style={fieldInputStyle(false)}
-                    >
-                      {!partyTypes?.length && <option value="">— لا توجد أنواع —</option>}
-                      {(partyTypes ?? []).map((pt) => (
-                        <option key={pt.id} value={pt.id}>{pt.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                {qcErr && <FieldError msg={qcErr} />}
-                <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-xs"
-                    disabled={creatingParty}
-                    onClick={cancelQuickCreate}
-                  >
-                    إلغاء
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-p btn-xs"
-                    disabled={creatingParty || !qcName.trim() || !qcPartyTypeId}
-                    onClick={submitQuickCreate}
-                  >
-                    {creatingParty ? 'يتم الإنشاء...' : 'إنشاء وتحديد'}
-                  </button>
-                </div>
-              </div>
+              <PartyQuickCreateForm
+                key={qcInitialName}
+                initialName={qcInitialName}
+                isPurchase={isPurchase}
+                partyTypes={partyTypes}
+                creatingParty={creatingParty}
+                onCancel={cancelQuickCreate}
+                onSubmit={onQuickCreateParty}
+              />
             )}
 
             <PartyBalanceBadge
@@ -301,13 +215,6 @@ export default function DocumentInfoSection({
   );
 }
 
-export interface PartyQuickCreatePayload {
-  name: string;
-  phone?: string;
-  nif?: string;
-  party_type_id: number;
-}
-
 /**
  * ═══════════════════════════════════════════════════════════════════════
  * DocumentAdvancedFields — محتوى صِرف بدون أي غلاف طيّ/تبويب خاص به.
@@ -322,12 +229,12 @@ export interface PartyQuickCreatePayload {
 export function DocumentAdvancedFields({
   form, errors, set, isReadOnly, isLinesReadOnly, isPurchase,
   priceLevelOptions, handlePriceLevelChange, lookups,
-  qc, slug, warehouseIdNum,
+  qc, slug, warehouseIdNum, slim = false,
 }: Pick<DocumentInfoSectionProps,
   | 'form' | 'errors' | 'set' | 'isReadOnly' | 'isLinesReadOnly' | 'isPurchase'
   | 'priceLevelOptions' | 'handlePriceLevelChange' | 'lookups'
   | 'qc' | 'slug' | 'warehouseIdNum'
->) {
+> & { slim?: boolean }) {
   return (
     <div style={{
       display: 'grid',
@@ -347,29 +254,31 @@ export function DocumentAdvancedFields({
         />
       </div>
 
-      <div>
-        <Label required>المستودع</Label>
-        <select
-          style={{
-            ...fieldInputStyle(isReadOnly, !!errors.warehouse_id),
-            cursor: isReadOnly ? 'not-allowed' : 'pointer',
-          }}
-          value={form.warehouse_id as string}
-          disabled={isReadOnly}
-          onChange={(e) => {
-            set('warehouse_id', e.target.value);
-            qc.invalidateQueries({ queryKey: [slug, 'warehouse-stock', warehouseIdNum] });
-          }}
-        >
-          <option value="">— اختر —</option>
-          {lookups.warehouses.map((w) => (
-            <option key={String(w.id)} value={String(w.id)}>
-              {String(w.name)}{w.is_default ? ' ★' : ''}
-            </option>
-          ))}
-        </select>
-        <FieldError msg={errors.warehouse_id} />
-      </div>
+      {!slim && (
+        <div>
+          <Label required>المستودع</Label>
+          <select
+            style={{
+              ...fieldInputStyle(isReadOnly, !!errors.warehouse_id),
+              cursor: isReadOnly ? 'not-allowed' : 'pointer',
+            }}
+            value={form.warehouse_id as string}
+            disabled={isReadOnly}
+            onChange={(e) => {
+              set('warehouse_id', e.target.value);
+              qc.invalidateQueries({ queryKey: [slug, 'warehouse-stock', warehouseIdNum] });
+            }}
+          >
+            <option value="">— اختر —</option>
+            {lookups.warehouses.map((w) => (
+              <option key={String(w.id)} value={String(w.id)}>
+                {String(w.name)}{w.is_default ? ' ★' : ''}
+              </option>
+            ))}
+          </select>
+          <FieldError msg={errors.warehouse_id} />
+        </div>
+      )}
 
       <div>
         <Label required>السنة المالية</Label>
@@ -415,7 +324,7 @@ export function DocumentAdvancedFields({
         <FieldError msg={errors.currency_id} />
       </div>
 
-      {!isPurchase && lookups.priceLevels.length > 0 && (
+      {!slim && !isPurchase && lookups.priceLevels.length > 0 && (
         <div>
           <Label>فئة السعر</Label>
           <ComboBox

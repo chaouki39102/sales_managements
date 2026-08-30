@@ -14,14 +14,17 @@ import { Tabs, AlertBanner } from './components/DocumentUIPrimitives';
 import { RETURNABLE_CODES, SHIPPING_CODES } from './types/document.types';
 
 import DocumentTopbar from './CommercialDocumentModal/DocumentTopbar';
-import DocumentInfoSection, { DocumentAdvancedFields, hasAdvancedFieldErrors } from './CommercialDocumentModal/DocumentInfoSection';
+import { DocumentAdvancedFields } from './CommercialDocumentModal/DocumentInfoSection';
 import DocumentLinesSection from './CommercialDocumentModal/DocumentLinesSection';
 import DocumentPaymentsSection from './CommercialDocumentModal/DocumentPaymentsSection';
 import DocumentTotalsSection from './CommercialDocumentModal/DocumentTotalsSection';
 
+import DocumentHeaderBand from './components/DocumentHeaderBand';
 import { DocumentChainPanel } from './components/DocumentChainPanel';
 import MiniPrintPreview from './components/MiniPrintPreview';
 import DocumentAttachmentsPanel from './components/DocumentAttachmentsPanel';
+import { CreditCheckBar } from './components/CreditCheckBar';
+import { CustomerInsightPanel } from './components/CustomerInsightPanel';
 import { ReturnDocumentModal } from './components/ReturnDocumentModal';
 import { BulkImportModal } from './components/BulkImportModal';
 import { InvoiceOcrModal } from './components/InvoiceOcrModal';
@@ -35,12 +38,6 @@ import { useCommercialDocumentController } from './hooks/useCommercialDocumentCo
 import { focusDocLineCell } from './utils/focusDocLineCell';
 import { isOfflineQueuedResponse } from '@/lib/offline/queueMath';
 
-/** زر طي/فتح لوحة المعلومات الجانبية. */
-const railBtnStyle: React.CSSProperties = {
-  width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-  border: '1px solid var(--b2)', background: 'var(--bg1)', color: 'var(--t3)',
-  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-};
 const formatMiniMoney = (v: unknown): string =>
   Number(v ?? 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
 
@@ -156,11 +153,11 @@ export default function CommercialDocumentPage() {
     try { localStorage.setItem(DOC_TAB_KEY, key); } catch {}
   };
   useEffect(() => {
-    if (hasAdvancedFieldErrors(errors) && extraTab !== 'advanced') {
+    if ((errors.fiscal_year_id || errors.currency_id) && extraTab !== 'advanced') {
       setExtraTab('advanced');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [errors.warehouse_id, errors.fiscal_year_id, errors.currency_id]);
+  }, [errors.fiscal_year_id, errors.currency_id]);
 
   const [alertsOpen, setAlertsOpen] = useState(true);
 
@@ -225,24 +222,24 @@ export default function CommercialDocumentPage() {
     return () => mq.removeEventListener('change', onChange);
   }, []);
 
-  // ── طي لوحة المعلومات الجانبية (محفوظ لكل نوع مستند، مفتوحة افتراضياً) ────
-  const [infoCollapsed, setInfoCollapsedState] = useState<boolean>(() => {
+  // ── طي الشريط العلوي (المتعامل، التاريخ، المستودع، فئة السعر) ───────────────
+  const [bandCollapsed, setBandCollapsedState] = useState<boolean>(() => {
     try {
-      const saved = localStorage.getItem(`doc_info_collapsed_${docCode}`);
+      const saved = localStorage.getItem(`doc_band_collapsed_${docCode}`);
       if (saved !== null) return saved === '1';
     } catch { /* ignore */ }
     return false;
   });
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(`doc_info_collapsed_${docCode}`);
-      setInfoCollapsedState(saved !== null ? saved === '1' : false);
+      const saved = localStorage.getItem(`doc_band_collapsed_${docCode}`);
+      setBandCollapsedState(saved !== null ? saved === '1' : false);
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docCode]);
-  const setInfoCollapsed = useCallback((v: boolean) => {
-    setInfoCollapsedState(v);
-    try { localStorage.setItem(`doc_info_collapsed_${docCode}`, v ? '1' : '0'); } catch { /* ignore */ }
+  const setBandCollapsed = useCallback((v: boolean) => {
+    setBandCollapsedState(v);
+    try { localStorage.setItem(`doc_band_collapsed_${docCode}`, v ? '1' : '0'); } catch { /* ignore */ }
   }, [docCode]);
 
   // ── قياس عرض لوحة المعلومات فعليةً (لمعاينة الطباعة المتجاوبة) ────────────
@@ -257,7 +254,7 @@ export default function CommercialDocumentPage() {
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [infoCollapsed]);
+  }, []);
 
   // ── طي معاينة الطباعة (محفوظ لكل نوع مستند، مفتوحة افتراضياً) ──────────────
   const [previewCollapsed, setPreviewCollapsedState] = useState<boolean>(() => {
@@ -442,41 +439,46 @@ export default function CommercialDocumentPage() {
         </div>
       )}
 
+      <DocumentHeaderBand
+        docCode={docCode}
+        isEdit={isEdit}
+        isReadOnly={isReadOnly}
+        isLinesReadOnly={isLinesReadOnly}
+        isPurchase={isPurchase}
+        needsParty={needsParty}
+        compact={compact}
+        narrow={narrow}
+        collapsed={bandCollapsed}
+        onToggleCollapse={() => setBandCollapsed(!bandCollapsed)}
+        ttcLabel={`TTC ${formatMiniMoney(totals?.ttc)}`}
+        form={form as unknown as Record<string, unknown>}
+        errors={errors}
+        set={set}
+        docNumber={docNumber}
+        docNumberErr={docNumberErr}
+        checkingDocNumber={checkingDocNumber}
+        handleDocNumberChange={handleDocNumberChange}
+        handlePartyChangeWithWarning={handlePartyChangeWithWarning}
+        partyOptions={partyOptions}
+        priceLevelOptions={priceLevelOptions}
+        handlePriceLevelChange={handlePriceLevelChange}
+        warehouses={lookups.warehouses as Array<{ id: number; name: string; is_default?: boolean }>}
+        warehouseIdNum={warehouseIdNum!}
+        qc={qc}
+        slug={slug}
+        partyBalance={partyBalance}
+        isLoadingBalance={isLoadingBalance}
+        partyTypes={partyTypes}
+        onQuickCreateParty={handleQuickCreateParty}
+        creatingParty={creatingParty}
+      />
+
       <div style={{
         flex: 1, minHeight: 0, display: 'flex',
         flexDirection: narrow ? 'column' : 'row',
         overflowY: narrow ? 'auto' : 'hidden',
       }}>
 
-        {infoCollapsed ? (
-          <div style={{
-            width: narrow ? '100%' : 44, flexShrink: 0,
-            borderLeft: narrow ? 'none' : '1px solid var(--b1)',
-            borderTop: narrow ? '1px solid var(--b1)' : 'none',
-            background: 'var(--bg2)', display: 'flex',
-            flexDirection: narrow ? 'row' : 'column',
-            alignItems: 'center', gap: 10,
-            padding: narrow ? '0 12px' : '8px 0',
-            height: narrow ? 42 : undefined,
-          }}>
-            <button onClick={() => setInfoCollapsed(false)} title="إظهار لوحة المعلومات" style={railBtnStyle}>
-              <i className={narrow ? 'ti ti-chevrons-up' : 'ti ti-chevrons-left'} style={{ fontSize: 15 }} />
-            </button>
-            <div style={
-              narrow
-                ? { flex: 1, display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }
-                : { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 0 }
-            }>
-              <span style={{
-                writingMode: narrow ? 'horizontal-tb' : 'vertical-rl',
-                fontSize: 11, fontWeight: 800, color: 'var(--em)', whiteSpace: 'nowrap',
-              }}>
-                TTC {formatMiniMoney(totals?.ttc)}
-              </span>
-            </div>
-            <i className="ti ti-info-circle" style={{ fontSize: 14, color: 'var(--t4)' }} />
-          </div>
-        ) : (
         <div ref={sidebarRef} style={{
           width: narrow ? '100%' : (compact ? 252 : 300),
           flex: narrow ? 'none' : undefined,
@@ -485,19 +487,29 @@ export default function CommercialDocumentPage() {
           borderTop: narrow ? '1px solid var(--b1)' : 'none',
           background: 'var(--bg2)', display: 'flex', flexDirection: 'column',
           minHeight: narrow ? undefined : 0,
+          overflow: 'hidden',
         }}>
+          <div style={{
+            flexShrink: 0, borderBottom: '1px solid var(--b1)',
+            background: 'var(--bg2)',
+          }}>
+            <DocumentTotalsSection
+              totals={totals}
+              payments={payments}
+              partyBalance={partyBalance}
+              form={form}
+              selectedParty={selectedParty!}
+              isPurchase={isPurchase}
+              isEdit={isEdit}
+            />
+          </div>
+
           <div style={{
             flex: narrow ? undefined : 1,
             minHeight: narrow ? undefined : 0,
             overflowY: narrow ? 'visible' : 'auto',
             padding: compact ? 10 : 16, display: 'flex', flexDirection: 'column', gap: compact ? 10 : 16,
           }}>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-              <button onClick={() => setInfoCollapsed(true)} title="طي لوحة المعلومات" style={railBtnStyle}>
-                <i className="ti ti-chevrons-right" style={{ fontSize: 14 }} />
-              </button>
-            </div>
 
             {isEdit && !!existingDoc && (
               <DocumentChainPanel
@@ -518,49 +530,29 @@ export default function CommercialDocumentPage() {
               />
             )}
 
-            <DocumentInfoSection
-              form={form as unknown as Record<string, unknown>}
-              errors={errors}
-              set={set}
-              isEdit={isEdit}
-              isReadOnly={isReadOnly}
-              isLinesReadOnly={isLinesReadOnly}
-              isPurchase={isPurchase}
-              needsParty={needsParty}
-              docCode={docCode}
-              docNumber={docNumber}
-              docNumberErr={docNumberErr}
-              checkingDocNumber={checkingDocNumber}
-              handleDocNumberChange={handleDocNumberChange}
-              handlePartyChangeWithWarning={handlePartyChangeWithWarning}
-              partyOptions={partyOptions}
-              priceLevelOptions={priceLevelOptions}
-              handlePriceLevelChange={handlePriceLevelChange}
-              lookups={{
-                warehouses: lookups.warehouses as Array<{ id: number; name: string; is_default?: boolean }>,
-                fiscalYears: lookups.fiscalYears as Array<{ id: number; name: string; is_current?: boolean; is_closed?: boolean }>,
-                currencies: lookups.currencies as Array<{ id: number; code: string; name: string; is_base_currency?: boolean }>,
-                priceLevels: lookups.priceLevels as Array<{ id: number; name: string }>,
-              }}
-              partyBalance={partyBalance}
-              isLoadingBalance={isLoadingBalance}
-              selectedParty={selectedParty}
-              creditCheck={creditCheck as any}
-              isLoadingCredit={isLoadingCredit}
-              customerInsights={customerInsights as any}
-              isLoadingInsights={isLoadingInsights}
-              balanceWarning={balanceWarning}
-              qc={qc}
-              slug={slug}
-              warehouseIdNum={warehouseIdNum}
-              partyTypes={partyTypes}
-              onQuickCreateParty={handleQuickCreateParty}
-              creatingParty={creatingParty}
-            />
+            {needsParty && (
+              <>
+                {!isPurchase && (
+                  <CreditCheckBar
+                    creditCheck={creditCheck as any}
+                    isLoading={isLoadingCredit}
+                    partyName={selectedParty?.name}
+                  />
+                )}
+                <CustomerInsightPanel
+                  insights={customerInsights as any}
+                  isLoading={isLoadingInsights}
+                />
+                {balanceWarning && (
+                  <AlertBanner type="warning" message={balanceWarning} />
+                )}
+              </>
+            )}
 
             <Tabs tabs={docTabs} activeKey={extraTab} onChange={setExtraTab}>
               {extraTab === 'advanced' && (
                 <DocumentAdvancedFields
+                  slim
                   form={form as unknown as Record<string, unknown>}
                   errors={errors}
                   set={set}
@@ -618,23 +610,6 @@ export default function CommercialDocumentPage() {
           </div>
 
           <div style={{
-            flexShrink: 0, borderTop: '1px solid var(--b1)',
-            background: 'var(--bg2)',
-            maxHeight: narrow ? 'none' : (compact ? '48vh' : '55vh'),
-            overflowY: narrow ? 'visible' : 'auto',
-          }}>
-            <DocumentTotalsSection
-              totals={totals}
-              payments={payments}
-              partyBalance={partyBalance}
-              form={form}
-              selectedParty={selectedParty!}
-              isPurchase={isPurchase}
-              isEdit={isEdit}
-            />
-          </div>
-
-          <div style={{
             flexShrink: 0, borderTop: '1px solid var(--b1)', background: 'var(--bg2)',
             padding: compact ? '6px 10px' : '8px 16px',
           }}>
@@ -678,7 +653,6 @@ export default function CommercialDocumentPage() {
             ) : null;
           })()}
         </div>
-        )}
 
         <div style={{
           flex: 1,
