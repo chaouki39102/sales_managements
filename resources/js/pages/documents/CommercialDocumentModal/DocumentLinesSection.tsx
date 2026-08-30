@@ -3,7 +3,6 @@ import { Section, AlertBanner, ColumnManager } from '../components/DocumentUIPri
 import { BarcodeInput } from '../components/BarcodeInput';
 import { LineCard } from '../components/LineCard';
 import { DocumentLineRow } from '../components/DocumentLineRow';
-import { SmartSuggestionsPanel } from '../components/SmartSuggestionsPanel';
 import type { QuickCreatePayload } from '../components/ProductSearch';
 import type { LineItem, ColKey } from '../types/document.types';
 import { ALL_COLUMNS } from '../types/document.types';
@@ -48,8 +47,6 @@ interface DocumentLinesSectionProps {
   onDiscardDraft?: () => void;
   set: (field: string, value: unknown) => void;
   needsParty: boolean;
-  productSuggestions: unknown;
-  isLoadingSuggestions: boolean;
   setShowBulkImport: React.Dispatch<React.SetStateAction<boolean>>;
   /**
    * فتح كاميرا «تصوير فاتورة المورد» (تعبئة OCR) — يُمرَّر فقط لمستندات الشراء.
@@ -74,14 +71,13 @@ interface DocumentLinesSectionProps {
 }
 
 export default function DocumentLinesSection({
-  lines, isLinesReadOnly, isReadOnly, isPurchase, isPartyExempt,
+  lines, isLinesReadOnly, isPurchase, isPartyExempt,
   products, isLoadingProducts,
   visibleCols, handleColsChange,
   lineMode, setLineMode,
   lineWarnings, stockData,
   addLine, addLineWithProduct, removeLine, duplicateLine, moveLine, updateLine,
   lineErr, savedDraft, draftKey, restoreDraft, set,
-  needsParty, productSuggestions, isLoadingSuggestions,
   setShowBulkImport, onOcrInvoice, onOcrImage, slug,
   affectsStock, stockDir, onRefreshStock,
   warehouses, compact = false,
@@ -836,7 +832,11 @@ export default function DocumentLinesSection({
               </div>
             </div>
           ) : lineMode === 'card' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+              gap: 10, alignItems: 'start',
+            }}>
               {lines.map((line, idx) => {
                 const stockResult = line._product
                   ? validateLineStock(line, line._product, isPurchase, stockData)
@@ -1136,17 +1136,6 @@ export default function DocumentLinesSection({
           </div>
         )}
 
-        {!isLinesReadOnly && needsParty && (
-          <SmartSuggestionsPanel
-            suggestions={productSuggestions as any}
-            isLoading={isLoadingSuggestions}
-            onAddProduct={(productId, suggestedPrice, suggestedTva) => {
-              addLineWithProduct(String(productId), suggestedPrice ?? undefined, suggestedTva ?? undefined);
-              focusLineQty(lines.length);
-            }}
-            disabled={isReadOnly}
-          />
-        )}
       </div>
       {scanner.open && (
         <React.Suspense fallback={null}>

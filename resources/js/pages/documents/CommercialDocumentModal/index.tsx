@@ -81,7 +81,6 @@ export default function CommercialDocumentModal({
     chain, isLoadingChain, convertMutation, allowedTargets,
     creditCheck, isLoadingCredit,
     customerInsights, isLoadingInsights,
-    productSuggestions, isLoadingSuggestions,
     advancePayments, isLoadingAdvances,
     successMsg, setSuccessMsg,
     companyInfo, printTemplates,
@@ -429,8 +428,6 @@ export default function CommercialDocumentModal({
             onDiscardDraft={discardDraft}
             set={set}
             needsParty={needsParty}
-            productSuggestions={productSuggestions}
-            isLoadingSuggestions={isLoadingSuggestions}
             setShowBulkImport={setShowBulkImport}
             slug={slug}
             affectsStock={affectsStock}

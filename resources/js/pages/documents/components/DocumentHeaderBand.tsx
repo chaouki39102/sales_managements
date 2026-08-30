@@ -1,10 +1,13 @@
 import React from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import type { PartyType } from '@/lib/api/core/types';
+import type { Party } from '../types/document.types';
+import { buildWhatsAppLink } from '@/lib/wa';
 import { ComboBox, FieldError } from './DocumentUIPrimitives';
 import PartyBalanceBadge from '../CommercialDocumentModal/PartyBalanceBadge';
 import PartyQuickCreateForm, { type PartyQuickCreatePayload } from './PartyQuickCreateForm';
 import type { PartyBalanceInfo } from '../hooks/useDocumentForm';
+import { fmtDZD } from '../utils/document.utils';
 
 const fieldInputStyle = (isReadOnly: boolean, hasError?: boolean): React.CSSProperties => ({
   width: '100%', padding: '7px 10px', borderRadius: 'var(--r2)',
@@ -50,6 +53,8 @@ interface DocumentHeaderBandProps {
 
   handlePartyChangeWithWarning: (id: string) => void;
   partyOptions: Array<{ id: number; label: string; sub?: string; badge?: string }>;
+  /** المتعامل المحدَّد (الكائن الكامل) — يعرض معلوماته الكاملة في بطاقة POS Pro. */
+  selectedParty: Party | null;
   priceLevelOptions: Array<{ id: number; label: string }>;
   handlePriceLevelChange: (v: string) => void;
 
@@ -87,6 +92,7 @@ export default function DocumentHeaderBand({
   form, errors, set,
   docNumber, docNumberErr, checkingDocNumber, handleDocNumberChange,
   handlePartyChangeWithWarning, partyOptions, priceLevelOptions, handlePriceLevelChange,
+  selectedParty: partyRecord,
   warehouses, warehouseIdNum, qc, slug,
   partyBalance, isLoadingBalance, partyTypes, onQuickCreateParty, creatingParty,
   variant = 'cards',
@@ -95,6 +101,7 @@ export default function DocumentHeaderBand({
 
   const [createOpen, setCreateOpen] = React.useState(false);
   const [qcName, setQcName] = React.useState('');
+  const [cardTab, setCardTab] = React.useState<'party' | 'doc'>('party');
 
   const selectedParty = partyOptions.find((o) => String(o.id) === String(form.party_id ?? ''));
   const bandPad = (compact ? 8 : 11);
@@ -107,48 +114,303 @@ export default function DocumentHeaderBand({
 
   // ── بطاقة المتعامل المستقلة (نمط POS Pro) ────────────────────────────────
   if (variant === 'party-card') {
+    const p = partyRecord;
+    const pName = p?.name ?? '';
+    const initials = (() => {
+      const parts = pName.trim().split(/\s+/).filter(Boolean);
+      if (!parts.length) return '؟';
+      if (parts.length === 1) return parts[0].slice(0, 2);
+      return (parts[0][0] ?? '') + (parts[1][0] ?? '');
+    })();
+    const isCashParty = p?.slug === 'client-cash';
+    const priceLevel = p?.default_price_level?.name;
+    const phone = p?.mobile ?? p?.phone;
+    const balance = partyBalance?.current_balance ?? 0;
+    const creditLimit = Number(p?.credit_limit ?? 0);
+    const isDebtor = balance > 0.009;
+    const overCredit = creditLimit > 0 && balance >= creditLimit;
+    const creditUsed = creditLimit > 0 ? Math.min(100, Math.max(0, (balance / creditLimit) * 100)) : 0;
+
+    const metaChips: Array<React.ReactNode> = [];
+    const chipStyle: React.CSSProperties = {
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '1px 6px', borderRadius: 999,
+      fontSize: 9.5, fontWeight: 700, whiteSpace: 'nowrap',
+      background: 'var(--bg3)', border: '1px solid var(--b1)', color: 'var(--t3)',
+    };
+    if (priceLevel) {
+      metaChips.push(
+        <span key="lv" title="مستوى السعر" style={chipStyle}><i className="ti ti-tags" /> {priceLevel}</span>,
+      );
+    }
+    if (p?.nif) {
+      metaChips.push(
+        <span key="nif" title="رقم التعريف الجبائي" style={chipStyle}><i className="ti ti-id-badge" /> {p.nif}</span>,
+      );
+    }
+    if (p?.rc) {
+      metaChips.push(
+        <span key="rc" title="رقم السجل التجاري" style={chipStyle}><i className="ti ti-file-text" /> {p.rc}</span>,
+      );
+    }
+    if (p?.is_tva_exempt) {
+      metaChips.push(
+        <span key="ex" title="معفى من ضريبة القيمة المضافة" style={{ ...chipStyle, background: 'var(--emb)', border: '1px solid var(--embo)', color: 'var(--em)' }}>
+          <i className="ti ti-shield-check" /> معفى من TVA
+        </span>,
+      );
+    }
+    const hasContact = !!(phone || p?.email || p?.address);
+    const waLink = (phone && buildWhatsAppLink(phone, ''));
+
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', gap: 6,
         padding: '10px 12px',
         background: 'var(--bg2)', border: '1px solid var(--b1)',
         borderRadius: 'var(--r3)', height: '100%', boxSizing: 'border-box',
+        minHeight: 0,
       }}>
-        <div style={segHeader()}>
-          <i className={`ti ${isPurchase ? 'ti-building-store' : 'ti-user'}`} />
-          <span>{isPurchase ? 'المورد' : 'الزبون'}</span>
+        {/* تَبويب: الزبون / معلومات المستند */}
+        <div style={{
+          display: 'flex', gap: 2, flexShrink: 0,
+          background: 'var(--bg1)', border: '1px solid var(--b1)',
+          borderRadius: 'var(--r1)', padding: 2,
+        }}>
+          {([
+            { key: 'party', icon: isPurchase ? 'ti-building-store' : 'ti-user', label: isPurchase ? 'المورد' : 'الزبون' },
+            { key: 'doc', icon: 'ti-file-description', label: 'معلومات المستند' },
+          ] as const).map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setCardTab(t.key)}
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                padding: '5px 4px', border: 'none', cursor: 'pointer', borderRadius: 'var(--r1)',
+                fontSize: 10.5, fontWeight: 800, whiteSpace: 'nowrap',
+                background: cardTab === t.key ? 'var(--em)' : 'transparent',
+                color: cardTab === t.key ? '#fff' : 'var(--t4)',
+                transition: 'all .15s',
+              }}
+            >
+              <i className={`ti ${t.icon}`} style={{ fontSize: 12 }} />
+              {t.label}
+            </button>
+          ))}
         </div>
-        <ComboBox
-          id="doc-party-select"
-          options={partyOptions}
-          value={form.party_id as string}
-          onChange={handlePartyChangeWithWarning}
-          placeholder={`— ابحث عن ${isPurchase ? 'مورد' : 'زبون'} —`}
-          disabled={isReadOnly}
-          error={!!errors.party_id}
-          showCreate={quickCreateEnabled}
-          createLabel={isPurchase ? 'مورد' : 'زبون'}
-          onCreate={openCreate}
-        />
-        <FieldError msg={errors.party_id} />
 
-        {createOpen && quickCreateEnabled && (
-          <PartyQuickCreateForm
-            key={qcName}
-            initialName={qcName}
-            isPurchase={isPurchase}
-            partyTypes={partyTypes}
-            creatingParty={creatingParty}
-            onCancel={() => setCreateOpen(false)}
-            onSubmit={(p) => { setCreateOpen(false); onQuickCreateParty!(p); }}
-          />
+        {cardTab === 'party' ? (
+          <>
+            {/*
+              ══ تبويب الزبون: اختيار المتعامل + معلوماته + الرصيد + سقف الائتمان ══
+            */}
+            <div style={segHeader()}>
+              <i className={`ti ${isPurchase ? 'ti-building-store' : 'ti-user'}`} />
+              <span>{isPurchase ? 'المورد' : 'الزبون'}</span>
+            </div>
+
+            <ComboBox
+              id="doc-party-select"
+              options={partyOptions}
+              value={form.party_id as string}
+              onChange={handlePartyChangeWithWarning}
+              placeholder={`— ابحث عن ${isPurchase ? 'مورد' : 'زبون'} —`}
+              disabled={isReadOnly}
+              error={!!errors.party_id}
+              showCreate={quickCreateEnabled}
+              createLabel={isPurchase ? 'مورد' : 'زبون'}
+              onCreate={openCreate}
+            />
+            <FieldError msg={errors.party_id} />
+
+            {p && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8, marginTop: 2,
+                padding: '6px 8px', borderRadius: 'var(--r2)',
+                background: 'var(--bg1)', border: '1px solid var(--b1)',
+              }}>
+                <div style={{
+                  width: 30, height: 30, flexShrink: 0, borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 800, fontSize: 12, color: 'var(--em)',
+                  background: 'var(--emb)', border: `1px solid ${isDebtor ? 'var(--red)' : 'var(--embo)'}`,
+                  overflow: 'hidden',
+                }}>
+                  {p.avatar
+                    ? <img src={p.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : initials}
+                </div>
+                <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 6, minWidth: 0,
+                    fontWeight: 800, fontSize: 13, color: 'var(--t1)',
+                  }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {pName}
+                    </span>
+                    {isCashParty && (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0,
+                        padding: '1px 6px', borderRadius: 999, fontSize: 9.5,
+                        background: 'var(--emb)', border: '1px solid var(--embo)', color: 'var(--em)',
+                      }}>
+                        <i className="ti ti-cash" style={{ fontSize: 10 }} /> الصندوق
+                      </span>
+                    )}
+                  </div>
+                  {p.commercial_name && p.commercial_name !== pName ? (
+                    <div style={{ fontSize: 10.5, color: 'var(--t4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {p.commercial_name}
+                    </div>
+                  ) : (
+                    p.code ? <div style={{ fontSize: 10.5, color: 'var(--t4)' }}>{p.code}</div> : null
+                  )}
+                </div>
+              </div>
+            )}
+
+            {p && metaChips.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {metaChips}
+              </div>
+            )}
+
+            {p && hasContact && (
+              <div style={{
+                display: 'flex', flexDirection: 'column', gap: 2,
+                fontSize: 10.5, color: 'var(--t3)', minWidth: 0,
+              }}>
+                {phone && (
+                  waLink
+                    ? <a href={waLink} target="_blank" rel="noopener noreferrer" title="مراسلة واتساب" style={{ color: '#25D366', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                        <i className="ti ti-brand-whatsapp" style={{ fontSize: 12 }} /> {phone}
+                      </a>
+                    : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><i className="ti ti-phone" style={{ fontSize: 12 }} /> {phone}</span>
+                )}
+                {p.email && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <i className="ti ti-mail" style={{ fontSize: 12, flexShrink: 0 }} /> {p.email}
+                  </span>
+                )}
+                {p.address && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <i className="ti ti-map-pin" style={{ fontSize: 12, flexShrink: 0 }} /> {p.address}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {createOpen && quickCreateEnabled && (
+              <PartyQuickCreateForm
+                key={qcName}
+                initialName={qcName}
+                isPurchase={isPurchase}
+                partyTypes={partyTypes}
+                creatingParty={creatingParty}
+                onCancel={() => setCreateOpen(false)}
+                onSubmit={(p) => { setCreateOpen(false); onQuickCreateParty!(p); }}
+              />
+            )}
+
+            <PartyBalanceBadge
+              balance={partyBalance}
+              isLoading={isLoadingBalance}
+              partyLabel={isPurchase ? 'المورد' : 'الزبون'}
+            />
+
+            {p && creditLimit > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div style={{
+                  height: 5, borderRadius: 999, background: 'var(--bg3)', overflow: 'hidden',
+                  border: `1px solid ${overCredit ? 'var(--red)' : 'var(--b1)'}`,
+                }}>
+                  <span style={{
+                    display: 'block', height: '100%', width: `${creditUsed}%`,
+                    background: overCredit ? 'var(--red)' : 'var(--em)', borderRadius: 999,
+                  }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, color: 'var(--t4)' }}>
+                  <span>سقف الائتمان <b style={{ color: 'var(--t2)' }}>{fmtDZD(creditLimit)}</b></span>
+                  <span style={{ color: overCredit ? 'var(--red)' : 'var(--t4)' }}>
+                    متبقّي {fmtDZD(Math.max(0, creditLimit - balance))}
+                  </span>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            {/*
+              ══ تبويب المستند: تاريخ المستند / المستودع / فئة السعر ══
+            */}
+            <div style={segHeader()}>
+              <i className="ti ti-file-description" />
+              <span>معلومات المستند</span>
+            </div>
+
+            {/* تاريخ المستند */}
+            <div style={segCard}>
+              <div style={segHeader()}>
+                <i className="ti ti-calendar" />
+                <span>تاريخ المستند</span>
+              </div>
+              <input
+                type="date"
+                style={fieldInputStyle(isReadOnly, !!errors.document_date)}
+                value={form.document_date as string}
+                disabled={isReadOnly}
+                onChange={(e) => set('document_date', e.target.value)}
+              />
+              <FieldError msg={errors.document_date} />
+            </div>
+
+            {/* المستودع */}
+            <div style={segCard}>
+              <div style={segHeader()}>
+                <i className="ti ti-building-warehouse" />
+                <span>المستودع</span>
+              </div>
+              <select
+                style={{
+                  ...fieldInputStyle(isReadOnly, !!errors.warehouse_id),
+                  cursor: isReadOnly ? 'not-allowed' : 'pointer',
+                }}
+                value={form.warehouse_id as string}
+                disabled={isReadOnly}
+                onChange={(e) => {
+                  set('warehouse_id', e.target.value);
+                  qc.invalidateQueries({ queryKey: [slug, 'warehouse-stock', warehouseIdNum] });
+                }}
+              >
+                <option value="">— اختر —</option>
+                {warehouses.map((w) => (
+                  <option key={String(w.id)} value={String(w.id)}>
+                    {String(w.name)}{w.is_default ? ' ★' : ''}
+                  </option>
+                ))}
+              </select>
+              <FieldError msg={errors.warehouse_id} />
+            </div>
+
+            {/* فئة السعر */}
+            {!isPurchase && priceLevelOptions.length > 0 && (
+              <div style={segCard}>
+                <div style={segHeader()}>
+                  <i className="ti ti-tag" />
+                  <span>فئة السعر</span>
+                </div>
+                <ComboBox
+                  options={priceLevelOptions}
+                  value={form.price_level_id as string}
+                  onChange={(v) => handlePriceLevelChange(v)}
+                  placeholder="— الافتراضي —"
+                  disabled={isReadOnly || isLinesReadOnly}
+                />
+              </div>
+            )}
+          </>
         )}
-
-        <PartyBalanceBadge
-          balance={partyBalance}
-          isLoading={isLoadingBalance}
-          partyLabel={isPurchase ? 'المورد' : 'الزبون'}
-        />
       </div>
     );
   }

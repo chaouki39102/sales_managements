@@ -20,11 +20,7 @@ import DocumentPaymentsSection from './CommercialDocumentModal/DocumentPaymentsS
 
 import DocumentHeaderBand from './components/DocumentHeaderBand';
 import DocTotalsCard from './components/DocTotalsCard';
-import { DocumentChainPanel } from './components/DocumentChainPanel';
 import MiniPrintPreview from './components/MiniPrintPreview';
-import DocumentAttachmentsPanel from './components/DocumentAttachmentsPanel';
-import { CreditCheckBar } from './components/CreditCheckBar';
-import { CustomerInsightPanel } from './components/CustomerInsightPanel';
 import { ReturnDocumentModal } from './components/ReturnDocumentModal';
 import { BulkImportModal } from './components/BulkImportModal';
 import { InvoiceOcrModal } from './components/InvoiceOcrModal';
@@ -100,10 +96,6 @@ export default function CommercialDocumentPage() {
     partyChangeWarning, setPartyChangeWarning,
     showReturnModal, setShowReturnModal,
     showBulkImport, setShowBulkImport,
-    chain, isLoadingChain, convertMutation, allowedTargets,
-    creditCheck, isLoadingCredit,
-    customerInsights, isLoadingInsights,
-    productSuggestions, isLoadingSuggestions,
     advancePayments, isLoadingAdvances,
     successMsg, setSuccessMsg,
     companyInfo, printTemplates,
@@ -117,7 +109,7 @@ export default function CommercialDocumentPage() {
     isPending,
     isPartyExempt, partyOptions, priceLevelOptions,
     paymentModeOptions, treasuryAccountMap, selectedParty,
-    stockBadge, paymentsExceedWarning, balanceWarning,
+    stockBadge, paymentsExceedWarning,
     savedDraft, draftKey, restoreDraft,
     draftSavedAt, discardDraft, saveDraftNow,
   } = ctrl;
@@ -248,8 +240,6 @@ export default function CommercialDocumentPage() {
     try { localStorage.setItem(`doc_band_collapsed_${docCode}`, v ? '1' : '0'); } catch { /* ignore */ }
   }, [docCode]);
 
-  // ── اللوحات الإضافية (السلسلة/الرصيد/الرؤى/المرفقات) — شريط قابل للطي ─────
-  const [auxOpen, setAuxOpen] = useState(true);
 
   // ── معاينة الطباعة في مودال (تفتح بزر في أسفل الشريط الجانبي) ──────────────
   const [showPreview, setShowPreview] = useState(false);
@@ -455,6 +445,7 @@ export default function CommercialDocumentPage() {
               handleDocNumberChange={handleDocNumberChange}
               handlePartyChangeWithWarning={handlePartyChangeWithWarning}
               partyOptions={partyOptions}
+              selectedParty={selectedParty ?? null}
               priceLevelOptions={priceLevelOptions}
               handlePriceLevelChange={handlePriceLevelChange}
               warehouses={lookups.warehouses as Array<{ id: number; name: string; is_default?: boolean }>}
@@ -501,6 +492,7 @@ export default function CommercialDocumentPage() {
             handleDocNumberChange={handleDocNumberChange}
             handlePartyChangeWithWarning={handlePartyChangeWithWarning}
             partyOptions={partyOptions}
+            selectedParty={selectedParty ?? null}
             priceLevelOptions={priceLevelOptions}
             handlePriceLevelChange={handlePriceLevelChange}
             warehouses={lookups.warehouses as Array<{ id: number; name: string; is_default?: boolean }>}
@@ -553,8 +545,6 @@ export default function CommercialDocumentPage() {
             onDiscardDraft={discardDraft}
             set={set}
             needsParty={needsParty}
-            productSuggestions={productSuggestions}
-            isLoadingSuggestions={isLoadingSuggestions}
             setShowBulkImport={setShowBulkImport}
             onOcrInvoice={isPurchase ? () => setShowOcrCamera(true) : undefined}
             onOcrImage={isPurchase ? () => ocrImageInputRef.current?.click() : undefined}
@@ -572,95 +562,6 @@ export default function CommercialDocumentPage() {
             fillFromLastDoc={isPurchase ? undefined : () => fillFromLastDoc()}
             fillLastLoading={fillLastLoading}
           />
-        </div>
-
-        <div style={{
-          flexShrink: 0, display: 'flex', flexDirection: 'column',
-          background: 'var(--bg2)', border: '1px solid var(--b1)',
-          borderRadius: 'var(--r3)', overflow: 'hidden',
-        }}>
-          <button
-            onClick={() => setAuxOpen((v) => !v)}
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: 6,
-              padding: '7px 12px', border: 'none', cursor: 'pointer',
-              background: 'transparent', color: 'var(--t4)', fontSize: 11, fontWeight: 700,
-              fontFamily: 'inherit', textAlign: 'right',
-            }}
-          >
-            <i className={`ti ti-chevron-${auxOpen ? 'up' : 'down'}`} style={{ fontSize: 10 }} />
-            <i className="ti ti-puzzle" style={{ fontSize: 12 }} />
-            {auxOpen ? 'إخفاء اللوحات الإضافية' : 'اللوحات الإضافية'}
-            {(
-              (isEdit && !!existingDoc ? 1 : 0) +
-              (needsParty ? (isPurchase ? 0 : 1) + 1 : 0) +
-              (Number.isFinite(Number(id)) && Number(id) > 0 ? 1 : 0)
-            ) > 0 && (
-              <span style={{
-                fontSize: 10, color: 'var(--em)', background: 'color-mix(in srgb, var(--em) 12%, transparent)',
-                borderRadius: 999, padding: '1px 7px', marginLeft: 'auto',
-              }}>
-                {(
-                  (isEdit && !!existingDoc ? 1 : 0) +
-                  (needsParty ? (isPurchase ? 0 : 1) + 1 : 0) +
-                  (Number.isFinite(Number(id)) && Number(id) > 0 ? 1 : 0)
-                )}
-              </span>
-            )}
-          </button>
-          {auxOpen && (
-            <div style={{
-              maxHeight: narrow ? 'none' : 'min(30vh, 240px)',
-              overflowY: 'auto',
-              display: 'flex', flexDirection: 'column', gap: compact ? 6 : 8,
-              padding: '0 12px 10px',
-            }}>
-              {isEdit && !!existingDoc && (
-                <DocumentChainPanel
-                  chain={chain}
-                  isLoading={isLoadingChain}
-                  currentId={Number((existingDoc as Record<string, unknown>).id)}
-                  allowedTargets={allowedTargets}
-                  isReadOnly={isReadOnly}
-                  onConvert={async (targetCode) => {
-                    if (!await confirm(`تحويل هذا المستند إلى ${targetCode}؟`)) return;
-                    convertMutation.mutate(
-                      { documentId: Number((existingDoc as Record<string, unknown>).id), targetTypeCode: targetCode },
-                      // onSaved يُنقل للمستند الجديد — لا نستدعي onClose حتى لا يعيدنا لمحرر المستند المصدر القديم
-                      { onSuccess: () => { onSaved(); } },
-                    );
-                  }}
-                  onNavigate={(node) => navigate(`/documents/${node.document_type}/${node.id}/edit`)}
-                />
-              )}
-
-              {needsParty && (
-                <>
-                  {!isPurchase && (
-                    <CreditCheckBar
-                      creditCheck={creditCheck as any}
-                      isLoading={isLoadingCredit}
-                      partyName={selectedParty?.name}
-                    />
-                  )}
-                  <CustomerInsightPanel
-                    insights={customerInsights as any}
-                    isLoading={isLoadingInsights}
-                  />
-                  {balanceWarning && (
-                    <AlertBanner type="warning" message={balanceWarning} />
-                  )}
-                </>
-              )}
-
-              {(() => {
-                const docId = id ? Number(id) : NaN;
-                return Number.isFinite(docId) && docId > 0 ? (
-                  <DocumentAttachmentsPanel docId={docId} readOnly={isReadOnly} />
-                ) : null;
-              })()}
-            </div>
-          )}
         </div>
       </div>
 

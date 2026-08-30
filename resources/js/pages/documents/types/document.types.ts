@@ -106,7 +106,15 @@ export interface Party {
   name:                    string;
   code?:                   string | null;
   phone?:                  string | null;
+  mobile?:                 string | null;
   email?:                  string | null;
+  address?:                string | null;
+  avatar?:                 string | null;
+  commercial_name?:        string | null;
+  slug?:                   string | null;
+  nif?:                    string | null;
+  nis?:                    string | null;
+  rc?:                     string | null;
   balance?:                number | null;
   default_price_level_id?: number | null;
   default_price_level?:    { id: number; name: string } | null;

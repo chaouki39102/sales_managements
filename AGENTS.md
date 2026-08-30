@@ -45,6 +45,26 @@
 
 **Verification**: `npx tsc --noEmit` clean · vitest **405/405** (23 files) · `npm run build` 0 errors, **240 precache entries** · **SW MATCH** (`public/sw.js` hash == `public/build/sw.js` hash). No PHP touched → pest not re-run.
 
+### Phase 88 — Doc Editor POS-Pro Shell: Party-Card Tabs + Remove Suggestions/Panels + Compact Cards View (Aug 30)
+
+**Request**: (1) remove «منتجات مقترحة» (suggested products) and «اللوحات الإضافية» (extra-panels strip) from the document editor, (2) make the party card behave like POS Pro's `CustomerCard` (tabbed), (3) reduce the vertical space the «عرض البطاقات» (cards view) takes above the product lines.
+
+**What was built**:
+- **`DocumentHeaderBand` `party-card` variant is now TABBED** (local `cardTab: 'party' | 'doc'`, default `'party'`) — a compact 2-tab strip (`الزبون/المورد` + `معلومات المستند`). The party tab = ComboBox + quick-create + avatar/initials + name + cash chip (`slug==='client-cash'`) + meta chips (price level / NIF / RC / TVA-exempt) + WhatsApp/tel/email/address contact rows + `PartyBalanceBadge` + credit-limit progress bar (red when `balance >= credit_limit`, shows «متبقّي»); the doc tab = document-date / warehouse / price-level fields (reusing the same `fieldInputStyle`/`segCard`/`segHeader` primitives and `errors.document_date`/`errors.warehouse_id` as the `toolbar` variant).
+- **New required `selectedParty: Party | null` prop** on `DocumentHeaderBandProps` (all-required contract preserved). `document.types.Party` extended with optional rich fields (`mobile`, `address`, `avatar`, `commercial_name`, `slug`, `nif`, `nis`, `rc`) so the page passes `selectedParty={selectedParty ?? null}` (from the shared controller hook, `lookups.parties.find(...)`) with **no cast**. `PartyBalanceBadge`/`PartyQuickCreateForm`/`ComboBox`/`FieldError` still used in the party-card branch.
+- **«منتجات مقترحة» removed**: `SmartSuggestionsPanel` import + block + `productSuggestions`/`isLoadingSuggestions` props removed from `DocumentLinesSection`; the page and the modal both stopped passing them (the shared controller's suggestion logic itself is KEPT — the modal doesn't render the panel either now).
+- **«اللوحات الإضافية» strip removed** from `CommercialDocumentPage` — the whole `auxOpen` block (chain / credit-check / insights + balance warning / attachments panels), its imports (`DocumentChainPanel`, `DocumentAttachmentsPanel`, `CreditCheckBar`, `CustomerInsightPanel`) and the `auxOpen` state are gone. `AlertBanner`/`refetchStock` kept (still used elsewhere).
+- **Cards view vertical-space fix**: the `lineMode==='card'` container in `DocumentLinesSection` changed from a tall vertical `flex column` (`gap:8`) to a **responsive grid** (`grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap:10; align-items:start`) mirroring the POS-Pro product grid — cards now flow side-by-side and their total vertical footprint above the products is roughly halved.
+
+**Key architectural rules**:
+- The `DocumentHeaderBandProps` interface stays **all-required**; adding a new rich prop (`selectedParty`) must use the **document-module `Party` type** (extended with the few optional rich fields) so the page's call sites need no cast — NOT the `lib/api/core/types` `Party` the initial draft mistakenly used.
+- The shared `useCommercialDocumentController` is used by BOTH the page and the modal — when removing a rendered sub-feature (suggestions panel, aux panels), remove only the component/block + the destructured props the page/modal separately consume; NEVER delete the controller's suggestion/chain/insight logic, the modal or other consumers may still rely on it.
+- A request to "remove X from the page" must be verified by grepping for the feature's literal string + component name in the page file — a UI that only hid panels via `auxOpen` state read as "not removed" to the user; delete the block wholesale.
+- Card views (many same-height cards) render more compactly as an `auto-fill; minmax` grid than a single vertical column — the same pattern POS Pro already uses for its product grid.
+
+**Files modified (6)**: `resources/js/pages/documents/CommercialDocumentPage.tsx` (aux-strip removed + `selectedParty` props + suggestions wiring removed), `resources/js/pages/documents/components/DocumentHeaderBand.tsx` (tabbed `party-card` + `selectedParty` prop), `resources/js/pages/documents/CommercialDocumentModal/DocumentLinesSection.tsx` (cards grid + suggestions removed), `resources/js/pages/documents/CommercialDocumentModal/index.tsx` (suggestions wiring removed), `resources/js/pages/documents/types/document.types.ts` (rich `Party` fields), `public/sw.js` (refreshed by build). Commit `…`, pushed to `origin/main`.
+
+**Verification**: `npx tsc --noEmit` clean · vitest **405/405** (23 files) · `npm run build` 0 errors, **240 precache entries** · **SW MATCH**. No PHP touched → pest not re-run.
 
 **Request**: "I DONT LIKE THE CURRENT [editor] IT NOT RESPONSIVE NOT WELL POSISIONNED THE LAYOUT ALL THINGS MUST BE RESPONSIVE AND WELL POSIONNED REFRESH ALL" — the Add/Edit document page (`CommercialDocumentPage`) was a fixed row layout (sidebar + lines) that cramped on laptop/tablet widths. Fix: a true responsive layout that keeps the desktop golden layout intact and stacks vertically on narrow viewports.
 
