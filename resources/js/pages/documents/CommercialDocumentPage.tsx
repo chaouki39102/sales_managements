@@ -463,7 +463,7 @@ export default function CommercialDocumentPage() {
       }}>
 
         <div style={{
-          flex: '1 1 auto', minHeight: 'min(45vh, 460px)',
+          flex: 1, minHeight: 'min(45vh, 460px)',
           display: 'flex', flexDirection: 'column',
         }}>
           <DocumentLinesSection
