@@ -19,9 +19,32 @@
 - **Offline layer** (`lib/offline/`) sits on the SHARED `client` — its cache keys embed the full URL (slug included), so tenant isolation in the offline cache is automatic; never store cross-tenant keys. The **write queue** (`pendingOps` in IndexedDB) is now tenant-scoped too: every op carries `slug` (captured from the url's first segment at enqueue), and reads/counts/replay/clear filter by the ACTIVE slug via `useActiveSlug()`/`appActions.getActiveSlug()` — legacy rows without the field fall back to `opSlug(url)`, and tenant-less ops (empty slug) stay visible to every company.
 
 ## Date
-2026-08-29
+2026-08-30
 
-### Phase 86 — Commercial Document Editor Responsive Rework (Aug 29)
+### Phase 87 — Commercial Document Editor: Full POS-Pro Shell Layout (Aug 30)
+
+**Request**: "اجعل الصفحة تشبه صفحة POS PRO" — make the Add/Edit document page (`CommercialDocumentPage`) look and behave like the POS Pro page: a top cards row (party card + totals card), one compact multi-field toolbar, a lines grid card filling all remaining height as the ONLY inner scroller, and aux panels collapsed into a thin expandable strip. The page itself never scrolls.
+
+**What was built** (all in `ComercialDocumentPage.tsx` + `DocumentHeaderBand.tsx` + NEW `DocTotalsCard.tsx`):
+- **`DocumentHeaderBand` split into variants** via a new `variant?: BandVariant = 'cards'` prop (`BandVariant = 'party-card' | 'toolbar' | 'cards'`; legacy `cards` mode kept intact but no longer used by the page):
+  - **`party-card`**: a self-contained party card (segHeader «الزبون/المورد», `ComboBox` with quick-create, `FieldError`, `PartyBalanceBadge`, `PartyQuickCreateForm` inline) rendered with `height:'100%'` so it stretches to the top-row height — the direct analog of POS Pro's `CustomerCard`.
+  - **`toolbar`**: a one-line collapsible toolbar (collapsed = a 30px strip with expand chevron + doc-code/doc-number chip + TTC; expanded = doc number / warehouse / price level / date fields in a single wrapping row). Driven by the `bandCollapsed` state (default collapsed on short screens, localStorage override honored).
+- **Top row** (`flexShrink:0`, `flexDirection: narrow ? 'column' : 'row'`): party card locked at **340px** (`flex:'0 0 340px'`), `DocTotalsCard` fills the rest (`flex:'1 1 0'`) — mirrors POS Pro's `ReorderableTopCards` (340px customer + flex total). On `narrow` (≤1180px) it stacks vertically, party card full-width.
+- **NEW `DocTotalsCard.tsx`**: the compact totals card (header + net-to-pay `--em` block + HT/discount/TVA/stamp rows + paid/remaining block) that replaces the old sidebar/down-below `DocumentTotalsSection`. `totals`/`payments`/`isPurchase`/`isEdit` in — nothing else.
+- **Lines grid card as the ONLY scroller**: the body's lines wrapper is now `flex:1; minHeight:0; background:var(--bg2); border:1px solid var(--b1); border-radius:var(--r3); overflow:hidden` — `DocumentLinesSection` (root `height:'100%'`, internal grid scroll) is the sole inner scroller; the page never scrolls.
+- **Aux panels → collapsible strip**: the old always-visible aux region (chain / credit / insights+balance-warning / attachments) is now a thin collapsed-by-default row with chevron + «اللوحات الإضافية» + a count badge, expanding to a bounded list (`maxHeight:'min(30vh,240px)'`, `overflowY:auto` on wide). **`DocumentTotalsSection` was REMOVED from the page body** (replaced by the top `DocTotalsCard`); the modal's own `DocumentTotalsSection` usage is untouched.
+- New `auxOpen` state (defaults true) in the page; `DocumentTotalsSection` import removed from the page (now unused there).
+
+**Key architectural rules**:
+- A single `DocumentHeaderBand` component with a `variant` switch is the clean way to serve "party card", "one-line toolbar", AND legacy cards mode from one props contract — but the interface must stay **all-required** (non-optional) so the legacy `cards` branch's destructures never go `possibly undefined`; pass the full prop set to every variant (each variant reads only its own slice). Do NOT make variant-gated props optional without null-guarding the whole cards-mode body.
+- The lines grid is the one element allowed to scroll inside a non-scrolling `height:100vh` shell: give its wrapper `flex:1; minHeight:0; overflow:hidden` (NOT `overflow:auto`), let `DocumentLinesSection`'s internal `flex:1; minHeight:0` grid scroll, and cap the aux strip with its own bounded `maxHeight` + `overflowY:auto` so sibling panels yield instead of pushing lines off-screen.
+- Totals belong with the top cards (POS-Pro `TotalCard` analog), so the page no longer renders `DocumentTotalsSection` at all — one totals source at the top, removing the double-totals and freeing the aux region from competing with lines.
+- Only `ComercialDocumentPage` consumes `DocumentHeaderBand`, and only via `party-card` + `toolbar`; the `cards` mode survives as dead-but-valid code (compiles clean, keeps the contract stable).
+
+**Files modified (4)**: NEW `resources/js/pages/documents/components/DocTotalsCard.tsx`; `resources/js/pages/documents/CommercialDocumentPage.tsx` (top-row shell + lines-card + aux strip + imports/`auxOpen`); `resources/js/pages/documents/components/DocumentHeaderBand.tsx` (variant split + `party-card`/`toolbar` implementations); `public/sw.js` (refreshed by build). Commit `132c684`, pushed to `origin/main`.
+
+**Verification**: `npx tsc --noEmit` clean · vitest **405/405** (23 files) · `npm run build` 0 errors, **240 precache entries** · **SW MATCH** (`public/sw.js` hash == `public/build/sw.js` hash). No PHP touched → pest not re-run.
+
 
 **Request**: "I DONT LIKE THE CURRENT [editor] IT NOT RESPONSIVE NOT WELL POSISIONNED THE LAYOUT ALL THINGS MUST BE RESPONSIVE AND WELL POSIONNED REFRESH ALL" — the Add/Edit document page (`CommercialDocumentPage`) was a fixed row layout (sidebar + lines) that cramped on laptop/tablet widths. Fix: a true responsive layout that keeps the desktop golden layout intact and stacks vertically on narrow viewports.
 
