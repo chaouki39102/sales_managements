@@ -24,6 +24,8 @@ interface DocumentTopbarProps {
   onPayments?: () => void;
   /** عدد أسطر الدفعات الحالية — لعرض شارة على زر الدفعات. */
   paymentsCount?: number;
+  /** فتح مودال الخيارات الإضافية (خيارات متقدمة / شحن / شروط الدفع). */
+  onExtraOptions?: () => void;
   onPrint?: () => void;
   templates?: Array<{ id: number | null; name: string }>;
   selectedTemplateId?: number | null;
@@ -66,7 +68,7 @@ export default function DocumentTopbar({
   documentType, isEdit, isCancelled, isLocked, isValidated, isPurchase,
   docCode, docNumber, existingDocument, pmMode, stockBadge,
   onBack, isPending, successMsg, isReadOnly, handleSave,
-  onPreview, onPayments, paymentsCount,
+  onPreview, onPayments, paymentsCount, onExtraOptions,
   onPrint, templates, selectedTemplateId, onTemplateChange,
   handleExport, handleDelete, onClone, onReturnClick, RETURNABLE_CODES,
   compact = false,
@@ -317,6 +319,18 @@ export default function DocumentTopbar({
                 {paymentsCount}
               </span>
             )}
+          </button>
+        )}
+
+        {onExtraOptions && (
+          <button
+            onClick={onExtraOptions}
+            title="خيارات إضافية"
+            disabled={isPending}
+            style={actionBtnStyle('var(--purple)')}
+          >
+            <i className="ti ti-adjustments" />
+            {!compact && 'خيارات إضافية'}
           </button>
         )}
 

@@ -246,6 +246,7 @@ export default function CommercialDocumentPage() {
   // ── معاينة الطباعة في مودال (تفتح بزر في أسفل الشريط الجانبي) ──────────────
   const [showPreview, setShowPreview] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
+  const [showExtraOptions, setShowExtraOptions] = useState(false);
 
   // ── اختصارات لوحة المفاتيح العامة: F2 باركود · F4 متعامل · F9/Ctrl+S حفظ · Alt+N سطر ──
   const hotRef = useRef({ handleSave, isPending, successMsg, isReadOnly, addLine, lineCount: form.lines.length });
@@ -353,6 +354,7 @@ export default function CommercialDocumentPage() {
         onPreview={() => setShowPreview(true)}
         onPayments={() => setShowPayments(true)}
         paymentsCount={payments.length}
+        onExtraOptions={() => setShowExtraOptions(true)}
       />
 
       {infoAlerts.length > 0 && (
@@ -545,48 +547,6 @@ export default function CommercialDocumentPage() {
           </>
         )}
 
-        <Tabs tabs={docTabs} activeKey={extraTab} onChange={setExtraTab}>
-          {extraTab === 'advanced' && (
-            <DocumentAdvancedFields
-              slim
-              form={form as unknown as Record<string, unknown>}
-              errors={errors}
-              set={set}
-              isReadOnly={isReadOnly}
-              isLinesReadOnly={isLinesReadOnly}
-              isPurchase={isPurchase}
-              priceLevelOptions={priceLevelOptions}
-              handlePriceLevelChange={handlePriceLevelChange}
-              lookups={{
-                warehouses: lookups.warehouses as Array<{ id: number; name: string; is_default?: boolean }>,
-                fiscalYears: lookups.fiscalYears as Array<{ id: number; name: string; is_current?: boolean; is_closed?: boolean }>,
-                currencies: lookups.currencies as Array<{ id: number; code: string; name: string; is_base_currency?: boolean }>,
-                priceLevels: lookups.priceLevels as Array<{ id: number; name: string }>,
-              }}
-              qc={qc}
-              slug={slug}
-              warehouseIdNum={warehouseIdNum!}
-            />
-          )}
-          {extraTab === 'shipping' && (
-            <ShippingInfoSection
-              value={form.shipping_info}
-              deliveryDate={form.delivery_date}
-              disabled={isReadOnly}
-              onChange={(info) => set('shipping_info', info)}
-              onDeliveryDateChange={(date) => set('delivery_date', date)}
-            />
-          )}
-          {extraTab === 'payment-terms' && (
-            <PaymentTermsTable
-              terms={form.payment_terms}
-              netToPay={totals.netToPay!}
-              disabled={isReadOnly}
-              onChange={(terms) => set('payment_terms', terms)}
-            />
-          )}
-        </Tabs>
-
         <DocumentTotalsSection
           totals={totals}
           payments={payments}
@@ -731,6 +691,59 @@ export default function CommercialDocumentPage() {
             totals={totals}
             affectsAccounting={docType?.affects_accounting ?? false}
           />
+        </Modal>
+      )}
+
+      {showExtraOptions && (
+        <Modal
+          open
+          onClose={() => setShowExtraOptions(false)}
+          title={<><i className="ti ti-adjustments" style={{ marginLeft: 5 }} /> خيارات إضافية</>}
+          subtitle="إعدادات متقدمة، الشحن والتسليم، وشروط الدفع"
+          size="lg"
+          resizable={false}
+        >
+          <Tabs tabs={docTabs} activeKey={extraTab} onChange={setExtraTab}>
+            {extraTab === 'advanced' && (
+              <DocumentAdvancedFields
+                slim
+                form={form as unknown as Record<string, unknown>}
+                errors={errors}
+                set={set}
+                isReadOnly={isReadOnly}
+                isLinesReadOnly={isLinesReadOnly}
+                isPurchase={isPurchase}
+                priceLevelOptions={priceLevelOptions}
+                handlePriceLevelChange={handlePriceLevelChange}
+                lookups={{
+                  warehouses: lookups.warehouses as Array<{ id: number; name: string; is_default?: boolean }>,
+                  fiscalYears: lookups.fiscalYears as Array<{ id: number; name: string; is_current?: boolean; is_closed?: boolean }>,
+                  currencies: lookups.currencies as Array<{ id: number; code: string; name: string; is_base_currency?: boolean }>,
+                  priceLevels: lookups.priceLevels as Array<{ id: number; name: string }>,
+                }}
+                qc={qc}
+                slug={slug}
+                warehouseIdNum={warehouseIdNum!}
+              />
+            )}
+            {extraTab === 'shipping' && (
+              <ShippingInfoSection
+                value={form.shipping_info}
+                deliveryDate={form.delivery_date}
+                disabled={isReadOnly}
+                onChange={(info) => set('shipping_info', info)}
+                onDeliveryDateChange={(date) => set('delivery_date', date)}
+              />
+            )}
+            {extraTab === 'payment-terms' && (
+              <PaymentTermsTable
+                terms={form.payment_terms}
+                netToPay={totals.netToPay!}
+                disabled={isReadOnly}
+                onChange={(terms) => set('payment_terms', terms)}
+              />
+            )}
+          </Tabs>
         </Modal>
       )}
     </div>
