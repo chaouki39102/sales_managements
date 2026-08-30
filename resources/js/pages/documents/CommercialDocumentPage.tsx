@@ -225,18 +225,22 @@ export default function CommercialDocumentPage() {
   }, []);
 
   // ── طي الشريط العلوي (المتعامل، التاريخ، المستودع، فئة السعر) ───────────────
-  const [bandCollapsed, setBandCollapsedState] = useState<boolean>(() => {
+  // على شاشات اللابتوب القصيرة (ارتفاع صغير) يُطوى الشريط افتراضياً حتى لا
+  // يطغى على جدول الأسطر — إلا إذا حفظ المستخدم خياراً يدوياً.
+  const defaultBandCollapsed = (): boolean => {
     try {
       const saved = localStorage.getItem(`doc_band_collapsed_${docCode}`);
       if (saved !== null) return saved === '1';
     } catch { /* ignore */ }
-    return false;
-  });
+    return (window.innerHeight ?? 0) < 820;
+  };
+  const [bandCollapsed, setBandCollapsedState] = useState<boolean>(defaultBandCollapsed);
   useEffect(() => {
+    let saved: string | null = null;
     try {
-      const saved = localStorage.getItem(`doc_band_collapsed_${docCode}`);
-      setBandCollapsedState(saved !== null ? saved === '1' : false);
+      saved = localStorage.getItem(`doc_band_collapsed_${docCode}`);
     } catch { /* ignore */ }
+    setBandCollapsedState(saved !== null ? saved === '1' : (window.innerHeight ?? 0) < 820);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docCode]);
   const setBandCollapsed = useCallback((v: boolean) => {
@@ -459,7 +463,7 @@ export default function CommercialDocumentPage() {
       }}>
 
         <div style={{
-          flex: 1, minHeight: 0,
+          flex: '1 1 auto', minHeight: 'min(45vh, 460px)',
           display: 'flex', flexDirection: 'column',
         }}>
           <DocumentLinesSection
@@ -510,7 +514,10 @@ export default function CommercialDocumentPage() {
           />
         </div>
 
-        <div style={{ flexShrink: 0 }}>
+        <div style={{
+          flex: '0 1 auto', minHeight: 0, overflowY: 'auto',
+          display: 'flex', flexDirection: 'column', gap: compact ? 8 : 10,
+        }}>
           {isEdit && !!existingDoc && (
             <DocumentChainPanel
               chain={chain}
@@ -555,9 +562,7 @@ export default function CommercialDocumentPage() {
               <DocumentAttachmentsPanel docId={docId} readOnly={isReadOnly} />
             ) : null;
           })()}
-        </div>
 
-        <div style={{ flexShrink: 0 }}>
           <DocumentTotalsSection
             totals={totals}
             payments={payments}
