@@ -80,7 +80,7 @@ export function FieldError({ msg }: { msg?: string }) {
 
 export function Section({
   title, icon, badge, children, collapsible = false,
-  defaultOpen = true, open: openProp, onOpenChange,
+  defaultOpen = true, open: openProp, onOpenChange, style,
 }: {
   title:        string;
   icon:         string;
@@ -93,6 +93,8 @@ export function Section({
    *  (مثال: ظهور خطأ تحقق داخل قسم مطوي). عدم تمريره = نفس السلوك القديم تماماً. */
   open?:         boolean;
   onOpenChange?: (open: boolean) => void;
+  /** أنماط إضافية للجذر — تُدمج فوق الافتراضي (تستخدمها أقسام الأسطر لملء الارتفاع). */
+  style?:        React.CSSProperties;
 }) {
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const isControlled = openProp !== undefined;
@@ -105,7 +107,7 @@ export function Section({
   };
 
   return (
-    <div style={{ marginBottom: 20 }}>
+    <div style={{ marginBottom: 20, ...style }}>
       <div
         style={{
           display:       'flex',

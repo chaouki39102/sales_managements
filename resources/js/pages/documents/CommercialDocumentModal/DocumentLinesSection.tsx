@@ -572,6 +572,7 @@ export default function DocumentLinesSection({
     <Section
       title="أسطر المستند"
       icon="ti-list-details"
+      style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}
       badge={
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {lines.length > 0 && (

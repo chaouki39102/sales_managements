@@ -452,13 +452,12 @@ export default function CommercialDocumentPage() {
       <div style={{
         flex: 1, minHeight: 0,
         display: 'flex', flexDirection: 'column',
-        overflowY: 'auto',
+        overflow: 'hidden',
         padding: compact ? 10 : 16, gap: compact ? 10 : 14,
       }}>
 
         <div style={{
-          flexShrink: 0,
-          minHeight: narrow ? 'min(65vh, 560px)' : 'min(58vh, 520px)',
+          flex: 1, minHeight: 0,
           display: 'flex', flexDirection: 'column',
         }}>
           <DocumentLinesSection
@@ -509,60 +508,64 @@ export default function CommercialDocumentPage() {
           />
         </div>
 
-        {isEdit && !!existingDoc && (
-          <DocumentChainPanel
-            chain={chain}
-            isLoading={isLoadingChain}
-            currentId={Number((existingDoc as Record<string, unknown>).id)}
-            allowedTargets={allowedTargets}
-            isReadOnly={isReadOnly}
-            onConvert={async (targetCode) => {
-              if (!await confirm(`تحويل هذا المستند إلى ${targetCode}؟`)) return;
-              convertMutation.mutate(
-                { documentId: Number((existingDoc as Record<string, unknown>).id), targetTypeCode: targetCode },
-                // onSaved يُنقل للمستند الجديد — لا نستدعي onClose حتى لا يعيدنا لمحرر المستند المصدر القديم
-                { onSuccess: () => { onSaved(); } },
-              );
-            }}
-            onNavigate={(node) => navigate(`/documents/${node.document_type}/${node.id}/edit`)}
-          />
-        )}
-
-        {needsParty && (
-          <>
-            {!isPurchase && (
-              <CreditCheckBar
-                creditCheck={creditCheck as any}
-                isLoading={isLoadingCredit}
-                partyName={selectedParty?.name}
-              />
-            )}
-            <CustomerInsightPanel
-              insights={customerInsights as any}
-              isLoading={isLoadingInsights}
+        <div style={{ flexShrink: 0 }}>
+          {isEdit && !!existingDoc && (
+            <DocumentChainPanel
+              chain={chain}
+              isLoading={isLoadingChain}
+              currentId={Number((existingDoc as Record<string, unknown>).id)}
+              allowedTargets={allowedTargets}
+              isReadOnly={isReadOnly}
+              onConvert={async (targetCode) => {
+                if (!await confirm(`تحويل هذا المستند إلى ${targetCode}؟`)) return;
+                convertMutation.mutate(
+                  { documentId: Number((existingDoc as Record<string, unknown>).id), targetTypeCode: targetCode },
+                  // onSaved يُنقل للمستند الجديد — لا نستدعي onClose حتى لا يعيدنا لمحرر المستند المصدر القديم
+                  { onSuccess: () => { onSaved(); } },
+                );
+              }}
+              onNavigate={(node) => navigate(`/documents/${node.document_type}/${node.id}/edit`)}
             />
-            {balanceWarning && (
-              <AlertBanner type="warning" message={balanceWarning} />
-            )}
-          </>
-        )}
+          )}
 
-        <DocumentTotalsSection
-          totals={totals}
-          payments={payments}
-          partyBalance={partyBalance}
-          form={form}
-          selectedParty={selectedParty!}
-          isPurchase={isPurchase}
-          isEdit={isEdit}
-        />
+          {needsParty && (
+            <>
+              {!isPurchase && (
+                <CreditCheckBar
+                  creditCheck={creditCheck as any}
+                  isLoading={isLoadingCredit}
+                  partyName={selectedParty?.name}
+                />
+              )}
+              <CustomerInsightPanel
+                insights={customerInsights as any}
+                isLoading={isLoadingInsights}
+              />
+              {balanceWarning && (
+                <AlertBanner type="warning" message={balanceWarning} />
+              )}
+            </>
+          )}
 
-        {(() => {
-          const docId = id ? Number(id) : NaN;
-          return Number.isFinite(docId) && docId > 0 ? (
-            <DocumentAttachmentsPanel docId={docId} readOnly={isReadOnly} />
-          ) : null;
-        })()}
+          {(() => {
+            const docId = id ? Number(id) : NaN;
+            return Number.isFinite(docId) && docId > 0 ? (
+              <DocumentAttachmentsPanel docId={docId} readOnly={isReadOnly} />
+            ) : null;
+          })()}
+        </div>
+
+        <div style={{ flexShrink: 0 }}>
+          <DocumentTotalsSection
+            totals={totals}
+            payments={payments}
+            partyBalance={partyBalance}
+            form={form}
+            selectedParty={selectedParty!}
+            isPurchase={isPurchase}
+            isEdit={isEdit}
+          />
+        </div>
       </div>
 
       <BulkImportModal
