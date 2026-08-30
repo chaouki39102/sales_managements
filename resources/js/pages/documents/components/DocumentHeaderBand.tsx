@@ -17,6 +17,12 @@ const fieldInputStyle = (isReadOnly: boolean, hasError?: boolean): React.CSSProp
   textOverflow: 'ellipsis',
 });
 
+/** أسلوب عرض الشريط:
+ *  - `party-card`: بطاقة المتعامل المستقلة (تُعرض في صف علوي بجانب بطاقة الإجماليات، عروض POS Pro).
+ *  - `toolbar`: شريط أدوات سطر واحد (التاريخ/المستودع/فئة السعر/رقم المستند)، بلا المتعامل.
+ *  - `cards`    : التخطيط القديم (شبكة بطاقات كاملة مع المتعامل) — يحتفظ بالتوافق القديم. */
+type BandVariant = 'party-card' | 'toolbar' | 'cards';
+
 interface DocumentHeaderBandProps {
   docCode: string;
   isEdit: boolean;
@@ -30,6 +36,8 @@ interface DocumentHeaderBandProps {
   onToggleCollapse: () => void;
   /** ملخّص شريط الطي — جزء مُنسَّق مُسبقاً من الصفحة لعرضه في شريط المنمنم. */
   ttcLabel?: string;
+  /** نمط العرض (سلوك افتراضي: `cards`). */
+  variant?: BandVariant;
 
   form: Record<string, unknown>;
   errors: Record<string, string>;
@@ -69,9 +77,9 @@ const segHeader = (): React.CSSProperties => ({
 });
 
 /**
- * شريط معلومات المستند — صفٌّ مقسّم من الحقول ذات الأيقونات أعلى مساحة
- * الأسطر في صفحة تحرير المستندات. يقبل الطيّ إلى شريط منمنم يحتفظ بالملخّص
- * (الرقم/الزبون/المجموع). الحالة محفوظة في `doc_band_collapsed_${docCode}`.
+ * شريط معلومات المستند. في نمط POS Pro:
+ *  - `party-card`: المتعامل كبطاقة مستقلة (مع الرصيد والإنشاء السريع) تُعرض في الصف العلوي.
+ *  - `toolbar`: التاريخ/المستودع/فئة السعر/رقم المستند في شريط سطر واحد قابل للطي.
  */
 export default function DocumentHeaderBand({
   docCode, isEdit, isReadOnly, isLinesReadOnly, isPurchase, needsParty,
@@ -81,25 +89,229 @@ export default function DocumentHeaderBand({
   handlePartyChangeWithWarning, partyOptions, priceLevelOptions, handlePriceLevelChange,
   warehouses, warehouseIdNum, qc, slug,
   partyBalance, isLoadingBalance, partyTypes, onQuickCreateParty, creatingParty,
+  variant = 'cards',
 }: DocumentHeaderBandProps) {
-  const [creating, setCreating] = React.useState(false);
-  const [qcInitialName, setQcInitialName] = React.useState('');
-
   const quickCreateEnabled = !!onQuickCreateParty && !isReadOnly;
 
-  const openQuickCreate = (query: string) => {
-    if (!quickCreateEnabled) return;
-    setQcInitialName(query.trim());
-    setCreating(true);
-  };
-
-  const cancelQuickCreate = () => setCreating(false);
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const [qcName, setQcName] = React.useState('');
 
   const selectedParty = partyOptions.find((o) => String(o.id) === String(form.party_id ?? ''));
-
   const bandPad = (compact ? 8 : 11);
 
-  const collapseBtn = (
+  const openCreate = (query: string) => {
+    if (!quickCreateEnabled) return;
+    setCreateOpen(true);
+    setQcName(query.trim());
+  };
+
+  // ── بطاقة المتعامل المستقلة (نمط POS Pro) ────────────────────────────────
+  if (variant === 'party-card') {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 6,
+        padding: '10px 12px',
+        background: 'var(--bg2)', border: '1px solid var(--b1)',
+        borderRadius: 'var(--r3)', height: '100%', boxSizing: 'border-box',
+      }}>
+        <div style={segHeader()}>
+          <i className={`ti ${isPurchase ? 'ti-building-store' : 'ti-user'}`} />
+          <span>{isPurchase ? 'المورد' : 'الزبون'}</span>
+        </div>
+        <ComboBox
+          id="doc-party-select"
+          options={partyOptions}
+          value={form.party_id as string}
+          onChange={handlePartyChangeWithWarning}
+          placeholder={`— ابحث عن ${isPurchase ? 'مورد' : 'زبون'} —`}
+          disabled={isReadOnly}
+          error={!!errors.party_id}
+          showCreate={quickCreateEnabled}
+          createLabel={isPurchase ? 'مورد' : 'زبون'}
+          onCreate={openCreate}
+        />
+        <FieldError msg={errors.party_id} />
+
+        {createOpen && quickCreateEnabled && (
+          <PartyQuickCreateForm
+            key={qcName}
+            initialName={qcName}
+            isPurchase={isPurchase}
+            partyTypes={partyTypes}
+            creatingParty={creatingParty}
+            onCancel={() => setCreateOpen(false)}
+            onSubmit={(p) => { setCreateOpen(false); onQuickCreateParty!(p); }}
+          />
+        )}
+
+        <PartyBalanceBadge
+          balance={partyBalance}
+          isLoading={isLoadingBalance}
+          partyLabel={isPurchase ? 'المورد' : 'الزبون'}
+        />
+      </div>
+    );
+  }
+
+  // ── شريط الأدوات أحادي السطر (نمط POS Pro) ──────────────────────────────
+  if (variant === 'toolbar') {
+    if (collapsed) {
+      return (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: `4px ${bandPad}px`, background: 'var(--bg2)',
+          border: '1px solid var(--b1)', borderRadius: 'var(--r2)',
+          flexWrap: 'wrap', minHeight: 30,
+        }}>
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            title="توسيع الشريط"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 24, height: 24, flexShrink: 0,
+              borderRadius: 'var(--r1)',
+              border: '1px solid var(--b1)', background: 'var(--bg1)',
+              color: 'var(--em)', cursor: 'pointer', fontSize: 12,
+            }}
+          >
+            <i className="ti ti-chevrons-down" />
+          </button>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            padding: '2px 7px', borderRadius: 999,
+            background: 'var(--emb)', border: '1px solid var(--embo)',
+            color: 'var(--em)', fontSize: 10.5, fontWeight: 700,
+          }}>
+            <i className="ti ti-file-description" style={{ fontSize: 11 }} />
+            {docCode}{isEdit && docNumber ? ` · ${docNumber}` : ''}
+          </span>
+          {ttcLabel && (
+            <span style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--em)', fontVariantNumeric: 'tabular-nums' }}>
+              {ttcLabel}
+            </span>
+          )}
+        </div>
+      );
+    }
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: `${bandPad}px ${bandPad}px`, background: 'var(--bg2)',
+        border: '1px solid var(--b1)', borderRadius: 'var(--r2)',
+        flexWrap: 'wrap',
+      }}>
+        {/* رقم المستند (تعديل فقط) */}
+        {isEdit && (
+          <div style={{ ...segCard, flex: '1 1 150px', minWidth: 130 }}>
+            <div style={segHeader()}>
+              <i className="ti ti-file-description" />
+              <span>رقم المستند</span>
+            </div>
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                style={{
+                  ...fieldInputStyle(isReadOnly, !!docNumberErr),
+                  paddingLeft: checkingDocNumber ? 28 : 10, paddingTop: 5, paddingBottom: 5,
+                }}
+                value={docNumber}
+                disabled={isReadOnly}
+                onChange={(e) => handleDocNumberChange(e.target.value)}
+                placeholder="أدخل رقم المستند..."
+              />
+              {checkingDocNumber && (
+                <i className="ti ti-loader" style={{
+                  position: 'absolute', left: 10, top: '50%',
+                  transform: 'translateY(-50%)',
+                  fontSize: 12, animation: 'spin 1s linear infinite',
+                  color: 'var(--t4)', pointerEvents: 'none',
+                }} />
+              )}
+            </div>
+            <FieldError msg={docNumberErr} />
+          </div>
+        )}
+
+        {/* التاريخ */}
+        <div style={{ ...segCard, flex: '1 1 145px', minWidth: 130 }}>
+          <div style={segHeader()}>
+            <i className="ti ti-calendar" />
+            <span>تاريخ المستند</span>
+          </div>
+          <input
+            type="date"
+            style={{
+              ...fieldInputStyle(isReadOnly, !!errors.document_date),
+              paddingTop: 5, paddingBottom: 5,
+            }}
+            value={form.document_date as string}
+            disabled={isReadOnly}
+            onChange={(e) => set('document_date', e.target.value)}
+          />
+          <FieldError msg={errors.document_date} />
+        </div>
+
+        {/* المستودع */}
+        <div style={{ ...segCard, flex: '1 1 165px', minWidth: 140 }}>
+          <div style={segHeader()}>
+            <i className="ti ti-building-warehouse" />
+            <span>المستودع</span>
+          </div>
+          <select
+            style={{
+              ...fieldInputStyle(isReadOnly, !!errors.warehouse_id),
+              paddingTop: 5, paddingBottom: 5,
+              cursor: isReadOnly ? 'not-allowed' : 'pointer',
+            }}
+            value={form.warehouse_id as string}
+            disabled={isReadOnly}
+            onChange={(e) => {
+              set('warehouse_id', e.target.value);
+              qc.invalidateQueries({ queryKey: [slug, 'warehouse-stock', warehouseIdNum] });
+            }}
+          >
+            <option value="">— اختر —</option>
+            {warehouses.map((w) => (
+              <option key={String(w.id)} value={String(w.id)}>
+                {String(w.name)}{w.is_default ? ' ★' : ''}
+              </option>
+            ))}
+          </select>
+          <FieldError msg={errors.warehouse_id} />
+        </div>
+
+        {/* فئة السعر */}
+        {!isPurchase && priceLevelOptions.length > 0 && (
+          <div style={{ ...segCard, flex: '1 1 150px', minWidth: 140 }}>
+            <div style={segHeader()}>
+              <i className="ti ti-tag" />
+              <span>فئة السعر</span>
+            </div>
+            <ComboBox
+              options={priceLevelOptions}
+              value={form.price_level_id as string}
+              onChange={(v) => handlePriceLevelChange(v)}
+              placeholder="— الافتراضي —"
+              disabled={isReadOnly || isLinesReadOnly}
+            />
+          </div>
+        )}
+
+        {collapseBtn()}
+
+        <div style={{ flex: 1 }} />
+        {ttcLabel && (
+          <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--em)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+            {ttcLabel}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  // ── التخطيط القديم (شبكة بطاقات كاملة) ──────────────────────────────────
+  const collapseBtnCards = (
     <button
       type="button"
       onClick={onToggleCollapse}
@@ -170,6 +382,26 @@ export default function DocumentHeaderBand({
     );
   }
 
+  function collapseBtn() {
+    return (
+      <button
+        type="button"
+        onClick={onToggleCollapse}
+        title="طي الشريط"
+        style={{
+          alignSelf: 'flex-start',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: 28, height: 28, flexShrink: 0,
+          borderRadius: 'var(--r2)',
+          border: '1px solid var(--b1)', background: 'var(--bg1)',
+          color: 'var(--t4)', cursor: 'pointer', fontSize: 13,
+        }}
+      >
+        <i className="ti ti-chevrons-up" />
+      </button>
+    );
+  }
+
   return (
     <div style={{
       display: 'flex', alignItems: 'flex-start', gap: 8,
@@ -229,19 +461,19 @@ export default function DocumentHeaderBand({
             error={!!errors.party_id}
             showCreate={quickCreateEnabled}
             createLabel={isPurchase ? 'مورد' : 'زبون'}
-            onCreate={openQuickCreate}
+            onCreate={openCreate}
           />
           <FieldError msg={errors.party_id} />
 
-          {creating && quickCreateEnabled && (
+          {createOpen && quickCreateEnabled && (
             <PartyQuickCreateForm
-              key={qcInitialName}
-              initialName={qcInitialName}
+              key={qcName}
+              initialName={qcName}
               isPurchase={isPurchase}
               partyTypes={partyTypes}
               creatingParty={creatingParty}
-              onCancel={cancelQuickCreate}
-              onSubmit={onQuickCreateParty!}
+              onCancel={() => setCreateOpen(false)}
+              onSubmit={(p) => { setCreateOpen(false); onQuickCreateParty!(p); }}
             />
           )}
 
@@ -319,7 +551,7 @@ export default function DocumentHeaderBand({
         </div>
       )}
 
-      {collapseBtn}
+      {collapseBtnCards}
     </div>
   );
 }
