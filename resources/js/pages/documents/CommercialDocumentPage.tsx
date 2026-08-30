@@ -245,6 +245,7 @@ export default function CommercialDocumentPage() {
 
   // ── معاينة الطباعة في مودال (تفتح بزر في أسفل الشريط الجانبي) ──────────────
   const [showPreview, setShowPreview] = useState(false);
+  const [showPayments, setShowPayments] = useState(false);
 
   // ── اختصارات لوحة المفاتيح العامة: F2 باركود · F4 متعامل · F9/Ctrl+S حفظ · Alt+N سطر ──
   const hotRef = useRef({ handleSave, isPending, successMsg, isReadOnly, addLine, lineCount: form.lines.length });
@@ -349,6 +350,9 @@ export default function CommercialDocumentPage() {
         draftSavedAt={draftSavedAt}
         onSaveDraft={saveDraftNow}
         onDiscardDraft={discardDraft}
+        onPreview={() => setShowPreview(true)}
+        onPayments={() => setShowPayments(true)}
+        paymentsCount={payments.length}
       />
 
       {infoAlerts.length > 0 && (
@@ -444,174 +448,16 @@ export default function CommercialDocumentPage() {
       />
 
       <div style={{
-        flex: 1, minHeight: 0, display: 'flex',
-        flexDirection: narrow ? 'column' : 'row',
-        overflowY: narrow ? 'auto' : 'hidden',
+        flex: 1, minHeight: 0,
+        display: 'flex', flexDirection: 'column',
+        overflowY: 'auto',
+        padding: compact ? 10 : 16, gap: compact ? 10 : 14,
       }}>
 
         <div style={{
-          width: narrow ? '100%' : (compact ? 252 : 300),
-          flex: narrow ? 'none' : undefined,
           flexShrink: 0,
-          borderLeft: narrow ? 'none' : '1px solid var(--b1)',
-          borderTop: narrow ? '1px solid var(--b1)' : 'none',
-          background: 'var(--bg2)', display: 'flex', flexDirection: 'column',
-          minHeight: narrow ? undefined : 0,
-          overflow: 'hidden',
-        }}>
-          <div style={{
-            flexShrink: 0, borderBottom: '1px solid var(--b1)',
-            background: 'var(--bg2)',
-          }}>
-            <DocumentTotalsSection
-              totals={totals}
-              payments={payments}
-              partyBalance={partyBalance}
-              form={form}
-              selectedParty={selectedParty!}
-              isPurchase={isPurchase}
-              isEdit={isEdit}
-            />
-          </div>
-
-          <div style={{
-            flex: narrow ? undefined : 1,
-            minHeight: narrow ? undefined : 0,
-            overflowY: narrow ? 'visible' : 'auto',
-            padding: compact ? 10 : 16, display: 'flex', flexDirection: 'column', gap: compact ? 10 : 16,
-          }}>
-
-            {isEdit && !!existingDoc && (
-              <DocumentChainPanel
-                chain={chain}
-                isLoading={isLoadingChain}
-                currentId={Number((existingDoc as Record<string, unknown>).id)}
-                allowedTargets={allowedTargets}
-                isReadOnly={isReadOnly}
-                onConvert={async (targetCode) => {
-                  if (!await confirm(`تحويل هذا المستند إلى ${targetCode}؟`)) return;
-                  convertMutation.mutate(
-                    { documentId: Number((existingDoc as Record<string, unknown>).id), targetTypeCode: targetCode },
-                    // onSaved يُنقل للمستند الجديد — لا نستدعي onClose حتى لا يعيدنا لمحرر المستند المصدر القديم
-                    { onSuccess: () => { onSaved(); } },
-                  );
-                }}
-                onNavigate={(node) => navigate(`/documents/${node.document_type}/${node.id}/edit`)}
-              />
-            )}
-
-            {needsParty && (
-              <>
-                {!isPurchase && (
-                  <CreditCheckBar
-                    creditCheck={creditCheck as any}
-                    isLoading={isLoadingCredit}
-                    partyName={selectedParty?.name}
-                  />
-                )}
-                <CustomerInsightPanel
-                  insights={customerInsights as any}
-                  isLoading={isLoadingInsights}
-                />
-                {balanceWarning && (
-                  <AlertBanner type="warning" message={balanceWarning} />
-                )}
-              </>
-            )}
-
-            <Tabs tabs={docTabs} activeKey={extraTab} onChange={setExtraTab}>
-              {extraTab === 'advanced' && (
-                <DocumentAdvancedFields
-                  slim
-                  form={form as unknown as Record<string, unknown>}
-                  errors={errors}
-                  set={set}
-                  isReadOnly={isReadOnly}
-                  isLinesReadOnly={isLinesReadOnly}
-                  isPurchase={isPurchase}
-                  priceLevelOptions={priceLevelOptions}
-                  handlePriceLevelChange={handlePriceLevelChange}
-                  lookups={{
-                    warehouses: lookups.warehouses as Array<{ id: number; name: string; is_default?: boolean }>,
-                    fiscalYears: lookups.fiscalYears as Array<{ id: number; name: string; is_current?: boolean; is_closed?: boolean }>,
-                    currencies: lookups.currencies as Array<{ id: number; code: string; name: string; is_base_currency?: boolean }>,
-                    priceLevels: lookups.priceLevels as Array<{ id: number; name: string }>,
-                  }}
-                  qc={qc}
-                  slug={slug}
-              warehouseIdNum={warehouseIdNum!}
-                />
-              )}
-              {extraTab === 'shipping' && (
-                <ShippingInfoSection
-                  value={form.shipping_info}
-                  deliveryDate={form.delivery_date}
-                  disabled={isReadOnly}
-                  onChange={(info) => set('shipping_info', info)}
-                  onDeliveryDateChange={(date) => set('delivery_date', date)}
-                />
-              )}
-              {extraTab === 'payment-terms' && (
-                <PaymentTermsTable
-                  terms={form.payment_terms}
-                  netToPay={totals.netToPay!}
-                  disabled={isReadOnly}
-                  onChange={(terms) => set('payment_terms', terms)}
-                />
-              )}
-            </Tabs>
-
-            <DocumentPaymentsSection
-              payments={payments}
-              paymentModeOptions={paymentModeOptions}
-              treasuryAccountMap={treasuryAccountMap}
-              treasuryAccounts={lookups.treasuryAccounts}
-              addPayment={addPayment}
-              addPaymentWithValues={addPaymentWithValues}
-              removePayment={removePayment}
-              updatePayment={updatePayment}
-              paymentsExceedWarning={paymentsExceedWarning}
-              advancePayments={advancePayments}
-              isLoadingAdvances={isLoadingAdvances}
-              pmMode={pmMode}
-              totals={totals}
-              affectsAccounting={docType?.affects_accounting ?? false}
-            />
-          </div>
-
-          <div style={{
-            flexShrink: 0, borderTop: '1px solid var(--b1)', background: 'var(--bg2)',
-            padding: compact ? '6px 10px' : '8px 16px',
-          }}>
-            <button
-              onClick={() => setShowPreview(true)}
-              title="عرض معاينة الطباعة"
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%',
-                padding: '7px 0', borderRadius: 'var(--r1)', cursor: 'pointer',
-                border: '1px dashed var(--em)', background: 'color-mix(in srgb, var(--em) 6%, transparent)',
-                fontSize: 11, fontWeight: 700, color: 'var(--em)', fontFamily: 'inherit',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'color-mix(in srgb, var(--em) 12%, transparent)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'color-mix(in srgb, var(--em) 6%, transparent)'; }}
-            >
-              <i className="ti ti-eye" style={{ fontSize: 13 }} />
-              <span>معاينة الطباعة</span>
-            </button>
-          </div>
-
-          {(() => {
-            const docId = id ? Number(id) : NaN;
-            return Number.isFinite(docId) && docId > 0 ? (
-              <DocumentAttachmentsPanel docId={docId} readOnly={isReadOnly} />
-            ) : null;
-          })()}
-        </div>
-
-        <div style={{
-          flex: 1,
-          minHeight: narrow ? 'min(72vh, 640px)' : 0,
-          display: 'flex', flexDirection: 'column', padding: compact ? 10 : 16,
+          minHeight: narrow ? 'min(65vh, 560px)' : 'min(58vh, 520px)',
+          display: 'flex', flexDirection: 'column',
         }}>
           <DocumentLinesSection
             lines={form.lines}
@@ -660,6 +506,103 @@ export default function CommercialDocumentPage() {
             fillLastLoading={fillLastLoading}
           />
         </div>
+
+        {isEdit && !!existingDoc && (
+          <DocumentChainPanel
+            chain={chain}
+            isLoading={isLoadingChain}
+            currentId={Number((existingDoc as Record<string, unknown>).id)}
+            allowedTargets={allowedTargets}
+            isReadOnly={isReadOnly}
+            onConvert={async (targetCode) => {
+              if (!await confirm(`تحويل هذا المستند إلى ${targetCode}؟`)) return;
+              convertMutation.mutate(
+                { documentId: Number((existingDoc as Record<string, unknown>).id), targetTypeCode: targetCode },
+                // onSaved يُنقل للمستند الجديد — لا نستدعي onClose حتى لا يعيدنا لمحرر المستند المصدر القديم
+                { onSuccess: () => { onSaved(); } },
+              );
+            }}
+            onNavigate={(node) => navigate(`/documents/${node.document_type}/${node.id}/edit`)}
+          />
+        )}
+
+        {needsParty && (
+          <>
+            {!isPurchase && (
+              <CreditCheckBar
+                creditCheck={creditCheck as any}
+                isLoading={isLoadingCredit}
+                partyName={selectedParty?.name}
+              />
+            )}
+            <CustomerInsightPanel
+              insights={customerInsights as any}
+              isLoading={isLoadingInsights}
+            />
+            {balanceWarning && (
+              <AlertBanner type="warning" message={balanceWarning} />
+            )}
+          </>
+        )}
+
+        <Tabs tabs={docTabs} activeKey={extraTab} onChange={setExtraTab}>
+          {extraTab === 'advanced' && (
+            <DocumentAdvancedFields
+              slim
+              form={form as unknown as Record<string, unknown>}
+              errors={errors}
+              set={set}
+              isReadOnly={isReadOnly}
+              isLinesReadOnly={isLinesReadOnly}
+              isPurchase={isPurchase}
+              priceLevelOptions={priceLevelOptions}
+              handlePriceLevelChange={handlePriceLevelChange}
+              lookups={{
+                warehouses: lookups.warehouses as Array<{ id: number; name: string; is_default?: boolean }>,
+                fiscalYears: lookups.fiscalYears as Array<{ id: number; name: string; is_current?: boolean; is_closed?: boolean }>,
+                currencies: lookups.currencies as Array<{ id: number; code: string; name: string; is_base_currency?: boolean }>,
+                priceLevels: lookups.priceLevels as Array<{ id: number; name: string }>,
+              }}
+              qc={qc}
+              slug={slug}
+              warehouseIdNum={warehouseIdNum!}
+            />
+          )}
+          {extraTab === 'shipping' && (
+            <ShippingInfoSection
+              value={form.shipping_info}
+              deliveryDate={form.delivery_date}
+              disabled={isReadOnly}
+              onChange={(info) => set('shipping_info', info)}
+              onDeliveryDateChange={(date) => set('delivery_date', date)}
+            />
+          )}
+          {extraTab === 'payment-terms' && (
+            <PaymentTermsTable
+              terms={form.payment_terms}
+              netToPay={totals.netToPay!}
+              disabled={isReadOnly}
+              onChange={(terms) => set('payment_terms', terms)}
+            />
+          )}
+        </Tabs>
+
+        <DocumentTotalsSection
+          totals={totals}
+          payments={payments}
+          partyBalance={partyBalance}
+          form={form}
+          selectedParty={selectedParty!}
+          isPurchase={isPurchase}
+          isEdit={isEdit}
+        />
+
+        {(() => {
+          const docId = id ? Number(id) : NaN;
+          return Number.isFinite(docId) && docId > 0 ? (
+            <DocumentAttachmentsPanel docId={docId} readOnly={isReadOnly} />
+          ) : null;
+        })()}
       </div>
 
       <BulkImportModal
@@ -760,6 +703,34 @@ export default function CommercialDocumentPage() {
               availableWidth={520}
             />
           </div>
+        </Modal>
+      )}
+
+      {showPayments && (
+        <Modal
+          open
+          onClose={() => setShowPayments(false)}
+          title={<><i className="ti ti-wallet" style={{ marginLeft: 5 }} /> الدفعات</>}
+          subtitle="تسجيل وإدارة دفعات هذا المستند"
+          size="lg"
+          resizable={false}
+        >
+          <DocumentPaymentsSection
+            payments={payments}
+            paymentModeOptions={paymentModeOptions}
+            treasuryAccountMap={treasuryAccountMap}
+            treasuryAccounts={lookups.treasuryAccounts}
+            addPayment={addPayment}
+            addPaymentWithValues={addPaymentWithValues}
+            removePayment={removePayment}
+            updatePayment={updatePayment}
+            paymentsExceedWarning={paymentsExceedWarning}
+            advancePayments={advancePayments}
+            isLoadingAdvances={isLoadingAdvances}
+            pmMode={pmMode}
+            totals={totals}
+            affectsAccounting={docType?.affects_accounting ?? false}
+          />
         </Modal>
       )}
     </div>

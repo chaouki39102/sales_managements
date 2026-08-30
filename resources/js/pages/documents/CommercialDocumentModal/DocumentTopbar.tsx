@@ -18,6 +18,12 @@ interface DocumentTopbarProps {
   successMsg: string;
   isReadOnly: boolean;
   handleSave: () => void;
+  /** فتح معاينة الطباعة السريعة (بجانب زر الحفظ). */
+  onPreview?: () => void;
+  /** فتح مودال الدفعات الخاص. */
+  onPayments?: () => void;
+  /** عدد أسطر الدفعات الحالية — لعرض شارة على زر الدفعات. */
+  paymentsCount?: number;
   onPrint?: () => void;
   templates?: Array<{ id: number | null; name: string }>;
   selectedTemplateId?: number | null;
@@ -60,6 +66,7 @@ export default function DocumentTopbar({
   documentType, isEdit, isCancelled, isLocked, isValidated, isPurchase,
   docCode, docNumber, existingDocument, pmMode, stockBadge,
   onBack, isPending, successMsg, isReadOnly, handleSave,
+  onPreview, onPayments, paymentsCount,
   onPrint, templates, selectedTemplateId, onTemplateChange,
   handleExport, handleDelete, onClone, onReturnClick, RETURNABLE_CODES,
   compact = false,
@@ -291,6 +298,28 @@ export default function DocumentTopbar({
           )}
         </div>
 
+        {onPayments && (
+          <button
+            onClick={onPayments}
+            title="الدفعات"
+            style={{ ...actionBtnStyle('var(--blue)'), position: 'relative' }}
+          >
+            <i className="ti ti-wallet" />
+            {!compact && 'الدفعات'}
+            {!!paymentsCount && (
+              <span style={{
+                position: 'absolute', top: -4, left: -4,
+                width: 17, height: 17, borderRadius: '50%',
+                background: 'var(--blue)', color: 'white',
+                fontSize: 10, fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {paymentsCount}
+              </span>
+            )}
+          </button>
+        )}
+
         {hasMoreItems && (
           <div style={{ position: 'relative' }} ref={moreRef}>
             <button onClick={() => setMoreOpen((v) => !v)} disabled={isPending} style={actionBtnStyle('var(--t2)', true)}>
@@ -347,6 +376,22 @@ export default function DocumentTopbar({
         >
           {isReadOnly ? 'إغلاق' : 'إلغاء'}
         </button>
+
+        {onPreview && (
+          <button
+            onClick={onPreview}
+            title="معاينة الطباعة"
+            style={{
+              padding: compact ? '8px 12px' : '8px 16px', borderRadius: 'var(--r2)',
+              border: '1px solid var(--blue)', background: 'color-mix(in srgb, var(--blue) 10%, transparent)',
+              color: 'var(--blue)', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+              display: 'flex', alignItems: 'center', gap: 7,
+            }}
+          >
+            <i className="ti ti-eye" />
+            معاينة
+          </button>
+        )}
 
         {!isReadOnly && (
           <button
