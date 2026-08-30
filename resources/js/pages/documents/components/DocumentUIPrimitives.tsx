@@ -80,7 +80,7 @@ export function FieldError({ msg }: { msg?: string }) {
 
 export function Section({
   title, icon, badge, children, collapsible = false,
-  defaultOpen = true, open: openProp, onOpenChange, style,
+  defaultOpen = true, open: openProp, onOpenChange, style, fillHeight = false,
 }: {
   title:        string;
   icon:         string;
@@ -95,6 +95,9 @@ export function Section({
   onOpenChange?: (open: boolean) => void;
   /** أنماط إضافية للجذر — تُدمج فوق الافتراضي (تستخدمها أقسام الأسطر لملء الارتفاع). */
   style?:        React.CSSProperties;
+  /** اجعل محتوى القسم يمتد عمودياً ويملأ الارتفاع الباقي (يُلزم الجذر بكونه column flex).
+   *  المحتوى يصبح flex:1 مع overflow:hidden ليتمكن ابناؤه (مثل حاوية التمرير) من التمرير داخلياً. */
+  fillHeight?:   boolean;
 }) {
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const isControlled = openProp !== undefined;
@@ -131,7 +134,9 @@ export function Section({
             style={{ fontSize: 12, color: 'var(--t4)' }} />
         )}
       </div>
-      {open && children}
+      {open && (fillHeight
+        ? <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>{children}</div>
+        : children)}
     </div>
   );
 }

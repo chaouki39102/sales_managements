@@ -65,6 +65,7 @@ import type {
   PaymentTerm,
 } from '../types/document.types';
 import type { LineStockValidation } from '../utils/document.utils';
+import { getDocLinePref } from '../utils/docLinePrefs';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -817,6 +818,16 @@ export function useDocumentForm({
           L.unit_price_ht  = unitPrice;
           L.price_per_pack = Math.round(unitPrice * L._packQty * 10_000) / 10_000;
 
+          // إعادة تعيين الكمية عند تغيير منتج السطر (إن كان التفضيل مفعّلاً)
+          if (getDocLinePref('resetQtyOnChange') &&
+              String(lines[idx].product_id) !== String(product.id)) {
+            const pid = Number(product.id);
+            const stock = !Number.isNaN(pid) ? stockDataRef.current[pid] : undefined;
+            L.quantity = (getDocLinePref('fillFullStock') && typeof stock === 'number' && stock > 0)
+              ? stock
+              : 1;
+          }
+
           // خصم الكميات — يحتاج baseQty
           const baseQty = Math.round(L.quantity * L._packQty * 1_000_000) / 1_000_000;
           const qd = resolveQuantityDiscount(product, baseQty, curPriceLevelId);
@@ -964,6 +975,10 @@ export function useDocumentForm({
   }, [defaultTvaRate]);
 
   const addLineWithProduct = useCallback((productId: string, unitPrice?: number, tvaRate?: number) => {
+    const fillStock = getDocLinePref('fillFullStock');
+    const pid = Number(productId);
+    const stock = !Number.isNaN(pid) ? stockDataRef.current[pid] : undefined;
+    const quantity = fillStock && typeof stock === 'number' && stock > 0 ? stock : undefined;
     setForm((f) => ({
       ...f,
       lines: [
@@ -973,6 +988,7 @@ export function useDocumentForm({
           product_id: productId,
           unit_price_ht: unitPrice ?? 0,
           tva_rate: tvaRate ?? defaultTvaRate,
+          ...(quantity !== undefined ? { quantity } : {}),
         },
       ],
     }));

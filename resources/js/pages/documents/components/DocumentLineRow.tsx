@@ -7,6 +7,7 @@ import { cellStyle } from './DocumentUIPrimitives';
 import type { LineItem, Product, ColKey } from '../types/document.types';
 import type { ProductType, Tva, Unit } from '@/lib/api/core/types';
 import type { LineStockValidation } from '../utils/document.utils';
+import { getDocLinePref } from '../utils/docLinePrefs';
 import type { ComputeLineWarning } from '../hooks/useComputeLine';
 
 interface WarehouseOption {
@@ -239,6 +240,8 @@ export const DocumentLineRow = memo(function DocumentLineRow({
               tvas={tvas}
               units={units}
               isLoadingProducts={isLoadingProducts}
+              clearOnChoose={getDocLinePref('clearProductSearch')}
+              autoOpenWhenEmpty={getDocLinePref('autoOpenProductOnEmpty') && !line.product_id}
             />
           </td>
         )}

@@ -23,6 +23,7 @@ import { ReturnDocumentModal } from '../components/ReturnDocumentModal';
 import { BulkImportModal } from '../components/BulkImportModal';
 import { ShippingInfoSection } from '../components/ShippingInfoSection';
 import { PaymentTermsTable } from '../components/PaymentTermsTable';
+import { DocPrefsTab } from '../components/DocPrefsTab';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useConfirm } from '@/hooks/useConfirm';
 
@@ -344,6 +345,7 @@ export default function CommercialDocumentModal({
           {(() => {
             const docTabs: Tab[] = [
               { key: 'advanced', label: 'خيارات إضافية', icon: 'ti-adjustments' },
+              { key: 'line-entry', label: 'الإدخال السريع', icon: 'ti-zap' },
             ];
             if (SHIPPING_CODES.has(docCode)) {
               docTabs.push({ key: 'shipping', label: 'الشحن والتسليم', icon: 'ti-truck-delivery' });
@@ -382,6 +384,9 @@ export default function CommercialDocumentModal({
                       onChange={(info) => set('shipping_info', info)}
                       onDeliveryDateChange={(date) => set('delivery_date', date)}
                     />
+                  )}
+                  {extraTab === 'line-entry' && (
+                    <DocPrefsTab />
                   )}
                   {extraTab === 'payment-terms' && (
                     <PaymentTermsTable

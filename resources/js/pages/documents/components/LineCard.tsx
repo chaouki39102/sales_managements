@@ -5,6 +5,7 @@ import type { QuickCreatePayload } from './ProductSearch';
 import type { LineItem, Product } from '../types/document.types';
 import type { ProductType, Tva, Unit } from '@/lib/api/core/types';
 import type { LineStockValidation } from '../utils/document.utils';
+import { getDocLinePref } from '../utils/docLinePrefs';
 import type { ComputeLineWarning } from '../hooks/useComputeLine';
 
 interface LineCardProps {
@@ -163,6 +164,8 @@ export function LineCard({
               tvas={tvas}
               units={units}
               isLoadingProducts={isLoadingProducts}
+              clearOnChoose={getDocLinePref('clearProductSearch')}
+              autoOpenWhenEmpty={getDocLinePref('autoOpenProductOnEmpty') && !line.product_id}
             />
             {stockBadge && (
               <span style={{

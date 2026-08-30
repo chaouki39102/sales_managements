@@ -10,6 +10,7 @@ import { ALL_COLUMNS } from '../types/document.types';
 import type { ComputeLineWarning } from '../hooks/useComputeLine';
 import { validateLineStock } from '../utils/document.utils';
 import { focusDocLineCell } from '../utils/focusDocLineCell';
+import { getDocLinePref } from '../utils/docLinePrefs';
 import { useBarcodeScan } from '../../../hooks/useBarcodeScan';
 import { useNotification } from '../../../hooks/useNotification';
 import { useLineTemplates, useLineTemplateMutations } from '@/lib/api/endpoints/lineTemplates';
@@ -515,6 +516,11 @@ export default function DocumentLinesSection({
     const mQty = /^doc-line-(\d+)-qty$/.exec(tid);
     const mPrice = /^doc-line-(\d+)-price$/.exec(tid);
     if (mQty) {
+      if (getDocLinePref('skipAmountField') && !isLinesReadOnly) {
+        // «تجاوز حقل المبلغ»: Enter على الكمية يضيف سطراً جديداً مباشرة
+        addLineAndFocusNewRow();
+        return;
+      }
       const priceEl = document.getElementById(`doc-line-${mQty[1]}-price`);
       if (priceEl) { focusEl(priceEl); return; }
     } else if (mPrice) {
@@ -573,6 +579,7 @@ export default function DocumentLinesSection({
       title="أسطر المستند"
       icon="ti-list-details"
       style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}
+      fillHeight
       badge={
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {lines.length > 0 && (

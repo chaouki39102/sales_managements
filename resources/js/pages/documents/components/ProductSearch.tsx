@@ -51,6 +51,10 @@ interface ProductSearchProps {
   units?: Unit[];
   /** هل لا تزال قائمة المنتجات قيد التحميل؟ */
   isLoadingProducts?: boolean;
+  /** مسح نص البحث بعد الاختيار / عند الإغلاق (تفضيل «الإدخال السريع»). الافتراضي true. */
+  clearOnChoose?: boolean;
+  /** فتح القائمة تلقائياً عند التركيز على زر منتقي منتج فارغ. */
+  autoOpenWhenEmpty?: boolean;
 }
 
 // ─── Dropdown position ────────────────────────────────────────────────────────
@@ -78,6 +82,8 @@ export function ProductSearch({
   tvas         = [],
   units        = [],
   isLoadingProducts = false,
+  clearOnChoose = true,
+  autoOpenWhenEmpty = false,
 }: ProductSearchProps) {
   const [open,  setOpen]  = useState(false);
   const [query, setQuery] = useState('');
@@ -143,7 +149,7 @@ export function ProductSearch({
       setTimeout(() => inputRef.current?.focus(), 50);
     } else {
       setOpen(false);
-      setQuery('');
+      if (clearOnChoose) setQuery('');
       setShowQuickCreate(false);
     }
   };
@@ -160,7 +166,7 @@ export function ProductSearch({
         dropRef.current    && !dropRef.current.contains(target)
       ) {
         setOpen(false);
-        setQuery('');
+        if (clearOnChoose) setQuery('');
       }
     };
 
@@ -169,7 +175,7 @@ export function ProductSearch({
         // أوقف الانتشار حتى لا يغلق مستمع Escape على مستوى النافذة المحرّر كله
         e.stopPropagation();
         setOpen(false);
-        setQuery('');
+        if (clearOnChoose) setQuery('');
       }
     };
 
@@ -207,7 +213,7 @@ export function ProductSearch({
   const choose = (p: Product) => {
     onChange(String(p.id), p);
     setOpen(false);
-    setQuery('');
+    if (clearOnChoose) setQuery('');
     // إكمال الدورة بلوحة المفاتيح: بعد الاختيار بالـ Enter ينتقل التركيز
     // مباشرة إلى خلية الكمية في نفس السطر — بدون لمس الفأرة.
     if (afterSelectFocusId) {
@@ -582,6 +588,9 @@ export function ProductSearch({
         data-has-product={value ? '1' : '0'}
         disabled={disabled}
         onClick={handleOpen}
+        onFocus={() => {
+          if (autoOpenWhenEmpty && !value && !open && !disabled) handleOpen();
+        }}
         style={{
           ...cellStyle(!!value && !error),
           display:        'flex',
