@@ -28,14 +28,12 @@ export function SmartSuggestionsPanel({
   if (!suggestions || suggestions.length === 0) return null;
 
   return (
-    // ✅ كان هذا زر + useState محلي بنفس الملف — أصبح الآن InfoPanel المشتركة
-    // (نفس المكوّن الذي يستخدمه CustomerInsightPanel) بدل تكرار نفس منطق
-    // الطي بكود منفصل. defaultOpen=true للحفاظ على نفس السلوك القديم بالضبط
-    // (كانت هذه اللوحة مفتوحة افتراضياً، عكس CustomerInsightPanel المغلقة).
+    // ✅ InfoPanel المشتركة (نفس المكوّن الذي يستخدمه CustomerInsightPanel).
+    // defaultOpen={false} — اللوحة مطوية دائماً افتراضياً، تُفتح عند الحاجة فقط.
     <InfoPanel
       title="منتجات مقترحة"
       icon="ti-bulb"
-      defaultOpen
+      defaultOpen={false}
       badge={
         <span style={{
           padding: '1px 6px', borderRadius: 99, fontSize: 10,

@@ -32,6 +32,7 @@ import CameraCaptureModal from '@/components/CameraCaptureModal';
 import { ShippingInfoSection } from './components/ShippingInfoSection';
 import { PaymentTermsTable } from './components/PaymentTermsTable';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import Modal from '@/components/ui/Modal';
 import { useConfirm } from '@/hooks/useConfirm';
 
 import { useCommercialDocumentController } from './hooks/useCommercialDocumentController';
@@ -242,39 +243,8 @@ export default function CommercialDocumentPage() {
     try { localStorage.setItem(`doc_band_collapsed_${docCode}`, v ? '1' : '0'); } catch { /* ignore */ }
   }, [docCode]);
 
-  // ── قياس عرض لوحة المعلومات فعليةً (لمعاينة الطباعة المتجاوبة) ────────────
-  const sidebarRef = useRef<HTMLDivElement | null>(null);
-  const [sidebarW, setSidebarW] = useState(compact ? 252 : 300);
-  useEffect(() => {
-    const el = sidebarRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect.width;
-      if (w && w > 40) setSidebarW(Math.round(w));
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  // ── طي معاينة الطباعة (محفوظ لكل نوع مستند، مفتوحة افتراضياً) ──────────────
-  const [previewCollapsed, setPreviewCollapsedState] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem(`doc_preview_collapsed_${docCode}`);
-      if (saved !== null) return saved === '1';
-    } catch { /* ignore */ }
-    return false;
-  });
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(`doc_preview_collapsed_${docCode}`);
-      setPreviewCollapsedState(saved !== null ? saved === '1' : false);
-    } catch { /* ignore */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [docCode]);
-  const setPreviewCollapsed = useCallback((v: boolean) => {
-    setPreviewCollapsedState(v);
-    try { localStorage.setItem(`doc_preview_collapsed_${docCode}`, v ? '1' : '0'); } catch { /* ignore */ }
-  }, [docCode]);
+  // ── معاينة الطباعة في مودال (تفتح بزر في أسفل الشريط الجانبي) ──────────────
+  const [showPreview, setShowPreview] = useState(false);
 
   // ── اختصارات لوحة المفاتيح العامة: F2 باركود · F4 متعامل · F9/Ctrl+S حفظ · Alt+N سطر ──
   const hotRef = useRef({ handleSave, isPending, successMsg, isReadOnly, addLine, lineCount: form.lines.length });
@@ -479,7 +449,7 @@ export default function CommercialDocumentPage() {
         overflowY: narrow ? 'auto' : 'hidden',
       }}>
 
-        <div ref={sidebarRef} style={{
+        <div style={{
           width: narrow ? '100%' : (compact ? 252 : 300),
           flex: narrow ? 'none' : undefined,
           flexShrink: 0,
@@ -614,36 +584,20 @@ export default function CommercialDocumentPage() {
             padding: compact ? '6px 10px' : '8px 16px',
           }}>
             <button
-              onClick={() => setPreviewCollapsed(!previewCollapsed)}
-              title={previewCollapsed ? 'إظهار معاينة الطباعة' : 'إخفاء معاينة الطباعة'}
+              onClick={() => setShowPreview(true)}
+              title="عرض معاينة الطباعة"
               style={{
-                display: 'flex', alignItems: 'center', gap: 6, width: '100%',
-                border: 'none', background: 'transparent', cursor: 'pointer',
-                fontSize: 11, fontWeight: 700, color: 'var(--em)', padding: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%',
+                padding: '7px 0', borderRadius: 'var(--r1)', cursor: 'pointer',
+                border: '1px dashed var(--em)', background: 'color-mix(in srgb, var(--em) 6%, transparent)',
+                fontSize: 11, fontWeight: 700, color: 'var(--em)', fontFamily: 'inherit',
               }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'color-mix(in srgb, var(--em) 12%, transparent)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'color-mix(in srgb, var(--em) 6%, transparent)'; }}
             >
-              <i className={`ti ${previewCollapsed ? 'ti-chevron-up' : 'ti-chevron-down'}`} style={{ fontSize: 12 }} />
+              <i className="ti ti-eye" style={{ fontSize: 13 }} />
               <span>معاينة الطباعة</span>
             </button>
-            {!previewCollapsed && (
-              <div style={{ marginTop: 6, display: 'flex', justifyContent: 'center' }}>
-                <MiniPrintPreview
-                  company={companyInfo}
-                  docTypeName={docType?.name ?? ''}
-                  docNumber={docNumber}
-                  date={form.document_date}
-                  partyLabel={isPurchase ? 'المورد' : 'الزبون'}
-                  partyName={selectedParty?.name ?? ''}
-                  lines={form.lines}
-                  totals={totals}
-                  notes={form.notes}
-                  availableWidth={Math.max(
-                    160,
-                    (narrow ? Math.min(sidebarW, 440) : sidebarW) - (compact ? 10 : 16) * 2,
-                  )}
-                />
-              </div>
-            )}
           </div>
 
           {(() => {
@@ -782,6 +736,32 @@ export default function CommercialDocumentPage() {
 
       <ConfirmDialog {...confirmDialogProps} />
       <ConfirmDialog {...deleteConfirm.confirmDialogProps} />
+
+      {showPreview && (
+        <Modal
+          open
+          onClose={() => setShowPreview(false)}
+          title={<><i className="ti ti-eye" style={{ marginLeft: 5 }} /> معاينة الطباعة</>}
+          subtitle="معاينة حيّة للمستند كما سيُطبع"
+          size="lg"
+          resizable={false}
+        >
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0' }}>
+            <MiniPrintPreview
+              company={companyInfo}
+              docTypeName={docType?.name ?? ''}
+              docNumber={docNumber}
+              date={form.document_date}
+              partyLabel={isPurchase ? 'المورد' : 'الزبون'}
+              partyName={selectedParty?.name ?? ''}
+              lines={form.lines}
+              totals={totals}
+              notes={form.notes}
+              availableWidth={520}
+            />
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
