@@ -369,45 +369,6 @@ export default function DocumentHeaderBand({
 
   // ── شريط الأدوات أحادي السطر (نمط POS Pro) ──────────────────────────────
   if (variant === 'toolbar') {
-    if (collapsed) {
-      return (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: `4px ${bandPad}px`, background: 'var(--bg2)',
-          border: '1px solid var(--b1)', borderRadius: 'var(--r2)',
-          flexWrap: 'wrap', minHeight: 30,
-        }}>
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            title="توسيع الشريط"
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 24, height: 24, flexShrink: 0,
-              borderRadius: 'var(--r1)',
-              border: '1px solid var(--b1)', background: 'var(--bg1)',
-              color: 'var(--em)', cursor: 'pointer', fontSize: 12,
-            }}
-          >
-            <i className="ti ti-chevrons-down" />
-          </button>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            padding: '2px 7px', borderRadius: 999,
-            background: 'var(--emb)', border: '1px solid var(--embo)',
-            color: 'var(--em)', fontSize: 10.5, fontWeight: 700,
-          }}>
-            <i className="ti ti-file-description" style={{ fontSize: 11 }} />
-            {docCode}{isEdit && docNumber ? ` · ${docNumber}` : ''}
-          </span>
-          {ttcLabel && (
-            <span style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--em)', fontVariantNumeric: 'tabular-nums' }}>
-              {ttcLabel}
-            </span>
-          )}
-        </div>
-      );
-    }
     return (
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
@@ -449,8 +410,6 @@ export default function DocumentHeaderBand({
 
         {/* تاريخ المستند / المستودع / فئة السعر — تُعرض فقط في تبويب
             «معلومات المستند» داخل بطاقة المتعامل (party-card) لتجنّب التكرار. */}
-
-        {collapseBtn()}
 
         <div style={{ flex: 1 }} />
         {ttcLabel && (
@@ -531,26 +490,6 @@ export default function DocumentHeaderBand({
           </span>
         )}
       </div>
-    );
-  }
-
-  function collapseBtn() {
-    return (
-      <button
-        type="button"
-        onClick={onToggleCollapse}
-        title="طي الشريط"
-        style={{
-          alignSelf: 'flex-start',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          width: 28, height: 28, flexShrink: 0,
-          borderRadius: 'var(--r2)',
-          border: '1px solid var(--b1)', background: 'var(--bg1)',
-          color: 'var(--t4)', cursor: 'pointer', fontSize: 13,
-        }}
-      >
-        <i className="ti ti-chevrons-up" />
-      </button>
     );
   }
 
