@@ -5,7 +5,7 @@ import { apiGet } from '@/lib/api/core/client';
 import { useActiveSlug } from '@/lib/store/appStore';
 import type { DocumentType } from '@/lib/api/core/types';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
-import { documentsApi } from '@/lib/api/endpoints/documents';
+import { documentsApi, useDocumentsByType } from '@/lib/api/endpoints/documents';
 
 const TemplatePrintModal = React.lazy(() => import('@/pages/settings/print-settings/components/shared/TemplatePrintModal'));
 
@@ -21,6 +21,7 @@ import DocumentPaymentsSection from './CommercialDocumentModal/DocumentPaymentsS
 
 import DocumentHeaderBand from './components/DocumentHeaderBand';
 import DocTotalsCard from './components/DocTotalsCard';
+import { ProductSearch } from './components/ProductSearch';
 import MiniPrintPreview from './components/MiniPrintPreview';
 import { ReturnDocumentModal } from './components/ReturnDocumentModal';
 import { BulkImportModal } from './components/BulkImportModal';
@@ -36,9 +37,6 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { useCommercialDocumentController } from './hooks/useCommercialDocumentController';
 import { focusDocLineCell } from './utils/focusDocLineCell';
 import { isOfflineQueuedResponse } from '@/lib/offline/queueMath';
-
-const formatMiniMoney = (v: unknown): string =>
-  Number(v ?? 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
 
 export default function CommercialDocumentPage() {
   const { typeCode, id } = useParams<{ typeCode: string; id: string }>();
@@ -195,6 +193,21 @@ export default function CommercialDocumentPage() {
     }
   }, [slug, qc, addLineWithProduct]);
 
+  // ── شريط المسح/البحث (مثل POS Pro) ──────────────────────────────────────
+  const [scanSearchValue, setScanSearchValue] = useState('');
+  const handleScanProduct = useCallback((productId: string) => {
+    if (!productId) return;
+    addLineWithProduct(productId);
+    setScanSearchValue('');
+  }, [addLineWithProduct]);
+
+  // ── المستندات الحديثة (تبويبات مثل POS Pro) ─────────────────────────────
+  const recentDocs = useDocumentsByType(docCode, { per_page: 8, sort: '-document_date' });
+  const recentList = (recentDocs.data?.data ?? []).filter(d => String(d.id) !== id);
+  const gotoDoc = useCallback((docId: number) => {
+    navigate(`/documents/${docCode}/${docId}/edit`);
+  }, [navigate, docCode]);
+
   // ── وضع الحاسب المحمول (≤1500px): ضغط الأعمدة والأزرار تلقائياً ───────────
   const [compact, setCompact] = useState<boolean>(
     () => window.matchMedia('(max-width: 1500px)').matches,
@@ -216,31 +229,6 @@ export default function CommercialDocumentPage() {
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, []);
-
-  // ── طي الشريط العلوي (المتعامل، التاريخ، المستودع، فئة السعر) ───────────────
-  // على شاشات اللابتوب القصيرة (ارتفاع صغير) يُطوى الشريط افتراضياً حتى لا
-  // يطغى على جدول الأسطر — إلا إذا حفظ المستخدم خياراً يدوياً.
-  const defaultBandCollapsed = (): boolean => {
-    try {
-      const saved = localStorage.getItem(`doc_band_collapsed_${docCode}`);
-      if (saved !== null) return saved === '1';
-    } catch { /* ignore */ }
-    return (window.innerHeight ?? 0) < 820;
-  };
-  const [bandCollapsed, setBandCollapsedState] = useState<boolean>(defaultBandCollapsed);
-  useEffect(() => {
-    let saved: string | null = null;
-    try {
-      saved = localStorage.getItem(`doc_band_collapsed_${docCode}`);
-    } catch { /* ignore */ }
-    setBandCollapsedState(saved !== null ? saved === '1' : (window.innerHeight ?? 0) < 820);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [docCode]);
-  const setBandCollapsed = useCallback((v: boolean) => {
-    setBandCollapsedState(v);
-    try { localStorage.setItem(`doc_band_collapsed_${docCode}`, v ? '1' : '0'); } catch { /* ignore */ }
-  }, [docCode]);
-
 
   // ── معاينة الطباعة في مودال (تفتح بزر في أسفل الشريط الجانبي) ──────────────
   const [showPreview, setShowPreview] = useState(false);
@@ -489,40 +477,47 @@ export default function CommercialDocumentPage() {
           </div>
         </div>
 
-        {!narrow && (
-          <DocumentHeaderBand
-            variant="toolbar"
-            docCode={docCode}
-            isEdit={isEdit}
-            isReadOnly={isReadOnly}
-            isLinesReadOnly={isLinesReadOnly}
+      </div>
+
+      <div className="pos-pro-scan-row" style={{
+        flexShrink: 0,
+        padding: (compact ? 6 : 10) + ' ' + (compact ? 10 : 16),
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <div style={{ flex: '1 1 0', minWidth: 0 }}>
+          <ProductSearch
+            products={lookups.products}
+            value={scanSearchValue}
+            onChange={(pid) => handleScanProduct(pid)}
+            disabled={isLinesReadOnly}
             isPurchase={isPurchase}
-            needsParty={needsParty}
-            compact={compact}
-            narrow={narrow}
-            collapsed={bandCollapsed}
-            onToggleCollapse={() => setBandCollapsed(!bandCollapsed)}
-            ttcLabel={`TTC ${formatMiniMoney(totals?.ttc)}`}
-            form={form as unknown as Record<string, unknown>}
-            errors={errors}
-            set={set}
-            docNumber={docNumber}
-            docNumberErr={docNumberErr}
-            checkingDocNumber={checkingDocNumber}
-            handleDocNumberChange={handleDocNumberChange}
-            handlePartyChangeWithWarning={handlePartyChangeWithWarning}
-            partyOptions={partyOptions}
-            selectedParty={selectedParty ?? null}
-            priceLevelOptions={priceLevelOptions}
-            handlePriceLevelChange={handlePriceLevelChange}
-            warehouses={lookups.warehouses as Array<{ id: number; name: string; is_default?: boolean }>}
-            warehouseIdNum={warehouseIdNum!}
-            qc={qc}
-            slug={slug}
-            partyBalance={partyBalance}
-            isLoadingBalance={isLoadingBalance}
+            stockData={stockData}
+            isLoadingProducts={lookups.isLoadingProducts}
+            onQuickCreate={isLinesReadOnly ? undefined : handleQuickCreateProduct}
+            productTypes={lookups.productTypes}
+            tvas={lookups.tvas}
+            units={lookups.units}
           />
-        )}
+        </div>
+        <button
+          type="button"
+          className="pp-print-btn"
+          onClick={isEdit ? handlePrint : undefined}
+          disabled={!isEdit || isLinesReadOnly}
+          title="طباعة المستند الحالي"
+        >
+          <i className="ti ti-printer" />
+          <span>طباعة</span>
+        </button>
+        <button
+          type="button"
+          className="pp-refresh-btn"
+          onClick={() => refetchStock()}
+          title="تحديث الأسطر والمخزون"
+        >
+          <i className="ti ti-refresh" />
+          <span>تحديث</span>
+        </button>
       </div>
 
       <div style={{
@@ -531,6 +526,31 @@ export default function CommercialDocumentPage() {
         overflow: 'hidden',
         padding: compact ? 10 : 16, gap: compact ? 10 : 14,
       }}>
+
+        <div className="pp-cart-hd" style={{ flexShrink: 0, padding: '6px 10px', background: 'var(--bg2)', border: '1px solid var(--b1)', borderRadius: 'var(--r3)', paddingBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottom: 0 }}>
+          <div className="pp-cart-tabs">
+            <span className="pp-cart-tab pp-cart-tab--current" title={isEdit ? 'المستند الحالي' : 'مستند جديد'}>
+              <i className="ti ti-file-text" />
+              {isEdit
+                ? (docNumber ?? `مستند ${id}`)
+                : 'مسودة جديدة'}
+            </span>
+            {recentList.map(rd => (
+              <span
+                key={rd.id}
+                role="button"
+                tabIndex={0}
+                className="pp-cart-tab pp-cart-tab--held"
+                onClick={() => gotoDoc(rd.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); gotoDoc(rd.id); } }}
+                title={`فتح ${rd.document_number} · ${rd.status}`}
+              >
+                <i className="ti ti-history" />
+                {rd.document_number}
+              </span>
+            ))}
+          </div>
+        </div>
 
         <div style={{
           flex: 1, minHeight: 0,

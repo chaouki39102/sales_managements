@@ -301,6 +301,38 @@ export default function DocumentHeaderBand({
               <span>معلومات المستند</span>
             </div>
 
+            {/* رقم المستند (تعديل فقط) */}
+            {isEdit && (
+              <div style={segCard}>
+                <div style={segHeader()}>
+                  <i className="ti ti-hash" />
+                  <span>رقم المستند</span>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    style={{
+                      ...fieldInputStyle(isReadOnly, !!docNumberErr),
+                      paddingLeft: checkingDocNumber ? 28 : 10, paddingTop: 5, paddingBottom: 5,
+                    }}
+                    value={docNumber}
+                    disabled={isReadOnly}
+                    onChange={(e) => handleDocNumberChange(e.target.value)}
+                    placeholder="أدخل رقم المستند..."
+                  />
+                  {checkingDocNumber && (
+                    <i className="ti ti-loader" style={{
+                      position: 'absolute', left: 10, top: '50%',
+                      transform: 'translateY(-50%)',
+                      fontSize: 12, animation: 'spin 1s linear infinite',
+                      color: 'var(--t4)', pointerEvents: 'none',
+                    }} />
+                  )}
+                </div>
+                <FieldError msg={docNumberErr} />
+              </div>
+            )}
+
             {/* تاريخ المستند */}
             <div style={segCard}>
               <div style={segHeader()}>
