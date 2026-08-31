@@ -41,6 +41,9 @@ interface DocumentHeaderBandProps {
   ttcLabel?: string;
   /** نمط العرض (سلوك افتراضي: `cards`). */
   variant?: BandVariant;
+  /** أقصى ارتفاع لبطاقة المتعامل (نمط `party-card`) — يعادل ارتفاع بطاقة الإجماليات،
+      ويتجاوز المحتوى الزائد بتمرير داخلي بدل زيادة حجم البطاقة. */
+  maxHeight?: number;
 
   form: Record<string, unknown>;
   errors: Record<string, string>;
@@ -88,7 +91,7 @@ const segHeader = (): React.CSSProperties => ({
  */
 export default function DocumentHeaderBand({
   docCode, isEdit, isReadOnly, isLinesReadOnly, isPurchase, needsParty,
-  compact, narrow, collapsed, onToggleCollapse, ttcLabel,
+  compact, narrow, collapsed, onToggleCollapse, ttcLabel, maxHeight,
   form, errors, set,
   docNumber, docNumberErr, checkingDocNumber, handleDocNumberChange,
   handlePartyChangeWithWarning, partyOptions, priceLevelOptions, handlePriceLevelChange,
@@ -138,7 +141,10 @@ export default function DocumentHeaderBand({
     return (
       <div
         className={`pp-cust-card${isCashParty ? ' pp-cust-card--cash' : ''}`}
-        style={{ height: '100%', boxSizing: 'border-box', minHeight: 0 }}
+        style={{
+          height: '100%', boxSizing: 'border-box', minHeight: 0,
+          ...(maxHeight ? { maxHeight, overflow: 'hidden' } : null),
+        }}
       >
         {/* تَبويب: الزبون / معلومات المستند */}
         <div style={{
@@ -169,6 +175,7 @@ export default function DocumentHeaderBand({
           ))}
         </div>
 
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         {cardTab === 'party' ? (
           <>
             {/*
@@ -395,6 +402,7 @@ export default function DocumentHeaderBand({
             )}
           </>
         )}
+        </div>
       </div>
     );
   }

@@ -1,4 +1,4 @@
-import React, { Suspense, useState, useEffect, useCallback, useRef } from 'react';
+import React, { Suspense, useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
 import { apiGet } from '@/lib/api/core/client';
@@ -21,7 +21,7 @@ import DocumentPaymentsSection from './CommercialDocumentModal/DocumentPaymentsS
 
 import DocumentHeaderBand from './components/DocumentHeaderBand';
 import DocTotalsCard from './components/DocTotalsCard';
-import { ProductSearch } from './components/ProductSearch';
+import DocScanbar from './components/DocScanbar';
 import MiniPrintPreview from './components/MiniPrintPreview';
 import { ReturnDocumentModal } from './components/ReturnDocumentModal';
 import { BulkImportModal } from './components/BulkImportModal';
@@ -37,16 +37,45 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { useCommercialDocumentController } from './hooks/useCommercialDocumentController';
 import { focusDocLineCell } from './utils/focusDocLineCell';
 import { isOfflineQueuedResponse } from '@/lib/offline/queueMath';
+import { useBarcodeScan } from '@/hooks/useBarcodeScan';
+import { useNotification } from '@/hooks/useNotification';
+
+const BarcodeScannerModal = React.lazy(() => import('@/components/BarcodeScannerModal'));
 
 export default function CommercialDocumentPage() {
   const { typeCode, id } = useParams<{ typeCode: string; id: string }>();
   const navigate = useNavigate();
   const slug = useActiveSlug();
   const qc = useQueryClient();
+  const notify = useNotification();
 
   const onClose = useCallback(() => navigate(-1), [navigate]);
   const onSaved = useCallback(() => navigate(`/documents/${typeCode}`), [navigate, typeCode]);
   const { confirm, confirmDialogProps } = useConfirm();
+
+  // تثبيت ارتفاع بطاقة المتعامل على ارتفاع بطاقة الإجماليات عند فتح الصفحة
+  // (لا تزيد مع اختيار الزبون — تُلتقط القيمة مرة واحدة فقط ثم تتوقف).
+  const totalsColRef = useRef<HTMLDivElement | null>(null);
+  const [partyMaxHeight, setPartyMaxHeight] = useState<number | undefined>(undefined);
+  const partyHRef = useRef<number | undefined>(undefined);
+  useLayoutEffect(() => {
+    const el = totalsColRef.current;
+    if (!el) return;
+    const capture = () => {
+      if (partyHRef.current !== undefined) return;
+      const h = el.offsetHeight;
+      if (h > 0) {
+        partyHRef.current = h;
+        setPartyMaxHeight(h);
+        return true;
+      }
+      return false;
+    };
+    capture();
+    const ro = new ResizeObserver(() => { capture(); if (partyHRef.current !== undefined) ro.disconnect(); });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const { data: docType } = useQuery({
     queryKey: [slug, 'document-type-by-code', typeCode],
@@ -194,12 +223,20 @@ export default function CommercialDocumentPage() {
   }, [slug, qc, addLineWithProduct]);
 
   // ── شريط المسح/البحث (مثل POS Pro) ──────────────────────────────────────
-  const [scanSearchValue, setScanSearchValue] = useState('');
   const handleScanProduct = useCallback((productId: string) => {
     if (!productId) return;
     addLineWithProduct(productId);
-    setScanSearchValue('');
   }, [addLineWithProduct]);
+
+  // ── مسح الباركود بالكاميرا في شريط المسح (مثل POS Pro) ──────────────────
+  const scanCamera = useBarcodeScan<{ id: number; name: string; ref?: string | null; barcode?: string | null }>({
+    resolve: (code) =>
+      (lookups.products ?? []).find(
+        (p) => p.barcode === code || p.ref === code || String(p.id) === code,
+      ) ?? null,
+    onFound: (p) => handleScanProduct(String(p.id)),
+    onNotFound: () => notify.error('لم يتم العثور على منتج بهذا الباركود'),
+  });
 
   // ── المستندات الحديثة (تبويبات مثل POS Pro) ─────────────────────────────
   const recentDocs = useDocumentsByType(docCode, { per_page: 8, sort: '-document_date' });
@@ -430,10 +467,16 @@ export default function CommercialDocumentPage() {
         padding: (compact ? 10 : 16) + ' ' + (compact ? 10 : 16) + ' ' + '0',
       }}>
         <div style={{
-          display: 'flex', gap: compact ? 8 : 12, alignItems: 'stretch',
+          display: 'flex', gap: compact ? 8 : 12,
+          alignItems: narrow ? 'stretch' : 'flex-start',
           flexDirection: narrow ? 'column' : 'row',
         }}>
-          <div style={{ width: narrow ? '100%' : '340px', flex: narrow ? '0 0 auto' : '0 0 340px', minWidth: 0 }}>
+          <div style={{
+            width: narrow ? '100%' : '340px',
+            flex: narrow ? '0 0 auto' : '0 0 340px',
+            minWidth: 0,
+            ...(narrow ? null : { height: partyMaxHeight ?? 320, overflow: 'hidden' }),
+          }}>
             <DocumentHeaderBand
               variant="party-card"
               docCode={docCode}
@@ -446,6 +489,7 @@ export default function CommercialDocumentPage() {
               narrow={narrow}
               collapsed={false}
               onToggleCollapse={() => {}}
+              maxHeight={narrow ? undefined : partyMaxHeight}
               form={form as unknown as Record<string, unknown>}
               errors={errors}
               set={set}
@@ -469,7 +513,7 @@ export default function CommercialDocumentPage() {
               creatingParty={creatingParty}
             />
           </div>
-          <div style={{ flex: '1 1 0', minWidth: 0 }}>
+          <div ref={totalsColRef} style={{ flex: '1 1 0', minWidth: 0 }}>
             <DocTotalsCard
               totals={totals}
               isEdit={isEdit}
@@ -485,18 +529,13 @@ export default function CommercialDocumentPage() {
         display: 'flex', alignItems: 'center', gap: 8,
       }}>
         <div style={{ flex: '1 1 0', minWidth: 0 }}>
-          <ProductSearch
+          <DocScanbar
             products={lookups.products}
-            value={scanSearchValue}
-            onChange={(pid) => handleScanProduct(pid)}
-            disabled={isLinesReadOnly}
+            onAdd={(p) => handleScanProduct(String(p.id))}
             isPurchase={isPurchase}
             stockData={stockData}
-            isLoadingProducts={lookups.isLoadingProducts}
-            onQuickCreate={isLinesReadOnly ? undefined : handleQuickCreateProduct}
-            productTypes={lookups.productTypes}
-            tvas={lookups.tvas}
-            units={lookups.units}
+            disabled={isLinesReadOnly}
+            onScanCamera={() => scanCamera.openScanner()}
           />
         </div>
         <button
@@ -628,6 +667,18 @@ export default function CommercialDocumentPage() {
         title="تصوير فاتورة المورد"
         hint="صوّب الكاميرا على فاتورة المورد لقراءتها تلقائياً، أو ارفع صورة من الجهاز"
       />
+
+      {scanCamera.open && (
+        <Suspense fallback={null}>
+          <BarcodeScannerModal
+            open={scanCamera.open}
+            onScan={scanCamera.handleScan}
+            onClose={scanCamera.closeScanner}
+            title="مسح الباركود لإضافة منتج"
+            hint="صوّب الكاميرا على باركود المنتج ليُضاف كسطر تلقائياً"
+          />
+        </Suspense>
+      )}
 
       <InvoiceOcrModal
         open={!!ocrFile}
