@@ -63,6 +63,8 @@ interface DocumentLinesSectionProps {
   warehouses: Array<{ id: number; name: string }>;
   /** وضع الحاسب المحمول — يضغط عروض أعمدة الجدول ليتسع على شاشات 1366px. */
   compact?: boolean;
+  /** إخفاء شريط المسح (حقل الباركود + كاميرا + مسح متسلسل) — لمطابقة POS Pro في المحرر. */
+  hideScanBar?: boolean;
   onQuickCreate?: (payload: QuickCreatePayload) => void;
   productTypes?: ProductType[];
   tvas?: Tva[];
@@ -83,6 +85,7 @@ export default function DocumentLinesSection({
   warehouses, compact = false,
   onQuickCreate, productTypes, tvas, units,
   bulkAddLines, onDiscardDraft, fillFromLastDoc, fillLastLoading = false,
+  hideScanBar = false,
 }: DocumentLinesSectionProps) {
   const [stockAlertOpen, setStockAlertOpen] = useState(true);
   const notify = useNotification();
@@ -650,6 +653,7 @@ export default function DocumentLinesSection({
 
         {!isLinesReadOnly && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, marginBottom: 8 }}>
+            {!hideScanBar && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <BarcodeInput
                 products={products}
@@ -713,6 +717,7 @@ export default function DocumentLinesSection({
                 </button>
               )}
             </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span
                 title="Enter: كمية ← سعر ← السطر التالي · Alt+N: سطر جديد · ↑/↓: نفس العمود · Ctrl+D: تكرار · Ctrl+Delete: حذف · Alt+↑↓: ترتيب · Ctrl+Enter: سطر في النهاية · F5: تحديث المخزون · Esc: ترك الحقل"

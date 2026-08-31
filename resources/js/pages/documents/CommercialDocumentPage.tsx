@@ -462,9 +462,7 @@ export default function CommercialDocumentPage() {
           <div style={{ flex: '1 1 0', minWidth: 0 }}>
             <DocTotalsCard
               totals={totals}
-              isPurchase={isPurchase}
               isEdit={isEdit}
-              payments={payments}
             />
           </div>
         </div>
@@ -554,6 +552,7 @@ export default function CommercialDocumentPage() {
             warehouses={lookups.warehouses as Array<{ id: number; name: string }>}
             compact={compact}
             onRefreshStock={refetchStock}
+            hideScanBar
             onQuickCreate={handleQuickCreateProduct}
             productTypes={lookups.productTypes}
             tvas={lookups.tvas}

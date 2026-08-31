@@ -5,7 +5,7 @@
 // قابلة للتصدير واستخدامها في أي مكان آخر.
 // ════════════════════════════════════════════════════════════════════════════
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useImperativeHandle } from 'react';
 import { ALL_COLUMNS, STATUS_CONFIG } from '../types/document.types';
 import type { ColKey } from '../types/document.types';
 
@@ -253,17 +253,36 @@ interface ComboBoxProps {
   /** يُستدعى عند الضغط على زر الإنشاء مع نص البحث المُدخل. */
   onCreate?:     (query: string) => void;
 }
-export function ComboBox({
+
+/** مقبض تحكّم برمجي في السلة المنسدلة — يسمح بفتح/إغلاق القائمة برمجياً من الخارج (زر صورة بطاقة المتعامل). */
+export interface ComboBoxHandle {
+  open:  () => void;
+  close: () => void;
+}
+
+export const ComboBox = React.forwardRef<ComboBoxHandle, ComboBoxProps>(function ComboBox({
   options, value, onChange, placeholder, 
 disabled, error, maxH = 260, onAfterSelect, id,
   showCreate, createLabel = 'إنشاء', onCreate,
-}: ComboBoxProps) {
+}: ComboBoxProps, ref) {
   const [open,       setOpen]       = useState(false);
   const [query,      setQuery]      = useState('');
   const [highlightIdx, setHighlightIdx] = useState(-1);
-  const ref          = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const inputRef     = useRef<HTMLInputElement>(null);
   const listRef      = useRef<HTMLDivElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    open: () => {
+      if (disabled) return;
+      setOpen(true);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    },
+    close: () => {
+      setOpen(false);
+      setQuery('');
+    },
+  }));
 
   const selected = options.find((o) => String(o.id) === value);
 
@@ -291,7 +310,7 @@ disabled, error, maxH = 260, onAfterSelect, id,
   useEffect(() => {
     if (!open) return;
     const fn = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
         setQuery('');
       }
@@ -334,7 +353,7 @@ disabled, error, maxH = 260, onAfterSelect, id,
   };
 
   return (
-    <div ref={ref} style={{ position: 'relative', width: '100%' }}>
+    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
       <button
         type="button"
         id={id}
@@ -451,7 +470,7 @@ disabled, error, maxH = 260, onAfterSelect, id,
       )}
     </div>
   );
-}
+});
 
 // ─── ColumnManager ────────────────────────────────────────────────────────────
 

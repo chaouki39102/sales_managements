@@ -44,6 +44,8 @@ interface DocumentTopbarProps {
   onSaveDraft?: () => void;
   /** تجاهل/حذف المسودة المحفوظة. */
   onDiscardDraft?: () => void;
+  /** إخفاء أزرار الإجراءات (طباعة/تصدير/دفعات/خيارات/حذف/نسخ/مرتجع) — تُنقل إلى شريط الإجراءات الجانبي. */
+  hideActions?: boolean;
 }
 
 function useDismissibleMenu<T extends HTMLElement>(open: boolean, onDismiss: () => void) {
@@ -73,6 +75,7 @@ export default function DocumentTopbar({
   handleExport, handleDelete, onClone, onReturnClick, RETURNABLE_CODES,
   compact = false,
   draftSavedAt = null, onSaveDraft, onDiscardDraft,
+  hideActions = false,
 }: DocumentTopbarProps) {
 
   const [exportOpen, setExportOpen] = useState(false);
@@ -230,6 +233,7 @@ export default function DocumentTopbar({
 
       <div style={{ marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
 
+        {!hideActions && <>
         {onPrint && (
           <>
             {templates && templates.length > 1 && (
@@ -379,6 +383,8 @@ export default function DocumentTopbar({
           </div>
         )}
 
+        </>}
+
         <button
           onClick={onBack}
           disabled={!canDismiss}
@@ -391,7 +397,7 @@ export default function DocumentTopbar({
           {isReadOnly ? 'إغلاق' : 'إلغاء'}
         </button>
 
-        {onPreview && (
+        {!hideActions && onPreview && (
           <button
             onClick={onPreview}
             title="معاينة الطباعة"
@@ -407,7 +413,7 @@ export default function DocumentTopbar({
           </button>
         )}
 
-        {!isReadOnly && (
+        {!hideActions && !isReadOnly && (
           <button
             onClick={handleSave}
             disabled={!canDismiss}
