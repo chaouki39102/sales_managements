@@ -57,8 +57,6 @@ interface DocumentLinesSectionProps {
   fillFromLastDoc?: () => Promise<void>;
   fillLastLoading?: boolean;
   slug: string | null | undefined;
-  affectsStock: boolean;
-  stockDir: 1 | -1 | 0;
   warehouses: Array<{ id: number; name: string }>;
   /** وضع الحاسب المحمول — يضغط عروض أعمدة الجدول ليتسع على شاشات 1366px. */
   compact?: boolean;
@@ -80,13 +78,12 @@ export default function DocumentLinesSection({
   addLine, addLineWithProduct, removeLine, duplicateLine, moveLine, updateLine,
   lineErr, savedDraft, draftKey, restoreDraft, set,
   setShowBulkImport, onOcrInvoice, onOcrImage, slug,
-  affectsStock, stockDir, onRefreshStock,
+  onRefreshStock,
   warehouses, compact = false,
   onQuickCreate, productTypes, tvas, units,
   bulkAddLines, onDiscardDraft, fillFromLastDoc, fillLastLoading = false,
   hideScanBar = false,
 }: DocumentLinesSectionProps) {
-  const [stockAlertOpen, setStockAlertOpen] = useState(true);
   const notify = useNotification();
 
   // ── وضع المسح المتسلسل (Task 15): يبقي حقل الباركود مركّزاً بعد كل مسحة
@@ -575,49 +572,6 @@ export default function DocumentLinesSection({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-        {affectsStock && (
-          <div style={{
-            display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 6,
-          }}>
-            {stockAlertOpen ? (
-              <div style={{ flex: 1 }}>
-                <AlertBanner
-                  type={stockDir > 0 ? 'info' : 'warning'}
-                  message={stockDir > 0
-                    ? 'هذا المستند سيضيف الكميات إلى المخزون عند الحفظ'
-                    : 'هذا المستند سيخصم الكميات من المخزون عند الحفظ'}
-                />
-              </div>
-            ) : (
-              <button
-                onClick={() => setStockAlertOpen(true)}
-                style={{
-                  padding: '4px 10px', borderRadius: 'var(--r1)',
-                  border: '1px solid var(--b2)', background: 'var(--bg2)',
-                  color: 'var(--t4)', cursor: 'pointer', fontSize: 11, fontWeight: 600,
-                  fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0,
-                }}
-              >
-                <i className="ti ti-info-circle" style={{ marginLeft: 4 }} />
-                المخزون
-              </button>
-            )}
-            {stockAlertOpen && (
-              <button
-                onClick={() => setStockAlertOpen(false)}
-                style={{
-                  padding: '4px 6px', borderRadius: 'var(--r1)',
-                  border: '1px solid var(--b2)', background: 'var(--bg3)',
-                  color: 'var(--t4)', cursor: 'pointer', fontSize: 10,
-                  fontFamily: 'inherit', flexShrink: 0, lineHeight: 1,
-                }}
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        )}
-
         {lineErr && <AlertBanner type="error" message={lineErr} />}
 
         {!isLinesReadOnly && (

@@ -68,7 +68,7 @@ export default function CommercialDocumentModal({
     fillFromLastDoc, fillLastLoading,
     partyBalance, isLoadingBalance,
     totals,
-    needsParty, affectsStock, stockDir,
+    needsParty,
     isReadOnly, isLinesReadOnly,
     lineWarnings,
     priceLevelSwitchMsg,
@@ -429,8 +429,6 @@ export default function CommercialDocumentModal({
             needsParty={needsParty}
             setShowBulkImport={setShowBulkImport}
             slug={slug}
-            affectsStock={affectsStock}
-            stockDir={stockDir}
             warehouses={lookups.warehouses as Array<{ id: number; name: string }>}
             onQuickCreate={handleQuickCreateProduct}
             productTypes={lookups.productTypes}

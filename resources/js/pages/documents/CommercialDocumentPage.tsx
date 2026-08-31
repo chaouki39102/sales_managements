@@ -87,7 +87,7 @@ export default function CommercialDocumentPage() {
     fillFromLastDoc, fillLastLoading,
     partyBalance, isLoadingBalance,
     totals,
-    needsParty, affectsStock, stockDir,
+    needsParty,
     isReadOnly, isLinesReadOnly,
     lineWarnings,
     priceLevelSwitchMsg,
@@ -568,8 +568,6 @@ export default function CommercialDocumentPage() {
             onOcrInvoice={isPurchase ? () => setShowOcrCamera(true) : undefined}
             onOcrImage={isPurchase ? () => ocrImageInputRef.current?.click() : undefined}
             slug={slug}
-            affectsStock={affectsStock}
-            stockDir={stockDir}
             warehouses={lookups.warehouses as Array<{ id: number; name: string }>}
             compact={compact}
             onRefreshStock={refetchStock}
