@@ -410,13 +410,6 @@ export default function DocumentHeaderBand({
 
         {/* تاريخ المستند / المستودع / فئة السعر — تُعرض فقط في تبويب
             «معلومات المستند» داخل بطاقة المتعامل (party-card) لتجنّب التكرار. */}
-
-        <div style={{ flex: 1 }} />
-        {ttcLabel && (
-          <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--em)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-            {ttcLabel}
-          </span>
-        )}
       </div>
     );
   }
