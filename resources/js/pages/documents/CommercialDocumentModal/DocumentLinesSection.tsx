@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Section, AlertBanner, ColumnManager } from '../components/DocumentUIPrimitives';
+import { AlertBanner } from '../components/DocumentUIPrimitives';
 import { BarcodeInput } from '../components/BarcodeInput';
 import { LineCard } from '../components/LineCard';
 import { DocumentLineRow } from '../components/DocumentLineRow';
@@ -27,7 +27,6 @@ interface DocumentLinesSectionProps {
   products: Array<{ id: number; name: string; ref?: string | null; barcode?: string | null }>;
   isLoadingProducts: boolean;
   visibleCols: Set<ColKey>;
-  handleColsChange: (cols: Set<ColKey>) => void;
   lineMode: 'table' | 'card';
   setLineMode: React.Dispatch<React.SetStateAction<'table' | 'card'>>;
   lineWarnings: Map<number, ComputeLineWarning[]>;
@@ -75,7 +74,7 @@ interface DocumentLinesSectionProps {
 export default function DocumentLinesSection({
   lines, isLinesReadOnly, isPurchase, isPartyExempt,
   products, isLoadingProducts,
-  visibleCols, handleColsChange,
+  visibleCols,
   lineMode, setLineMode,
   lineWarnings, stockData,
   addLine, addLineWithProduct, removeLine, duplicateLine, moveLine, updateLine,
@@ -574,37 +573,7 @@ export default function DocumentLinesSection({
   };
 
   return (
-    <Section
-      title="أسطر المستند"
-      icon="ti-list-details"
-      style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}
-      fillHeight
-      badge={
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {lines.length > 0 && (
-            <span style={{
-              padding: '2px 8px', borderRadius: 99, fontSize: 11, fontWeight: 700,
-              background: 'var(--emb)', color: 'var(--em)',
-            }}>
-              {lines.length} سطر
-            </span>
-          )}
-          {isLinesReadOnly && (
-            <span style={{
-              padding: '2px 8px', borderRadius: 99, fontSize: 10, fontWeight: 700,
-              background: 'var(--bg3)', color: 'var(--t4)',
-              display: 'flex', alignItems: 'center', gap: 4,
-            }}>
-              <i className="ti ti-lock" style={{ fontSize: 10 }} />
-              محمية
-            </span>
-          )}
-          {!isLinesReadOnly && (
-            <ColumnManager visible={visibleCols} onChange={handleColsChange} />
-          )}
-        </div>
-      }
-    >
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         {affectsStock && (
           <div style={{
@@ -1238,6 +1207,6 @@ export default function DocumentLinesSection({
           </div>
         </div>
       )}
-    </Section>
+    </div>
   );
 }

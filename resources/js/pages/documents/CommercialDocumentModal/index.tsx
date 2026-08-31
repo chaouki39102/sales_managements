@@ -86,7 +86,7 @@ export default function CommercialDocumentModal({
     companyInfo, printTemplates,
     selectedTemplateId, setSelectedTemplateId, selectedTemplate,
     printModalOpen, setPrintModalOpen, handlePrint,
-    visibleCols, lineMode, handleColsChange, setLineMode,
+    visibleCols, lineMode, setLineMode,
     deleteConfirm,
     handleSave, handleDelete, handleExport, handlePartyChangeWithWarning,
     handleQuickCreateParty, creatingParty,
@@ -410,7 +410,6 @@ export default function CommercialDocumentModal({
             products={lookups.products}
             isLoadingProducts={lookups.isLoadingProducts}
             visibleCols={visibleCols}
-            handleColsChange={handleColsChange}
             lineMode={lineMode}
             setLineMode={setLineMode}
             lineWarnings={lineWarnings}

@@ -14,6 +14,7 @@ import { Tabs, AlertBanner } from './components/DocumentUIPrimitives';
 import { RETURNABLE_CODES, SHIPPING_CODES } from './types/document.types';
 
 import DocumentTopbar from './CommercialDocumentModal/DocumentTopbar';
+import DocActionRail from './components/DocActionRail';
 import { DocumentAdvancedFields } from './CommercialDocumentModal/DocumentInfoSection';
 import DocumentLinesSection from './CommercialDocumentModal/DocumentLinesSection';
 import DocumentPaymentsSection from './CommercialDocumentModal/DocumentPaymentsSection';
@@ -101,7 +102,7 @@ export default function CommercialDocumentPage() {
     companyInfo, printTemplates,
     selectedTemplateId, setSelectedTemplateId, selectedTemplate,
     printModalOpen, setPrintModalOpen, handlePrint,
-    visibleCols, lineMode, handleColsChange, setLineMode,
+    visibleCols, lineMode, setLineMode,
     deleteConfirm,
     handleSave, handleDelete, handleExport, handlePartyChangeWithWarning,
     handleQuickCreateParty, creatingParty,
@@ -336,25 +337,46 @@ export default function CommercialDocumentPage() {
         isPending={isPending}
         successMsg={successMsg}
         isReadOnly={isReadOnly}
-        handleSave={handleSave}
-        onPrint={isEdit ? handlePrint : undefined}
-        templates={printTemplates}
-        selectedTemplateId={selectedTemplateId}
-        onTemplateChange={setSelectedTemplateId}
-        handleExport={handleExport}
-        handleDelete={handleDelete}
-        onClone={isEdit ? handleClone : undefined}
-        onReturnClick={() => setShowReturnModal(true)}
-        RETURNABLE_CODES={RETURNABLE_CODES}
         compact={compact}
         draftSavedAt={draftSavedAt}
         onSaveDraft={saveDraftNow}
         onDiscardDraft={discardDraft}
-        onPreview={() => setShowPreview(true)}
-        onPayments={() => setShowPayments(true)}
-        paymentsCount={payments.length}
-        onExtraOptions={() => setShowExtraOptions(true)}
+        handleSave={handleSave}
+        hideSave
       />
+
+      <div style={{
+        flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row',
+        alignItems: 'stretch', overflow: 'hidden',
+      }}>
+
+        <DocActionRail
+          isEdit={isEdit}
+          isReadOnly={isReadOnly}
+          isPending={isPending}
+          successMsg={successMsg}
+          docCode={docCode}
+          onBack={onClose}
+          handleSave={handleSave}
+          onPrint={isEdit ? handlePrint : undefined}
+          onPayments={() => setShowPayments(true)}
+          paymentsCount={payments.length}
+          onExtraOptions={() => setShowExtraOptions(true)}
+          onPreview={() => setShowPreview(true)}
+          handleExport={handleExport}
+          handleDelete={handleDelete}
+          onClone={isEdit ? handleClone : undefined}
+          onReturnClick={() => setShowReturnModal(true)}
+          RETURNABLE_CODES={RETURNABLE_CODES}
+          templates={printTemplates}
+          selectedTemplateId={selectedTemplateId}
+          onTemplateChange={setSelectedTemplateId}
+        />
+
+        <div style={{
+          flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column',
+          overflow: 'hidden',
+        }}>
 
       {infoAlerts.length > 0 && (
         <div style={{ flexShrink: 0, borderBottom: '1px solid var(--b1)', background: 'var(--bg2)' }}>
@@ -525,7 +547,6 @@ export default function CommercialDocumentPage() {
             products={lookups.products}
             isLoadingProducts={lookups.isLoadingProducts}
             visibleCols={visibleCols}
-            handleColsChange={handleColsChange}
             lineMode={lineMode}
             setLineMode={setLineMode}
             lineWarnings={lineWarnings}
@@ -561,6 +582,9 @@ export default function CommercialDocumentPage() {
             fillFromLastDoc={isPurchase ? undefined : () => fillFromLastDoc()}
             fillLastLoading={fillLastLoading}
           />
+        </div>
+      </div>
+
         </div>
       </div>
 
