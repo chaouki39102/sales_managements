@@ -53,30 +53,6 @@ export default function CommercialDocumentPage() {
   const onSaved = useCallback(() => navigate(`/documents/${typeCode}`), [navigate, typeCode]);
   const { confirm, confirmDialogProps } = useConfirm();
 
-  // تثبيت ارتفاع بطاقة المتعامل على ارتفاع بطاقة الإجماليات عند فتح الصفحة
-  // (لا تزيد مع اختيار الزبون — تُلتقط القيمة مرة واحدة فقط ثم تتوقف).
-  const totalsColRef = useRef<HTMLDivElement | null>(null);
-  const [partyMaxHeight, setPartyMaxHeight] = useState<number | undefined>(undefined);
-  const partyHRef = useRef<number | undefined>(undefined);
-  useLayoutEffect(() => {
-    const el = totalsColRef.current;
-    if (!el) return;
-    const capture = () => {
-      if (partyHRef.current !== undefined) return;
-      const h = el.offsetHeight;
-      if (h > 0) {
-        partyHRef.current = h;
-        setPartyMaxHeight(h);
-        return true;
-      }
-      return false;
-    };
-    capture();
-    const ro = new ResizeObserver(() => { capture(); if (partyHRef.current !== undefined) ro.disconnect(); });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
   const { data: docType } = useQuery({
     queryKey: [slug, 'document-type-by-code', typeCode],
     queryFn: async () => {
@@ -141,6 +117,32 @@ export default function CommercialDocumentPage() {
     savedDraft, draftKey, restoreDraft,
     draftSavedAt, discardDraft, saveDraftNow,
   } = ctrl;
+
+  // تثبيت ارتفاع بطاقة المتعامل على ارتفاع بطاقة الإجماليات عند فتح الصفحة
+  // (لا تزيد مع اختيار الزبون — تُلتقط القيمة مرة واحدة فقط ثم تتوقف).
+  // يجب أن يظهر بعد destructuring الـ controller حتى لا يكون `lookupsReady`
+  // في المنطقة الميتة الزمنية (TDZ) عند تقييم مصفوفة الاعتماديات.
+  const totalsColRef = useRef<HTMLDivElement | null>(null);
+  const [partyMaxHeight, setPartyMaxHeight] = useState<number | undefined>(undefined);
+  const partyHRef = useRef<number | undefined>(undefined);
+  useLayoutEffect(() => {
+    const el = totalsColRef.current;
+    if (!el) return;
+    const capture = () => {
+      if (partyHRef.current !== undefined) return;
+      const h = el.offsetHeight;
+      if (h > 0) {
+        partyHRef.current = h;
+        setPartyMaxHeight(h);
+        return true;
+      }
+      return false;
+    };
+    capture();
+    const ro = new ResizeObserver(() => { capture(); if (partyHRef.current !== undefined) ro.disconnect(); });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [lookupsReady]);
 
   // نسخ المستند كنسخة جديدة مستقلة (Task 7)
   const cloneMutation = useMutation({
