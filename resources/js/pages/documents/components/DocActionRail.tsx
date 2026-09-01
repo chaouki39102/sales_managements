@@ -93,7 +93,7 @@ export default function DocActionRail({
         </button>
       )}
 
-      <div style={{ position: 'relative' }} ref={exportRef}>
+      <div className="doc-rail-menu-wrap" ref={exportRef}>
         <button
           className="pp-rail-btn"
           onClick={() => setExportOpen((v) => !v)}
@@ -126,7 +126,7 @@ export default function DocActionRail({
       </div>
 
       {templates && templates.length > 0 && (
-        <div style={{ position: 'relative' }} ref={tplRef}>
+        <div className="doc-rail-menu-wrap" ref={tplRef}>
           <button
             className="pp-rail-btn"
             onClick={() => setTplOpen((v) => !v)}
@@ -189,7 +189,7 @@ export default function DocActionRail({
       )}
 
       {(showReturn || showDelete || (isEdit && onClone)) && (
-        <div style={{ position: 'relative' }} ref={moreRef}>
+        <div className="doc-rail-menu-wrap" ref={moreRef}>
           <button
             className="pp-rail-btn pp-rail-btn--ghost"
             onClick={() => setMoreOpen((v) => !v)}

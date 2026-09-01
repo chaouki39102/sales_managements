@@ -141,7 +141,7 @@ export default function DocumentHeaderBand({
 
     return (
       <div
-        className={`pp-cust-card${isCashParty ? ' pp-cust-card--cash' : ''}`}
+        className={`pp-cust-card${isCashParty ? ' pp-cust-card--cash' : ''} doc-party-card`}
         style={{
           height: '100%', boxSizing: 'border-box', minHeight: 0,
           ...(maxHeight ? { maxHeight, overflow: 'hidden' } : null),
@@ -165,7 +165,7 @@ export default function DocumentHeaderBand({
           ))}
         </div>
 
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+        <div className="doc-party-scroll">
         {cardTab === 'party' ? (
           <>
             {/*
@@ -285,7 +285,7 @@ export default function DocumentHeaderBand({
                   <i className="ti ti-hash" />
                   <span>رقم المستند</span>
                 </div>
-                <div style={{ position: 'relative' }}>
+                <div className="doc-field-rel">
                   <input
                     type="text"
                     style={{
@@ -298,12 +298,7 @@ export default function DocumentHeaderBand({
                     placeholder="أدخل رقم المستند..."
                   />
                   {checkingDocNumber && (
-                    <i className="ti ti-loader" style={{
-                      position: 'absolute', left: 10, top: '50%',
-                      transform: 'translateY(-50%)',
-                      fontSize: 12, animation: 'spin 1s linear infinite',
-                      color: 'var(--t4)', pointerEvents: 'none',
-                    }} />
+                    <i className="ti ti-loader doc-field-spin" />
                   )}
                 </div>
                 <FieldError msg={docNumberErr} />
@@ -405,7 +400,7 @@ export default function DocumentHeaderBand({
               <i className="ti ti-file-description" />
               <span>رقم المستند</span>
             </div>
-            <div style={{ position: 'relative' }}>
+            <div className="doc-field-rel">
               <input
                 type="text"
                 style={{
@@ -418,12 +413,7 @@ export default function DocumentHeaderBand({
                 placeholder="أدخل رقم المستند..."
               />
               {checkingDocNumber && (
-                <i className="ti ti-loader" style={{
-                  position: 'absolute', left: 10, top: '50%',
-                  transform: 'translateY(-50%)',
-                  fontSize: 12, animation: 'spin 1s linear infinite',
-                  color: 'var(--t4)', pointerEvents: 'none',
-                }} />
+                <i className="ti ti-loader doc-field-spin" />
               )}
             </div>
             <FieldError msg={docNumberErr} />
@@ -521,7 +511,7 @@ export default function DocumentHeaderBand({
             <i className="ti ti-file-description" />
             <span>رقم المستند</span>
           </div>
-          <div style={{ position: 'relative' }}>
+          <div className="doc-field-rel">
             <input
               type="text"
               style={{
@@ -534,12 +524,7 @@ export default function DocumentHeaderBand({
               placeholder="أدخل رقم المستند..."
             />
             {checkingDocNumber && (
-              <i className="ti ti-loader" style={{
-                position: 'absolute', left: 10, top: '50%',
-                transform: 'translateY(-50%)',
-                fontSize: 12, animation: 'spin 1s linear infinite',
-                color: 'var(--t4)', pointerEvents: 'none',
-              }} />
+              <i className="ti ti-loader doc-field-spin" />
             )}
           </div>
           <FieldError msg={docNumberErr} />

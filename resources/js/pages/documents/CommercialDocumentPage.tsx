@@ -311,12 +311,9 @@ export default function CommercialDocumentPage() {
 
   if (!lookupsReady) {
     return (
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        gap: 12, height: '100vh', background: 'var(--bg1)',
-      }}>
-        <i className="ti ti-loader-2" style={{ fontSize: 32, color: 'var(--em)', animation: 'spin 0.8s linear infinite' }} />
-          <span style={{ fontSize: 13, color: 'var(--t3)' }}>{docType?.name ?? 'جاري التحميل'}...</span>
+      <div className="doc-loading">
+        <i className="ti ti-loader-2 doc-loading-spin" />
+        <span className="doc-loading-text">{docType?.name ?? 'جاري التحميل'}...</span>
       </div>
     );
   }
@@ -342,11 +339,7 @@ export default function CommercialDocumentPage() {
   if (pmMode === 'additive' && !isLocked) infoAlerts.push({ type: 'info', message: 'المستند معتمد — الأسطر محمية من التعديل. يمكنك فقط إضافة دفعات جديدة.' });
 
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', height: '100vh',
-      background: isCancelled ? 'var(--bg3)' : 'var(--bg1)',
-      direction: 'rtl', overflow: 'hidden',
-    }}>
+    <div className={isCancelled ? 'doc-page doc-page--cancelled' : 'doc-page'}>
 
       <DocumentTopbar
         documentType={docType ?? null}
@@ -372,10 +365,7 @@ export default function CommercialDocumentPage() {
         hideSave
       />
 
-      <div style={{
-        flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row',
-        alignItems: 'stretch', overflow: 'hidden',
-      }}>
+      <div className="doc-body">
 
         <DocActionRail
           isEdit={isEdit}
@@ -400,27 +390,19 @@ export default function CommercialDocumentPage() {
           onTemplateChange={setSelectedTemplateId}
         />
 
-        <div style={{
-          flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column',
-          overflow: 'hidden',
-        }}>
+        <div className="doc-main">
 
       {infoAlerts.length > 0 && (
-        <div style={{ flexShrink: 0, borderBottom: '1px solid var(--b1)', background: 'var(--bg2)' }}>
+        <div className="doc-alerts">
           <button
             onClick={() => setAlertsOpen((v) => !v)}
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: 6,
-              padding: '6px 20px', border: 'none', cursor: 'pointer',
-              background: 'transparent', color: 'var(--t4)', fontSize: 11, fontWeight: 600,
-              fontFamily: 'inherit', textAlign: 'right',
-            }}
+            className="doc-alerts-toggle"
           >
-            <i className={`ti ti-chevron-${alertsOpen ? 'up' : 'down'}`} style={{ fontSize: 10 }} />
+            <i className={`ti ti-chevron-${alertsOpen ? 'up' : 'down'} doc-alerts-chevron`} />
             {alertsOpen ? 'إخفاء التنبيهات' : `${infoAlerts.length} تنبيه`}
           </button>
           {alertsOpen && (
-            <div style={{ padding: '0 20px 8px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="doc-alerts-list">
               {infoAlerts.map((a, i) => <AlertBanner key={i} type={a.type} message={a.message} />)}
             </div>
           )}
@@ -428,24 +410,18 @@ export default function CommercialDocumentPage() {
       )}
 
       {(successMsg || apiErr) && (
-        <div style={{ flexShrink: 0, padding: '8px 20px 0' }}>
+        <div className="doc-msg-slot">
           {successMsg && <AlertBanner type="success" message={successMsg} />}
           {apiErr && <AlertBanner type="error" message={apiErr} />}
         </div>
       )}
 
       {partyChangeWarning && (
-        <div style={{ flexShrink: 0, padding: '10px 20px 0' }}>
-          <div style={{
-            padding: '10px 14px', borderRadius: 'var(--r2)',
-            background: 'color-mix(in srgb, var(--orange) 10%, transparent)',
-            border: '1px solid var(--orange)',
-            fontSize: 12.5, color: 'var(--orange)',
-            display: 'flex', alignItems: 'flex-start', gap: 8,
-          }}>
-            <i className="ti ti-alert-triangle" style={{ marginTop: 1, flexShrink: 0 }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, marginBottom: 3 }}>
+        <div className="doc-party-warn">
+        <div className="doc-party-warn-box">
+            <i className="ti ti-alert-triangle doc-party-warn-icon" />
+            <div className="doc-party-warn-body">
+              <div className="doc-party-warn-title">
                 {partyChangeWarning.blockType === 'existing_payments' && 'دفعات مُسجَّلة في المستند'}
                 {partyChangeWarning.blockType === 'has_payments' && 'دفعات في النموذج'}
                 {partyChangeWarning.blockType === 'price_level_change' && 'تعارض فئة السعر'}
@@ -455,7 +431,7 @@ export default function CommercialDocumentPage() {
             </div>
             <button
               onClick={() => setPartyChangeWarning(null)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--orange)', padding: 0, fontSize: 13, flexShrink: 0 }}
+              className="doc-party-warn-close"
             >
               <i className="ti ti-x" />
             </button>
@@ -463,22 +439,12 @@ export default function CommercialDocumentPage() {
         </div>
       )}
 
-      <div style={{
-        flexShrink: 0,
-        display: 'flex', flexDirection: 'column', gap: compact ? 8 : 10,
-        padding: (compact ? 10 : 16) + 'px ' + (compact ? 10 : 16) + 'px 0',
-      }}>
-        <div style={{
-          display: 'flex', gap: compact ? 8 : 12,
-          alignItems: narrow ? 'stretch' : 'flex-start',
-          flexDirection: narrow ? 'column' : 'row',
-        }}>
-          <div style={{
-            width: narrow ? '100%' : '340px',
-            flex: narrow ? '0 0 auto' : '0 0 340px',
-            minWidth: 0,
-            ...(narrow ? null : { height: partyMaxHeight ?? 320, overflow: 'hidden' }),
-          }}>
+      <div className={compact ? 'doc-ed-top doc-ed-top--compact' : 'doc-ed-top'}>
+        <div className={`doc-ed-top-row${compact ? ' doc-ed-top-row--compact' : ''}${narrow ? ' doc-ed-top-row--narrow' : ''}`}>
+          <div
+            className={narrow ? 'party-col party-col--narrow' : 'party-col'}
+            style={narrow ? undefined : ({ '--party-col-h': `${partyMaxHeight ?? 320}px` } as React.CSSProperties)}
+          >
             <DocumentHeaderBand
               variant="party-card"
               docCode={docCode}
@@ -515,7 +481,7 @@ export default function CommercialDocumentPage() {
               creatingParty={creatingParty}
             />
           </div>
-          <div ref={totalsColRef} style={{ flex: '1 1 0', minWidth: 0 }}>
+          <div ref={totalsColRef} className="totals-col">
             <DocTotalsCard
               totals={totals}
               isEdit={isEdit}
@@ -525,12 +491,8 @@ export default function CommercialDocumentPage() {
 
       </div>
 
-      <div className="pos-pro-scan-row" style={{
-        flexShrink: 0,
-        padding: (compact ? 6 : 10) + 'px ' + (compact ? 10 : 16) + 'px',
-        display: 'flex', alignItems: 'center', gap: 8,
-      }}>
-        <div style={{ flex: '1 1 0', minWidth: 0 }}>
+      <div className={`pos-pro-scan-row doc-scan-row${compact ? ' doc-scan-row--compact' : ''}`}>
+        <div className="doc-scan-grow">
           <DocScanbar
             products={lookups.products}
             onAdd={(p) => handleScanProduct(String(p.id))}
@@ -561,14 +523,10 @@ export default function CommercialDocumentPage() {
         </button>
       </div>
 
-      <div style={{
-        flex: 1, minHeight: 0,
-        display: 'flex', flexDirection: 'column',
-        overflow: 'hidden',
-        padding: compact ? 10 : 16, gap: compact ? 10 : 14,
-      }}>
+      <div className={compact ? 'doc-lines-card doc-lines-card--compact' : 'doc-lines-card'}>
 
-        <div className="pp-cart-hd" style={{ flexShrink: 0, padding: '6px 10px', background: 'var(--bg2)', border: '1px solid var(--b1)', borderRadius: 'var(--r3)', paddingBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottom: 0 }}>
+        <div className="pp-cart">
+        <div className="pp-cart-hd">
           <div className="pp-cart-tabs">
             <span className="pp-cart-tab pp-cart-tab--current" title={isEdit ? 'المستند الحالي' : 'مستند جديد'}>
               <i className="ti ti-file-text" />
@@ -593,12 +551,7 @@ export default function CommercialDocumentPage() {
           </div>
         </div>
 
-        <div style={{
-          flex: 1, minHeight: 0,
-          display: 'flex', flexDirection: 'column',
-          background: 'var(--bg2)', border: '1px solid var(--b1)',
-          borderRadius: 'var(--r3)', overflow: 'hidden',
-        }}>
+        <div className="doc-lines-body">
           <DocumentLinesSection
             lines={form.lines}
             isLinesReadOnly={isLinesReadOnly}
@@ -641,6 +594,7 @@ export default function CommercialDocumentPage() {
             fillFromLastDoc={isPurchase ? undefined : () => fillFromLastDoc()}
             fillLastLoading={fillLastLoading}
           />
+        </div>
         </div>
       </div>
 
@@ -743,7 +697,7 @@ export default function CommercialDocumentPage() {
           size="lg"
           resizable={false}
         >
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0' }}>
+          <div className="doc-preview-wrap">
             <MiniPrintPreview
               company={companyInfo}
               docTypeName={docType?.name ?? ''}
