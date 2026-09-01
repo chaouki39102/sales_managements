@@ -289,7 +289,7 @@ export default function CommercialDocumentPage() {
         if (el) { el.focus(); el.select(); }
       } else if (e.key === 'F4') {
         e.preventDefault();
-        document.getElementById('doc-party-select')?.focus();
+        document.getElementById('doc-party-select')?.click();
       } else if (
         (e.key === 'F9' || ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 's'))
       ) {
@@ -466,7 +466,7 @@ export default function CommercialDocumentPage() {
       <div style={{
         flexShrink: 0,
         display: 'flex', flexDirection: 'column', gap: compact ? 8 : 10,
-        padding: (compact ? 10 : 16) + ' ' + (compact ? 10 : 16) + ' ' + '0',
+        padding: (compact ? 10 : 16) + 'px ' + (compact ? 10 : 16) + 'px 0',
       }}>
         <div style={{
           display: 'flex', gap: compact ? 8 : 12,
@@ -527,7 +527,7 @@ export default function CommercialDocumentPage() {
 
       <div className="pos-pro-scan-row" style={{
         flexShrink: 0,
-        padding: (compact ? 6 : 10) + ' ' + (compact ? 10 : 16),
+        padding: (compact ? 6 : 10) + 'px ' + (compact ? 10 : 16) + 'px',
         display: 'flex', alignItems: 'center', gap: 8,
       }}>
         <div style={{ flex: '1 1 0', minWidth: 0 }}>

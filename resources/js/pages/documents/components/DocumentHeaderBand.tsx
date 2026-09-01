@@ -3,7 +3,8 @@ import type { QueryClient } from '@tanstack/react-query';
 import type { PartyType } from '@/lib/api/core/types';
 import type { Party } from '../types/document.types';
 import { buildWhatsAppLink } from '@/lib/wa';
-import { ComboBox, FieldError, type ComboBoxHandle } from './DocumentUIPrimitives';
+import { ComboBox, FieldError } from './DocumentUIPrimitives';
+import PartySearchModal from './PartySearchModal';
 import PartyBalanceBadge from '../CommercialDocumentModal/PartyBalanceBadge';
 import PartyQuickCreateForm, { type PartyQuickCreatePayload } from './PartyQuickCreateForm';
 import type { PartyBalanceInfo } from '../hooks/useDocumentForm';
@@ -105,7 +106,7 @@ export default function DocumentHeaderBand({
   const [createOpen, setCreateOpen] = React.useState(false);
   const [qcName, setQcName] = React.useState('');
   const [cardTab, setCardTab] = React.useState<'party' | 'doc'>('party');
-  const comboRef = React.useRef<ComboBoxHandle>(null);
+  const [partyPickerOpen, setPartyPickerOpen] = React.useState(false);
 
   const selectedParty = partyOptions.find((o) => String(o.id) === String(form.party_id ?? ''));
   const bandPad = (compact ? 8 : 11);
@@ -146,12 +147,8 @@ export default function DocumentHeaderBand({
           ...(maxHeight ? { maxHeight, overflow: 'hidden' } : null),
         }}
       >
-        {/* تَبويب: الزبون / معلومات المستند */}
-        <div style={{
-          display: 'flex', gap: 2, flexShrink: 0,
-          background: 'var(--bg1)', border: '1px solid var(--b1)',
-          borderRadius: 'var(--r1)', padding: 2,
-        }}>
+        {/* تَبويب: الزبون / معلومات المستند — نمط POS Pro (مكوّن مجزّأ نظيف) */}
+        <div className="dhb-tabs">
           {([
             { key: 'party', icon: isPurchase ? 'ti-building-store' : 'ti-user', label: isPurchase ? 'المورد' : 'الزبون' },
             { key: 'doc', icon: 'ti-file-description', label: 'معلومات المستند' },
@@ -159,17 +156,10 @@ export default function DocumentHeaderBand({
             <button
               key={t.key}
               type="button"
+              className={`dhb-tab${cardTab === t.key ? ' dhb-tab--on' : ''}`}
               onClick={() => setCardTab(t.key)}
-              style={{
-                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                padding: '5px 4px', border: 'none', cursor: 'pointer', borderRadius: 'var(--r1)',
-                fontSize: 10.5, fontWeight: 800, whiteSpace: 'nowrap',
-                background: cardTab === t.key ? 'var(--em)' : 'transparent',
-                color: cardTab === t.key ? '#fff' : 'var(--t4)',
-                transition: 'all .15s',
-              }}
             >
-              <i className={`ti ${t.icon}`} style={{ fontSize: 12 }} />
+              <i className={`ti ${t.icon}`} />
               {t.label}
             </button>
           ))}
@@ -181,33 +171,38 @@ export default function DocumentHeaderBand({
             {/*
               ══ تبويب الزبون: اختيار المتعامل + معلوماته + الرصيد + سقف الائتمان (نمط POS Pro) ══
             */}
-            {p && (
-              <div className="pp-cust-head">
+            {/* رأس المتعامل يُعرض دائماً (حتى دون اختيار) لإظهار طريقة تحديد الزبون */}
+            <div className="pp-cust-head">
+              <div className="pp-avatar-wrap">
                 <button
                   type="button"
-                  title={isReadOnly ? undefined : 'تغيير المتعامل'}
+                  id="doc-party-select"
+                  aria-label={p ? (isPurchase ? 'تغيير المورد' : 'تغيير الزبون') : (isPurchase ? 'اختر المورد' : 'اختر الزبون')}
                   className={`pp-avatar${isDebtor ? ' pp-avatar--debt' : ''}`}
-                  onClick={() => { if (!isReadOnly) comboRef.current?.open(); }}
+                  onClick={() => { if (!isReadOnly) setPartyPickerOpen(true); }}
                 >
-                  {p.avatar
-                    ? <img src={p.avatar} alt="" />
-                    : initials}
+                  {p?.avatar ? <img src={p.avatar} alt="" /> : initials}
                 </button>
-                <div className="pp-cust-id">
-                  <div className="pp-cust-name">
-                    <span className="pp-cust-name-txt">{pName}</span>
-                    {isCashParty && (
-                      <span className="pp-cust-badge"><i className="ti ti-cash" /> الصندوق</span>
-                    )}
-                  </div>
-                  {p.commercial_name && p.commercial_name !== pName ? (
-                    <div className="pp-cust-meta"><span>{p.commercial_name}</span></div>
-                  ) : (
-                    p.code ? <div className="pp-cust-meta"><span>{p.code}</span></div> : null
+                {!isReadOnly && (
+                  <span className={`pp-avatar-hint${p ? '' : ' dhb-empty-hint'}`}>
+                    <i className="ti ti-user-swap" /> {p ? (isPurchase ? 'تغيير المورد' : 'تغيير الزبون') : (isPurchase ? 'اختر المورد' : 'اختر الزبون')}
+                  </span>
+                )}
+              </div>
+              <div className="pp-cust-id">
+                <div className="pp-cust-name">
+                  <span className="pp-cust-name-txt">{pName || (isPurchase ? 'اختر المورد' : 'اختر الزبون')}</span>
+                  {isCashParty && (
+                    <span className="pp-cust-badge"><i className="ti ti-cash" /> الصندوق</span>
                   )}
                 </div>
+                {p?.commercial_name && p.commercial_name !== pName ? (
+                  <div className="pp-cust-meta"><span>{p.commercial_name}</span></div>
+                ) : (
+                  p?.code ? <div className="pp-cust-meta"><span>{p.code}</span></div> : null
+                )}
               </div>
-            )}
+            </div>
 
             {p && (priceLevel || p.nif || p.rc || p.is_tva_exempt) && (
               <div className="pp-cust-meta">
@@ -246,32 +241,7 @@ export default function DocumentHeaderBand({
               </div>
             )}
 
-            <ComboBox
-              id="doc-party-select"
-              ref={comboRef}
-              options={partyOptions}
-              value={form.party_id as string}
-              onChange={handlePartyChangeWithWarning}
-              placeholder={`— ابحث عن ${isPurchase ? 'مورد' : 'زبون'} —`}
-              disabled={isReadOnly}
-              error={!!errors.party_id}
-              showCreate={quickCreateEnabled}
-              createLabel={isPurchase ? 'مورد' : 'زبون'}
-              onCreate={openCreate}
-            />
             <FieldError msg={errors.party_id} />
-
-            {createOpen && quickCreateEnabled && (
-              <PartyQuickCreateForm
-                key={qcName}
-                initialName={qcName}
-                isPurchase={isPurchase}
-                partyTypes={partyTypes}
-                creatingParty={creatingParty}
-                onCancel={() => setCreateOpen(false)}
-                onSubmit={(p) => { setCreateOpen(false); onQuickCreateParty!(p); }}
-              />
-            )}
 
             {p && (
               <div className="pp-cust-stats">
@@ -403,6 +373,18 @@ export default function DocumentHeaderBand({
           </>
         )}
         </div>
+        <PartySearchModal
+          open={partyPickerOpen}
+          isPurchase={isPurchase}
+          options={partyOptions}
+          value={form.party_id as string}
+          quickCreateEnabled={quickCreateEnabled}
+          partyTypes={partyTypes}
+          creatingParty={creatingParty}
+          onChange={handlePartyChangeWithWarning}
+          onQuickCreate={onQuickCreateParty ? (p) => onQuickCreateParty!(p) : undefined}
+          onClose={() => setPartyPickerOpen(false)}
+        />
       </div>
     );
   }

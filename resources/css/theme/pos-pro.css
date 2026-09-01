@@ -532,6 +532,225 @@
 .pp-avatar--debt:hover { box-shadow: 0 0 0 2px var(--bg2), 0 0 0 3.5px var(--red); }
 .pp-avatar--debt + .pp-avatar-hint { color: var(--red); border-color: color-mix(in srgb, var(--red) 30%, transparent); }
 
+/* ── تبويبات بطاقة المتعامل/المستند (DocumentHeaderBand) — مكوّن مجزّأ نظيف ── */
+.dhb-tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg1);
+  border: 1px solid var(--b1);
+  border-radius: var(--r1);
+}
+.dhb-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: var(--r1);
+  background: transparent;
+  color: var(--t4);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all .15s;
+}
+.dhb-tab i { font-size: 12px; }
+.dhb-tab:hover:not(.dhb-tab--on) { background: var(--bg3); color: var(--t2); }
+.dhb-tab--on {
+  background: var(--grad-em);
+  color: #fff;
+  box-shadow: var(--emglow);
+}
+
+/* عند عدم اختيار متعامل: إبقاء مؤشر "اختر الزبون" ظاهراً دائماً (لا عند التحويم فقط) */
+.dhb-empty-hint {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+/* ── قائمة بحث المتعاملين (PartySearchModal) — نمط POS Pro ── */
+.psm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.psm-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg1);
+  border: 1px solid var(--b2);
+  border-radius: var(--r2);
+}
+.psm-search > i { font-size: 15px; color: var(--t4); flex-shrink: 0; }
+.psm-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--t1);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+.psm-search input::placeholder { color: var(--t4); }
+
+.psm-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: var(--r1);
+  background: transparent;
+  color: var(--t4);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--d1), color var(--d1);
+}
+.psm-clear i { font-size: 14px; }
+.psm-clear:hover { background: var(--bg3); color: var(--red); }
+
+.psm-count {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--t4);
+}
+.psm-count span { color: var(--em); }
+
+.psm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.psm-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--r1);
+  background: transparent;
+  color: var(--t2);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: start;
+  cursor: pointer;
+  transition: background var(--d1), color var(--d1);
+}
+.psm-item.hi { background: var(--bg3); }
+.psm-item:hover { background: var(--emb); color: var(--em); }
+.psm-item.on { color: var(--em); }
+
+.psm-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.psm-item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.psm-item-sub {
+  font-size: 11px;
+  color: var(--t4);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.psm-item-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--t4);
+  background: var(--bg3);
+  border: 1px solid var(--b2);
+  border-radius: var(--r1);
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+.psm-item-check { font-size: 15px; color: var(--em); flex-shrink: 0; }
+
+.psm-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 24px 12px;
+  color: var(--t4);
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: center;
+}
+.psm-empty > i { font-size: 24px; color: var(--t4); }
+
+.psm-create-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  padding: 7px 12px;
+  border: 1px solid var(--embo);
+  border-radius: var(--r2);
+  background: color-mix(in srgb, var(--em) 12%, transparent);
+  color: var(--em);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background var(--d1), border-color var(--d1);
+}
+.psm-create-btn i { font-size: 14px; }
+.psm-create-btn:hover { background: color-mix(in srgb, var(--em) 20%, transparent); border-color: var(--em); }
+
+.psm-create {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.psm-create-hd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 2px 0;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--t2);
+}
+.psm-create-hd > i { font-size: 14px; color: var(--em); }
+.psm-create-hd > span { flex: 1; }
+.psm-create-hd .psm-clear { color: var(--t4); }
+.psm-create-hd .psm-clear:hover { color: var(--red); }
+
+.psm-hint {
+  font-size: 11px;
+  color: var(--t4);
+  font-weight: 600;
+  text-align: center;
+  padding: 2px 4px;
+}
+
 .pp-cust-id { min-width: 0; flex: 1; }
 
 .pp-cust-name {
