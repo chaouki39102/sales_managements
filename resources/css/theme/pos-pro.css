@@ -3378,6 +3378,34 @@
 /* غلاف قائمة الإجراءات في الشريط الجانبي */
 .doc-rail-menu-wrap { position: relative; }
 
+/* ═══ توحيد أزرار شريط المحرر مع POS PRO (ارتفاعات متساوية) ════════════ */
+/* غلاف القوائم (تصدير/قالب/المزيد) يعمل كعنصر تمرير خالٍ: الزر الداخلي
+   يستوعب عرض وارتفاع الغلاف بالكامل، فيطابق أزرار .pp-rail-btn المباشرة. */
+.doc-rail .doc-rail-menu-wrap {
+  display: flex;
+  flex: 0 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+.doc-rail .doc-rail-menu-wrap > .pp-rail-btn {
+  flex: 1 1 auto;
+  width: 100%;
+  align-self: stretch;
+}
+
+/* كل أزرار الشريط تأخذ العرض الكامل وتسمية من سطر واحد ثابت
+   (لا التفاف) → ارتفاعات متساوية بغضّ النظر عن طول النص. */
+.doc-rail .pp-rail-btn {
+  width: 100%;
+}
+.doc-rail .pp-rail-btn > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  line-height: 1.3;
+}
+
 /* بطاقة المتعامل داخل الرأس */
 .doc-party-card {
   height: 100%;
