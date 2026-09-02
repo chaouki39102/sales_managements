@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { QueryClient } from '@tanstack/react-query';
 import type { PartyType } from '@/lib/api/core/types';
 import type { Party } from '../types/document.types';
@@ -112,6 +113,8 @@ export default function DocumentHeaderBand({
   const [qcName, setQcName] = React.useState('');
   const [cardTab, setCardTab] = React.useState<'party' | 'doc'>('party');
   const [partyPickerOpen, setPartyPickerOpen] = React.useState(false);
+  const [avatarHover, setAvatarHover] = useState<{ x: number; y: number } | null>(null);
+  const avatarBtnRef = useRef<HTMLButtonElement>(null);
 
   const selectedParty = partyOptions.find((o) => String(o.id) === String(form.party_id ?? ''));
   const bandPad = (compact ? 8 : 11);
@@ -180,18 +183,28 @@ export default function DocumentHeaderBand({
             <div className="pp-cust-head">
               <div className="pp-avatar-wrap">
                 <button
+                  ref={avatarBtnRef}
                   type="button"
                   id="doc-party-select"
                   aria-label={p ? (isPurchase ? 'تغيير المورد' : 'تغيير الزبون') : (isPurchase ? 'اختر المورد' : 'اختر الزبون')}
                   className={`pp-avatar${isDebtor ? ' pp-avatar--debt' : ''}`}
                   onClick={() => { if (!isReadOnly) setPartyPickerOpen(true); }}
+                  onMouseEnter={() => {
+                    const r = avatarBtnRef.current?.getBoundingClientRect();
+                    if (r) setAvatarHover({ x: r.left + r.width / 2, y: r.bottom + 6 });
+                  }}
+                  onMouseLeave={() => setAvatarHover(null)}
                 >
                   {p?.avatar ? <img src={p.avatar} alt="" /> : initials}
                 </button>
-                {!isReadOnly && (
-                  <span className={`pp-avatar-hint${p ? '' : ' dhb-empty-hint'}`}>
+                {!isReadOnly && avatarHover && createPortal(
+                  <span
+                    className="doc-party-avatar-tooltip"
+                    style={{ position: 'fixed', left: avatarHover.x, top: avatarHover.y, transform: 'translateX(-50%)', zIndex: 99999, pointerEvents: 'none' }}
+                  >
                     <i className="ti ti-user-swap" /> {p ? (isPurchase ? 'تغيير المورد' : 'تغيير الزبون') : (isPurchase ? 'اختر المورد' : 'اختر الزبون')}
-                  </span>
+                  </span>,
+                  document.body,
                 )}
               </div>
               <div className="pp-cust-id">
