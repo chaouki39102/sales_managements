@@ -612,7 +612,7 @@ export default function CommercialDocumentPage() {
         ref={ocrImageInputRef}
         type="file"
         accept="image/*"
-        style={{ display: 'none' }}
+        className="doc-hidden-input"
         onChange={handleOcrImagePicked}
       />
 
@@ -692,7 +692,7 @@ export default function CommercialDocumentPage() {
         <Modal
           open
           onClose={() => setShowPreview(false)}
-          title={<><i className="ti ti-eye" style={{ marginLeft: 5 }} /> معاينة الطباعة</>}
+          title={<><i className="ti ti-eye doc-modal-title-ic" /> معاينة الطباعة</>}
           subtitle="معاينة حيّة للمستند كما سيُطبع"
           size="lg"
           resizable={false}
@@ -718,7 +718,7 @@ export default function CommercialDocumentPage() {
         <Modal
           open
           onClose={() => setShowPayments(false)}
-          title={<><i className="ti ti-wallet" style={{ marginLeft: 5 }} /> الدفعات</>}
+          title={<><i className="ti ti-wallet doc-modal-title-ic" /> الدفعات</>}
           subtitle="تسجيل وإدارة دفعات هذا المستند"
           size="lg"
           resizable={false}
@@ -746,7 +746,7 @@ export default function CommercialDocumentPage() {
         <Modal
           open
           onClose={() => setShowExtraOptions(false)}
-          title={<><i className="ti ti-adjustments" style={{ marginLeft: 5 }} /> خيارات إضافية</>}
+          title={<><i className="ti ti-adjustments doc-modal-title-ic" /> خيارات إضافية</>}
           subtitle="إعدادات متقدمة، الشحن والتسليم، وشروط الدفع"
           size="lg"
           resizable={false}

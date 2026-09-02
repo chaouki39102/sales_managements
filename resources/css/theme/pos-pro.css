@@ -3153,6 +3153,16 @@
 
 /* ═══════════════ المستند التجاري — تطبيق الصناديق (CommercialDocumentPage) ═══════════════ */
 
+/* إدخال ملف مخفي (رفع صورة فاتورة المورد) */
+.doc-hidden-input {
+  display: none;
+}
+
+/* أيقونة عنوان نافذة منبثقة */
+.doc-modal-title-ic {
+  margin-inline-end: 5px;
+}
+
 /* حالة التحميل */
 .doc-loading {
   display: flex;
@@ -3173,14 +3183,17 @@
   color: var(--t3);
 }
 
-/* جذر الصفحة */
+/* جذر الصفحة — الارتفاع يطابق .pos-pro أسفل الشريط العلوي للقالب (--tb) */
 .doc-page {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: calc(100vh - var(--tb));
   direction: rtl;
   overflow: hidden;
   background: var(--bg1);
+}
+@media (max-width: 720px) {
+  .doc-page { height: calc(100vh - var(--tb) - var(--mb)); }
 }
 .doc-page--cancelled { background: var(--bg3); }
 
