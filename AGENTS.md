@@ -64,7 +64,55 @@
 
 **Files modified (6)**: `resources/js/pages/documents/CommercialDocumentPage.tsx` (aux-strip removed + `selectedParty` props + suggestions wiring removed), `resources/js/pages/documents/components/DocumentHeaderBand.tsx` (tabbed `party-card` + `selectedParty` prop), `resources/js/pages/documents/CommercialDocumentModal/DocumentLinesSection.tsx` (cards grid + suggestions removed), `resources/js/pages/documents/CommercialDocumentModal/index.tsx` (suggestions wiring removed), `resources/js/pages/documents/types/document.types.ts` (rich `Party` fields), `public/sw.js` (refreshed by build). Commit `d130deb`, pushed to `origin/main`.
 
-**Verification**: `npx tsc --noEmit` clean · vitest **405/405** (23 files) · `npm run build` 0 errors, **240 precache entries** · **SW MATCH**. No PHP touched → pest not re-run.
+**Verification**: `npx tsc --noEmit` clean · vitest **405/405** (23 files) · `npm run build` 0 errors, **240 precache entries** · **SW MATCH**. No PHP touched → pest not re-run. Commit `d130deb`, pushed to `origin/main`.
+
+### Phase 89 — DocActionRail Equal-Height Buttons (Sep 2)
+
+**Request**: "MAKE THE BTN OF SIDE BAR IDENTICAL LIKE POS PRO" — the DocActionRail (doc-editor sidebar) buttons had unequal heights vs POS Pro's POSProRail: wrapper-enclosed buttons (export/template/more) were shorter than direct buttons, and some labels wrapped to 2 lines.
+
+**Root cause**: POSProRail renders every button as a **direct** `.pp-rail` flex child. DocActionRail wraps `export`/`template`/`more` in `<div className="doc-rail-menu-wrap">` (for dropdown menus) — the wrapper (bare `position: relative` block, pos-pro.css:3379) became the flex child instead of the button, so the inner button was not stretched to fill the wrapper. Additionally, longer Arabic labels (e.g. «خيارات») wrapped to 2 lines at 12px in ≈62px content width, making those buttons taller.
+
+**What was built** (CSS-only fix in `resources/css/theme/pos-pro.css`, all scoped to `.doc-rail`, zero `.pp-rail` base changes):
+- **Wrapper pass-through**: `.doc-rail .doc-rail-menu-wrap` gained `display: flex; flex: 0 1 auto; width: 100%; min-width: 0` — the wrapper now behaves as a flex container with the same sizing as a direct `.pp-rail-btn`.
+- **Inner button fills wrapper**: `.doc-rail .doc-rail-menu-wrap > .pp-rail-btn` gained `flex: 1 1 auto; width: 100%; align-self: stretch` — the button inside the wrapper fills the entire wrapper box, byte-identical to a direct button.
+- **Full-width direct buttons**: `.doc-rail .pp-rail-btn { width: 100% }` — ensures direct buttons also fill the rail width uniformly.
+- **Single-line labels**: `.doc-rail .pp-rail-btn > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; line-height: 1.3 }` — prevents 2-line-wrap inequality; ellipsis is safe since doc labels are short (max ~6 Arabic glyphs: خيارات/المزيد/تصدير//options/…).
+- The absolute-positioned dropdown menus remain anchored to `.doc-rail-menu-wrap` (which retains `position: relative` from the original rule at 3379) — no menu regression.
+
+**Key architectural rules**:
+- **Wrapper pass-through pattern**: when a UI framework wraps a button in a container for dropdown/modal behavior, the container must be `display: flex` with the button as `flex: 1 1 auto; align-self: stretch; width: 100%` so the button fills the wrapper identically to a direct flex child. Never rely on the wrapper inheriting flex alignment from a parent — the wrapper is the flex child, not the button.
+- **Single-line label contract**: in a fixed-width rail (≈62px content), any label that could exceed 1 line MUST use `white-space: nowrap; overflow: hidden; text-overflow: ellipsis` — never let text wrapping create height inequality between sibling buttons.
+- **Scoped overrides**: UI parity fixes that affect shared components (`.pp-rail-btn`) must be scoped via the parent class (`.doc-rail .pp-rail-btn`) — never modify the shared base, which is used by POSProRail and potentially other consumers.
+
+**Files modified (2)**: `resources/css/theme/pos-pro.css` (wrapper pass-through + full-width + single-line label rules after `.doc-rail-menu-wrap` at ~line 3379); `public/sw.js` (refreshed by build). Commit `27acbef`, pushed to `origin/main`.
+
+**Verification**: `npx tsc --noEmit` clean · vitest **405/405** (23 files) · `npm run build` 0 errors, **240 precache entries** · **SW MATCH** (`public/sw.js` hash == `public/build/sw.js` hash). No PHP touched → pest not re-run.
+
+### Phase 90 — Doc Editor Customer Card Enhancement: 8 Rich Info Features (Sep 2)
+
+**Request**: enhance the document editor's customer/party card (`DocumentHeaderBand` `party-card` variant) with 8 specific improvements: NIS chip, email → mailto link, phone → call link, open debts badge, FY document count, credit remaining, party since date, credit days display.
+
+**What was built** (all in `DocumentHeaderBand.tsx` + `CommercialDocumentPage.tsx` + `pos-pro.css` + `document.types.ts`):
+- **NIS chip** (`ti-certificate` icon + `p.nis` value) added alongside NIF/RC chips in the party meta row — visible when `p.nis` is truthy.
+- **Email → `mailto:` link**: changed `<span>` to `<a href="mailto:${p.email}">` with `ti-mail` icon — clickable in the contact row (aligns with POS Pro `CustomerCard`).
+- **Phone → `tel:` call link**: when WhatsApp is not available, the phone number renders as `<a href="tel:${phone}">` with `ti-phone` icon — single-tap call from the card.
+- **Open debts badge**: `creditCheck.overdue_invoices.count > 0` → amber `pp-stat--overdue` stat with count + total amount.
+- **FY document count**: `customerInsights.document_count > 0` → "X فاتورة" stat showing this fiscal year's activity.
+- **Credit remaining stat**: `creditCheck.available_credit > 0` → green `pp-stat--available` with remaining credit amount.
+- **Party since**: `p.created_at` → "عميل منذ month year" using `toLocaleDateString('ar-DZ')` — shown on its own row or alongside credit_days.
+- **Credit days**: `p.credit_days > 0` → "أجل N يوم" meta chip with `ti-calendar` icon.
+- **Props extended**: `DocumentHeaderBandProps` gained `creditCheck?: CreditCheckResult` and `customerInsights?: CustomerInsightsData` (both already fetched by the controller but never passed down).
+- **Zero new API calls** — all data was already returned by `useCommercialDocumentController` (lines 296–318, 816–829) but simply not rendered.
+
+**Key architectural rules**:
+- A party card enhancement must reuse data ALREADY fetched by the controller hook — never add new `useQuery` calls to `DocumentHeaderBand` (it is a pure presentational component).
+- `creditCheck` is only available for sales documents (gated `!isPurchase` in `useCreditCheck`); the card must handle `creditCheck === null` for purchase docs gracefully (the stats section just omits debt/credit rows).
+- Contact links must be `<a href="mailto:...">` / `<a href="tel:...">` (clickable, semantic) — not `<span>` with a click handler — so they work on all platforms and are accessible.
+- `created_at` is serialized by `PartyResource.php` (line 55) but was NOT in the TypeScript `Party` interface before this phase — always verify the backend serializer when relying on a field that was "always there" on the PHP side.
+
+**Files modified (4)**: `resources/js/pages/documents/types/document.types.ts` (added `created_at?: string | null` to `Party`); `resources/js/pages/documents/components/DocumentHeaderBand.tsx` (props + destructuring + party-card JSX enhancements); `resources/js/pages/documents/CommercialDocumentPage.tsx` (pass `creditCheck`/`customerInsights` to `DocumentHeaderBand`); `resources/css/theme/pos-pro.css` (new `pp-stat--overdue`/`pp-stat--available`/`pp-stat-sub` classes); `public/sw.js` (refreshed by build). Commit `832f883`, pushed to `origin/main`.
+
+**Verification**: `npx tsc --noEmit` clean · vitest **405/405** (23 files) · `npm run build` 0 errors, **240 precache entries** · **SW MATCH** (`public/sw.js` hash == `public/build/sw.js` hash). No PHP touched → pest not re-run.
 
 **Request**: "I DONT LIKE THE CURRENT [editor] IT NOT RESPONSIVE NOT WELL POSISIONNED THE LAYOUT ALL THINGS MUST BE RESPONSIVE AND WELL POSIONNED REFRESH ALL" — the Add/Edit document page (`CommercialDocumentPage`) was a fixed row layout (sidebar + lines) that cramped on laptop/tablet widths. Fix: a true responsive layout that keeps the desktop golden layout intact and stacks vertically on narrow viewports.
 
