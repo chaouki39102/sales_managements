@@ -3151,6 +3151,23 @@
 .doc-rail-menu-item.danger:hover { background: var(--redb); color: var(--red); }
 .doc-rail-menu-item.danger:hover i { color: var(--red); }
 
+/* شارة "دائم" للأزرار الإلزامية (رجوع/حفظ) في مودال تخصيص الشريط */
+.doc-rail-custom-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--b2);
+  border-radius: var(--r1);
+  background: var(--bg2);
+  color: var(--t4);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.doc-rail-custom-lock i { font-size: 12px; }
+
 /* ═══════════════ المستند التجاري — تطبيق الصناديق (CommercialDocumentPage) ═══════════════ */
 
 /* إدخال ملف مخفي (رفع صورة فاتورة المورد) */
