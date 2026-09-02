@@ -856,6 +856,12 @@
 
 .pp-stat--balance.debt strong { color: var(--red); }
 
+.pp-stat--overdue strong { color: var(--amber, #f59e0b); }
+
+.pp-stat--overdue .pp-stat-sub { font-weight: 400; font-size: var(--fs-2xs); }
+
+.pp-stat--available strong { color: var(--green); }
+
 .pp-cust-credit {
   display: flex;
   flex-direction: column;

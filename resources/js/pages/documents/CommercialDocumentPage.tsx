@@ -101,6 +101,7 @@ export default function CommercialDocumentPage() {
     showReturnModal, setShowReturnModal,
     showBulkImport, setShowBulkImport,
     advancePayments, isLoadingAdvances,
+    creditCheck, customerInsights,
     successMsg, setSuccessMsg,
     companyInfo, printTemplates,
     selectedTemplateId, setSelectedTemplateId, selectedTemplate,
@@ -476,6 +477,8 @@ export default function CommercialDocumentPage() {
               slug={slug}
               partyBalance={partyBalance}
               isLoadingBalance={isLoadingBalance}
+              creditCheck={creditCheck}
+              customerInsights={customerInsights}
               partyTypes={partyTypes}
               onQuickCreateParty={handleQuickCreateParty}
               creatingParty={creatingParty}

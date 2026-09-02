@@ -124,6 +124,7 @@ export interface Party {
   is_final_consumer?:      boolean;
   is_vat_registered?:      boolean;
   allow_credit_sale?:      boolean;
+  created_at?:             string | null;
 }
 
 // ─── Shipping Info ──────────────────────────────────────────────────────────────

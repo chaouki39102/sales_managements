@@ -8,6 +8,8 @@ import PartySearchModal from './PartySearchModal';
 import PartyBalanceBadge from '../CommercialDocumentModal/PartyBalanceBadge';
 import PartyQuickCreateForm, { type PartyQuickCreatePayload } from './PartyQuickCreateForm';
 import type { PartyBalanceInfo } from '../hooks/useDocumentForm';
+import type { CreditCheckResult } from '../hooks/useCreditCheck';
+import type { CustomerInsightsData } from '../hooks/useCustomerInsights';
 import { fmtDZD } from '../utils/document.utils';
 
 const fieldInputStyle = (isReadOnly: boolean, hasError?: boolean): React.CSSProperties => ({
@@ -69,6 +71,8 @@ interface DocumentHeaderBandProps {
 
   partyBalance: PartyBalanceInfo | null;
   isLoadingBalance: boolean;
+  creditCheck?: CreditCheckResult | null;
+  customerInsights?: CustomerInsightsData | null;
   partyTypes?: PartyType[];
   onQuickCreateParty?: (payload: PartyQuickCreatePayload) => void;
   creatingParty?: boolean;
@@ -98,7 +102,8 @@ export default function DocumentHeaderBand({
   handlePartyChangeWithWarning, partyOptions, priceLevelOptions, handlePriceLevelChange,
   selectedParty: partyRecord,
   warehouses, warehouseIdNum, qc, slug,
-  partyBalance, isLoadingBalance, partyTypes, onQuickCreateParty, creatingParty,
+  partyBalance, isLoadingBalance, creditCheck, customerInsights,
+  partyTypes, onQuickCreateParty, creatingParty,
   variant = 'cards',
 }: DocumentHeaderBandProps) {
   const quickCreateEnabled = !!onQuickCreateParty && !isReadOnly;
@@ -204,7 +209,7 @@ export default function DocumentHeaderBand({
               </div>
             </div>
 
-            {p && (priceLevel || p.nif || p.rc || p.is_tva_exempt) && (
+            {p && (priceLevel || p.nif || p.rc || p.nis || p.is_tva_exempt) && (
               <div className="pp-cust-meta">
                 {priceLevel && (
                   <span title="مستوى السعر"><i className="ti ti-tags" /> {priceLevel}</span>
@@ -215,11 +220,28 @@ export default function DocumentHeaderBand({
                 {p.rc && (
                   <span title="رقم السجل التجاري"><i className="ti ti-file-text" /> {p.rc}</span>
                 )}
+                {p.nis && (
+                  <span title="الرقم الشريطي"><i className="ti ti-certificate" /> {p.nis}</span>
+                )}
                 {p.is_tva_exempt && (
                   <span className="exempt" title="معفى من ضريبة القيمة المضافة">
                     <i className="ti ti-shield-check" /> معفى من TVA
                   </span>
                 )}
+              </div>
+            )}
+
+            {p?.credit_days && p.credit_days > 0 && (
+              <div className="pp-cust-meta">
+                <span title="أيام الدفع"><i className="ti ti-calendar" /> أجل {p.credit_days} يوم</span>
+                {p.created_at && (
+                  <span title="تاريخ التسجيل"><i className="ti ti-clock" /> عميل منذ {new Date(p.created_at).toLocaleDateString('ar-DZ', { year: 'numeric', month: 'short' })}</span>
+                )}
+              </div>
+            )}
+            {!p?.credit_days && p?.created_at && (
+              <div className="pp-cust-meta">
+                <span title="تاريخ التسجيل"><i className="ti ti-clock" /> عميل منذ {new Date(p.created_at).toLocaleDateString('ar-DZ', { year: 'numeric', month: 'short' })}</span>
               </div>
             )}
 
@@ -230,10 +252,10 @@ export default function DocumentHeaderBand({
                     ? <a href={waLink} target="_blank" rel="noopener noreferrer" title="مراسلة واتساب">
                         <i className="ti ti-brand-whatsapp" /> {phone}
                       </a>
-                    : <span><i className="ti ti-phone" /> {phone}</span>
+                    : <a href={`tel:${phone}`} title="إجراء مكالمة"><i className="ti ti-phone" /> {phone}</a>
                 )}
                 {p.email && (
-                  <span title="البريد الإلكتروني"><i className="ti ti-mail" /> {p.email}</span>
+                  <a href={`mailto:${p.email}`} title="إرسال بريد إلكتروني"><i className="ti ti-mail" /> {p.email}</a>
                 )}
                 {p.address && (
                   <span title="العنوان"><i className="ti ti-map-pin" /> {p.address}</span>
@@ -253,6 +275,24 @@ export default function DocumentHeaderBand({
                   <span className="pp-stat-label">سقف الائتمان</span>
                   <strong dir="ltr">{fmtDZD(creditLimit)}</strong>
                 </div>
+                {creditCheck && creditCheck.overdue_invoices.count > 0 && (
+                  <div className="pp-stat pp-stat--overdue">
+                    <span className="pp-stat-label">فواتير متأخرة</span>
+                    <strong dir="ltr">{creditCheck.overdue_invoices.count} <span className="pp-stat-sub">({fmtDZD(creditCheck.overdue_invoices.total_amount)})</span></strong>
+                  </div>
+                )}
+                {customerInsights && customerInsights.document_count > 0 && (
+                  <div className="pp-stat">
+                    <span className="pp-stat-label">حركة هذا العام</span>
+                    <strong dir="ltr">{customerInsights.document_count} فاتورة</strong>
+                  </div>
+                )}
+                {creditCheck && creditCheck.available_credit != null && creditCheck.available_credit > 0 && (
+                  <div className="pp-stat pp-stat--available">
+                    <span className="pp-stat-label">متبقّي من السقف</span>
+                    <strong dir="ltr">{fmtDZD(creditCheck.available_credit)}</strong>
+                  </div>
+                )}
               </div>
             )}
 
