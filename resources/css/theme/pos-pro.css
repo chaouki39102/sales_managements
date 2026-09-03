@@ -3442,7 +3442,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  padding-top: 4px;
+  padding-top: 8px;
 }
 
 /* حقل إدخال مع مؤشر تحميل */

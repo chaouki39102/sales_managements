@@ -97,7 +97,7 @@ const segHeader = (): React.CSSProperties => ({
  */
 export default function DocumentHeaderBand({
   docCode, isEdit, isReadOnly, isLinesReadOnly, isPurchase, needsParty,
-  compact, narrow, collapsed, onToggleCollapse, ttcLabel, maxHeight,
+  compact, narrow, collapsed, onToggleCollapse, ttcLabel,
   form, errors, set,
   docNumber, docNumberErr, checkingDocNumber, handleDocNumberChange,
   handlePartyChangeWithWarning, partyOptions, priceLevelOptions, handlePriceLevelChange,
@@ -152,7 +152,6 @@ export default function DocumentHeaderBand({
         className={`pp-cust-card${isCashParty ? ' pp-cust-card--cash' : ''} doc-party-card`}
         style={{
           height: '100%', boxSizing: 'border-box', minHeight: 0,
-          ...(maxHeight ? { maxHeight, overflow: 'hidden' } : null),
         }}
       >
         {/* تَبويب: الزبون / معلومات المستند — نمط POS Pro (مكوّن مجزّأ نظيف) */}
