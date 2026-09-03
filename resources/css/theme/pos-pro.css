@@ -3234,6 +3234,11 @@
 }
 @media (max-width: 720px) {
   .doc-page { height: calc(100vh - var(--tb) - var(--mb)); }
+  /* The rail becomes a fixed bottom bar (generic @media720 .pp-rail rule, z-index 40)
+     but the app's bottom nav (#mob-nav, z-index 9999, height var(--mb)) sits above it
+     and intercepts pointer events on the doc rail's buttons (e.g. تخصيص الشريط/الرجوع).
+     Lift the doc rail up onto the nav's own block so it is visible AND clickable. */
+  .doc-rail { bottom: var(--mb); }
 }
 .doc-page--cancelled { background: var(--bg3); }
 
