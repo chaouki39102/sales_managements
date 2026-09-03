@@ -31,12 +31,14 @@ import CameraCaptureModal from '@/components/CameraCaptureModal';
 import { ShippingInfoSection } from './components/ShippingInfoSection';
 import { PaymentTermsTable } from './components/PaymentTermsTable';
 import { DocPrefsTab } from './components/DocPrefsTab';
+import { DocEditorPrefsTab } from './components/DocEditorPrefsTab';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Modal from '@/components/ui/Modal';
 import { useConfirm } from '@/hooks/useConfirm';
 
 import { useCommercialDocumentController } from './hooks/useCommercialDocumentController';
 import { focusDocLineCell } from './utils/focusDocLineCell';
+import { getDocPref } from './utils/docPrefs';
 import { isOfflineQueuedResponse } from '@/lib/offline/queueMath';
 import { useBarcodeScan } from '@/hooks/useBarcodeScan';
 import { useNotification } from '@/hooks/useNotification';
@@ -330,6 +332,7 @@ export default function CommercialDocumentPage() {
   const docTabs: Tab[] = [
     { key: 'advanced', label: 'خيارات إضافية', icon: 'ti-adjustments' },
     { key: 'line-entry', label: 'الإدخال السريع', icon: 'ti-zap' },
+    { key: 'editor-prefs', label: 'المحرر', icon: 'ti-adjustments-horizontal' },
   ];
   if (SHIPPING_CODES.has(docCode)) {
     docTabs.push({ key: 'shipping', label: 'الشحن والتسليم', icon: 'ti-truck-delivery' });
@@ -692,6 +695,7 @@ export default function CommercialDocumentPage() {
             docTypeCode={docCode}
             prevBalance={partyBalance?.current_balance ?? 0}
             newBalance={partyBalance?.current_balance ?? 0}
+            copies={getDocPref('printCopies', slug)}
           />
         </Suspense>
       )}
@@ -813,6 +817,9 @@ export default function CommercialDocumentPage() {
             )}
             {extraTab === 'line-entry' && (
               <DocPrefsTab />
+            )}
+            {extraTab === 'editor-prefs' && (
+              <DocEditorPrefsTab slug={slug} />
             )}
             {extraTab === 'shipping' && (
               <ShippingInfoSection

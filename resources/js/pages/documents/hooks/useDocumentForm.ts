@@ -66,6 +66,8 @@ import type {
 } from '../types/document.types';
 import type { LineStockValidation } from '../utils/document.utils';
 import { getDocLinePref } from '../utils/docLinePrefs';
+import { loadDocPrefs } from '../utils/docPrefs';
+import type { DocPrefs } from '../utils/docPrefs';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -404,9 +406,17 @@ function buildDefaultForm(
   defaults: { warehouseId: string; currencyId: string; yearId: string; priceLevelId?: string },
   defaultTvaRate: number,
   products?: Product[],
+  prefs?: DocPrefs,
 ): DocumentFormState {
-  const defaultShipping: ShippingInfo = {};
-  const defaultPaymentTerms: PaymentTerm[] = [];
+  const defaultShipping = { ...(prefs?.defaultShippingInfo ?? {}) } as ShippingInfo;
+  const defaultPaymentTerms: PaymentTerm[] = prefs?.defaultPaymentTermsDays
+    ? [{
+        due_date:   '',
+        percentage: 100,
+        amount:     0,
+        notes:      prefs.defaultPaymentTermsNotes || undefined,
+      }]
+    : [];
 
   if (existingDocument) {
     const doc   = existingDocument;
@@ -532,7 +542,7 @@ export function useDocumentForm({
       currencyId:  baseCurrencyId,
       yearId:      selectedYearId,
       priceLevelId: defaultPriceLevelId,
-    }, defaultTvaRate, products),
+    }, defaultTvaRate, products, loadDocPrefs(slug)),
   );
   const [errors,  setErrors]  = useState<FormErrors>({});
   const [lineErr, setLineErr] = useState('');
@@ -1289,7 +1299,7 @@ export function useDocumentForm({
         currencyId:  baseCurrencyId,
         yearId:      selectedYearId,
         priceLevelId: defaultPriceLevelId,
-      }, defaultTvaRate, products),
+      }, defaultTvaRate, products, loadDocPrefs(slug)),
     );
     setErrors({});
     setLineErr('');

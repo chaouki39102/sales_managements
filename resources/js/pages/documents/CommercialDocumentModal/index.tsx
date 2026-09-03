@@ -24,10 +24,12 @@ import { BulkImportModal } from '../components/BulkImportModal';
 import { ShippingInfoSection } from '../components/ShippingInfoSection';
 import { PaymentTermsTable } from '../components/PaymentTermsTable';
 import { DocPrefsTab } from '../components/DocPrefsTab';
+import { DocEditorPrefsTab } from '../components/DocEditorPrefsTab';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useConfirm } from '@/hooks/useConfirm';
 
 import { useCommercialDocumentController } from '../hooks/useCommercialDocumentController';
+import { getDocPref } from '../utils/docPrefs';
 import { isOfflineQueuedResponse } from '@/lib/offline/queueMath';
 
 interface CommercialDocumentModalProps {
@@ -345,6 +347,7 @@ export default function CommercialDocumentModal({
             const docTabs: Tab[] = [
               { key: 'advanced', label: 'خيارات إضافية', icon: 'ti-adjustments' },
               { key: 'line-entry', label: 'الإدخال السريع', icon: 'ti-zap' },
+              { key: 'editor-prefs', label: 'المحرر', icon: 'ti-adjustments-horizontal' },
             ];
             if (SHIPPING_CODES.has(docCode)) {
               docTabs.push({ key: 'shipping', label: 'الشحن والتسليم', icon: 'ti-truck-delivery' });
@@ -386,6 +389,9 @@ export default function CommercialDocumentModal({
                   )}
                   {extraTab === 'line-entry' && (
                     <DocPrefsTab />
+                  )}
+                  {extraTab === 'editor-prefs' && (
+                    <DocEditorPrefsTab slug={slug} />
                   )}
                   {extraTab === 'payment-terms' && (
                     <PaymentTermsTable
@@ -549,6 +555,7 @@ export default function CommercialDocumentModal({
             docTypeCode={docCode}
             prevBalance={partyBalance?.current_balance ?? 0}
             newBalance={partyBalance?.current_balance ?? 0}
+            copies={getDocPref('printCopies', slug)}
           />
         </Suspense>
       )}

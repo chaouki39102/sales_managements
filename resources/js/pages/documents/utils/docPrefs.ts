@@ -50,7 +50,9 @@ export const DOC_PREFS_DEFAULTS: DocPrefs = {
   defaultPaymentTermsNotes: '',
 };
 
-function prefsKey(slug: string | undefined): string {
+type SlugLike = string | null | undefined;
+
+function prefsKey(slug: SlugLike): string {
   return `doc_prefs:${slug ?? 'default'}`;
 }
 
@@ -64,17 +66,17 @@ function safeParse(raw: string | null): Partial<DocPrefs> {
   }
 }
 
-export function loadDocPrefs(slug?: string): DocPrefs {
+export function loadDocPrefs(slug?: SlugLike): DocPrefs {
   let parsed: Partial<DocPrefs> = {};
   try { parsed = safeParse(localStorage.getItem(prefsKey(slug))); } catch {}
   return { ...DOC_PREFS_DEFAULTS, ...parsed };
 }
 
-export function saveDocPrefs(prefs: DocPrefs, slug?: string): void {
+export function saveDocPrefs(prefs: DocPrefs, slug?: SlugLike): void {
   try { localStorage.setItem(prefsKey(slug), JSON.stringify(prefs)); } catch {}
 }
 
 /** قراءة متزامنة لمفتاح واحد (بلا حالة React) — داخل سلوكيات المحرر. */
-export function getDocPref<K extends keyof DocPrefs>(key: K, slug?: string): DocPrefs[K] {
+export function getDocPref<K extends keyof DocPrefs>(key: K, slug?: SlugLike): DocPrefs[K] {
   return loadDocPrefs(slug)[key];
 }

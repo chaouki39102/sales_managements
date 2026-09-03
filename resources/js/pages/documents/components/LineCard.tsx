@@ -36,6 +36,8 @@ interface LineCardProps {
   onRowDrop?:      (idx: number, e: React.DragEvent) => void;
   isDragSource?:   boolean;
   isDropTarget?:   boolean;
+  /** طريقة عرض السعر في القراءات العرضية — لا يمس الحقل القابل للتحرير. */
+  priceDisplayMode?: 'ht' | 'ttc';
 }
 
 export function LineCard({
@@ -45,7 +47,7 @@ export function LineCard({
   onQuickCreate, productTypes, tvas, units, isLoadingProducts,
   selected, onToggleSelect,
   onRowDragStart, onRowDragEnd, onRowDragOver, onRowDragLeave, onRowDrop,
-  isDragSource, isDropTarget,
+  isDragSource, isDropTarget, priceDisplayMode = 'ht',
 }: LineCardProps) {
   const prod = products.find((p) => String(p.id) === line.product_id) ?? line._product;
   const { baseQty, gross: _gross, ht, tva, ttc, discountAmt, discPct: _discPct } = calcLineTotal(line);
@@ -166,6 +168,7 @@ export function LineCard({
               isLoadingProducts={isLoadingProducts}
               clearOnChoose={getDocLinePref('clearProductSearch')}
               autoOpenWhenEmpty={getDocLinePref('autoOpenProductOnEmpty') && !line.product_id}
+              priceDisplayMode={priceDisplayMode}
             />
             {stockBadge && (
               <span style={{

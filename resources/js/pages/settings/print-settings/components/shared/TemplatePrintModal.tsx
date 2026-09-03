@@ -59,13 +59,15 @@ interface TemplatePrintModalProps {
   /** Fallback balance when document.balance_data is absent (e.g., from list endpoint) */
   prevBalance?: number;
   newBalance?:  number;
+  /** عدد النسخ (أفضل جهد — يُمرَّر لنافذة طباعة المتصفح كمرجع؛ لا يفرضه تكرار call). */
+  copies?:      number;
 }
 
 const STK_SCALE = 0.38;
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-function TemplatePrintModal({ open, onClose, document, company, template, templates, docTypeCode, data: overrideData, prevBalance, newBalance }: TemplatePrintModalProps) {
+function TemplatePrintModal({ open, onClose, document, company, template, templates, docTypeCode, data: overrideData, prevBalance, newBalance, copies = 1 }: TemplatePrintModalProps) {
   const navigate = useNavigate();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -103,8 +105,8 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
 
   const handlePrint = useCallback(() => {
     if (!tpl || !source) return;
-    renderPipelineToPopup(source as any, tpl, company);
-  }, [tpl, source, company]);
+    renderPipelineToPopup(source as any, tpl, company, copies);
+  }, [tpl, source, company, copies]);
 
   const handlePdf = useCallback(async () => {
     if (!tpl || !source || pdfBusy) return;

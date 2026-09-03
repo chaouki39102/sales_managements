@@ -11,7 +11,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { getProductStock } from '../utils/document.utils';
+import { getProductStock, fmtDZD, productDisplayPrice } from '../utils/document.utils';
 import { cellStyle } from './DocumentUIPrimitives';
 import type { Product } from '../types/document.types';
 import type { ProductType, Tva, Unit } from '@/lib/api/core/types';
@@ -55,6 +55,11 @@ interface ProductSearchProps {
   clearOnChoose?: boolean;
   /** فتح القائمة تلقائياً عند التركيز على زر منتقي منتج فارغ. */
   autoOpenWhenEmpty?: boolean;
+  /**
+   * طريقة عرض السعر في القائمة المنسدلة: 'ht' (سعر خالص الضريبة) أو 'ttc'
+   * (سعر شامل الضريبة). عرضي فقط — لا يعدّل السعر القابل للتحرير.
+   */
+  priceDisplayMode?: 'ht' | 'ttc';
 }
 
 // ─── Dropdown position ────────────────────────────────────────────────────────
@@ -84,6 +89,7 @@ export function ProductSearch({
   isLoadingProducts = false,
   clearOnChoose = true,
   autoOpenWhenEmpty = false,
+  priceDisplayMode = 'ht',
 }: ProductSearchProps) {
   const [open,  setOpen]  = useState(false);
   const [query, setQuery] = useState('');
@@ -567,6 +573,17 @@ export function ProductSearch({
                       {badge.label}
                     </span>
                   )}
+
+                  {/* السعر (عرضي حسب طريقة العرض) */}
+                  <span style={{
+                    fontSize: 11.5, fontWeight: 600, flexShrink: 0,
+                    color: 'var(--em)', whiteSpace: 'nowrap',
+                  }}>
+                    {fmtDZD(productDisplayPrice(p, priceDisplayMode, isPurchase))}
+                    <span style={{ fontSize: 9, color: 'var(--t4)', marginInlineStart: 2 }}>
+                      {priceDisplayMode === 'ttc' ? 'TTC' : 'HT'}
+                    </span>
+                  </span>
                 </div>
               );
             })

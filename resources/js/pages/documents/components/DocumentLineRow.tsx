@@ -45,6 +45,8 @@ interface DocumentLineRowProps {
   onRowDrop?: (idx: number, e: React.DragEvent) => void;
   isDragSource?: boolean;
   isDropTarget?: boolean;
+  /** طريقة عرض السعر في القراءات العرضية (سعر بعد الخصم) — لا يمس الحقل القابل للتحرير. */
+  priceDisplayMode?: 'ht' | 'ttc';
 }
 
 function CellInput({
@@ -117,7 +119,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
   onQuickCreate, productTypes, tvas, units, isLoadingProducts,
   selected, onToggleSelect,
   onRowDragStart, onRowDragEnd, onRowDragOver, onRowDragLeave, onRowDrop,
-  isDragSource, isDropTarget,
+  isDragSource, isDropTarget, priceDisplayMode = 'ht',
 }: DocumentLineRowProps) {
 
   const { baseQty, gross: _gross, discountAmt, discPct: _discPct, ht, tva: _lineTva, ttc } = calcLineTotal(line);
@@ -242,6 +244,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
               isLoadingProducts={isLoadingProducts}
               clearOnChoose={getDocLinePref('clearProductSearch')}
               autoOpenWhenEmpty={getDocLinePref('autoOpenProductOnEmpty') && !line.product_id}
+              priceDisplayMode={priceDisplayMode}
             />
           </td>
         )}
@@ -411,7 +414,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
         {col('price_after') && (
           <td style={{ padding: '3px 6px', textAlign: 'left', direction: 'ltr',
             fontSize: 11, color: discountAmt > 0 ? 'var(--em)' : 'var(--t3)' }}>
-            {fmtDZD(ht)}
+            {fmtDZD(priceDisplayMode === 'ttc' ? ttc : ht)}
           </td>
         )}
 

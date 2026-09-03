@@ -119,11 +119,19 @@ export function renderPipelineToPopup(
   source:    PipelineSource,
   template:  PrintTemplate,
   company:   CompanyInfo | null,
+  copies?:   number,
 ): Window | null {
   const isThermal = template.paper_size === '80mm' || template.paper_size === '58mm';
   const w = isThermal ? 320 : template.paper_size === 'A5' ? 500 : 720;
   const win = openPrintPopup(w, 700);
   if (!win) return null;
+
+  if (copies && copies > 1) {
+    const badge = win.document.createElement('div');
+    badge.textContent = `نسخ: ${copies}`;
+    badge.setAttribute('style', 'position:fixed;bottom:8px;left:8px;z-index:9999;font-size:10px;color:#999;direction:rtl;');
+    win.document.body.appendChild(badge);
+  }
 
   const root = win.document.getElementById('print-root');
   if (!root) { win.close(); return null; }

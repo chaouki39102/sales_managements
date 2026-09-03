@@ -10,6 +10,7 @@ import type { ComputeLineWarning } from '../hooks/useComputeLine';
 import { validateLineStock } from '../utils/document.utils';
 import { focusDocLineCell } from '../utils/focusDocLineCell';
 import { getDocLinePref } from '../utils/docLinePrefs';
+import { getDocPref } from '../utils/docPrefs';
 import { useBarcodeScan } from '../../../hooks/useBarcodeScan';
 import { useNotification } from '../../../hooks/useNotification';
 import { useLineTemplates, useLineTemplateMutations } from '@/lib/api/endpoints/lineTemplates';
@@ -67,6 +68,8 @@ interface DocumentLinesSectionProps {
   tvas?: Tva[];
   units?: Unit[];
   bulkAddLines?: (lines: Array<{ product_id?: string; description?: string; unit_price_ht?: number; quantity?: number; tva_rate?: number; line_note?: string }>) => void;
+  /** طريقة عرض الأسعار (HT/TTC) — تُمرَّر لقراءات العرض فقط (منتقي المنتج + سعر بعد الخصم). */
+  priceDisplayMode?: 'ht' | 'ttc';
 }
 
 export default function DocumentLinesSection({
@@ -83,7 +86,10 @@ export default function DocumentLinesSection({
   onQuickCreate, productTypes, tvas, units,
   bulkAddLines, onDiscardDraft, fillFromLastDoc, fillLastLoading = false,
   hideScanBar = false,
+  priceDisplayMode,
 }: DocumentLinesSectionProps) {
+  const resolvedPriceDisplayMode: 'ht' | 'ttc' =
+    priceDisplayMode ?? getDocPref('priceDisplayMode', slug);
   const notify = useNotification();
 
   // ── وضع المسح المتسلسل (Task 15): يبقي حقل الباركود مركّزاً بعد كل مسحة
@@ -799,6 +805,7 @@ export default function DocumentLinesSection({
                     onRowDrop={handleRowDrop}
                     isDragSource={dragIdx === idx}
                     isDropTarget={dragOverIdx === idx}
+                    priceDisplayMode={resolvedPriceDisplayMode}
                   />
                 );
               })}
@@ -868,6 +875,7 @@ export default function DocumentLinesSection({
                         onRowDrop={handleRowDrop}
                         isDragSource={dragIdx === idx}
                         isDropTarget={dragOverIdx === idx}
+                        priceDisplayMode={resolvedPriceDisplayMode}
                       />
                     );
                   })}

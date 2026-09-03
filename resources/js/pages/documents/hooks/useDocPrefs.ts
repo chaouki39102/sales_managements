@@ -13,7 +13,7 @@ import {
   DocPrefs,
 } from '../utils/docPrefs';
 
-export function useDocPrefs(slug?: string): {
+export function useDocPrefs(slug?: string | null): {
   prefs: DocPrefs;
   set: (partial: Partial<DocPrefs>) => void;
 } {

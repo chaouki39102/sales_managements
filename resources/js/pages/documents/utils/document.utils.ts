@@ -207,6 +207,24 @@ export function resolvePrice(
   return 0;
 }
 
+/**
+ * سعر العرض لمنتج معين وفق طريقة العرض المختارة (HT أو TTC) في محرر المستندات.
+ * هذه قراءة عرضية فقط — لا تعدّل الحقل القابل للتحرير `unit_price_ht`
+ * (مصدر الحقيقة دائماً HT).
+ *
+ * @returns {number} السعر المعروض (محسوب بـ 4 خانات عشرية للـ TTC)
+ */
+export function productDisplayPrice(
+  product:  Product,
+  mode:     'ht' | 'ttc',
+  isPurchase: boolean,
+): number {
+  const base = resolvePrice(product, null, isPurchase);
+  if (mode === 'ht' || base <= 0) return base;
+  const rate = toNum(product.tva?.rate);
+  return Math.round(base * (1 + rate / 100) * 10000) / 10000;
+}
+
 export function resolveQuantityDiscount(
   product:      Product,
   baseQty:      number,
