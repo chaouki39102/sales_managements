@@ -618,36 +618,22 @@ export function Tabs({
   style?:    React.CSSProperties;
 }) {
   return (
-    <div style={style}>
-      <div style={{
-        display: 'flex', gap: 2, borderBottom: '1px solid var(--b2)',
-        marginBottom: 14, overflowX: 'auto',
-      }}>
+    <div className="doc-tabs" style={style}>
+      <div className="doc-tabs-bar" role="tablist">
         {tabs.map((tab) => {
           const isActive = tab.key === activeKey;
           return (
             <button
               key={tab.key}
+              role="tab"
+              aria-selected={isActive}
+              className={`doc-tab${isActive ? ' on' : ''}`}
               onClick={() => onChange(tab.key)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '7px 14px', border: 'none', cursor: 'pointer',
-                fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
-                borderRadius: 'var(--r1) var(--r1) 0 0',
-                background: isActive ? 'var(--bg1)' : 'transparent',
-                color: isActive ? 'var(--em)' : 'var(--t4)',
-                borderBottom: isActive ? '2px solid var(--em)' : '2px solid transparent',
-                transition: 'all .15s',
-              }}
             >
-              <i className={`ti ${tab.icon}`} style={{ fontSize: 13 }} />
-              {tab.label}
+              <i className={`ti ${tab.icon}`} />
+              <span>{tab.label}</span>
               {tab.badge != null && (
-                <span style={{
-                  padding: '0 6px', borderRadius: 99, fontSize: 10, fontWeight: 700,
-                  background: isActive ? 'var(--emb)' : 'var(--bg3)',
-                  color: isActive ? 'var(--em)' : 'var(--t4)',
-                }}>
+                <span className={`doc-tab-badge${isActive ? ' on' : ''}`}>
                   {tab.badge}
                 </span>
               )}
@@ -655,7 +641,7 @@ export function Tabs({
           );
         })}
       </div>
-      {children}
+      <div className="doc-tabs-body">{children}</div>
     </div>
   );
 }

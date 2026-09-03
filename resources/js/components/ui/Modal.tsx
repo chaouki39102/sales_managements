@@ -14,6 +14,7 @@ interface ModalProps {
   storageKey?: string;
   closeOnBackdrop?: boolean;
   className?: string;
+  bodyHeight?: number | string;
 }
 
 const sizeMap = { sm: 'modal-sm', md: '', lg: 'modal-lg', xl: 'modal-xl' };
@@ -62,7 +63,7 @@ export default function Modal({
   open, onClose, title, subtitle,
   size = 'md', footer, footerLeft, children,
   resizable = true, storageKey,
-  closeOnBackdrop = true, className,
+  closeOnBackdrop = true, className, bodyHeight,
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
@@ -156,7 +157,14 @@ export default function Modal({
         </div>
 
         {/* Body */}
-        <div className="m-body">{children}</div>
+        <div
+          className="m-body"
+          style={bodyHeight === undefined ? undefined : {
+            flex: '1 1 auto',
+            minHeight: 0,
+            height: bodyHeight,
+          }}
+        >{children}</div>
 
         {/* Footer */}
         {(footer || footerLeft) && (

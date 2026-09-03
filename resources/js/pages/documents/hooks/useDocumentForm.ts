@@ -179,6 +179,7 @@ export interface UseDocumentFormReturn {
   lineWarnings:           Map<number, ComputeLineWarning[]>;
   priceLevelSwitchMsg:    PriceLevelSwitchMsg | null;
   clearPriceLevelSwitchMsg: () => void;
+  resetToNew:             () => void;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -1280,10 +1281,29 @@ export function useDocumentForm({
     [isPurchase],
   );
 
+  // ── إعادة تعيين النموذج لعمل مستند جديد بنفس النوع (زر «حفظ و مستند جديد») ──
+  const resetToNew = useCallback(() => {
+    setForm(
+      buildDefaultForm(undefined, {
+        warehouseId: defaultWarehouseId,
+        currencyId:  baseCurrencyId,
+        yearId:      selectedYearId,
+        priceLevelId: defaultPriceLevelId,
+      }, defaultTvaRate, products),
+    );
+    setErrors({});
+    setLineErr('');
+    setApiErr('');
+    setPayments([]);
+    setLineWarnings(new Map());
+    setPriceLevelSwitchMsg(null);
+  }, [defaultWarehouseId, baseCurrencyId, selectedYearId, defaultPriceLevelId, defaultTvaRate, products]);
+
   return {
     form, errors, lineErr, apiErr, setApiErr,
     set, handlePartyChange, handlePriceLevelChange, priceLevelId,
     addLine, addLineWithProduct, bulkAddLines, removeLine, duplicateLine, moveLine, updateLine,
+    resetToNew,
     paymentMode: pmMode,
     payments,
     addPayment, addPaymentWithValues, removePayment, updatePayment,

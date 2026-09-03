@@ -21,6 +21,7 @@ import DocumentPaymentsSection from './CommercialDocumentModal/DocumentPaymentsS
 
 import DocumentHeaderBand from './components/DocumentHeaderBand';
 import DocTotalsCard from './components/DocTotalsCard';
+import DocSaveModal, { type DocSaveAction } from './components/DocSaveModal';
 import DocScanbar from './components/DocScanbar';
 import MiniPrintPreview from './components/MiniPrintPreview';
 import { ReturnDocumentModal } from './components/ReturnDocumentModal';
@@ -109,6 +110,7 @@ export default function CommercialDocumentPage() {
     visibleCols, lineMode, setLineMode,
     deleteConfirm,
     handleSave, handleDelete, handleExport, handlePartyChangeWithWarning,
+    requestSaveAction,
     handleQuickCreateParty, creatingParty,
     partyTypes,
     isPending,
@@ -274,10 +276,16 @@ export default function CommercialDocumentPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
   const [showExtraOptions, setShowExtraOptions] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
 
   // ── اختصارات لوحة المفاتيح العامة: F2 باركود · F4 متعامل · F9/Ctrl+S حفظ · Alt+N سطر ──
-  const hotRef = useRef({ handleSave, isPending, successMsg, isReadOnly, addLine, lineCount: form.lines.length });
-  hotRef.current = { handleSave, isPending, successMsg, isReadOnly, addLine, lineCount: form.lines.length };
+  const openSaveModal = useCallback(() => {
+    if (isPending || successMsg || isReadOnly) return;
+    setShowSaveModal(true);
+  }, [isPending, successMsg, isReadOnly]);
+
+  const hotRef = useRef({ openSaveModal, addLine, lineCount: form.lines.length, isReadOnly });
+  hotRef.current = { openSaveModal, addLine, lineCount: form.lines.length, isReadOnly };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -295,7 +303,7 @@ export default function CommercialDocumentPage() {
         (e.key === 'F9' || ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 's'))
       ) {
         e.preventDefault();
-        if (!h.isPending && !h.successMsg && !h.isReadOnly) h.handleSave();
+        h.openSaveModal();
       } else if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === 'n') {
         e.preventDefault();
         if (!h.isReadOnly) {
@@ -375,7 +383,7 @@ export default function CommercialDocumentPage() {
           successMsg={successMsg}
           docCode={docCode}
           onBack={onClose}
-          handleSave={handleSave}
+          handleSave={openSaveModal}
           onPrint={isEdit ? handlePrint : undefined}
           onPayments={() => setShowPayments(true)}
           paymentsCount={payments.length}
@@ -698,7 +706,8 @@ export default function CommercialDocumentPage() {
           title={<><i className="ti ti-eye doc-modal-title-ic" /> معاينة الطباعة</>}
           subtitle="معاينة حيّة للمستند كما سيُطبع"
           size="lg"
-          resizable={false}
+          storageKey="doc-modal-preview-size"
+          bodyHeight={560}
         >
           <div className="doc-preview-wrap">
             <MiniPrintPreview
@@ -724,7 +733,8 @@ export default function CommercialDocumentPage() {
           title={<><i className="ti ti-wallet doc-modal-title-ic" /> الدفعات</>}
           subtitle="تسجيل وإدارة دفعات هذا المستند"
           size="lg"
-          resizable={false}
+          storageKey="doc-modal-payments-size"
+          bodyHeight={480}
         >
           <DocumentPaymentsSection
             payments={payments}
@@ -752,8 +762,32 @@ export default function CommercialDocumentPage() {
           title={<><i className="ti ti-adjustments doc-modal-title-ic" /> خيارات إضافية</>}
           subtitle="إعدادات متقدمة، الشحن والتسليم، وشروط الدفع"
           size="lg"
-          resizable={false}
+          storageKey="doc-modal-extra-options-size"
+          bodyHeight={480}
         >
+          {docType && (
+            <div className="doc-type-props" role="group" aria-label="خصائص المستند">
+              <span className="doc-type-props-title">
+                <i className="ti ti-file-info" /> خصائص المستند
+              </span>
+              <span className={`doc-type-prop ${docType.affects_accounting ? 'on' : 'off'}`}>
+                <i className="ti ti-chart-bar" />
+                {docType.affects_accounting ? 'يؤثر على المحاسبة' : 'لا يؤثر على المحاسبة'}
+              </span>
+              <span className={`doc-type-prop ${docType.affects_stock_direction === 1 ? 'on' : docType.affects_stock_direction === -1 ? 'warn' : 'off'}`}>
+                <i className="ti ti-box" />
+                {docType.affects_stock_direction === 1 ? 'يدخل المخزون' : docType.affects_stock_direction === -1 ? 'يُخرج من المخزون' : 'لا يحرّك المخزون'}
+              </span>
+              <span className={`doc-type-prop ${docType.requires_party ? 'on' : 'off'}`}>
+                <i className="ti ti-user" />
+                {docType.requires_party ? 'يتطلب متعامل' : 'بدون متعامل إلزامي'}
+              </span>
+              <span className={`doc-type-prop ${docType.is_printable ? 'on' : 'off'}`}>
+                <i className="ti ti-printer" />
+                {docType.is_printable ? 'قابل للطباعة' : 'غير قابل للطباعة'}
+              </span>
+            </div>
+          )}
           <Tabs tabs={docTabs} activeKey={extraTab} onChange={setExtraTab}>
             {extraTab === 'advanced' && (
               <DocumentAdvancedFields
@@ -800,6 +834,18 @@ export default function CommercialDocumentPage() {
           </Tabs>
         </Modal>
       )}
+
+      <DocSaveModal
+        open={showSaveModal}
+        onClose={() => setShowSaveModal(false)}
+        isEdit={isEdit}
+        isPending={isPending}
+        successMsg={successMsg}
+        onConfirm={(action: DocSaveAction) => {
+          setShowSaveModal(false);
+          requestSaveAction(action);
+        }}
+      />
     </div>
   );
 }

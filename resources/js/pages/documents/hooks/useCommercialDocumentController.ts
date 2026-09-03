@@ -77,6 +77,8 @@ export function useCommercialDocumentController({
 
   const [lineMode, setLineMode] = useState<'table' | 'card'>('table');
 
+  const [nextAction, setNextAction] = useState<'list' | 'new' | 'close'>('list');
+
   const initialDefaultsApplied = useRef(false);
   useEffect(() => {
     if (!settingsDict || initialDefaultsApplied.current) return;
@@ -173,6 +175,7 @@ export function useCommercialDocumentController({
     lineWarnings,
     priceLevelSwitchMsg,
     clearPriceLevelSwitchMsg,
+    resetToNew,
   } = useDocumentForm({
     documentType,
     existingDocument,
@@ -498,7 +501,15 @@ export function useCommercialDocumentController({
       navigator.clipboard?.writeText(docNum).catch(() => {});
       successTimer.current = setTimeout(() => {
         setSuccessMsg('');
-        onSaved();
+        const action = nextAction;
+        setNextAction('list');
+        if (action === 'new') {
+          resetToNew();
+        } else if (action === 'close') {
+          _onClose();
+        } else {
+          onSaved();
+        }
       }, 3000);
     },
     onError: (e: unknown) => {
@@ -554,6 +565,11 @@ export function useCommercialDocumentController({
       if (!await deleteConfirm.confirm(`تجاوز حد الائتمان بـ ${fmtDZD(creditCheck.exceed_by)} دج — هل تريد المتابعة؟`)) return;
     }
     if (validate()) saveMut.mutate();
+  };
+
+  const requestSaveAction = (action: 'list' | 'new' | 'close') => {
+    setNextAction(action);
+    handleSave();
   };
 
   const handleDelete = async () => {
@@ -843,6 +859,8 @@ export function useCommercialDocumentController({
     // Actions
     handleSave, handleDelete, handleExport, handlePartyChangeWithWarning,
     fillFromLastDoc, fillLastLoading,
+    requestSaveAction, nextAction, setNextAction,
+    resetToNew,
 
     // State
     isPending,

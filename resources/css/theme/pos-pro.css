@@ -3477,3 +3477,177 @@
   pointer-events: none;
   animation: spin 1s linear infinite;
 }
+
+/* ═══ مكوّن Tabs المحترف (يحل محل التنسيق داخل المكوّن) ═══════════════ */
+.doc-tabs { display: flex; flex-direction: column; min-height: 0; }
+.doc-tabs-bar {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--b2);
+  padding-bottom: 0;
+  margin-bottom: 14px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  flex-shrink: 0;
+}
+.doc-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  border-radius: var(--r1) var(--r1) 0 0;
+  background: transparent;
+  color: var(--t4);
+  border-bottom: 2px solid transparent;
+  transition: color .15s ease, background .15s ease, border-color .15s ease;
+}
+.doc-tab > i { font-size: 13px; }
+.doc-tab:hover {
+  color: var(--t2);
+  background: var(--emb);
+}
+.doc-tab.on {
+  background: var(--bg1);
+  color: var(--em);
+  border-bottom-color: var(--em);
+}
+.doc-tab-badge {
+  padding: 0 6px;
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--bg3);
+  color: var(--t4);
+}
+.doc-tab-badge.on {
+  background: var(--emb);
+  color: var(--em);
+}
+.doc-tabs-body { min-height: 0; display: flex; flex-direction: column; }
+
+/* ═══ شريط خصائص المستند (من إعدادات النوع من الواجهة الخلفية) ═══════ */
+.doc-type-props {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  border: 1px solid var(--b2);
+  border-radius: var(--r2);
+  background: var(--bg3);
+}
+.doc-type-props-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--t2);
+  margin-inline-end: 4px;
+}
+.doc-type-props-title i { font-size: 12px; color: var(--t4); }
+.doc-type-prop {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  font-size: 10.5px;
+  font-weight: 600;
+  border: 1px solid var(--b2);
+}
+.doc-type-prop i { font-size: 11px; }
+.doc-type-prop.on { color: var(--em); border-color: var(--em); background: var(--emb); }
+.doc-type-prop.warn { color: var(--gold); border-color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, transparent); }
+.doc-type-prop.off { color: var(--t4); background: var(--bg1); }
+
+/* ═══ مودال الحفظ المخصص: ثلاثة إجراءات (حفظ / حفظ وجديد / حفظ وإغلاق) ═══ */
+.doc-save-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.doc-save-btn {
+  display: grid;
+  grid-template-columns: 30px 22px 1fr;
+  grid-template-areas:
+    'kbd icon label'
+    'kbd icon hint';
+  column-gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--b2);
+  border-radius: var(--r2);
+  background: var(--bg1);
+  cursor: pointer;
+  text-align: start;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+}
+.doc-save-btn:hover:not(.is-disabled) {
+  border-color: var(--em);
+  background: var(--emb);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--em) 12%, transparent);
+}
+.doc-save-btn.is-disabled { opacity: .55; cursor: not-allowed; }
+.doc-save-btn--primary {
+  border-color: var(--em);
+  background: var(--emb);
+}
+.doc-save-btn--primary:hover:not(.is-disabled) {
+  border-color: var(--em);
+  background: color-mix(in srgb, var(--em) 14%, var(--bg1));
+}
+.doc-save-btn-kbd {
+  grid-area: kbd;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--b2);
+  border-radius: 6px;
+  background: var(--bg2);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--t3);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.doc-save-btn--primary .doc-save-btn-kbd { color: var(--em); border-color: var(--em); }
+.doc-save-btn > i.ti {
+  grid-area: icon;
+  font-size: 18px;
+  color: var(--t2);
+}
+.doc-save-btn--primary > i.ti { color: var(--em); }
+.doc-save-btn-label {
+  grid-area: label;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--t1);
+}
+.doc-save-btn-hint {
+  grid-area: hint;
+  font-size: 11px;
+  color: var(--t4);
+}
+.doc-save-note {
+  margin-top: 12px;
+  font-size: 11.5px;
+  color: var(--t4);
+}
+.doc-save-note--ok { color: var(--em); font-weight: 700; }
+.doc-save-note--warn { color: var(--gold); }
+
+/* Modal root: a duplicated `.ov` base rule (with display:flex) later in the
+   bundle overrides the Tailwind `.hidden{display:none}` utility at equal
+   specificity, so a CLOSED modal stayed display:flex (playwright toBeHidden
+   required display:none/visibility). `.ov.hidden` has higher specificity and
+   is loaded last — the authoritative "closed modal is hidden" rule. */
+.ov.hidden { display: none !important; }
