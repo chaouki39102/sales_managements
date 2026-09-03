@@ -3141,6 +3141,21 @@
   box-shadow: var(--shadow2);
 }
 
+/* Portaled variant (rendered into document.body via createPortal): the base
+   .doc-rail-menu uses `position:absolute; inset-inline-start: calc(100% + 6px)`
+   which was designed for the in-sidebar wrapper. When portaled the menu is
+   positioned by RailMenu with an inline `left`/`top` — neutralize the base
+   logical offsets and the absolute anchor so the fixed positioning wins and it
+   can never stretch/clip to the wrong side in RTL. */
+.doc-rail-menu--pop {
+  position: fixed;
+  top: 0;
+  inset-inline-start: auto;
+  inset-inline-end: auto;
+  left: auto;
+  right: auto;
+}
+
 .doc-rail-menu--tpl {
   max-height: 300px;
   overflow-y: auto;

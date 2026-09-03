@@ -14,7 +14,8 @@
 // محتفظاً بموقعه في الترتيب (يظهر عند إعادة تفعيله).
 // "رجوع" و"حفظ" زرّان إلزاميان — لا يمكن إخفاؤهما (مقفلان في مودال التخصيص).
 // ════════════════════════════════════════════════════════════════════════════
-import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useActiveSlug } from '@/lib/store/appStore';
 import Modal from '@/components/ui/Modal';
 import Switch from '@/components/ui/Switch';
@@ -112,22 +113,105 @@ function loadHidden(slug: string | null): Set<DocActionId> {
   return hidden;
 }
 
-function useDismissibleMenu<T extends HTMLElement>(open: boolean, onDismiss: () => void) {
-  const ref = useRef<T>(null);
+interface RailMenuProps {
+  open: boolean;
+  triggerRef: React.RefObject<HTMLElement | null>;
+  onClose: () => void;
+  className?: string;
+  children: React.ReactNode;
+}
+
+/**
+ * قائمة منبثقة تُعرض عبر Portal أعلى كل العناصر (document.body) بدل أن تُقتطع
+ * داخل حاوية الشريط الجانبي (التي لها overflow-y:auto). تُثبَّت عند موضع زر
+ * المشغّل عبر getBoundingClientRect مع تقييد داخل الشاشة.
+ */
+function RailMenu({ open, triggerRef, onClose, className = '', children }: RailMenuProps) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+
+  /* يفضّل الفتح نحو داخل الصفحة (باتجاه محتوى المستند) مع تقييد على الشاشة */
+  useLayoutEffect(() => {
+    if (!open) { setPos(null); return; }
+    const btn = triggerRef.current;
+    if (!btn) { setPos({ left: 0, top: 0 }); return; }
+    const gap = 6;
+    const r = btn.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    // أول تنفيذ: القائمة ليست في الـ DOM بعد (نعيد null حتى تُركَّب)، لذا نضع
+    // موضعاً أولياً تقريبياً فقط لجعل القائمة تظهر ثم نعيد القياس في التأثير الثاني.
+    const menuW = 176;
+    let left: number;
+    if (r.left - gap >= menuW) {
+      left = r.left - menuW - gap;
+    } else if (vw - (r.right + gap) >= menuW) {
+      left = r.right + gap;
+    } else {
+      left = r.left - menuW - gap;
+    }
+    left = Math.max(gap, Math.min(left, vw - menuW - gap));
+    setPos({ left, top: Math.max(gap, Math.min(r.top, vh - 160 - gap)) });
+  }, [open, triggerRef]);
+
+  /* بعد تركيب القائمة، أعد القياس بأبعادها الحقيقية وصحّح الموضع (مع حارس يمنع
+     حلقات اللانهاية: لا نُحدِّث إلا إذا تغيّر الموضع فعلياً). */
+  useLayoutEffect(() => {
+    if (!open) return;
+    const btn = triggerRef.current;
+    const menu = menuRef.current;
+    if (!btn || !menu) return;
+    const gap = 6;
+    const menuW = menu.offsetWidth;
+    const menuH = menu.offsetHeight;
+    const r = btn.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let left: number;
+    if (r.left - gap >= menuW) {
+      left = r.left - menuW - gap;
+    } else if (vw - (r.right + gap) >= menuW) {
+      left = r.right + gap;
+    } else {
+      left = r.left - menuW - gap;
+    }
+    left = Math.max(gap, Math.min(left, vw - menuW - gap));
+    const top = Math.max(gap, Math.min(r.top, vh - menuH - gap));
+    setPos((prev) => {
+      if (prev && Math.abs(prev.left - left) < 1 && Math.abs(prev.top - top) < 1) return prev;
+      return { left, top };
+    });
+  }, [open, triggerRef, pos]);
+
   useEffect(() => {
     if (!open) return;
-    const onDocClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onDismiss();
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (menuRef.current && menuRef.current.contains(t)) return;
+      if (triggerRef.current && triggerRef.current.contains(t)) return;
+      onClose();
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onDismiss(); };
-    document.addEventListener('mousedown', onDocClick);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open, onDismiss]);
-  return ref;
+  }, [open, onClose, triggerRef]);
+
+  if (!open || !pos) return null;
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      className={`doc-rail-menu doc-rail-menu--pop${className}`}
+      style={{ left: pos.left, top: pos.top, zIndex: 10002, margin: 0 }}
+    >
+      {children}
+    </div>,
+    document.body
+  );
 }
 
 export default function DocActionRail({
@@ -145,9 +229,9 @@ export default function DocActionRail({
   const [moreOpen, setMoreOpen] = useState(false);
   const [tplOpen, setTplOpen] = useState(false);
 
-  const exportRef = useDismissibleMenu<HTMLDivElement>(exportOpen, () => setExportOpen(false));
-  const moreRef = useDismissibleMenu<HTMLDivElement>(moreOpen, () => setMoreOpen(false));
-  const tplRef = useDismissibleMenu<HTMLDivElement>(tplOpen, () => setTplOpen(false));
+  const exportRef = useRef<HTMLDivElement>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
+  const tplRef = useRef<HTMLDivElement>(null);
 
   const [dragId, setDragId]   = useState<DocActionId | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
@@ -360,88 +444,95 @@ export default function DocActionRail({
         return (
           <div className="doc-rail-menu-wrap" ref={exportRef} key={id}>
             {renderBtn(id, i, () => setExportOpen((v) => !v))}
-            {exportOpen && (
-              <div className="doc-rail-menu">
-                {EXPORT_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.format}
-                    className="doc-rail-menu-item"
-                    onClick={() => { setExportOpen(false); handleExport(opt.format); }}
-                    type="button"
-                  >
-                    <i className={`ti ${opt.icon}`} />
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            )}
+            <RailMenu
+              open={exportOpen}
+              triggerRef={exportRef}
+              onClose={() => setExportOpen(false)}
+            >
+              {EXPORT_OPTIONS.map((opt) => (
+                <button
+                  key={opt.format}
+                  className="doc-rail-menu-item"
+                  onClick={() => { setExportOpen(false); handleExport(opt.format); }}
+                  type="button"
+                >
+                  <i className={`ti ${opt.icon}`} />
+                  {opt.label}
+                </button>
+              ))}
+            </RailMenu>
           </div>
         );
       case 'template':
         return (
           <div className="doc-rail-menu-wrap" ref={tplRef} key={id}>
             {renderBtn(id, i, () => setTplOpen((v) => !v))}
-            {tplOpen && (
-              <div className="doc-rail-menu doc-rail-menu--tpl">
+            <RailMenu
+              open={tplOpen}
+              triggerRef={tplRef}
+              onClose={() => setTplOpen(false)}
+              className=" doc-rail-menu--tpl"
+            >
+              <button
+                className="doc-rail-menu-item"
+                onClick={() => { setTplOpen(false); onTemplateChange?.(null); }}
+                type="button"
+              >
+                القالب الافتراضي
+              </button>
+              {templates?.map((t) => (
                 <button
-                  className="doc-rail-menu-item"
-                  onClick={() => { setTplOpen(false); onTemplateChange?.(null); }}
+                  key={t.id}
+                  className={`doc-rail-menu-item${selectedTemplateId === t.id ? ' on' : ''}`}
+                  onClick={() => { setTplOpen(false); onTemplateChange?.(t.id); }}
                   type="button"
                 >
-                  القالب الافتراضي
+                  {t.name}
                 </button>
-                {templates?.map((t) => (
-                  <button
-                    key={t.id}
-                    className={`doc-rail-menu-item${selectedTemplateId === t.id ? ' on' : ''}`}
-                    onClick={() => { setTplOpen(false); onTemplateChange?.(t.id); }}
-                    type="button"
-                  >
-                    {t.name}
-                  </button>
-                ))}
-              </div>
-            )}
+              ))}
+            </RailMenu>
           </div>
         );
       case 'more':
         return (
           <div className="doc-rail-menu-wrap" ref={moreRef} key={id}>
             {renderBtn(id, i, () => setMoreOpen((v) => !v))}
-            {moreOpen && (
-              <div className="doc-rail-menu">
-                {showReturn && (
-                  <button
-                    className="doc-rail-menu-item"
-                    onClick={() => { setMoreOpen(false); onReturnClick?.(); }}
-                    type="button"
-                  >
-                    <i className="ti ti-receipt-refund" />
-                    إنشاء مرتجع
-                  </button>
-                )}
-                {isEdit && !!onClone && (
-                  <button
-                    className="doc-rail-menu-item"
-                    onClick={() => { setMoreOpen(false); onClone(); }}
-                    type="button"
-                  >
-                    <i className="ti ti-copy" />
-                    نسخ كمستند جديد
-                  </button>
-                )}
-                {showDelete && (
-                  <button
-                    className="doc-rail-menu-item danger"
-                    onClick={() => { setMoreOpen(false); handleDelete(); }}
-                    type="button"
-                  >
-                    <i className="ti ti-trash" />
-                    حذف
-                  </button>
-                )}
-              </div>
-            )}
+            <RailMenu
+              open={moreOpen}
+              triggerRef={moreRef}
+              onClose={() => setMoreOpen(false)}
+            >
+              {showReturn && (
+                <button
+                  className="doc-rail-menu-item"
+                  onClick={() => { setMoreOpen(false); onReturnClick?.(); }}
+                  type="button"
+                >
+                  <i className="ti ti-receipt-refund" />
+                  إنشاء مرتجع
+                </button>
+              )}
+              {isEdit && !!onClone && (
+                <button
+                  className="doc-rail-menu-item"
+                  onClick={() => { setMoreOpen(false); onClone(); }}
+                  type="button"
+                >
+                  <i className="ti ti-copy" />
+                  نسخ كمستند جديد
+                </button>
+              )}
+              {showDelete && (
+                <button
+                  className="doc-rail-menu-item danger"
+                  onClick={() => { setMoreOpen(false); handleDelete(); }}
+                  type="button"
+                >
+                  <i className="ti ti-trash" />
+                  حذف
+                </button>
+              )}
+            </RailMenu>
           </div>
         );
       default:
