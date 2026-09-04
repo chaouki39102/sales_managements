@@ -23,8 +23,9 @@ import { useFiscalYear } from '@/context/FiscalYearContext';
 import type {
   CommercialDocument,
   CommercialDocumentLine,
-  PaginatedResponse,
+  DocumentAuditLogEntry,
   ListParams,
+  PaginatedResponse,
 } from '../core/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -220,6 +221,12 @@ export const documentsApi = {
   qrcode: (id: number) =>
     apiGet<{ url: string }>(`/documents/${id}/qrcode`),
 
+  auditLog: (id: number, params?: ListParams) =>
+    apiGet<PaginatedResponse<DocumentAuditLogEntry>>(`/documents/${id}/audit-log`, {
+      include: 'user',
+      ...params,
+    }),
+
   share: (id: number) =>
     apiPost<{ share_url: string; expires_at: string }>(`/documents/${id}/share`),
 
@@ -294,6 +301,17 @@ export function useDocument(id: number | null | undefined) {
     queryFn:   () => documentsApi.show(id!),
     enabled:   !!slug && !!id,
     staleTime: 5 * 60_000,
+  });
+}
+
+export function useDocumentAuditLog(id: number | null | undefined, params?: ListParams) {
+  const slug = useActiveSlug();
+  return useQuery({
+    queryKey:        [...tenantKeys.documents.detail(slug ?? '', id!), 'audit-log', params],
+    queryFn:         () => documentsApi.auditLog(id!, params),
+    enabled:         !!slug && !!id,
+    staleTime:       30_000,
+    placeholderData: keepPreviousData,
   });
 }
 

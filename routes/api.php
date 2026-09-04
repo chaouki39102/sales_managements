@@ -602,6 +602,7 @@ Route::prefix('v1')->group(function () {
                 Route::post('documents/{commercialDocument}/cancel',   [CommercialDocumentController::class, 'cancel']);
                 Route::post('documents/{commercialDocument}/payments', [CommercialDocumentController::class, 'addPayments']);
                 Route::get('documents/{commercialDocument}/qrcode',    [CommercialDocumentController::class, 'generateQRCode']);
+                Route::get('documents/{commercialDocument}/audit-log', [CommercialDocumentController::class, 'auditLog']);
 
                 // ── مسارات التحويل والمرتجع ─────────────
                 Route::post('documents/{document}/convert', [DocumentComputeController::class, 'convert']);

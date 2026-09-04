@@ -46,6 +46,7 @@ import { useColumnStatePersistence } from "@/components/ui/DataTable";
 import CommercialDocumentModal from "./CommercialDocumentModal";
 import QuickSaleModal from "./QuickSaleModal";
 import { DeliveryProgressBar } from "./components/DeliveryProgressBar";
+import DocumentAuditPanel from "./components/DocumentAuditPanel";
 import ConvertDocumentModal from "./components/ConvertDocumentModal";
 import BatchPrintModal from "./components/BatchPrintModal";
 const TemplatePrintModal = React.lazy(() => import('@/pages/settings/print-settings/components/shared/TemplatePrintModal'));
@@ -705,6 +706,8 @@ function DocumentViewModal({
                     )}
                 </div>
             </div>
+
+            <DocumentAuditPanel docId={docId} />
         </Modal>
     );
 }

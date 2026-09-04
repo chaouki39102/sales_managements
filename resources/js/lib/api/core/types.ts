@@ -644,6 +644,29 @@ export interface CommercialDocument extends BaseModel {
   } | null;
 }
 
+// ─── Document Audit Log ─────────────────────────────────────────────────────────
+export type DocumentAuditAction =
+  | 'created' | 'updated' | 'line_added' | 'line_removed' | 'line_modified'
+  | 'price_changed' | 'discount_changed' | 'status_changed' | 'locked' | 'unlocked'
+  | 'cancelled' | 'deleted' | 'payment_added' | 'payment_removed' | 'converted'
+  | 'returned' | 'cloned';
+
+export interface DocumentAuditLogEntry {
+  id:          number;
+  document_id: number;
+  company_id:  number;
+  user_id?:    number | null;
+  user?:       User | null;
+  action:      DocumentAuditAction;
+  field_name?: string | null;
+  old_value?:  unknown;
+  new_value?:  unknown;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  created_at:  string;
+  updated_at:  string;
+}
+
 // ─── Payments ─────────────────────────────────────────────────────────────────
 export type PaymentStatus = 'pending' | 'confirmed' | 'cancelled';
 

@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Core\Http\Controllers\BaseApiController;
 use App\Http\Resources\CommercialDocumentResource;
+use App\Http\Resources\DocumentAuditLogResource;
 use App\Services\QRCodeService;
 use App\Services\CommercialDocumentService;
 use App\Services\PaymentSynchronizer;
 use App\Services\PartyBalanceService;
 use App\Models\CommercialDocument;
+use App\Models\DocumentAuditLog;
 use App\Models\DocumentType;
 use App\Services\NotificationService;
 use App\Models\Company;          // ✅ أضفنا هذا
@@ -630,6 +632,34 @@ class CommercialDocumentController extends BaseApiController
             );
         } catch (\Throwable $e) {
             return $this->handleError($e, 'generateQRCode');
+        }
+    }
+
+    /**
+     * سجل تدقيق مستند — قائمة أحداث document_audit_logs الخاصة بهذا المستند
+     * (من غيّر أيّ سطر / مبلغ / حالة ومتى)، الأحدث أولاً.
+     *
+     * @param \App\Models\CommercialDocument $commercialDocument
+     */
+    public function auditLog(Request $request, CommercialDocument $commercialDocument): JsonResponse
+    {
+        try {
+            $this->authorizeAction('view', $commercialDocument);
+
+            $perPage = $request->integer('per_page', 20);
+            $perPage = min(max($perPage, 1), 100);
+
+            $query = DocumentAuditLog::query()
+                ->with('user')
+                ->where('document_id', $commercialDocument->id)
+                ->orderByDesc('id');
+
+            return $this->successResponse(
+                DocumentAuditLogResource::collection($query->paginate($perPage)),
+                'تم جلب سجل تدقيق الوثيقة'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'auditLog');
         }
     }
 
