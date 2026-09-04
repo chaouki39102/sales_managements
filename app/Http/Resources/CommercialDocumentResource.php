@@ -71,6 +71,8 @@ class CommercialDocumentResource extends JsonResource
             'source_document'              => new CommercialDocumentResource($this->whenLoaded('sourceDocument')),
             'validatedBy'                  => new UserResource($this->whenLoaded('validatedBy')),
             'user'                         => new UserResource($this->whenLoaded('user')),
+            'createdBy'                    => new UserResource($this->whenLoaded('createdBy')),
+            'updatedBy'                    => new UserResource($this->whenLoaded('updatedBy')),
             'balance_data'                 => $this->balance_data ?? null,
         ];
     }

@@ -369,7 +369,7 @@ function DocumentViewModal({
         queryKey: [slug, "doc-detail-full", docId],
         queryFn: () =>
             apiGet<CommercialDocument>(`/documents/${docId}`, {
-                include: ["party","documentStatus","warehouse","fiscalYear","currency","documentType","lines.product","lines.product.unit","lines.productVariant","lines.packaging","lines.stockLot","validatedBy","user","payments","payments.paymentMode"].join(","),
+                include: ["party","documentStatus","warehouse","fiscalYear","currency","documentType","lines.product","lines.product.unit","lines.productVariant","lines.packaging","lines.stockLot","validatedBy","user","createdBy","updatedBy","payments","payments.paymentMode"].join(","),
             }),
         staleTime: 2 * 60_000,
     });
@@ -539,10 +539,22 @@ function DocumentViewModal({
                         )}
                     </div>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-t4">
+                <div className="flex flex-wrap items-center gap-4 text-xs text-t4">
                     <span>{getWarehouseName(data) || "—"}</span>
                     <span>•</span>
                     <span>{(d.fiscalYear as Record<string, unknown> | undefined)?.name as string ?? "—"}</span>
+                    {data.createdBy && (
+                        <>
+                            <span>•</span>
+                            <span className="text-em" title="أنشأه"><i className="ti ti-user-check inline-block" /> {data.createdBy.name}</span>
+                        </>
+                    )}
+                    {data.updatedBy && (
+                        <>
+                            <span>•</span>
+                            <span className="text-em" title="آخر تعديل"><i className="ti ti-user-edit inline-block" /> {data.updatedBy.name}</span>
+                        </>
+                    )}
                 </div>
             </div>
 
