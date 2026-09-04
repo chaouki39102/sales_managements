@@ -314,6 +314,15 @@ class CompanyRoleService
                 'validate_commercial_document', 'lock_commercial_document',
                 'cancel_commercial_document', 'duplicate_commercial_document',
                 'manage_numbering_series',
+                // الصلاحيات الدقيقة للمستندات (المهمة 3)
+                'create_commercial_document', 'update_own_commercial_document',
+                'update_any_commercial_document', 'delete_own_commercial_document',
+                'delete_any_commercial_document', 'unlock_commercial_document',
+                'clone_commercial_document', 'return_commercial_document',
+                'convert_commercial_document', 'apply_discount_commercial_document',
+                'change_price_commercial_document', 'override_stock_commercial_document',
+                'view_cost_price', 'add_payment_commercial_document',
+                'print_commercial_document',
                 // المدفوعات
                 'view_any_payment', 'view_payment', 'create_payment',
                 'update_payment', 'delete_payment',
@@ -388,6 +397,14 @@ class CompanyRoleService
                 'update_commercial_document', 'delete_commercial_document',
                 'validate_commercial_document', 'lock_commercial_document',
                 'cancel_commercial_document', 'duplicate_commercial_document',
+                // الصلاحيات الدقيقة للمستندات (المهمة 3) — عضو + مدير
+                'create_commercial_document', 'update_own_commercial_document',
+                'update_any_commercial_document', 'delete_own_commercial_document',
+                'delete_any_commercial_document', 'clone_commercial_document',
+                'return_commercial_document', 'convert_commercial_document',
+                'apply_discount_commercial_document', 'change_price_commercial_document',
+                'view_cost_price', 'add_payment_commercial_document',
+                'print_commercial_document',
                 // المدفوعات
                 'view_any_payment', 'view_payment', 'create_payment', 'update_payment',
                 // الشيكات
@@ -431,6 +448,10 @@ class CompanyRoleService
                 'view_any_commercial_document', 'view_commercial_document',
                 'create_sales_document', 'update_commercial_document',
                 'duplicate_commercial_document',
+                // الصلاحيات الدقيقة للمستندات (المهمة 3) — عضو
+                'create_commercial_document', 'update_own_commercial_document',
+                'delete_own_commercial_document', 'clone_commercial_document',
+                'add_payment_commercial_document', 'print_commercial_document',
                 // المدفوعات (قراءة + إنشاء)
                 'view_any_payment', 'view_payment', 'create_payment',
                 // المخزون (قراءة)
@@ -454,6 +475,7 @@ class CompanyRoleService
                 'view_any_product', 'view_product',
                 'view_any_warehouse', 'view_warehouse',
                 'view_any_commercial_document', 'view_commercial_document',
+                'print_commercial_document',
                 'view_any_payment', 'view_payment',
                 'view_any_check', 'view_check',
                 'view_any_expense', 'view_expense',

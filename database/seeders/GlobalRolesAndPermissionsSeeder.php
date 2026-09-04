@@ -149,6 +149,23 @@ class GlobalRolesAndPermissionsSeeder extends Seeder
             ['name' => 'duplicate_commercial_document', 'display_name' => 'نسخ مستند',           'group' => 'المستندات'],
             ['name' => 'manage_numbering_series',       'display_name' => 'إدارة سلاسل الترقيم', 'group' => 'المستندات'],
 
+            // الصلاحيات الدقيقة للمستندات (المهمة 3 — ترقية محرر المستندات)
+            ['name' => 'create_commercial_document',         'display_name' => 'إنشاء مستند',             'group' => 'المستندات', 'description' => 'إنشاء مستند جديد'],
+            ['name' => 'update_own_commercial_document',     'display_name' => 'تعديل مستند أنشأه',       'group' => 'المستندات', 'description' => 'تعديل مستند أنشأه المستخدم'],
+            ['name' => 'update_any_commercial_document',     'display_name' => 'تعديل أي مستند',          'group' => 'المستندات', 'description' => 'تعديل مستند أنشأه أي شخص'],
+            ['name' => 'delete_own_commercial_document',     'display_name' => 'حذف مستند أنشأه',         'group' => 'المستندات', 'description' => 'حذف مستند أنشأه المستخدم'],
+            ['name' => 'delete_any_commercial_document',     'display_name' => 'حذف أي مستند',            'group' => 'المستندات', 'description' => 'حذف مستند أنشأه أي شخص'],
+            ['name' => 'unlock_commercial_document',         'display_name' => 'فتح قفل مستند',           'group' => 'المستندات', 'description' => 'فتح قفل مستند مقفل'],
+            ['name' => 'clone_commercial_document',          'display_name' => 'استنساخ مستند',           'group' => 'المستندات', 'description' => 'إنشاء نسخة من مستند'],
+            ['name' => 'return_commercial_document',         'display_name' => 'إنشاء مستند إرجاع',       'group' => 'المستندات', 'description' => 'إنشاء مستند إرجاع'],
+            ['name' => 'convert_commercial_document',        'display_name' => 'تحويل مستند',             'group' => 'المستندات', 'description' => 'تحويل مستند إلى نوع آخر'],
+            ['name' => 'apply_discount_commercial_document', 'display_name' => 'تطبيق خصم',               'group' => 'المستندات', 'description' => 'تطبيق خصم على مستند'],
+            ['name' => 'change_price_commercial_document',   'display_name' => 'تغيير سعر الوحدة',        'group' => 'المستندات', 'description' => 'تغيير سعر الوحدة في سطور المستند'],
+            ['name' => 'override_stock_commercial_document', 'display_name' => 'بيع بمخزون سالب',         'group' => 'المستندات', 'description' => 'تجاوز حماية المخزون'],
+            ['name' => 'view_cost_price',                    'display_name' => 'رؤية تكلفة الشراء',       'group' => 'المستندات', 'description' => 'رؤية سعر التكلفة'],
+            ['name' => 'add_payment_commercial_document',    'display_name' => 'إضافة دفعة',              'group' => 'المستندات', 'description' => 'إضافة دفعة لمستند'],
+            ['name' => 'print_commercial_document',          'display_name' => 'طباعة مستند',             'group' => 'المستندات', 'description' => 'طباعة مستند'],
+
             // 6. المدفوعات
             ['name' => 'view_any_payment', 'display_name' => 'عرض قائمة المدفوعات', 'group' => 'المدفوعات'],
             ['name' => 'view_payment',     'display_name' => 'عرض دفعة',            'group' => 'المدفوعات'],
