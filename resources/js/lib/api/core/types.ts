@@ -631,6 +631,8 @@ export interface CommercialDocument extends BaseModel {
   payments?:        Payment[];
   validatedBy?:     User;
   user?:            User;
+  createdBy?:       User;
+  updatedBy?:       User;
   /** SSOT balance computed by backend */
   balance_data?: {
     previous_balance: number;

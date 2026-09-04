@@ -73,6 +73,9 @@ class CommercialDocument extends Model
         'exported_at',
         'fiscal_stamp_id',
         'pos_session_id',
+        'created_by',
+        'updated_by',
+        'deleted_by',
     ];
 
     protected $casts = [
@@ -146,6 +149,8 @@ class CommercialDocument extends Model
         'warehouse.name',
         'document_status.name',
         'validatedBy.name',
+        'createdBy.name',
+        'updatedBy.name',
         'user.name',
         // بحث نصي موحد
         'search',
@@ -170,6 +175,8 @@ class CommercialDocument extends Model
         // sort عبر العلاقة (Spatie يدعم party.name إذا ضُبط allowedSorts)
         'party.name',
         'warehouse.name',
+        'createdBy.name',
+        'updatedBy.name',
     ];
     public static array $defaultWith = [];
     public static array $allowedIncludes = [

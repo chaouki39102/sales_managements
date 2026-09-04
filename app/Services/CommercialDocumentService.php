@@ -238,6 +238,12 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         if ($isAccounting && $item->party_id) {
             $this->persistBalanceSnapshots($item);
         }
+
+        // ✅ سجّل إنشاء المستند في سجل التدقيق المحسّن
+        DocumentAuditLogger::log($item->id, 'created', [
+            'company_id' => $item->company_id,
+            'new_value'  => ['document_status' => 'validated', 'lines' => count($lines)],
+        ]);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -287,7 +293,14 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         $payments = $request?->input('payments') ?? $data['payments'] ?? [];
 
         // AU1: تحديث الأسطر
+        $oldLinesSnapshot = null;
         if (!empty($lines)) {
+            // التقط صورة الأسطر القديمة قبل حذفها كلياً — تُستخدم لاحقاً في
+            // سجل التدقيق (line_removed / price_changed / discount_changed).
+            $oldLinesSnapshot = $item->lines()->get([
+                'id', 'line_order', 'product_id', 'quantity', 'unit_price_ht',
+                'discount_percentage', 'discount_amount_per_unit', 'tva_rate',
+            ]);
             $this->deleteStockMovementsForDocument($item);
             $item->lines()->delete();
             // لا تنسَ إبطال علاقة lines المحمّلة: حذف/إدراج عبر الـ query builder
@@ -298,6 +311,12 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         }
 
         $this->recalculateTotals($item);
+
+        // AU2-bis: سجل التدقيق الدلالي للأسطر — بعد إعادة الحساب تعرض $item->lines
+        // الأسطر الجديدة فعلياً، فنقارنها بالصورة القديمة سطراً سطراً.
+        if ($oldLinesSnapshot !== null) {
+            $this->auditLineChanges($item, $oldLinesSnapshot);
+        }
 
         // Money gate #2 (stored level) — same as afterCreate: verify the edited
         // transaction's money math before stock movements/payments are rewritten.
@@ -323,8 +342,102 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $this->payments()->refreshAmountsAndStatus($item);
         }
 
-        // ✅ Snapshots intentionally NOT recomputed on update — they are frozen
-        // at creation time (afterCreate) and represent the historical balance state.
+// ✅ Snapshots intentionally NOT recomputed on update — they are frozen
+        //    at creation time (afterCreate) and represent the historical balance state.
+
+        // ✅ سجّل التعديل (+ تغيير الأسطر إن وُجد) في سجل التدقيق المحسّن
+        $auditContext = [
+            'company_id' => $item->company_id,
+        ];
+        if (!empty($lines)) {
+            $auditContext['field_name'] = 'lines';
+            $auditContext['new_value']  = ['lines' => count($lines)];
+        }
+        DocumentAuditLogger::log($item->id, 'updated', $auditContext);
+    }
+
+    /**
+     * سجّل تغييرات الأسطر الدلالية بعد إعادة إنشائها أثناء التعديل.
+     * مطابقة بالمنتج (product_id): منتج اختفى كلياً → line_removed؛
+     * منتج بقي وتغيّر سعره فعلًا → price_changed؛ تغيّر خصمه → discount_changed.
+     * لا نُخرج line_removed لكل سطر مُعاد إنشاؤه (إعادة الإنشاء تغطي كل الأسطر)
+     * لأن "حذف + إعادة إنشاء" هو خطة التعديل الفعلية — نكتفي بالفرق الدلالي.
+     */
+    private function auditLineChanges(Model $document, $oldLines): void
+    {
+        if (!$oldLines || $oldLines->isEmpty()) {
+            return;
+        }
+        $document->loadMissing('lines');
+
+        $epsilon   = 0.0001;
+        $oldByProduct = [];
+        foreach ($oldLines as $line) {
+            $oldByProduct[(int) $line->product_id] = $line;
+        }
+        $newByProduct = [];
+        foreach ($document->lines as $line) {
+            $newByProduct[(int) $line->product_id] = $line;
+        }
+
+        // أسطر اختفت كلياً بعد التعديل
+        foreach ($oldByProduct as $productId => $oldLine) {
+            if (isset($newByProduct[$productId])) {
+                continue;
+            }
+            DocumentAuditLogger::log($document->id, 'line_removed', [
+                'company_id' => $document->company_id,
+                'field_name' => 'line_' . ($oldLine->line_order ?? '?'),
+                'old_value'  => [
+                    'product_id'             => (int) $oldLine->product_id,
+                    'quantity'               => (float) $oldLine->quantity,
+                    'unit_price_ht'          => (float) $oldLine->unit_price_ht,
+                    'discount_percentage'    => (float) ($oldLine->discount_percentage ?? 0),
+                    'discount_amount_per_unit' => (float) ($oldLine->discount_amount_per_unit ?? 0),
+                    'tva_rate'               => (float) ($oldLine->tva_rate ?? 0),
+                ],
+            ]);
+        }
+
+        // منتجات بقيَت: سجّل فقط التغيّرات الفعلية
+        foreach ($oldByProduct as $productId => $oldLine) {
+            $newLine = $newByProduct[$productId] ?? null;
+            if (!$newLine) {
+                continue;
+            }
+
+            $oldPrice = (float) $oldLine->unit_price_ht;
+            $newPrice = (float) $newLine->unit_price_ht;
+            if (abs($newPrice - $oldPrice) > $epsilon) {
+                DocumentAuditLogger::log($document->id, 'price_changed', [
+                    'company_id' => $document->company_id,
+                    'field_name' => 'line_' . ($newLine->line_order ?? '?'),
+                    'old_value'  => ['product_id' => (int) $productId, 'unit_price_ht' => $oldPrice],
+                    'new_value'  => ['product_id' => (int) $productId, 'unit_price_ht' => $newPrice],
+                ]);
+            }
+
+            $oldDiscPct = (float) ($oldLine->discount_percentage ?? 0);
+            $newDiscPct = (float) ($newLine->discount_percentage ?? 0);
+            $oldDiscAmt = (float) ($oldLine->discount_amount_per_unit ?? 0);
+            $newDiscAmt = (float) ($newLine->discount_amount_per_unit ?? 0);
+            if (abs($newDiscPct - $oldDiscPct) > $epsilon || abs($newDiscAmt - $oldDiscAmt) > $epsilon) {
+                DocumentAuditLogger::log($document->id, 'discount_changed', [
+                    'company_id' => $document->company_id,
+                    'field_name' => 'line_' . ($newLine->line_order ?? '?'),
+                    'old_value'  => [
+                        'product_id'               => (int) $productId,
+                        'discount_percentage'      => $oldDiscPct,
+                        'discount_amount_per_unit' => $oldDiscAmt,
+                    ],
+                    'new_value'  => [
+                        'product_id'               => (int) $productId,
+                        'discount_percentage'      => $newDiscPct,
+                        'discount_amount_per_unit' => $newDiscAmt,
+                    ],
+                ]);
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -353,6 +466,14 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
             // 3. Hard-delete document (DB CASCADE يحذف lines و pivot rows)
             $document->forceDelete();
+
+            // ✅ سجّل حذف المستند في سجل التدقيق المحسّن (بعد forceDelete —
+            //    نحصد القيم قبل الضياع، ونمرّر الرقم يدوياً لأن forceDelete
+            //    يزيل الصف قبل أن يكون متاحاً لقراءة لاحقة)
+            DocumentAuditLogger::log($document->id, 'deleted', [
+                'company_id' => $document->company_id,
+                'old_value'  => ['document_number' => $document->document_number],
+            ]);
         });
 
         $this->performPostCommitOperations($document, [], $request, 'delete');
@@ -370,6 +491,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     public function lockDocument(CommercialDocument $document): void
     {
         $document->updateQuietly(['is_locked' => true]);
+        DocumentAuditLogger::log($document->id, 'locked', ['company_id' => $document->company_id]);
     }
 
     /**
@@ -382,6 +504,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         }
 
         $document->updateQuietly(['is_locked' => false]);
+        DocumentAuditLogger::log($document->id, 'unlocked', ['company_id' => $document->company_id]);
     }
 
     /**
@@ -404,6 +527,11 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         $document->updateQuietly([
             'cancellation_reason' => $reason,
             'document_status_id'  => $this->getStatusId($document->company_id, 'cancelled'),
+        ]);
+
+        DocumentAuditLogger::log($document->id, 'cancelled', [
+            'company_id' => $document->company_id,
+            'new_value'  => ['reason' => $reason],
         ]);
     }
 
@@ -674,6 +802,18 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 'stock_lot_id'           => $lineData['stock_lot_id'] ?? null,
                 'line_attributes'        => $this->buildLineAttributes($lineData),
                 'notes'                  => $lineData['notes'] ?? null,
+            ]);
+
+            // ✅ سجّل إضافة السطر في سجل التدقيق المحسّن
+            DocumentAuditLogger::log($document->id, 'line_added', [
+                'company_id' => $document->company_id,
+                'field_name' => 'line_' . ($order + 1),
+                'new_value'  => [
+                    'product_id'  => (int) $lineData['product_id'],
+                    'quantity'    => (float) $lineData['quantity'],
+                    'unit_price'  => (float) $lineData['unit_price_ht'],
+                    'tva_rate'    => (float) ($lineData['tva_rate'] ?? 0),
+                ],
             ]);
         }
     }

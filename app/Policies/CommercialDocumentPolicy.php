@@ -21,7 +21,8 @@ class CommercialDocumentPolicy
 
     public function create(User $user): bool
     {
-        return $user->can('create_commercial_document');
+        // لا توجد صلاحية «create_commercial_document» — الإنشاء يصنّف بيعاً أو شراءً.
+        return $user->can('create_sales_document') || $user->can('create_purchase_document');
     }
 
     public function update(User $user, $model): bool
