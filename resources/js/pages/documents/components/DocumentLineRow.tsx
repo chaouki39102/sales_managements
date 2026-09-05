@@ -26,6 +26,8 @@ interface DocumentLineRowProps {
   canEditPrice?:  boolean;
   /** صلاحية تطبيق خصومات الأسطر (apply_discount_commercial_document) — تُفنَّى حقول/مبدّل الخصم دون الصلاحية. */
   canApplyDiscount?: boolean;
+  /** صلاحية تجاوز المخزون (override_stock_commercial_document) — تُظهر تحذير نقص المخزون وزرّ «تجاوز المخزون» (و backend يسمح بالنقص مع تسجيل تحذير). */
+  canOverrideStock?: boolean;
   disabled:       boolean;
   products:       Product[];
   stockData:      Record<number, number>;
@@ -122,7 +124,7 @@ function TotalQtyInput({
 }
 
 export const DocumentLineRow = memo(function DocumentLineRow({
-  line, idx, visibleCols, isPurchase, canViewCost = true, canEditPrice = true, canApplyDiscount = true, disabled, products, stockData,
+  line, idx, visibleCols, isPurchase, canViewCost = true, canEditPrice = true, canApplyDiscount = true, canOverrideStock = false, disabled, products, stockData,
   stockValidation, onUpdate, onRemove, onDuplicate, isTvaExempt, lineWarnings, warehouses,
   onQuickCreate, productTypes, tvas, units, isLoadingProducts,
   selected, onToggleSelect,
@@ -140,6 +142,8 @@ export const DocumentLineRow = memo(function DocumentLineRow({
     : [];
 
   const hasStockWarning = !stockValidation.ok;
+  const stockOverriden = !!line._stockOverriden;
+  const showStockWarning = canOverrideStock && hasStockWarning && !stockOverriden;
   const computeWarnings = line._warnings ?? lineWarnings ?? [];
   const activeComputeWarnings = computeWarnings.filter(
     (w) => w.level !== 'info',
@@ -156,7 +160,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
     ? 'color-mix(in srgb, var(--em) 8%, transparent)'
     : lowMarginRow
     ? `color-mix(in srgb, var(--red) 15%, transparent)`
-    : hasStockWarning || activeComputeWarnings.length > 0
+    : showStockWarning || activeComputeWarnings.length > 0
       ? `color-mix(in srgb, ${(stockValidation as any).blocking ? 'var(--red)' : 'var(--orange)'} 5%, transparent)`
       : undefined;
 
@@ -560,7 +564,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
       </tr>
 
       {/* تحذير المخزون — صف فرعي */}
-      {hasStockWarning && (
+      {showStockWarning && (
         <tr style={{ background: rowBg }}>
           <td
             colSpan={subRowColSpan}
@@ -570,6 +574,39 @@ export const DocumentLineRow = memo(function DocumentLineRow({
             <i className={`ti ${stockValidation.blocking ? 'ti-alert-circle' : 'ti-alert-triangle'}`}
               style={{ marginLeft: 4 }} />
             {stockValidation.message}
+            {canOverrideStock && (
+              <button
+                onClick={() => onUpdate(idx, { _stockOverriden: true })}
+                disabled={disabled}
+                title="تجاوز المخزون"
+                style={{
+                  marginInlineStart: 8, padding: '1px 8px', borderRadius: 'var(--r1)',
+                  border: '1px solid color-mix(in srgb, var(--em) 40%, transparent)',
+                  background: 'color-mix(in srgb, var(--em) 10%, transparent)', color: 'var(--em)',
+                  cursor: disabled ? 'not-allowed' : 'pointer', fontSize: 10.5, fontWeight: 600,
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                <i className="ti ti-user-shield" style={{ fontSize: 11 }} />
+                تجاوز المخزون
+              </button>
+            )}
+          </td>
+        </tr>
+      )}
+
+      {/* تجاوز المخزون المفعّل — صف فرعي أخضر */}
+      {canOverrideStock && stockOverriden && (
+        <tr>
+          <td
+            colSpan={subRowColSpan}
+            style={{
+              padding: '3px 10px 6px', fontSize: 11, color: 'var(--green)',
+              background: 'color-mix(in srgb, var(--green) 8%, transparent)',
+            }}
+          >
+            <i className="ti ti-circle-check" style={{ marginLeft: 4 }} />
+            تم تجاوز المخزون
           </td>
         </tr>
       )}

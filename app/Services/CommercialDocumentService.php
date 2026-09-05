@@ -1179,10 +1179,24 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                     $document->id
                 );
                 if ($baseQty > $available) {
-                    throw new BusinessRuleException(
-                        "الكمية المطلوبة ({$baseQty}) للمنتج «{$product->name}» تتجاوز المخزون المتاح ({$available}).",
-                        409
-                    );
+                    // Task 12: صلاحية «تجاوز المخزون» (override_stock_commercial_document)
+                    // تسمح بانقاص يفوق المخزون المتاح مع تسجيل تحذير في سجل التدقيق.
+                    // بدون الصلاحية يبقى السلوك الحالي (رفض 409).
+                    $canOverrideStock = !empty(auth()->user())
+                        && auth()->user()->can('override_stock_commercial_document');
+
+                    if (!$canOverrideStock) {
+                        throw new BusinessRuleException(
+                            "الكمية المطلوبة ({$baseQty}) للمنتج «{$product->name}» تتجاوز المخزون المتاح ({$available}).",
+                            409
+                        );
+                    }
+
+                    DocumentAuditLogger::log($document->id, 'stock_override', [
+                        'field_name' => 'stock_override',
+                        'old_value'  => ['available' => (float) $available],
+                        'new_value'  => ['qty' => (float) $baseQty, 'product' => $product->name],
+                    ]);
                 }
             }
 

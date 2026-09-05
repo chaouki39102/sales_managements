@@ -56,6 +56,7 @@ class DocumentAuditLog extends Model
         'converted',
         'returned',
         'cloned',
+        'stock_override',
     ];
 
     public static array $searchableFields = ['action', 'field_name'];

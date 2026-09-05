@@ -97,6 +97,12 @@ export function useCommercialDocumentController({
   const canEditPrice     = !lockPrices || !!myPermissions?.includes('change_price_commercial_document');
   const canApplyDiscount = !lockPrices || !!myPermissions?.includes('apply_discount_commercial_document');
 
+  // ─── صلاحية تجاوز المخزون (override_stock_commercial_document) ──────────
+  // تُظهر تحذير «مخزون غير كافٍ» وزر «تجاوز المخزون» للمدير/المالك فقط.
+  // (التجاوز الفعلي يتم تلقائياً في الباكند — الصلاحية تتحقق من ability،
+  //  الزر هنا إقرار بصري مُزيل للتحذير من السطر.)
+  const canOverrideStock = !!myPermissions?.includes('override_stock_commercial_document');
+
   const [nextAction, setNextAction] = useState<'list' | 'new' | 'close'>('list');
 
   const initialDefaultsApplied = useRef(false);
@@ -807,7 +813,7 @@ export function useCommercialDocumentController({
 
     // Columns & line mode
     visibleCols: effectiveVisibleCols, canViewCost, lineMode, handleColsChange, setLineMode,
-    canEditPrice, canApplyDiscount,
+    canEditPrice, canApplyDiscount, canOverrideStock,
 
     // Lookups
     lookups,

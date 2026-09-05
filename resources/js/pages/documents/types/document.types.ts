@@ -216,6 +216,7 @@ export interface LineItem {
   _warnings?:             Array<{ type: string; level: string; message: string }>;
   _computing?:            boolean;
   _fromCompute?:          boolean;
+  _stockOverriden?:       boolean;  // Task 12: تجاوز يدوي لمخزون غير كافٍ (عرضي فقط — لا يُرسل للباكند)
   discount_amount?:       number;
 }
 

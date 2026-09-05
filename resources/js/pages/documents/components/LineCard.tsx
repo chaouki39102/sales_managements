@@ -19,6 +19,8 @@ interface LineCardProps {
   canEditPrice?:   boolean;
   /** صلاحية تطبيق خصومات الأسطر (apply_discount_commercial_document) — تُفنَّى حقول/مبدّل الخصم دون الصلاحية. */
   canApplyDiscount?: boolean;
+  /** صلاحية تجاوز المخزون (override_stock_commercial_document) — تُظهر تحذير نقص المخزون وزرّ «تجاوز المخزون» (و backend يسمح بالنقص مع تسجيل تحذير). */
+  canOverrideStock?: boolean;
   disabled:        boolean;
   stockData:       Record<number, number>;
   stockValidation: LineStockValidation;
@@ -47,7 +49,7 @@ interface LineCardProps {
 }
 
 export function LineCard({
-  line, idx, products, isPurchase, canViewCost = true, canEditPrice = true, disabled, stockData, stockValidation,
+  line, idx, products, isPurchase, canViewCost = true, canEditPrice = true, canOverrideStock = false, disabled, stockData, stockValidation,
   isTvaExempt, lineWarnings, warehouses,
   onUpdate, onRemove, onDuplicate,
   onQuickCreate, productTypes, tvas, units, isLoadingProducts,
@@ -63,9 +65,11 @@ export function LineCard({
     : null;
 
   const hasStockWarning = !stockValidation.ok;
+  const stockOverriden = !!line._stockOverriden;
+  const showStockWarning = canOverrideStock && hasStockWarning && !stockOverriden;
   const computeWarnings = line._warnings ?? lineWarnings ?? [];
   const activeComputeWarnings = computeWarnings.filter((w) => w.level !== 'info');
-  const hasWarning = hasStockWarning || activeComputeWarnings.length > 0;
+  const hasWarning = showStockWarning || activeComputeWarnings.length > 0;
 
   const stockQty = prod ? getProductStock(prod, stockData) : null;
 
@@ -451,7 +455,7 @@ export function LineCard({
       </div>
 
       {/* ── Stock & Other Warnings ── */}
-      {hasStockWarning && (
+      {showStockWarning && (
         <div style={{
           marginTop: 6, padding: '4px 8px', borderRadius: 'var(--r1)',
           background: stockValidation && 'blocking' in stockValidation && stockValidation.blocking
@@ -464,6 +468,36 @@ export function LineCard({
           <i className={`ti ${stockValidation && 'blocking' in stockValidation && stockValidation.blocking ? 'ti-alert-circle' : 'ti-alert-triangle'}`}
             style={{ fontSize: 11 }} />
           {stockValidation && 'message' in stockValidation ? stockValidation.message : ''}
+          {canOverrideStock && (
+            <button
+              onClick={() => onUpdate(idx, { _stockOverriden: true })}
+              disabled={disabled}
+              title="تجاوز المخزون"
+              style={{
+                marginInlineStart: 'auto', padding: '2px 8px', borderRadius: 'var(--r1)',
+                border: '1px solid color-mix(in srgb, var(--em) 40%, transparent)',
+                background: 'color-mix(in srgb, var(--em) 10%, transparent)', color: 'var(--em)',
+                cursor: disabled ? 'not-allowed' : 'pointer', fontSize: 10.5, fontWeight: 600,
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+              }}
+            >
+              <i className="ti ti-user-shield" style={{ fontSize: 11 }} />
+              تجاوز المخزون
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* تجاوز المخزون المفعّل — إشارة خضراء */}
+      {canOverrideStock && stockOverriden && (
+        <div style={{
+          marginTop: 6, padding: '4px 8px', borderRadius: 'var(--r1)',
+          background: 'color-mix(in srgb, var(--green) 8%, transparent)',
+          fontSize: 10.5, color: 'var(--green)',
+          display: 'flex', alignItems: 'center', gap: 5,
+        }}>
+          <i className="ti ti-circle-check" style={{ fontSize: 11 }} />
+          تم تجاوز المخزون
         </div>
       )}
 

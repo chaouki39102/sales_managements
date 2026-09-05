@@ -34,6 +34,8 @@ interface DocumentLinesSectionProps {
   canEditPrice?: boolean;
   /** صلاحية تطبيق خصومات الأسطر (apply_discount_commercial_document) — تُفنَّى حقول/مبدّل الخصم (readOnly) دون الصلاحية. */
   canApplyDiscount?: boolean;
+  /** صلاحية تجاوز المخزون (override_stock_commercial_document) — تظهر تحذير «مخزون غير كافٍ» وزر «تجاوز المخزون» للمدير/المالك فقط. */
+  canOverrideStock?: boolean;
   lineMode: 'table' | 'card';
   setLineMode: React.Dispatch<React.SetStateAction<'table' | 'card'>>;
   lineWarnings: Map<number, ComputeLineWarning[]>;
@@ -85,6 +87,7 @@ export default function DocumentLinesSection({
   canViewCost = true,
   canEditPrice = true,
   canApplyDiscount = true,
+  canOverrideStock = false,
   lineMode, setLineMode,
   lineWarnings, stockData,
   addLine, addLineWithProduct, removeLine, duplicateLine, moveLine, updateLine,
@@ -799,6 +802,7 @@ export default function DocumentLinesSection({
                     canViewCost={canViewCost}
                     canEditPrice={canEditPrice}
                     canApplyDiscount={canApplyDiscount}
+                    canOverrideStock={canOverrideStock}
                     warehouses={warehouses}
                     onUpdate={updateLine}
                     onRemove={removeLine}
@@ -866,6 +870,7 @@ export default function DocumentLinesSection({
                         canViewCost={canViewCost}
                         canEditPrice={canEditPrice}
                         canApplyDiscount={canApplyDiscount}
+                        canOverrideStock={canOverrideStock}
                         disabled={isLinesReadOnly}
                         products={products}
                         stockData={stockData}

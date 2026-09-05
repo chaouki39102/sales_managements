@@ -88,7 +88,7 @@ export default function CommercialDocumentModal({
     companyInfo, printTemplates,
     selectedTemplateId, setSelectedTemplateId, selectedTemplate,
     printModalOpen, setPrintModalOpen, handlePrint,
-    visibleCols, canViewCost, canEditPrice, canApplyDiscount, lineMode, setLineMode,
+    visibleCols, canViewCost, canEditPrice, canApplyDiscount, canOverrideStock, lineMode, setLineMode,
     deleteConfirm,
     handleSave, handleDelete, handleExport, handlePartyChangeWithWarning,
     handleQuickCreateParty, creatingParty,
@@ -419,6 +419,7 @@ export default function CommercialDocumentModal({
             canViewCost={canViewCost}
             canEditPrice={canEditPrice}
             canApplyDiscount={canApplyDiscount}
+            canOverrideStock={canOverrideStock}
             lineMode={lineMode}
             setLineMode={setLineMode}
             lineWarnings={lineWarnings}
