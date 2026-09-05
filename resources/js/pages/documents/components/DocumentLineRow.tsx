@@ -22,6 +22,10 @@ interface DocumentLineRowProps {
   isPurchase:     boolean;
   /** صلاحية إظهار التكلفة والهامش (view_cost_price) — تُخفي خلفية صف الهامش المنخفض وتلوين المبالغ. */
   canViewCost?:   boolean;
+  /** صلاحية تغيير أسعار الأسطر (change_price_commercial_document) — تُفنَّى حقول السعر دون الصلاحية (و backend يرفض الرفع). */
+  canEditPrice?:  boolean;
+  /** صلاحية تطبيق خصومات الأسطر (apply_discount_commercial_document) — تُفنَّى حقول/مبدّل الخصم دون الصلاحية. */
+  canApplyDiscount?: boolean;
   disabled:       boolean;
   products:       Product[];
   stockData:      Record<number, number>;
@@ -52,7 +56,7 @@ interface DocumentLineRowProps {
 }
 
 function CellInput({
-  value, onChange, type = 'number', min, step, disabled, highlight, width, id,
+  value, onChange, type = 'number', min, step, disabled, readOnly, highlight, width, id,
 }: {
   value:      number | string;
   onChange:   (v: string) => void;
@@ -60,6 +64,7 @@ function CellInput({
   min?:       number;
   step?:      number;
   disabled?:  boolean;
+  readOnly?:  boolean;
   highlight?: boolean;
   width?:     number;
   id?:        string;
@@ -72,6 +77,7 @@ function CellInput({
       min={min}
       step={step}
       disabled={disabled}
+      readOnly={readOnly}
       onChange={(e) => onChange(e.target.value)}
       style={{ ...cellStyle(highlight), width: width ?? '100%' }}
     />
@@ -116,7 +122,7 @@ function TotalQtyInput({
 }
 
 export const DocumentLineRow = memo(function DocumentLineRow({
-  line, idx, visibleCols, isPurchase, canViewCost = true, disabled, products, stockData,
+  line, idx, visibleCols, isPurchase, canViewCost = true, canEditPrice = true, canApplyDiscount = true, disabled, products, stockData,
   stockValidation, onUpdate, onRemove, onDuplicate, isTvaExempt, lineWarnings, warehouses,
   onQuickCreate, productTypes, tvas, units, isLoadingProducts,
   selected, onToggleSelect,
@@ -356,6 +362,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
               step={0.01}
               onChange={(v) => onUpdate(idx, { unit_price_ht: toNum(v) })}
               disabled={disabled}
+              readOnly={!canEditPrice}
             />
           </td>
         )}
@@ -368,6 +375,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
               step={0.01}
               onChange={(v) => onUpdate(idx, { price_per_pack: toNum(v) })}
               disabled={disabled || line._packQty <= 1}
+              readOnly={!canEditPrice}
             />
           </td>
         )}
@@ -385,7 +393,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
               <select
                 style={{ ...cellStyle(), width: 40, padding: '5px 2px', fontSize: 10 }}
                 value={line.discount_mode}
-                disabled={disabled}
+                disabled={disabled || !canApplyDiscount}
                 onChange={(e) => {
                   const newMode = e.target.value as 'percent' | 'fixed';
                   onUpdate(idx, newMode === 'fixed'
@@ -408,6 +416,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
                   : { discount_amount_fixed: toNum(v), discount_percentage:   0 }
                 )}
                 disabled={disabled}
+                readOnly={!canApplyDiscount}
               />
             </div>
           </td>

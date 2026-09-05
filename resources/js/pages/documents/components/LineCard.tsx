@@ -15,6 +15,10 @@ interface LineCardProps {
   isPurchase:      boolean;
   /** صلاحية إظهار التكلفة والهامش (view_cost_price) — تُخفي صفّي التكلفة والهامش وتمنع حسابات الهامش. */
   canViewCost?:    boolean;
+  /** صلاحية تغيير أسعار الأسطر (change_price_commercial_document) — تُفنَّى حقول السعر دون الصلاحية (و backend يرفض الرفع). */
+  canEditPrice?:   boolean;
+  /** صلاحية تطبيق خصومات الأسطر (apply_discount_commercial_document) — تُفنَّى حقول/مبدّل الخصم دون الصلاحية. */
+  canApplyDiscount?: boolean;
   disabled:        boolean;
   stockData:       Record<number, number>;
   stockValidation: LineStockValidation;
@@ -43,7 +47,7 @@ interface LineCardProps {
 }
 
 export function LineCard({
-  line, idx, products, isPurchase, canViewCost = true, disabled, stockData, stockValidation,
+  line, idx, products, isPurchase, canViewCost = true, canEditPrice = true, disabled, stockData, stockValidation,
   isTvaExempt, lineWarnings, warehouses,
   onUpdate, onRemove, onDuplicate,
   onQuickCreate, productTypes, tvas, units, isLoadingProducts,
@@ -320,6 +324,7 @@ export function LineCard({
             step={0.01}
             value={line.unit_price_ht}
             disabled={disabled}
+            readOnly={!canEditPrice}
             onChange={(e) => onUpdate(idx, { unit_price_ht: parseFloat(e.target.value) || 0 })}
             style={{
               width: 80, textAlign: 'right', padding: '3px 6px',

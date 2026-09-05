@@ -9,6 +9,7 @@ use App\Services\QRCodeService;
 use App\Services\CommercialDocumentService;
 use App\Services\PaymentSynchronizer;
 use App\Services\PartyBalanceService;
+use App\Services\TransactionIntegrityService;
 use App\Models\CommercialDocument;
 use App\Models\DocumentAuditLog;
 use App\Models\DocumentType;
@@ -431,6 +432,28 @@ class CommercialDocumentController extends BaseApiController
             $item       = $this->getService()->findById($resolvedId);
             $this->authorizeAction('update', $item);
             $data = $this->getValidatedData($request, $resolvedId);
+            // Task 10 — pre-save line price/discount grant gate. Runs against the
+            // ORIGINAL stored lines (before any write) so a cashier-ledger user who
+            // lacks change_price/apply_discount perms is rejected with a 403 here,
+            // before the service rebuilds the lines. Quantity-only edits re-send
+            // stored discounts/prices and always pass (see priceChanged/discountIncreased).
+            $sentLines = $request->input('lines', []) ?? ($data['lines'] ?? []);
+            if (!empty($sentLines)) {
+                $oldLinesByOrder = [];
+                foreach ($item->lines()->get([
+                    'id', 'line_order', 'product_id', 'quantity', 'unit_price_ht',
+                    'discount_percentage', 'discount_amount_per_unit', 'tva_rate',
+                    'packaging_units_snapshot',
+                ]) as $oldLine) {
+                    $oldLinesByOrder[$oldLine->line_order] = $oldLine->getAttributes();
+                }
+                app(TransactionIntegrityService::class)->assertAllowedLinePermissionChanges(
+                    auth()->user(),
+                    $sentLines,
+                    $oldLinesByOrder,
+                    $item
+                );
+            }
             $item = $this->getService()->update($item, $data, $request);
             $this->attachBalanceData($item);
             return $this->successResponse(

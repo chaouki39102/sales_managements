@@ -300,14 +300,21 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $oldLinesSnapshot = $item->lines()->get([
                 'id', 'line_order', 'product_id', 'quantity', 'unit_price_ht',
                 'discount_percentage', 'discount_amount_per_unit', 'tva_rate',
+                'packaging_units_snapshot',
             ]);
+            // Task 10 — original line snapshot keyed by line_order, so the payload
+            // gate can tell "price CHANGED" / "discount INCREASED" on edit.
+            $oldLinesByOrder = [];
+            foreach ($oldLinesSnapshot as $oldLine) {
+                $oldLinesByOrder[$oldLine->line_order] = $oldLine->getAttributes();
+            }
             $this->deleteStockMovementsForDocument($item);
             $item->lines()->delete();
             // لا تنسَ إبطال علاقة lines المحمّلة: حذف/إدراج عبر الـ query builder
             // لا يُحدّث collection المحمّل مسبقاً، فكان recalculateTotals و
             // integrity gate يقرآن أسطراً قديمة (قبل التعديل) ويحسبان إجماليات خاطئة.
             $item->unsetRelation('lines');
-            $this->createDocumentLines($item, $lines);
+            $this->createDocumentLines($item, $lines, $oldLinesByOrder);
         }
 
         $this->recalculateTotals($item);
@@ -632,7 +639,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     // PRIVATE: إنشاء أسطر الوثيقة
     // ═══════════════════════════════════════════════════════════════════════
 
-    private function createDocumentLines(CommercialDocument $document, array $lines): void
+    private function createDocumentLines(CommercialDocument $document, array $lines, ?array $originalLinesByOrder = null): void
     {
         foreach ($lines as $order => $line) {
             $pid = $line['product_id'] ?? null;
@@ -683,11 +690,24 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         $priceLevelId = $party?->default_price_level_id
             ?? \App\Models\Setting::getSetting('default_price_level_id', null, $document->company_id);
 
+        // Task 10 — resolve line price/discount grants ONCE per document.
+        // Editing (original snapshot provided) passes the permission context into
+        // the payload-line gate so a forbidden price/discount RAISE throws 403;
+        // create/copy paths ($originalLinesByOrder === null) never block.
+        $editPerm = app(TransactionIntegrityService::class)->resolveLineEditPerms(
+            auth()->user(),
+            $document,
+            $originalLinesByOrder !== null
+        );
+
         foreach ($lines as $order => $lineData) {
             // Money gate #1 (payload level): reject garbage/stale money fields before
             // anything touches the ledger — negative qty, invalid price, out-of-range
             // discounts/TVA, or a packaged line with no positive pack factor.
-            app(TransactionIntegrityService::class)->assertPayloadLine($lineData, $order);
+            $lineOrder = (int) ($lineData['line_order'] ?? ($order + 1));
+            app(TransactionIntegrityService::class)->assertPayloadLine($lineData, $order, $editPerm + [
+                'original' => $originalLinesByOrder[$lineOrder] ?? null,
+            ]);
 
             // Override TVA rate if party is exempt
             $product = isset($lineData['product_id'])

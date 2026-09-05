@@ -734,6 +734,15 @@ class SettingsSeeder extends Seeder
                 'is_editable'   => true,
                 'display_order' => 79,
             ],
+            'lock_prices_for_cashiers' => [
+                'value'         => false,
+                'group'         => 'documents',
+                'type'          => 'boolean',
+                'description'   => 'قفل حقول أسعار وخصومات الأسطر في المستندات للمستخدمين الذين لا يملكون صلاحية تغيير الأسعار/الخصومات',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 80,
+            ],
 
             // ══════════════════════════════════════════
             // group: inventory — توسعة سياسات المخزون

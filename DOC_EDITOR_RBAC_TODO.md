@@ -27,11 +27,13 @@
 
 ## المخطط التنفيذي — 15 مهمة
 
+> **حالة عامة (آخر تحديث: 2026-09-05):** المهام 1–4، 9 مكتملة ومُدفوعة على `main`. المهمة 10 مكتملة محلياً (Backend + Hook + واجهة موثّقة) ولم تُدفع بعد — تنتظر الاعتماد. المهام 5–8 (سير عمل الموافقات) لا تُفعّل سلوكاً جديداً إلا عند `require_document_approval = true` — غير مانعة للإطلاق. المهام 13–15 (مجموعة د) حماية عالية المخاطر — يمكن تأجيلها لما بعد الإطلاق.
+
 ---
 
 ### المجموعة أ: التأسيس (4 مهام)
 
-#### المهمة 1 — تتبع المالكين: `created_by` + `updated_by`
+#### المهمة 1 — تتبع المالكين: `created_by` + `updated_by` **[مكتملة — `d45c0b3`]**
 **الأولوية**: عالية | **المخاطر**: منخفضة
 
 **الخلفية**: الآن فقط `validated_by` موجود (يُكتب تلقائياً عند الإنشاء). لا نعرف من أنشأ المستند أصلاً أو من عدّله لاحقاً.
@@ -51,7 +53,7 @@
 
 ---
 
-#### المهمة 2 — مسجّل التدقيق المحسّن: `DocumentAuditLog`
+#### المهمة 2 — مسجّل التدقيق المحسّن: `DocumentAuditLog` **[مكتملة — `b1e9564` + `e6e26f4`]**
 **الأولوية**: عالية | **المخاطر**: منخفضة
 
 **الخلفية**: نظام التدقيق العام (`DataAuditSubscriber`) يسجّل كل التغييرات على كل النماذج، لكن لا يوجد تفاصيل محددة للمستندات (من غيّر أيّ سطر؟ غيّر أيّ مبلغ؟).
@@ -77,7 +79,7 @@
 
 ---
 
-#### المهمة 3 — تحديث الصلاحيات المعرّفة في Spatie
+#### المهمة 3 — تحديث الصلاحيات المعرّفة في Spatie **[مكتملة — `7afcd34`]**
 **الأولوية**: عالية | **المخاطر**: منخفضة
 
 **الخلفية**: الصلاحيات الحالية (8) غير كافية. نحتاج صلاحيات أدق.
@@ -124,7 +126,7 @@
 
 ---
 
-#### المهمة 4 — تحديث `CommercialDocumentPolicy` بمنطق ملكية + صلاحيات جديدة
+#### المهمة 4 — تحديث `CommercialDocumentPolicy` بمنطق ملكية + صلاحيات جديدة **[مكتملة — `a270f29`]**
 **الأولوية**: عالية | **المخاطر**: متوسطة
 
 **الخلفية**: الآن `CommercialDocumentPolicy` يتحقق فقط من صلاحية نصية. لا يوجد فرق بين "مستندي" و"مستند شخص آخر".
@@ -177,7 +179,7 @@ public function validate(User $user, CommercialDocument $doc) {
 
 ### المجموعة ب: سير عمل الموافقات (4 مهام)
 
-#### المهمة 5 — حالات المستند: `draft` → `pending_approval` → `validated` → `locked`
+#### المهمة 5 — حالات المستند: `draft` → `pending_approval` → `validated` → `locked` **[متبقية — يُنصح بالتأجيل لما بعد الإطلاق]**
 **الأولوية**: عالية | **المخاطر**: متوسطة
 
 **الخلفية**: الآن المستند يتحول تلقائياً إلى `validated` عند الإنشاء. لا يوجد طريقة للمراجعة.
@@ -212,7 +214,7 @@ public function validate(User $user, CommercialDocument $doc) {
 
 ---
 
-#### المهمة 6 — حدود الموافقة حسب المبلغ
+#### المهمة 6 — حدود الموافقة حسب المبلغ **[متبقية — تُنفَّذ مع المهمة 5]**
 **الأولوية**: متوسطة | **المخاطر**: منخفضة
 
 **الخلفية**: جدول `ApprovalThreshold` موجود لكن غير مستخدم.
@@ -231,7 +233,7 @@ public function validate(User $user, CommercialDocument $doc) {
 
 ---
 
-#### المهمة 7 — زر الإرسال + الموافقة في واجهة المستند
+#### المهمة 7 — زر الإرسال + الموافقة في واجهة المستند **[متبقية — تُنفَّذ مع المهمة 5]**
 **الأولوية**: عالية | **المخاطر**: منخفضة
 
 **الخلفية**: الواجهة تحتاج أزرار جديدة لسير عمل الموافقات.
@@ -260,7 +262,7 @@ public function validate(User $user, CommercialDocument $doc) {
 
 ---
 
-#### المهمة 8 — حماية المخزون: تعليق الحركات حتى التأكيد
+#### المهمة 8 — حماية المخزون: تعليق الحركات حتى التأكيد **[متبقية — تُنفَّذ مع المهمة 5]**
 **الأولوية**: عالية | **المخاطر**: متوسطة
 
 **الخلفية**: الآن `afterCreate` ينشئ حركات المخزون فوراً. مع سير عمل الموافقة، يجب تأخيرها.
@@ -283,7 +285,7 @@ public function validate(User $user, CommercialDocument $doc) {
 
 ### المجموعة ج: قيود على مستوى الحقول + حدود المبالغ (4 مهام)
 
-#### المهمة 9 — "هل أستطيع رؤية التكلفة؟" — `view_cost_price`
+#### المهمة 9 — "هل أستطيع رؤية التكلفة؟" — `view_cost_price` **[مكتملة — `c43bc4f`]**
 **الأولوية**: عالية | **المخاطر**: منخفضة
 
 **الخلفية**: الآن `cost_price_ht` ظاهرة لكل من يملك `view_commercial_document`. الكاشير لا يحتاج أن يرى تكلفة الشراء.
@@ -302,7 +304,9 @@ public function validate(User $user, CommercialDocument $doc) {
 
 ---
 
-#### المهمة 10 — "هل أستطيع تغيير السعر؟" + "هل أستطيع تطبيق خصم؟"
+#### المهمة 10 — "هل أستطيع تغيير السعر؟" + "هل أستطيع تطبيق خصم؟" **[مكتمل ✅]**
+
+**ملاحظة التنفيذ**: `lock_prices_for_cashiers` هو مفتاح واجهة على مستوى الشركة (عند `false` تبقى الحقول قابلة للتعديل في الواجهة لكن الـ backend يرفض أي رفع مخالف بـ 403) — الترخيص هو الحد الفاصل. عند `true`: `canEditPrice = !lockPrices || has(change_price_commercial_document)` و `canApplyDiscount = !lockPrices || has(apply_discount_commercial_document)`، حقل السعر و`price_per_pack` يصبحان `readonly`، مبدّل/حقل الخصم `disabled`/`readonly`. استثناء مسودات المستخدم (`draft` + `update_own_commercial_document`). خصومات النطاقات تلقائية غير مشمولة.
 **الأولوية**: عالية | **المخاطر**: متوسطة
 
 **الخلفية**: الآن أي شخص يملك `update_commercial_document` يمكنه تغيير الأسعار والخصومات بلا قيود.
@@ -325,16 +329,20 @@ public function validate(User $user, CommercialDocument $doc) {
 4. **الإعدادات**: `lock_prices_for_cashiers = true/false` (إعداد عام)
 
 **الملفات المتأثرة**:
-- `app/Services/CommercialDocumentService.php` — `update()`
-- `app/Services/TransactionIntegrityService.php`
+- `app/Services/CommercialDocumentService.php` — `createDocumentLines()` 3-arg + تمرير `$perm` إلى `assertPayloadLine`
+- `app/Services/TransactionIntegrityService.php` — `assertAllowedLinePermissionChanges()` + `resolveLineEditPerms()` + `assertLineGrants()`
+- `app/Http/Controllers/Api/V1/CommercialDocumentController.php` — كتلة Task 10 قبل الحفظ في `update()` (تقارن الأسعار/الخصومات المرسلة مع الأسطر الأصلية بـ 403)
+- `database/seeders/SettingsSeeder.php` — `lock_prices_for_cashiers` (إعداد عام)
 - `resources/js/pages/documents/components/DocumentLineRow.tsx`
 - `resources/js/pages/documents/components/LineCard.tsx`
 - `resources/js/pages/documents/CommercialDocumentModal/DocumentLinesSection.tsx`
+- `resources/js/pages/documents/CommercialDocumentModal/index.tsx`
+- `resources/js/pages/documents/CommercialDocumentPage.tsx`
 - `resources/js/pages/documents/hooks/useCommercialDocumentController.ts`
 
 ---
 
-#### المهمة 11 — حدود المبالغ حسب الدور
+#### المهمة 11 — حدود المبالغ حسب الدور **[متبقية]**
 **الأولوية**: متوسطة | **المخاطر**: منخفضة
 
 **الخلفية**: لا يوجد حد لمبلغ المستند الذي يمكن للمستخدم إنشاءه/تعديله.
@@ -360,7 +368,7 @@ public function validate(User $user, CommercialDocument $doc) {
 
 ---
 
-#### المهمة 12 — عرض المخزون السلبي فقط للمدير/المالك
+#### المهمة 12 — عرض المخزون السلبي فقط للمدير/المالك **[متبقية]**
 **الأولوية**: متوسطة | **المخاطر**: منخفضة
 
 **الخلفية**: الآن `override_stock_commercial_document` غير مستخدم. الكاشير لا يستطيع رؤية المخزون السلبي.
@@ -382,7 +390,7 @@ public function validate(User $user, CommercialDocument $doc) {
 
 ### المجموعة د: حماية الإلغاء والحذف + التعديل المتزامن (3 مهام)
 
-#### المهمة 13 — استرجاع المخزون عند الإلغاء
+#### المهمة 13 — استرجاع المخزون عند الإلغاء **[متبقية — عالية المخاطر، تأجيل]**
 **الأولوية**: عالية | **المخاطر**: عالية
 
 **الخلفية**: `cancel()` لا يعكس حركات المخزون. مستند مُلغى لا يزال يحتسب في المخزون!
@@ -404,7 +412,7 @@ public function validate(User $user, CommercialDocument $doc) {
 
 ---
 
-#### المهمة 14 — حماية الحذف: استرجاع المخزون + منع الحذف بعد الدفع
+#### المهمة 14 — حماية الحذف: استرجاع المخزون + منع الحذف بعد الدفع **[متبقية — عالية المخاطر، تأجيل]**
 **الأولوية**: عالية | **المخاطر**: عالية
 
 **الخلفية**: `delete()` لا يسترجع المخزون. مستند محذوف لا يزال يحتسب في المخزون!
@@ -425,7 +433,7 @@ public function validate(User $user, CommercialDocument $doc) {
 
 ---
 
-#### المهمة 15 — حماية التعديل المتزامن (Optimistic Locking)
+#### المهمة 15 — حماية التعديل المتزامن (Optimistic Locking) **[متبقية — أولوية منخفضة، تأجيل]**
 **الأولوية**: منخفضة | **المخاطر**: منخفضة
 
 **الخلفية**: شخصان يمكنهما تعديل المستند نفسّه في نفس الوقت — آخر حفظ يفوز.

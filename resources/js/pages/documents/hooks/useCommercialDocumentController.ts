@@ -89,6 +89,14 @@ export function useCommercialDocumentController({
     return next;
   }, [visibleCols, canViewCost]);
 
+  // ─── صلاحية تعديل الأسعار/الخصومات (change_price/apply_discount) ───────
+  // Company switch off (lock_prices_for_cashiers = false) → price/discount fields
+  // stay editable here; the backend still 403s any save that RAISES a value for a
+  // user lacking the perm. Switch on → lock the fields per permission.
+  const lockPrices = !!settingsDict?.lock_prices_for_cashiers?.value;
+  const canEditPrice     = !lockPrices || !!myPermissions?.includes('change_price_commercial_document');
+  const canApplyDiscount = !lockPrices || !!myPermissions?.includes('apply_discount_commercial_document');
+
   const [nextAction, setNextAction] = useState<'list' | 'new' | 'close'>('list');
 
   const initialDefaultsApplied = useRef(false);
@@ -799,6 +807,7 @@ export function useCommercialDocumentController({
 
     // Columns & line mode
     visibleCols: effectiveVisibleCols, canViewCost, lineMode, handleColsChange, setLineMode,
+    canEditPrice, canApplyDiscount,
 
     // Lookups
     lookups,

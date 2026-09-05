@@ -30,6 +30,10 @@ interface DocumentLinesSectionProps {
   visibleCols: Set<ColKey>;
   /** صلاحية إظهار التكلفة والهامش (view_cost_price) — تُخفى أعمدة/أسطر التكلفة والهامش للمستخدمين غير المصرّح لهم. */
   canViewCost?: boolean;
+  /** صلاحية تغيير أسعار الأسطر (change_price_commercial_document) — تُفنَّى حقول السعر (readOnly) دون الصلاحية (و backend يرفض الرفع). */
+  canEditPrice?: boolean;
+  /** صلاحية تطبيق خصومات الأسطر (apply_discount_commercial_document) — تُفنَّى حقول/مبدّل الخصم (readOnly) دون الصلاحية. */
+  canApplyDiscount?: boolean;
   lineMode: 'table' | 'card';
   setLineMode: React.Dispatch<React.SetStateAction<'table' | 'card'>>;
   lineWarnings: Map<number, ComputeLineWarning[]>;
@@ -79,6 +83,8 @@ export default function DocumentLinesSection({
   products, isLoadingProducts,
   visibleCols,
   canViewCost = true,
+  canEditPrice = true,
+  canApplyDiscount = true,
   lineMode, setLineMode,
   lineWarnings, stockData,
   addLine, addLineWithProduct, removeLine, duplicateLine, moveLine, updateLine,
@@ -791,6 +797,8 @@ export default function DocumentLinesSection({
                     isTvaExempt={!isPurchase && isPartyExempt}
                     lineWarnings={lineWarnings.get(idx)}
                     canViewCost={canViewCost}
+                    canEditPrice={canEditPrice}
+                    canApplyDiscount={canApplyDiscount}
                     warehouses={warehouses}
                     onUpdate={updateLine}
                     onRemove={removeLine}
@@ -856,6 +864,8 @@ export default function DocumentLinesSection({
                         visibleCols={visibleCols}
                         isPurchase={isPurchase}
                         canViewCost={canViewCost}
+                        canEditPrice={canEditPrice}
+                        canApplyDiscount={canApplyDiscount}
                         disabled={isLinesReadOnly}
                         products={products}
                         stockData={stockData}

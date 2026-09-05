@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Core\Exceptions\BusinessRuleException;
 use App\Models\CommercialDocument;
 use App\Models\Setting;
+use App\Models\User;
 use App\Services\Tax\FiscalStampCalculator;
 
 /**
@@ -41,7 +42,7 @@ class TransactionIntegrityService
     // PAYLOAD-LEVEL SANITY — runs at the top of every line before it is written
     // ═══════════════════════════════════════════════════════════════════════
 
-    public function assertPayloadLine(array $lineData, int $order): void
+    public function assertPayloadLine(array $lineData, int $order, array $perm = []): void
     {
         $errors = [];
 
@@ -88,6 +89,146 @@ class TransactionIntegrityService
                 422
             );
         }
+
+        // Task 10 — RBAC permission gate. Runs AFTER the arithmetic sanity checks so
+        // a malformed line always surfaces as the 422 shape error first; this block
+        // only answers "may this actor RAISE an existing line's price/discount?".
+        // On EDIT the caller resolves $perm once per document: update = editing,
+        // price_allowed / discount_allowed = grants (own-draft exception applied),
+        // original = the stored line snapshot keyed by line_order, or null for a
+        // brand-new line. $perm === [] on create/copy flows → this block is inert.
+        if (!empty($perm['update'])) {
+            $this->assertLineGrants($lineData, $perm);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // RBAC LINE PRICE/DISCOUNT GATE (Task 10)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Resolve whether the current actor may RAISE an existing line's price and
+     * discount during an UPDATE. Only a real authenticated backend User editing an
+     * EXISTING document ($update = true) is gated; create/copy flows and portal
+     * actors ($user is a PortalUser, not App\Models\User) are never blocked.
+     *
+     * Own-draft exception: the author editing their own DRAFT may freely adjust
+     * price/discount via update_own_commercial_document — mirrors the policy.
+     *
+     * @return array{update: bool, price_allowed: bool, discount_allowed: bool}
+     */
+    public function resolveLineEditPerms(mixed $user, CommercialDocument $document, bool $update): array
+    {
+        if (!$update || !($user instanceof User)) {
+            return [
+                'update'           => false,
+                'price_allowed'    => true,
+                'discount_allowed' => true,
+            ];
+        }
+
+        $isOwnDraft = $document->documentStatus?->name === 'draft'
+            && $user->can('update_own_commercial_document')
+            && (int) $document->created_by === (int) $user->id;
+
+        return [
+            'update'           => true,
+            'price_allowed'    => $isOwnDraft || $user->can('change_price_commercial_document'),
+            'discount_allowed' => $isOwnDraft || $user->can('apply_discount_commercial_document'),
+        ];
+    }
+
+    /**
+     * Controller pre-save convenience: resolve the grants once for the whole
+     * document, then apply them per sent line against the original stored snapshot.
+     * Throws 403 on the first forbidden increase; no writes have happened yet.
+     *
+     * @param  array<int,array<string,mixed>>  $sentLines
+     * @param  array<int,array<string,mixed>>  $originalLinesByOrder  keyed by line_order
+     */
+    public function assertAllowedLinePermissionChanges(
+        mixed $user,
+        array $sentLines,
+        array $originalLinesByOrder,
+        CommercialDocument $document
+    ): void {
+        $perm = $this->resolveLineEditPerms($user, $document, true);
+        if (empty($perm['update'])) {
+            return;
+        }
+
+        foreach ($sentLines as $order => $lineData) {
+            $lineOrder = (int) ($lineData['line_order'] ?? ($order + 1));
+            $this->assertLineGrants($lineData, $perm + [
+                'original' => $originalLinesByOrder[$lineOrder] ?? null,
+            ]);
+        }
+    }
+
+    /**
+     * Throw a 403 BusinessRuleException when the actor is not allowed to RAISE an
+     * existing line's discount or price. The 422 arithmetic validation already ran
+     * above; this is a pure grant check against the ORIGINAL stored line.
+     */
+    private function assertLineGrants(array $lineData, array $perm): void
+    {
+        if (empty($perm['update'])) {
+            return;
+        }
+
+        $original = is_array($perm['original'] ?? null) ? $perm['original'] : null;
+
+        // Discount first, then price.
+        if (empty($perm['discount_allowed']) && $this->discountIncreased($lineData, $original)) {
+            throw new BusinessRuleException('لا تملك صلاحية تطبيق الخصومات.', 403);
+        }
+
+        if (empty($perm['price_allowed']) && $this->priceChanged($lineData, $original)) {
+            throw new BusinessRuleException('لا تملك صلاحية تغيير الأسعار.', 403);
+        }
+    }
+
+    /**
+     * True when the sent line carries MORE discount than the stored original.
+     * A sent discount of zero (unset) is never a violation — quantity-only edits
+     * that re-send stored values (or undercut them) always pass, so the gate only
+     * ever blocks genuinely increased discounts.
+     */
+    private function discountIncreased(array $lineData, ?array $original): bool
+    {
+        $sentPct = (float) ($lineData['discount_percentage'] ?? 0);
+        $sentAmt = (float) ($lineData['discount_amount_per_unit'] ?? 0);
+
+        if ($sentPct <= 0 && $sentAmt <= 0) {
+            return false;
+        }
+
+        $origPct = (float) ($original['discount_percentage'] ?? 0);
+        $origAmt = (float) ($original['discount_amount_per_unit'] ?? 0);
+
+        return $sentPct > $origPct + 0.0005 || $sentAmt > $origAmt + 0.0005;
+    }
+
+    /**
+     * True when the sent line's PER-UNIT price differs from the stored original's
+     * PER-UNIT price. Stored unit_price_ht is the PACK price when a packaging
+     * snapshot exists; payload unit_price_ht is always PER-UNIT (Phase 51) — both
+     * are normalized to the same per-unit basis before comparing.
+     */
+    private function priceChanged(array $lineData, ?array $original): bool
+    {
+        if (!is_array($original)) {
+            return false; // brand-new line — a price is being created, not changed
+        }
+
+        $snap        = (float) ($original['packaging_units_snapshot'] ?? 1);
+        $origPerUnit = $snap > 1
+            ? (float) $original['unit_price_ht'] / $snap
+            : (float) $original['unit_price_ht'];
+
+        $sentPrice = (float) ($lineData['unit_price_ht'] ?? 0);
+
+        return abs(round($sentPrice, 4) - round($origPerUnit, 4)) > 0.0005;
     }
 
     // ═══════════════════════════════════════════════════════════════════════

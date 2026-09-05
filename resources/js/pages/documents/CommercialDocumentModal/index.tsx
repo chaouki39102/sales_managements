@@ -88,7 +88,7 @@ export default function CommercialDocumentModal({
     companyInfo, printTemplates,
     selectedTemplateId, setSelectedTemplateId, selectedTemplate,
     printModalOpen, setPrintModalOpen, handlePrint,
-    visibleCols, canViewCost, lineMode, setLineMode,
+    visibleCols, canViewCost, canEditPrice, canApplyDiscount, lineMode, setLineMode,
     deleteConfirm,
     handleSave, handleDelete, handleExport, handlePartyChangeWithWarning,
     handleQuickCreateParty, creatingParty,
@@ -417,6 +417,8 @@ export default function CommercialDocumentModal({
             isLoadingProducts={lookups.isLoadingProducts}
             visibleCols={visibleCols}
             canViewCost={canViewCost}
+            canEditPrice={canEditPrice}
+            canApplyDiscount={canApplyDiscount}
             lineMode={lineMode}
             setLineMode={setLineMode}
             lineWarnings={lineWarnings}
