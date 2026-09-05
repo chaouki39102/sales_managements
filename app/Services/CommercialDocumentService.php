@@ -571,10 +571,16 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     /**
      * إلغاء المستند — في حالات نادرة جداً
-     * يضع الحالة "cancelled" ولا يؤثر على المخزون بأثر رجعي
+     * يضع الحالة "cancelled" ويعكس حركات المخزون تلقائياً.
      *
-     * ⚠️ تنبيه: المخزون الذي تأثر عند الإنشاء لا يُعكس تلقائياً.
-     *    إذا احتجت لعكس المخزون: أنشئ مستند مقابل (مرتجع) بدلاً من الإلغاء.
+     * ✅ عكس المخزون: لكل حركة مخزون أصلية للوثيقة يتم إنشاء حركة معاكسة
+     *    (بيع → دخول، شراء → خروج) بنفس الكمية، مرتبطة بالأصل عبر
+     *    parent_movement_id + reason = CANCELLATION_REVERSAL_REASON.
+     *    الحركات الأصلية تُحفظ كما هي (لا تُحذف) — الإلغاء يضيف العكس فقط.
+     * ✅ قبل الحفظ النهائي للحالة، يتأكد TransactionIntegrityService أن كل
+     *    حركة أصلية لها عكس — نقص أي عكس يرفض الإلغاء (422) ويرجع المعاملة.
+     * ✅ الوثائق التي لا تؤثر على المخزون (affects_stock_direction = 0)
+     *    لا تحتاج عكساً — تُلغى كما كانت سابقاً.
      */
     public function cancelDocument(CommercialDocument $document, string $reason): void
     {
@@ -586,14 +592,111 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             throw new BusinessRuleException('لا يمكن إلغاء وثيقة تم تصديرها للمحاسبة.', 409);
         }
 
-        $document->updateQuietly([
-            'cancellation_reason' => $reason,
-            'document_status_id'  => $this->getStatusId($document->company_id, 'cancelled'),
-        ]);
+        if (($document->documentStatus?->name ?? '') === 'cancelled') {
+            throw new BusinessRuleException('الوثيقة ملغاة بالفعل.', 409);
+        }
 
-        DocumentAuditLogger::log($document->id, 'cancelled', [
-            'company_id' => $document->company_id,
-            'new_value'  => ['reason' => $reason],
+        DB::transaction(function () use ($document, $reason) {
+            $this->reverseStockMovementsForCancellation($document);
+
+            $document->updateQuietly([
+                'cancellation_reason' => $reason,
+                'document_status_id'  => $this->getStatusId($document->company_id, 'cancelled'),
+            ]);
+
+            $violations = app(\App\Services\TransactionIntegrityService::class)
+                ->violationsForDocument($document);
+            if (!empty($violations)) {
+                throw new BusinessRuleException(
+                    'معاملة غير سليمة مادياً (' . $document->document_number . '): '
+                    . implode(' | ', $violations)
+                    . '. تم رفض إلغاء الوثيقة للحفاظ على سلامة الحسابات.',
+                    422
+                );
+            }
+
+            DocumentAuditLogger::log($document->id, 'cancelled', [
+                'company_id' => $document->company_id,
+                'new_value'  => ['reason' => $reason],
+            ]);
+        });
+    }
+
+    /**
+     * ينشئ حركات مخزون معاكسة (عكس) لكل حركة أصلية للوثيقة الملغاة.
+     *
+     * 🔁 الاتجاه: بيع (direction -1) → حركة دخول "in" تعيد الكمية للمخزون؛
+     *    شراء (direction +1) → حركة خروج "out" تسحب الكمية (لم تعد مشتراة).
+     * 🔁 فقط حركات السبب ≠ CANCELLATION_REVERSAL_REASON تُعتبر أصلية —
+     *    الحركات العكسية لا تُعكَس ثانيةً أبداً (لا حلقات لا نهائية).
+     * 🔁 التكلفة: تُنسَخ من cost_price الأصلية مباشرة (تصفير صحيح للمخزون
+     *    في الاتجاهين)؛ ويظل StockMovementObserver يعيد احتساب تكلفة
+     *    الحركات الخارجة عبر getCostPriceForSale كالمعتاد.
+     */
+    private function reverseStockMovementsForCancellation(CommercialDocument $document): void
+    {
+        $direction = (int) ($document->documentType?->affects_stock_direction ?? 0);
+        if ($direction === 0) return;
+
+        foreach ($document->lines as $line) {
+            $originals = $line->stockMovements()
+                ->where(function ($q) {
+                    $q->whereNull('reason')
+                        ->orWhere('reason', '!=', StockMovement::CANCELLATION_REVERSAL_REASON);
+                })
+                ->get();
+
+            foreach ($originals as $original) {
+                $this->createReversalMovement($document, $line, $original);
+            }
+        }
+    }
+
+    /**
+     * ينشئ حركة واحدة معاكسة لحركة أصلية.
+     *
+     * @param  \App\Models\CommercialDocumentLine  $line  سطر الوثيقة الذي يملك الأصل
+     */
+    private function createReversalMovement(CommercialDocument $document, $line, $original): void
+    {
+        $originalType   = $original->stockMovementType;
+        $originalDir    = (int) ($originalType?->direction ?? 0);
+        if ($originalDir === 0) return;
+
+        $reverseName = $originalDir < 0 ? 'in' : 'out';
+        $reverseType = \App\Models\StockMovementType::where('company_id', $document->company_id)
+            ->where('name', $reverseName)
+            ->where('active', true)
+            ->first();
+        if (!$reverseType) {
+            Log::warning("createReversalMovement: no reverse type '{$reverseName}' for company {$document->company_id}");
+            return;
+        }
+
+        $restoreCost = (float) $original->cost_price;
+
+        StockMovement::create([
+            'company_id'                  => $document->company_id,
+            'fiscal_year_id'              => $original->fiscal_year_id ?: $document->fiscal_year_id,
+            'warehouse_id'                => $original->warehouse_id ?: $document->warehouse_id,
+            'packaging_id'                => $original->packaging_id,
+            'product_id'                  => $original->product_id,
+            'stock_movement_type_id'      => $reverseType->id,
+            'commercial_document_line_id' => $line->id,
+            'movement_date'               => $document->document_date,
+            'quantity'                    => (float) $original->quantity,
+            'packaging_quantity'          => $original->packaging_quantity,
+            'unit_price'                  => $restoreCost,
+            'cost_price'                  => $restoreCost,
+            'total_price'                 => round((float) $original->quantity * $restoreCost, 4),
+            'price_source'                => 'adjustment',
+            'reason'                      => StockMovement::CANCELLATION_REVERSAL_REASON,
+            'parent_movement_id'          => $original->id,
+            'notes'                       => 'عكس حركة الأصل #' . $original->id
+                . ' بسبب إلغاء الوثيقة ' . $document->document_number,
+            'is_validated'                => true,
+            'user_id'                     => $this->actorUserId(),
+            'stock_balance_after'         => 0, // يُحدَّث بـ StockMovementObserver
         ]);
     }
 

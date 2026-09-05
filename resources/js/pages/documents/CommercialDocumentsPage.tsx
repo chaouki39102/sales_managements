@@ -751,7 +751,11 @@ export default function CommercialDocumentsPage() {
     const [loadingEdit, setLoadingEdit] = useState(false);
 
     // ── Cancel modal state ────────────────────────────────────────────────────
-    const [cancelModal, setCancelModal] = useState<{ id: number; reason: string } | null>(null);
+    const [cancelModal, setCancelModal] = useState<{
+        id: number;
+        reason: string;
+        stockInfo?: { quantity: number; unit: string | null } | null;
+    } | null>(null);
 
     // ── Send email modal state ────────────────────────────────────────────────
     const [mailModal, setMailModal] = useState<{
@@ -1711,7 +1715,7 @@ export default function CommercialDocumentsPage() {
                     icon: "ban",
                     onClick: () => {
                         if (!row) return;
-                        setCancelModal({ id: row.id, reason: '' });
+                        openCancelModal(row.id);
                     },
                 });
             }
@@ -1800,11 +1804,39 @@ export default function CommercialDocumentsPage() {
     // ROW ACTIONS
     // ════════════════════════════════════════════════════════════════════════
 
+    // Cancel is a DB write through the reader's PermissionsProvider, so the raw
+    // list row (no lines/quantities) cannot answer "will stock be restored?".
+    // Fetch the doc fresh and aggregate the affected quantity for the confirm
+    // message. Best-effort: any failure keeps the generic warning.
+    const openCancelModal = useCallback((docId: number | { id: number }) => {
+        const id = typeof docId === 'number' ? docId : docId.id;
+        setCancelModal({ id, reason: '', stockInfo: null });
+        void (async () => {
+            try {
+                const full = await apiGet<CommercialDocument>(`/documents/${id}`, {
+                    include: 'lines,lines.product,lines.product.unit,documentType',
+                });
+                if (!full?.document_type) return;
+                if (Number(full.document_type.affects_stock_direction ?? 0) === 0) return;
+                let quantity = 0;
+                let unit: string | null = null;
+                for (const l of full.lines ?? []) {
+                    const snap = Number(l.packaging_units_snapshot ?? 1) || 1;
+                    quantity += (Number(l.quantity) || 0) * snap;
+                    if (!unit) unit = l.product?.unit?.abbreviation || l.product?.unit?.name || null;
+                }
+                setCancelModal(m => (m && m.id === id ? { ...m, stockInfo: { quantity, unit } } : m));
+            } catch {
+                // keep the generic warning
+            }
+        })();
+    }, []);
+
     const rowActions = useCallback((row: CommercialDocument) => {
         const { canEdit, canLock, canUnlock, canCancel } = getRowPermissions(row, !!isReadOnly);
 
         const handleCancel = () => {
-            setCancelModal({ id: row.id, reason: '' });
+            openCancelModal(row.id);
         };
 
         const rowStatus = getDocStatus(row);
@@ -2156,7 +2188,7 @@ export default function CommercialDocumentsPage() {
                           else { closeModal(); openEditModal(doc); }
                         }
                     }}
-                    onCancel={() => { closeModal(); setCancelModal({ id: viewDocId, reason: '' }); }}
+                    onCancel={() => { closeModal(); openCancelModal(viewDocId); }}
                     isReadOnly={!!isReadOnly}
                     onDeleteDoc={async () => {
                         closeModal();
@@ -2221,7 +2253,9 @@ export default function CommercialDocumentsPage() {
                 >
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '8px 0' }}>
                         <div style={{ fontSize: 13, color: 'var(--t3)', lineHeight: 1.6 }}>
-                            سيتم إلغاء هذا المستند. لا يمكن التراجع عن هذا الإجراء.
+                            {cancelModal.stockInfo && cancelModal.stockInfo.quantity > 0
+                                ? `هل أنت متأكد؟ سيُسترجع المخزون (${cancelModal.stockInfo.quantity.toLocaleString('fr-DZ', { maximumFractionDigits: 3 })} ${cancelModal.stockInfo.unit ?? 'وحدة'})`
+                                : 'سيتم إلغاء هذا المستند. لا يمكن التراجع عن هذا الإجراء.'}
                         </div>
                         <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--t2)' }}>
                             سبب الإلغاء <span style={{ color: 'var(--red)' }}>*</span>

@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Core\Exceptions\BusinessRuleException;
 use App\Models\CommercialDocument;
+use App\Models\DocumentStatus;
 use App\Models\Setting;
+use App\Models\StockMovement;
 use App\Models\User;
 use App\Services\Tax\FiscalStampCalculator;
 
@@ -366,6 +368,44 @@ class TransactionIntegrityService
             $storedNet   = (float) ($document->getAttribute('net_to_pay') ?? 0);
             if (abs($storedNet - $expectedNet) > self::TOLERANCE) {
                 $violations[] = "الوثيقة: net_to_pay مخزَّن {$storedNet} ≠ متوقع {$expectedNet}";
+            }
+        }
+
+        // Cancelled-document reversal guard — a cancelled doc must have a reverse
+        // movement for every one of its original stock movements, otherwise its
+        // stock was never restored. The status is read FRESH from the table (the
+        // in-memory relation goes stale after saveQuietly()/updateQuietly()), and
+        // the movements are queried directly by line id — never through the
+        // relation, whose cached collection could mask a missing reversal.
+        $rawStatus = DocumentStatus::where('id', (int) $document->document_status_id)->value('name');
+        $isCancelled = $rawStatus === 'cancelled';
+        $affectsStock = (int) ($document->documentType?->affects_stock_direction ?? 0) !== 0;
+        if ($isCancelled && $affectsStock) {
+            // Load the lines relation once so pluck() works below; the movements
+            // themselves stay a fresh direct query.
+            if ($document->relationLoaded('lines')) {
+                $lineIds = $document->lines->pluck('id')->all();
+            } else {
+                $lineIds = $document->lines()->pluck('id')->all();
+            }
+
+            if (!empty($lineIds)) {
+                $movements = StockMovement::whereIn('commercial_document_line_id', $lineIds)
+                    ->get(['id', 'parent_movement_id', 'product_id', 'reason']);
+                $reversed = [];
+                foreach ($movements as $m) {
+                    if ($m->reason === StockMovement::CANCELLATION_REVERSAL_REASON && (int) $m->parent_movement_id > 0) {
+                        $reversed[(int) $m->parent_movement_id] = (int) $m->id;
+                    }
+                }
+                foreach ($movements as $m) {
+                    if ($m->reason === StockMovement::CANCELLATION_REVERSAL_REASON) {
+                        continue;
+                    }
+                    if (!array_key_exists((int) $m->id, $reversed)) {
+                        $violations[] = "الوثيقة ملغاة: حركة المخزون #{$m->id} (منتج #{$m->product_id}) بدون حركة عكسية — المخزون لم يُسترجع";
+                    }
+                }
             }
         }
 

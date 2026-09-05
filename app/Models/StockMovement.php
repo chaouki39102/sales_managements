@@ -16,6 +16,14 @@ class StockMovement extends Model
 {
     use HasStandardizedConfiguration, HasCompany, SoftDeletes, BelongsToFiscalYear;
 
+    /**
+     * Movement reason used by reverse movements created when a stock-affecting
+     * document is cancelled. The reversal carries the ORIGINAL movement's
+     * parent_movement_id and this reason so the integrity gate can verify the
+     * stock was restored without confusing the reversal with a normal movement.
+     */
+    public const CANCELLATION_REVERSAL_REASON = 'cancel';
+
     protected $table = 'stock_movements';
 
     protected $fillable = [
