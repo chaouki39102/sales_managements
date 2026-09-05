@@ -24,12 +24,12 @@ export const usersApi = {
 } as const;
 
 export const rolesApi = {
-  list:   (params?: ListParams) => apiGet<Role[]>('/roles', params),
+  list:   (params?: ListParams) => apiGet<PaginatedResponse<Role>>('/roles', params).then(r => r.data),
   show:   (id: number)          => apiGet<Role>(`/roles/${id}`),
   create: (data: Partial<Role>) => apiPost<Role>('/roles', data),
   update: (id: number, data: Partial<Role>) => apiPut<Role>(`/roles/${id}`, data),
   delete: (id: number)          => apiDelete(`/roles/${id}`),
-  permissions: ()         => apiGet<Permission[]>('/permissions', { per_page: 500, sort: 'group' }),
+  permissions: ()         => apiGet<PaginatedResponse<Permission>>('/permissions', { per_page: 500, sort: 'group' }).then(r => r.data),
 } as const;
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────

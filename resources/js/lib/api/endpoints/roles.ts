@@ -7,7 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPut, apiDelete } from "../core/client";
 import { tenantKeys } from "../core/queryKeys";
 import { useActiveSlug } from "../../store/appStore";
-import type { Permission, Role } from "../core/types";
+import type { Permission, Role, PaginatedResponse } from "../core/types";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -39,10 +39,10 @@ export interface UpdateRolePayload {
 export const rolesApi = {
     /** جلب كل الأدوار مع صلاحياتها */
     list: () =>
-        apiGet<RoleWithPermissions[]>("/roles", {
+        apiGet<PaginatedResponse<RoleWithPermissions>>("/roles", {
             per_page: 100,
             sort: "name",
-        }),
+        }).then((r) => r.data),
 
     /** جلب دور واحد */
     show: (id: number) => apiGet<RoleWithPermissions>(`/roles/${id}`),
@@ -62,7 +62,7 @@ export const rolesApi = {
 export const permissionsApi = {
     /** جلب كل الصلاحيات */
     list: () =>
-        apiGet<Permission[]>("/permissions", { per_page: 500, sort: "group" }),
+        apiGet<PaginatedResponse<Permission>>("/permissions", { per_page: 500, sort: "group" }).then((r) => r.data),
 
     /** جلب الصلاحيات مجمّعة حسب المجموعة */
     byGroup: (group?: string) =>
