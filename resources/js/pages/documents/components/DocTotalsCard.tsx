@@ -4,15 +4,18 @@ import { fmtDZD } from '../utils/document.utils';
 interface DocTotalsCardProps {
   totals: DocumentTotals;
   isEdit: boolean;
+  /** سقف مبلغ إنشاء المستند حسب دور المستخدم (0 = غير محدود = لا يظهر التحذير). */
+  createLimit?: number | null;
 }
 
 /**
  * بطاقة الإجماليات — مطابقة تماماً لبطاقة POS Pro (`.pp-total-card`):
  * صافي المستحق كرقم ضخم، شرائح الدفع، وتفصيل HT / الخصم / TVA / الطابع الجبائي.
  */
-export default function DocTotalsCard({ totals, isEdit }: DocTotalsCardProps) {
+export default function DocTotalsCard({ totals, isEdit, createLimit }: DocTotalsCardProps) {
   const net = totals.netToPay ?? totals.ttc + totals.stamp;
   const hasPayments = totals.totalPaid > 0.004;
+  const showLimitHint = !isEdit && typeof createLimit === 'number' && createLimit > 0;
 
   return (
     <div className="pp-total-card">
@@ -37,6 +40,12 @@ export default function DocTotalsCard({ totals, isEdit }: DocTotalsCardProps) {
         <div><span>TVA</span><strong dir="ltr">{fmtDZD(totals.tva)}</strong></div>
         <div><span>الطابع الجبائي</span><strong dir="ltr">{fmtDZD(totals.stamp)}</strong></div>
       </div>
+      {showLimitHint && (
+        <div className="pp-total-limit">
+          <i className="ti ti-shield-lock" />
+          الحد الأقصى لمستندك&nbsp;<strong dir="ltr">{fmtDZD(createLimit)}</strong>
+        </div>
+      )}
     </div>
   );
 }

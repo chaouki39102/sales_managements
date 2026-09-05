@@ -1,4 +1,4 @@
-import React, { Suspense, useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
+import React, { Suspense, useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
 import { apiGet } from '@/lib/api/core/client';
@@ -6,6 +6,9 @@ import { useActiveSlug } from '@/lib/store/appStore';
 import type { DocumentType } from '@/lib/api/core/types';
 import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { documentsApi, useDocumentsByType } from '@/lib/api/endpoints/documents';
+import { useMyRolesAndPermissions } from '@/lib/api/endpoints/roles';
+import { useSettingsByGroup } from '@/lib/api/endpoints/settings';
+import { useIsSuperAdmin } from '@/context/AuthContext';
 
 const TemplatePrintModal = React.lazy(() => import('@/pages/settings/print-settings/components/shared/TemplatePrintModal'));
 
@@ -122,6 +125,20 @@ export default function CommercialDocumentPage() {
     savedDraft, draftKey, restoreDraft,
     draftSavedAt, discardDraft, saveDraftNow,
   } = ctrl;
+
+  // سقف مبلغ الإنشاء حسب دور المستخدم (Task 11) — مرآة لحارس afterCreate
+  // في CommercialDocumentService::assertDocumentAmountLimit: owner→admin،
+  // manager→manager، أي دور آخر/بدون دور→member؛ super-admin بلا سقف.
+  const { data: userRolesData } = useMyRolesAndPermissions();
+  const { data: docSettings = [] } = useSettingsByGroup('documents');
+  const isSuperAdmin = useIsSuperAdmin();
+  const createLimit = useMemo(() => {
+    if (isEdit || isSuperAdmin) return null;
+    const roleName = userRolesData?.roles?.[0]?.name;
+    const suffix = roleName === 'owner' ? 'admin' : roleName === 'manager' ? 'manager' : 'member';
+    const raw = Number(docSettings.find((s) => s.key === `max_create_amount_${suffix}`)?.value ?? 0);
+    return Number.isFinite(raw) && raw > 0 ? raw : null;
+  }, [isEdit, isSuperAdmin, userRolesData, docSettings]);
 
   // تثبيت ارتفاع بطاقة المتعامل على ارتفاع بطاقة الإجماليات عند فتح الصفحة
   // (لا تزيد مع اختيار الزبون — تُلتقط القيمة مرة واحدة فقط ثم تتوقف).
@@ -499,6 +516,7 @@ export default function CommercialDocumentPage() {
             <DocTotalsCard
               totals={totals}
               isEdit={isEdit}
+              createLimit={createLimit}
             />
           </div>
         </div>

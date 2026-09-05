@@ -436,6 +436,21 @@
 
 .pp-total-breakdown strong { font-weight: 800; }
 
+.pp-total-limit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,.22);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: #ffe9b0;
+}
+
+.pp-total-limit strong { font-weight: 900; letter-spacing: .3px; }
+
 /* ════════════════════════════════════════════════════
    بطاقة الزبون
 ════════════════════════════════════════════════════ */

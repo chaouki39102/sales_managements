@@ -743,6 +743,53 @@ class SettingsSeeder extends Seeder
                 'is_editable'   => true,
                 'display_order' => 80,
             ],
+            // حد أقصى لمبلغ المستند حسب دور المستخدم (0 = غير محدود)
+            // owner → admin | manager → manager | cashier/viewer → member
+            'max_create_amount_member' => [
+                'value'         => 500000,
+                'group'         => 'documents',
+                'type'          => 'integer',
+                'description'   => 'الحد الأقصى لمبلغ إنشاء مستند للمستخدم العادي (كاشير/مطّلع) بالدينار. 0 = غير محدود',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 81,
+            ],
+            'max_create_amount_manager' => [
+                'value'         => 5000000,
+                'group'         => 'documents',
+                'type'          => 'integer',
+                'description'   => 'الحد الأقصى لمبلغ إنشاء مستند للمدير بالدينار. 0 = غير محدود',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 82,
+            ],
+            'max_create_amount_admin' => [
+                'value'         => 0,
+                'group'         => 'documents',
+                'type'          => 'integer',
+                'description'   => 'الحد الأقصى لمبلغ إنشاء مستند للمالك بالدينار. 0 = غير محدود',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 83,
+            ],
+            'max_edit_amount_member' => [
+                'value'         => 200000,
+                'group'         => 'documents',
+                'type'          => 'integer',
+                'description'   => 'الحد الأقصى لمبلغ تعديل مستند للمستخدم العادي (كاشير/مطّلع) بالدينار. 0 = غير محدود',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 84,
+            ],
+            'max_edit_amount_manager' => [
+                'value'         => 0,
+                'group'         => 'documents',
+                'type'          => 'integer',
+                'description'   => 'الحد الأقصى لمبلغ تعديل مستند للمدير بالدينار. 0 = غير محدود',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 85,
+            ],
 
             // ══════════════════════════════════════════
             // group: inventory — توسعة سياسات المخزون

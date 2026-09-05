@@ -197,6 +197,11 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         // any client (or code change) that could corrupt prices/totals.
         app(TransactionIntegrityService::class)->assertStoredDocumentClean($item);
 
+        // Task 11 — حد أقصى لمبلغ الإنشاء حسب دور المستخدم (قبل حركات المخزون).
+        // بعد recalculateTotals يُصبح $item->total_ttc نهائياً؛ والاستثناء 422
+        // داخل transaction BaseService يُرجع كل شيء (BaseService يلف create()).
+        $this->assertDocumentAmountLimit('create', $item);
+
         // ✅ حركات المخزون فوراً بعد الإنشاء (لأن الوثيقة معتمدة مباشرةً)
         $item->load('documentType', 'lines.product');
 
@@ -329,6 +334,10 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         // transaction's money math before stock movements/payments are rewritten.
         app(TransactionIntegrityService::class)->assertStoredDocumentClean($item);
 
+        // Task 11 — حد أقصى لمبلغ التعديل حسب دور المستخدم (قبل إعادة حركات
+        // المخزون). بعد recalculateTotals يُصبح $item->total_ttc نهائياً.
+        $this->assertDocumentAmountLimit('edit', $item);
+
         if (!empty($lines)) {
             $item->load('documentType', 'lines.product');
             if (($item->documentType?->affects_stock_direction ?? 0) !== 0) {
@@ -361,6 +370,52 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             $auditContext['new_value']  = ['lines' => count($lines)];
         }
         DocumentAuditLogger::log($item->id, 'updated', $auditContext);
+    }
+
+    /**
+     * Task 11 — فرض حد أقصى لمبلغ المستند حسب دور المستخدم الفعّال.
+     *
+     * المفاتيح: max_create_amount_{suffix} / max_edit_amount_{suffix}
+     *   owner   → admin   | manager → manager | cashier/viewer → member
+     *   0 = غير محدود. المستخدمون غير المسجلين (مثل PortalUser الناشئة عبر
+     *   بوابة الزبائن) لا يُقيَّدون هنا لأنهم ليسوا App\Models\User.
+     *
+     * يُستدعى بعد recalculateTotals (حيث total_ttc نهائي) وقبل حركات المخزون.
+     * الاستثناء 422 داخل transaction BaseService يتراجع عن كل شيء.
+     */
+    private function assertDocumentAmountLimit(string $action, Model $item): void
+    {
+        $actor = auth()->user();
+        if (!$actor instanceof \App\Models\User) {
+            return;
+        }
+
+        // super-admin يتجاوز كل قيود الشركة (توافقاً مع CompanyService).
+        if ($actor->isSuperAdmin()) {
+            return;
+        }
+
+        $suffix = strtolower((string) app(CompanyRoleService::class)
+            ->getUserRole($actor, (int) $item->company_id)?->name);
+        $suffix = match ($suffix) {
+            'owner'   => 'admin',
+            'manager' => 'manager',
+            default   => 'member', // cashier / viewer / no-role staff fall through here
+        };
+
+        $limit = (float) Setting::getSetting(
+            "max_{$action}_amount_{$suffix}",
+            0,
+            (int) $item->company_id
+        );
+
+        if ($limit > 0 && (float) $item->total_ttc > $limit) {
+            throw new BusinessRuleException(
+                'مبلغ المستند يتجاوز الحد الأقصى لدورك (' .
+                number_format($limit, 2) . ' دج).',
+                422
+            );
+        }
     }
 
     /**
