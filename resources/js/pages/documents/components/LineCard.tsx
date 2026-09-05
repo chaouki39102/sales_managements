@@ -13,6 +13,8 @@ interface LineCardProps {
   idx:             number;
   products:        Product[];
   isPurchase:      boolean;
+  /** صلاحية إظهار التكلفة والهامش (view_cost_price) — تُخفي صفّي التكلفة والهامش وتمنع حسابات الهامش. */
+  canViewCost?:    boolean;
   disabled:        boolean;
   stockData:       Record<number, number>;
   stockValidation: LineStockValidation;
@@ -41,7 +43,7 @@ interface LineCardProps {
 }
 
 export function LineCard({
-  line, idx, products, isPurchase, disabled, stockData, stockValidation,
+  line, idx, products, isPurchase, canViewCost = true, disabled, stockData, stockValidation,
   isTvaExempt, lineWarnings, warehouses,
   onUpdate, onRemove, onDuplicate,
   onQuickCreate, productTypes, tvas, units, isLoadingProducts,
@@ -79,7 +81,7 @@ export function LineCard({
   let marginColor = 'var(--t4)';
   let costPrice = 0;
   const lowMarginThreshold = (prod as any)?.min_margin_percentage ?? 5;
-  if (!isPurchase && prod) {
+  if (canViewCost && !isPurchase && prod) {
     costPrice = toNum(prod.current_cost_price) || toNum(prod.purchase_price_ht);
     if (costPrice > 0 && line.unit_price_ht > 0) {
       unitMargin = line.unit_price_ht - costPrice;
@@ -89,7 +91,7 @@ export function LineCard({
     }
   }
   const hasLowMarginWarning = (line._warnings ?? []).some(w => w.type === 'low_margin');
-  const hasLowMargin = hasLowMarginWarning || (!isPurchase && marginPct !== null && marginPct < lowMarginThreshold);
+  const hasLowMargin = hasLowMarginWarning || (canViewCost && !isPurchase && marginPct !== null && marginPct < lowMarginThreshold);
   const borderColor = selected
     ? 'var(--em)'
     : hasLowMargin
@@ -410,7 +412,7 @@ export function LineCard({
           <span style={{ color: 'var(--t4)', fontSize: 10 }}>المبلغ TTC: </span>
           <span style={{ fontWeight: 800, color: 'var(--em)' }}>{fmtDZD(ttc)} دج</span>
         </div>
-        {!isPurchase && (
+        {canViewCost && !isPurchase && (
           <div>
             <span style={{ color: 'var(--t4)', fontSize: 10 }}>التكلفة: </span>
             {costPrice > 0 ? (
@@ -420,7 +422,7 @@ export function LineCard({
             )}
           </div>
         )}
-        {!isPurchase && (
+        {canViewCost && !isPurchase && (
           <div>
             <span style={{ color: 'var(--t4)', fontSize: 10 }}>الهامش: </span>
             {marginPct !== null ? (

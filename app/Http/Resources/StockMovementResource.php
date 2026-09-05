@@ -10,6 +10,8 @@ class StockMovementResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $canViewCost = (bool) ($request->user()?->can('view_cost_price'));
+
         return [
             'id'                          => $this->id,
             'company_id'                  => $this->company_id,
@@ -23,8 +25,8 @@ class StockMovementResource extends JsonResource
             'quantity'                    => $this->quantity,
             'packaging_quantity'          => $this->packaging_quantity,
             'unit_price'                  => $this->unit_price,
-            'cost_price'                  => $this->cost_price,
-            'total_price'                 => $this->total_price,
+            'cost_price'                  => $this->when($canViewCost, $this->cost_price, null),
+            'total_price'                 => $this->when($canViewCost, $this->total_price, null),
             'price_source'                => $this->price_source,
             'stock_balance_after'         => $this->stock_balance_after,
             'lot_number'                  => $this->lot_number,

@@ -24,6 +24,11 @@ class ReportService
         return (int) app(CompanyContextService::class)->get();
     }
 
+    private function canViewCost(): bool
+    {
+        return (bool) auth()->user()?->can('view_cost_price');
+    }
+
     /**
      * ظٹط±ظپظ‚ ط£ط³ط·ط± ظƒظ„ ظˆط«ظٹظ‚ط© (طھظپط§طµظٹظ„ ط§ظ„طھظپط§طµظٹظ„) ط¨ظ‚ط§ط¦ظ…ط© ط§ظ„ظˆط«ط§ط¦ظ‚ ط§ظ„ظ…ط¨ظ†ظٹط© ظ…ط³ط¨ظ‚ط§ظ‹.
      * ظٹط³طھط®ط¯ظ… ظ„ط¥ط¸ظ‡ط§ط± طھظپط§طµظٹظ„ ظ‚ط§ط¨ظ„ط© ظ„ظ„ط·ظٹ ظپظٹ طھظ‚ط§ط±ظٹط± ط§ظ„ظ…ط¨ظٹط¹ط§طھ/ط§ظ„ظ…ط´طھط±ظٹط§طھ/ط§ظ„ط¥ط±ط¬ط§ط¹ط§طھ/ط§ظ„ظٹظˆظ…ظٹ.
@@ -82,6 +87,7 @@ class ReportService
 
     public function salesReport(array $filters = []): array
     {
+        $canViewCost = $this->canViewCost();
         $query = CommercialDocument::with(['documentType', 'party', 'currency'])
             ->whereHas('documentType', fn($q) => $q->whereIn('code', self::SALE_CODES));
 
@@ -160,15 +166,15 @@ class ReportService
                     'total_ht'     => round($ht, 2),
                     'total_tva'    => round((float) $lr->total_tva, 2),
                     'total_ttc'    => round((float) $lr->total_ttc, 2),
-                    'total_cost'   => round($cost, 2),
+                    'total_cost'   => $canViewCost ? round($cost, 2) : null,
                     'total_discount' => round((float) $lr->total_discount, 2),
-                    'margin_value' => round($margin, 2),
-                    'margin_pct'   => $ht > 0 ? round($margin / $ht * 100, 2) : 0,
+                    'margin_value' => $canViewCost ? round($margin, 2) : null,
+                    'margin_pct'   => $canViewCost ? ($ht > 0 ? round($margin / $ht * 100, 2) : 0) : null,
                 ];
             }
         }
 
-        $docsArray = $documents->map(function ($doc) use ($costMap, $discountMap) {
+        $docsArray = $documents->map(function ($doc) use ($costMap, $discountMap, $canViewCost) {
             $docCost = $costMap[$doc->id] ?? 0;
             $docDiscount = $discountMap[$doc->id] ?? 0;
             return [
@@ -185,8 +191,8 @@ class ReportService
                 'total_discount'    => round($docDiscount, 2),
                 'paid_amount'       => round($doc->paid_amount, 2),
                 'remaining_amount'  => round($doc->remaining_amount, 2),
-                'doc_cost_ht'       => round($docCost, 2),
-                'margin_value'      => round($doc->total_ht - $docCost, 2),
+                'doc_cost_ht'       => $canViewCost ? round($docCost, 2) : null,
+                'margin_value'      => $canViewCost ? round($doc->total_ht - $docCost, 2) : null,
                 'payment_status'    => $doc->remaining_amount > 0.01 ? 'unpaid' : 'paid',
                 'status'            => $doc->remaining_amount > 0.01 ? 'unpaid' : 'paid',
             ];
@@ -194,7 +200,7 @@ class ReportService
 
         $docsArray = $this->attachDocumentLines($docsArray, $documents);
 
-        $totalCost = array_sum(array_column($docsArray, 'doc_cost_ht'));
+        $totalCost = array_sum($costMap);
         $totalDiscount = array_sum(array_column($docsArray, 'total_discount'));
         $totalHt = $documents->sum('total_ht');
 
@@ -217,9 +223,9 @@ class ReportService
                 'total_stamp'       => round($documents->sum('total_stamp'), 2),
                 'total_ttc'         => round($documents->sum('total_ttc'), 2),
                 'total_discount'    => round($totalDiscount, 2),
-                'total_cost'        => round($totalCost, 2),
-                'total_margin'      => round($totalHt - $totalCost, 2),
-                'margin_pct'        => $totalHt > 0 ? round(($totalHt - $totalCost) / $totalHt * 100, 2) : 0,
+                'total_cost'        => $canViewCost ? round($totalCost, 2) : null,
+                'total_margin'      => $canViewCost ? round($totalHt - $totalCost, 2) : null,
+                'margin_pct'        => $canViewCost ? ($totalHt > 0 ? round(($totalHt - $totalCost) / $totalHt * 100, 2) : 0) : null,
                 'total_paid'        => round($documents->sum('paid_amount'), 2),
                 'total_remaining'   => round($documents->sum('remaining_amount'), 2),
                 'count'             => $documents->count(),
@@ -590,6 +596,8 @@ class ReportService
     {
         $query = Product::with(['family', 'brand', 'unit', 'tva']);
 
+        $canViewCost = $this->canViewCost();
+
         if (!empty($filters['family_id'])) {
             $query->where('family_id', $filters['family_id']);
         }
@@ -731,7 +739,7 @@ class ReportService
             }
         }
 
-        $rows = $products->map(function ($product) use ($salesStats, $purchaseStats, $avgPurchase, $useWarehouseStock, $warehouseStockMap, $stockMap) {
+        $rows = $products->map(function ($product) use ($salesStats, $purchaseStats, $avgPurchase, $useWarehouseStock, $warehouseStockMap, $stockMap, $canViewCost) {
             $ss = $salesStats[$product->id] ?? ['total_sold' => 0, 'sales_ht' => 0, 'sales_cost' => 0];
             $ps = $purchaseStats[$product->id] ?? ['qty_bought' => 0, 'purchase_ht' => 0];
             $stockQty = $useWarehouseStock ? ($warehouseStockMap[$product->id] ?? 0) : ($stockMap[$product->id]['current_stock'] ?? 0);
@@ -749,31 +757,31 @@ class ReportService
                 'family'              => $product->family?->name,
                 'brand'               => $product->brand?->name,
                 'unit'                => $product->unit?->name,
-                'purchase_price_ht'   => round($product->purchase_price_ht, 2),
-                'current_cost_price'  => round($product->current_cost_price, 2),
+                'purchase_price_ht'   => $canViewCost ? round($product->purchase_price_ht, 2) : null,
+                'current_cost_price'  => $canViewCost ? round($product->current_cost_price, 2) : null,
                 'tva_rate'            => $product->tva?->rate,
                 'stock_quantity'       => round($stockQty, 2),
                 'min_stock_alert'     => $product->min_stock_alert,
-                'stock_value'         => $stockVal,
+                'stock_value'         => $canViewCost ? $stockVal : null,
                 'total_sold'          => $ss['total_sold'],
                 'sales_ht'            => $ss['sales_ht'],
-                'sales_cost'          => $ss['sales_cost'],
-                'margin_value'        => round($margin, 2),
-                'margin_pct'          => $ss['sales_ht'] > 0 ? round($margin / $ss['sales_ht'] * 100, 2) : 0,
+                'sales_cost'          => $canViewCost ? $ss['sales_cost'] : null,
+                'margin_value'        => $canViewCost ? round($margin, 2) : null,
+                'margin_pct'          => $canViewCost ? ($ss['sales_ht'] > 0 ? round($margin / $ss['sales_ht'] * 100, 2) : 0) : null,
                 'qty_bought'          => round($ps['qty_bought'], 2),
                 'purchase_ht'         => $ps['purchase_ht'],
-                'avg_purchase_price'  => round($avgCost, 4),
-                'cogs_estimated'      => round($cogs, 2),
-                'est_profit'          => round($estProfit, 2),
-                'profit_pct'          => $ss['sales_ht'] > 0 ? round($estProfit / $ss['sales_ht'] * 100, 2) : 0,
+                'avg_purchase_price'  => $canViewCost ? round($avgCost, 4) : null,
+                'cogs_estimated'      => $canViewCost ? round($cogs, 2) : null,
+                'est_profit'          => $canViewCost ? round($estProfit, 2) : null,
+                'profit_pct'          => $canViewCost ? ($ss['sales_ht'] > 0 ? round($estProfit / $ss['sales_ht'] * 100, 2) : 0) : null,
                 'stock_status'        => $status,
             ];
         })->values();
 
         // طھط±طھظٹط¨ ط­ط³ط¨ ط§ظ„ط±ط¨ط­ ط§ظ„ظ…ظ‚ط¯ط± (طھظ†ط§ط²ظ„ظٹ) ط«ظ… طھط«ط¨ظٹطھ ط±ظ‚ظ… ط§ظ„طھط±طھظٹط¨
         $rows = $rows->sortByDesc('est_profit')->values()
-            ->map(function ($row, $i) {
-                $row['profit_rank'] = $i + 1;
+            ->map(function ($row, $i) use ($canViewCost) {
+                $row['profit_rank'] = $canViewCost ? $i + 1 : null;
                 return $row;
             });
 
@@ -788,18 +796,18 @@ class ReportService
             'products' => $rows->toArray(),
             'summary' => [
                 'total_products'    => $products->count(),
-                'total_stock_value' => round(array_sum(array_column($rows->toArray(), 'stock_value')), 2),
+                'total_stock_value' => $canViewCost ? round(array_sum(array_column($rows->toArray(), 'stock_value')), 2) : null,
                 'total_sold'        => array_sum(array_column($rows->toArray(), 'total_sold')),
                 'total_sales_ht'    => $totalSalesHt,
                 'total_qty_bought'  => round(array_sum(array_column($rows->toArray(), 'qty_bought')), 2),
                 'total_purchase_ht' => round(array_sum(array_column($rows->toArray(), 'purchase_ht')), 2),
-                'total_cogs'        => round(array_sum(array_column($rows->toArray(), 'cogs_estimated')), 2),
-                'total_est_profit'  => $totalEstProfit,
-                'margin_pct'        => $totalSalesHt > 0 ? round($totalEstProfit / $totalSalesHt * 100, 2) : 0,
+                'total_cogs'        => $canViewCost ? round(array_sum(array_column($rows->toArray(), 'cogs_estimated')), 2) : null,
+                'total_est_profit'  => $canViewCost ? $totalEstProfit : null,
+                'margin_pct'        => $canViewCost ? ($totalSalesHt > 0 ? round($totalEstProfit / $totalSalesHt * 100, 2) : 0) : null,
                 'reorder_count'     => $rows->filter(fn($r) => $r['stock_status'] !== 'good')->count(),
             ],
-            'best_product'  => $best  ? ['id' => $best['id'], 'name' => $best['name'], 'est_profit' => $best['est_profit']] : null,
-            'worst_product' => $worst ? ['id' => $worst['id'], 'name' => $worst['name'], 'est_profit' => $worst['est_profit']] : null,
+            'best_product'  => $best  ? ['id' => $best['id'], 'name' => $best['name'], 'est_profit' => $canViewCost ? $best['est_profit'] : null] : null,
+            'worst_product' => $worst ? ['id' => $worst['id'], 'name' => $worst['name'], 'est_profit' => $canViewCost ? $worst['est_profit'] : null] : null,
         ];
     }
 

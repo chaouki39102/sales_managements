@@ -9,6 +9,8 @@ class ProductResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $canViewCost = (bool) ($request->user()?->can('view_cost_price'));
+
         return [
             'id'                        => $this->id,
             'company_id'                => $this->company_id,
@@ -22,8 +24,8 @@ class ProductResource extends JsonResource
             'product_type_id'           => $this->product_type_id,
             'tva_id'                    => $this->tva_id,
             'unit_id'                   => $this->unit_id,
-            'purchase_price_ht'         => $this->purchase_price_ht,
-            'current_cost_price'        => $this->current_cost_price,
+            'purchase_price_ht'         => $this->when($canViewCost, $this->purchase_price_ht, null),
+            'current_cost_price'        => $this->when($canViewCost, $this->current_cost_price, null),
             'min_margin_percentage'     => $this->min_margin_percentage,
             'manages_stock'             => $this->manages_stock,
             'allow_negative_stock'      => $this->allow_negative_stock,

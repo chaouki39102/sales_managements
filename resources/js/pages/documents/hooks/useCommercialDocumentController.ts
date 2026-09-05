@@ -7,6 +7,7 @@ import { tenantKeys } from '@/lib/api/core/queryKeys';
 import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
 import { settingsApi } from '@/lib/api/endpoints/settings';
 import { partiesApi } from '@/lib/api/endpoints/parties';
+import { useMyPermissions } from '@/lib/api/endpoints/roles';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useNotification } from '@/hooks/useNotification';
@@ -76,6 +77,17 @@ export function useCommercialDocumentController({
   };
 
   const [lineMode, setLineMode] = useState<'table' | 'card'>('table');
+
+  // ─── صلاحية إظهار التكلفة والهامش (view_cost_price) ─────────────────────
+  const { data: myPermissions } = useMyPermissions();
+  const canViewCost = !!myPermissions?.includes('view_cost_price');
+  const effectiveVisibleCols = useMemo(() => {
+    if (canViewCost) return visibleCols;
+    const next = new Set(visibleCols);
+    next.delete('cost');
+    next.delete('margin');
+    return next;
+  }, [visibleCols, canViewCost]);
 
   const [nextAction, setNextAction] = useState<'list' | 'new' | 'close'>('list');
 
@@ -786,7 +798,7 @@ export function useCommercialDocumentController({
     settingsDict,
 
     // Columns & line mode
-    visibleCols, lineMode, handleColsChange, setLineMode,
+    visibleCols: effectiveVisibleCols, canViewCost, lineMode, handleColsChange, setLineMode,
 
     // Lookups
     lookups,

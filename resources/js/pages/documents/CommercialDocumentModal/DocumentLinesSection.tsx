@@ -28,6 +28,8 @@ interface DocumentLinesSectionProps {
   products: Array<{ id: number; name: string; ref?: string | null; barcode?: string | null }>;
   isLoadingProducts: boolean;
   visibleCols: Set<ColKey>;
+  /** صلاحية إظهار التكلفة والهامش (view_cost_price) — تُخفى أعمدة/أسطر التكلفة والهامش للمستخدمين غير المصرّح لهم. */
+  canViewCost?: boolean;
   lineMode: 'table' | 'card';
   setLineMode: React.Dispatch<React.SetStateAction<'table' | 'card'>>;
   lineWarnings: Map<number, ComputeLineWarning[]>;
@@ -76,6 +78,7 @@ export default function DocumentLinesSection({
   lines, isLinesReadOnly, isPurchase, isPartyExempt,
   products, isLoadingProducts,
   visibleCols,
+  canViewCost = true,
   lineMode, setLineMode,
   lineWarnings, stockData,
   addLine, addLineWithProduct, removeLine, duplicateLine, moveLine, updateLine,
@@ -787,6 +790,7 @@ export default function DocumentLinesSection({
                     stockValidation={stockResult}
                     isTvaExempt={!isPurchase && isPartyExempt}
                     lineWarnings={lineWarnings.get(idx)}
+                    canViewCost={canViewCost}
                     warehouses={warehouses}
                     onUpdate={updateLine}
                     onRemove={removeLine}
@@ -851,6 +855,7 @@ export default function DocumentLinesSection({
                         idx={idx}
                         visibleCols={visibleCols}
                         isPurchase={isPurchase}
+                        canViewCost={canViewCost}
                         disabled={isLinesReadOnly}
                         products={products}
                         stockData={stockData}

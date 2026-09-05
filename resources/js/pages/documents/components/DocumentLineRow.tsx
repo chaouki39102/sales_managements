@@ -20,6 +20,8 @@ interface DocumentLineRowProps {
   idx:            number;
   visibleCols:    Set<ColKey>;
   isPurchase:     boolean;
+  /** صلاحية إظهار التكلفة والهامش (view_cost_price) — تُخفي خلفية صف الهامش المنخفض وتلوين المبالغ. */
+  canViewCost?:   boolean;
   disabled:       boolean;
   products:       Product[];
   stockData:      Record<number, number>;
@@ -114,7 +116,7 @@ function TotalQtyInput({
 }
 
 export const DocumentLineRow = memo(function DocumentLineRow({
-  line, idx, visibleCols, isPurchase, disabled, products, stockData,
+  line, idx, visibleCols, isPurchase, canViewCost = true, disabled, products, stockData,
   stockValidation, onUpdate, onRemove, onDuplicate, isTvaExempt, lineWarnings, warehouses,
   onQuickCreate, productTypes, tvas, units, isLoadingProducts,
   selected, onToggleSelect,
@@ -137,7 +139,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
     (w) => w.level !== 'info',
   );
   let lowMarginRow = false;
-  if (!isPurchase && prod) {
+  if (canViewCost && !isPurchase && prod) {
     const cp = toNum(prod.current_cost_price) || toNum(prod.purchase_price_ht);
     if (cp > 0 && line.unit_price_ht > 0) {
       const threshold = (prod as any).min_margin_percentage ?? 5;
@@ -446,7 +448,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
         {col('total_ht') && (
           <td style={{ padding: '3px 6px', textAlign: 'left', direction: 'ltr',
             fontSize: 11, color: (() => {
-              if (isPurchase || !prod) return 'var(--t2)';
+              if (!canViewCost || isPurchase || !prod) return 'var(--t2)';
               const costPrice = toNum(prod.current_cost_price) || toNum(prod.purchase_price_ht);
               if (!costPrice || !line.unit_price_ht) return 'var(--t2)';
               const marginPct = ((line.unit_price_ht - costPrice) / line.unit_price_ht) * 100;

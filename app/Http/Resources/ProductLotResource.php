@@ -9,6 +9,8 @@ class ProductLotResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $canViewCost = (bool) ($request->user()?->can('view_cost_price'));
+
         return [
             'id'                  => $this->id,
             'company_id'          => $this->company_id,
@@ -18,14 +20,14 @@ class ProductLotResource extends JsonResource
             'manufacturing_date'  => $this->manufacturing_date,
             'expiration_date'     => $this->expiration_date,
             'purchase_date'       => $this->purchase_date,
-            'purchase_price'      => $this->purchase_price,
+            'purchase_price'      => $this->when($canViewCost, $this->purchase_price, null),
             'legal_selling_price' => $this->legal_selling_price,
-            'margin_percentage'   => $this->margin_percentage,
+            'margin_percentage'   => $this->when($canViewCost, $this->margin_percentage, null),
             'original_quantity'   => $this->original_quantity,
             'remaining_quantity'  => $this->remaining_quantity,
             'is_depleted'         => $this->is_depleted,
-            'total_cost'          => $this->total_cost,
-            'remaining_value'     => $this->remaining_value,
+            'total_cost'          => $this->when($canViewCost, $this->total_cost, null),
+            'remaining_value'     => $this->when($canViewCost, $this->remaining_value, null),
             'stock_movement_id'   => $this->stock_movement_id,
             'supplier_lot_number' => $this->supplier_lot_number,
             'active'              => $this->active,

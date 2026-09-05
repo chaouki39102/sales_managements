@@ -3,6 +3,7 @@ import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY, REPORT_DEFAULTS, ReportLinesDetail } from './helpers';
 import { useSalesReport } from '@/lib/api/endpoints/reports';
+import { useMyPermissions } from '@/lib/api/endpoints/roles';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
@@ -15,30 +16,33 @@ export default function SalesReportPage() {
   const [toDate, setToDate] = useState(REPORT_DEFAULTS.to);
   const [tab, setTab] = useState<'docs' | 'products'>('docs');
   const { data, isLoading, isError, refetch } = useSalesReport({ from_date: fromDate || undefined, to_date: toDate || undefined });
+  const { data: myPermissions } = useMyPermissions();
+  const canViewCost = !!myPermissions?.includes('view_cost_price');
 
   const handleExport = async () => {
     if (!data) return;
     const sheets = [];
     sheets.push({
       name: 'الوثائق',
-      headers: ['#', 'رقم الوثيقة', 'التاريخ', 'الزبون', 'HT', 'TVA', 'الخصم', 'TTC', 'المدفوع', 'المتبقي', 'التكلفة', 'الهامش', 'الحالة'],
+      headers: ['#', 'رقم الوثيقة', 'التاريخ', 'الزبون', 'HT', 'TVA', 'الخصم', 'TTC', 'المدفوع', 'المتبقي', ...(canViewCost ? ['التكلفة', 'الهامش'] : []), 'الحالة'],
       rows: data.documents.map((doc, i) => [
         i + 1, doc.document_number, doc.date, doc.party_name ?? '—',
         doc.total_ht, doc.total_tva, doc.total_discount,
         doc.total_ttc, doc.paid_amount, doc.remaining_amount,
-        doc.doc_cost_ht, doc.margin_value,
+        ...(canViewCost ? [doc.doc_cost_ht, doc.margin_value] : []),
         doc.remaining_amount > 0.01 ? 'غير مسددة' : 'مسددة',
       ]),
     });
     if (data.product_recap.length > 0) {
       sheets.push({
         name: 'ملخص المنتجات',
-        headers: ['#', 'المنتج', 'المرجع', 'الكمية', 'م.الوحدة', 'HT', 'الخصم', 'التكلفة', 'الهامش', 'TTC', '%'],
+        headers: ['#', 'المنتج', 'المرجع', 'الكمية', 'م.الوحدة', 'HT', 'الخصم', ...(canViewCost ? ['التكلفة', 'الهامش'] : []), 'TTC', ...(canViewCost ? ['%'] : [])],
         rows: data.product_recap.map((item, i) => [
           i + 1, item.product_name, item.product_ref, item.total_qty,
           item.total_qty > 0 ? Math.round((item.total_ht + item.total_discount) / item.total_qty) : 0,
-          item.total_ht, item.total_discount, item.total_cost,
-          item.margin_value, item.total_ttc, `${item.margin_pct}%`,
+          item.total_ht, item.total_discount,
+          ...(canViewCost ? [item.total_cost, item.margin_value] : []),
+          item.total_ttc, ...(canViewCost ? [`${item.margin_pct}%`] : []),
         ]),
       });
     }
@@ -67,12 +71,14 @@ export default function SalesReportPage() {
     </div>
     {data && (
       <>
-        <div className="kpis" style={{ gridTemplateColumns: 'repeat(7,1fr)' }}>
+        <div className="kpis" style={{ gridTemplateColumns: canViewCost ? 'repeat(7,1fr)' : 'repeat(5,1fr)' }}>
           <KpiCard variant="green"  icon="ti-trending-up"   label="إجمالي HT"      value={MONEY(data.summary.total_ht)}/>
           <KpiCard variant="blue"   icon="ti-receipt"       label="إجمالي TTC"     value={MONEY(data.summary.total_ttc)}/>
           <KpiCard variant="orange" icon="ti-discount"      label="الخصومات"       value={MONEY(data.summary.total_discount)}/>
-          <KpiCard variant="teal"   icon="ti-trending-down"  label="التكلفة"       value={MONEY(data.summary.total_cost)}/>
-          <KpiCard variant="gold"   icon="ti-coin"          label="الهامش"         value={MONEY(data.summary.total_margin)} sub={`${data.summary.margin_pct}%`}/>
+          {canViewCost && <>
+            <KpiCard variant="teal"   icon="ti-trending-down"  label="التكلفة"       value={MONEY(data.summary.total_cost)}/>
+            <KpiCard variant="gold"   icon="ti-coin"          label="الهامش"         value={MONEY(data.summary.total_margin)} sub={`${data.summary.margin_pct}%`}/>
+          </>}
           <KpiCard variant="purple" icon="ti-file-text"     label="الوثائق"        value={data.summary.count}/>
           <KpiCard variant="red"    icon="ti-clock"         label="غير مسددة"      value={data.summary.unpaid_count} sub={`${MONEY(data.summary.total_remaining)}`}/>
         </div>
@@ -95,8 +101,10 @@ export default function SalesReportPage() {
                 { key: 'total_ht', label: 'HT', render: (v) => FMT(v as number) },
                 { key: 'total_tva', label: 'TVA', render: (v) => FMT(v as number) },
                 { key: 'total_discount', label: 'الخصم', render: (v, _row) => (v as number) > 0 ? <span style={{ color: 'var(--orange)' }}>{FMT(v as number)}</span> : '—' },
-                { key: 'doc_cost_ht', label: 'التكلفة', render: (v) => FMT(v as number) },
-                { key: 'margin_value', label: 'الهامش', render: (v) => <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(v as number)}</span> },
+                ...(canViewCost ? [
+                  { key: 'doc_cost_ht', label: 'التكلفة', render: (v: unknown) => FMT(v as number) },
+                  { key: 'margin_value', label: 'الهامش', render: (v: unknown) => <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(v as number)}</span> },
+                ] : []),
                 { key: 'total_ttc', label: 'TTC', render: (v) => FMT(v as number) },
                 { key: 'paid_amount', label: 'المدفوع', render: (v) => <span style={{ color: 'var(--em)' }}>{FMT(v as number)}</span> },
                 { key: 'remaining_amount', label: 'المتبقي', render: (v) => <span style={{ color: (v as number) > 0 ? 'var(--red)' : 'var(--t4)', fontWeight: (v as number) > 0 ? 700 : 400 }}>{FMT(v as number)}</span> },
@@ -122,10 +130,12 @@ export default function SalesReportPage() {
                 { key: 'unit_price', label: 'م.الوحدة', render: (v) => v != null ? FMT(v as number) : '—' },
                 { key: 'total_ht', label: 'HT', render: (v) => FMT(v as number) },
                 { key: 'total_discount', label: 'الخصم', render: (v) => (v as number) > 0 ? <span style={{ color: 'var(--orange)' }}>{FMT(v as number)}</span> : '—' },
-                { key: 'total_cost', label: 'التكلفة', render: (v) => FMT(v as number) },
-                { key: 'margin_value', label: 'الهامش', render: (v) => <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(v as number)}</span> },
+                ...(canViewCost ? [
+                  { key: 'total_cost', label: 'التكلفة', render: (v: unknown) => FMT(v as number) },
+                  { key: 'margin_value', label: 'الهامش', render: (v: unknown) => <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 700 }}>{FMT(v as number)}</span> },
+                ] : []),
                 { key: 'total_ttc', label: 'TTC', render: (v) => FMT(v as number) },
-                { key: 'margin_pct', label: '%', render: (v) => <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)' }}>{v as React.ReactNode}%</span> },
+                ...(canViewCost ? [{ key: 'margin_pct', label: '%', render: (v: unknown) => <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)' }}>{v as React.ReactNode}%</span> }] : []),
               ]}
               data={productsData}
             />
