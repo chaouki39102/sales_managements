@@ -80,7 +80,7 @@ class DocumentComputeController extends BaseApiController
             $documentId = (int) $request->route('document');
             $document   = CommercialDocument::findOrFail($documentId);
 
-            $this->authorizeAction('update', $document);
+            $this->authorizeAction('convert', $document);
 
             $validated = $request->validate([
                 'target_type_code'  => 'required|string|max:10',
@@ -131,7 +131,7 @@ class DocumentComputeController extends BaseApiController
             $documentId = (int) $request->route('document');
             $document   = CommercialDocument::with(['documentType'])->findOrFail($documentId);
 
-            $this->authorizeAction('update', $document);
+            $this->authorizeAction('return', $document);
 
             $validated = $request->validate([
                 'reason'          => 'required|string|max:500',

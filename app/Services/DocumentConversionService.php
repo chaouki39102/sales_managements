@@ -9,6 +9,7 @@ use App\Models\DocumentStatus;
 use App\Models\DocumentType;
 use App\Models\DocumentTypeConversion;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class DocumentConversionService
 {
@@ -45,6 +46,12 @@ class DocumentConversionService
         ?array             $includeLineIds = null,
         ?string            $documentDate   = null,
     ): CommercialDocument {
+        // Task 4: defensive permission gate — enforced only when an authenticated
+        // user is present (console commands/tests/jobs have no actor).
+        if (auth()->user() !== null) {
+            Gate::authorize('convert', $source);
+        }
+
         $companyId  = $this->companyContext->get();
         $sourceCode = $source->documentType?->code;
 

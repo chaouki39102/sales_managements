@@ -6,6 +6,7 @@ use App\Core\Exceptions\BusinessRuleException;
 use App\Models\CommercialDocument;
 use App\Models\DocumentType;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class DocumentReturnService
 {
@@ -27,6 +28,12 @@ class DocumentReturnService
         array              $returnLines,
         string             $reason,
     ): CommercialDocument {
+        // Task 4: defensive permission gate — enforced only when an authenticated
+        // user is present (console commands/tests/jobs have no actor).
+        if (auth()->user() !== null) {
+            Gate::authorize('return', $source);
+        }
+
         $companyId  = $this->companyContext->get();
         $sourceCode = $source->documentType?->code;
 

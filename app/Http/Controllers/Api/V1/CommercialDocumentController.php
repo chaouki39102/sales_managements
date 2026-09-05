@@ -369,8 +369,7 @@ class CommercialDocumentController extends BaseApiController
     public function cloneDocument(Request $request, CommercialDocument $commercialDocument): JsonResponse
     {
         try {
-            $this->authorizeAction('create', CommercialDocument::class);
-            $this->authorizeAction('update', $commercialDocument);
+            $this->authorizeAction('clone', $commercialDocument);
 
             $item = $this->commercialDocumentService->clone($commercialDocument);
             $this->attachBalanceData($item);
@@ -471,7 +470,7 @@ class CommercialDocumentController extends BaseApiController
     public function validateDocument(Request $request, Company $company, CommercialDocument $commercialDocument): JsonResponse
     {
         try {
-            $this->authorizeAction('update', $commercialDocument);
+            $this->authorizeAction('validate', $commercialDocument);
             $this->commercialDocumentService->validateDocument($commercialDocument, $request);
             $this->notificationService->success(
                 'تم التحقق من المستند',
@@ -499,7 +498,7 @@ class CommercialDocumentController extends BaseApiController
     public function addPayments(Request $request, Company $company, CommercialDocument $commercialDocument): JsonResponse
     {
         try {
-            $this->authorizeAction('update', $commercialDocument);
+            $this->authorizeAction('addPayment', $commercialDocument);
 
             if ($commercialDocument->is_locked) {
                 return $this->errorResponse('لا يمكن إضافة دفعات لوثيقة مقفلة.', 409);
@@ -549,7 +548,7 @@ class CommercialDocumentController extends BaseApiController
     public function lock(Request $request, Company $company, CommercialDocument $commercialDocument): JsonResponse
     {
         try {
-            $this->authorizeAction('update', $commercialDocument);
+            $this->authorizeAction('lock', $commercialDocument);
             $this->commercialDocumentService->lockDocument($commercialDocument);
             $this->notificationService->warning(
                 'تم قفل المستند',
@@ -570,7 +569,7 @@ class CommercialDocumentController extends BaseApiController
     public function unlock(Request $request, Company $company, CommercialDocument $commercialDocument): JsonResponse
     {
         try {
-            $this->authorizeAction('update', $commercialDocument);
+            $this->authorizeAction('unlock', $commercialDocument);
             $this->commercialDocumentService->unlockDocument($commercialDocument);
             $this->notificationService->info(
                 'تم فتح قفل المستند',
@@ -591,7 +590,7 @@ class CommercialDocumentController extends BaseApiController
     public function cancel(Request $request, Company $company, CommercialDocument $commercialDocument): JsonResponse
     {
         try {
-            $this->authorizeAction('delete', $commercialDocument);
+            $this->authorizeAction('cancel', $commercialDocument);
 
             $validated = $request->validate([
                 'cancellation_reason' => 'required|string|max:500'
