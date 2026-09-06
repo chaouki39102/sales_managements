@@ -377,7 +377,9 @@ class TransactionIntegrityService
         // in-memory relation goes stale after saveQuietly()/updateQuietly()), and
         // the movements are queried directly by line id — never through the
         // relation, whose cached collection could mask a missing reversal.
-        $rawStatus = DocumentStatus::where('id', (int) $document->document_status_id)->value('name');
+        $rawStatus = $document->document_status_id !== null
+            ? DocumentStatus::where('id', (int) $document->document_status_id)->value('name')
+            : null;
         $isCancelled = $rawStatus === 'cancelled';
         $affectsStock = (int) ($document->documentType?->affects_stock_direction ?? 0) !== 0;
         if ($isCancelled && $affectsStock) {

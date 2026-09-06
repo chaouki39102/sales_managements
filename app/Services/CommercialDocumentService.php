@@ -520,13 +520,38 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         }
 
         DB::transaction(function () use ($document) {
-            // 1. Soft-delete stock movements (عكس تأثير المخزون)
-            $this->deleteStockMovementsForDocument($document);
+            // 1. حماية الدفعات — مستند عليه دفعات لا يُحذف (يجب إلغاؤها أولاً).
+            $this->payments()->assertDocumentDeletable($document);
 
-            // 2. Unlink payments (حذف rows الوسيطة)
+            // 2. عكس المخزون: للمستندات المصدَّقة التي تؤثر على المخزون،
+            //    ننشئ حركات معاكسة (عكس الحركة الأصلية) لكل حركة أصلية —
+            //    نفس آلية Task 13 للإلغاء — ثم نحذف المستند نهائياً.
+            //    الحركات العكسية تبقى (orphaned بعد حذف السطر) ويكون مجموعها
+            //    الصافي صفراً (بما أن الأصل والعكس كلاهما يُحتسب في getStockAt).
+            //    أما غير المصدَّقة أو التي لا تؤثر على المخزون فتكفي الحذف
+            //    الناعم القديم لحركاتها.
+            if ($this->isValidatedDocument($document)
+                && (float) ($document->documentType?->affects_stock_direction ?? 0) !== 0.0) {
+                foreach ($document->lines as $line) {
+                    $originals = $line->stockMovements()
+                        ->where(function ($q) {
+                            $q->whereNull('reason')
+                                ->orWhere('reason', '!=', StockMovement::CANCELLATION_REVERSAL_REASON);
+                        })
+                        ->get();
+
+                    foreach ($originals as $original) {
+                        $this->createReversalMovement($document, $line, $original, 'حذف');
+                    }
+                }
+            } else {
+                $this->deleteStockMovementsForDocument($document);
+            }
+
+            // 3. Unlink payments (حذف rows الوسيطة)
             $document->payments()->detach();
 
-            // 3. Hard-delete document (DB CASCADE يحذف lines و pivot rows)
+            // 4. Hard-delete document (DB CASCADE يحذف lines و pivot rows)
             $document->forceDelete();
 
             // ✅ سجّل حذف المستند في سجل التدقيق المحسّن (بعد forceDelete —
@@ -541,6 +566,17 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         $this->performPostCommitOperations($document, [], $request, 'delete');
 
         return true;
+    }
+
+    /**
+     * هل الوثيقة "مصدَّقة" (خاضعة للمسار المحاسبي/المخزني الكامل)؟
+     *
+     * أي حالة غير مسودة/معلّقة تعني أنها دخلت دورة حياة التأثير المحاسبي،
+     * لذلك يجب حذفها مع عكس حركات المخزون. يُستخدم للحذف فقط.
+     */
+    protected function isValidatedDocument(CommercialDocument $document): bool
+    {
+        return in_array($document->documentStatus?->name ?? '', ['validated', 'paid', 'partially_paid', 'overdue'], true);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -656,8 +692,9 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
      * ينشئ حركة واحدة معاكسة لحركة أصلية.
      *
      * @param  \App\Models\CommercialDocumentLine  $line  سطر الوثيقة الذي يملك الأصل
+     * @param  string  $reasonLabel  وصف العملية في الملاحظة (إلغاء / حذف)
      */
-    private function createReversalMovement(CommercialDocument $document, $line, $original): void
+    private function createReversalMovement(CommercialDocument $document, $line, $original, string $reasonLabel = 'إلغاء'): void
     {
         $originalType   = $original->stockMovementType;
         $originalDir    = (int) ($originalType?->direction ?? 0);
@@ -693,7 +730,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             'reason'                      => StockMovement::CANCELLATION_REVERSAL_REASON,
             'parent_movement_id'          => $original->id,
             'notes'                       => 'عكس حركة الأصل #' . $original->id
-                . ' بسبب إلغاء الوثيقة ' . $document->document_number,
+                . ' بسبب ' . $reasonLabel . ' الوثيقة ' . $document->document_number,
             'is_validated'                => true,
             'user_id'                     => $this->actorUserId(),
             'stock_balance_after'         => 0, // يُحدَّث بـ StockMovementObserver

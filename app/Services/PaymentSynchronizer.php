@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Core\Exceptions\BusinessRuleException;
 use App\Core\Services\Concerns\ResolvesPaymentDirection;
 use App\Models\CommercialDocument;
 use App\Models\DocumentStatus;
@@ -28,6 +29,24 @@ use Illuminate\Support\Facades\Log;
 class PaymentSynchronizer
 {
     use ResolvesPaymentDirection;
+
+    /**
+     * حماية الحذف: مستند عليه أي دفعة (paid_amount > 0) ممنوع من الحذف.
+     *
+     * المبرر: حذف المستند يمسح pivot الدفعات ويترك دفعات خارجة حسابياً
+     * (payments بلا مرجع). يجب على المستخدم إلغاء/حذف الدفعات أولاً.
+     *
+     * @throws \App\Core\Exceptions\BusinessRuleException
+     */
+    public function assertDocumentDeletable(CommercialDocument $document): void
+    {
+        if ((float) ($document->paid_amount ?? 0) > 0) {
+            throw new BusinessRuleException(
+                'لا يمكن حذف مستند عليه دفعات — ألغِ الدفعات أولاً.',
+                409
+            );
+        }
+    }
 
     // ═══════════════════════════════════════════════════════════════════════
     // PUBLIC: مزامنة الدفعات — UPSERT/DELETE pattern

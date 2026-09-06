@@ -66,12 +66,18 @@ class CommercialDocumentPolicy
             return true;
         }
 
+        // الحذف العام (أي مستند) محجوز للمديرين/المالك داخل الشركة.
         if ($user->can('delete_any_commercial_document')) {
-            return true;
+            return $user->isAdminOf($document->company);
         }
 
-        return $user->can('delete_own_commercial_document')
-            && $document->created_by === $user->id;
+        // الحذف الخاص متاح للمنشئ فقط على المستندات غير المصدَّقة (draft/pending).
+        if ($user->can('delete_own_commercial_document')) {
+            return $document->created_by === $user->id
+                && in_array($document->documentStatus?->name ?? '', ['draft', 'pending'], true);
+        }
+
+        return false;
     }
 
     /** صلاحية التحقق من صحة المستند (الموافقة على البيانات قبل التأثير المحاسبي). */

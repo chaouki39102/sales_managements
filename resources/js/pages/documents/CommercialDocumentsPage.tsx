@@ -2192,7 +2192,7 @@ export default function CommercialDocumentsPage() {
                     isReadOnly={!!isReadOnly}
                     onDeleteDoc={async () => {
                         closeModal();
-                        if (await confirm('هل أنت متأكد من حذف هذا المستند؟')) {
+                        if (await confirm('حذف هذا المستند نهائياً؟ للمستندات المُصدَّقة ستُعكس حركات المخزون تلقائياً، والمستندات التي عليها دفعات (مدفوعة جزئياً أو كلياً) لا يمكن حذفها.')) {
                             deleteMut.mutate(viewDocId);
                         }
                     }}

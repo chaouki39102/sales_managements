@@ -415,7 +415,10 @@ public function validate(User $user, CommercialDocument $doc) {
 
 ---
 
-#### المهمة 14 — حماية الحذف: استرجاع المخزون + منع الحذف بعد الدفع **[متبقية — عالية المخاطر، تأجيل]**
+#### المهمة 14 — حماية الحذف: استرجاع المخزون + منع الحذف بعد الدفع **[مكتمل ✅]**
+
+**الحالة**: `delete()` يسترجع المخزون عبر حركات عكسية (مثل المهمة 13) ولا يحذف مستنداً عليه دفعات. تسلسل `delete()`: حراسة `is_locked`/`is_exported_to_accounting` → داخل المعاملة → `payments()->assertDocumentDeletable($document)` (يرفض بـ 409 «لا يمكن حذف مستند عليه دفعات — ألغِ الدفعات أولاً.» عندما `paid_amount > 0`) → إذا المستند `validated`/`paid`/`partially_paid`/`overdue` + `affects_stock_direction ≠ 0`: حركة عكسية لكل سطر (`createReversalMovement($document, $line, $original, 'حذف')`، `reason='cancel-reversal'` (ثابت `CANCELLATION_REVERSAL_REASON`)، `parent_movement_id=الحركة الأصلية`، `notes` = «عكس حركة الأصل #N بسبب حذف الوثيقة X») والأصلية تُبقي صافية (لا `deleteStockMovementsForDocument` في هذا الفرع)؛ وإلا المسار القديم (soft-delete + `deleteStockMovementsForDocument`). ثم `payments()->detach()` + `forceDelete()` + سجل تدقيق + `performPostCommitOperations(...)`. `paymentGuard`/`isValidatedDocument` جديدتان في `CommercialDocumentService` و`assertDocumentDeletable` في `PaymentSynchronizer`. السياسة: `delete_any_commercial_document` → فقط مالك/مدير (`isAdminOf`)، `delete_own_commercial_document` → `created_by === user` + المستند `draft`/`pending`. رسالة تأكيد الحذف في الواجهة نُقّحت. الحالة الفعلية للمستند = `documentStatus->name`.
+**اختبار تم**: `php -l` نظيف ×3؛ فحص تجريبي (ملف قالب `task13_cancel_probe.php` بإرجاع تلقائي) — مستند مُصدَّق → تُنشأ حركات عكسية وتُحذف الأصلية بشكل ناعم، مستند `draft`/`pending` → المسار الناعم القديم، مستند عليه دفعات (`paid_amount > 0`) → `BusinessRuleException` 409.
 **الأولوية**: عالية | **المخاطر**: عالية
 
 **الخلفية**: `delete()` لا يسترجع المخزون. مستند محذوف لا يزال يحتسب في المخزون!
