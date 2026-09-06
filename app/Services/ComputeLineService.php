@@ -34,10 +34,11 @@ class ComputeLineService
         // الفرونتند يُرسل:
         //   manual_discount_mode:        'percent' | 'fixed' | null
         //   manual_discount_percentage:  نسبة % (في percent mode)
-        //   manual_discount_amount_fixed: خصم العبوة الواحدة (في fixed mode)
+        //   manual_discount_amount_fixed: خصم على السطر كله (في fixed mode)
+        //     (الباكاند يحسب discPct = fixed / (unit_price × qty × packQty) ثم يطبقه)
         $manualDiscountMode    = $input['manual_discount_mode']         ?? null;
         $manualDiscountPct     = (float) ($input['manual_discount_percentage']   ?? 0);
-        $manualDiscountFixed   = (float) ($input['manual_discount_amount_fixed'] ?? 0); // خصم العبوة الواحدة
+        $manualDiscountFixed   = (float) ($input['manual_discount_amount_fixed'] ?? 0); // خصم على السطر كله
 
         $product = Product::with([
             'tva',

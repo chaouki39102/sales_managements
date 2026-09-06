@@ -19,7 +19,27 @@
 - **Offline layer** (`lib/offline/`) sits on the SHARED `client` — its cache keys embed the full URL (slug included), so tenant isolation in the offline cache is automatic; never store cross-tenant keys. The **write queue** (`pendingOps` in IndexedDB) is now tenant-scoped too: every op carries `slug` (captured from the url's first segment at enqueue), and reads/counts/replay/clear filter by the ACTIVE slug via `useActiveSlug()`/`appActions.getActiveSlug()` — legacy rows without the field fall back to `opSlug(url)`, and tenant-less ops (empty slug) stay visible to every company.
 
 ## Date
-2026-08-30
+2026-09-06
+
+### Phase 91 — DOC_REPAIR_TODO Group B (B1–B6) Complete: Document Hooks/Utils Repairs (Sep 6)
+
+**Request**: work the B-group repairs from `DOC_REPAIR_TODO.md` (frontend hooks + utils) in one batch and commit/push when verified.
+
+**What was done** (8 files, all under `resources/js/pages/documents/` + 1 backend:
+- **B1** (`app/Services/ComputeLineService.php` + `hooks/useComputeLine.ts`): comment-only — `manual_discount_amount_fixed` is a WHOLE-LINE discount in both the PHP and TS implementations («خصم على السطر كله»). No logic change; the settings UI changes for this row were already committed previously.
+- **B2** (`utils/document.utils.ts` + `useCommercialDocumentController.ts`): the doc-status/mode derivation that existed twice with different cancelled-sets (`LOCKED_STATUSES` vs inline `cancelled`/`returned`) is now ONE pure helper set — `resolveDocumentStatus(existingDocument)`, `resolvePaymentMode`, `PaymentMode`, `VALIDATED_STATUSES` — and both the controller and the form consume them.
+- **B3** (`useDocumentForm.ts`): `addPayment` and `addPaymentWithValues` were byte-identical except `...values`. Now `addPaymentWithValues` is defined first (with the `if (pmMode === 'locked') return;` guard) and `addPayment` delegates to `addPaymentWithValues({})`.
+- **B4** (`useDocumentForm.ts` `bulkAddLines`): `price_per_pack` for imported SINGLE-unit lines was `0` (diverging from reopened lines which store the unit price); now `packQty > 1 ? Math.round(unitPrice * packQty * 10_000) / 10_000 : unitPrice`.
+- **B5** (`useDocumentForm.ts`): the 3 `(party as any)?.default_price_level_id ?? … as any … price_level?.id` casts replaced by extending the parties inline type with the serialized `default_price_level_id`/`default_price_level`/`price_level`/`credit_days`/`is_tva_exempt` fields (drop casts, no coercion).
+- **B6** (`utils/document.utils.ts` + `DocumentLineRow.tsx` + `LineCard.tsx`): `LineStockValidation` declared a `blocking: true` arm nothing ever returned. The union is now `{ ok: true } | { ok: false; message: string }` and every `'blocking' in` check is gone — the UI keeps the orange warning-row styling (`validateLineStock` untouched).
+
+**Key architectural rules**:
+- A "pick ONE unit and apply everywhere" fix (B1/B4) must keep the two implementations (PHP service + TS hook) semantically identical — update comments in both, never change one side only.
+- Duplicated state derivation is consolidated by extracting ONE pure resolver into the shared utils module that both the controller and the form import — never keep two copies of a status/mode table with different allowed-sets.
+- A discriminated-union property that no producer ever sets must be REMOVED from the union, not kept "for future use" — keeping it forces every consumer into `'blocking' in` guard branches that can never fire.
+- Extension over `as any`: if a real field is serialized by the resource, add it to the interface and drop the cast — casts hide field-name typos (B5 verified the actual serialized field names first).
+
+**Verification**: `npx tsc --noEmit` clean · vitest **405/405** (23 files) · `npm run build` 0 errors, **239 precache entries** · **SW MATCH** (`public/sw.js` hash == `public/build/sw.js` hash). No PHP logic changed → pest not re-run (`php -l` clean on the touched lines). `DOC_REPAIR_TODO.md` updated: Group B ✅ DONE, next group = C (page & modal).
 
 ### Phase 87 — Commercial Document Editor: Full POS-Pro Shell Layout (Aug 30)
 

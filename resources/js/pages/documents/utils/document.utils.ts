@@ -3,37 +3,39 @@
 //
 // ══ نموذج البيانات (مصدر الحقيقة) ══════════════════════════════════════════
 //
-// الباكاند (DB):
-//   quantity         = وحدات أساسية دائماً (مثلاً: 24 قارورة)
-//   unit_price_ht    = سعر الوحدة الأساسية HT
+// الباكاند (DB) — وحدة البيع هي العبوة للمنتجات المُعبأة:
+//   quantity            = وحدات البيع (عبوات للمُعبأ، وحدات أساسية لغير المُعبأ)
+//   unit_price_ht       = سعر وحدة البيع (سعر العبوة للمُعبأ = أساسي × عامل العبوة)
 //   discount_percentage = نسبة الخصم %
-//   discount_amount  = مبلغ خصم الوحدة الواحدة (= unit_price_ht × discPct/100)
-//   total_ht         = quantity × unit_price_ht × (1 - discPct/100)
+//   discount_amount     = مرجع النسبة «على العبوة» (= unit_price_ht × discPct/100)  [Path B]
+//   discount_amount_per_unit = خصم الوحدة الأساسية الواحدة                           [Path A]
+//   packaging_units_snapshot = عامل العبوة المجمَّد وقت البيع
+//   total_ht            = quantity × unit_price_ht × (1 - discPct/100)
 //
 // الفرونتند (LineItem):
-//   quantity         = عدد العبوات (مثلاً: 2 كرتون)
-//   _packQty         = كمية الوحدات في العبوة (مثلاً: 12)
-//   unit_price_ht    = سعر الوحدة الأساسية HT (نفس الباكاند)
-//   price_per_pack   = سعر العبوة = unit_price_ht × _packQty
-//   discount_mode    = 'percent' | 'fixed'
+//   quantity            = وحدات البيع (عدد العبوات مثلاً: 2 كرتون)
+//   _packQty            = كمية الوحدات في العبوة (مثلاً: 12)
+//   unit_price_ht       = سعر الوحدة الأساسية HT
+//   price_per_pack      = سعر العبوة = unit_price_ht × _packQty
+//   discount_mode       = 'percent' | 'fixed'
 //   discount_percentage = نسبة الخصم % (عند percent)
-//   discount_amount_fixed = مبلغ خصم العبوة الواحدة (عند fixed)
+//   discount_amount_fixed = مبلغ خصم على السطر كله (عند fixed)
 //
 // ══ معادلات الإرسال للباكاند ════════════════════════════════════════════════
 //
-//   effectiveQty = quantity × _packQty    (تحويل للوحدات الأساسية)
-//   unit_price_ht = unit_price_ht         (لا تغيير)
+//   effectiveQty = baseQty = quantity × _packQty   (تحويل للوحدات الأساسية)
+//   unit_price_ht = unit_price_ht                  (لا تغيير — الباكاند يضرب في العبوة وحدها)
 //   discount_percentage:
 //     - percent mode:  discountPercentage (مباشر)
-//     - fixed mode:    (discount_amount_fixed / price_per_pack) × 100
-//       ملاحظة: discount_amount_fixed هو خصم العبوة الواحدة
-//               الباكاند يريد discount_amount = خصم الوحدة الأساسية
+//     - fixed mode:    (discount_amount_fixed / (unit_price_ht × quantity × _packQty)) × 100
+//                       ملاحظة: discount_amount_fixed هو خصم على السطر كله
 //   discount_amount (للباكاند) = unit_price_ht × discPct / 100
 //
 // ══ معادلات الاستقبال من الباكاند ═══════════════════════════════════════════
 //
-//   displayQty = db.quantity / _packQty   (تحويل لعبوات)
-//   discount_amount_fixed = db.discount_amount × _packQty
+//   displayQty = db.quantity                        (وحدات البيع)
+//   discount_amount_fixed = db.discount_amount_per_unit × (displayQty × packQty)   [Path A: أساسي × الأساسية]
+//                          = db.discount_amount × displayQty                        [Path B: لكل وحدة بيع]
 //
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -44,6 +46,48 @@ import type {
   ProductPrice,
   ColKey,
 } from '../types/document.types';
+
+// ─── Document status / payment mode ───────────────────────────────────────────
+
+export type PaymentMode = 'free' | 'additive' | 'locked';
+
+export const VALIDATED_STATUSES = new Set(['validated', 'paid', 'partially_paid', 'overdue']);
+export const LOCKED_STATUSES    = new Set(['cancelled', 'returned']);
+
+export interface ResolvedDocumentStatus {
+  docStatusName: string;
+  isLocked:      boolean;
+  isCancelled:   boolean;
+}
+
+/**
+ * يحل حالة المستند من الكائن الخام القادم من API.
+ * يقبل null/undefined (مستند جديد) ويعيد الاسم الصغير + أعلام القفل/الإلغاء.
+ */
+export function resolveDocumentStatus(
+  existingDocument: Record<string, unknown> | null | undefined,
+): ResolvedDocumentStatus {
+  const docStatusName = String(
+    (existingDocument?.document_status as Record<string, unknown> | undefined)?.name
+    ?? existingDocument?.status ?? '',
+  ).toLowerCase();
+  const isLocked    = !!(existingDocument?.is_locked);
+  const isCancelled = LOCKED_STATUSES.has(docStatusName);
+  return { docStatusName, isLocked, isCancelled };
+}
+
+/**
+ * نمط الدفع للمستند: حر / إضافي (مقفل للأسطر لكنه قابل للتعديل) / مؤمَّن.
+ */
+export function resolvePaymentMode(
+  existingDocument: Record<string, unknown> | null | undefined,
+): PaymentMode {
+  const { docStatusName, isLocked, isCancelled } = resolveDocumentStatus(existingDocument);
+  if (!existingDocument) return 'free';
+  if (isLocked || isCancelled) return 'locked';
+  if (VALIDATED_STATUSES.has(docStatusName)) return 'additive';
+  return 'free';
+}
 
 // ─── Number helpers ───────────────────────────────────────────────────────────
 
@@ -287,8 +331,7 @@ export function getProductStock(
 
 export type LineStockValidation =
   | { ok: true }
-  | { ok: false; blocking: true;  message: string }
-  | { ok: false; blocking: false; message: string };
+  | { ok: false; message: string };
 
 /**
  * التحقق من المخزون.
@@ -315,14 +358,12 @@ export function validateLineStock(
   if (!product.allow_negative_stock) {
     return {
       ok: false,
-      blocking: false,
       message: `تنبيه: الكمية المطلوبة (${packLabel}) — المتاح (${stock} وحدة)`,
     };
   }
 
   return {
     ok: false,
-    blocking: false,
     message: `تنبيه: البيع سيجعل المخزون سالباً (${Math.round((stock - baseQty) * 1000) / 1000} وحدة)`,
   };
 }

@@ -20,16 +20,16 @@
 //           discount_amount = unit_price_ht × discPct/100  (خصم وحدة واحدة)
 //
 // الفرونتند (fixed mode):
-//   المستخدم يدخل: discount_amount_fixed = خصم العبوة الواحدة
-//   يُحوَّل: discPct = (discount_amount_fixed / price_per_pack) × 100
+//   المستخدم يدخل: discount_amount_fixed = خصم على السطر كله
+//   يُحوَّل: discPct = (discount_amount_fixed / (unit_price_ht × الكمية × العبوة)) × 100
 //   يُرسل: discount_percentage = discPct
 //           discount_amount = unit_price_ht × discPct/100
 //
 // ══ الاستقبال من الباكاند (بناء السطر من API) ════════════════════════════
 //
-//   displayQty = db.quantity / _packQty
-//   discount_amount_fixed = db.discount_amount × _packQty
-//     (تحويل خصم الوحدة إلى خصم العبوة للعرض)
+//   displayQty = db.quantity (وحدات البيع)
+//   discount_amount_fixed = per-unit × (الكمية × العبوة) — خصم على السطر كله
+//     per-unit = discount_amount_per_unit (Path A) أو discount_amount (قديم)
 //
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -47,6 +47,8 @@ import {
   calcLineTotal,
   validateLineStock,
   toNum,
+  resolveDocumentStatus,
+  resolvePaymentMode,
 } from '../utils/document.utils';
 import { useComputeLine } from './useComputeLine';
 import type { ComputeLineWarning } from './useComputeLine';
@@ -64,7 +66,7 @@ import type {
   ShippingInfo,
   PaymentTerm,
 } from '../types/document.types';
-import type { LineStockValidation } from '../utils/document.utils';
+import type { LineStockValidation, PaymentMode } from '../utils/document.utils';
 import { getDocLinePref } from '../utils/docLinePrefs';
 import { loadDocPrefs } from '../utils/docPrefs';
 import type { DocPrefs } from '../utils/docPrefs';
@@ -95,8 +97,6 @@ export interface PartyBalanceInfo {
   fiscal_year_id:    number;
   date:              string;
 }
-
-export type PaymentMode = 'free' | 'additive' | 'locked';
 
 export interface PriceLevelSwitchMsg {
   from: string;
@@ -133,6 +133,9 @@ interface UseDocumentFormOptions {
     name:                     string;
     default_price_level_id?:  number | null;
     default_price_level?:     { id: number; name: string } | null;
+    price_level?:             { id: number; name: string } | null;
+    credit_days?:             number | null;
+    is_tva_exempt?:           boolean;
   }>;
   products:      Product[];
   stockData:     Record<number, number>;
@@ -183,11 +186,6 @@ export interface UseDocumentFormReturn {
   clearPriceLevelSwitchMsg: () => void;
   resetToNew:             () => void;
 }
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const VALIDATED_STATUSES = new Set(['validated', 'paid', 'partially_paid', 'overdue']);
-const LOCKED_STATUSES    = new Set(['cancelled', 'returned']);
 
 // ─── makeLine ─────────────────────────────────────────────────────────────────
 
@@ -266,13 +264,15 @@ function resolvePackQty(
 /**
  * بناء LineItem من بيانات الباكاند.
  *
- * الباكاند يخزن:
- *   quantity      = وحدات أساسية
- *   discount_amount = خصم الوحدة الواحدة = unit_price × discPct/100
+ * الباكاند يخزن (اتفاقية واحدة):
+ *   quantity      = وحدات البيع (عبوات للأسطر المعبأة، وحدات أساسية لغيرها)
+ *   unit_price_ht = سعر العبوة = سعر الوحدة الأساسية × packaging_units_snapshot
+ *   discount_amount_per_unit = خصم الوحدة الأساسية (Path A) — الإجمالي = per-unit × (qty × packQty)
+ *   discount_amount = مرجع نسبة خصم العبوة (Path B)
  *
  * الفرونتند يعرض:
- *   quantity      = عدد العبوات = db.quantity / packQty
- *   discount_amount_fixed = خصم العبوة الواحدة = db.discount_amount × packQty
+ *   quantity      = وحدات البيع كما هي
+ *   discount_amount_fixed = خصم على السطر كله = per-unit × (الكمية × العبوة)
  */
 export function buildLineFromApi(
   l:              any,
@@ -313,12 +313,9 @@ export function buildLineFromApi(
   const unitPrice          = toNum(l.unit_price_ht ?? 0);
   const discountPercentage = toNum(l.discount_percentage ?? 0);
 
-  // discount_amount في DB = خصم الوحدة الواحدة
-  // discount_amount_fixed في الفرونتند = خصم العبوة الواحدة
-  const dbDiscountAmount   = toNum(l.discount_amount ?? 0);
-  const discountAmountFixed = packQty > 1
-    ? Math.round(dbDiscountAmount * packQty * 10_000) / 10_000
-    : dbDiscountAmount;
+  // Path A (native fixed): discount_amount_per_unit = خصم الوحدة الأساسية
+  // Path B (percent): discount_amount = مرجع نسبة خصم العبوة
+  const dbDiscountAmount = toNum(l.discount_amount ?? 0);
 
   const discountMode: 'percent' | 'fixed' =
     dbDiscountAmount > 0 && discountPercentage === 0 ? 'fixed' : 'percent';
@@ -346,6 +343,15 @@ export function buildLineFromApi(
   const pricePerPack = isPackConvention
     ? unitPrice
     : Math.round(unitPrice * packQty * 10_000) / 10_000;
+
+  // discount_amount_fixed = خصم على السطر كله (Path A): per-unit × (الكمية × العبوة)
+  // = 0 في وضع النسبة (Path B) — القيمة تُستخدم فقط في الوضع الثابت
+  const perUnitDiscount = toNum(l.discount_amount_per_unit ?? 0) > 0
+    ? toNum(l.discount_amount_per_unit)
+    : dbDiscountAmount;
+  const discountAmountFixed = discountPercentage > 0
+    ? 0
+    : Math.round(perUnitDiscount * (displayQty * packQty) * 10_000) / 10_000;
 
   return {
     id:                    l.id as number | undefined,
@@ -461,23 +467,6 @@ function buildDefaultForm(
   };
 }
 
-// ─── resolvePaymentMode ───────────────────────────────────────────────────────
-
-function resolvePaymentMode(
-  existingDocument: Record<string, unknown> | undefined,
-  isLocked:    boolean,
-  isCancelled: boolean,
-): PaymentMode {
-  if (!existingDocument) return 'free';
-  if (isLocked || isCancelled) return 'locked';
-  const statusName = String(
-    (existingDocument.document_status as Record<string, unknown> | undefined)?.name
-    ?? existingDocument.status ?? '',
-  ).toLowerCase();
-  if (VALIDATED_STATUSES.has(statusName)) return 'additive';
-  return 'free';
-}
-
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useDocumentForm({
@@ -509,16 +498,10 @@ export function useDocumentForm({
 
   // ── حالة المستند ──────────────────────────────────────────────────────────
 
-  const docStatusName = String(
-    (existingDocument?.document_status as Record<string, unknown> | undefined)?.name
-    ?? existingDocument?.status ?? '',
-  ).toLowerCase();
-
-  const isLocked    = !!(existingDocument?.is_locked);
-  const isCancelled = LOCKED_STATUSES.has(docStatusName);
+  const { isLocked, isCancelled } = resolveDocumentStatus(existingDocument);
   const isReadOnly  = isLocked || isCancelled;
 
-  const pmMode = resolvePaymentMode(existingDocument, isLocked, isCancelled);
+  const pmMode          = resolvePaymentMode(existingDocument);
   const isLinesReadOnly = isReadOnly || pmMode === 'additive';
 
   // ── Refs ──────────────────────────────────────────────────────────────────
@@ -689,7 +672,7 @@ export function useDocumentForm({
 
     const curForm       = formRef.current!;
     const party         = partiesRef.current.find((p) => String(p.id) === id);
-    const newPriceLevel = (party as any)?.default_price_level_id ?? (party as any)?.default_price_level?.id ?? (party as any)?.price_level?.id ?? (defaultPriceLevelId ? parseInt(defaultPriceLevelId) : null);
+    const newPriceLevel = party?.default_price_level_id ?? party?.default_price_level?.id ?? party?.price_level?.id ?? (defaultPriceLevelId ? parseInt(defaultPriceLevelId) : null);
     const curPriceLvl   = curForm.price_level_id ? parseInt(curForm.price_level_id) : null;
 
     const hasPayments = payments.some((p) => p.payment_mode_id && parseFloat(p.amount) > 0);
@@ -720,7 +703,7 @@ export function useDocumentForm({
     const newPriceLevelStr = newPriceLevel ? String(newPriceLevel) : defaultPriceLevelId;
 
     // due_date تلقائي من credit_days
-    const creditDays = (party as Record<string, unknown> | undefined)?.credit_days as number ?? 0;
+    const creditDays = party?.credit_days ?? 0;
     const curDate    = formRef.current?.document_date || today();
     let   newDueDate = formRef.current?.due_date || '';
     if (creditDays > 0) {
@@ -730,7 +713,7 @@ export function useDocumentForm({
     }
 
     setForm((f) => {
-      const isTvaExempt = (party as Record<string, unknown> | undefined)?.is_tva_exempt as boolean ?? false;
+      const isTvaExempt = party?.is_tva_exempt ?? false;
 
       // إذا كان الزبون معفى من TVA → تصفير TVA في كل الأسطر
       const updatedLines = isTvaExempt
@@ -847,9 +830,9 @@ export function useDocumentForm({
             L.discount_percentage   = qd.percentage;
             L.discount_amount_fixed = 0;
           } else if (qd.fixed > 0) {
-            // qd.fixed = خصم الوحدة الأساسية → نحوّل لعبوة
+            // qd.fixed = وحدات أساسية → خصم على السطر كله = qd.fixed × baseQty
             L.discount_mode         = 'fixed';
-            L.discount_amount_fixed = Math.round(qd.fixed * L._packQty * 10_000) / 10_000;
+            L.discount_amount_fixed = Math.round(qd.fixed * baseQty * 10_000) / 10_000;
             L.discount_percentage   = 0;
           } else {
             L.discount_mode         = 'percent';
@@ -905,17 +888,11 @@ export function useDocumentForm({
           pkg = prod?.packagings?.find((pk) => String(pk.id) === packId);
         }
 
-        const oldPackQty = L._packQty;
-        L._packQty       = pkg ? (Number(pkg.quantity) || 1) : 1;
+        L._packQty = pkg ? (Number(pkg.quantity) || 1) : 1;
 
         // تحويل: unit_price_ht لا يتغير — فقط price_per_pack
+        // discount_amount_fixed يبقى كما هو — خصم على السطر كله وليس على العبوة
         L.price_per_pack = Math.round(L.unit_price_ht * L._packQty * 10_000) / 10_000;
-
-        // تحديث discount_amount_fixed (كان خصم العبوة القديمة → نحوّل للجديدة)
-        if (L.discount_mode === 'fixed' && oldPackQty > 0) {
-          const unitDisc = L.discount_amount_fixed / oldPackQty;
-          L.discount_amount_fixed = Math.round(unitDisc * L._packQty * 10_000) / 10_000;
-        }
 
         // تحديث خصم الكميات
         if (L._product) {
@@ -950,7 +927,8 @@ export function useDocumentForm({
           if (qd.percentage > 0) {
             L.discount_mode = 'percent'; L.discount_percentage = qd.percentage; L.discount_amount_fixed = 0;
           } else if (qd.fixed > 0) {
-            L.discount_mode = 'fixed'; L.discount_amount_fixed = Math.round(qd.fixed * L._packQty * 10_000) / 10_000; L.discount_percentage = 0;
+            // qd.fixed = وحدات أساسية → خصم على السطر كله = qd.fixed × baseQty
+            L.discount_mode = 'fixed'; L.discount_amount_fixed = Math.round(qd.fixed * baseQty * 10_000) / 10_000; L.discount_percentage = 0;
           }
         }
         // compute-line مع debounce 350ms عند تغيير الكمية
@@ -1023,7 +1001,7 @@ export function useDocumentForm({
             line_note:      line.line_note ?? '',
             packaging_id:   line.packaging_id ? String(line.packaging_id) : '',
             _packQty:       packQty,
-            price_per_pack: packQty > 1 ? Math.round(unitPrice * packQty * 10_000) / 10_000 : 0,
+            price_per_pack: packQty > 1 ? Math.round(unitPrice * packQty * 10_000) / 10_000 : unitPrice,
           };
         }),
       ],
@@ -1064,20 +1042,6 @@ export function useDocumentForm({
 
   // ── إدارة الدفعات ─────────────────────────────────────────────────────────
 
-  const addPayment = useCallback(() => {
-    if (pmMode === 'locked') return;
-    const firstMode = paymentModsRef.current[0];
-    setPayments((prev) => [...prev, {
-      payment_mode_id:     firstMode ? String(firstMode.id) : '',
-      amount:              '',
-      reference:           '',
-      payment_date:        today(),
-      treasury_account_id: firstMode?.treasury_account_id
-        ? String(firstMode.treasury_account_id) : '',
-      _clientRef:          genClientRef(),
-    }]);
-  }, [pmMode]);
-
   const addPaymentWithValues = useCallback((values: Partial<PaymentEntry>) => {
     if (pmMode === 'locked') return;
     const firstMode = paymentModsRef.current[0];
@@ -1092,6 +1056,10 @@ export function useDocumentForm({
       ...values,
     }]);
   }, [pmMode]);
+
+  const addPayment = useCallback(() => {
+    addPaymentWithValues({});
+  }, [addPaymentWithValues]);
 
   const removePayment = useCallback((idx: number) => {
     if (pmMode === 'locked') return;
@@ -1156,7 +1124,7 @@ export function useDocumentForm({
         }
         if (line._product) {
           const sv = validateLineStock(line, line._product, isPurchase, stockDataRef.current);
-          if (!sv.ok && sv.blocking) {
+          if (!sv.ok) {
             setLineErr(`السطر ${i + 1}: ${sv.message}`);
             setErrors(errs); return false;
           }

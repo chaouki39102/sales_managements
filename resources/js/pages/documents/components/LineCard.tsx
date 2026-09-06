@@ -105,16 +105,14 @@ export function LineCard({
     : hasLowMargin
     ? 'var(--red)'
     : hasWarning
-      ? (stockValidation && 'blocking' in stockValidation && stockValidation.blocking ? 'var(--red)' : 'var(--orange)')
+      ? 'var(--orange)'
       : 'var(--b2)';
   const bgTint = selected
     ? 'color-mix(in srgb, var(--em) 8%, var(--bg2))'
     : hasLowMargin
     ? `color-mix(in srgb, var(--red) 18%, var(--bg2))`
     : hasWarning
-      ? (stockValidation && 'blocking' in stockValidation && stockValidation.blocking
-          ? `color-mix(in srgb, var(--red) 5%, var(--bg2))`
-          : `color-mix(in srgb, var(--orange) 4%, var(--bg2))`)
+      ? `color-mix(in srgb, var(--orange) 4%, var(--bg2))`
       : 'var(--bg2)';
 
   return (
@@ -458,15 +456,11 @@ export function LineCard({
       {showStockWarning && (
         <div style={{
           marginTop: 6, padding: '4px 8px', borderRadius: 'var(--r1)',
-          background: stockValidation && 'blocking' in stockValidation && stockValidation.blocking
-            ? 'color-mix(in srgb, var(--red) 8%, transparent)'
-            : 'color-mix(in srgb, var(--orange) 8%, transparent)',
-          fontSize: 10.5, color: stockValidation && 'blocking' in stockValidation && stockValidation.blocking
-            ? 'var(--red)' : 'var(--orange)',
+          background: 'color-mix(in srgb, var(--orange) 8%, transparent)',
+          fontSize: 10.5, color: 'var(--orange)',
           display: 'flex', alignItems: 'center', gap: 5,
         }}>
-          <i className={`ti ${stockValidation && 'blocking' in stockValidation && stockValidation.blocking ? 'ti-alert-circle' : 'ti-alert-triangle'}`}
-            style={{ fontSize: 11 }} />
+          <i className="ti ti-alert-triangle" style={{ fontSize: 11 }} />
           {stockValidation && 'message' in stockValidation ? stockValidation.message : ''}
           {canOverrideStock && (
             <button

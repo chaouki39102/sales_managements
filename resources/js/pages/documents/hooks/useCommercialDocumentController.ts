@@ -33,6 +33,7 @@ import type { ColKey } from '../types/document.types';
 import {
   fmtDZD, loadVisibleCols, saveVisibleCols,
   toNum,
+  resolveDocumentStatus, VALIDATED_STATUSES,
 } from '../utils/document.utils';
 
 interface UseCommercialDocumentControllerOptions {
@@ -227,15 +228,7 @@ export function useCommercialDocumentController({
 
   // ─── حالة المستند ─────────────────────────────────────────────────────────
 
-  const docStatusName = String(
-    (existingDocument?.document_status as Record<string, unknown> | undefined)?.name
-    ?? existingDocument?.status
-    ?? '',
-  ).toLowerCase();
-
-  const isLocked    = !!(existingDocument?.is_locked);
-  const isCancelled = docStatusName === 'cancelled' || docStatusName === 'returned';
-  const VALIDATED_STATUSES = new Set(['validated', 'paid', 'partially_paid', 'overdue']);
+  const { docStatusName, isLocked, isCancelled } = resolveDocumentStatus(existingDocument);
   const isValidated = !isLocked && !isCancelled && VALIDATED_STATUSES.has(docStatusName);
 
   // ─── Stock query ──────────────────────────────────────────────────────────

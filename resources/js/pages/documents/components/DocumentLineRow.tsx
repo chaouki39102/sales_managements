@@ -161,7 +161,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
     : lowMarginRow
     ? `color-mix(in srgb, var(--red) 15%, transparent)`
     : showStockWarning || activeComputeWarnings.length > 0
-      ? `color-mix(in srgb, ${(stockValidation as any).blocking ? 'var(--red)' : 'var(--orange)'} 5%, transparent)`
+      ? `color-mix(in srgb, var(--orange) 5%, transparent)`
       : undefined;
 
   const col = (key: ColKey) => visibleCols.has(key);
@@ -336,7 +336,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
               step={1}
               onChange={(v) => onUpdate(idx, { quantity: toNum(v) })}
               disabled={disabled}
-              highlight={hasStockWarning && !stockValidation.blocking}
+              highlight={hasStockWarning}
             />
           </td>
         )}
@@ -568,10 +568,9 @@ export const DocumentLineRow = memo(function DocumentLineRow({
         <tr style={{ background: rowBg }}>
           <td
             colSpan={subRowColSpan}
-            style={{ padding: '3px 10px 6px', fontSize: 11,
-              color: stockValidation.blocking ? 'var(--red)' : 'var(--orange)' }}
+            style={{ padding: '3px 10px 6px', fontSize: 11, color: 'var(--orange)' }}
           >
-            <i className={`ti ${stockValidation.blocking ? 'ti-alert-circle' : 'ti-alert-triangle'}`}
+            <i className="ti ti-alert-triangle"
               style={{ marginLeft: 4 }} />
             {stockValidation.message}
             {canOverrideStock && (

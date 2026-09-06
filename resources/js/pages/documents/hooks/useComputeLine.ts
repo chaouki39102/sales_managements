@@ -20,7 +20,7 @@ export interface ComputeLineInput {
   // الباكاند يُطبّقه فقط إذا لم يوجد خصم كميات تلقائي
   manual_discount_mode?:         'percent' | 'fixed' | null;
   manual_discount_percentage?:   number;
-  manual_discount_amount_fixed?: number;  // خصم العبوة الواحدة
+  manual_discount_amount_fixed?: number;  // خصم على السطر كله
 }
 
 export interface ComputeLineWarning {

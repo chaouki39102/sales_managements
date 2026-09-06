@@ -1,6 +1,8 @@
 # DOC_REPAIR_TODO.md — Commercial Document Code Repair Ledger
 
-> **Status (2026-09-06):** Full read of the commercial-document module (backend service/controller/model/observers/policies + frontend page/modal/hooks/components) — audit produced the findings below. No fixes applied yet. Each row = one repair; work top-down, commit after each group.
+> **Status (2026-09-06):** Full read of the commercial-document module (backend service/controller/model/observers/policies + frontend page/modal/hooks/components) — audit produced the findings below. Each row = one repair; work top-down, commit after each group.
+>
+> **Progress:** Group B (frontend hooks/utils, B1–B6) ✅ DONE — one commit. Group B is fully verified: `npx tsc --noEmit` clean · vitest 405/405 · build 0 errors (239 precache) · SW MATCH. Next group: C (page & modal) then D (components), then E.
 
 ## Categories
 - **DEAD** = dead/unreachable code, safe to delete
@@ -27,12 +29,12 @@
 
 | # | Cat | Loc | Issue | Repair |
 |---|-----|-----|-------|--------|
-| B1 | BUG | `useDocumentForm.ts:319-321` vs `:914-918` vs `utils/document.utils.ts:126-128` | `discount_amount_fixed` unit contradiction: `calcLineTotal` treats it as WHOLE-LINE, receive-side stores per-PACK (`db.discount_amount × packQty`), packaging re-scale divides per-pack → understated discount on reopen with qty>1 | Pick ONE unit and apply everywhere (per-pack × quantity in `calcLineTotal`, or whole-line and drop `× packQty`/re-scale) |
-| B2 | CLEAN | `useDocumentForm.ts:512-519` vs `useCommercialDocumentController.ts:230-239` | `docStatusName`/`isLocked`/`isCancelled` derived twice with different cancelled-sets (`LOCKED_STATUSES` vs inline `cancelled`/`returned`) | Extract one pure `resolveDocumentState(doc)` helper, share it |
-| B3 | DUP | `useDocumentForm.ts:1067-1079` vs `:1081-1094` | `addPayment` and `addPaymentWithValues` byte-identical except `...values` | `addPayment = () => addPaymentWithValues({})` |
-| B4 | BUG | `useDocumentForm.ts:1026` | `bulkAddLines` sets `price_per_pack: packQty > 1 ? round(unit*pack) : 0` — imported single-unit lines get `price_per_pack = 0`, diverges from reopened lines | `packQty > 1 ? round(unit*pack,4) : unitPrice` |
-| B5 | CLEAN | `useDocumentForm.ts:692` | `(party as any)?.default_price_level_id ?? …as any… price_level?.id` — 3 `any` casts, phantom field | Extend options type, drop casts, verify which field is serialized |
-| B6 | CLEAN | `utils/document.utils.ts:288-291, 298-328` | `LineStockValidation` declares `blocking: true` arm but `validateLineStock` never returns it | Implement a real blocking branch or drop the arm |
+| B1 | BUG | `useDocumentForm.ts:319-321` vs `:914-918` vs `utils/document.utils.ts:126-128` | `discount_amount_fixed` unit contradiction: `calcLineTotal` treats it as WHOLE-LINE, receive-side stores per-PACK (`db.discount_amount × packQty`), packaging re-scale divides per-pack → understated discount on reopen with qty>1 | Pick ONE unit and apply everywhere (per-pack × quantity in `calcLineTotal`, or whole-line and drop `× packQty`/re-scale) | ✅ FIXED — `manual_discount_amount_fixed` now whole-line in BOTH `ComputeLineService.php` (PHP) and `useComputeLine.ts` (TS), comment updated to «خصم على السطر كله» in both |
+| B2 | CLEAN | `useDocumentForm.ts:512-519` vs `useCommercialDocumentController.ts:230-239` | `docStatusName`/`isLocked`/`isCancelled` derived twice with different cancelled-sets (`LOCKED_STATUSES` vs inline `cancelled`/`returned`) | Extract one pure `resolveDocumentState(doc)` helper, share it | ✅ FIXED — `resolveDocumentStatus(existingDocument)` + `resolvePaymentMode` + `PaymentMode` + `VALIDATED_STATUSES` centralized in `utils/document.utils.ts`; controller + form consume them |
+| B3 | DUP | `useDocumentForm.ts:1067-1079` vs `:1081-1094` | `addPayment` and `addPaymentWithValues` byte-identical except `...values` | `addPayment = () => addPaymentWithValues({})` | ✅ FIXED — `addPaymentWithValues` defined first with `if (pmMode === 'locked') return;` guard; `addPayment` delegates `addPaymentWithValues({})` |
+| B4 | BUG | `useDocumentForm.ts:1026` | `bulkAddLines` sets `price_per_pack: packQty > 1 ? round(unit*pack) : 0` — imported single-unit lines get `price_per_pack = 0`, diverges from reopened lines | `packQty > 1 ? round(unit*pack,4) : unitPrice` | ✅ FIXED — `price_per_pack: packQty > 1 ? Math.round(unitPrice * packQty * 10_000) / 10_000 : unitPrice` |
+| B5 | CLEAN | `useDocumentForm.ts:692` | `(party as any)?.default_price_level_id ?? …as any… price_level?.id` — 3 `any` casts, phantom field | Extend options type, drop casts, verify which field is serialized | ✅ FIXED — parties inline type extended (`default_price_level_id?`, `default_price_level?`, `price_level?`, `credit_days?`, `is_tva_exempt?`); casts removed at `:672/:703/:713` |
+| B6 | CLEAN | `utils/document.utils.ts:288-291, 298-328` | `LineStockValidation` declares `blocking: true` arm but `validateLineStock` never returns it | Implement a real blocking branch or drop the arm | ✅ FIXED — union is 2-member `{ ok: true } \| { ok: false; message: string }`; `blocking` arm dropped; `'blocking' in` checks removed from `DocumentLineRow.tsx`/`LineCard.tsx` (orange-only warnings preserved) |
 
 ## C. Frontend — page & modal (`.pages/documents/*.tsx`)
 
