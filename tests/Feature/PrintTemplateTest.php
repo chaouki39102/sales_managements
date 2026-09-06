@@ -2,7 +2,9 @@
 
 use App\Models\Company;
 use App\Models\PrintTemplate;
+use App\Models\User;
 use App\Services\CompanyContextService;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     $company = Company::firstOrCreate(
@@ -11,6 +13,13 @@ beforeEach(function () {
     );
     app(CompanyContextService::class)->set($company->id);
     $this->companyId = $company->id;
+
+    // المالك → Gate::before يتجاوز فحص الصلاحيات (print-templates التحريرية محمية بـ can:manage_print_templates)
+    $user = User::query()->firstOrCreate(
+        ['email' => TEST_TENANT_EMAIL],
+        ['name' => 'Test Tenant', 'password' => 'password'],
+    );
+    DB::table('companies')->where('id', $this->companyId)->update(['owner_id' => $user->id]);
 });
 
 it('lists print templates', function () {

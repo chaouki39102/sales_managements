@@ -332,35 +332,44 @@ Route::prefix('v1')->group(function () {
             Route::get('dashboard/top-profitable',        [DashboardController::class, 'topProfitable']);
 
             Route::prefix('reports')->group(function () {
-                Route::get('sales',     [ReportController::class, 'sales']);
-                Route::get('purchases', [ReportController::class, 'purchases']);
-                Route::get('customers', [ReportController::class, 'customers']);
-                Route::get('suppliers', [ReportController::class, 'suppliers']);
-                Route::get('products',  [ReportController::class, 'products']);
-                Route::get('forecast',  [ReportController::class, 'forecast']);
-                Route::get('monthly',   [ReportController::class, 'monthly']);
-                Route::get('dashboard', [ReportController::class, 'dashboard']);
-                Route::get('inventory', [ReportController::class, 'inventory']);
-                Route::get('payments',  [ReportController::class, 'payments']);
-                Route::get('taxes',     [ReportController::class, 'taxes']);
-                Route::get('velocity',  [ReportController::class, 'velocity']);
-                Route::get('margin',    [ReportController::class, 'margin']);
-                Route::get('aging',     [ReportController::class, 'aging']);
-                Route::get('creative',  [ReportController::class, 'creative']);
-                Route::get('daily',     [ReportController::class, 'daily']);
-                Route::get('product-movement', [ReportController::class, 'productMovement']);
-                Route::get('profit-loss', [ReportController::class, 'profitLoss']);
-                Route::get('returns', [ReportController::class, 'returns']);
-                Route::get('cash-flow', [ReportController::class, 'cashFlow']);
-                Route::get('expenses', [ReportController::class, 'expenses']);
-                Route::get('sales-trend', [ReportController::class, 'salesTrend']);
-                Route::get('stock-movements', [ReportController::class, 'stockMovements']);
-                Route::get('sales-matrix',     [ReportController::class, 'salesMatrix']);
-                Route::get('purchases-matrix', [ReportController::class, 'purchasesMatrix']);
-                Route::get('matrix-detail',    [ReportController::class, 'matrixDetail']);
-                Route::get('client-monthly',   [ReportController::class, 'clientMonthly']);
-                Route::get('grand-livre',      [ReportController::class, 'grandLivre']);
-                Route::get('product-history',  [ReportController::class, 'productHistory']);
+                // ── تقارير متاحة لكل أعضاء الشركة (الحماية التفصيلية في الواجهة — Phase 3) ──
+                Route::get('sales',           [ReportController::class, 'sales']);
+                Route::get('purchases',       [ReportController::class, 'purchases']);
+                Route::get('customers',       [ReportController::class, 'customers']);
+                Route::get('suppliers',       [ReportController::class, 'suppliers']);
+                Route::get('returns',         [ReportController::class, 'returns']);
+                Route::get('sales-trend',     [ReportController::class, 'salesTrend']);
+                Route::get('sales-matrix',    [ReportController::class, 'salesMatrix']);
+                Route::get('purchases-matrix',[ReportController::class, 'purchasesMatrix']);
+                Route::get('matrix-detail',   [ReportController::class, 'matrixDetail']);
+
+                // ── تقارير المخزون — can:view_inventory_report ──
+                Route::middleware('can:view_inventory_report')->group(function () {
+                    Route::get('inventory',         [ReportController::class, 'inventory']);
+                    Route::get('stock-movements',   [ReportController::class, 'stockMovements']);
+                    Route::get('product-movement',  [ReportController::class, 'productMovement']);
+                    Route::get('product-history',   [ReportController::class, 'productHistory']);
+                    Route::get('products',          [ReportController::class, 'products']);
+                    Route::get('velocity',          [ReportController::class, 'velocity']);
+                });
+
+                // ── تقارير مالية حساسة — can:view_financial_report ──
+                Route::middleware('can:view_financial_report')->group(function () {
+                    Route::get('payments',       [ReportController::class, 'payments']);
+                    Route::get('taxes',          [ReportController::class, 'taxes']);
+                    Route::get('cash-flow',      [ReportController::class, 'cashFlow']);
+                    Route::get('expenses',       [ReportController::class, 'expenses']);
+                    Route::get('profit-loss',    [ReportController::class, 'profitLoss']);
+                    Route::get('margin',         [ReportController::class, 'margin']);
+                    Route::get('forecast',       [ReportController::class, 'forecast']);
+                    Route::get('monthly',        [ReportController::class, 'monthly']);
+                    Route::get('daily',          [ReportController::class, 'daily']);
+                    Route::get('aging',          [ReportController::class, 'aging']);
+                    Route::get('creative',       [ReportController::class, 'creative']);
+                    Route::get('grand-livre',    [ReportController::class, 'grandLivre']);
+                    Route::get('client-monthly', [ReportController::class, 'clientMonthly']);
+                    Route::get('dashboard',      [ReportController::class, 'dashboard']);
+                });
             });
 
             // جداول مرجعية — endpoint مجمّع للمنتجات ( families + brands + units + tvas + ... )
@@ -473,10 +482,14 @@ Route::prefix('v1')->group(function () {
             // ✅ notifications (routes/notifications.php)
             require __DIR__ . '/notifications.php';
 
-            Route::get('audits',               [AuditController::class, 'index']);
-            Route::get('audits/{audit}',       [AuditController::class, 'show']);
-            Route::get('audits/user/{user}',   [AuditController::class, 'byUser']);
-            Route::get('audits/event/{event}', [AuditController::class, 'byEvent']);
+            // ✅ سجل التدقيق — can:view_audit_log (المالك/المسؤول فقط)
+            Route::middleware('can:view_audit_log')->group(function () {
+                // المسارات المحددة (user/{user}, event/{event}) قبل {audit} لتجنب التقاطها كمعرّف
+                Route::get('audits',               [AuditController::class, 'index']);
+                Route::get('audits/user/{user}',   [AuditController::class, 'byUser']);
+                Route::get('audits/event/{event}', [AuditController::class, 'byEvent']);
+                Route::get('audits/{audit}',       [AuditController::class, 'show']);
+            });
 
             Route::prefix('me')->group(function () {
                 Route::get('/',                 [UserController::class, 'profile']);
@@ -529,17 +542,15 @@ Route::prefix('v1')->group(function () {
                 Route::apiResource('warehouses',        WarehouseController::class,           ['except' => ['index', 'show']]);
                 Route::apiResource('parties',           PartyController::class,               ['except' => ['index', 'show']]);
 
-                // مستخدمون (كتابة/إدارة — المالك فقط)
+                // مستخدمون (كتابة — can:update_company)
                 // ✅ القراءة في مجموعة can:view_any_user أعلاه
+                // ✅ الحذف / التفعيل / تعيين الدور → مجموعة can:manage_company_members أدناه
                 Route::post('users',                        [UserController::class, 'store']);
                 Route::put('users/{user}',                  [UserController::class, 'update']);
                 Route::patch('users/{user}',                [UserController::class, 'update']);
-                Route::delete('users/{user}',               [UserController::class, 'destroy']);
                 Route::post('users/{user}/restore',        [UserController::class, 'restore']);
                 Route::delete('users/{user}/force-delete', [UserController::class, 'forceDelete']);
                 Route::post('users/{user}/change-password', [UserController::class, 'changePassword']);
-                Route::post('users/{user}/toggle-active',  [UserController::class, 'toggleActive']);
-                Route::post('users/{user}/assign-role',    [UserController::class, 'assignRole']);
 
                 // أدوار وصلاحيات
                 Route::apiResource('roles',               RoleController::class,               ['except' => ['index', 'show']]);
@@ -572,6 +583,13 @@ Route::prefix('v1')->group(function () {
                     Route::post('parties/preview',  [\App\Http\Controllers\Api\V1\ImportController::class, 'previewParties']);
                     Route::post('parties/execute',  [\App\Http\Controllers\Api\V1\ImportController::class, 'executeParties']);
                 });
+            });
+
+            // ── ⑤-ب-١: إدارة أعضاء الشركة (can:manage_company_members) ──
+            Route::middleware('can:manage_company_members')->group(function () {
+                Route::delete('users/{user}',              [UserController::class, 'destroy']);
+                Route::post('users/{user}/toggle-active',  [UserController::class, 'toggleActive']);
+                Route::post('users/{user}/assign-role',    [UserController::class, 'assignRole']);
             });
 
             // ── ⑤-ب-٢: السنوات المالية (manage_fiscal_year) ─────
@@ -733,31 +751,37 @@ Route::prefix('v1')->group(function () {
                 Route::put('portal-access/{id}',                [PortalAccessController::class, 'update']);
                 Route::delete('portal-access/{id}',             [PortalAccessController::class, 'destroy']);
 
-                // ── طلبات بوابة الزبائن (وصل طلب سلعة) ───────────
+                // ── النسخ الاحتياطي واستعادة قاعدة البيانات (can:manage_backup) ──
+                Route::middleware('can:manage_backup')->group(function () {
+                    Route::prefix('backups')->group(function () {
+                        Route::post('import',    [\App\Http\Controllers\Api\V1\BackupController::class, 'import']);
+                        Route::get('/',        [\App\Http\Controllers\Api\V1\BackupController::class, 'index']);
+                        Route::post('/',       [\App\Http\Controllers\Api\V1\BackupController::class, 'store']);
+                        Route::post('{file}/verify',    [\App\Http\Controllers\Api\V1\BackupController::class, 'verify']);
+                        Route::get('{file}/download',   [\App\Http\Controllers\Api\V1\BackupController::class, 'download']);
+                        Route::post('{file}/restore',   [\App\Http\Controllers\Api\V1\BackupController::class, 'doRestore']);
+                        Route::delete('{file}',         [\App\Http\Controllers\Api\V1\BackupController::class, 'destroy']);
+                    });
+                });
+
+                // ── طابعات النظام (اكتشاف طابعات ويندوز المثبتة) (can:manage_printer) ──
+                Route::middleware('can:manage_printer')->group(function () {
+                    Route::get('system/printers',       [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'index']);
+                    Route::post('system/printers/test', [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'testPrint']);
+                    Route::post('system/printers/raw',  [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'rawPrint']);
+                    Route::post('system/printers/raw-text', [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'rawText']);
+                    Route::post('system/printers/html', [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'htmlPrint']);
+                });
+            });
+
+            // ── طلبات بوابة الزبائن (إدارة المسؤول) — can:manage_portal_orders ──
+            Route::middleware('can:manage_portal_orders')->group(function () {
                 Route::get('portal-orders/summary',   [\App\Http\Controllers\Api\V1\Portal\PortalOrdersController::class, 'summary']);
                 Route::get('portal-orders',           [\App\Http\Controllers\Api\V1\Portal\PortalOrdersController::class, 'index']);
                 Route::get('portal-orders/{id}',          [\App\Http\Controllers\Api\V1\Portal\PortalOrdersController::class, 'show']);
                 Route::patch('portal-orders/{id}',        [\App\Http\Controllers\Api\V1\Portal\PortalOrdersController::class, 'update']);
                 Route::patch('portal-orders/{id}/lines',  [\App\Http\Controllers\Api\V1\Portal\PortalOrdersController::class, 'updateLines']);
                 Route::post('portal-orders/{id}/convert', [\App\Http\Controllers\Api\V1\Portal\PortalOrdersController::class, 'convert']);
-
-                // ── النسخ الاحتياطي واستعادة قاعدة البيانات ────────────
-                Route::prefix('backups')->group(function () {
-                    Route::post('import',    [\App\Http\Controllers\Api\V1\BackupController::class, 'import']);
-                    Route::get('/',        [\App\Http\Controllers\Api\V1\BackupController::class, 'index']);
-                    Route::post('/',       [\App\Http\Controllers\Api\V1\BackupController::class, 'store']);
-                    Route::post('{file}/verify',    [\App\Http\Controllers\Api\V1\BackupController::class, 'verify']);
-                    Route::get('{file}/download',   [\App\Http\Controllers\Api\V1\BackupController::class, 'download']);
-                    Route::post('{file}/restore',   [\App\Http\Controllers\Api\V1\BackupController::class, 'doRestore']);
-                    Route::delete('{file}',         [\App\Http\Controllers\Api\V1\BackupController::class, 'destroy']);
-                });
-
-                // ── طابعات النظام (اكتشاف طابعات ويندوز المثبتة) ───────────
-                Route::get('system/printers',       [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'index']);
-                Route::post('system/printers/test', [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'testPrint']);
-                Route::post('system/printers/raw',  [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'rawPrint']);
-                Route::post('system/printers/raw-text', [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'rawText']);
-                Route::post('system/printers/html', [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'htmlPrint']);
             });
 
             // ── POS Sessions ──────────────────────────────────────
@@ -778,27 +802,35 @@ Route::prefix('v1')->group(function () {
             Route::get('attachments/{attachment}/view',     [AttachmentController::class, 'view']);
 
             // ✅ settings: المسارات المحددة قبل apiResource
-            // ① المسارات المحددة أولاً (قبل أي {wildcard})
+            // ① المسارات المحددة أولاً (قبل أي {wildcard}) — قراءة فردية لكل أعضاء الشركة
             Route::get('settings/group/{group}',   [SettingController::class, 'byGroup']);
             Route::get('settings/{key}',           [SettingController::class, 'getValue']);
 
             // ② العمليات الجماعية على /settings (بدون ID)
-            Route::get('settings',                 [SettingController::class, 'index']);
-            Route::patch('settings',               [SettingController::class, 'update']);
-            Route::put('settings',                 [SettingController::class, 'update']);
+            Route::middleware('can:view_settings')->group(function () {
+                Route::get('settings',                 [SettingController::class, 'index']);
+            });
+            Route::middleware('can:manage_settings')->group(function () {
+                Route::patch('settings',               [SettingController::class, 'update']);
+                Route::put('settings',                 [SettingController::class, 'update']);
+            });
 
-            // ✅ print-templates: قوالب الطباعة — لكل أعضاء الشركة (قراءة وكتابة)
+            // ✅ print-templates: قوالب الطباعة — قراءة لكل أعضاء الشركة، كتابة للمدراء (can:manage_print_templates)
             Route::get('print-templates',                    [PrintTemplateController::class, 'index']);
             // ✅ مكتبة القوالب الجاهزة — قبل {id} وإلا التُقطت كمعرّف قالب
             Route::get('print-templates/library',            [PrintTemplateController::class, 'library']);
             Route::post('print-templates/library/install',   [PrintTemplateController::class, 'installLibrary']);
             Route::get('print-templates/{id}',               [PrintTemplateController::class, 'show']);
-            Route::post('print-templates',                   [PrintTemplateController::class, 'store']);
-            Route::put('print-templates/{id}',               [PrintTemplateController::class, 'update']);
-            Route::delete('print-templates/{id}',            [PrintTemplateController::class, 'destroy']);
-            Route::post('print-templates/{id}/set-default',  [PrintTemplateController::class, 'setDefault']);
-            Route::post('print-templates/{id}/duplicate',    [PrintTemplateController::class, 'duplicate']);
-            Route::post('print-templates/upload-logo',       [PrintTemplateController::class, 'uploadLogo']);
+
+            // الكتابة — للمالك/المدير (can:manage_print_templates)
+            Route::middleware('can:manage_print_templates')->group(function () {
+                Route::post('print-templates',                   [PrintTemplateController::class, 'store']);
+                Route::put('print-templates/{id}',               [PrintTemplateController::class, 'update']);
+                Route::delete('print-templates/{id}',            [PrintTemplateController::class, 'destroy']);
+                Route::post('print-templates/{id}/set-default',  [PrintTemplateController::class, 'setDefault']);
+                Route::post('print-templates/{id}/duplicate',    [PrintTemplateController::class, 'duplicate']);
+                Route::post('print-templates/upload-logo',       [PrintTemplateController::class, 'uploadLogo']);
+            });
 
             // line-templates: قوالب أسطر المستندات — CRUD كامل
             Route::apiResource('line-templates', DocumentLineTemplateController::class);
