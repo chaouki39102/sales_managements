@@ -875,7 +875,7 @@ function UserFormModal({
     const sel_perm_count = form.permission_ids.length;
 
     return (
-        <Modal open onClose={onClose} title={isEdit ? `تعديل: ${user?.name}` : "مستخدم جديد"}
+        <Modal open onClose={onClose} closeOnBackdrop={false} title={isEdit ? `تعديل: ${user?.name}` : "مستخدم جديد"}
                 subtitle={
                     isEdit ? "تحديث بيانات المستخدم" : "إضافة مستخدم إلى الشركة"
                 } size="md"

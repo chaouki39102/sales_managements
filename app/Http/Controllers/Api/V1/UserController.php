@@ -39,7 +39,7 @@ class UserController extends BaseApiController
 
     $users = User::whereHas('companies', function ($q) use ($companyId) {
         $q->where('companies.id', $companyId);
-    })->paginate($request->get('per_page', 15));
+    })->with(['roles', 'permissions'])->paginate($request->get('per_page', 15));
 
     return $this->successResponse(
         UserResource::collection($users),
