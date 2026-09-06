@@ -277,24 +277,39 @@ class UserService extends \App\Core\Services\BaseService
     }
     public function getByRole(string $roleName)
     {
-        return User::role($roleName)
-            ->where('company_id', $this->getCurrentCompanyId())
+        $companyId = $this->getCurrentCompanyId();
+
+        return User::whereHas('companies', function ($q) use ($companyId) {
+            $q->where('companies.id', $companyId);
+        })
+            ->whereHas('roles', function ($q) use ($roleName, $companyId) {
+                $q->where('name', $roleName)
+                  ->where('roles.company_id', $companyId);
+            })
             ->with($this->defaultWith)
             ->get();
     }
 
     public function getActive()
     {
+        $companyId = $this->getCurrentCompanyId();
+
         return User::where('active', true)
-            ->where('company_id', $this->getCurrentCompanyId())
+            ->whereHas('companies', function ($q) use ($companyId) {
+                $q->where('companies.id', $companyId);
+            })
             ->with($this->defaultWith)
             ->get();
     }
 
     public function getInactive()
     {
+        $companyId = $this->getCurrentCompanyId();
+
         return User::where('active', false)
-            ->where('company_id', $this->getCurrentCompanyId())
+            ->whereHas('companies', function ($q) use ($companyId) {
+                $q->where('companies.id', $companyId);
+            })
             ->with($this->defaultWith)
             ->get();
     }
@@ -305,7 +320,9 @@ class UserService extends \App\Core\Services\BaseService
 
     private function validateUniqueEmail(string $email, int $companyId, ?int $excludeId = null): void
     {
-        $query = User::where('company_id', $companyId)->where('email', $email);
+        $query = User::whereHas('companies', function ($q) use ($companyId) {
+            $q->where('companies.id', $companyId);
+        })->where('email', $email);
         if ($excludeId) {
             $query->where('id', '!=', $excludeId);
         }

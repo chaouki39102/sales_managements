@@ -487,6 +487,16 @@ Route::prefix('v1')->group(function () {
                 Route::get('roles',             [UserController::class, 'myRoles']);
             });
 
+            // ── مستخدمون (قراءة) — للمدير/المالك فقط (can:view_any_user) ──
+            Route::middleware('can:view_any_user')->group(function () {
+                // ✅ المسارات المحددة قبل apiResource لتجنب conflict
+                Route::get('users/trashed',   [UserController::class, 'trashed']);
+                Route::get('users/active',    [UserController::class, 'active']);
+                Route::get('users/inactive',  [UserController::class, 'inactive']);
+                Route::get('users-by-role',   [UserController::class, 'byRole']);
+                Route::apiResource('users', UserController::class)->only(['index', 'show']);
+            });
+
             // ── ⑤-ب: للمالك/المدير (كتابة) ──────────────────
             Route::middleware('can:update_company')->group(function () {
 
@@ -519,13 +529,12 @@ Route::prefix('v1')->group(function () {
                 Route::apiResource('warehouses',        WarehouseController::class,           ['except' => ['index', 'show']]);
                 Route::apiResource('parties',           PartyController::class,               ['except' => ['index', 'show']]);
 
-                // مستخدمون (بصلاحيات كاملة)
-                // ✅ المسارات المحددة قبل apiResource لتجنب conflict
-                Route::get('users/trashed',                [UserController::class, 'trashed']);
-                Route::get('users/active',                 [UserController::class, 'active']);
-                Route::get('users/inactive',               [UserController::class, 'inactive']);
-                Route::get('users-by-role',                [UserController::class, 'byRole']);
-                Route::apiResource('users', UserController::class);
+                // مستخدمون (كتابة/إدارة — المالك فقط)
+                // ✅ القراءة في مجموعة can:view_any_user أعلاه
+                Route::post('users',                        [UserController::class, 'store']);
+                Route::put('users/{user}',                  [UserController::class, 'update']);
+                Route::patch('users/{user}',                [UserController::class, 'update']);
+                Route::delete('users/{user}',               [UserController::class, 'destroy']);
                 Route::post('users/{user}/restore',        [UserController::class, 'restore']);
                 Route::delete('users/{user}/force-delete', [UserController::class, 'forceDelete']);
                 Route::post('users/{user}/change-password', [UserController::class, 'changePassword']);

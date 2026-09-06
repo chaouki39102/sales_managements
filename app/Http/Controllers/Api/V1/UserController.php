@@ -249,7 +249,9 @@ class UserController extends BaseApiController
         try {
             $this->authorizeAction('viewAny', User::class);
             $users = User::onlyTrashed()
-                ->where('company_id', app(\App\Services\CompanyContextService::class)->get())
+                ->whereHas('companies', function ($q) {
+                    $q->where('companies.id', app(\App\Services\CompanyContextService::class)->get());
+                })
                 ->with(['roles', 'gender'])
                 ->paginate(20);
             return $this->successResponse(UserResource::collection($users));
