@@ -349,7 +349,13 @@ class CompanyRoleService
                 // السنوات المالية
                 'view_any_fiscal_year', 'manage_fiscal_year',
                 // الإعدادات
-                'manage_settings', 'manage_lookups', 'manage_attachments', 'view_audit_log',
+                'view_settings', 'manage_settings', 'manage_lookups', 'manage_attachments', 'view_audit_log',
+                // قوالب الطباعة
+                'view_print_templates', 'manage_print_templates',
+                // النسخ الاحتياطي والطابعات
+                'manage_backup', 'manage_printer',
+                // طلبات البوابة
+                'manage_portal_orders',
                 // الأدوار
                 'view_roles', 'manage_roles',
                 // الشركة
@@ -423,8 +429,12 @@ class CompanyRoleService
                 'view_financial_report', 'view_party_report', 'view_dashboard',
                 // السنوات المالية (قراءة)
                 'view_any_fiscal_year',
+                // الإعدادات والطباعة (قراءة/تشغيل)
+                'view_settings', 'view_print_templates',
+                // طلبات البوابة
+                'manage_portal_orders',
                 // متفرقات
-                'manage_lookups', 'manage_attachments', 'view_roles', 'view_company',
+                'manage_lookups', 'manage_attachments', 'view_roles', 'view_company', 'manage_company_members',
                 // التنبيهات
                 'view_any_notification', 'manage_notifications',
                 // جداول البحث (قراءة)
@@ -459,7 +469,7 @@ class CompanyRoleService
                 // التقارير المتعلقة بالمبيعات
                 'view_sales_report', 'view_party_report', 'view_dashboard',
                 // متفرقات
-                'manage_attachments', 'view_company',
+                'manage_attachments', 'view_company', 'view_print_templates',
                 // التنبيهات
                 'view_any_notification',
                 // جداول البحث (قراءة)

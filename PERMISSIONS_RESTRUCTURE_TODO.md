@@ -51,6 +51,8 @@ Restructure the RBAC system so permission checks are REAL and enforced **everywh
 
 ## Phase 1 — NEW permission keys + propagation (backend seeds)
 
+**Status: ✅ DONE (executed Sep 6, 2026).** 6 global `Permission` rows materialized (ids 185–190) via `GlobalRolesAndPermissionsSeeder`; profiles applied in `CompanyRoleService::getRolePermissionsMap()`; propagated with `php artisan company:upgrade-roles 1`. DB verified: owner=all 6, manager=4 (`manage_portal_orders`, `view_print_templates`, `view_settings`, `manage_company_members`), cashier=1 (`view_print_templates`), viewer=none.
+
 Add these keys to the canonical permission canons AND the role profiles. They do **not** exist yet anywhere.
 
 **New keys:**
@@ -67,7 +69,7 @@ Add these keys to the canonical permission canons AND the role profiles. They do
    - `owner` (r295–378): add `manage_portal_orders`, `view_print_templates`, `manage_print_templates`, `view_settings`, `manage_backup`, `manage_printer`.
    - `manager` (r383–435): add `manage_portal_orders`, `view_print_templates`, `view_settings`, **`manage_company_members`** (user decision — NOT owner-only anymore) (still NOT `manage_print_templates`, NOT backups/printer).
    - `cashier` (r440–468): add `view_print_templates`.
-   - `viewer` (r473–489): add `view_print_templates`.
+   - `viewer` (r473–489): **NO new keys** (final decision — viewer is strict read-only; `view_settings` exposes the full settings dict).
 4. **Propagate** (each company; the command calls `seedRoles()` which is idempotent and refreshes `role_has_permissions` + `forgetCachedPermissions()`):
    ```
    php artisan company:upgrade-roles {company_id}

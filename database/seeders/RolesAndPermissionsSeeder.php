@@ -306,6 +306,7 @@ class RolesAndPermissionsSeeder extends Seeder
             // 14. الإعدادات
             // ══════════════════════════════════════════════════════
             ['name' => 'manage_settings',    'display_name' => 'إدارة الإعدادات',     'group' => 'الإعدادات'],
+            ['name' => 'view_settings',      'display_name' => 'عرض الإعدادات',       'group' => 'الإعدادات'],
             ['name' => 'manage_lookups',     'display_name' => 'إدارة جداول البحث',   'group' => 'الإعدادات'],
             ['name' => 'manage_attachments', 'display_name' => 'إدارة المرفقات',      'group' => 'الإعدادات'],
             ['name' => 'view_audit_log',     'display_name' => 'عرض سجل المراجعة',   'group' => 'الإعدادات'],
@@ -422,6 +423,27 @@ class RolesAndPermissionsSeeder extends Seeder
             ['name' => 'create_inventory_valuation_method',   'display_name' => 'إنشاء طريقة تقييم',     'group' => 'جداول البحث'],
             ['name' => 'update_inventory_valuation_method',   'display_name' => 'تعديل طريقة تقييم',     'group' => 'جداول البحث'],
             ['name' => 'delete_inventory_valuation_method',   'display_name' => 'حذف طريقة تقييم',       'group' => 'جداول البحث'],
+
+            // ══════════════════════════════════════════════════════
+            // 19. طلبات البوابة
+            // ══════════════════════════════════════════════════════
+            ['name' => 'manage_portal_orders', 'display_name' => 'إدارة طلبات البوابة', 'group' => 'طلبات البوابة'],
+
+            // ══════════════════════════════════════════════════════
+            // 20. قوالب الطباعة
+            // ══════════════════════════════════════════════════════
+            ['name' => 'view_print_templates',   'display_name' => 'عرض قوالب الطباعة',   'group' => 'قوالب الطباعة'],
+            ['name' => 'manage_print_templates', 'display_name' => 'إدارة قوالب الطباعة', 'group' => 'قوالب الطباعة'],
+
+            // ══════════════════════════════════════════════════════
+            // 21. النسخ الاحتياطي
+            // ══════════════════════════════════════════════════════
+            ['name' => 'manage_backup', 'display_name' => 'إدارة النسخ الاحتياطي', 'group' => 'النسخ الاحتياطي'],
+
+            // ══════════════════════════════════════════════════════
+            // 22. الطابعات
+            // ══════════════════════════════════════════════════════
+            ['name' => 'manage_printer', 'display_name' => 'إدارة الطابعات', 'group' => 'الطابعات'],
         ];
     }
 }
