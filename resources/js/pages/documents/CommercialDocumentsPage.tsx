@@ -974,7 +974,9 @@ export default function CommercialDocumentsPage() {
     const deleteMut = useMutation({
         mutationFn: (id: number) => apiDelete(`/documents/${id}`),
         onSuccess: () => { notify.success("تم حذف المستند"); invalidateDocs(); },
-        onError:   () => notify.error("فشل الحذف"),
+        onError:   (e: unknown) => notify.error(
+            e instanceof Error ? (e.message || "فشل الحذف") : "فشل الحذف",
+        ),
     });
 
     // ── Edit modal ────────────────────────────────────────────────────────────
