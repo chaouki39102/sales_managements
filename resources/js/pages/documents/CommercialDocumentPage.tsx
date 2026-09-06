@@ -89,6 +89,7 @@ export default function CommercialDocumentPage() {
     docCode, isPurchase, isEdit,
     lookups, lookupsReady,
     form, errors, lineErr, apiErr,
+    conflictVersion,
     set, handlePriceLevelChange,
     addLine, addLineWithProduct, removeLine, duplicateLine, moveLine, updateLine,
     pmMode, payments,
@@ -438,10 +439,25 @@ export default function CommercialDocumentPage() {
         </div>
       )}
 
-      {(successMsg || apiErr) && (
+      {(successMsg || apiErr || conflictVersion !== null) && (
         <div className="doc-msg-slot">
           {successMsg && <AlertBanner type="success" message={successMsg} />}
           {apiErr && <AlertBanner type="error" message={apiErr} />}
+          {conflictVersion !== null && (
+            <AlertBanner
+              type="error"
+              message={`تعارض: المستند تم تعديله من مستخدم آخر (نسخة ${conflictVersion}). أعد تحميل الصفحة لاستعادة آخر نسخة محفوظة.`}
+              action={
+                <button
+                  type="button"
+                  className="btn btn-sm btn-p"
+                  onClick={() => window.location.reload()}
+                >
+                  <i className="ti ti-refresh" /> تحديث
+                </button>
+              }
+            />
+          )}
         </div>
       )}
 

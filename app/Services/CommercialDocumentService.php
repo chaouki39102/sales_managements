@@ -19,6 +19,7 @@ use App\Services\InventoryValuationService;
 use App\Services\Tax\FiscalStampCalculator;
 use App\Services\Tax\TaxRuleService;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -249,6 +250,55 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             'company_id' => $item->company_id,
             'new_value'  => ['document_status' => 'validated', 'lines' => count($lines)],
         ]);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // UPDATE — Task 15: optimistic locking (تعارض التعديلات المتزامنة)
+    // نفس مسار BaseService::update لكن تُضاف CAS على عمود version داخل
+    // الـ transaction الواحدة — أي فشل يُرجع 409 ويلفّ العمل بأكمله رجوعاً.
+    // بدون version (POS/البوابة/ptos legacy) يبقى السلوك السابق بلا قيد.
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public function update(Model $item, array $data, ?Request $request = null): Model
+    {
+        $this->beforeUpdate($item, $data, $request);
+
+        $expectedVersion = $request?->input('version') ?? $data['version'] ?? null;
+
+        $item = DB::transaction(function () use ($item, $data, $request, $expectedVersion) {
+            // ?? CAS: version موجود فقط عندما يقصد العميل تعديلاً فوق نسخة معروفة ⤵
+            if (is_numeric($expectedVersion)) {
+                $affected = DB::table($item->getTable())
+                    ->where('company_id', $item->company_id)
+                    ->where('id', $item->id)
+                    ->where('version', (int) $expectedVersion)
+                    ->whereNull('deleted_at')
+                    ->update(['version' => DB::raw('version + 1')]);
+
+                if ((int) $affected !== 1) {
+                    throw new BusinessRuleException(
+                        'المستند تم تعديله من مستخدم آخر — أعد تحميل الصفحة للمتابعة.',
+                        409
+                    );
+                }
+
+                // أبعِد الكولوم عن mass-assignment وطبّقه على نسخة الذاكرة حتى
+                // يُعاد في الرد (الـ resource يقرأ $this->version).
+                $item->version = (int) $expectedVersion + 1;
+            }
+
+            // version/expected_version حقل CAS داخلي — لا يُكتب مباشرةً أبداً
+            // (في مسار legacy يُمنع أيضاً إجبار قيمة عشوائية عبر mass-assignment).
+            unset($data['version'], $data['expected_version']);
+
+            $data = $this->prepareDataForUpdate($item, $data, $request);
+            $item->update($data);
+            $this->afterUpdate($item, $data, $request);
+            return $this->loadDefaultRelations($item);
+        });
+
+        $this->performPostCommitOperations($item, $data, $request, 'update');
+        return $item;
     }
 
     // ═══════════════════════════════════════════════════════════════════════

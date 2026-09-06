@@ -439,8 +439,14 @@ public function validate(User $user, CommercialDocument $doc) {
 
 ---
 
-#### المهمة 15 — حماية التعديل المتزامن (Optimistic Locking) **[متبقية — أولوية منخفضة، تأجيل]**
+#### المهمة 15 — حماية التعديل المتزامن (Optimistic Locking) **[مكتمل ✅]**
 **الأولوية**: منخفضة | **المخاطر**: منخفضة
+
+**الحالة**: مكتملة. الخلفية (CAS) مطبقة بالكامل:
+- **الهجرة**: `2026_09_03_000003_add_version_to_commercial_documents.php` — عمود `version` int (افتراضي 0) + فهرس مركّب `(company_id, id, deleted_at)`.
+- **الخلفية**: `CommercialDocument::update()` في `CommercialDocumentService` — عند إرسال `version` رقمي: `WHERE version = expected` + `version = version + 1` داخل معاملة، وإذا `affected = 0` → `BusinessRuleException` برسالة «المستند تم تعديله من مستخدم آخر — أعد تحميل الصفحة للمتابعة.» (HTTP 409). المسار القديم (بدون `version`) يعمل كما كان. الطراز + المورد يعرضان `version` كعدد صحيح (يشمل `0`).
+- **الواجهة**: `CommercialDocumentPage` عند 409 تعرض `AlertBanner` علماً برتقالياً مع زر «تحديث» يعيد تحميل المستند من السيرفر؛ الـ `useCommercialDocumentController` يرسل `version` الحالي (يشمل `0`) ويحدّث `knownVersionRef` بعد كل حفظ ناجح لتفادي 409 كاذب في الحفظ المتتالي داخل نفس الجلسة.
+- **التحقق**: `npx tsc --noEmit` نظيف · vitest 405/405 (23 ملفاً) · `npm run build` بدون أخطاء (239 precache) · **SW MATCH** (`public/sw.js` == `public/build/sw.js`).
 
 **الخلفية**: شخصان يمكنهما تعديل المستند نفسّه في نفس الوقت — آخر حفظ يفوز.
 

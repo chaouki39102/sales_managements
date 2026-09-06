@@ -574,10 +574,11 @@ export function StatusBadge({ status }: { status: string }) {
 // ─── AlertBanner ──────────────────────────────────────────────────────────────
 
 export function AlertBanner({
-  type, message,
+  type, message, action,
 }: {
   type:    'error' | 'success' | 'warning' | 'info';
   message: string;
+  action?: React.ReactNode;
 }) {
   const colors = {
     error:   { bg: 'var(--redb)',   border: 'var(--red)',   color: 'var(--red)',   icon: 'ti-alert-circle'    },
@@ -591,10 +592,11 @@ export function AlertBanner({
       padding: '9px 14px', marginBottom: 14,
       borderRadius: 'var(--r2)',
       background: c.bg, border: `1px solid ${c.border}`, color: c.color,
-      fontSize: 12.5, display: 'flex', gap: 7, alignItems: 'flex-start',
+      fontSize: 12.5, display: 'flex', gap: 7, alignItems: 'center',
     }}>
       <i className={`ti ${c.icon}`} style={{ marginTop: 1 }} />
-      <span>{message}</span>
+      <span style={{ flex: 1 }}>{message}</span>
+      {action}
     </div>
   );
 }

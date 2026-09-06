@@ -78,6 +78,11 @@ export function useCommercialDocumentController({
 
   const [lineMode, setLineMode] = useState<'table' | 'card'>('table');
 
+  // ─── Task 15: تعارض التعديلات المتزامنة (optimistic locking) ─────────
+  // يُضبط على version المستند المستقبل من الـ API عند فشل الحفظ بـ 409 —
+  // الصفحة تعرض شريطاً مع زر «تحديث» لإعادة تحميل النسخة الأخيرة.
+  const [conflictVersion, setConflictVersion] = useState<number | null>(null);
+
   // ─── صلاحية إظهار التكلفة والهامش (view_cost_price) ─────────────────────
   const { data: myPermissions } = useMyPermissions();
   const canViewCost = !!myPermissions?.includes('view_cost_price');
@@ -488,19 +493,41 @@ export function useCommercialDocumentController({
 
   // ─── Mutations ────────────────────────────────────────────────────────────
 
+  // Task 15: آخر version عاد من الخادم في حفظٍ ناجح — يُرسل في المحاولة
+  // التالية داخل نفس الجلسة حتى لا يصطدم CAS بمعرّفٍ قديم ويُفشل حفظاً صحيحاً.
+  const knownVersionRef = useRef<number | null>(null);
+
   const saveMut = useMutation({
     mutationFn: () => {
       const payload = buildPayload();
 
       const url = isEdit ? `/documents/${existingDocument!.id}` : '/documents';
-      if (isEdit && docNumber) {
-        (payload as Record<string, unknown>).document_number = docNumber;
+      if (isEdit) {
+        // Task 15: optimistic-lock — أرسل نسخة المستند الحالية (0 شاملة) حتى
+        // يفحص الباكند الـ CAS. الرقم يُؤخذ من آخر ردّ ناجح إن وُجد، وإلا من
+        // المستند المفتوح. القيم غير الرقمية/الغائبة تُبقي المسار القديم بلا قيد.
+        const known = knownVersionRef.current ?? existingDocument?.version;
+        if (typeof known === 'number' || typeof known === 'string') {
+          (payload as Record<string, unknown>).version = Number(known);
+        }
+        if (docNumber) {
+          (payload as Record<string, unknown>).document_number = docNumber;
+        }
       }
       return isEdit
         ? apiPut<Record<string, unknown>>(url, payload)
         : apiPost<Record<string, unknown>>(url, payload);
     },
     onSuccess: async (savedDoc) => {
+      setConflictVersion(null);
+      // Task 15: تزامن النسخة المحلية مع آخر ردّ حقيقي (وليس قائمة انتظار)
+      // حتى يحمل الحفظ التالي في نفس الجلسة نسخةً جديدةً لا تصطدم كذباً بـ CAS.
+      if (!isOfflineQueuedResponse(savedDoc)) {
+        const sv = (savedDoc as Record<string, unknown>)?.version;
+        if (typeof sv === 'number' || typeof sv === 'string') {
+          knownVersionRef.current = Number(sv);
+        }
+      }
       if (slug) {
         qc.invalidateQueries({ queryKey: tenantKeys.documents.all(slug) });
         qc.invalidateQueries({ queryKey: tenantKeys.parties.all(slug) });
@@ -540,6 +567,11 @@ export function useCommercialDocumentController({
     },
     onError: (e: unknown) => {
       const err = e as Record<string, unknown>;
+      // Task 15: تعارض optimistic-lock — المستند تغيّر في جلسة أخرى.
+      if ((e as { status?: number })?.status === 409
+          || String(err?.message ?? '').includes('تم تعديله من مستخدم آخر')) {
+        setConflictVersion((existingDocument?.version as number | undefined) ?? 0);
+      }
       const errMsg = err?.message ?? 'حدث خطأ أثناء الحفظ';
       const validationErrors = (err as Record<string, unknown>)?.errors as Record<string, string[]> | undefined;
       if (validationErrors) {
@@ -571,6 +603,7 @@ export function useCommercialDocumentController({
 
   const handleSave = async () => {
     setApiErr('');
+    setConflictVersion(null);
     if (isReadOnly) return;
     if (isEdit && !docNumber.trim()) {
       setDocNumberErr('رقم المستند إلزامي'); return;
@@ -824,6 +857,7 @@ export function useCommercialDocumentController({
 
     // Form
     form, errors, lineErr, apiErr, setApiErr,
+    conflictVersion, setConflictVersion,
     set, handlePartyChange, handlePriceLevelChange, priceLevelId,
     addLine, addLineWithProduct, removeLine, duplicateLine, moveLine, updateLine,
     pmMode, payments,
