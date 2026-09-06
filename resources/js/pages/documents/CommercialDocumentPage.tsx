@@ -42,6 +42,8 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { useCommercialDocumentController } from './hooks/useCommercialDocumentController';
 import { focusDocLineCell } from './utils/focusDocLineCell';
 import { getDocPref } from './utils/docPrefs';
+import { toNum } from './utils/document.utils';
+import { usePersistedDocTab } from './utils/docTab';
 import { isOfflineQueuedResponse } from '@/lib/offline/queueMath';
 import { useBarcodeScan } from '@/hooks/useBarcodeScan';
 import { useNotification } from '@/hooks/useNotification';
@@ -62,9 +64,9 @@ export default function CommercialDocumentPage() {
   const { data: docType } = useQuery({
     queryKey: [slug, 'document-type-by-code', typeCode],
     queryFn: async () => {
-      const res = await apiGet('/document-types', { per_page: 500 });
+      const res = await apiGet('/document-types', { 'filter[code]': typeCode });
       const list = Array.isArray(res) ? res : ((res as Record<string, unknown>)?.data as DocumentType[]) ?? [];
-      return list.find((dt) => dt.code === typeCode) ?? null;
+      return list[0] ?? null;
     },
     enabled: !!slug && !!typeCode,
     staleTime: 10 * 60_000,
@@ -190,21 +192,7 @@ export default function CommercialDocumentPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [confirm, docNumber, id, cloneMutation]);
 
-  const DOC_TAB_KEY = `doc-tab:${docCode}`;
-  const [extraTab, setExtraTabState] = useState<string>(() => {
-    try { return localStorage.getItem(DOC_TAB_KEY) || 'advanced'; }
-    catch { return 'advanced'; }
-  });
-  const setExtraTab = (key: string) => {
-    setExtraTabState(key);
-    try { localStorage.setItem(DOC_TAB_KEY, key); } catch {}
-  };
-  useEffect(() => {
-    if ((errors.fiscal_year_id || errors.currency_id) && extraTab !== 'advanced') {
-      setExtraTab('advanced');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [errors.fiscal_year_id, errors.currency_id]);
+  const [extraTab, setExtraTab] = usePersistedDocTab(docCode, errors);
 
   const [alertsOpen, setAlertsOpen] = useState(true);
 
@@ -237,15 +225,13 @@ export default function CommercialDocumentPage() {
         await qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
       }
       // تحديد المنتج الجديد في السطر
-      if (saved && (saved as any).id) {
-        addLineWithProduct(String((saved as any).id), payload.purchase_price_ht);
+      if (saved?.id) {
+        addLineWithProduct(String(saved.id), payload.purchase_price_ht);
       }
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Quick create product failed:', err);
-      throw err;
+    } catch {
+      notify.error('تعذر إنشاء المنتج');
     }
-  }, [slug, qc, addLineWithProduct]);
+  }, [slug, qc, addLineWithProduct, notify]);
 
   // ── شريط المسح/البحث (مثل POS Pro) ──────────────────────────────────────
   const handleScanProduct = useCallback((productId: string) => {
@@ -500,8 +486,6 @@ export default function CommercialDocumentPage() {
               needsParty={needsParty}
               compact={compact}
               narrow={narrow}
-              collapsed={false}
-              onToggleCollapse={() => {}}
               maxHeight={narrow ? undefined : partyMaxHeight}
               form={form as unknown as Record<string, unknown>}
               errors={errors}
@@ -621,7 +605,7 @@ export default function CommercialDocumentPage() {
             removeLine={removeLine}
             duplicateLine={duplicateLine}
             moveLine={moveLine}
-            updateLine={updateLine as any}
+            updateLine={updateLine}
             lineErr={lineErr}
             savedDraft={savedDraft}
             draftKey={draftKey}
@@ -726,12 +710,12 @@ export default function CommercialDocumentPage() {
             open={printModalOpen}
             onClose={() => setPrintModalOpen(false)}
             document={existingDoc as Record<string, unknown>}
-            company={companyInfo as any}
+            company={companyInfo}
             template={selectedTemplate || undefined}
             templates={printTemplates}
             docTypeCode={docCode}
             prevBalance={partyBalance?.current_balance ?? 0}
-            newBalance={partyBalance?.current_balance ?? 0}
+            newBalance={(partyBalance?.current_balance ?? 0) + (totals.netToPay ?? 0) - payments.reduce((acc, p) => acc + toNum(p.amount), 0)}
             copies={getDocPref('printCopies', slug)}
           />
         </Suspense>

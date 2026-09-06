@@ -4,7 +4,7 @@ import { BarcodeInput } from '../components/BarcodeInput';
 import { LineCard } from '../components/LineCard';
 import { DocumentLineRow } from '../components/DocumentLineRow';
 import type { QuickCreatePayload } from '../components/ProductSearch';
-import type { LineItem, ColKey } from '../types/document.types';
+import type { LineItem, ColKey, Product } from '../types/document.types';
 import { ALL_COLUMNS } from '../types/document.types';
 import type { ComputeLineWarning } from '../hooks/useComputeLine';
 import { validateLineStock } from '../utils/document.utils';
@@ -45,7 +45,7 @@ interface DocumentLinesSectionProps {
   removeLine: (idx: number) => void;
   duplicateLine: (idx: number) => void;
   moveLine: (fromIdx: number, toIdx: number) => void;
-  updateLine: (idx: number, patch: Partial<LineItem>, product?: unknown) => void;
+  updateLine: (idx: number, patch: Partial<LineItem>, product?: Product | null) => void;
   onRefreshStock?: () => void;
   lineErr: string;
   savedDraft: Record<string, unknown> | null;

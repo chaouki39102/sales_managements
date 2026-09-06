@@ -11,7 +11,7 @@ import {
 } from '../types/document.types';
 
 import DocumentHeaderSection from './DocumentHeaderSection';
-import DocumentInfoSection, { DocumentAdvancedFields, hasAdvancedFieldErrors } from './DocumentInfoSection';
+import DocumentInfoSection, { DocumentAdvancedFields } from './DocumentInfoSection';
 import DocumentStickyTotalsBar from './DocumentStickyTotalsBar';
 import DocumentLinesSection from './DocumentLinesSection';
 import DocumentPaymentsSection from './DocumentPaymentsSection';
@@ -27,9 +27,11 @@ import { DocPrefsTab } from '../components/DocPrefsTab';
 import { DocEditorPrefsTab } from '../components/DocEditorPrefsTab';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useConfirm } from '@/hooks/useConfirm';
+import { useNotification } from '@/hooks/useNotification';
 
 import { useCommercialDocumentController } from '../hooks/useCommercialDocumentController';
 import { getDocPref } from '../utils/docPrefs';
+import { usePersistedDocTab } from '../utils/docTab';
 import { isOfflineQueuedResponse } from '@/lib/offline/queueMath';
 
 interface CommercialDocumentModalProps {
@@ -50,6 +52,7 @@ export default function CommercialDocumentModal({
 
   const [alertsOpen, setAlertsOpen] = React.useState(true);
   const { confirm, confirmDialogProps } = useConfirm();
+  const notify = useNotification();
 
   const ctrl = useCommercialDocumentController({
     documentType,
@@ -116,32 +119,16 @@ export default function CommercialDocumentModal({
         await qc.invalidateQueries({ queryKey: [slug, 'modal-products-v3'] });
         await qc.invalidateQueries({ queryKey: tenantKeys.products.all(slug) });
       }
-      if (saved && (saved as any).id) {
-        addLineWithProduct(String((saved as any).id), payload.purchase_price_ht);
+      if (saved?.id) {
+        addLineWithProduct(String(saved.id), payload.purchase_price_ht);
       }
-    } catch (err) {
-      console.error('Quick create product failed:', err);
-      throw err;
+    } catch {
+      notify.error('تعذر إنشاء المنتج');
     }
-  }, [slug, qc, addLineWithProduct]);
+  }, [slug, qc, addLineWithProduct, notify]);
 
   // ✅ تذكّر آخر تبويب مُستخدَم لكل نوع مستند على حدة — يخدم سير العمل المتكرر
-  const DOC_TAB_KEY = `doc-tab:${docCode}`;
-  const [extraTab, setExtraTabState] = useState<string>(() => {
-    try { return localStorage.getItem(DOC_TAB_KEY) || 'advanced'; }
-    catch { return 'advanced'; }
-  });
-  const setExtraTab = (key: string) => {
-    setExtraTabState(key);
-    try { localStorage.setItem(DOC_TAB_KEY, key); } catch {}
-  };
-  // ✅ فتح تلقائي لتبويب "خيارات إضافية" لو ظهر خطأ تحقق بداخله
-  useEffect(() => {
-    if (hasAdvancedFieldErrors(errors) && extraTab !== 'advanced') {
-      setExtraTab('advanced');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [errors.warehouse_id, errors.fiscal_year_id, errors.currency_id]);
+  const [extraTab, setExtraTab] = usePersistedDocTab(docCode, errors);
 
   // ─── Guard ────────────────────────────────────────────────────────────────
 
@@ -429,7 +416,7 @@ export default function CommercialDocumentModal({
             removeLine={removeLine}
             duplicateLine={duplicateLine}
             moveLine={moveLine}
-            updateLine={updateLine as any}
+            updateLine={updateLine}
             lineErr={lineErr}
             savedDraft={savedDraft}
             draftKey={draftKey}
@@ -474,7 +461,7 @@ export default function CommercialDocumentModal({
               payments={payments}
               partyBalance={partyBalance}
               form={form}
-              selectedParty={selectedParty as any}
+              selectedParty={selectedParty ?? null}
               isPurchase={isPurchase}
               isEdit={isEdit}
               existingDocument={existingDocument}
@@ -592,7 +579,7 @@ export default function CommercialDocumentModal({
       position: 'fixed', inset: 0, zIndex: 1000,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       direction: 'rtl',
-      pointerEvents: open ? 'auto' : 'none' as any,
+      pointerEvents: (open ? 'auto' : 'none') as React.CSSProperties['pointerEvents'],
       opacity: open ? 1 : 0,
       background: open ? 'rgba(0,0,0,.45)' : 'transparent',
       backdropFilter: open ? 'blur(3px)' : 'none',

@@ -38,6 +38,7 @@ class DocumentTypeController extends BaseApiController
         try {
             $items = DocumentType::query()
                 ->when($request->boolean('active_only'), fn($q) => $q->where('active', true))
+                ->when($request->filled('filter.code'), fn($q) => $q->where('code', $request->input('filter.code')))
                 ->orderBy('display_order')
                 ->orderBy('name')
                 ->get();

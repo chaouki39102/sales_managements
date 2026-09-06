@@ -2,7 +2,7 @@
 
 > **Status (2026-09-06):** Full read of the commercial-document module (backend service/controller/model/observers/policies + frontend page/modal/hooks/components) — audit produced the findings below. Each row = one repair; work top-down, commit after each group.
 >
-> **Progress:** Group B (frontend hooks/utils, B1–B6) ✅ DONE — one commit. Group B is fully verified: `npx tsc --noEmit` clean · vitest 405/405 · build 0 errors (239 precache) · SW MATCH. Next group: C (page & modal) then D (components), then E.
+> **Progress:** Group B (frontend hooks/utils, B1–B6) ✅ DONE — one commit. Group C (page & modal, C1–C13) ✅ DONE — one commit. Both verified: `npx tsc --noEmit` clean · vitest 405/405 · build 0 errors (239 precache) · SW MATCH · `php -l` clean · pest 87/87 · tinker smoke `filter[code]=FV` → exactly 1. Next group: D (components) then E.
 
 ## Categories
 - **DEAD** = dead/unreachable code, safe to delete
@@ -40,19 +40,19 @@
 
 | # | Cat | Loc | Issue | Repair |
 |---|-----|-----|-------|--------|
-| C1 | BUG | `CommercialDocumentsPage.tsx:483` | «إرسال» footer button only `onClose`s (sends nothing) | Rename («إغلاق») or implement send |
-| C2 | BUG | `CommercialDocumentsPage.tsx:205` | SummaryCards «الأرباح» bound to `stats.remaining` (unpaid) — misreads as profit | Re-label «الديون المتبقية» or bind to margin |
-| C3 | UNUSED | `CommercialDocumentsPage.tsx:364,2191` | `DocumentViewModal` `onCancel: _onCancel; void _onCancel;` never called | Remove prop/interface/call site |
-| C4 | DUP | `CommercialDocumentsPage.tsx:1126/1155/1421/1447` | 4 identical `apiGet('/parties'|'/warehouses'|'/users', {per_page:9999})` lookup blocks | One `useLookupOptions(resource, which)` hook |
-| C5 | CLEAN | `CommercialDocumentsPage.tsx` (many) | `as any` / `as unknown as Record` double-casts on lookup rows | Type the lookup arrays |
-| C6 | BUG | `CommercialDocumentPage.tsx:733-734` | `prevBalance` and `newBalance` both = `current_balance` → receipt delta always 0 | `newBalance = current_balance + netToPay − paid` |
-| C7 | CLEAN | `CommercialDocumentPage.tsx:240/519/624/729/852/491/506/836` | Cluster of `as any`, `warehouseIdNum!`, `as React.CSSProperties` | Real typed signatures / guards |
-| C8 | CLEAN | `CommercialDocumentPage.tsx:504` | `onToggleCollapse={() => {}}` + `collapsed={false}` forced by all-required contract | Make optional or drop for `party-card` variant |
-| C9 | DUP | `CommercialDocumentPage.tsx:193-207` | `DOC_TAB_KEY` auto-switch effect duplicated with modal `index.tsx:129-144` | Shared localStorage helper/effect |
-| C10 | CLEAN | `CommercialDocumentPage.tsx:63-71` | doc-type query hand-rolls list→find | Use `filter[code]` (API supports it) |
-| C11 | CLEAN | `CommercialDocumentModal/index.tsx:595` | `pointerEvents: open ? 'auto' : 'none' as any` — `as any` binds only to `'none'` | `(open ? 'auto' : 'none') as React.CSSProperties['pointerEvents']` |
-| C12 | CLEAN | `CommercialDocumentModal/index.tsx:477-478` | `selectedParty as any` | Use rich document-module `Party` type |
-| C13 | DEBUG | `CommercialDocumentModal/index.tsx:123` | `console.error` in product quick-create | Replace with notification or remove |
+| C1 | BUG | `CommercialDocumentsPage.tsx:483` | «إرسال» footer button only `onClose`s (sends nothing) | Rename («إغلاق») or implement send | ✅ FIXED — button renamed «إغلاق» (`variant="info"`, `ti-x` icon), bound to `onClose` at `:484-486` |
+| C2 | BUG | `CommercialDocumentsPage.tsx:205` | SummaryCards «الأرباح» bound to `stats.remaining` (unpaid) — misreads as profit | Re-label «الديون المتبقية» or bind to margin | ✅ FIXED — card re-labelled «الديون المتبقية» (`ti-trending-up`), keeps `stats.remaining` value at `:206` |
+| C3 | UNUSED | `CommercialDocumentsPage.tsx:364,2191` | `DocumentViewModal` `onCancel: _onCancel; void _onCancel;` never called | Remove prop/interface/call site | ✅ FIXED — `onCancel` prop removed from `DocumentViewModalProps` interface + destructure; no call site remains |
+| C4 | DUP | `CommercialDocumentsPage.tsx:1126/1155/1421/1447` | 4 identical `apiGet('/parties'|'/warehouses'|'/users', {per_page:9999})` lookup blocks | One `useLookupOptions(resource, which)` hook | ✅ FIXED — NEW `useLookupOptions(resource, which='name')` in `hooks/useLookupOptions.ts`; all 4 blocks (`partyOptions` `:1032`, `warehouseOptions` `:1033`, `userOptions` `:1034` ×2 fetchOptions `:1133/:1158/:1420/:1440`) consume it |
+| C5 | CLEAN | `CommercialDocumentsPage.tsx` (many) | `as any` / `as unknown as Record` double-casts on lookup rows | Type the lookup arrays | ✅ FIXED — lookup arrays typed (`Party`/`Warehouse`/`User`); `validated_at?: string | null` + `validatedBy?: User` added to `CommercialDocument` (`types.ts:624,633`); `?? vb?.username` fallbacks removed |
+| C6 | BUG | `CommercialDocumentPage.tsx:733-734` | `prevBalance` and `newBalance` both = `current_balance` → receipt delta always 0 | `newBalance = current_balance + netToPay − paid` | ✅ FIXED — `newBalance = (partyBalance?.current_balance ?? 0) + (totals.netToPay ?? 0) − Σ payments.amount` at `:718` |
+| C7 | CLEAN | `CommercialDocumentPage.tsx:240/519/624/729/852/491/506/836` | Cluster of `as any`, `warehouseIdNum!`, `as React.CSSProperties` | Real typed signatures / guards | ✅ FIXED — `as any` casts removed; remaining `form={form as unknown as Record<string, unknown>}` is the typed bridge to `DocumentHeaderBand.form: Record<string, unknown>`; CSS-var cast kept for `--party-col-h`; `warehouseIdNum!` retained where guarded |
+| C8 | CLEAN | `CommercialDocumentPage.tsx:504` | `onToggleCollapse={() => {}}` + `collapsed={false}` forced by all-required contract | Make optional or drop for `party-card` variant | ✅ FIXED — `collapsed?`/`onToggleCollapse?` now optional on `DocumentHeaderBandProps` (`:42-43`) with `= false` / `= () => {}` defaults (`:100`) |
+| C9 | DUP | `CommercialDocumentPage.tsx:193-207` | `DOC_TAB_KEY` auto-switch effect duplicated with modal `index.tsx:129-144` | Shared localStorage helper/effect | ✅ FIXED — NEW `usePersistedDocTab(docCode, errors)` in `utils/docTab.ts` (`DocTabErrors = warehouse_id|fiscal_year_id|currency_id`, key `doc-tab:${docCode}`, default `'advanced'`); page uses it at `:195` |
+| C10 | CLEAN | `CommercialDocumentPage.tsx:63-71` | doc-type query hand-rolls list→find | Use `filter[code]` (API supports it) | ✅ FIXED — FE query uses `{ 'filter[code]': typeCode }`; backend `DocumentTypeController::index` gained `->when($request->filled('filter.code'), fn($q) => $q->where('code', $request->input('filter.code')))` after `active_only`; tinker smoke `filter[code]=FV` → exactly 1 result (200) |
+| C11 | CLEAN | `CommercialDocumentModal/index.tsx:595` | `pointerEvents: open ? 'auto' : 'none' as any` — `as any` binds only to `'none'` | `(open ? 'auto' : 'none') as React.CSSProperties['pointerEvents']` | ✅ FIXED — cast corrected at `:582`: `(open ? 'auto' : 'none') as React.CSSProperties['pointerEvents']` |
+| C12 | CLEAN | `CommercialDocumentModal/index.tsx:477-478` | `selectedParty as any` | Use rich document-module `Party` type | ✅ FIXED — `selectedParty as any` gone; party passed via the rich document-module `Party` type |
+| C13 | DEBUG | `CommercialDocumentModal/index.tsx:123` | `console.error` in product quick-create | Replace with notification or remove | ✅ FIXED — removed; no `console.error`/`warn`/`log` remains in the modal |
 
 ## D. Frontend — components
 

@@ -621,6 +621,7 @@ export interface CommercialDocument extends BaseModel {
   currency_id?:       number | null;
   is_locked:          boolean;
   company_id:         number;
+  validated_at?:      string | null;
   // Relations
   document_type?:   DocumentType;
   document_status?: { id: number; name: string };

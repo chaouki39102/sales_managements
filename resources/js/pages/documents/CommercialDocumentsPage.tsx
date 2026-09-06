@@ -43,6 +43,7 @@ import type {
     ContextMenuContext,
 } from "@/components/ui/DataTable";
 import { useColumnStatePersistence } from "@/components/ui/DataTable";
+import { useLookupOptions } from "./hooks/useLookupOptions";
 import CommercialDocumentModal from "./CommercialDocumentModal";
 import QuickSaleModal from "./QuickSaleModal";
 import { DeliveryProgressBar } from "./components/DeliveryProgressBar";
@@ -202,7 +203,7 @@ function SummaryCards({ items = [], opColor }: { items: CommercialDocument[]; op
         { icon: "ti-file-text",         label: "عدد المستندات", value: stats.count.toLocaleString("ar-DZ"),       accent: opColor },
         { icon: "ti-currency-dinar",     label: "HT",           value: fmtMoney(stats.totalHt) + " دج",           accent: "var(--blue)", ltr: true },
         { icon: "ti-receipt",            label: "TTC",          value: fmtMoney(stats.totalTtc) + " دج",          accent: opColor, ltr: true },
-        { icon: "ti-trending-up",        label: "الأرباح",      value: fmtMoney(stats.remaining) + " دج",         accent: stats.remaining > 0 ? "var(--red)" : "var(--green)", ltr: true },
+        { icon: "ti-trending-up",        label: "الديون المتبقية", value: fmtMoney(stats.remaining) + " دج",         accent: stats.remaining > 0 ? "var(--red)" : "var(--green)", ltr: true },
     ] as const;
 
     return (
@@ -360,8 +361,8 @@ function getRowPermissions(row: CommercialDocument, isReadOnly: boolean) {
 // ════════════════════════════════════════════════════════════════════════════
 
 function DocumentViewModal({
-    docId, docType, onClose, onEdit, isReadOnly, onDeleteDoc, onPrint, onCancel: _onCancel,
-}: { docId: number; docType: DocumentType | null; onClose: () => void; onEdit: () => void; isReadOnly: boolean; onDeleteDoc?: () => void; onPrint?: () => void; onCancel?: () => void }) { void _onCancel;
+    docId, docType, onClose, onEdit, isReadOnly, onDeleteDoc, onPrint,
+}: { docId: number; docType: DocumentType | null; onClose: () => void; onEdit: () => void; isReadOnly: boolean; onDeleteDoc?: () => void; onPrint?: () => void }) {
     const slug    = useActiveSlug();
     const isPurch = PURCHASE_CODES.has(docType?.code ?? "");
 
@@ -480,8 +481,8 @@ function DocumentViewModal({
                             تعديل
                         </Button>
                     )}
-                    <Button size="sm" variant="info" icon={<i className="ti ti-mail" />} onClick={onClose}>
-                        إرسال
+                    <Button size="sm" variant="info" icon={<i className="ti ti-x" />} onClick={onClose}>
+                        إغلاق
                     </Button>
                     {(() => {
                         const pty = d.party as Record<string, unknown> | undefined;
@@ -1028,6 +1029,10 @@ export default function CommercialDocumentsPage() {
         setPage(1);
     }, []);
 
+    const partyOptions       = useLookupOptions('/parties');
+    const warehouseOptions   = useLookupOptions('/warehouses');
+    const userOptions        = useLookupOptions('/users');
+
     // ════════════════════════════════════════════════════════════════════════
     // COLUMN DEFINITIONS
     // ════════════════════════════════════════════════════════════════════════
@@ -1125,11 +1130,7 @@ export default function CommercialDocumentsPage() {
             searchable: true,
             filter: {
                 type: "dynamic-multiselect" as const,
-                fetchOptions: async () => {
-                    const res = await apiGet<any>('/parties', { per_page: 9999 });
-                    const list = Array.isArray(res) ? res : (res?.data ?? []);
-                    return [...new Set(list.map((p: any) => p.name).filter(Boolean))] as string[];
-                },
+                fetchOptions: partyOptions,
             },
             accessor: r => getPartyName(r),
             render: row => {
@@ -1154,11 +1155,7 @@ export default function CommercialDocumentsPage() {
             hideOnMobile: true,
             filter: {
                 type: "dynamic-multiselect" as const,
-                fetchOptions: async () => {
-                    const res = await apiGet<any>('/warehouses', { per_page: 9999 });
-                    const list = Array.isArray(res) ? res : (res?.data ?? []);
-                    return [...new Set(list.map((w: any) => w.name).filter(Boolean))] as string[];
-                },
+                fetchOptions: warehouseOptions,
             },
             accessor: r => getWarehouseName(r),
             render: row => <span style={{ fontSize: 12, color: "var(--t3)" }}>{getWarehouseName(row) || "—"}</span>,
@@ -1403,9 +1400,9 @@ export default function CommercialDocumentsPage() {
             sortable: true,
             defaultHidden: true,
             filter: { type: "date" as const },
-            accessor: (r: CommercialDocument) => String((r as unknown as Record<string,unknown>).validated_at ?? ""),
+            accessor: (r: CommercialDocument) => String(r.validated_at ?? ""),
             render: (row: CommercialDocument) => {
-                const d = (row as unknown as Record<string,unknown>).validated_at as string | null | undefined;
+                const d = row.validated_at;
                 return d
                     ? <span style={{ fontSize: 11, color: "var(--em)", fontVariantNumeric: "tabular-nums" }}>{fmtDateTime(d)}</span>
                     : <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
@@ -1420,20 +1417,14 @@ export default function CommercialDocumentsPage() {
             defaultHidden: true,
             filter: {
                 type: "dynamic-multiselect" as const,
-                fetchOptions: async () => {
-                    const res = await apiGet<any>('/users', { per_page: 9999 });
-                    const list = Array.isArray(res) ? res : (res?.data ?? []);
-                    return [...new Set(list.map((u: any) => u.name).filter(Boolean))] as string[];
-                },
+                fetchOptions: userOptions,
             },
             // validated_by في DB = integer FK — الـ Resource يُرسل العلاقة بـ camelCase
             accessor: (r: CommercialDocument) => {
-                const vb = (r as unknown as Record<string,unknown>).validatedBy as Record<string,unknown> | null | undefined;
-                return String(vb?.name ?? vb?.username ?? "");
+                return String(r.validatedBy?.name ?? "");
             },
             render: (row: CommercialDocument) => {
-                const vb = (row as unknown as Record<string,unknown>).validatedBy as Record<string,unknown> | null | undefined;
-                const name = String(vb?.name ?? vb?.username ?? "");
+                const name = String(row.validatedBy?.name ?? "");
                 return name ? <UserChip name={name} color="var(--em)" /> : <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
             },
         },
@@ -1446,20 +1437,14 @@ export default function CommercialDocumentsPage() {
             defaultHidden: true,
             filter: {
                 type: "dynamic-multiselect" as const,
-                fetchOptions: async () => {
-                    const res = await apiGet<any>('/users', { per_page: 9999 });
-                    const list = Array.isArray(res) ? res : (res?.data ?? []);
-                    return [...new Set(list.map((u: any) => u.name).filter(Boolean))] as string[];
-                },
+                fetchOptions: userOptions,
             },
             // المنشئ = user_id في DB → العلاقة هي user() وليس created_by
             accessor: (r: CommercialDocument) => {
-                const u = (r as unknown as Record<string,unknown>).user as Record<string,unknown> | null | undefined;
-                return String(u?.name ?? u?.username ?? "");
+                return String(r.user?.name ?? "");
             },
             render: (row: CommercialDocument) => {
-                const u = (row as unknown as Record<string,unknown>).user as Record<string,unknown> | null | undefined;
-                const name = String(u?.name ?? u?.username ?? "");
+                const name = String(row.user?.name ?? "");
                 return name ? <UserChip name={name} color="var(--blue)" /> : <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
             },
         },
@@ -2190,7 +2175,6 @@ export default function CommercialDocumentsPage() {
                           else { closeModal(); openEditModal(doc); }
                         }
                     }}
-                    onCancel={() => { closeModal(); openCancelModal(viewDocId); }}
                     isReadOnly={!!isReadOnly}
                     onDeleteDoc={async () => {
                         closeModal();

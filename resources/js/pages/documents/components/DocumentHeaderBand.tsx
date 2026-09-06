@@ -39,8 +39,8 @@ interface DocumentHeaderBandProps {
   needsParty: boolean;
   compact?: boolean;
   narrow?: boolean;
-  collapsed: boolean;
-  onToggleCollapse: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
   /** ملخّص شريط الطي — جزء مُنسَّق مُسبقاً من الصفحة لعرضه في شريط المنمنم. */
   ttcLabel?: string;
   /** نمط العرض (سلوك افتراضي: `cards`). */
@@ -97,7 +97,7 @@ const segHeader = (): React.CSSProperties => ({
  */
 export default function DocumentHeaderBand({
   docCode, isEdit, isReadOnly, isLinesReadOnly, isPurchase, needsParty,
-  compact, narrow, collapsed, onToggleCollapse, ttcLabel,
+  compact, narrow, collapsed = false, onToggleCollapse = () => {}, ttcLabel,
   form, errors, set,
   docNumber, docNumberErr, checkingDocNumber, handleDocNumberChange,
   handlePartyChangeWithWarning, partyOptions, priceLevelOptions, handlePriceLevelChange,
