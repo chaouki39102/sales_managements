@@ -127,18 +127,6 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
         if (empty($data['document_number'])) {
             $generated = $this->generateDocumentNumber($documentType, $companyId);
             $data['document_number'] = $generated;
-
-            \Illuminate\Support\Facades\Log::debug('[DocGen beforeCreate]', [
-                'company' => $companyId,
-                'doc_type_id' => $data['document_type_id'],
-                'generated' => $generated,
-                'data_doc_num' => $data['document_number'] ?? 'MISSING',
-            ]);
-        } else {
-            \Illuminate\Support\Facades\Log::debug('[DocGen not-empty]', [
-                'document_number' => $data['document_number'],
-                'source' => 'already in data',
-            ]);
         }
 
         // ── الإعدادات الافتراضية من Settings ─────────────────────────────
@@ -1540,16 +1528,6 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 ->exists();
 
             if (!$exists) {
-                \Illuminate\Support\Facades\Log::debug('[DocGen]', [
-                    'prefix'   => $prefix,
-                    'year'     => $year,
-                    'company'  => $companyId,
-                    'last_found' => $last?->document_number,
-                    'seq'      => $seq,
-                    'result'   => $candidate,
-                    'attempts' => $attempt + 1,
-                ]);
-
                 return $candidate;
             }
 

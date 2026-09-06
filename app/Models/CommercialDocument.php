@@ -199,8 +199,10 @@ class CommercialDocument extends Model
         // الأسطر — nested includes
         'lines',
         'lines.product',
-        'lines.productVariant',
-        'lines.tva',
+        'lines.product.unit',
+        'lines.product.tva',
+        'lines.packaging',
+        'lines.stockLot',
         // المدفوعات — nested includes
         'payments',
         'payments.paymentMode',
@@ -325,5 +327,15 @@ class CommercialDocument extends Model
     public function isOverdue(): bool
     {
         return $this->due_date && $this->due_date->isPast() && !$this->isFullyPaid();
+    }
+
+    public function scopeUnpaid(Builder $query): Builder
+    {
+        return $query->where('remaining_amount', '>', 0);
+    }
+
+    public function scopeOverdue(Builder $query): Builder
+    {
+        return $query->where('due_date', '<', now())->where('remaining_amount', '>', 0);
     }
 }

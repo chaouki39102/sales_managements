@@ -65,9 +65,25 @@ class UpdateCommercialDocumentRequest extends FormRequest
             }],
             'lines.*.unit_price_ht'            => 'required_with:lines|numeric|min:0|max:9999999999',
             'lines.*.discount_percentage'      => 'nullable|numeric|min:0|max:100',
+            'lines.*.discount_amount_per_unit' => 'nullable|numeric|min:0',
             'lines.*.tva_rate'                 => 'nullable|numeric|min:0|max:100',
             'lines.*.description'              => 'nullable|string|max:1000',
-            'lines.*.packaging_id'             => 'nullable|integer|exists:product_packagings,id',
+            // pack contract: packaging_id يتطلب معامل تعبئة موجب — pack_qty (عقد الوحدات) أو packaging_units_snapshot (مسار النسخ)
+            'lines.*.packaging_id'             => ['nullable', 'integer', 'exists:product_packagings,id', function ($attr, $value, $fail) use ($request) {
+                if (! $value) {
+                    return;
+                }
+                $index    = (int) explode('.', $attr)[1];
+                $packQty  = $request->input("lines.$index.pack_qty");
+                $snapshot = $request->input("lines.$index.packaging_units_snapshot");
+                $positive = ($packQty !== null && (float) $packQty > 0)
+                    || ($snapshot !== null && (float) $snapshot > 0);
+                if (! $positive) {
+                    $fail('سطر معبّأ بدون معامل تعبئة (pack_qty أو packaging_units_snapshot) موجب.');
+                }
+            }],
+            'lines.*.pack_qty'                 => 'nullable|numeric|min:0.0001',
+            'lines.*.packaging_units_snapshot' => 'nullable|numeric|min:0.0001',
             'lines.*.stock_lot_id'             => 'nullable|integer|exists:product_lots,id',
             'lines.*.lot_number'               => 'nullable|string|max:100',
             'lines.*.manufacturing_date'       => 'nullable|date',
@@ -84,6 +100,9 @@ class UpdateCommercialDocumentRequest extends FormRequest
             'lines.*.product_id.required_with' => 'يجب تحديد المنتج لكل سطر.',
             'lines.*.quantity.required_with'   => 'يجب تحديد الكمية لكل سطر.',
             'lines.*.unit_price_ht.required_with' => 'يجب تحديد السعر لكل سطر.',
+            'lines.*.discount_amount_per_unit.min' => 'الخصم الثابت لا يمكن أن يكون سالباً.',
+            'lines.*.pack_qty.min'                 => 'معامل التعبئة (pack_qty) يجب أن يكون موجباً.',
+            'lines.*.packaging_units_snapshot.min' => 'معامل التعبئة المخزّن يجب أن يكون موجباً.',
         ];
     }
 }
