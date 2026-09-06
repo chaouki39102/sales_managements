@@ -357,7 +357,15 @@ export const SEARCH_INDEX = [
 ];
 
 // ─── SettingsSearch ────────────────────────────────────────────────────────────
-export function SettingsSearch({ onNavigate }: { onNavigate: (tab: TabId) => void }) {
+// visibleTabIds: اختياري — من يمرّره يقيّد البحث والشرائح بالتبويبات المتاحة فقط
+// (تُستعمل من SettingsPage لقفل تبويبات المالك-فقط عن غيرهم)
+export function SettingsSearch({
+    onNavigate,
+    visibleTabIds,
+}: {
+    onNavigate: (tab: TabId) => void;
+    visibleTabIds?: ReadonlySet<TabId> | null;
+}) {
     const [q, setQ] = useState("");
     const [open, setOpen] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -368,10 +376,11 @@ export function SettingsSearch({ onNavigate }: { onNavigate: (tab: TabId) => voi
         const lq = dq.toLowerCase();
         return SEARCH_INDEX.filter(
             (item) =>
-                item.label.includes(dq) ||
-                item.keywords.some((k) => k.includes(lq)),
+                (!visibleTabIds || visibleTabIds.has(item.tab)) &&
+                (item.label.includes(dq) ||
+                    item.keywords.some((k) => k.includes(lq))),
         ).slice(0, 6);
-    }, [dq]);
+    }, [dq, visibleTabIds]);
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
@@ -527,7 +536,11 @@ export function SettingsSearch({ onNavigate }: { onNavigate: (tab: TabId) => voi
                                         gap: 8,
                                     }}
                                 >
-                                    {TABS.map((t) => (
+                                    {TABS.filter(
+                                        (t) =>
+                                            !visibleTabIds ||
+                                            visibleTabIds.has(t.id),
+                                    ).map((t) => (
                                         <button
                                             key={t.id}
                                             onClick={() => {

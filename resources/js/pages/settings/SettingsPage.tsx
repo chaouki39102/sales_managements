@@ -17,7 +17,7 @@
 //   - tabs/PlanTab.tsx      → الخطة
 // ════════════════════════════════════════════════════════════════════════════
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import {
     TABS,
@@ -27,6 +27,8 @@ import {
     SettingsErrorBoundary,
     UnsavedChangesModal,
 } from "./tabs/_shared";
+import { useMyRolesAndPermissions } from "@/lib/api/endpoints/roles";
+import { useIsSuperAdmin } from "@/context/AuthContext";
 import { CompanyTab } from "./tabs/CompanyTab";
 import { InvoiceTab } from "./tabs/InvoiceTab";
 import { FiscalTab } from "./tabs/FiscalTab";
@@ -74,6 +76,38 @@ export default function SettingsPage() {
 
     const currentTabLabel = TABS.find((t) => t.id === tab)?.label ?? "";
 
+    // ── Gating: تبويبات المالك-فقط تُخفى عن الأعضاء غير المخوّلين ─────────────
+    // SSOT: myRoles تُقيَّد بسياق الشركة الحالية من الباكند وتحمل صلاحيات كل دور.
+    // نقرأ من roles[].permissions[].name (وليس القائمة العامة permissions[]
+    // التي هي union عبر كل الشركات ولا تصلح لقفل الشركة الحالية).
+    //   - users    ← view_any_user  (مالك/مدير)
+    //   - backup   ← update_company (مالك فقط)
+    //   - printers ← update_company (مالك فقط)
+    const { data: myRolesData } = useMyRolesAndPermissions();
+    const isSuperAdmin = useIsSuperAdmin();
+
+    const settingsPermissions = useMemo(() => {
+        const names = new Set<string>();
+        for (const role of myRolesData?.roles ?? []) {
+            for (const p of role.permissions ?? []) names.add(p.name);
+        }
+        return names;
+    }, [myRolesData]);
+
+    const visibleTabIds = useMemo(() => {
+        const all = new Set(TABS.map((t) => t.id));
+        // مسؤول عام → يرى كل شيء (قد لا يكون عضواً بالشركة أصلاً)
+        // وقبل تحميل الصلاحيات، لا نخفي أي تبويب
+        if (isSuperAdmin || !myRolesData) return all;
+        return new Set(
+            TABS.filter((t) => {
+                if (t.id === "users") return settingsPermissions.has("view_any_user");
+                if (t.id === "backup" || t.id === "printers") return settingsPermissions.has("update_company");
+                return true;
+            }).map((t) => t.id),
+        );
+    }, [isSuperAdmin, myRolesData, settingsPermissions]);
+
     return (
         <div className="page on" id="p-settings">
             <div
@@ -91,7 +125,10 @@ export default function SettingsPage() {
                     subtitle="إعدادات المؤسسة والنظام"
                 />
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <SettingsSearch onNavigate={(t) => handleTabClick(t)} />
+                    <SettingsSearch
+                        visibleTabIds={visibleTabIds}
+                        onNavigate={(t) => handleTabClick(t)}
+                    />
                     <SettingsExportImport />
                 </div>
             </div>
@@ -112,7 +149,7 @@ export default function SettingsPage() {
                     overflowX: "auto",
                 }}
             >
-                {TABS.map((t) => (
+                {TABS.filter((t) => visibleTabIds.has(t.id)).map((t) => (
                     <button
                         key={t.id}
                         onClick={() => handleTabClick(t.id)}
