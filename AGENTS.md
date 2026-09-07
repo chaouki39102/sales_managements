@@ -20,6 +20,32 @@
 - **Offline layer** (`lib/offline/`) sits on the SHARED `client` — its cache keys embed the full URL (slug included), so tenant isolation in the offline cache is automatic; never store cross-tenant keys. The **write queue** (`pendingOps` in IndexedDB) is now tenant-scoped too: every op carries `slug` (captured from the url's first segment at enqueue), and reads/counts/replay/clear filter by the ACTIVE slug via `useActiveSlug()`/`appActions.getActiveSlug()` — legacy rows without the field fall back to `opSlug(url)`, and tenant-less ops (empty slug) stay visible to every company.
 
 ## Date
+2026-09-07
+
+### Phase 92 — Tailscale Funnel Public-Ingress Health Probe + Self-Heal (Sep 7)
+
+**Request (follow-up to Phase 67)**: after the 2026-09-07 incident — the public order page was unreachable from an external phone while `tailscale funnel status` still printed "Funnel on". The status check only proves the LOCAL config; on this PC the ts.net name resolves to the MagicDNS 100.x tailnet IP and still answers while the PUBLIC ingress backhaul is dead, so a status-only guard cannot detect an outage. Both funnel-maintaining scripts must probe the PUBLIC path and self-heal. User approved the hardening.
+
+**What was built**:
+- **NEW shared module `server-helper/funnel-health.ps1`**, dot-sourced by BOTH `share-public-order.ps1` and `server-helper/watchdog.ps1` (one implementation of "is the funnel healthy?" — the two scripts must never diverge):
+  - `Get-FunnelUrl` — parses the URL from `tailscale funnel status`.
+  - `Resolve-PublicIngressIps` — resolves the ts.net hostname over DNS-over-HTTPS (`cloudflare-dns.com` → `1.1.1.1` → `dns.google`) to get the PUBLIC A records (Tailscale ingress edge IPs, e.g. `176.58.90.x`), bypassing MagicDNS's 100.x answer.
+  - `Test-FunnelPublicPath` — for each ingress IP runs `curl.exe --silent --output NUL --write-out '%{http_code}' --connect-timeout 8 --max-time 12 --resolve host:443:<ip> https://host/`; **ANY HTTP status > 000 proves ingress + backhaul reach the app** (only 000 = connect/TLS failure = stale). When DoH yields no IPs it falls back to a plain `Invoke-WebRequest` and returns `$true` — a PC that lost ALL internet never tears down a healthy funnel.
+- **`share-public-order.ps1` `Ensure-Funnel`** — probes the current URL (healthy → done; stale → `funnel off` + recreate), loops until `Get-FunnelUrl` reports a URL, then warm-up warning when the new URL is not yet reachable.
+- **`server-helper/watchdog.ps1` block 3** — replaced the `funnel status`-only check with the public probe, throttled to once/minute (`$script:funnelTick` ≥ 4 × 15s loop) and recreates the funnel only after **TWO consecutive failed probes** so a single transient blip never tears down a healthy funnel. `funnelFail`/`funnelTick` initialized before `while ($true)`.
+
+**Key architectural rules**:
+- `tailscale funnel status` ("Funnel on") only proves local config. A funnel guard MUST probe the PUBLIC ingress: resolve the ts.net name via DoH (bypasses MagicDNS) and verify HTTPS per ingress IP with `curl --resolve host:443:<ip>` while SNI/Host stay the real ts.net name.
+- ANY HTTP status > 000 is healthy (404/503 still prove TLS + backhaul + app are reachable); only 000 means stale ingress.
+- Shared funnel-health logic lives in ONE module dot-sourced by both scripts — never two copies of "is the funnel up?".
+- Funnel recreation must be debounced (2 consecutive failures) and throttled (once/minute) so a flaky probe never churns a live funnel.
+- The no-DoH fallback returns `$true` (not `$false`): when the PC itself is offline, tearing down a healthy funnel would make the outage worse.
+
+**Files modified (3)**: NEW `server-helper/funnel-health.ps1`; `share-public-order.ps1` (module dot-source + probe-first `Ensure-Funnel`); `server-helper/watchdog.ps1` (module dot-source + probe block with 2-failure counter). Commit `<hash>`, pushed to `origin/main`.
+
+**Verification**: all 3 scripts PowerShell parse-checked (`[scriptblock]::Create((Get-Content -Raw …))`) · live probe on THIS PC: URL `https://desktop-h8shjo5.taila9b3bd.ts.net` · DoH resolved ingress IPs `176.58.90.46/.63/.145` · `curl --resolve` → **HTTP 200 on all three** · portal page `…/portal/el-houda-emballage-6a71b1b47555f/order` via `.63` → **200** · `Test-FunnelPublicPath` → `True`.
+
+## Date
 2026-09-06
 
 ### Phase 91 — DOC_REPAIR_TODO Group B (B1–B6) Complete: Document Hooks/Utils Repairs (Sep 6)

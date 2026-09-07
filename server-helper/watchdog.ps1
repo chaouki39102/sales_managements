@@ -26,6 +26,12 @@ $AppPort = 8000
 $configPath = Join-Path $root 'share-public-order.config.ps1'
 if (Test-Path -LiteralPath $configPath) { . $configPath }
 
+# Shared funnel health helpers (Get-FunnelUrl, Test-FunnelPublicPath). Probes
+# the PUBLIC ingress (DoH + curl --resolve) - a status-only check cannot detect
+# a dead ingress backhaul (2026-09-07 incident).
+$funnelHealth = Join-Path $root 'server-helper\funnel-health.ps1'
+if (Test-Path -LiteralPath $funnelHealth) { . $funnelHealth }
+
 # Single-instance guard (named mutex - auto-released by the OS if we die).
 $mutex = New-Object System.Threading.Mutex($false, 'ERP_SalesManagement_Watchdog_Mutex')
 if (-not $mutex.WaitOne(0)) { exit 0 }
@@ -43,6 +49,7 @@ if (Test-Path -LiteralPath $php84) {
     $php = (Get-Command php -ErrorAction SilentlyContinue).Source
 }
 $script:funnelTick = 0
+$script:funnelFail = 0
 
 while ($true) {
     try {
@@ -66,21 +73,33 @@ while ($true) {
             }
         }
 
-        # 3. Keep the public order page reachable: if the app server is up but
-        #    Tailscale Funnel is off, re-enable it. Idempotent + throttled to
-        #    once a minute so the tailscale CLI is not spawned every 15s.
+        # 3. Keep the public order page reachable. `tailscale funnel status` is
+        #    NOT enough - it can print "Funnel on" while the public ingress
+        #    backhaul is dead (2026-09-07 incident). Probe the PUBLIC path via
+        #    the shared health module (DoH + curl --resolve); recreate the
+        #    funnel only after TWO consecutive failed probes so a single
+        #    transient failure never tears down a healthy funnel. Idempotent +
+        #    throttled to once a minute so the tailscale CLI is not spawned
+        #    every 15s.
         if (PortUp $AppPort) {
             $script:funnelTick++
             if ($script:funnelTick -ge 4) {
                 $script:funnelTick = 0
                 if (Test-Path -LiteralPath $TailscaleCli) {
                     try {
-                        $fs = & $TailscaleCli funnel status 2>&1 | Out-String
-                        if ($fs -notmatch 'Funnel on') {
-                            & $TailscaleCli funnel --bg --yes $AppPort 2>&1 | Out-Null
+                        $furl = Get-FunnelUrl
+                        if ($furl -and (Test-FunnelPublicPath $furl)) {
+                            $script:funnelFail = 0
+                        } else {
+                            $script:funnelFail++
+                            if ($script:funnelFail -ge 2) {
+                                if ($furl) { & $TailscaleCli funnel off 2>&1 | Out-Null }
+                                & $TailscaleCli funnel --bg --yes $AppPort 2>&1 | Out-Null
+                                $script:funnelFail = 0
+                            }
                         }
                     } catch {
-                        # tailscale busy - next minute will retry
+                        # tailscale busy / probe error - next minute will retry
                     }
                 }
             }

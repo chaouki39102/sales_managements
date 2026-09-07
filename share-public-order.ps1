@@ -42,20 +42,27 @@ function Ensure-Server {
     Write-Host 'Server is up.' -ForegroundColor Green
 }
 
-function Get-FunnelUrl {
-    $out = & $TailscaleCli funnel status 2>&1 | Out-String
-    if ($out -match 'https://[a-zA-Z0-9\-\.]+\.ts\.net') { return $matches[0] }
-    return $null
-}
+# Shared funnel helpers (Get-FunnelUrl, Test-FunnelPublicPath). The health check
+# MUST probe the PUBLIC ingress (DoH + curl --resolve), never the local tailnet
+# path: `tailscale funnel status` can print "Funnel on" while the public ingress
+# backhaul is dead (2026-09-07 incident), and on this PC the ts.net name
+# resolves to the 100.x tailnet IP for local requests.
+$funnelHealth = Join-Path $Root 'server-helper\funnel-health.ps1'
+if (Test-Path -LiteralPath $funnelHealth) { . $funnelHealth }
 
 function Ensure-Funnel {
     if (-not (Test-Path -LiteralPath $TailscaleCli)) {
         Write-Host 'Tailscale not found. Install it from https://tailscale.com/download and sign in, then run this again.' -ForegroundColor Red
         exit 1
     }
-    if (Get-FunnelUrl) {
-        Write-Host 'Tailscale Funnel is already active.' -ForegroundColor Green
-        return
+    $url = Get-FunnelUrl
+    if ($url) {
+        if (Test-FunnelPublicPath $url) {
+            Write-Host 'Tailscale Funnel is active and the public path responds.' -ForegroundColor Green
+            return
+        }
+        Write-Host 'Funnel reports active but the public path is NOT responding (stale ingress). Recreating it...' -ForegroundColor Yellow
+        & $TailscaleCli funnel off | Out-Null
     }
     Write-Host "Enabling Tailscale Funnel on port $AppPort..." -ForegroundColor Yellow
     & $TailscaleCli funnel --bg --yes $AppPort | Out-Null
@@ -66,6 +73,10 @@ function Ensure-Funnel {
             exit 1
         }
         Start-Sleep -Milliseconds 500
+    }
+    $newUrl = Get-FunnelUrl
+    if ($newUrl -and -not (Test-FunnelPublicPath $newUrl)) {
+        Write-Host 'Funnel enabled; the public path may take up to a minute to propagate.' -ForegroundColor Yellow
     }
     Write-Host 'Funnel enabled.' -ForegroundColor Green
 }

@@ -35,7 +35,14 @@ Customer  ──HTTPS──▶  https://desktop-abc.tailXXXX.ts.net
 
 - Funnel config is stored inside Tailscale, so it survives reboots.
 - The **watchdog** (`server-helper/watchdog.ps1`) keeps the servers alive and
-  re-enables the Funnel every minute if it ever drops (idempotent).
+  re-enables the Funnel every minute if it ever drops (idempotent). Since
+  Sep 2026 the watchdog and `share-public-order.ps1` both **probe the PUBLIC
+  path** (`server-helper/funnel-health.ps1`): they resolve the ts.net name over
+  DNS-over-HTTPS to the real Tailscale ingress IPs and `curl --resolve` each of
+  them. Only when the probe fails **twice in a row** is the funnel recreated —
+  `tailscale funnel status` alone proves nothing (on this PC the ts.net name
+  resolves to the MagicDNS 100.x tailnet IP, which keeps answering while the
+  public backhaul is dead).
 - `bootstrap/app.php` already trusts the tunnel proxy (`trustProxies`) so
   generated URLs are correct.
 
@@ -168,6 +175,7 @@ tailscale funnel 8000            # start again (foreground)
 | `Funnel did not start` | Run `tailscale funnel 8000` manually to see the exact error (most often: not signed in, or HTTPS not yet provisioned — Funnel auto-provisions the Let's Encrypt cert on first use). |
 | Page offline after reboot | The watchdog re-enables Funnel within ~60s (only when the app server is up). Wait one minute, or run `share-public-order.bat`. |
 | `ERR_CONNECTION_REFUSED` | The Laravel server is down — the watchdog/helper should restart it within ~20s (see `status.html` or `http://localhost:8777`). |
+| Page unreachable from a phone/outside, but `tailscale funnel status` still says "Funnel on" | The funnel's **public ingress** is dead even though the local config is fine — on this PC the ts.net URL resolves to the MagicDNS 100.x tailnet IP and still answers locally while the internet-facing backhaul is down. This is exactly what `server-helper/funnel-health.ps1` detects: it resolves the real ingress IPs over DoH and `curl --resolve`s each; **2 consecutive probe failures** make the watchdog recreate the funnel (self-heal, ~1–2 min). To check manually: `curl --resolve desktop-<machine>.tail<tailnet>.ts.net:443:176.58.90.x https://<machine>.<tailnet>.ts.net/` (any HTTP status > 000 = healthy, 000 = stale). |
 | Port 8000 busy | Another process holds it; stop it or change `$AppPort` (and the `--port` in `start-helper.ps1`) consistently. |
 | New PC still shows old URL | Each machine has its own hostname. After `git pull` on the new PC, fill the config and run the script — do not reuse this PC's URL. |
 
@@ -177,11 +185,12 @@ tailscale funnel 8000            # start again (foreground)
 
 | File | Purpose |
 |---|---|
-| `share-public-order.ps1` | Main script: ensure server → enable Funnel → print public links. Reads the machine config. |
+| `share-public-order.ps1` | Main script: ensure server → enable Funnel (probes the public ingress first) → print public links. Reads the machine config. |
 | `share-public-order.bat` | Double-clickable wrapper. |
 | `share-public-order.config.example.ps1` | **Committed template** — copy to the real config on each PC. |
 | `share-public-order.config.ps1` | **Machine-specific, gitignored** — filled in per PC. |
+| `server-helper/funnel-health.ps1` | **Shared funnel-health module** (dot-sourced by `share-public-order.ps1` AND `watchdog.ps1`): `Get-FunnelUrl`, `Resolve-PublicIngressIps` (DoH), `Test-FunnelPublicPath` (`curl --resolve` per ingress IP; newest + PWA docs here). |
 | `server-helper/start-helper.ps1` | Hidden launcher for helper (8777) + app (8000) + watchdog. |
-| `server-helper/watchdog.ps1` | Self-healing loop: keeps 8777/8000 up, re-enables Funnel every minute. |
+| `server-helper/watchdog.ps1` | Self-healing loop: keeps 8777/8000 up, probes the funnel's PUBLIC ingress (DoH + `curl --resolve`) every minute and recreates it after 2 consecutive failures. |
 | `register-autostart.ps1` | Registers the logon autostart (scheduled task or Startup VBS). |
 | `bootstrap/app.php` | `trustProxies` — makes Laravel trust the tunnel proxy. |
