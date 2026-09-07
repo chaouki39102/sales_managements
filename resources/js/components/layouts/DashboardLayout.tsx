@@ -11,6 +11,7 @@ import OfflineIndicator from '@/components/OfflineIndicator';
 import NotificationBell from '@/components/topbar/NotificationBell';
 import { AlertBell } from '@/pages/documents/components/AlertBell';
 import PrintQueuePanel from '@/pages/settings/print-settings/components/shared/PrintQueuePanel';
+import { usePermissions, permissionForNavPath } from '@/lib/permissions';
 // ─── ناف القائمة ─────────────────────────────────────────────
 const NAV_GROUPS = [
   {
@@ -617,14 +618,33 @@ export default function DashboardLayout() {
 
   const currentPath = location.pathname.replace(/^\//, '') || 'dashboard';
 
+  // ✅ صلاحيات المستخدم لفلترة عناصر القائمة الجانبية
+  const { can, isReady: permsReady } = usePermissions();
+
+  // ✅ تجميع القائمة مع فلترة العناصر حسب الصلاحيات.
+  //    (نفرد نسخاً — لا نغيّر الثابت الآني NAV_GROUPS).
+  //    أثناء تحميل الصلاحيات تُعرَض كل العناصر (لا وميض في القائمة).
+  const navGroups = useMemo(() => {
+    return NAV_GROUPS
+      .filter(g => !(g as any).superAdminOnly || isSuperAdmin)
+      .map(g => ({
+        ...g,
+        items: permsReady
+          ? (g.items as any[]).filter(it => {
+              const perm = permissionForNavPath(it.href);
+              return perm === undefined || can(perm);
+            })
+          : g.items,
+      }));
+  }, [isSuperAdmin, permsReady, can]);
+
   // ✅ كل روابط القائمة (لتمييز الصفحات الشقيقة عن الصفحات الفرعية)
   const navHrefSet = useMemo(() => {
     const s = new Set<string>();
-    NAV_GROUPS
-      .filter(g => !(g as any).superAdminOnly || isSuperAdmin)
+    navGroups
       .forEach(g => (g.items as any[]).forEach(it => s.add(normHref(it.href))));
     return s;
-  }, [isSuperAdmin]);
+  }, [navGroups]);
 
   // ✅ عنصر واحد فقط يظهر نشطاً:
   //    - تطابق تام، أو
@@ -707,7 +727,7 @@ const meta = useTopbarTitle();
           )}
         </div>
 
-        {NAV_GROUPS.filter(g => !(g as any).superAdminOnly || isSuperAdmin).map((group, idx) => {
+        {navGroups.map((group, idx) => {
           const q = sidebarQuery.trim().toLowerCase();
           const matchesQuery = (item: any) => !q || item.name.toLowerCase().includes(q) || normHref(item.href).includes(q);
           const hasActiveItem = group.items.some(isItemActive);

@@ -6,6 +6,8 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useActiveCompany } from '@/lib/store/appStore';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+import { RequirePermission } from '@/components/auth/RequirePermission';
+import { PERMISSION } from '@/lib/permissions';
 
 // â”€â”€ Layouts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const DashboardLayout = lazy(() => import('@/components/layouts/DashboardLayout'));
@@ -257,34 +259,102 @@ function AppRoutesInner() {
           }
         >
           {/* Dashboard */}
-          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="dashboard" element={
+            <RequirePermission permission={PERMISSION.VIEW_DASHBOARD}>
+              <DashboardPage />
+            </RequirePermission>
+          } />
 
           {/* POS */}
-          <Route path="pos"         element={<POSPage />} />
-          <Route path="pos/kiosk"   element={<POSKioskPage />} />
-          <Route path="pos/sessions" element={<PosSessionsPage />} />
-          <Route path="pos/monitor"  element={<SessionMonitorPage />} />
-          <Route path="pos/pro"     element={<POSProPage />} />
+          <Route path="pos"         element={
+            <RequirePermission permission={PERMISSION.CREATE_SALES_DOCUMENT}>
+              <POSPage />
+            </RequirePermission>
+          } />
+          <Route path="pos/kiosk"   element={
+            <RequirePermission permission={PERMISSION.CREATE_SALES_DOCUMENT}>
+              <POSKioskPage />
+            </RequirePermission>
+          } />
+          <Route path="pos/sessions" element={
+            <RequirePermission permission={PERMISSION.CREATE_SALES_DOCUMENT}>
+              <PosSessionsPage />
+            </RequirePermission>
+          } />
+          <Route path="pos/monitor"  element={
+            <RequirePermission permission={PERMISSION.CREATE_SALES_DOCUMENT}>
+              <SessionMonitorPage />
+            </RequirePermission>
+          } />
+          <Route path="pos/pro"     element={
+            <RequirePermission permission={PERMISSION.CREATE_SALES_DOCUMENT}>
+              <POSProPage />
+            </RequirePermission>
+          } />
           <Route path="invoices" element={<InvoicesPage />} />
 
           {/* Documents */}
-          <Route path="documents/:typeCode/new" element={<CommercialDocumentPage />} />
-          <Route path="documents/:typeCode/:id/edit" element={<CommercialDocumentPage />} />
-          <Route path="documents/:typeCode" element={<CommercialDocumentsPage />} />
+          <Route path="documents/:typeCode/new" element={
+            <RequirePermission permission={PERMISSION.VIEW_ANY_COMMERCIAL_DOCUMENT}>
+              <CommercialDocumentPage />
+            </RequirePermission>
+          } />
+          <Route path="documents/:typeCode/:id/edit" element={
+            <RequirePermission permission={PERMISSION.VIEW_ANY_COMMERCIAL_DOCUMENT}>
+              <CommercialDocumentPage />
+            </RequirePermission>
+          } />
+          <Route path="documents/:typeCode" element={
+            <RequirePermission permission={PERMISSION.VIEW_ANY_COMMERCIAL_DOCUMENT}>
+              <CommercialDocumentsPage />
+            </RequirePermission>
+          } />
 
           {/* Products */}
-          <Route path="products"  element={<ProductsPage />} />
-          <Route path="inventory" element={<InventoryPage />} />
-          <Route path="inventory/stock-take" element={<StockTakePage />} />
+          <Route path="products"  element={
+            <RequirePermission permission={PERMISSION.VIEW_ANY_PRODUCT}>
+              <ProductsPage />
+            </RequirePermission>
+          } />
+          <Route path="inventory" element={
+            <RequirePermission permission={PERMISSION.VIEW_ANY_PRODUCT}>
+              <InventoryPage />
+            </RequirePermission>
+          } />
+          <Route path="inventory/stock-take" element={
+            <RequirePermission permission={PERMISSION.VIEW_ANY_PRODUCT}>
+              <StockTakePage />
+            </RequirePermission>
+          } />
 
           {/* Parties */}
-          <Route path="parties"   element={<PartiesPage />} />
-          <Route path="clients"   element={<ClientsPage />} />
-          <Route path="suppliers" element={<SuppliersPage />} />
-          <Route path="portal-orders" element={<PortalOrdersAdminPage />} />
+          <Route path="parties"   element={
+            <RequirePermission permission={PERMISSION.VIEW_ANY_PARTY}>
+              <PartiesPage />
+            </RequirePermission>
+          } />
+          <Route path="clients"   element={
+            <RequirePermission permission={PERMISSION.VIEW_ANY_PARTY}>
+              <ClientsPage />
+            </RequirePermission>
+          } />
+          <Route path="suppliers" element={
+            <RequirePermission permission={PERMISSION.VIEW_ANY_PARTY}>
+              <SuppliersPage />
+            </RequirePermission>
+          } />
+          <Route path="portal-orders" element={
+            <RequirePermission permission={PERMISSION.MANAGE_PORTAL_ORDERS}>
+              <PortalOrdersAdminPage />
+            </RequirePermission>
+          } />
 
           {/* Finance */}
-          <Route path="finance"  element={<FinancePage />} />
+          <Route path="finance"  element={
+            <RequirePermission permission={PERMISSION.VIEW_ANY_PAYMENT}>
+              <FinancePage />
+            </RequirePermission>
+          } />
           <Route path="expenses" element={<ExpensesPage />} />
           <Route path="debts"    element={<DebtsPage />} />
           <Route path="tva"      element={<TvaPage />} />
@@ -335,14 +405,26 @@ function AppRoutesInner() {
           <Route path="employees" element={<EmployeesPage />} />
 
           {/* Users */}
-          <Route path="users" element={<UsersPage />} />
-          <Route path="roles" element={<RolesPage />} />
+          <Route path="users" element={
+            <RequirePermission permission={PERMISSION.VIEW_ANY_USER}>
+              <UsersPage />
+            </RequirePermission>
+          } />
+          <Route path="roles" element={
+            <RequirePermission permission={PERMISSION.VIEW_ROLES}>
+              <RolesPage />
+            </RequirePermission>
+          } />
 
           {/* Notifications */}
           <Route path="notifications" element={<NotificationsPage />} />
 
           {/* Audit Log */}
-          <Route path="audit-log" element={<AuditLogPage />} />
+          <Route path="audit-log" element={
+            <RequirePermission permission={PERMISSION.VIEW_AUDIT_LOG}>
+              <AuditLogPage />
+            </RequirePermission>
+          } />
 
           {/* Offline */}
           <Route path="offline" element={<OfflinePage />} />
@@ -351,9 +433,17 @@ function AppRoutesInner() {
           <Route path="alerts" element={<AlertsPage />} />
 
           {/* Settings */}
-          <Route path="settings"                 element={<SettingsPage />} />
+          <Route path="settings"                 element={
+            <RequirePermission permission={PERMISSION.MANAGE_SETTINGS}>
+              <SettingsPage />
+            </RequirePermission>
+          } />
           <Route path="settings/document-types"  element={<DocumentTypesPage />} />
-          <Route path="settings/print"           element={<PrintSettingsPage />} />
+          <Route path="settings/print"           element={
+            <RequirePermission permission={PERMISSION.MANAGE_SETTINGS}>
+              <PrintSettingsPage />
+            </RequirePermission>
+          } />
           <Route path="settings/print/designer" element={<ReportDesignerPage />} />
           <Route path="settings/stickers" element={<StickerDesignerPage />} />
           <Route path="profile" element={<ProfilePage />} />
@@ -428,7 +518,9 @@ function AppRoutesInner() {
           element={
             <RequireCompany>
               <Suspense fallback={<PageLoader />}>
-                <POSProMobilePage />
+                <RequirePermission permission={PERMISSION.CREATE_SALES_DOCUMENT}>
+                  <POSProMobilePage />
+                </RequirePermission>
               </Suspense>
             </RequireCompany>
           }

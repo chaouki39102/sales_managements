@@ -118,9 +118,11 @@ Add these keys to the canonical permission canons AND the role profiles. They do
 
 ---
 
-## Phase 3 — Frontend guards (routes + nav + 403)
+## Phase 3 — Frontend guards (routes + nav + 403) ✅ DONE
 
-**Files:**
+> **Executed** (commits: `8e30fd1`, `dab6072`, + Phase 3 commit): created `lib/permissions.ts` (PERMISSION constants, `usePermissions()` — roles-scoped set + `can()`, super-admin bypass, `NAV_PATH_PERMISSION` + `permissionForNavPath`), `RequirePermission` (named export), `ForbiddenPage` (`.err-bd*`), wrapped all routes per the table below (+ `/pos/pro/mobile` → `create_sales_document`), and rebuilt the sidebar nav via a `navGroups` memo (per-item perm filtering, all items shown while `isLoading`, groups spread — no mutation of the module-level `NAV_GROUPS`, kept `superAdminOnly` drop + `LABEL_COLORS` alignment). Also migrated `SalesReportPage` + `ProductsReportPage` off the flat `useMyPermissions` → `usePermissions().can(PERMISSION.VIEW_COST_PRICE)` (report **cards** stay ungated — deferral recorded in Phase 3 commit). Verified: `tsc` clean · vitest **405/405** · build 0 errors, 239 precache · SW MATCH.
+
+**Files (actual):**
 1. NEW `resources/js/pages/errors/ForbiddenPage.tsx` (Arabic 403 page: «غير مصرح لك بالوصول», button back to dashboard).
 2. NEW `resources/js/components/auth/RequirePermission.tsx` — wrapper reading `useMyRolesAndPermissions` (empty while loading → render skeleton/`null`), derives `permissionsSet = new Set(roles.flatMap(r => r.permissions.map(p => p.name)))`, renders `<ForbiddenPage/>` when the required perm is absent; keeps `Gate::before`-style super-admin bypass (super admin → always allow).
 3. `resources/js/lib/api/core/types.ts` OR a new `lib/permissions.ts` — export the PERMISSION key constants + a `useCan(perm): boolean` hook that memoizes the set. **Source of truth for the set**: `useMyRolesAndPermissions` (roles-scoped) — NOT the flat `useMyPermissions` global list (see SettingsPage SSOT comment already in code).

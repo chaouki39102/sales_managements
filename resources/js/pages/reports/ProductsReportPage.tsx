@@ -3,7 +3,7 @@ import ReportShell from './ReportShell';
 import ReportDateFilter from './ReportDateFilter';
 import { FMT, MONEY, REPORT_DEFAULTS } from './helpers';
 import { useProductsReport, useProductHistory, type ProductHistoryItem } from '@/lib/api/endpoints/reports';
-import { useMyPermissions } from '@/lib/api/endpoints/roles';
+import { usePermissions, PERMISSION } from '@/lib/permissions';
 import { exportToExcel } from './exportUtils';
 import KpiCard from '@/components/ui/KpiCard';
 import Card from '@/components/ui/Card';
@@ -30,8 +30,8 @@ export default function ProductsReportPage() {
     ? { product_id: historyProduct.id, from_date: fromDate || undefined, to_date: toDate || undefined }
     : undefined);
 
-  const { data: myPermissions } = useMyPermissions();
-  const canViewCost = !!myPermissions?.includes('view_cost_price');
+  const { can } = usePermissions();
+  const canViewCost = can(PERMISSION.VIEW_COST_PRICE);
 
   const handleExport = async () => {
     if (!data) return;
