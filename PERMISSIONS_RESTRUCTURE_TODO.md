@@ -151,7 +151,9 @@ Add these keys to the canonical permission canons AND the role profiles. They do
 
 ---
 
-## Phase 4 — Settings page gating (`SettingsPage.tsx`) — REBASE `eb98378` onto real perms
+## Phase 4 — Settings page gating (`SettingsPage.tsx`) ✅ DONE
+
+> **Executed** (Phase 4 commit): `SettingsPage.tsx` tab gates now use the NEW keys — `users` → `view_any_user`, `backup` → `manage_backup`, `printers` → `manage_printer` (replaced the old `update_company` check); kept the existing roles-scoped pattern (nothing hidden while `myRolesData` is loading / super-admin sees all). Added `PERMISSION.MANAGE_BACKUP` + `PERMISSION.MANAGE_PRINTER` constants to `lib/permissions.ts`. Verified: `tsc` clean · vitest 405/405 · build 0 errors · SW MATCH.
 
 Current tab-hide (`SettingsPage.tsx` r79–109) hardcodes: `users` tab hidden unless `view_any_user`; `backup`/`printers` tabs hidden unless `update_company`. That commit must be REBASED (not removed):
 - `backup` + `printers` tabs → gate on the NEW keys: `manage_backup` and `manage_printer` respectively (replacing the `update_company` check).

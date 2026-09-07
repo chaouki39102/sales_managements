@@ -23,6 +23,8 @@ export const PERMISSION = {
   VIEW_AUDIT_LOG: 'view_audit_log',
   MANAGE_SETTINGS: 'manage_settings',
   MANAGE_PORTAL_ORDERS: 'manage_portal_orders',
+  MANAGE_BACKUP: 'manage_backup',
+  MANAGE_PRINTER: 'manage_printer',
   CREATE_SALES_DOCUMENT: 'create_sales_document',
   VIEW_SALES_REPORT: 'view_sales_report',
   VIEW_PURCHASE_REPORT: 'view_purchase_report',

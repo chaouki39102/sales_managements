@@ -28,6 +28,7 @@ import {
     UnsavedChangesModal,
 } from "./tabs/_shared";
 import { useMyRolesAndPermissions } from "@/lib/api/endpoints/roles";
+import { PERMISSION } from "@/lib/permissions";
 import { useIsSuperAdmin } from "@/context/AuthContext";
 import { CompanyTab } from "./tabs/CompanyTab";
 import { InvoiceTab } from "./tabs/InvoiceTab";
@@ -80,9 +81,9 @@ export default function SettingsPage() {
     // SSOT: myRoles تُقيَّد بسياق الشركة الحالية من الباكند وتحمل صلاحيات كل دور.
     // نقرأ من roles[].permissions[].name (وليس القائمة العامة permissions[]
     // التي هي union عبر كل الشركات ولا تصلح لقفل الشركة الحالية).
-    //   - users    ← view_any_user  (مالك/مدير)
-    //   - backup   ← update_company (مالك فقط)
-    //   - printers ← update_company (مالك فقط)
+    //   - users    ← view_any_user    (مالك/مدير)
+    //   - backup   ← manage_backup    (مالك فقط)
+    //   - printers ← manage_printer   (مالك فقط)
     const { data: myRolesData } = useMyRolesAndPermissions();
     const isSuperAdmin = useIsSuperAdmin();
 
@@ -101,8 +102,9 @@ export default function SettingsPage() {
         if (isSuperAdmin || !myRolesData) return all;
         return new Set(
             TABS.filter((t) => {
-                if (t.id === "users") return settingsPermissions.has("view_any_user");
-                if (t.id === "backup" || t.id === "printers") return settingsPermissions.has("update_company");
+                if (t.id === "users") return settingsPermissions.has(PERMISSION.VIEW_ANY_USER);
+                if (t.id === "backup") return settingsPermissions.has(PERMISSION.MANAGE_BACKUP);
+                if (t.id === "printers") return settingsPermissions.has(PERMISSION.MANAGE_PRINTER);
                 return true;
             }).map((t) => t.id),
         );
