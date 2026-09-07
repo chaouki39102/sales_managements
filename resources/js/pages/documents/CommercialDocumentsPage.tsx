@@ -92,6 +92,16 @@ const STATUS_CFG = {
 
 type StatusKey = keyof typeof STATUS_CFG;
 
+const CONFIRM_LOCK_LONG  = "تأكيد قفل هذا المستند؟ لن يمكن تعديله بعد القفل.";
+const CONFIRM_LOCK_SHORT = "تأكيد قفل هذا المستند؟";
+const CONFIRM_UNLOCK     = "تأكيد فتح قفل هذا المستند؟";
+
+const ICON_BTN_STYLE: React.CSSProperties = {
+    height: 28, width: 28, borderRadius: 7, border: "1px solid var(--b2)",
+    background: "var(--bg2)", color: "var(--t4)", fontSize: 13, cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center", transition: "all .15s",
+};
+
 // ════════════════════════════════════════════════════════════════════════════
 // PURE HELPERS
 // ════════════════════════════════════════════════════════════════════════════
@@ -1088,11 +1098,11 @@ export default function CommercialDocumentsPage() {
                             if (isReadOnly) return;
                             if (locked) {
                                 if (isExported) { notify.error("لا يمكن فتح قفل مستند مُصدَّر للمحاسبة"); return; }
-                                if (await confirm("تأكيد فتح قفل هذا المستند؟")) unlockMut.mutate(row.id);
+                                if (await confirm(CONFIRM_UNLOCK)) unlockMut.mutate(row.id);
                             } else {
                                 const status = getDocStatus(row);
                                 if (status === "cancelled") { notify.error("لا يمكن قفل مستند ملغى"); return; }
-                                if (await confirm("تأكيد قفل هذا المستند؟ لن يمكن تعديله بعد القفل.")) lockMut.mutate(row.id);
+                                if (await confirm(CONFIRM_LOCK_LONG)) lockMut.mutate(row.id);
                             }
                         }}
                         style={{
@@ -1227,12 +1237,12 @@ export default function CommercialDocumentsPage() {
             sortable: true,
             hideOnMobile: true,
             filter: { type: "number" },
-            accessor: r => Number((r as unknown as Record<string,unknown>).net_to_pay ?? r.total_ttc ?? 0),
+            accessor: r => Number(r.net_to_pay ?? r.total_ttc ?? 0),
             aggregate: "sum",
             aggregateFormat: v => `${fmtMoney(v)} دج`,
             render: row => {
-                const ntp = Number((row as unknown as Record<string,unknown>).net_to_pay ?? row.total_ttc ?? 0);
-                const rem = Number((row as unknown as Record<string,unknown>).remaining_amount ?? 0);
+                const ntp = Number(row.net_to_pay ?? row.total_ttc ?? 0);
+                const rem = Number(row.remaining_amount ?? 0);
                 const paid = ntp > 0 && rem <= 0.001;
                 return <MoneyCell value={ntp} bold accent={paid ? "var(--em)" : rem > 0 ? "var(--red)" : "var(--t2)"} />;
             },
@@ -1245,11 +1255,11 @@ export default function CommercialDocumentsPage() {
             align: "end",
             sortable: true,
             filter: { type: "number" },
-            accessor: r => Number((r as unknown as Record<string,unknown>).paid_amount ?? 0),
+            accessor: r => Number(r.paid_amount ?? 0),
             aggregate: "sum",
             aggregateFormat: v => `${fmtMoney(v)} دج`,
             render: row => {
-                const paid = Number((row as unknown as Record<string,unknown>).paid_amount ?? 0);
+                const paid = Number(row.paid_amount ?? 0);
                 return paid > 0
                     ? <MoneyCell value={paid} accent="var(--em)" />
                     : <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
@@ -1294,11 +1304,11 @@ export default function CommercialDocumentsPage() {
             sortable: true,
             defaultHidden: true,
             filter: { type: "number" as const },
-            accessor: (r: CommercialDocument) => Number((r as unknown as Record<string,unknown>).total_discount ?? 0),
+            accessor: (r: CommercialDocument) => Number(r.total_discount ?? 0),
             aggregate: "sum" as const,
             aggregateFormat: (v: number) => `${fmtMoney(v)} دج`,
             render: (row: CommercialDocument) => {
-                const v = Number((row as unknown as Record<string,unknown>).total_discount ?? 0);
+                const v = Number(row.total_discount ?? 0);
                 if (!v) return <span style={{ color: "var(--t4)", fontSize: 12 }}>—</span>;
                 return <MoneyCell value={v} accent="var(--red)" />;
             },
@@ -1312,10 +1322,10 @@ export default function CommercialDocumentsPage() {
             sortable: true,
             defaultHidden: true,
             filter: { type: "number" as const },
-            accessor: (r: CommercialDocument) => Number((r as unknown as Record<string,unknown>).total_stamp ?? 0),
+            accessor: (r: CommercialDocument) => Number(r.total_stamp ?? 0),
             aggregate: "sum" as const,
             aggregateFormat: (v: number) => `${fmtMoney(v)} دج`,
-            render: (row: CommercialDocument) => <MoneyCell value={(row as unknown as Record<string,unknown>).total_stamp as number} />,
+            render: (row: CommercialDocument) => <MoneyCell value={row.total_stamp ?? 0} />,
         },
         {
             key: "remaining_amount",
@@ -1326,11 +1336,11 @@ export default function CommercialDocumentsPage() {
             sortable: true,
             defaultHidden: true,
             filter: { type: "number" as const },
-            accessor: (r: CommercialDocument) => Number((r as unknown as Record<string,unknown>).remaining_amount ?? 0),
+            accessor: (r: CommercialDocument) => Number(r.remaining_amount ?? 0),
             aggregate: "sum" as const,
             aggregateFormat: (v: number) => `${fmtMoney(v)} دج`,
             render: (row: CommercialDocument) => {
-                const rem = Number((row as unknown as Record<string,unknown>).remaining_amount ?? 0);
+                const rem = Number(row.remaining_amount ?? 0);
                 if (rem <= 0.001) return <span style={{ color: "var(--em)", fontSize: 12, fontWeight: 700 }}>مسدد ✓</span>;
                 return <MoneyCell value={rem} accent="var(--red)" bold />;
             },
@@ -1680,7 +1690,7 @@ export default function CommercialDocumentsPage() {
                     label: "قفل المستند",
                     icon: "lock",
                     onClick: async () => {
-                        if (row && await confirm("تأكيد قفل هذا المستند؟")) lockMut.mutate(row.id);
+                        if (row && await confirm(CONFIRM_LOCK_SHORT)) lockMut.mutate(row.id);
                     },
                 });
             }
@@ -1689,7 +1699,7 @@ export default function CommercialDocumentsPage() {
                     label: "فتح قفل المستند",
                     icon: "lock-open",
                     onClick: async () => {
-                        if (row && await confirm("تأكيد فتح قفل هذا المستند؟")) unlockMut.mutate(row.id);
+                        if (row && await confirm(CONFIRM_UNLOCK)) unlockMut.mutate(row.id);
                     },
                 });
             }
@@ -1864,7 +1874,7 @@ export default function CommercialDocumentsPage() {
                         icon="ti-lock" title="قفل المستند" color="var(--orange)"
                         disabled={lockMut.isPending}
                         onClick={async () => {
-                            if (await confirm("تأكيد قفل هذا المستند؟ لن يمكن تعديله بعد القفل."))
+                            if (await confirm(CONFIRM_LOCK_LONG))
                                 lockMut.mutate(row.id);
                         }}
                     />
@@ -1876,7 +1886,7 @@ export default function CommercialDocumentsPage() {
                         icon="ti-lock-open" title="فتح القفل" color="var(--blue)"
                         disabled={unlockMut.isPending}
                         onClick={async () => {
-                            if (await confirm("تأكيد فتح قفل هذا المستند؟"))
+                            if (await confirm(CONFIRM_UNLOCK))
                                 unlockMut.mutate(row.id);
                         }}
                     />
@@ -1895,7 +1905,7 @@ export default function CommercialDocumentsPage() {
                 <ApprovalActions
                     documentId={row.id}
                     statusSlug={rowStatus}
-                    netToPay={Number((row as unknown as Record<string, unknown>).net_to_pay ?? row.total_ttc ?? 0)}
+                    netToPay={Number(row.net_to_pay ?? row.total_ttc ?? 0)}
                     approvalCheck={approvalBatch?.[row.id]}
                 />
             </div>
@@ -1934,7 +1944,7 @@ export default function CommercialDocumentsPage() {
                             window.location.reload();
                         }
                     }}
-                    style={{ height: 28, width: 28, borderRadius: 7, border: "1px solid var(--b2)", background: "var(--bg2)", color: "var(--t4)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all .15s" }}
+                    style={ICON_BTN_STYLE}
                     aria-label="إعادة ضبط تخطيط الجدول"
                 >
                     <i className="ti ti-layout-columns" aria-hidden="true" />
@@ -1944,7 +1954,7 @@ export default function CommercialDocumentsPage() {
             <button
                 title="مسح QR الفاتورة لفتح المستند"
                 onClick={docScan.openScanner}
-                style={{ height: 28, width: 28, borderRadius: 7, border: "1px solid var(--b2)", background: "var(--bg2)", color: "var(--t4)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all .15s" }}
+                style={ICON_BTN_STYLE}
                 aria-label="مسح QR الفاتورة لفتح المستند"
             >
                 <i className="ti ti-camera" aria-hidden="true" />

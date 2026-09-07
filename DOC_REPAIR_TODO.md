@@ -2,7 +2,7 @@
 
 > **Status (2026-09-06):** Full read of the commercial-document module (backend service/controller/model/observers/policies + frontend page/modal/hooks/components) — audit produced the findings below. Each row = one repair; work top-down, commit after each group.
 >
-> **Progress:** Group B (frontend hooks/utils, B1–B6) ✅ DONE — one commit. Group C (page & modal, C1–C13) ✅ DONE — one commit. Group D (components, D1–D27) ✅ DONE — one commit (incl. `SmartSuggestionsPanel.tsx` deletion). All verified: `npx tsc --noEmit` clean · vitest 405/405 · build 0 errors (239 precache) · SW MATCH · `php -l` clean · pest 87/87 · tinker smoke `filter[code]=FV` → exactly 1. Next group: E (document view modal) then F.
+> **Progress:** Group B (frontend hooks/utils, B1–B6) ✅ DONE — one commit. Group C (page & modal, C1–C13) ✅ DONE — one commit. Group D (components, D1–D27) ✅ DONE — one commit (incl. `SmartSuggestionsPanel.tsx` deletion). Group E (document view modal, E1–E3) ✅ DONE — one commit. **Ledger COMPLETE — the file contains groups A–E only; there is no Group F section (the older «then F» header text was stale).** All verified: `npx tsc --noEmit` clean · vitest 405/405 · build 0 errors (239 precache) · SW MATCH · `php -l` clean · pest 87/87 · tinker smoke `filter[code]=FV` → exactly 1.
 
 ## Categories
 - **DEAD** = dead/unreachable code, safe to delete
@@ -90,9 +90,9 @@
 
 | # | Cat | Loc | Issue | Repair |
 |---|-----|-----|-------|--------|
-| E1 | CLEAN | `CommercialDocumentsPage.tsx:1071,1232,1236-1239` | `Legacy…` pay-field verification harnesses cast legacy shapes | Use typed rows / the `LegacyPay` mapper |
-| E2 | DUP | `CommercialDocumentsPage.tsx:1089,1883 (variant 1699)` | Lock-confirmation message string repeated | Extract const |
-| E3 | DUP | `CommercialDocumentsPage.tsx:1953,1963` | Reset-layout button style block duplicated | One shared const |
+| E1 | CLEAN | `CommercialDocumentsPage.tsx:1071,1232,1236-1239` | `Legacy…` pay-field verification harnesses cast legacy shapes | Use typed rows / the `LegacyPay` mapper | ✅ FIXED — 12 dual-cast sites removed; all read typed `CommercialDocument` row fields directly (`r.net_to_pay ?? r.total_ttc`, `r.paid_amount`, `r.total_discount`, `r.total_stamp`, `r.remaining_amount`) incl. the `ApprovalActions` `netToPay` at `:1905`; no `LegacyPay` references remain |
+| E2 | DUP | `CommercialDocumentsPage.tsx:1089,1883 (variant 1699)` | Lock-confirmation message string repeated | Extract const | ✅ FIXED — `CONFIRM_LOCK_LONG`/`CONFIRM_LOCK_SHORT`/`CONFIRM_UNLOCK` consts at `:95-97`; all 6 lock/unlock call sites use them (`:1101/:1105/:1693/:1702/:1877/:1889`) |
+| E3 | DUP | `CommercialDocumentsPage.tsx:1953,1963` | Reset-layout button style block duplicated | One shared const | ✅ FIXED — `ICON_BTN_STYLE: React.CSSProperties` at `:99-103`; both reset-layout and QR-scan buttons use it at `:1947/:1957` |
 
 ---
 
