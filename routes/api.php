@@ -545,16 +545,13 @@ Route::prefix('v1')->group(function () {
                 // مستخدمون (كتابة — can:update_company)
                 // ✅ القراءة في مجموعة can:view_any_user أعلاه
                 // ✅ الحذف / التفعيل / تعيين الدور → مجموعة can:manage_company_members أدناه
+                // ✅ أدوار/صلاحيات (كتابة) → مجموعة can:manage_roles أدناه
                 Route::post('users',                        [UserController::class, 'store']);
                 Route::put('users/{user}',                  [UserController::class, 'update']);
                 Route::patch('users/{user}',                [UserController::class, 'update']);
                 Route::post('users/{user}/restore',        [UserController::class, 'restore']);
                 Route::delete('users/{user}/force-delete', [UserController::class, 'forceDelete']);
                 Route::post('users/{user}/change-password', [UserController::class, 'changePassword']);
-
-                // أدوار وصلاحيات
-                Route::apiResource('roles',               RoleController::class,               ['except' => ['index', 'show']]);
-                Route::apiResource('permissions',         PermissionController::class,         ['except' => ['index', 'show']]);
 
                 // موظفون وعقود
                 Route::apiResource('employees',             EmployeeController::class,           ['except' => ['index', 'show']]);
@@ -590,6 +587,12 @@ Route::prefix('v1')->group(function () {
                 Route::delete('users/{user}',              [UserController::class, 'destroy']);
                 Route::post('users/{user}/toggle-active',  [UserController::class, 'toggleActive']);
                 Route::post('users/{user}/assign-role',    [UserController::class, 'assignRole']);
+            });
+
+            // ── ⑤-ب-١-م: إدارة الأدوار والصلاحيات (can:manage_roles) ──
+            Route::middleware('can:manage_roles')->group(function () {
+                Route::apiResource('roles',       RoleController::class,        ['except' => ['index', 'show']]);
+                Route::apiResource('permissions', PermissionController::class,  ['except' => ['index', 'show']]);
             });
 
             // ── ⑤-ب-٢: السنوات المالية (manage_fiscal_year) ─────
