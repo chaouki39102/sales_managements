@@ -2,7 +2,7 @@
 // ════════════════════════════════════════════════
 // إدارة المستخدمين + الأدوار + الصلاحيات — واجهة متكاملة
 // ════════════════════════════════════════════════
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRoles } from "@/lib/api/endpoints/roles";
 import { usersApi, rolesApi, usePermissions } from "@/lib/api/endpoints/users";
@@ -301,10 +301,12 @@ function PermMatrix({
     permissions,
     selected,
     onChange,
+    roleDerivedIds,
 }: {
     permissions: Permission[];
     selected: number[];
     onChange: (ids: number[]) => void;
+    roleDerivedIds?: Set<number>;
 }) {
     const groups = permissions.reduce<Record<string, Permission[]>>(
         (acc, p) => {
@@ -417,9 +419,11 @@ function PermMatrix({
                         >
                             {perms.map((p) => {
                                 const on = selected.includes(p.id);
+                                const fromRole = roleDerivedIds?.has(p.id) ?? false;
                                 return (
                                     <label
                                         key={p.id}
+                                        title={fromRole ? "ممنوحة عبر الدور — تغييرها يُضيف صلاحية مباشرة" : undefined}
                                         style={{
                                             display: "inline-flex",
                                             alignItems: "center",
@@ -430,10 +434,14 @@ function PermMatrix({
                                             fontSize: 11,
                                             fontWeight: 600,
                                             background: on
-                                                ? `${color}15`
-                                                : "var(--bg4)",
-                                            border: `1px solid ${on ? color + "50" : "transparent"}`,
-                                            color: on ? color : "var(--t3)",
+                                                ? fromRole
+                                                    ? `${color}25`
+                                                    : `${color}15`
+                                                : fromRole
+                                                    ? "var(--bg3)"
+                                                    : "var(--bg4)",
+                                            border: `1px solid ${on ? color + "50" : fromRole ? "var(--b2)" : "transparent"}`,
+                                            color: on ? color : fromRole ? "var(--t4)" : "var(--t3)",
                                             transition: "all .13s",
                                             userSelect: "none",
                                         }}
@@ -444,10 +452,17 @@ function PermMatrix({
                                             onChange={() => toggleOne(p.id)}
                                             style={{ display: "none" }}
                                         />
-                                        <i
-                                            className={`ti ti-${on ? "check" : "plus"}`}
-                                            style={{ fontSize: 9 }}
-                                        />
+                                        {fromRole && !on ? (
+                                            <i
+                                                className="ti ti-shield"
+                                                style={{ fontSize: 9, opacity: 0.6 }}
+                                            />
+                                        ) : (
+                                            <i
+                                                className={`ti ti-${on ? "check" : "plus"}`}
+                                                style={{ fontSize: 9 }}
+                                            />
+                                        )}
                                         {p.display_name ?? p.name}
                                     </label>
                                 );
@@ -829,12 +844,9 @@ function UserFormModal({
                 job_title: user.job_title ?? "",
                 password: "",
                 role: user.roles?.[0]?.name ?? "",
-                // نجمع: الصلاحيات المباشرة + صلاحيات الدور المُعيَّن
-                // user.permissions = Direct Permissions (objects مع id)
-                // user.role_permissions = صلاحيات الدور (يرجعها UserResource)
+                // الصلاحيات المباشرة فقط (غير ممنوحة عبر الدور)
                 permission_ids: [
                     ...(user.permissions?.map((p: any) => p.id) ?? []),
-                    ...((user as any).role_permissions?.map((p: any) => p.id) ?? []),
                 ],
                 active: user.active ?? true,
             });
@@ -873,6 +885,18 @@ function UserFormModal({
             setForm((prev) => ({ ...prev, [k]: v }));
 
     const sel_perm_count = form.permission_ids.length;
+
+    // صلاحيات الدور المُعيَّن (للعرض فقط — غير قابلة للتعديل)
+    const roleDerivedPerms = useMemo(() => {
+        if (!isEdit || !form.role) return [] as Permission[];
+        const selectedRole = roles.find((r) => r.name === form.role);
+        return selectedRole?.permissions ?? [];
+    }, [isEdit, form.role, roles]);
+
+    const roleDerivedIds = useMemo(
+        () => new Set(roleDerivedPerms.map((p) => p.id)),
+        [roleDerivedPerms],
+    );
 
     return (
         <Modal open onClose={onClose} closeOnBackdrop={false} title={isEdit ? `تعديل: ${user?.name}` : "مستخدم جديد"}
@@ -1162,6 +1186,74 @@ function UserFormModal({
 
                 {tab === "perms" && (
                     <div>
+                        {/* ── صلاحيات الدور (للعرض فقط) ── */}
+                        {isEdit && roleDerivedPerms.length > 0 && (
+                            <div
+                                style={{
+                                    marginBottom: 14,
+                                    padding: "10px 14px",
+                                    borderRadius: 10,
+                                    background: "var(--bg3)",
+                                    border: "1px solid var(--b1)",
+                                }}
+                            >
+                                <span
+                                    style={{
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        color: "var(--t3)",
+                                        display: "block",
+                                        marginBottom: 8,
+                                    }}
+                                >
+                                    <i className="ti ti-shield" style={{ marginInlineEnd: 4 }} />
+                                    صلاحيات ممنوحة عبر الدور —{" "}
+                                    {roles.find((r) => r.name === form.role)?.display_name ??
+                                        form.role}{" "}
+                                    ({roleDerivedPerms.length})
+                                </span>
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        flexWrap: "wrap",
+                                        gap: 5,
+                                    }}
+                                >
+                                    {roleDerivedPerms.map((p) => (
+                                        <span
+                                            key={p.id}
+                                            style={{
+                                                display: "inline-flex",
+                                                alignItems: "center",
+                                                gap: 4,
+                                                padding: "3px 9px",
+                                                borderRadius: 16,
+                                                fontSize: 10,
+                                                fontWeight: 600,
+                                                background: "var(--bg4)",
+                                                color: "var(--t4)",
+                                                border: "1px solid var(--b2)",
+                                            }}
+                                        >
+                                            <i className="ti ti-lock" style={{ fontSize: 8 }} />
+                                            {p.display_name ?? p.name}
+                                        </span>
+                                    ))}
+                                </div>
+                                <span
+                                    style={{
+                                        fontSize: 10,
+                                        color: "var(--t4)",
+                                        display: "block",
+                                        marginTop: 6,
+                                    }}
+                                >
+                                    تُدار من محرر الأدوار — الإضافة أدناه تُنشئ صلاحية مباشرة إضافية
+                                </span>
+                            </div>
+                        )}
+
+                        {/* ── مصفوفة الصلاحيات المباشرة ── */}
                         <div
                             style={{
                                 marginBottom: 12,
@@ -1173,6 +1265,9 @@ function UserFormModal({
                             <span style={{ fontSize: 12, color: "var(--t4)" }}>
                                 صلاحيات مباشرة — {sel_perm_count} محدد من{" "}
                                 {permissions.length}
+                                {roleDerivedIds.size > 0 && (
+                                    <> (+{roleDerivedIds.size} من الدور)</>
+                                )}
                             </span>
                             <div style={{ display: "flex", gap: 6 }}>
                                 <Btn
@@ -1197,6 +1292,7 @@ function UserFormModal({
                             permissions={permissions}
                             selected={form.permission_ids}
                             onChange={(ids) => f("permission_ids")(ids)}
+                            roleDerivedIds={isEdit ? roleDerivedIds : undefined}
                         />
                     </div>
                 )}
