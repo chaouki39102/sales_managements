@@ -12,17 +12,19 @@ interface ConvertDocumentModalProps {
   onDone:    () => void;
   documentId: number;
   sourceCode: string | null;
-  sourceDate: string;
 }
 
 export default function ConvertDocumentModal({
   isOpen, onClose, onDone,
-  documentId, sourceCode, sourceDate: _sourceDate,
+  documentId, sourceCode,
 }: ConvertDocumentModalProps) {
   const slug  = useActiveSlug();
   const convertMut = useConvertDocument();
 
-  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const todayStr = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+  }, []);
 
   const [targetCode, setTargetCode]   = useState('');
   const [docDate, setDocDate]         = useState(todayStr);
@@ -104,17 +106,8 @@ export default function ConvertDocumentModal({
               <button
                 key={t.code}
                 type="button"
+                className={`doc-convert-target${targetCode === t.code ? ' on' : ''}`}
                 onClick={() => setTargetCode(t.code)}
-                onFocus={(e) => { (e.currentTarget as HTMLElement).style.outline = '2px solid var(--em)'; (e.currentTarget as HTMLElement).style.outlineOffset = '1px'; }}
-                onBlur={(e) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }}
-                style={{
-                  padding: '8px 16px', borderRadius: 'var(--r2)', cursor: 'pointer',
-                  border: targetCode === t.code ? '2px solid var(--em)' : '1px solid var(--b3)',
-                  background: targetCode === t.code ? 'color-mix(in srgb, var(--em) 10%, transparent)' : 'var(--bg2)',
-                  color: targetCode === t.code ? 'var(--em)' : 'var(--t2)',
-                  fontSize: 13, fontWeight: targetCode === t.code ? 700 : 500,
-                  transition: 'all .1s',
-                }}
               >
                 {t.code} · {t.name}
               </button>
@@ -173,7 +166,7 @@ export default function ConvertDocumentModal({
           >
             {isLoading ? (
               <>
-                <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
+                <i className="ti ti-loader ti-spin" />
                 جاري التحويل…
               </>
             ) : 'تحويل'}

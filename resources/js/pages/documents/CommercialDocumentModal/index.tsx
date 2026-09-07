@@ -237,7 +237,6 @@ export default function CommercialDocumentModal({
             <DocumentChainPanel
               chain={chain}
               isLoading={isLoadingChain}
-              currentId={Number(existingDocument?.id)}
               allowedTargets={allowedTargets}
               isReadOnly={isReadOnly}
               onConvert={async (targetCode) => {

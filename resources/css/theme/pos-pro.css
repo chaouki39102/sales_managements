@@ -3666,3 +3666,75 @@
    required display:none/visibility). `.ov.hidden` has higher specificity and
    is loaded last — the authoritative "closed modal is hidden" rule. */
 .ov.hidden { display: none !important; }
+
+/* D24 — CSS :hover/:focus-visible classes (no DOM-inline hover mutation).
+   Base colors live in the class so :hover can override them. Selected states
+   use modifier classes that must beat plain :hover (same-or-higher specificity). */
+.doc-chain-opt {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: right;
+  border: none;
+  border-bottom: 1px solid var(--b1);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--t1);
+  background: transparent;
+  font-family: inherit;
+}
+.doc-chain-opt:hover,
+.doc-chain-opt:focus-visible {
+  background: var(--emb);
+  color: var(--em);
+}
+
+.doc-convert-target {
+  padding: 8px 16px;
+  border-radius: var(--r2);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--b3);
+  background: var(--bg2);
+  color: var(--t2);
+  transition: all .1s;
+  font-family: inherit;
+}
+.doc-convert-target:hover,
+.doc-convert-target:focus-visible {
+  border-color: var(--em);
+  color: var(--em);
+}
+.doc-convert-target.on {
+  border: 2px solid var(--em);
+  background: color-mix(in srgb, var(--em) 10%, transparent);
+  color: var(--em);
+  font-weight: 700;
+}
+
+.adv-apply-btn { background: transparent; color: var(--green); }
+.adv-apply-btn:hover:not(:disabled),
+.adv-apply-btn:focus-visible:not(:disabled) {
+  background: var(--green);
+  color: #fff;
+}
+
+.combo-item { background: transparent; }
+.combo-item:hover { background: var(--bg3); }
+.combo-item--sel,
+.combo-item--sel:hover,
+.combo-item--hi,
+.combo-item--hi:hover { background: var(--emb); }
+
+.col-toggle { background: transparent; transition: background .1s; }
+.col-toggle:hover { background: var(--bg3); }
+.col-toggle--on,
+.col-toggle--on:hover { background: var(--emb); }
+
+.alert-item { background: transparent; transition: background .12s; }
+.alert-item:hover { background: var(--bg3); }
+.alert-item--unread,
+.alert-item--unread:hover {
+  background: color-mix(in srgb, var(--blue) 4%, transparent);
+}

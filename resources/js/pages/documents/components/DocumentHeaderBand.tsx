@@ -90,6 +90,115 @@ const segHeader = (): React.CSSProperties => ({
   fontSize: 10.5, fontWeight: 800, color: 'var(--t4)',
 });
 
+/** حقل رقم المستند (تعديل فقط) — مُستخرج لتجنّب التكرار بين أنماط العرض الثلاثة. */
+function DocNumberInput({
+  docNumber, docNumberErr, checkingDocNumber, handleDocNumberChange, isReadOnly,
+}: {
+  docNumber: string;
+  docNumberErr: string;
+  checkingDocNumber: boolean;
+  handleDocNumberChange: (v: string) => void;
+  isReadOnly: boolean;
+}) {
+  return (
+    <>
+      <div style={segHeader()}>
+        <i className="ti ti-file-description" />
+        <span>رقم المستند</span>
+      </div>
+      <div className="doc-field-rel">
+        <input
+          type="text"
+          style={{
+            ...fieldInputStyle(isReadOnly, !!docNumberErr),
+            paddingLeft: checkingDocNumber ? 28 : 10, paddingTop: 5, paddingBottom: 5,
+          }}
+          value={docNumber}
+          disabled={isReadOnly}
+          onChange={(e) => handleDocNumberChange(e.target.value)}
+          placeholder="أدخل رقم المستند..."
+        />
+        {checkingDocNumber && (
+          <i className="ti ti-loader doc-field-spin" />
+        )}
+      </div>
+      <FieldError msg={docNumberErr} />
+    </>
+  );
+}
+
+/** حقل تاريخ المستند — مُستخرج لتجنّب التكرار (بطاقة المتعامل + التخطيط القديم). */
+function DateFieldBlock({
+  isReadOnly, value, err, onChange, style,
+}: {
+  isReadOnly: boolean;
+  value: string;
+  err: string;
+  onChange: (v: string) => void;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <div style={{ ...segCard, ...style }}>
+      <div style={segHeader()}>
+        <i className="ti ti-calendar" />
+        <span>تاريخ المستند</span>
+      </div>
+      <input
+        type="date"
+        style={fieldInputStyle(isReadOnly, !!err)}
+        value={value}
+        disabled={isReadOnly}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <FieldError msg={err} />
+    </div>
+  );
+}
+
+/** حقل المستودع — مُستخرج لتجنّب التكرار (بطاقة المتعامل + التخطيط القديم). */
+function WarehouseFieldBlock({
+  isReadOnly, value, err, onChange, style, qc, slug, warehouseIdNum, warehouses,
+}: {
+  isReadOnly: boolean;
+  value: string;
+  err: string;
+  onChange: (v: string) => void;
+  style?: React.CSSProperties;
+  qc: QueryClient;
+  slug: string | null | undefined;
+  warehouseIdNum: number | null;
+  warehouses: Array<{ id: number; name: string; is_default?: boolean }>;
+}) {
+  return (
+    <div style={{ ...segCard, ...style }}>
+      <div style={segHeader()}>
+        <i className="ti ti-building-warehouse" />
+        <span>المستودع</span>
+      </div>
+      <select
+        style={{
+          ...fieldInputStyle(isReadOnly, !!err),
+          cursor: isReadOnly ? 'not-allowed' : 'pointer',
+        }}
+        value={value}
+        disabled={isReadOnly}
+        onChange={(e) => {
+          onChange(e.target.value);
+          qc.invalidateQueries({ queryKey: [slug, 'warehouse-stock', warehouseIdNum] });
+        }}
+      >
+        <option value="">— اختر —</option>
+        {warehouses.map((w) => (
+          <option key={String(w.id)} value={String(w.id)}>
+            {String(w.name)}{w.is_default ? ' ★' : ''}
+          </option>
+        ))}
+      </select>
+      <FieldError msg={err} />
+    </div>
+  );
+}
+
 /**
  * شريط معلومات المستند. في نمط POS Pro:
  *  - `party-card`: المتعامل كبطاقة مستقلة (مع الرصيد والإنشاء السريع) تُعرض في الصف العلوي.
@@ -333,73 +442,35 @@ export default function DocumentHeaderBand({
             {/* رقم المستند (تعديل فقط) */}
             {isEdit && (
               <div style={segCard}>
-                <div style={segHeader()}>
-                  <i className="ti ti-hash" />
-                  <span>رقم المستند</span>
-                </div>
-                <div className="doc-field-rel">
-                  <input
-                    type="text"
-                    style={{
-                      ...fieldInputStyle(isReadOnly, !!docNumberErr),
-                      paddingLeft: checkingDocNumber ? 28 : 10, paddingTop: 5, paddingBottom: 5,
-                    }}
-                    value={docNumber}
-                    disabled={isReadOnly}
-                    onChange={(e) => handleDocNumberChange(e.target.value)}
-                    placeholder="أدخل رقم المستند..."
-                  />
-                  {checkingDocNumber && (
-                    <i className="ti ti-loader doc-field-spin" />
-                  )}
-                </div>
-                <FieldError msg={docNumberErr} />
+                <DocNumberInput
+                  docNumber={docNumber}
+                  docNumberErr={docNumberErr}
+                  checkingDocNumber={checkingDocNumber}
+                  handleDocNumberChange={handleDocNumberChange}
+                  isReadOnly={isReadOnly}
+                />
               </div>
             )}
 
             {/* تاريخ المستند */}
-            <div style={segCard}>
-              <div style={segHeader()}>
-                <i className="ti ti-calendar" />
-                <span>تاريخ المستند</span>
-              </div>
-              <input
-                type="date"
-                style={fieldInputStyle(isReadOnly, !!errors.document_date)}
-                value={form.document_date as string}
-                disabled={isReadOnly}
-                onChange={(e) => set('document_date', e.target.value)}
-              />
-              <FieldError msg={errors.document_date} />
-            </div>
+            <DateFieldBlock
+              isReadOnly={isReadOnly}
+              value={form.document_date as string}
+              err={errors.document_date}
+              onChange={(v) => set('document_date', v)}
+            />
 
             {/* المستودع */}
-            <div style={segCard}>
-              <div style={segHeader()}>
-                <i className="ti ti-building-warehouse" />
-                <span>المستودع</span>
-              </div>
-              <select
-                style={{
-                  ...fieldInputStyle(isReadOnly, !!errors.warehouse_id),
-                  cursor: isReadOnly ? 'not-allowed' : 'pointer',
-                }}
-                value={form.warehouse_id as string}
-                disabled={isReadOnly}
-                onChange={(e) => {
-                  set('warehouse_id', e.target.value);
-                  qc.invalidateQueries({ queryKey: [slug, 'warehouse-stock', warehouseIdNum] });
-                }}
-              >
-                <option value="">— اختر —</option>
-                {warehouses.map((w) => (
-                  <option key={String(w.id)} value={String(w.id)}>
-                    {String(w.name)}{w.is_default ? ' ★' : ''}
-                  </option>
-                ))}
-              </select>
-              <FieldError msg={errors.warehouse_id} />
-            </div>
+            <WarehouseFieldBlock
+              isReadOnly={isReadOnly}
+              value={form.warehouse_id as string}
+              err={errors.warehouse_id}
+              onChange={(v) => set('warehouse_id', v)}
+              qc={qc}
+              slug={slug}
+              warehouseIdNum={warehouseIdNum}
+              warehouses={warehouses}
+            />
 
             {/* فئة السعر */}
             {!isPurchase && priceLevelOptions.length > 0 && (
@@ -448,27 +519,13 @@ export default function DocumentHeaderBand({
         {/* رقم المستند (تعديل فقط) */}
         {isEdit && (
           <div style={{ ...segCard, flex: '1 1 150px', minWidth: 130 }}>
-            <div style={segHeader()}>
-              <i className="ti ti-file-description" />
-              <span>رقم المستند</span>
-            </div>
-            <div className="doc-field-rel">
-              <input
-                type="text"
-                style={{
-                  ...fieldInputStyle(isReadOnly, !!docNumberErr),
-                  paddingLeft: checkingDocNumber ? 28 : 10, paddingTop: 5, paddingBottom: 5,
-                }}
-                value={docNumber}
-                disabled={isReadOnly}
-                onChange={(e) => handleDocNumberChange(e.target.value)}
-                placeholder="أدخل رقم المستند..."
-              />
-              {checkingDocNumber && (
-                <i className="ti ti-loader doc-field-spin" />
-              )}
-            </div>
-            <FieldError msg={docNumberErr} />
+            <DocNumberInput
+              docNumber={docNumber}
+              docNumberErr={docNumberErr}
+              checkingDocNumber={checkingDocNumber}
+              handleDocNumberChange={handleDocNumberChange}
+              isReadOnly={isReadOnly}
+            />
           </div>
         )}
 
@@ -559,27 +616,13 @@ export default function DocumentHeaderBand({
       {/* ── رقم المستند (تعديل فقط) ─────────────────────────────── */}
       {isEdit && (
         <div style={{ ...segCard, flex: '1 1 150px' }}>
-          <div style={segHeader()}>
-            <i className="ti ti-file-description" />
-            <span>رقم المستند</span>
-          </div>
-          <div className="doc-field-rel">
-            <input
-              type="text"
-              style={{
-                ...fieldInputStyle(isReadOnly, !!docNumberErr),
-                paddingLeft: checkingDocNumber ? 28 : 10,
-              }}
-              value={docNumber}
-              disabled={isReadOnly}
-              onChange={(e) => handleDocNumberChange(e.target.value)}
-              placeholder="أدخل رقم المستند..."
-            />
-            {checkingDocNumber && (
-              <i className="ti ti-loader doc-field-spin" />
-            )}
-          </div>
-          <FieldError msg={docNumberErr} />
+          <DocNumberInput
+            docNumber={docNumber}
+            docNumberErr={docNumberErr}
+            checkingDocNumber={checkingDocNumber}
+            handleDocNumberChange={handleDocNumberChange}
+            isReadOnly={isReadOnly}
+          />
         </div>
       )}
 
@@ -629,48 +672,26 @@ export default function DocumentHeaderBand({
       )}
 
       {/* ── التاريخ ───────────────────────────────────────────────── */}
-      <div style={{ ...segCard, flex: '1 1 145px' }}>
-        <div style={segHeader()}>
-          <i className="ti ti-calendar" />
-          <span>تاريخ المستند</span>
-        </div>
-        <input
-          type="date"
-          style={fieldInputStyle(isReadOnly, !!errors.document_date)}
-          value={form.document_date as string}
-          disabled={isReadOnly}
-          onChange={(e) => set('document_date', e.target.value)}
-        />
-        <FieldError msg={errors.document_date} />
-      </div>
+      <DateFieldBlock
+        isReadOnly={isReadOnly}
+        value={form.document_date as string}
+        err={errors.document_date}
+        onChange={(v) => set('document_date', v)}
+        style={{ flex: '1 1 145px' }}
+      />
 
       {/* ── المستودع ──────────────────────────────────────────────── */}
-      <div style={{ ...segCard, flex: '1 1 165px' }}>
-        <div style={segHeader()}>
-          <i className="ti ti-building-warehouse" />
-          <span>المستودع</span>
-        </div>
-        <select
-          style={{
-            ...fieldInputStyle(isReadOnly, !!errors.warehouse_id),
-            cursor: isReadOnly ? 'not-allowed' : 'pointer',
-          }}
-          value={form.warehouse_id as string}
-          disabled={isReadOnly}
-          onChange={(e) => {
-            set('warehouse_id', e.target.value);
-            qc.invalidateQueries({ queryKey: [slug, 'warehouse-stock', warehouseIdNum] });
-          }}
-        >
-          <option value="">— اختر —</option>
-          {warehouses.map((w) => (
-            <option key={String(w.id)} value={String(w.id)}>
-              {String(w.name)}{w.is_default ? ' ★' : ''}
-            </option>
-          ))}
-        </select>
-        <FieldError msg={errors.warehouse_id} />
-      </div>
+      <WarehouseFieldBlock
+        isReadOnly={isReadOnly}
+        value={form.warehouse_id as string}
+        err={errors.warehouse_id}
+        onChange={(v) => set('warehouse_id', v)}
+        qc={qc}
+        slug={slug}
+        warehouseIdNum={warehouseIdNum}
+        warehouses={warehouses}
+        style={{ flex: '1 1 165px' }}
+      />
 
       {/* ── فئة السعر ────────────────────────────────────────────── */}
       {!isPurchase && priceLevelOptions.length > 0 && (

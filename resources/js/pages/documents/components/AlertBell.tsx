@@ -107,16 +107,11 @@ export function AlertBell() {
             <div
               key={alert.id}
               onClick={() => { if (!alert.is_read) markAsRead(alert.id); }}
+              className={alert.is_read ? 'alert-item' : 'alert-item alert-item--unread'}
               style={{
                 padding: '8px 10px', borderRadius: 'var(--r1)',
-                background: alert.is_read ? 'transparent' : 'color-mix(in srgb, var(--blue) 4%, transparent)',
                 cursor: 'pointer', marginBottom: 2,
                 borderLeft: `3px solid ${severityColor(alert.severity)}`,
-                transition: 'background .12s',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg3)'; }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = alert.is_read ? 'transparent' : 'color-mix(in srgb, var(--blue) 4%, transparent)';
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>

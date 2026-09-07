@@ -747,7 +747,6 @@ export default function CommercialDocumentsPage() {
     const [viewDocId, setViewDocId]   = useState<number | null>(null);
     const [convertDocId, setConvertDocId]     = useState<number | null>(null);
     const [convertSourceCode, setConvertSourceCode] = useState('');
-    const [convertSourceDate, setConvertSourceDate] = useState('');
     const [editDocFull, setEditDocFull] = useState<CommercialDocument | null>(null);
     const [loadingEdit, setLoadingEdit] = useState(false);
 
@@ -1607,7 +1606,6 @@ export default function CommercialDocumentsPage() {
                         const docType = (row as unknown as Record<string, unknown>).document_type as Record<string, unknown> | undefined;
                         const code = String(docType?.code ?? '');
                         setConvertSourceCode(code);
-                        setConvertSourceDate(String(row.document_date ?? ''));
                         setConvertDocId(row.id);
                     },
                 },
@@ -1648,7 +1646,6 @@ export default function CommercialDocumentsPage() {
                         const docType = (row as unknown as Record<string, unknown>).document_type as Record<string, unknown> | undefined;
                         const code = String(docType?.code ?? '');
                         setConvertSourceCode(code);
-                        setConvertSourceDate(String(row.document_date ?? ''));
                         setConvertDocId(row.id);
                     },
                 },
@@ -2206,7 +2203,6 @@ export default function CommercialDocumentsPage() {
                     onDone={() => { invalidateDocs(); notify.success('تم تحويل المستند بنجاح'); }}
                     documentId={convertDocId}
                     sourceCode={convertSourceCode}
-                    sourceDate={convertSourceDate}
                 />
             )}
 

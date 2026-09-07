@@ -1,5 +1,5 @@
 
-import { fmtDZD, calcLineTotal, getProductStock, toNum } from '../utils/document.utils';
+import { fmtDZD, calcLineTotal, getProductStock, marginFor, toNum } from '../utils/document.utils';
 import { ProductSearch } from './ProductSearch';
 import type { QuickCreatePayload } from './ProductSearch';
 import type { LineItem, Product } from '../types/document.types';
@@ -58,7 +58,8 @@ export function LineCard({
   isDragSource, isDropTarget, priceDisplayMode = 'ht',
 }: LineCardProps) {
   const prod = products.find((p) => String(p.id) === line.product_id) ?? line._product;
-  const { baseQty, gross: _gross, ht, tva, ttc, discountAmt, discPct: _discPct } = calcLineTotal(line);
+  const { baseQty, ht, tva, ttc, discountAmt } = calcLineTotal(line);
+  const totalQty = Math.round(baseQty * line._packQty * 10_000) / 10_000;
   const packagings = prod?.packagings ?? [];
   const selectedPack = line.packaging_id
     ? packagings.find((p) => String(p.id) === line.packaging_id)
@@ -88,7 +89,7 @@ export function LineCard({
   let totalMargin = 0;
   let marginColor = 'var(--t4)';
   let costPrice = 0;
-  const lowMarginThreshold = (prod as any)?.min_margin_percentage ?? 5;
+  const lowMarginThreshold = marginFor(prod);
   if (canViewCost && !isPurchase && prod) {
     costPrice = toNum(prod.current_cost_price) || toNum(prod.purchase_price_ht);
     if (costPrice > 0 && line.unit_price_ht > 0) {
@@ -98,7 +99,7 @@ export function LineCard({
       marginColor = marginPct < 0 ? 'var(--red)' : marginPct < lowMarginThreshold ? 'var(--orange)' : 'var(--green)';
     }
   }
-  const hasLowMarginWarning = (line._warnings ?? []).some(w => w.type === 'low_margin');
+  const hasLowMarginWarning = (lineWarnings ?? line._warnings ?? []).some(w => w.type === 'low_margin');
   const hasLowMargin = hasLowMarginWarning || (canViewCost && !isPurchase && marginPct !== null && marginPct < lowMarginThreshold);
   const borderColor = selected
     ? 'var(--em)'
@@ -306,7 +307,7 @@ export function LineCard({
         {line._packQty > 1 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ color: 'var(--t4)', fontSize: 10, width: 56 }}>الكمية الإجمالية:</span>
-            <input id={`doc-line-${idx}-total_qty`} type="number" defaultValue={baseQty * line._packQty} disabled={disabled}
+            <input id={`doc-line-${idx}-total_qty`} type="number" value={totalQty} disabled={disabled}
               onChange={(e) => {
                 const v = Number(e.target.value);
                 const newQty = line._packQty > 1 ? v / line._packQty : v;

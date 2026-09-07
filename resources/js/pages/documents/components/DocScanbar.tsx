@@ -12,7 +12,6 @@
 // ════════════════════════════════════════════════════════════════════════════
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { formatDZD } from '@/pos/utils/calculations';
-import { proxyImage } from '@/lib/api/imageProxy';
 import type { Product } from '../types/document.types';
 
 interface Props {
@@ -162,7 +161,7 @@ export default function DocScanbar({
           }}
           onKeyDown={handleKeyDown}
           onFocus={() => { if (code.trim() && !code.trim().startsWith('*')) setOpen(true); }}
-          placeholder={isPurchase ? 'امسح الباركود أو ابحث عن منتج…' : 'امسح الباركود أو ابحث عن منتج…'}
+          placeholder="امسح الباركود أو ابحث عن منتج…"
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
@@ -201,7 +200,6 @@ export default function DocScanbar({
               const price = isPurchase
                 ? (typeof p.purchase_price_ht === 'number' ? p.purchase_price_ht : Number(p.purchase_price_ht ?? 0) || 0)
                 : Number(p.default_selling_price_ht ?? 0) * (1 + tvaRate / 100);
-              const img = proxyImage(null, 120);
               const manages = p.manages_stock !== false;
               const rawStock = typeof stockData?.[p.id] === 'number' ? stockData[p.id] as number
                 : (typeof p.stock_quantity === 'number' ? p.stock_quantity : undefined);
@@ -218,7 +216,7 @@ export default function DocScanbar({
                   disabled={disabled}
                 >
                   <span className="pp-scanbar-dd-img">
-                    {img ? <img src={img} alt="" loading="lazy" /> : <i className="ti ti-package" />}
+                    <i className="ti ti-package" />
                   </span>
                   <span className="pp-scanbar-dd-main">
                     <span className="pp-scanbar-dd-name">

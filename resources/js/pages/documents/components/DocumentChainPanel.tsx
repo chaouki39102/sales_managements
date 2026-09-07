@@ -11,7 +11,6 @@ interface TargetType {
 interface DocumentChainPanelProps {
   chain:           DocumentChain | null | undefined;
   isLoading:       boolean;
-  currentId:       number;
   allowedTargets:  TargetType[];
   onConvert:       (targetCode: string) => void;
   onNavigate:      (node: ChainNode) => void;
@@ -88,14 +87,14 @@ function NodeWithChildren({
 }
 
 export function DocumentChainPanel({
-  chain, isLoading, currentId: _currentId, allowedTargets, onConvert, onNavigate, isReadOnly,
+  chain, isLoading, allowedTargets, onConvert, onNavigate, isReadOnly,
 }: DocumentChainPanelProps) {
   const [showConvert, setShowConvert] = useState(false);
 
   if (isLoading) {
     return (
       <div style={{ padding: '8px 0', fontSize: 11, color: 'var(--t4)', display: 'flex', gap: 6, alignItems: 'center' }}>
-        <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite' }} />
+        <i className="ti ti-loader ti-spin" />
         جاري تحميل سلسلة المستندات...
       </div>
     );
@@ -154,15 +153,8 @@ export function DocumentChainPanel({
                 {allowedTargets.map(t => (
                   <button
                     key={t.code}
+                    className="doc-chain-opt"
                     onClick={() => { setShowConvert(false); onConvert(t.code); }}
-                    style={{
-                      width: '100%', padding: '8px 12px', textAlign: 'right',
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      fontSize: 12, color: 'var(--t1)',
-                      borderBottom: '1px solid var(--b1)',
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg3)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                   >
                     {t.code} · {t.name}
                   </button>

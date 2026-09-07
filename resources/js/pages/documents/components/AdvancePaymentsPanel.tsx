@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState } from 'react';
 import { fmtDZD } from '../utils/document.utils';
 import type { AdvancePayment } from '../hooks/useAdvancePayments';
 
@@ -12,7 +12,7 @@ interface AdvancePaymentsPanelProps {
 export function AdvancePaymentsPanel({
   advances, isLoading, onApply, disabled,
 }: AdvancePaymentsPanelProps) {
-  const [collapsed, setCollapsed] = React.useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   if (isLoading) {
     return (
@@ -21,7 +21,7 @@ export function AdvancePaymentsPanel({
         background: 'var(--bg3)', border: '1px solid var(--b2)',
         display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--t4)',
       }}>
-        <i className="ti ti-loader" style={{ animation: 'spin 1s linear infinite', fontSize: 13 }} />
+        <i className="ti ti-loader ti-spin" style={{ fontSize: 13 }} />
         جاري تحميل الدفعات المتاحة...
       </div>
     );
@@ -90,24 +90,12 @@ export function AdvancePaymentsPanel({
                 <button
                   onClick={() => { if (!disabled) onApply(adv); }}
                   disabled={disabled}
+                  className="adv-apply-btn"
                   style={{
                     marginTop: 2, padding: '2px 8px', borderRadius: 'var(--r1)',
-                    border: '1px solid var(--green)', background: 'transparent',
-                    color: 'var(--green)', cursor: disabled ? 'not-allowed' : 'pointer',
+                    border: '1px solid var(--green)', cursor: disabled ? 'not-allowed' : 'pointer',
                     fontSize: 10, fontWeight: 700, fontFamily: 'inherit',
                     whiteSpace: 'nowrap', transition: 'all .12s',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!disabled) {
-                      e.currentTarget.style.background = 'var(--green)';
-                      e.currentTarget.style.color = 'white';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!disabled) {
-                      e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.color = 'var(--green)';
-                    }
                   }}
                 >
                   <i className="ti ti-arrow-left" style={{ marginLeft: 3, fontSize: 9 }} />

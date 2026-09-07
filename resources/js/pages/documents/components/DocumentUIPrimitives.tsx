@@ -374,7 +374,7 @@ disabled, error, maxH = 260, onAfterSelect, id,
             onClick={(e) => { e.stopPropagation(); onChange(''); }}
             style={{ color: 'var(--t4)', cursor: 'pointer', flexShrink: 0, fontSize: 11 }}
             title="مسح"
-          >✕</span>
+          ><i className="ti ti-x" style={{ fontSize: 12 }} /></span>
         )}
         <i className={`ti ti-chevron-${open ? 'up' : 'down'}`}
           style={{ fontSize: 11, color: 'var(--t4)', flexShrink: 0 }} />
@@ -429,13 +429,11 @@ disabled, error, maxH = 260, onAfterSelect, id,
                   key={o.id}
                   data-combo-item
                   onClick={() => { selectItem(i); }}
-                  onMouseEnter={(e) => { if (String(o.id) !== value) (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'; }}
-                  onMouseLeave={(e) => { if (String(o.id) !== value) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                  className={
+                    `combo-item${String(o.id) === value ? ' combo-item--sel' : ''}${highlightIdx === i ? ' combo-item--hi' : ''}`
+                  }
                   style={{
                     padding: '8px 12px', cursor: 'pointer',
-                    background: highlightIdx === i
-                      ? 'var(--emb)'
-                      : String(o.id) === value ? 'var(--emb)' : 'transparent',
                     borderBottom: '1px solid var(--b1)',
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
                     outline: highlightIdx === i ? '2px solid var(--em)' : undefined,
@@ -535,14 +533,12 @@ export function ColumnManager({
             <div
               key={col.key}
               onClick={() => toggle(col.key)}
+              className={visible.has(col.key) ? 'col-toggle col-toggle--on' : 'col-toggle'}
               style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 padding: '8px 12px', cursor: 'pointer',
-                background: visible.has(col.key) ? 'var(--emb)' : 'transparent',
-                borderBottom: '1px solid var(--b1)', transition: 'background .1s',
+                borderBottom: '1px solid var(--b1)',
               }}
-              onMouseEnter={(e) => { if (!visible.has(col.key)) (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'; }}
-              onMouseLeave={(e) => { if (!visible.has(col.key)) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
               <i className={`ti ti-${visible.has(col.key) ? 'eye' : 'eye-off'}`}
                 style={{ fontSize: 13, color: visible.has(col.key) ? 'var(--em)' : 'var(--t4)' }} />
@@ -652,9 +648,8 @@ export function Tabs({
  * ════════════════════════════════════════════════════════════════════════
  * InfoPanel — لوحة صغيرة قابلة للطي (معلومات تكميلية اختيارية)
  * ────────────────────────────────────────────────────────────────────────
- * ✅ يوحّد تطبيقين منفصلين كانا يفعلان بالضبط نفس الشيء بكود مختلف قليلاً:
- *    - CollapsiblePanel المحلية داخل CustomerInsightPanel.tsx
- *    - الزر + useState المحلي داخل SmartSuggestionsPanel.tsx
+ * ✅ يوحّد نمط "الانهيار/الطي" السابق (كان CollapsiblePanel مدمجة داخل
+ *    CustomerInsightPanel.tsx) في مكوّن واحد قابل لإعادة الاستخدام.
  * الفرق عن Section: هذه للمعلومات الثانوية الصغيرة (تحليلات، اقتراحات)
  * التي تظهر ضمن قسم أكبر أصلاً — وليست تبويباً على مستوى المستند بالكامل
  * (لذلك تبقى نمط "طي" بسيط، عكس الحقول الأساسية التي انتقلت لنظام Tabs).

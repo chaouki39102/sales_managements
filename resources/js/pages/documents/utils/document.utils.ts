@@ -182,6 +182,11 @@ export function calcLineTotal(line: LineItem): LineCalcResult {
   return { baseQty, gross, discountAmt, discPct, ht, tva, ttc, unitDiscount };
 }
 
+/** الحد الأدنى لهامش الربح لمنتج — القيمة 0 تُحترم (افتراض 5). */
+export function marginFor(p: Product | null | undefined): number {
+  return p?.min_margin_percentage ?? 5;
+}
+
 export function calcTotals(
   lines:      LineItem[],
   applyStamp: boolean,

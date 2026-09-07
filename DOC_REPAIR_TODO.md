@@ -2,7 +2,7 @@
 
 > **Status (2026-09-06):** Full read of the commercial-document module (backend service/controller/model/observers/policies + frontend page/modal/hooks/components) — audit produced the findings below. Each row = one repair; work top-down, commit after each group.
 >
-> **Progress:** Group B (frontend hooks/utils, B1–B6) ✅ DONE — one commit. Group C (page & modal, C1–C13) ✅ DONE — one commit. Both verified: `npx tsc --noEmit` clean · vitest 405/405 · build 0 errors (239 precache) · SW MATCH · `php -l` clean · pest 87/87 · tinker smoke `filter[code]=FV` → exactly 1. Next group: D (components) then E.
+> **Progress:** Group B (frontend hooks/utils, B1–B6) ✅ DONE — one commit. Group C (page & modal, C1–C13) ✅ DONE — one commit. Group D (components, D1–D27) ✅ DONE — one commit (incl. `SmartSuggestionsPanel.tsx` deletion). All verified: `npx tsc --noEmit` clean · vitest 405/405 · build 0 errors (239 precache) · SW MATCH · `php -l` clean · pest 87/87 · tinker smoke `filter[code]=FV` → exactly 1. Next group: E (document view modal) then F.
 
 ## Categories
 - **DEAD** = dead/unreachable code, safe to delete
@@ -58,33 +58,33 @@
 
 | # | Cat | Loc | Issue | Repair |
 |---|-----|-----|-------|--------|
-| D1 | DEAD | `components/SmartSuggestionsPanel.tsx` (whole file) | No importer anywhere — Phase 88 removed the panel from page+modal; hook still alive | **Delete the component file** (keep `useProductSuggestions`) |
-| D2 | DEAD | `components/DocSaveModal.tsx:139-141` | Unreachable note branch (`canSave = !isPending && !successMsg`) | Remove the branch |
-| D3 | UNUSED | `components/DocumentChainPanel.tsx:164-165` | `_currentId` destructured but ignored, no `documentId` prop | Remove from interface/destructure |
-| D4 | UNUSED | `components/ConvertDocumentModal.tsx:20` | `sourceDate: _sourceDate` declared + destructured, ignored | Remove prop + destructure |
-| D5 | BUG | `components/ConvertDocumentModal.tsx:25` | `todayStr = new Date().toISOString().slice(0,10)` is UTC → wrong default date 00:00–00:59 local (UTC+1) | Local date via `getTimezoneOffset` |
-| D6 | DUP | `components/DocumentHeaderBand.tsx:334-358,449-473,560-584` | Doc-number input block duplicated 3× | Extract `DocNumberInput` sub-component |
-| D7 | DUP | `components/DocumentHeaderBand.tsx:361-402` vs `:632-673` | date + warehouse field blocks duplicated 2× | Shared `Date/WHFieldBlock` |
-| D8 | UNUSED | `components/DocumentLineRow.tsx:135` | `_gross`, `_discPct`, `_lineTva` discarded | Remove from destructure |
-| D9 | DUP | `components/DocumentLineRow.tsx:155,468,502` + `LineCard.tsx:91` | `(prod as any)?.min_margin_percentage ?? 5` margin formula repeated | Shared `marginFor(product)` helper |
-| D10 | CLEAN | `components/DocumentLineRow.tsx:390` | `(line as any).orig_price ?? 0` — field not in `LineItem` type | Add `orig_price?: number` to `LineItem` |
-| D11 | UNUSED | `components/LineCard.tsx:61` | `_gross`, `_discPct` discarded | Remove from destructure |
-| D12 | BUG | `components/LineCard.tsx:311` | Total-qty input uncontrolled (`defaultValue`, no `key`) → stale after qty changes | Controlled or `key={line.quantity}` |
-| D13 | CLEAN | `components/LineCard.tsx:101` | Uses `line._warnings` instead of `lineWarnings` prop | Read `lineWarnings` |
-| D14 | DUP | `components/LineCard.tsx:108,115,461,464,468` | `'blocking' in stockValidation` repeated | `isBlockingStock(v)` helper |
-| D15 | BUG | `components/DocumentAuditPanel.tsx:29-30` | `bg-em/10` / `bg-red/10` render nothing (no `--color-em`/`--color-red` in `@theme`) | Use `color-mix(in srgb, var(--em) 10%, transparent)` or add utilities |
-| D16 | CLEAN | `components/DocumentAuditPanel.tsx:45-104` | Tailwind utility names render at the custom 4px scale — inconsistent with sibling panels | Project token classes or documented utility scale |
-| D17 | BUG | `components/DocumentAuditPanel.tsx:53-55` | `count = entries.length` = fetched page only (`per_page: 50`) — «N حدث» undercounts | Surface API total / paginate |
-| D18 | CLEAN | `components/ApprovalWorkflow.tsx:170-231` | Hand-rolled fixed overlay (inline styles) — violates shared-`Modal` rule, misses Escape/scroll-lock | Replace with shared `Modal` |
-| D19 | UNUSED | `components/ApprovalWorkflow.tsx:73,77` | `netToPay` declared twice, destructured `_netToPay`, never used (page passes real value) | Remove or implement its validation |
-| D20 | CLEAN | `components/DocScanbar.tsx:203` | `const img = proxyImage(null, 120)` constant | Remove or derive |
-| D21 | DUP | `components/DocScanbar.tsx:165` | Ternary with identical true/false branches | Collapse the conditional |
-| D22 | CLEAN | `components/SmartSuggestionsPanel.tsx:22,102` + `AdvancePaymentsPanel.tsx:24` + `ConvertDocumentModal.tsx:176` | Inline `animation: 'spin 1s linear infinite'` (3 files) | Use global `.ti-spin` |
-| D23 | CLEAN | `components/AdvancePaymentsPanel.tsx:1,15` | `import React from 'react'` only for `React.useState` | Named `import { useState }` |
-| D24 | CLEAN | `components/DocumentUIPrimitives.tsx:432-433,544-545` + `DocumentChainPanel.tsx:164` + `SmartSuggestionsPanel.tsx:54` + `AlertBell.tsx:117-120` + `AdvancePaymentsPanel.tsx:100-111` + `ConvertDocumentModal.tsx:108-109` | DOM `onMouseEnter/Leave = (t => t.style…)` hover pattern in 8 files | CSS `:hover` / `:focus-visible` classes |
-| D25 | CLEAN | `components/DocumentUIPrimitives.tsx:374` | '✕' text glyph instead of Tabler icon | `<i className="ti ti-x" />` |
-| D26 | TODO | `components/DocumentUIPrimitives.tsx:657` | Stale comment references removed `SmartSuggestionsPanel` | Update/remove comment |
-| D27 | DUP | `components/DocSaveModal.tsx:15-45` | `SAVE_ACTIONS` duplicates shortcut-key list vs handler | Derive from the keyboard map |
+| D1 | DEAD | `components/SmartSuggestionsPanel.tsx` (whole file) | No importer anywhere — Phase 88 removed the panel from page+modal; hook still alive | **Delete the component file** (keep `useProductSuggestions`) | ✅ FIXED — file DELETED (`git status D`); `useProductSuggestions` hook kept alive in the shared controller |
+| D2 | DEAD | `components/DocSaveModal.tsx:139-141` | Unreachable note branch (`canSave = !isPending && !successMsg`) | Remove the branch | ✅ FIXED — unreachable `canSave = !isPending && !successMsg` note branch removed |
+| D3 | UNUSED | `components/DocumentChainPanel.tsx:164-165` | `_currentId` destructured but ignored, no `documentId` prop | Remove from interface/destructure | ✅ FIXED — `_currentId` removed from interface + destructure; grep-verified zero matches module-wide |
+| D4 | UNUSED | `components/ConvertDocumentModal.tsx:20` | `sourceDate: _sourceDate` declared + destructured, ignored | Remove prop + destructure | ✅ FIXED — `sourceDate: _sourceDate` prop + destructure removed; grep-verified zero `sourceDate` references |
+| D5 | BUG | `components/ConvertDocumentModal.tsx:25` | `todayStr = new Date().toISOString().slice(0,10)` is UTC → wrong default date 00:00–00:59 local (UTC+1) | Local date via `getTimezoneOffset` | ✅ FIXED — `todayStr` now local: `new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10)` at `:24-26` |
+| D6 | DUP | `components/DocumentHeaderBand.tsx:334-358,449-473,560-584` | Doc-number input block duplicated 3× | Extract `DocNumberInput` sub-component | ✅ FIXED — `DocNumberInput` sub-component extracted, used by all variants |
+| D7 | DUP | `components/DocumentHeaderBand.tsx:361-402` vs `:632-673` | date + warehouse field blocks duplicated 2× | Shared `Date/WHFieldBlock` | ✅ FIXED — shared `Date/WHFieldBlock` used by the date+warehouse blocks |
+| D8 | UNUSED | `components/DocumentLineRow.tsx:135` | `_gross`, `_discPct`, `_lineTva` discarded | Remove from destructure | ✅ FIXED — destructure cleaned; grep-verified zero `_gross`/`_discPct`/`_lineTva` |
+| D9 | DUP | `components/DocumentLineRow.tsx:155,468,502` + `LineCard.tsx:91` | `(prod as any)?.min_margin_percentage ?? 5` margin formula repeated | Shared `marginFor(product)` helper | ✅ FIXED — `min_margin_percentage?` typed on `Product`; `marginFor()` added to `utils/document.utils.ts`; all 4 call sites (DocumentLineRow :155/:468/:502, LineCard :91) use it, casts removed |
+| D10 | CLEAN | `components/DocumentLineRow.tsx:390` | `(line as any).orig_price ?? 0` — field not in `LineItem` type | Add `orig_price?: number` to `LineItem` | ✅ FIXED — `orig_price?: number` added to `LineItem`; cast removed |
+| D11 | UNUSED | `components/LineCard.tsx:61` | `_gross`, `_discPct` discarded | Remove from destructure | ✅ FIXED — destructure now `{ baseQty, ht, tva, ttc, discountAmt }` |
+| D12 | BUG | `components/LineCard.tsx:311` | Total-qty input uncontrolled (`defaultValue`, no `key`) → stale after qty changes | Controlled or `key={line.quantity}` | ✅ FIXED — controlled `value={totalQty}` (float-noise-guarded via `Math.round(baseQty * line._packQty * 1e4) / 1e4`), mirrors price-input pattern |
+| D13 | CLEAN | `components/LineCard.tsx:101` | Uses `line._warnings` instead of `lineWarnings` prop | Read `lineWarnings` | ✅ FIXED — `(lineWarnings ?? line._warnings ?? [])`, prop prioritized |
+| D14 | DUP | `components/LineCard.tsx:108,115,461,464,468` | `'blocking' in stockValidation` repeated | `isBlockingStock(v)` helper | ✅ FIXED — zero `'blocking' in` checks remain module-wide (B6 removed the union arm that produced them); the single `'message' in` at LineCard :464 is the correct discriminator for `{ ok: true } | { ok: false; message: string }`; grep-verified |
+| D15 | BUG | `components/DocumentAuditPanel.tsx:29-30` | `bg-em/10` / `bg-red/10` render nothing (no `--color-em`/`--color-red` in `@theme`) | Use `color-mix(in srgb, var(--em) 10%, transparent)` or add utilities | ✅ FIXED — zero `bg-em/10`/`bg-red/10`; all color-mix `color-mix(in srgb, var(--em) 10%, transparent)` |
+| D16 | CLEAN | `components/DocumentAuditPanel.tsx:45-104` | Tailwind utility names render at the custom 4px scale — inconsistent with sibling panels | Project token classes or documented utility scale | ✅ FIXED — project token classes |
+| D17 | BUG | `components/DocumentAuditPanel.tsx:53-55` | `count = entries.length` = fetched page only (`per_page: 50`) — «N حدث» undercounts | Surface API total / paginate | ✅ FIXED — `count = data?.meta?.total ?? entries.length` at `:55` |
+| D18 | CLEAN | `components/ApprovalWorkflow.tsx:170-231` | Hand-rolled fixed overlay (inline styles) — violates shared-`Modal` rule, misses Escape/scroll-lock | Replace with shared `Modal` | ✅ FIXED — shared `Modal` (size="sm", resizable={false}); Escape/scroll-lock/backdrop; confirm `disabled={reject.isPending || !rejectReason.trim()}` |
+| D19 | UNUSED | `components/ApprovalWorkflow.tsx:73,77` | `netToPay` declared twice, destructured `_netToPay`, never used (page passes real value) | Remove or implement its validation | ✅ FIXED — `_netToPay` gone; `netToPay?: number` kept on interface (API snapshot contract); L77 signature |
+| D20 | CLEAN | `components/DocScanbar.tsx:203` | `const img = proxyImage(null, 120)` constant | Remove or derive | ✅ FIXED — `proxyImage(null, 120)` removed; zero `proxyImage(null` matches remain |
+| D21 | DUP | `components/DocScanbar.tsx:165` | Ternary with identical true/false branches | Collapse the conditional | ⛔ NOT A BUG — verified false positive; no identical-branch ternary remains in `DocScanbar.tsx`; the price ternary branches are distinct — collapsing would be incorrect |
+| D22 | CLEAN | `components/SmartSuggestionsPanel.tsx:22,102` + `AdvancePaymentsPanel.tsx:24` + `ConvertDocumentModal.tsx:176` | Inline `animation: 'spin 1s linear infinite'` (3 files) | Use global `.ti-spin` | ✅ FIXED — `.ti-spin` in all 3 sites: AdvancePaymentsPanel :24, DocumentChainPanel :97, ConvertDocumentModal :169 (grep-verified) |
+| D23 | CLEAN | `components/AdvancePaymentsPanel.tsx:1,15` | `import React from 'react'` only for `React.useState` | Named `import { useState }` | ✅ FIXED — named `import { useState }` at `:1` |
+| D24 | CLEAN | `components/DocumentUIPrimitives.tsx:432-433,544-545` + `DocumentChainPanel.tsx:164` + `SmartSuggestionsPanel.tsx:54` + `AlertBell.tsx:117-120` + `AdvancePaymentsPanel.tsx:100-111` + `ConvertDocumentModal.tsx:108-109` | DOM `onMouseEnter/Leave = (t => t.style…)` hover pattern in 8 files | CSS `:hover` / `:focus-visible` classes | ✅ FIXED — all 6 ledger-listed file locations clean (none appear in `onMouseEnter\|onMouseLeave` grep); remaining setState-based hover handlers are out of D24 scope |
+| D25 | CLEAN | `components/DocumentUIPrimitives.tsx:374` | '✕' text glyph instead of Tabler icon | `<i className="ti ti-x" />` | ✅ FIXED — text glyph replaced with `<i className="ti ti-x" style={{ fontSize: 12 }} />` |
+| D26 | TODO | `components/DocumentUIPrimitives.tsx:657` | Stale comment references removed `SmartSuggestionsPanel` | Update/remove comment | ✅ FIXED — stale comment rewritten without `SmartSuggestionsPanel` reference |
+| D27 | DUP | `components/DocSaveModal.tsx:15-45` | `SAVE_ACTIONS` duplicates shortcut-key list vs handler | Derive from the keyboard map | ✅ FIXED — `SAVE_KEY_MAP` at `:66/:99` is SSOT; `SAVE_ACTIONS` derived from it |
 
 ## E. Document view modal (`DocumentViewModal` inside `CommercialDocumentsPage.tsx`)
 

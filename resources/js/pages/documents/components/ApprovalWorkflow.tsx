@@ -4,6 +4,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useState } from 'react';
+import Modal from '@/components/ui/Modal';
 import { useApprovalCheck, useApprovalMutations } from '@/lib/api/endpoints/approvals';
 import { useNotification } from '@/hooks/useNotification';
 import type { ApprovalCheck } from '@/lib/api/endpoints/approvals';
@@ -74,7 +75,7 @@ interface ApprovalActionsProps {
   approvalCheck?: ApprovalCheck;
 }
 
-export function ApprovalActions({ documentId, statusSlug, netToPay: _netToPay, approvalCheck }: ApprovalActionsProps & { netToPay?: number }) {
+export function ApprovalActions({ documentId, statusSlug, approvalCheck }: ApprovalActionsProps) {
   const notify = useNotification();
   const { data: hookCheck } = useApprovalCheck(approvalCheck === undefined ? documentId : null);
   const check = approvalCheck ?? hookCheck;
@@ -167,68 +168,44 @@ export function ApprovalActions({ documentId, statusSlug, netToPay: _netToPay, a
       </div>
 
       {/* Reject Modal */}
-      {rejectModal && (
-        <div
-          role="dialog" aria-modal="true"
+      <Modal
+        open={rejectModal}
+        onClose={() => setRejectModal(false)}
+        title="رفض المستند"
+        size="sm"
+        resizable={false}
+        footer={
+          <>
+            <button className="btn" onClick={() => setRejectModal(false)}>
+              إلغاء
+            </button>
+            <button
+              className="btn btn-r"
+              onClick={handleReject}
+              disabled={reject.isPending || !rejectReason.trim()}
+              style={{ opacity: reject.isPending || !rejectReason.trim() ? 0.5 : 1 }}
+            >
+              {reject.isPending ? 'جاري الرفض...' : 'تأكيد الرفض'}
+            </button>
+          </>
+        }
+      >
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--t3)', display: 'block', marginBottom: 6 }}>
+          سبب الرفض <span style={{ color: 'var(--red)' }}>*</span>
+        </label>
+        <textarea
+          value={rejectReason}
+          onChange={e => setRejectReason(e.target.value)}
+          placeholder="اكتب سبب الرفض..."
+          rows={3}
           style={{
-            position: 'fixed', inset: 0, zIndex: 500,
-            background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(4px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: '100%', padding: '8px 12px', borderRadius: 8,
+            border: '1px solid var(--border)', background: 'var(--bg2)',
+            fontSize: 13, resize: 'vertical', boxSizing: 'border-box',
           }}
-          onClick={() => setRejectModal(false)}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              width: '100%', maxWidth: 420, background: 'var(--bg1)',
-              borderRadius: 'var(--r3)', padding: 24,
-              boxShadow: '0 24px 64px rgba(0,0,0,.22)',
-            }}
-          >
-            <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700 }}>
-              رفض المستند
-            </h3>
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--t3)', display: 'block', marginBottom: 6 }}>
-              سبب الرفض <span style={{ color: 'var(--red)' }}>*</span>
-            </label>
-            <textarea
-              value={rejectReason}
-              onChange={e => setRejectReason(e.target.value)}
-              placeholder="اكتب سبب الرفض..."
-              rows={3}
-              style={{
-                width: '100%', padding: '8px 12px', borderRadius: 8,
-                border: '1px solid var(--border)', background: 'var(--bg2)',
-                fontSize: 13, resize: 'vertical', boxSizing: 'border-box',
-              }}
-              autoFocus
-            />
-            <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-start' }}>
-              <button
-                onClick={() => setRejectModal(false)}
-                style={{
-                  padding: '6px 16px', borderRadius: 8, border: '1px solid var(--border)',
-                  background: 'var(--bg2)', cursor: 'pointer', fontSize: 13,
-                }}
-              >
-                إلغاء
-              </button>
-              <button
-                onClick={handleReject}
-                disabled={reject.isPending || !rejectReason.trim()}
-                style={{
-                  padding: '6px 16px', borderRadius: 8, border: 'none',
-                  background: 'var(--red)', color: '#fff', cursor: 'pointer',
-                  fontSize: 13, fontWeight: 600,
-                  opacity: reject.isPending || !rejectReason.trim() ? 0.5 : 1,
-                }}
-              >
-                {reject.isPending ? 'جاري الرفض...' : 'تأكيد الرفض'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          autoFocus
+        />
+      </Modal>
     </>
   );
 }

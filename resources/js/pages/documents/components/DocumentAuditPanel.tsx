@@ -26,8 +26,8 @@ const ACTION_META: Record<DocumentAuditAction, ActionMeta> = {
 };
 
 const TONE_CLS: Record<ActionMeta['tone'], string> = {
-  em:     'text-em bg-em/10',
-  red:    'text-red bg-red/10',
+  em:     'text-em bg-emb',
+  red:    'text-red bg-redb',
   muted:  'text-t3 bg-3',
 };
 
@@ -52,7 +52,7 @@ function ActionBadge({ action }: { action: DocumentAuditAction }) {
 export default function DocumentAuditPanel({ docId }: { docId: number }) {
   const { data, isLoading, isError } = useDocumentAuditLog(docId, { per_page: 50 });
   const entries = data?.data ?? [];
-  const count = entries.length;
+  const count = data?.meta?.total ?? entries.length;
 
   return (
     <div className="mb-8">
@@ -99,8 +99,8 @@ export default function DocumentAuditPanel({ docId }: { docId: number }) {
                   {hasField && (
                     <div className="mt-6 text-xs text-t4 font-mono break-all leading-loose">
                       {e.field_name && <span className="font-bold text-t3">{e.field_name}: </span>}
-                      {!!e.old_value && <span className="line-through opacity-60">{fmtVal(e.old_value)}</span>}
-                      {!!e.old_value && !!e.new_value && <span className="mx-4 opacity-50">←</span>}
+                      {!!e.old_value && <span className="line-through opacity-50">{fmtVal(e.old_value)}</span>}
+                      {!!e.old_value && !!e.new_value && <span style={{ margin: '0 4px', opacity: 0.5 }}>←</span>}
                       {!!e.new_value && <span className="text-t2">{fmtVal(e.new_value)}</span>}
                     </div>
                   )}

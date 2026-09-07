@@ -33,8 +33,7 @@ export function CustomerInsightPanel({ insights, isLoading }: CustomerInsightPan
 
   return (
     // ✅ كانت CollapsiblePanel محلية بنفس هذا الملف — أصبحت الآن InfoPanel
-    // المشتركة من DocumentUIPrimitives (نفس المكوّن تستخدمه SmartSuggestionsPanel
-    // أيضاً)، بدون أي تغيير في السلوك أو الشكل الظاهر للمستخدم.
+    // المشتركة من DocumentUIPrimitives، بدون أي تغيير في السلوك أو الشكل الظاهر.
     <InfoPanel title="تحليلات المتعامل" icon="ti-chart-bar" defaultOpen={false}>
       {/* الإحصائيات */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>

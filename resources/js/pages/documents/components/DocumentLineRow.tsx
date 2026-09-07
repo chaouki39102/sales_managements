@@ -1,5 +1,5 @@
 import { memo, useState, useRef, useCallback } from 'react';
-import { calcLineTotal, fmtDZD, toNum } from '../utils/document.utils';
+import { calcLineTotal, fmtDZD, marginFor, toNum } from '../utils/document.utils';
 import { ProductSearch } from './ProductSearch';
 import type { QuickCreatePayload } from './ProductSearch';
 import { LotCell } from './LotCell';
@@ -132,7 +132,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
   isDragSource, isDropTarget, priceDisplayMode = 'ht',
 }: DocumentLineRowProps) {
 
-  const { baseQty, gross: _gross, discountAmt, discPct: _discPct, ht, tva: _lineTva, ttc } = calcLineTotal(line);
+  const { baseQty, discountAmt, ht, ttc } = calcLineTotal(line);
 
   const prodFromList = products.find((p) => String(p.id) === line.product_id);
   const prod         = prodFromList ?? line._product;
@@ -152,7 +152,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
   if (canViewCost && !isPurchase && prod) {
     const cp = toNum(prod.current_cost_price) || toNum(prod.purchase_price_ht);
     if (cp > 0 && line.unit_price_ht > 0) {
-      const threshold = (prod as any).min_margin_percentage ?? 5;
+      const threshold = marginFor(prod);
       lowMarginRow = ((line.unit_price_ht - cp) / line.unit_price_ht) * 100 < threshold;
     }
   }
@@ -387,7 +387,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
         {col('orig_price') && (
           <td style={{ padding: '3px 6px', textAlign: 'left', direction: 'ltr',
             fontSize: 11, color: 'var(--t4)' }}>
-            {fmtDZD((line as any).orig_price ?? 0)}
+            {fmtDZD(line.orig_price ?? 0)}
           </td>
         )}
 
@@ -465,7 +465,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
               const costPrice = toNum(prod.current_cost_price) || toNum(prod.purchase_price_ht);
               if (!costPrice || !line.unit_price_ht) return 'var(--t2)';
               const marginPct = ((line.unit_price_ht - costPrice) / line.unit_price_ht) * 100;
-              const marginThreshold = (prod as any)?.min_margin_percentage ?? 5;
+              const marginThreshold = marginFor(prod);
               return marginPct < 0 ? 'var(--red)' : marginPct < marginThreshold ? 'var(--orange)' : 'var(--green)';
             })() }}>
             {fmtDZD(ht)}
@@ -499,7 +499,7 @@ export const DocumentLineRow = memo(function DocumentLineRow({
               const unitMargin = line.unit_price_ht - costPrice;
               const marginPct = (unitMargin / line.unit_price_ht) * 100;
               const totalMargin = unitMargin * baseQty;
-              const marginThreshold = (prod as any)?.min_margin_percentage ?? 5;
+              const marginThreshold = marginFor(prod);
               const color  = marginPct < marginThreshold ? 'var(--red)' : marginPct < 10 ? 'var(--orange)' : 'var(--green)';
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>

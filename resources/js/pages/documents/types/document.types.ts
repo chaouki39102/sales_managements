@@ -97,6 +97,7 @@ export interface Product {
   stock_quantity?:            number | null;
   allow_negative_stock?:      boolean;
   min_stock_alert?:          number | null;
+  min_margin_percentage?:    number | null;
 }
 
 // ─── Party ────────────────────────────────────────────────────────────────────
@@ -218,6 +219,7 @@ export interface LineItem {
   _fromCompute?:          boolean;
   _stockOverriden?:       boolean;  // Task 12: تجاوز يدوي لمخزون غير كافٍ (عرضي فقط — لا يُرسل للباكند)
   discount_amount?:       number;
+  orig_price?:            number;
 }
 
 // ─── Form ─────────────────────────────────────────────────────────────────────

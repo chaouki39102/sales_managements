@@ -63,6 +63,10 @@ const SAVE_ACTIONS: Array<{
   },
 ];
 
+const SAVE_KEY_MAP = Object.fromEntries(
+  SAVE_ACTIONS.map((a) => [a.key, a.action])
+) as Record<string, DocSaveAction>;
+
 export default function DocSaveModal({
   open,
   onClose,
@@ -92,10 +96,11 @@ export default function DocSaveModal({
       }
       if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
       const k = e.key.toLowerCase();
-      if (k === 's') { e.preventDefault(); choose('list'); }
-      else if (k === 'n') { e.preventDefault(); choose('new'); }
-      else if (k === 'c') { e.preventDefault(); choose('close'); }
-      else if (e.key === 'Enter') { e.preventDefault(); choose('list'); }
+      const action = SAVE_KEY_MAP[k] ?? (e.key === 'Enter' ? 'list' : undefined);
+      if (action) {
+        e.preventDefault();
+        choose(action);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -136,9 +141,6 @@ export default function DocSaveModal({
       </div>
       {isPending && <p className="doc-save-note">جاري الحفظ…</p>}
       {successMsg && <p className="doc-save-note doc-save-note--ok">{successMsg}</p>}
-      {!canSave && !isPending && !successMsg && (
-        <p className="doc-save-note doc-save-note--warn">الحفظ غير متاح حالياً (المستند مقروء فقط أو قيد الإرسال).</p>
-      )}
     </Modal>
   );
 }
