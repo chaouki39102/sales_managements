@@ -67,7 +67,7 @@ trait HasUserPermissionEndpoints
             $companyId = app(\App\Services\CompanyContextService::class)->get();
 
             $roles = $user->roles()
-                ->when($companyId, fn($q) => $q->where('company_id', $companyId))
+                ->when($companyId, fn($q) => $q->where('roles.company_id', $companyId))
                 ->with('permissions')
                 ->get();
 
