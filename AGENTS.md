@@ -41,7 +41,7 @@
 - Funnel recreation must be debounced (2 consecutive failures) and throttled (once/minute) so a flaky probe never churns a live funnel.
 - The no-DoH fallback returns `$true` (not `$false`): when the PC itself is offline, tearing down a healthy funnel would make the outage worse.
 
-**Files modified (3)**: NEW `server-helper/funnel-health.ps1`; `share-public-order.ps1` (module dot-source + probe-first `Ensure-Funnel`); `server-helper/watchdog.ps1` (module dot-source + probe block with 2-failure counter). Commit `<hash>`, pushed to `origin/main`.
+**Files modified (4)**: NEW `server-helper/funnel-health.ps1`; `share-public-order.ps1` (module dot-source + probe-first `Ensure-Funnel`); `server-helper/watchdog.ps1` (module dot-source + probe block with 2-failure counter); `docs/SHARE_PUBLIC_ORDER.md` (watchdog bullet, public-probe troubleshooting row, funnel-health.ps1 in files table). Commit `007b21c`, pushed to `origin/main`.
 
 **Verification**: all 3 scripts PowerShell parse-checked (`[scriptblock]::Create((Get-Content -Raw …))`) · live probe on THIS PC: URL `https://desktop-h8shjo5.taila9b3bd.ts.net` · DoH resolved ingress IPs `176.58.90.46/.63/.145` · `curl --resolve` → **HTTP 200 on all three** · portal page `…/portal/el-houda-emballage-6a71b1b47555f/order` via `.63` → **200** · `Test-FunnelPublicPath` → `True`.
 
