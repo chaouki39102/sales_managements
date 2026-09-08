@@ -106,8 +106,13 @@ trait HasUserPermissionEndpoints
             ->flatMap(fn($role) => $role->permissions)
             ->pluck('name');
 
-        // الصلاحيات المباشرة — ضمن نطاق الشركة الحالية أو عامة فقط
-        $directPermissions = $user->getDirectPermissions()
+        // الصلاحيات المباشرة — ضمن نطاق الشركة الحالية أو عامة فقط.
+        // استعلام طازج (permissions()->get()) لا قراءة العلاقة المخزنة مؤقتاً:
+        // `getDirectPermissions()` ترجع $this->permissions (العلاقة المخزنة
+        // على النسخة) — لو كانت النسخة مشتركة (Sanctum::actingAs في الاختبارات)
+        // تبقى الحقن القديمة مرئية بعد أي تعديل، فيجب دائماً إعادة الاستعلام.
+        $directPermissions = $user->permissions()
+            ->get()
             ->filter(fn($p) => $p->company_id === null || (int) $p->company_id === (int) $companyId)
             ->pluck('name');
 

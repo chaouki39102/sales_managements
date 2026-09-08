@@ -2,7 +2,10 @@
 
 use App\Models\Company;
 use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\PermissionRegistrar;
 use function Pest\Laravel\getJson;
 use function Pest\Laravel\patchJson;
@@ -278,4 +281,214 @@ it('17. المالك يتجاوز البوابة — GET /settings 200 و PATCH 
     getJson("/api/v1/{$slug}/settings")->assertOk();
 
     expect(patchJson("/api/v1/{$slug}/settings", [])->getStatusCode())->not->toBe(403);
+});
+
+// ─── 18. 6d: المنح المباشرة عبر API (permission_ids على PUT users/{id}) ──
+// المسار يتطلب update_company + السياسة update_user، لذا كل سيناريو يملك
+// محرِّرًا (admin) بصلاحيتين مباشرتين وهدفًا (target) يُفحص عبر /me/roles.
+
+it('18a. PUT users/{id} — منح مباشر عبر permission_ids يظهر للهدف في /me/roles', function () {
+    actingAsAuthenticatedTenantUser();
+    $slug    = testCompanySlug();
+    $company = Company::query()->where('slug', TEST_COMPANY_SLUG)->first();
+    $admin   = User::query()->where('email', TEST_TENANT_EMAIL)->first();
+    $target  = User::query()->create(['name' => 'Target 6d', 'email' => 'target-6d@example.test', 'password' => 'password']);
+    DB::table('company_user')->insert([
+        'company_id'  => $company->id,
+        'user_id'     => $target->id,
+        'role'        => 'member',
+        'active'      => true,
+        'created_at'  => now(),
+        'updated_at'  => now(),
+    ]);
+
+    $view = Permission::query()->firstOrCreate(
+        ['name' => 'view_settings', 'guard_name' => 'web', 'company_id' => null],
+        ['name' => 'view_settings', 'guard_name' => 'web', 'company_id' => null],
+    );
+    foreach (['update_company', 'update_user'] as $permName) {
+        Permission::query()->firstOrCreate(
+            ['name' => $permName, 'guard_name' => 'web', 'company_id' => null],
+            ['name' => $permName, 'guard_name' => 'web', 'company_id' => null],
+        );
+    }
+    $admin->givePermissionTo(['update_company', 'update_user']);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    putJson("/api/v1/{$slug}/users/{$target->id}", ['name' => 'Target 6d', 'permission_ids' => [$view->id]])->assertOk();
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    Sanctum::actingAs($target);
+    expect(getJson("/api/v1/{$slug}/me/roles")->getContent())->toContain('view_settings');
+});
+
+it('18b. PUT users/{id} — permission_ids: [] يمسح كل المنح المباشرة', function () {
+    actingAsAuthenticatedTenantUser();
+    $slug    = testCompanySlug();
+    $company = Company::query()->where('slug', TEST_COMPANY_SLUG)->first();
+    $admin   = User::query()->where('email', TEST_TENANT_EMAIL)->first();
+    $target  = User::query()->create(['name' => 'Target 6b', 'email' => 'target-6b@example.test', 'password' => 'password']);
+    DB::table('company_user')->insert([
+        'company_id'  => $company->id,
+        'user_id'     => $target->id,
+        'role'        => 'member',
+        'active'      => true,
+        'created_at'  => now(),
+        'updated_at'  => now(),
+    ]);
+
+    $view = Permission::query()->firstOrCreate(
+        ['name' => 'view_settings', 'guard_name' => 'web', 'company_id' => null],
+        ['name' => 'view_settings', 'guard_name' => 'web', 'company_id' => null],
+    );
+    foreach (['update_company', 'update_user'] as $permName) {
+        Permission::query()->firstOrCreate(
+            ['name' => $permName, 'guard_name' => 'web', 'company_id' => null],
+            ['name' => $permName, 'guard_name' => 'web', 'company_id' => null],
+        );
+    }
+    $admin->givePermissionTo(['update_company', 'update_user']);
+    $target->givePermissionTo('view_settings');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    Sanctum::actingAs($target);
+    expect(getJson("/api/v1/{$slug}/me/roles")->getContent())->toContain('view_settings');
+
+    Sanctum::actingAs($admin);
+    putJson("/api/v1/{$slug}/users/{$target->id}", ['name' => 'Target 6b', 'permission_ids' => []])->assertOk();
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    Sanctum::actingAs($target);
+    expect(getJson("/api/v1/{$slug}/me/roles")->getContent())->not->toContain('view_settings');
+    expect(getJson("/api/v1/{$slug}/settings")->getStatusCode())->toBe(403);
+});
+
+it('18c. PUT users/{id} — إعادة المنح بعد المسح تعمل', function () {
+    actingAsAuthenticatedTenantUser();
+    $slug    = testCompanySlug();
+    $company = Company::query()->where('slug', TEST_COMPANY_SLUG)->first();
+    $admin   = User::query()->where('email', TEST_TENANT_EMAIL)->first();
+    $target  = User::query()->create(['name' => 'Target 6c', 'email' => 'target-6c@example.test', 'password' => 'password']);
+    DB::table('company_user')->insert([
+        'company_id'  => $company->id,
+        'user_id'     => $target->id,
+        'role'        => 'member',
+        'active'      => true,
+        'created_at'  => now(),
+        'updated_at'  => now(),
+    ]);
+
+    $view = Permission::query()->firstOrCreate(
+        ['name' => 'view_settings', 'guard_name' => 'web', 'company_id' => null],
+        ['name' => 'view_settings', 'guard_name' => 'web', 'company_id' => null],
+    );
+    foreach (['update_company', 'update_user'] as $permName) {
+        Permission::query()->firstOrCreate(
+            ['name' => $permName, 'guard_name' => 'web', 'company_id' => null],
+            ['name' => $permName, 'guard_name' => 'web', 'company_id' => null],
+        );
+    }
+    $admin->givePermissionTo(['update_company', 'update_user']);
+    $target->givePermissionTo('view_settings');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    Sanctum::actingAs($admin);
+    putJson("/api/v1/{$slug}/users/{$target->id}", ['name' => 'Target 6c', 'permission_ids' => []])->assertOk();
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    Sanctum::actingAs($target);
+    expect(getJson("/api/v1/{$slug}/me/roles")->getContent())->not->toContain('view_settings');
+
+    Sanctum::actingAs($admin);
+    putJson("/api/v1/{$slug}/users/{$target->id}", ['name' => 'Target 6c', 'permission_ids' => [$view->id]])->assertOk();
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    Sanctum::actingAs($target);
+    expect(getJson("/api/v1/{$slug}/me/roles")->getContent())->toContain('view_settings');
+    getJson("/api/v1/{$slug}/settings")->assertOk();
+});
+
+it('18d. PUT users/{id} — تعديل مباشر بـ [] لا يمسح صلاحيات الدور', function () {
+    actingAsAuthenticatedTenantUser();
+    $slug    = testCompanySlug();
+    $company = Company::query()->where('slug', TEST_COMPANY_SLUG)->first();
+    $admin   = User::query()->where('email', TEST_TENANT_EMAIL)->first();
+    $target  = User::query()->create(['name' => 'Target 6d', 'email' => 'target-6d-bis@example.test', 'password' => 'password']);
+    DB::table('company_user')->insert([
+        'company_id'  => $company->id,
+        'user_id'     => $target->id,
+        'role'        => 'member',
+        'active'      => true,
+        'created_at'  => now(),
+        'updated_at'  => now(),
+    ]);
+
+    Permission::query()->firstOrCreate(
+        ['name' => 'view_settings', 'guard_name' => 'web', 'company_id' => null],
+        ['name' => 'view_settings', 'guard_name' => 'web', 'company_id' => null],
+    );
+    foreach (['update_company', 'update_user'] as $permName) {
+        Permission::query()->firstOrCreate(
+            ['name' => $permName, 'guard_name' => 'web', 'company_id' => null],
+            ['name' => $permName, 'guard_name' => 'web', 'company_id' => null],
+        );
+    }
+    $admin->givePermissionTo(['update_company', 'update_user']);
+
+    $role = Role::query()->firstOrCreate(
+        ['name' => 'manager-settings', 'guard_name' => 'web', 'company_id' => $company->id],
+        ['name' => 'manager-settings', 'guard_name' => 'web', 'company_id' => $company->id],
+    );
+    $role->syncPermissions(['view_settings']);
+    $target->assignRole($role);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    Sanctum::actingAs($admin);
+    putJson("/api/v1/{$slug}/users/{$target->id}", ['name' => 'Target 6d', 'permission_ids' => []])->assertOk();
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    Sanctum::actingAs($target);
+    expect(getJson("/api/v1/{$slug}/me/roles")->getContent())->toContain('view_settings');
+    getJson("/api/v1/{$slug}/settings")->assertOk();
+});
+
+it('18e. PUT users/{id} — صلاحية من شركة أخرى تُفلتَر بصمت ولا تُمنح', function () {
+    actingAsAuthenticatedTenantUser();
+    $slug         = testCompanySlug();
+    $company      = Company::query()->where('slug', TEST_COMPANY_SLUG)->first();
+    $admin        = User::query()->where('email', TEST_TENANT_EMAIL)->first();
+    $target       = User::query()->create(['name' => 'Target 6e', 'email' => 'target-6e@example.test', 'password' => 'password']);
+    $otherCompany = Company::query()->create(['name' => 'Other Co', 'slug' => 'other-company-6d', 'active' => true]);
+    DB::table('company_user')->insert([
+        'company_id'  => $company->id,
+        'user_id'     => $target->id,
+        'role'        => 'member',
+        'active'      => true,
+        'created_at'  => now(),
+        'updated_at'  => now(),
+    ]);
+
+    $foreign = Permission::query()->create([
+        'name'       => 'secret_other',
+        'guard_name' => 'web',
+        'company_id' => $otherCompany->id,
+    ]);
+    foreach (['update_company', 'update_user'] as $permName) {
+        Permission::query()->firstOrCreate(
+            ['name' => $permName, 'guard_name' => 'web', 'company_id' => null],
+            ['name' => $permName, 'guard_name' => 'web', 'company_id' => null],
+        );
+    }
+    $admin->givePermissionTo(['update_company', 'update_user']);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    Sanctum::actingAs($admin);
+    putJson("/api/v1/{$slug}/users/{$target->id}", ['name' => 'Target 6e', 'permission_ids' => [$foreign->id]])->assertOk();
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $target->unsetRelation('permissions');
+    expect($target->getDirectPermissions()->pluck('name'))->not->toContain('secret_other');
+
+    Sanctum::actingAs($target);
+    expect(getJson("/api/v1/{$slug}/me/roles")->getContent())->not->toContain('secret_other');
 });
