@@ -116,6 +116,25 @@ export default function PortalTrackOrderPage() {
     phoneRef.current?.focus();
   };
 
+  // مسح رقم الهاتف: يستحيل البحث بدونه (الخادم يتطلب phone) — نعيد البحث بالكامل.
+  const clearPhoneField = () => {
+    setPhone('');
+    setReference('');
+    setResults([]);
+    setSearched(false);
+    phoneRef.current?.focus();
+  };
+
+  // مسح مرجع الطلب: نعيد تطبيق البحث بالرقم المتبقي فوراً (filter re-run).
+  const clearReferenceField = () => {
+    setReference('');
+    if (phone.trim()) trackMutation.mutate({ phone: phone.trim(), reference: '' });
+    else {
+      setResults([]);
+      setSearched(false);
+    }
+  };
+
   return (
     <div className="portal-public">
       <header className="portal-public-hd">
@@ -175,7 +194,7 @@ export default function PortalTrackOrderPage() {
                   type="button"
                   aria-label="مسح رقم الهاتف"
                   disabled={!phone}
-                  onClick={() => { setPhone(''); setSearched(false); phoneRef.current?.focus(); }}
+                  onClick={clearPhoneField}
                 >
                   <i className="ti ti-x" />
                 </button>
@@ -198,7 +217,7 @@ export default function PortalTrackOrderPage() {
                   type="button"
                   aria-label="مسح مرجع الطلب"
                   disabled={!reference}
-                  onClick={() => { setReference(''); setSearched(false); }}
+                  onClick={clearReferenceField}
                 >
                   <i className="ti ti-x" />
                 </button>
