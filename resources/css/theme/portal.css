@@ -3119,15 +3119,18 @@ body.dark .poa-date input::-webkit-calendar-picker-indicator { opacity: .85; }
 /* غلاف داخلي: حشوة أفقية موحّدة لحقول البحث والنتائج (تطابق رأس البطاقة) */
 .portal-track-body { padding: 18px 22px 20px; display: flex; flex-direction: column; min-width: 0; }
 .portal-track-wrap .portal-form-input { width: 100%; padding-inline-start: 36px; padding-inline-end: 38px; }
-/* زر مسح الحقل (×) */
+/* زر مسح الحقل (×) — ظاهر دائماً، باهت عند الفراغ */
 .portal-track-clear {
   position: absolute; top: 50%; inset-inline-end: 8px; transform: translateY(-50%);
   width: 25px; height: 25px; padding: 0; border: 0; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
   background: transparent; color: var(--t4); cursor: pointer; transition: all .15s;
 }
+.portal-track-clear i { font-size: 16px; line-height: 1; }
 .portal-track-clear:hover { background: var(--em); color: #fff; }
 .portal-track-clear:active { transform: translateY(-50%) scale(.9); }
+.portal-track-clear--idle { opacity: .28; cursor: default; pointer-events: none; }
+.portal-track-clear:disabled { opacity: .28; cursor: default; }
 .portal-track-form .portal-cart-actions { display: flex; }
 .portal-track-form .portal-cart-actions .portal-btn { min-height: 44px; white-space: nowrap; }
 .portal-track-hint i { color: var(--em); font-size: 14px; flex: none; margin-top: 1px; }

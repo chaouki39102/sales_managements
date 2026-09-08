@@ -170,16 +170,15 @@ export default function PortalTrackOrderPage() {
                   onChange={(e) => { setPhone(e.target.value); setSearched(false); }}
                   onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
                 />
-                {phone && (
-                  <button
-                    className="portal-track-clear"
-                    type="button"
-                    aria-label="مسح رقم الهاتف"
-                    onClick={() => { setPhone(''); setSearched(false); phoneRef.current?.focus(); }}
-                  >
-                    <i className="ti ti-x" />
-                  </button>
-                )}
+                <button
+                  className={`portal-track-clear${phone ? '' : ' portal-track-clear--idle'}`}
+                  type="button"
+                  aria-label="مسح رقم الهاتف"
+                  disabled={!phone}
+                  onClick={() => { setPhone(''); setSearched(false); phoneRef.current?.focus(); }}
+                >
+                  <i className="ti ti-x" />
+                </button>
               </div>
             </div>
             <div className="portal-track-field">
@@ -194,16 +193,15 @@ export default function PortalTrackOrderPage() {
                   onChange={(e) => { setReference(e.target.value); setSearched(false); }}
                   onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
                 />
-                {reference && (
-                  <button
-                    className="portal-track-clear"
-                    type="button"
-                    aria-label="مسح مرجع الطلب"
-                    onClick={() => { setReference(''); setSearched(false); }}
-                  >
-                    <i className="ti ti-x" />
-                  </button>
-                )}
+                <button
+                  className={`portal-track-clear${reference ? '' : ' portal-track-clear--idle'}`}
+                  type="button"
+                  aria-label="مسح مرجع الطلب"
+                  disabled={!reference}
+                  onClick={() => { setReference(''); setSearched(false); }}
+                >
+                  <i className="ti ti-x" />
+                </button>
               </div>
             </div>
             <div className="portal-cart-actions">
