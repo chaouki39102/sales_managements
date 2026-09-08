@@ -3100,6 +3100,118 @@ body.dark .poa-date input::-webkit-calendar-picker-indicator { opacity: .85; }
   .portal-track-form { grid-template-columns: 1fr; }
 }
 
+/* ═══ صفحة التتبع — تحسينات الواجهة (تسميات + أيقونات + حالة + تفاصيل) ═══ */
+/* حقول البحث مع عنوان وأيقونة داخلية */
+.portal-track-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.portal-track-lbl { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; color: var(--t2); }
+.portal-track-lbl i { color: var(--em); font-size: 14px; }
+.portal-track-lbl .req { color: var(--red); font-size: 12px; }
+.portal-track-lbl .opt {
+  font-size: 10px; font-weight: 800; color: var(--t4);
+  padding: 1px 8px; border: 1px solid var(--b2); border-radius: 999px;
+}
+.portal-track-wrap { position: relative; }
+.portal-track-ic {
+  position: absolute; top: 50%; inset-inline-start: 12px; transform: translateY(-50%);
+  color: var(--t4); font-size: 15px; pointer-events: none; transition: color .15s;
+}
+.portal-track-wrap:focus-within .portal-track-ic { color: var(--em); }
+.portal-track-wrap .portal-form-input { width: 100%; padding-inline-start: 36px; }
+.portal-track-form .portal-cart-actions { display: flex; }
+.portal-track-form .portal-cart-actions .portal-btn { min-height: 44px; white-space: nowrap; }
+.portal-track-hint i { color: var(--em); font-size: 14px; flex: none; margin-top: 1px; }
+
+/* عدّاد النتائج */
+.portal-track-count {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 16px; padding: 5px 14px;
+  font-size: 12.5px; font-weight: 800; color: var(--t2);
+  background: var(--bg2); border: 1px solid var(--b1); border-radius: 999px;
+}
+.portal-track-count i { color: var(--em); font-size: 14px; }
+
+/* بطاقات الطلبات: شريط حالة على الحافة + سطر عناوين أغنى */
+.portal-order--acc-z      { border-inline-start: 3px solid var(--t4); }
+.portal-order--acc-y      { border-inline-start: 3px solid var(--gold); }
+.portal-order--acc-b      { border-inline-start: 3px solid var(--blue); }
+.portal-order--acc-g      { border-inline-start: 3px solid #16a34a; }
+.portal-order--acc-r      { border-inline-start: 3px solid var(--red); }
+.portal-order--acc-purple { border-inline-start: 3px solid #8b5cf6; }
+
+.portal-track-meta {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 3px;
+  font-size: 11.5px; color: var(--t4); font-weight: 600;
+}
+.portal-track-meta i { font-size: 12px; }
+.portal-track-meta .tdot { width: 3px; height: 3px; border-radius: 50%; background: var(--b3); }
+
+/* تفاصيل الطلب المفتوح */
+.portal-track-detail-hd {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  padding: 10px 2px 4px;
+}
+.portal-track-ref-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 8px;
+  font-family: Consolas, monospace; font-size: 12.5px; font-weight: 700; letter-spacing: .3px;
+  color: var(--em); background: var(--emb); border: 1px solid var(--b2);
+}
+
+/* سطر منتج محسّن */
+.portal-track-line { display: flex; align-items: flex-start; gap: 10px; }
+.portal-track-line .portal-cart-item { flex: 1; min-width: 0; }
+.portal-track-line .portal-cart-info { flex: 1; min-width: 0; }
+.portal-track-line-ic {
+  width: 32px; height: 32px; border-radius: 9px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--emb); color: var(--em); font-size: 15px; margin-top: 2px;
+}
+
+/* ملاحظات الطلب */
+.portal-track-note {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin-top: 12px; padding: 10px 12px;
+  font-size: 12.5px; line-height: 1.8; color: var(--t3);
+  background: var(--bg2); border: 1px solid var(--b1); border-radius: 10px;
+}
+.portal-track-note i { color: var(--gold); font-size: 15px; flex: none; margin-top: 2px; }
+.portal-track-note b { display: block; font-size: 12px; color: var(--t2); margin-bottom: 2px; }
+.portal-track-note-txt { white-space: pre-wrap; word-break: break-word; }
+
+/* حالة فتح البطاقة: توهّج خفيف على الشريط الجانبي */
+.portal-order-hd.is-open { border-bottom-color: var(--b1); }
+
+/* حالة فارغة: أيقونة + نصائح + زر إعادة البحث */
+.portal-track-empty {
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px;
+  margin-top: 18px; padding: 28px 18px;
+  border: 1px dashed var(--b2); border-radius: 14px;
+  background: var(--bg2);
+}
+.portal-track-empty-ic {
+  width: 54px; height: 54px; border-radius: 50%; margin-bottom: 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--emb); color: var(--em); font-size: 24px;
+}
+.portal-track-empty-t { font-size: 14.5px; font-weight: 800; color: var(--t1); }
+.portal-track-empty-s { font-size: 12.5px; line-height: 1.7; color: var(--t3); max-width: 420px; }
+.portal-track-empty .portal-btn { margin-top: 10px; }
+.portal-track-empty .portal-btn--ghost i { color: var(--em); }
+
+/* زر واتساب بعرض كامل */
+.portal-track-wa { width: 100%; justify-content: center; margin-top: 12px; }
+
+/* توست الخطأ */
+.portal-toast--err {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 8px 32px rgba(239,68,68,.3);
+}
+
+@media (max-width: 640px) {
+  .portal-track-field .portal-form-input { font-size: 16px; }
+  .portal-track-form .portal-cart-actions .portal-btn { width: 100%; }
+}
+
 /* ═══ «اطلب سلعة»: كتالوج بعرض كامل + سلة في درج جانبي منزلق (تصميم متجر) ═══ */
 .portal-order-main { min-width: 0; }
 
