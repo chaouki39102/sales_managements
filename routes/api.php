@@ -753,28 +753,28 @@ Route::prefix('v1')->group(function () {
                 Route::get('portal-access/for-party/{partyId}', [PortalAccessController::class, 'forParty']);
                 Route::put('portal-access/{id}',                [PortalAccessController::class, 'update']);
                 Route::delete('portal-access/{id}',             [PortalAccessController::class, 'destroy']);
+            });
 
-                // ── النسخ الاحتياطي واستعادة قاعدة البيانات (can:manage_backup) ──
-                Route::middleware('can:manage_backup')->group(function () {
-                    Route::prefix('backups')->group(function () {
-                        Route::post('import',    [\App\Http\Controllers\Api\V1\BackupController::class, 'import']);
-                        Route::get('/',        [\App\Http\Controllers\Api\V1\BackupController::class, 'index']);
-                        Route::post('/',       [\App\Http\Controllers\Api\V1\BackupController::class, 'store']);
-                        Route::post('{file}/verify',    [\App\Http\Controllers\Api\V1\BackupController::class, 'verify']);
-                        Route::get('{file}/download',   [\App\Http\Controllers\Api\V1\BackupController::class, 'download']);
-                        Route::post('{file}/restore',   [\App\Http\Controllers\Api\V1\BackupController::class, 'doRestore']);
-                        Route::delete('{file}',         [\App\Http\Controllers\Api\V1\BackupController::class, 'destroy']);
-                    });
+            // ── النسخ الاحتياطي واستعادة قاعدة البيانات — can:manage_backup (sibling, key-only) ──
+            Route::middleware('can:manage_backup')->group(function () {
+                Route::prefix('backups')->group(function () {
+                    Route::post('import',    [\App\Http\Controllers\Api\V1\BackupController::class, 'import']);
+                    Route::get('/',        [\App\Http\Controllers\Api\V1\BackupController::class, 'index']);
+                    Route::post('/',       [\App\Http\Controllers\Api\V1\BackupController::class, 'store']);
+                    Route::post('{file}/verify',    [\App\Http\Controllers\Api\V1\BackupController::class, 'verify']);
+                    Route::get('{file}/download',   [\App\Http\Controllers\Api\V1\BackupController::class, 'download']);
+                    Route::post('{file}/restore',   [\App\Http\Controllers\Api\V1\BackupController::class, 'doRestore']);
+                    Route::delete('{file}',         [\App\Http\Controllers\Api\V1\BackupController::class, 'destroy']);
                 });
+            });
 
-                // ── طابعات النظام (اكتشاف طابعات ويندوز المثبتة) (can:manage_printer) ──
-                Route::middleware('can:manage_printer')->group(function () {
-                    Route::get('system/printers',       [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'index']);
-                    Route::post('system/printers/test', [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'testPrint']);
-                    Route::post('system/printers/raw',  [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'rawPrint']);
-                    Route::post('system/printers/raw-text', [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'rawText']);
-                    Route::post('system/printers/html', [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'htmlPrint']);
-                });
+            // ── طابعات النظام (اكتشاف طابعات ويندوز المثبتة) — can:manage_printer (sibling, key-only) ──
+            Route::middleware('can:manage_printer')->group(function () {
+                Route::get('system/printers',       [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'index']);
+                Route::post('system/printers/test', [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'testPrint']);
+                Route::post('system/printers/raw',  [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'rawPrint']);
+                Route::post('system/printers/raw-text', [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'rawText']);
+                Route::post('system/printers/html', [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'htmlPrint']);
             });
 
             // ── طلبات بوابة الزبائن (إدارة المسؤول) — can:manage_portal_orders ──
