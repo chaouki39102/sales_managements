@@ -1,8 +1,8 @@
 // resources/js/lib/permissions.ts
 // ══════════════════════════════════════════════════════════════════════════════
 // طبقة الصلاحيات الأمامية — المصدر الوحيد لبيانيات الصلاحيات في الواجهة.
-// بني على أدوار وصلاحيات المستخدم الحالي (useMyRolesAndPermissions) وليس على
-// قائمة Spatie المسطّحة (useMyPermissions) — انظر PERMISSIONS_RESTRUCTURE_TODO.md.
+// يعتمد على الـ effective set (role ∪ direct) المرسل من /me/roles في حقل
+// permissions العلوي — انظر PERMISSIONS_RESTRUCTURE_TODO.md Phase 6.
 import { useMemo, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useMyRolesAndPermissions } from '@/lib/api/endpoints/roles';
@@ -57,13 +57,13 @@ export interface UsePermissionsResult {
   isReady: boolean;
 }
 
-/** عكس source of truth: أدوار صلاحيات المستخدم الحالي (المفصولة backend). */
+/** عكس source of truth: الـ effective set (role ∪ direct) الصادر من /me/roles. */
 export function usePermissions(): UsePermissionsResult {
   const { isSuperAdmin } = useAuth();
   const { data, isPending, isFetched } = useMyRolesAndPermissions();
 
   const permissions = useMemo(
-    () => permissionsSetFromRoles(data?.roles ?? []),
+    () => new Set<string>(data?.permissions ?? []),
     [data],
   );
 
