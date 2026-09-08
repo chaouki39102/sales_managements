@@ -1043,21 +1043,21 @@ html.dark .portal-login-box {
 .portal-login .fg input,
 .portal-form-input {
   width: 100%;
-  padding: 8.5px 35px;
-  border-radius: 12px;
-  border: 1.5px solid var(--b2);
-  background: var(--bg3);
+  padding: 8.5px 35px !important;
+  border-radius: 12px !important;
+  border: 1.5px solid var(--b2) !important;
+  background: var(--bg3) !important;
   color: var(--t1);
-  font-size: 13.5px;
+  font-size: 13.5px !important;
   font-family: 'Tajawal', sans-serif;
-  transition: all .25s cubic-bezier(.4,0,.2,1);
+  transition: all .25s cubic-bezier(.4,0,.2,1) !important;
   outline: none;
 }
 .portal-login .fg input:focus,
 .portal-form-input:focus {
-  border-color: var(--em);
-  box-shadow: 0 0 0 4px var(--emb);
-  background: var(--bg2);
+  border-color: var(--em) !important;
+  box-shadow: 0 0 0 4px var(--emb) !important;
+  background: var(--bg2) !important;
 }
 
 /* ─── كشف الحساب ─── */
@@ -2213,7 +2213,7 @@ html.dark .portal-prod-discs--ov .portal-disc-chip { background: rgba(20,22,28,.
   .portal-search input,
   .portal-prod-qty input,
   .portal-prod-pkg,
-  .portal-form-input { font-size: 16px; }
+.portal-form-input { font-size: 16px !important; }
   /* التوست فوق الشريط السفلي الثابت */
   .portal-toast { bottom: 84px; }
 }
@@ -2869,7 +2869,7 @@ body.dark .poa-date input::-webkit-calendar-picker-indicator { opacity: .85; }
 /* ── أدوات عامة إضافية ── */
 .portal-relative { position: relative; }
 .portal-form-input--r { text-align: right; }
-.portal-form-input--pass { text-align: right; padding-left: 40px; }
+.portal-form-input--pass { text-align: right; padding-left: 40px !important; }
 
 /* ── ملخص الدفعات ── */
 .portal-pay-summary {
@@ -3223,7 +3223,7 @@ body.dark .poa-date input::-webkit-calendar-picker-indicator { opacity: .85; }
 }
 
 @media (max-width: 640px) {
-  .portal-track-field .portal-form-input { font-size: 16px; }
+  .portal-track-field .portal-form-input { font-size: 16px !important; }
   .portal-track-form .portal-cart-actions .portal-btn { width: 100%; }
 }
 
@@ -4009,7 +4009,7 @@ body.dark .poa-sort-hint { color: var(--t5, #64748b); }
   border-bottom: 1px solid var(--b1);
   transition: all .22s ease;
 }
-.portal-cart-note .portal-form-input { display: none; border: 0; background: transparent; font-size: 13px; }
+.portal-cart-note .portal-form-input { display: none; border: 0 !important; background: transparent !important; font-size: 13px !important; }
 .portal-cart-note.is-open { padding: 12px 18px; }
 .portal-cart-note.is-open .portal-form-input { display: block; }
 .portal-cart-note-hd {
@@ -4026,7 +4026,7 @@ body.dark .poa-sort-hint { color: var(--t5, #64748b); }
   transition: transform .2s ease;
 }
 .portal-cart-note.is-open .portal-cart-note-caret { transform: rotate(180deg); }
-.portal-cart-note .portal-form-input:focus { outline: none; box-shadow: none; }
+.portal-cart-note .portal-form-input:focus { outline: none; box-shadow: none !important; }
 
 /* صفوف السلة — غنية مثل POS Pro */
 .portal-cart { display: flex; flex-direction: column; gap: 2px; }
