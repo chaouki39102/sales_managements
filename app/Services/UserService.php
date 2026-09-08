@@ -39,12 +39,35 @@ class UserService extends \App\Core\Services\BaseService
         // نستدعي الـ parent الذي يعالج باقي الحقول
         $item = parent::update($item, $data, $request);
 
-        // نطبق الصلاحيات بعد الحفظ مباشرة
+        // نطبق الصلاحيات بعد الحفظ مباشرة — مقيّدة بنطاق الشركة الحالية
         if ($permissionIds !== null) {
-            $item->syncPermissions($permissionIds);
+            $this->syncScopedPermissions($item, $permissionIds, $this->getCurrentCompanyId());
         }
 
         return $item->fresh($this->defaultWith);
+    }
+
+    /**
+     * مزامنة الصلاحيات المباشرة ضمن نطاق الشركة الحالية فقط.
+     * شركة أخرى لا يمكن أن تُمنح صلاحياتها لمستخدم هذه الشركة،
+     * والصلاحيات العامة (company_id NULL) تُمنح للجميع.
+     */
+    protected function syncScopedPermissions(Model $item, array $permissionIds, ?int $companyId): void
+    {
+        $permissionClass = app(\Spatie\Permission\PermissionRegistrar::class)->getPermissionClass();
+
+        $allowed = $permissionClass::query()
+            ->whereIn('id', $permissionIds)
+            ->where(function ($q) use ($companyId) {
+                $q->whereNull('company_id');
+                if ($companyId) {
+                    $q->orWhere('company_id', $companyId);
+                }
+            })
+            ->pluck('id')
+            ->all();
+
+        $item->syncPermissions($allowed);
     }
 
     // ═══════════════════════════════════════════
@@ -90,9 +113,9 @@ class UserService extends \App\Core\Services\BaseService
                 ->assignRole($item, $data['role'], $companyId);
         }
 
-        // 3. الصلاحيات المباشرة (إن وجدت)
+        // 3. الصلاحيات المباشرة (إن وجدت) — مقيّدة بنطاق الشركة الحالية
         if (isset($data['permission_ids']) && is_array($data['permission_ids'])) {
-            $item->syncPermissions($data['permission_ids']);
+            $this->syncScopedPermissions($item, $data['permission_ids'], $companyId);
         }
 
         // 4. رفع الصورة (إن وجدت)
@@ -145,9 +168,13 @@ class UserService extends \App\Core\Services\BaseService
 
     protected function afterUpdate(Model $item, array $data, ?Request $request): void
     {
-        // الدور
+        // الدور — استبدال ضمن نطاق الشركة الحالية عبر CompanyRoleService
         if (isset($data['role']) && $data['role']) {
-            $item->syncRoles([$data['role']]);
+            $companyId = $this->getCurrentCompanyId();
+            if ($companyId) {
+                app(\App\Services\CompanyRoleService::class)
+                    ->replaceRole($item, $data['role'], $companyId);
+            }
         }
 
         // permission_ids تُعالج في update() المُتجاوَز — لا شيء هنا

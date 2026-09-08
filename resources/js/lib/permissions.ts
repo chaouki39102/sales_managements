@@ -31,6 +31,12 @@ export const PERMISSION = {
   VIEW_INVENTORY_REPORT: 'view_inventory_report',
   VIEW_FINANCIAL_REPORT: 'view_financial_report',
   VIEW_COST_PRICE: 'view_cost_price',
+  VIEW_PRINT_TEMPLATES: 'view_print_templates',
+  MANAGE_PRINT_TEMPLATES: 'manage_print_templates',
+  VIEW_SETTINGS: 'view_settings',
+  MANAGE_ROLES: 'manage_roles',
+  MANAGE_COMPANY_MEMBERS: 'manage_company_members',
+  UPDATE_COMPANY: 'update_company',
 } as const;
 
 export type PermissionKey = keyof typeof PERMISSION;

@@ -106,7 +106,10 @@ trait HasUserPermissionEndpoints
             ->flatMap(fn($role) => $role->permissions)
             ->pluck('name');
 
-        $directPermissions = $user->getDirectPermissions()->pluck('name');
+        // الصلاحيات المباشرة — ضمن نطاق الشركة الحالية أو عامة فقط
+        $directPermissions = $user->getDirectPermissions()
+            ->filter(fn($p) => $p->company_id === null || (int) $p->company_id === (int) $companyId)
+            ->pluck('name');
 
         return $rolePermissions
             ->merge($directPermissions)
