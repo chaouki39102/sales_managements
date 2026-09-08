@@ -154,6 +154,7 @@ export default function PortalTrackOrderPage() {
             <h3><i className="ti ti-truck-delivery" /> تتبع طلبك</h3>
           </div>
 
+          <div className="portal-track-body">
           <div className="portal-track-form">
             <div className="portal-track-field">
               <label className="portal-track-lbl"><i className="ti ti-phone" /> رقم الهاتف <b className="req">*</b></label>
@@ -169,6 +170,16 @@ export default function PortalTrackOrderPage() {
                   onChange={(e) => { setPhone(e.target.value); setSearched(false); }}
                   onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
                 />
+                {phone && (
+                  <button
+                    className="portal-track-clear"
+                    type="button"
+                    aria-label="مسح رقم الهاتف"
+                    onClick={() => { setPhone(''); setSearched(false); phoneRef.current?.focus(); }}
+                  >
+                    <i className="ti ti-x" />
+                  </button>
+                )}
               </div>
             </div>
             <div className="portal-track-field">
@@ -183,6 +194,16 @@ export default function PortalTrackOrderPage() {
                   onChange={(e) => { setReference(e.target.value); setSearched(false); }}
                   onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
                 />
+                {reference && (
+                  <button
+                    className="portal-track-clear"
+                    type="button"
+                    aria-label="مسح مرجع الطلب"
+                    onClick={() => { setReference(''); setSearched(false); }}
+                  >
+                    <i className="ti ti-x" />
+                  </button>
+                )}
               </div>
             </div>
             <div className="portal-cart-actions">
@@ -328,6 +349,7 @@ export default function PortalTrackOrderPage() {
               </div>
             );
           })}
+          </div>
         </div>
       </main>
 
