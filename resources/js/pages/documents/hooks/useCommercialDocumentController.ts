@@ -8,6 +8,7 @@ import { useActiveSlug, useActiveCompany } from '@/lib/store/appStore';
 import { settingsApi } from '@/lib/api/endpoints/settings';
 import { partiesApi } from '@/lib/api/endpoints/parties';
 import { useMyPermissions } from '@/lib/api/endpoints/roles';
+import { PERMISSION } from '@/lib/permissions';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useNotification } from '@/hooks/useNotification';
@@ -86,7 +87,7 @@ export function useCommercialDocumentController({
 
   // ─── صلاحية إظهار التكلفة والهامش (view_cost_price) ─────────────────────
   const { data: myPermissions } = useMyPermissions();
-  const canViewCost = !!myPermissions?.includes('view_cost_price');
+  const canViewCost = !!myPermissions?.includes(PERMISSION.VIEW_COST_PRICE);
   const effectiveVisibleCols = useMemo(() => {
     if (canViewCost) return visibleCols;
     const next = new Set(visibleCols);
@@ -100,14 +101,14 @@ export function useCommercialDocumentController({
   // stay editable here; the backend still 403s any save that RAISES a value for a
   // user lacking the perm. Switch on → lock the fields per permission.
   const lockPrices = !!settingsDict?.lock_prices_for_cashiers?.value;
-  const canEditPrice     = !lockPrices || !!myPermissions?.includes('change_price_commercial_document');
-  const canApplyDiscount = !lockPrices || !!myPermissions?.includes('apply_discount_commercial_document');
+  const canEditPrice     = !lockPrices || !!myPermissions?.includes(PERMISSION.CHANGE_PRICE_COMMERCIAL_DOCUMENT);
+  const canApplyDiscount = !lockPrices || !!myPermissions?.includes(PERMISSION.APPLY_DISCOUNT_COMMERCIAL_DOCUMENT);
 
   // ─── صلاحية تجاوز المخزون (override_stock_commercial_document) ──────────
   // تُظهر تحذير «مخزون غير كافٍ» وزر «تجاوز المخزون» للمدير/المالك فقط.
   // (التجاوز الفعلي يتم تلقائياً في الباكند — الصلاحية تتحقق من ability،
   //  الزر هنا إقرار بصري مُزيل للتحذير من السطر.)
-  const canOverrideStock = !!myPermissions?.includes('override_stock_commercial_document');
+  const canOverrideStock = !!myPermissions?.includes(PERMISSION.OVERRIDE_STOCK_COMMERCIAL_DOCUMENT);
 
   const [nextAction, setNextAction] = useState<'list' | 'new' | 'close'>('list');
 
