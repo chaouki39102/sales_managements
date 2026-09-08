@@ -3118,7 +3118,7 @@ body.dark .poa-date input::-webkit-calendar-picker-indicator { opacity: .85; }
 .portal-track-wrap:focus-within .portal-track-ic { color: var(--em); }
 /* غلاف داخلي: حشوة أفقية موحّدة لحقول البحث والنتائج (تطابق رأس البطاقة) */
 .portal-track-body { padding: 18px 22px 20px; display: flex; flex-direction: column; min-width: 0; }
-.portal-track-wrap .portal-form-input { width: 100%; padding-left: 58px; padding-right: 44px; }
+.portal-track-wrap .portal-form-input { width: 100%; padding: 8.5px 35px; }
 /* زر مسح الحقل (×) — ظاهر دائماً، باهت عند الفراغ */
 .portal-track-clear {
   position: absolute; top: 50%; inset-inline-end: 8px; transform: translateY(-50%);
