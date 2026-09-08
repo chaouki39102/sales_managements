@@ -1043,7 +1043,7 @@ html.dark .portal-login-box {
 .portal-login .fg input,
 .portal-form-input {
   width: 100%;
-  padding: 12px 14px;
+  padding: 8.5px 35px;
   border-radius: 12px;
   border: 1.5px solid var(--b2);
   background: var(--bg3);
