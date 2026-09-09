@@ -65,7 +65,8 @@ class RoleController extends BaseApiController
     {
         try {
             $resolvedId = $this->extractId($id);
-            $role = $this->roleService->findById($resolvedId, ['company']);
+            // defaultWith = ['permissions'] → لا يوجد relation (company) على نموذج Spatie Role
+            $role = $this->roleService->findById($resolvedId);
             $this->authorizeAction('view', $role);
 
             return $this->successResponse(new RoleResource($role));

@@ -85,11 +85,92 @@ it('5. GET /reports/sales — مفتوح (ليس 403)', function () {
 
 // ─── 6–9. الأدوار وقوالب الطباعة ─────────────────────────────────
 
-it('6. GET /roles — مفتوح → 200', function () {
+it('6a. GET /roles — بدون view_roles → 403', function () {
     actingAsAuthenticatedTenantUser();
     $slug = testCompanySlug();
 
+    getJson("/api/v1/{$slug}/roles")->assertForbidden();
+});
+
+it('6b. GET /roles — مع view_roles → 200', function () {
+    actingAsRole('manager-roles', ['view_roles']);
+    $slug = testCompanySlug();
+
     getJson("/api/v1/{$slug}/roles")->assertOk();
+});
+
+// ─── 6c. بوابة قراءة الصلاحيات (can:view_roles — نفس بوابة قراءة الأدوار) ──
+
+it('6c1. GET /permissions — بدون view_roles → 403', function () {
+    actingAsAuthenticatedTenantUser();
+    $slug = testCompanySlug();
+
+    getJson("/api/v1/{$slug}/permissions")->assertForbidden();
+});
+
+it('6c2. GET /permissions — مع view_roles → 200', function () {
+    actingAsRole('manager-roles', ['view_roles']);
+    $slug = testCompanySlug();
+
+    getJson("/api/v1/{$slug}/permissions")->assertOk();
+});
+
+it('6c3. GET /permissions/by-group — بدون view_roles → 403', function () {
+    actingAsAuthenticatedTenantUser();
+    $slug = testCompanySlug();
+
+    getJson("/api/v1/{$slug}/permissions/by-group")->assertForbidden();
+});
+
+it('6c4. GET /permissions/by-group — مع view_roles → 200', function () {
+    actingAsRole('manager-roles', ['view_roles']);
+    $slug = testCompanySlug();
+
+    getJson("/api/v1/{$slug}/permissions/by-group")->assertOk();
+});
+
+it('6c5. GET /permissions/{id} — بدون view_roles → 403', function () {
+    actingAsAuthenticatedTenantUser();
+    $slug = testCompanySlug();
+    $company   = Company::query()->where('slug', TEST_COMPANY_SLUG)->first();
+    $permission = Permission::query()->create([
+        'name' => 'some_perm_read', 'guard_name' => 'web', 'company_id' => $company->id,
+    ]);
+
+    getJson("/api/v1/{$slug}/permissions/{$permission->id}")->assertForbidden();
+});
+
+it('6c6. GET /permissions/{id} — مع view_roles → 200', function () {
+    actingAsRole('manager-roles', ['view_roles']);
+    $slug = testCompanySlug();
+    $company   = Company::query()->where('slug', TEST_COMPANY_SLUG)->first();
+    $permission = Permission::query()->create([
+        'name' => 'some_perm_read2', 'guard_name' => 'web', 'company_id' => $company->id,
+    ]);
+
+    getJson("/api/v1/{$slug}/permissions/{$permission->id}")->assertOk();
+});
+
+it('6c7. GET /roles/{id} — بدون view_roles → 403', function () {
+    actingAsAuthenticatedTenantUser();
+    $slug = testCompanySlug();
+    $company              = Company::query()->where('slug', TEST_COMPANY_SLUG)->first();
+    $role                 = Role::query()->create([
+        'name' => 'some-role-read', 'guard_name' => 'web', 'company_id' => $company->id,
+    ]);
+
+    getJson("/api/v1/{$slug}/roles/{$role->id}")->assertForbidden();
+});
+
+it('6c8. GET /roles/{id} — مع view_roles → 200', function () {
+    actingAsRole('manager-roles', ['view_roles']);
+    $slug = testCompanySlug();
+    $company              = Company::query()->where('slug', TEST_COMPANY_SLUG)->first();
+    $role                 = Role::query()->create([
+        'name' => 'some-role-read2', 'guard_name' => 'web', 'company_id' => $company->id,
+    ]);
+
+    getJson("/api/v1/{$slug}/roles/{$role->id}")->assertOk();
 });
 
 // ─── 6d. عزل super-admin عن مستخدمي الشركة (RoleService::getListConfig) ──

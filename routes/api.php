@@ -473,11 +473,15 @@ Route::prefix('v1')->group(function () {
             Route::get('fiscal-years',         [FiscalYearController::class, 'index']);
             Route::get('fiscal-years/{year}',  [FiscalYearController::class, 'show']);
 
-            Route::get('roles',                    [RoleController::class, 'index']);
-            Route::get('roles/{role}',             [RoleController::class, 'show']);
-            Route::get('permissions/by-group',     [PermissionController::class, 'byGroup']);
-            Route::get('permissions',              [PermissionController::class, 'index']);
-            Route::get('permissions/{permission}', [PermissionController::class, 'show']);
+            // قراءة الأدوار/الصلاحيات — can:view_roles (المالك/المدير/المشاهد فقط،
+            // وليس أمين الصندوق). الكاتبة في مجموعة can:manage_roles أدناه.
+            Route::middleware('can:view_roles')->group(function () {
+                Route::get('roles',                    [RoleController::class, 'index']);
+                Route::get('roles/{role}',             [RoleController::class, 'show']);
+                Route::get('permissions/by-group',     [PermissionController::class, 'byGroup']);
+                Route::get('permissions',              [PermissionController::class, 'index']);
+                Route::get('permissions/{permission}', [PermissionController::class, 'show']);
+            });
 
             // ✅ notifications (routes/notifications.php)
             require __DIR__ . '/notifications.php';
