@@ -39,7 +39,7 @@ Tab gates use `view_any_user` (users), `manage_backup` (backup), `manage_printer
 ## Phase 6 — Owner full control: assign/unassign ANY permission to ANY user + effective-set fix ✅ DONE
 
 ### 6a. Backend `/me/roles` returns the EFFECTIVE (role ∪ direct) set ✅
-`PermissionController::myRoles()` → `UserPermissionsMethods` trait returns `{roles, permissions}` using `getAllPermissions()` = role ∪ direct. Confirmed by test 16 (direct grant visible in `/me/permissions`, opens `/settings`, revoke restores 403).
+`PermissionController::myRoles()` → the `HasUserPermissionEndpoints` trait (`app/Http/Controllers/Api/V1/HasUserPermissionEndpoints.php`, used by `UserController`) returns `{roles, permissions}` using the company-scoped effective set (role ∪ direct, honoring `hasImplicitFullControl`). The old buggy duplicate `app/Http/Controllers/Api/V1/UserPermissionsMethods.php` was DELETED (declared the same trait name; never imported; latent class-redefinition trap). Confirmed by test 16 (direct grant visible in `/me/permissions`, opens `/settings`, revoke restores 403).
 
 ### 6b. Frontend effective set = the `permissions` array from `/me/roles` ✅
 `lib/permissions.ts` `usePermissions()` reads `useMyRolesAndPermissions()` and builds `new Set(data?.permissions ?? [])`. Every route guard, nav item, and `can()` gate honors direct per-user grants.
