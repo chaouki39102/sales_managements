@@ -127,6 +127,34 @@ class AuditLabelService
         'packaging_units_snapshot' => 'عدد الوحدات في العبوة',
         'expense_number'      => 'رقم المصروف',
         'payment_number'      => 'رقم الدفعة',
+        // أعمدة CommercialDocumentLine
+        'line_order'           => 'ترتيب السطر',
+        'product_id'           => 'المنتج',
+        'packaging_id'         => 'العبوة',
+        'packaging_quantity'   => 'عدد الوحدات في العبوة',
+        'quantity_discount_id' => 'خصم الكمية',
+        'discount_amount_per_unit' => 'الخصم لكل وحدة',
+        'total_discount_amount' => 'مجموع الخصم',
+        'line_attributes'      => 'خصائص السطر',
+        'commercial_document_id' => 'المستند',
+        'stock_lot_id'         => 'رقم الدفعة',
+        'cost_price_ht'        => 'تكلفة الوحدة HT',
+        'total_stamp'          => 'الطابع',
+        'net_to_pay'           => 'الصافي للدفع',
+        'paid_amount'          => 'المبلغ المدفوع',
+        'remaining_amount'     => 'المبلغ المتبقي',
+        // حقول عامة إضافية
+        'id'                   => 'المعرف',
+        'created_at'           => 'تاريخ الإنشاء',
+        'updated_at'           => 'تاريخ التحديث',
+        'deleted_at'           => 'تاريخ الحذف',
+        'company'              => 'الشركة',
+        'is_active'            => 'نشط',
+        'is_default'           => 'افتراضي',
+        'is_tva_exempt'        => 'معفى من TVA',
+        'is_readonly'          => 'للقراءة فقط',
+        'sort_order'           => 'ترتيب العرض',
+        'display_order'        => 'ترتيب العرض',
     ];
 
     /**
@@ -184,20 +212,37 @@ class AuditLabelService
     }
 
     /**
+     * مفاتيح يُتجاهل عرضها كلوحة ضجيج داخلي (معرّف وخطوط زمنية — بلا قيمة للمستخدم).
+     */
+    public const NOISE_KEYS = [
+        'id',
+        'created_at',
+        'updated_at',
+        'deleted_at',
+    ];
+
+    /**
      * تحويل old/new values إلى مصفوفة صفوف مقروءة.
      */
     public function humanizedDiff(?array $old, ?array $new, ?Model $auditable = null): array
     {
         $old = $old ?? [];
         $new = $new ?? [];
+        $isCreate = empty($old) && !empty($new);
+        $isDelete = empty($new) && !empty($old);
 
         $rows = [];
         foreach (array_unique(array_merge(array_keys($old), array_keys($new))) as $key) {
             $o = array_key_exists($key, $old) ? $old[$key] : null;
             $n = array_key_exists($key, $new) ? $new[$key] : null;
 
-            // تجاهل الحقول غير المتغيرة إلا عند الحذف/الإنشاء (لا جديد = حذف، لا قديم = إنشاء).
-            if ($o === $n && !empty($old) && !empty($new)) {
+            // مفاتيح الضجيج لا تُعرض أبداً (المعرّف + الخطوط الزمنية).
+            if (in_array($key, self::NOISE_KEYS, true)) {
+                continue;
+            }
+
+            // تجاهل الحقول غير المتغيرة إلا عند الحذف/الإنشاء.
+            if ($o === $n && !$isCreate && !$isDelete) {
                 continue;
             }
 
@@ -223,15 +268,17 @@ class AuditLabelService
         if (is_bool($value)) {
             return $value ? 'نعم' : 'لا';
         }
-        if (is_int($value) || is_float($value)) {
-            // الأرقام تبقى كما هي (مبالغ/كميات) — لا تُحوَّل إلى معرّف.
-            return (string) $value;
-        }
-        if (is_string($value) && (str_ends_with($key, '_id') || in_array($key, ['created_by', 'updated_by', 'deleted_by'], true)) && is_numeric($value)) {
+        // العمود العلاقة (FK/مستخدم) يُحلَّ إلى اسم مقروء أولاً — لا يُعرض معرّف خام أبداً.
+        // يجب أن يسبق أي تمرير رقمي حتى لا تتسرب المعرّفات كأرقام (مثل product_id: 12).
+        if (is_numeric($value) && (str_ends_with($key, '_id') || in_array($key, ['created_by', 'updated_by', 'deleted_by'], true))) {
             $label = $this->resolveFkLabel($key, $value, $auditable);
-            if ($label) {
+            if ($label !== null) {
                 return $label;
             }
+        }
+        if (is_int($value) || is_float($value)) {
+            // الأرقام غير المرتبطة بعلاقة تبقى كما هي (مبالغ/كميات).
+            return (string) $value;
         }
         return (string) $value;
     }
@@ -301,6 +348,12 @@ class AuditLabelService
             'fiscal_year_id'   => \App\Models\FiscalYear::class,
             'document_type_id' => \App\Models\DocumentType::class,
             'role_id'          => \App\Models\Role::class,
+            // أعمدة CommercialDocumentLine / سطور المستندات
+            'commercial_document_id' => \App\Models\CommercialDocument::class,
+            'product_id'       => \App\Models\Product::class,
+            'packaging_id'     => \App\Models\ProductPackaging::class,
+            'quantity_discount_id' => \App\Models\QuantityDiscount::class,
+            'stock_lot_id'     => \App\Models\ProductLot::class,
         ];
 
         return $static[$key] ?? null;
