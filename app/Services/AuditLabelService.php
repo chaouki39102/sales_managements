@@ -79,6 +79,7 @@ class AuditLabelService
         'quantity'            => 'الكمية',
         'qty'                 => 'الكمية',
         'unit_price_ht'       => 'سعر الوحدة HT',
+        'unit_price'          => 'سعر الوحدة HT',
         'price'               => 'السعر',
         'price_ht'            => 'السعر HT',
         'purchase_price_ht'   => 'سعر الشراء HT',
@@ -283,6 +284,144 @@ class AuditLabelService
         }
 
         return "{$who} {$action} {$this->typeLabel($auditable)} " . $this->displayLabel($auditable);
+    }
+
+    /**
+     * تسمية عربية مختصرة لأفعال تدقيق المستند (للشارات/الفلاتر الملونة).
+     */
+    public const DOCUMENT_ACTION_LABELS = [
+        'created'          => 'إنشاء',
+        'updated'          => 'تعديل',
+        'line_added'       => 'إضافة سطر',
+        'line_removed'     => 'إزالة سطر',
+        'line_modified'    => 'تعديل سطر',
+        'price_changed'    => 'تغيير السعر',
+        'discount_changed' => 'تغيير الخصم',
+        'status_changed'   => 'تغيير الحالة',
+        'locked'           => 'قفل',
+        'unlocked'         => 'فتح',
+        'cancelled'        => 'إلغاء',
+        'deleted'          => 'حذف',
+        'payment_added'    => 'إضافة دفعة',
+        'payment_removed'  => 'إزالة دفعة',
+        'converted'        => 'تحويل',
+        'returned'         => 'إرجاع',
+        'cloned'           => 'استنساخ',
+        'stock_override'   => 'تصحيح المخزون',
+    ];
+
+    /**
+     * تسمية عربية مختصرة لفعل تدقيق المستند (للشارة الملونة).
+     */
+    public function documentAuditActionLabel(string $action): string
+    {
+        return self::DOCUMENT_ACTION_LABELS[$action] ?? Str::title(str_replace('_', ' ', $action));
+    }
+
+    /**
+     * صفوف مقروءة لقيمة مركّبة (حمولة سطر/كائن): {key,label,value} مع حلّ معرّفات FK.
+     */
+    public function documentAuditValueRows(?array $value): array
+    {
+        $value = $value ?? [];
+        $rows = [];
+        foreach ($value as $key => $v) {
+            // لا تُعرض مفاتيح الضجيج الداخلي أبداً (المعرّف + الخطوط الزمنية).
+            if (in_array($key, self::NOISE_KEYS, true)) {
+                continue;
+            }
+            $rows[] = [
+                'key'   => (string) $key,
+                'label' => $this->fieldLabel((string) $key),
+                'value' => $this->humanizeValue((string) $key, $v),
+            ];
+        }
+        return $rows;
+    }
+
+    /**
+     * شكل مقروء لقيمة حدث تدقيق مستند: null → «—»، مصفوفة → صفوف، قيمة بسيطة → نص/رقم.
+     */
+    public function documentAuditHumanized($value): array|string
+    {
+        if ($value === null || $value === '') {
+            return '—';
+        }
+        if (is_array($value)) {
+            return $this->documentAuditValueRows($value);
+        }
+        if (is_bool($value)) {
+            return $value ? 'نعم' : 'لا';
+        }
+        return (string) $value;
+    }
+
+    /**
+     * جملة عربية كاملة لحدث تدقيق مستند، مثال:
+     * «شوقي عبد الصادق أضاف سطر «حليب» إلى مبيعات POS POS-2026-000076».
+     */
+    public function documentAuditSummary(\App\Models\DocumentAuditLog $log): string
+    {
+        $doc = null;
+        try {
+            $doc = $log->document;
+        } catch (\Throwable $e) {
+            $doc = null;
+        }
+        $docLabel = $doc ? $this->displayLabel($doc) : ('#' . $log->document_id);
+
+        $who = 'مستخدم';
+        if ($log->user_id) {
+            try {
+                $userLabel = $this->displayLabel($log->user);
+                if ($userLabel !== '—' && $userLabel !== '') {
+                    $who = $userLabel;
+                }
+            } catch (\Throwable $e) {
+                // أبقِ «مستخدم»
+            }
+        }
+
+        $payload = is_array($log->new_value) ? $log->new_value : (is_array($log->old_value) ? $log->old_value : null);
+        $product = null;
+        if ($payload !== null) {
+            $productId = $payload['product_id'] ?? null;
+            if ($productId !== null) {
+                try {
+                    $productLabel = $this->humanizeValue('product_id', $productId);
+                    if ($productLabel !== '—') {
+                        $product = $productLabel;
+                    }
+                } catch (\Throwable $e) {
+                    $product = null;
+                }
+            }
+        }
+
+        $lineProduct = $product !== null ? 'سطر «' . $product . '»' : 'سطر';
+        $priceTarget = $product !== null ? '«' . $product . '»' : null;
+
+        return match ($log->action) {
+            'created'          => "{$who} أنشأ {$docLabel}",
+            'updated'          => "{$who} عدّل {$docLabel}",
+            'line_added'       => "{$who} أضاف {$lineProduct} إلى {$docLabel}",
+            'line_removed'     => "{$who} أزال {$lineProduct} من {$docLabel}",
+            'line_modified'    => "{$who} عدّل {$lineProduct} في {$docLabel}",
+            'price_changed'    => $priceTarget !== null ? "{$who} غيّر سعر {$priceTarget}" : "{$who} غيّر سعر {$docLabel}",
+            'discount_changed' => $priceTarget !== null ? "{$who} غيّر خصم {$priceTarget}" : "{$who} غيّر خصم {$docLabel}",
+            'status_changed'   => "{$who} غيّر حالة {$docLabel}",
+            'locked'           => "{$who} قفل {$docLabel}",
+            'unlocked'         => "{$who} فتح {$docLabel}",
+            'cancelled'        => "{$who} ألغى {$docLabel}",
+            'deleted'          => "{$who} حذف {$docLabel}",
+            'payment_added'    => "{$who} أضاف دفعة إلى {$docLabel}",
+            'payment_removed'  => "{$who} أزال دفعة من {$docLabel}",
+            'converted'        => "{$who} حوّل {$docLabel}",
+            'returned'         => "{$who} أرجع {$docLabel}",
+            'cloned'           => "{$who} استنسخ {$docLabel}",
+            'stock_override'   => "{$who} صحّح مخزون {$docLabel}",
+            default            => "{$who} {$this->documentAuditActionLabel($log->action)} {$docLabel}",
+        };
     }
 
     /**

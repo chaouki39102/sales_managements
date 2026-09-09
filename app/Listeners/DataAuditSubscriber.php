@@ -23,9 +23,13 @@ class DataAuditSubscriber
     /**
      * نماذج تُستثنى من التسجيل.
      * Audit ممنوع إزالته — منعاً للتكرار اللانهائي.
+     * DocumentAuditLog مُستبعد لأنه يسجّل تدقيقه بنفسه عبر DocumentAuditLogger
+     * (سجلّ تدقيق منفصل بالعربية لكل مستند) — تسجيله هنا ينتج صفوفاً مكررة
+     * غير مفهومة («أنشأ DocumentAuditLog #96») في السجل العام.
      */
     protected array $excluded = [
         Audit::class,
+        \App\Models\DocumentAuditLog::class,
     ];
 
     public function subscribe(Dispatcher $events): void

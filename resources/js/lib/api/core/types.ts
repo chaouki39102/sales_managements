@@ -650,22 +650,37 @@ export type DocumentAuditAction =
   | 'created' | 'updated' | 'line_added' | 'line_removed' | 'line_modified'
   | 'price_changed' | 'discount_changed' | 'status_changed' | 'locked' | 'unlocked'
   | 'cancelled' | 'deleted' | 'payment_added' | 'payment_removed' | 'converted'
-  | 'returned' | 'cloned';
+  | 'returned' | 'cloned' | 'stock_override';
+
+export interface DocumentAuditValueRow {
+  key:   string;
+  label: string;
+  value: string;
+}
 
 export interface DocumentAuditLogEntry {
-  id:          number;
-  document_id: number;
-  company_id:  number;
-  user_id?:    number | null;
-  user?:       User | null;
-  action:      DocumentAuditAction;
-  field_name?: string | null;
-  old_value?:  unknown;
-  new_value?:  unknown;
-  ip_address?: string | null;
-  user_agent?: string | null;
-  created_at:  string;
-  updated_at:  string;
+  id:                 number;
+  document_id:        number;
+  company_id:         number;
+  user_id?:           number | null;
+  user?:              User | null;
+  user_label?:        string | null;
+  company_name?:      string | null;
+  document?:          { id: number; document_number: string | null; display_label: string } | null;
+  document_label?:    string | null;
+  action:             DocumentAuditAction;
+  action_label?:      string | null;
+  action_summary?:    string | null;
+  field_name?:        string | null;
+  field_label?:       string | null;
+  old_value?:         unknown;
+  new_value?:         unknown;
+  humanized_old_value?: unknown;
+  humanized_new_value?: unknown;
+  ip_address?:        string | null;
+  user_agent?:        string | null;
+  created_at:         string;
+  updated_at:         string;
 }
 
 // ─── Payments ─────────────────────────────────────────────────────────────────

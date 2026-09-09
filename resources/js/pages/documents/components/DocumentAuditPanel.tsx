@@ -1,10 +1,12 @@
 // DocumentAuditPanel — سجل تدقيق المستند (من غيّر ماذا ومتى)
 // Read-only panel fed by GET /documents/{id}/audit-log
 import { useDocumentAuditLog } from '@/lib/api/endpoints/documents';
-import type { DocumentAuditAction, DocumentAuditLogEntry } from '@/lib/api/core/types';
+import type { DocumentAuditAction, DocumentAuditLogEntry, DocumentAuditValueRow } from '@/lib/api/core/types';
 
 interface ActionMeta { label: string; icon: string; tone: 'em' | 'red' | 'muted'; }
 
+// التسميات النصية مصدرها الخادم (action_label / action_summary) — هذه الخريطة
+// للشارة (الأيقونة + اللون) فقط، مع لاحق لتسمية قديمة عند غياب الحقل.
 const ACTION_META: Record<DocumentAuditAction, ActionMeta> = {
   created:           { label: 'إنشاء المستند',     icon: 'ti-plus',              tone: 'em' },
   updated:           { label: 'تعديل المستند',     icon: 'ti-pencil',            tone: 'muted' },
@@ -23,6 +25,7 @@ const ACTION_META: Record<DocumentAuditAction, ActionMeta> = {
   converted:         { label: 'تحويل المستند',     icon: 'ti-exchange',          tone: 'em' },
   returned:          { label: 'مبيوع مرتجع',       icon: 'ti-arrow-back-up',     tone: 'muted' },
   cloned:            { label: 'نسخ المستند',       icon: 'ti-copy',              tone: 'muted' },
+  stock_override:    { label: 'تصحيح المخزون',     icon: 'ti-archive',           tone: 'muted' },
 };
 
 const TONE_CLS: Record<ActionMeta['tone'], string> = {
@@ -31,22 +34,40 @@ const TONE_CLS: Record<ActionMeta['tone'], string> = {
   muted:  'text-t3 bg-3',
 };
 
-function fmtVal(v: unknown): string {
-  if (v === null || v === undefined) return '—';
-  if (typeof v === 'object') {
-    try { return JSON.stringify(v); } catch { return String(v); }
-  }
-  return String(v);
-}
-
-function ActionBadge({ action }: { action: DocumentAuditAction }) {
-  const meta = ACTION_META[action] ?? { label: action, icon: 'ti-info-circle', tone: 'muted' as const };
+function ActionBadge({ entry }: { entry: DocumentAuditLogEntry }) {
+  const meta = ACTION_META[entry.action] ?? { label: entry.action, icon: 'ti-info-circle', tone: 'muted' as const };
   return (
     <span className={`inline-flex items-center gap-4 px-6 py-2 rounded-md text-xs font-bold whitespace-nowrap ${TONE_CLS[meta.tone]}`}>
       <i className={`ti ${meta.icon}`} />
-      {meta.label}
+      {entry.action_label ?? meta.label}
     </span>
   );
+}
+
+function isValueRow(v: unknown): v is DocumentAuditValueRow[] {
+  return Array.isArray(v) && v.length > 0 && typeof v[0] === 'object'
+    && v[0] !== null && 'label' in v[0] && 'value' in v[0];
+}
+
+function ValueView({ v }: { v: unknown }) {
+  if (v === null || v === undefined || v === '—') {
+    return <span className="text-t4">—</span>;
+  }
+  if (isValueRow(v)) {
+    return (
+      <table className="audit-value-rows mt-4 w-full">
+        <tbody>
+          {v.map((row) => (
+            <tr key={row.key}>
+              <td className="text-xs text-t4 py-2 pe-6 whitespace-nowrap">{row.label}</td>
+              <td className="text-xs text-t2 py-2">{row.value}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
+  return <span className="text-t2">{String(v)}</span>;
 }
 
 export default function DocumentAuditPanel({ docId }: { docId: number }) {
@@ -72,17 +93,24 @@ export default function DocumentAuditPanel({ docId }: { docId: number }) {
       )}
       {!isLoading && count > 0 && (
         <div className="flex flex-col gap-6">
-          {entries.map((e: DocumentAuditLogEntry) => {
-            const hasField = !!e.field_name || !!(e.old_value ?? e.new_value);
+          {entries.map((e) => {
+            const hasValue = e.humanized_old_value != null || e.humanized_new_value != null
+              || e.old_value != null || e.new_value != null;
             return (
               <div key={e.id} className="flex items-start gap-8 p-10 rounded-lg bg-3">
-                <ActionBadge action={e.action} />
+                <ActionBadge entry={e} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-6 flex-wrap">
                     <span className="text-sm font-bold flex items-center gap-4">
                       <i className="ti ti-user text-t4" />
-                      {e.user?.name ?? 'النظام'}
+                      {e.user_label ?? e.user?.name ?? 'النظام'}
                     </span>
+                    {e.field_label && (
+                      <span className="text-xs text-t3 bg-2 px-6 py-2 rounded-md flex items-center gap-3">
+                        <i className="ti ti-list-details" />
+                        {e.field_label}
+                      </span>
+                    )}
                     <span className="text-xs text-t4 flex items-center gap-4">
                       <i className="ti ti-clock" />
                       {new Date(e.created_at).toLocaleString('ar-DZ', {
@@ -96,12 +124,29 @@ export default function DocumentAuditPanel({ docId }: { docId: number }) {
                       </span>
                     )}
                   </div>
-                  {hasField && (
-                    <div className="mt-6 text-xs text-t4 font-mono break-all leading-loose">
-                      {e.field_name && <span className="font-bold text-t3">{e.field_name}: </span>}
-                      {!!e.old_value && <span className="line-through opacity-50">{fmtVal(e.old_value)}</span>}
-                      {!!e.old_value && !!e.new_value && <span style={{ margin: '0 4px', opacity: 0.5 }}>←</span>}
-                      {!!e.new_value && <span className="text-t2">{fmtVal(e.new_value)}</span>}
+
+                  {e.action_summary && (
+                    <div className="mt-6 text-sm font-medium text-t1">{e.action_summary}</div>
+                  )}
+
+                  {hasValue && (
+                    <div className="mt-4 flex flex-col gap-2">
+                      {e.humanized_old_value != null && (
+                        <div className="flex items-start gap-4">
+                          <span className="text-xs font-bold text-t4 mt-4 shrink-0">قبل</span>
+                          <div className="flex-1 min-w-0">
+                            <ValueView v={e.humanized_old_value} />
+                          </div>
+                        </div>
+                      )}
+                      {e.humanized_new_value != null && (
+                        <div className="flex items-start gap-4">
+                          <span className="text-xs font-bold text-em mt-4 shrink-0">بعد</span>
+                          <div className="flex-1 min-w-0">
+                            <ValueView v={e.humanized_new_value} />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
