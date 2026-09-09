@@ -23,6 +23,12 @@ class AuditResource extends JsonResource
             'user_label'          => $user ? $service->displayLabel($user) : 'مستخدم محذوف',
             'user_type'           => $this->user_type,
             'event'               => $this->event,
+            'event_label'         => match ($this->event) {
+                'created' => 'إنشاء',
+                'deleted' => 'حذف',
+                default   => 'تعديل',
+            },
+            'action_summary'      => $service->actionSummary($this->event, $auditable, $user),
             'auditable_type'      => $this->auditable_type,
             'auditable_type_label'=> $service->typeLabel($auditable, $this->auditable_type),
             'auditable_id'        => $this->auditable_id,

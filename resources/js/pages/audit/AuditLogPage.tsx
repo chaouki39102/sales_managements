@@ -154,7 +154,7 @@ export default function AuditLogPage() {
                           <TableCell className="audit-td">
                             <Badge variant={evt.variant} noDot>
                               <i className={`ti ${evt.icon}`} style={{ marginLeft: 4, fontSize: 11 }} />
-                              {evt.label}
+                              {log.event_label ?? evt.label}
                             </Badge>
                           </TableCell>
                           <TableCell className="audit-td" style={{ color: 'var(--t2)' }}>
@@ -177,6 +177,11 @@ export default function AuditLogPage() {
                         {isExpanded && (
                           <TableRow>
                             <TableCell colSpan={6} style={{ padding: '16px 20px', background: 'var(--bg3)' }}>
+                              {log.action_summary && (
+                                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)', marginBottom: 10 }}>
+                                  {log.action_summary}
+                                </div>
+                              )}
                               <DiffView diff={log.humanized_diff} />
                               {log.ip_address && (
                                 <div style={{ marginTop: 10, fontSize: 11, color: 'var(--t4)', display: 'flex', gap: 12 }}>

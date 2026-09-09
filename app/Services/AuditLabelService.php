@@ -164,6 +164,12 @@ class AuditLabelService
 
     /**
      * اسم عرض عام من أي نموذج — #id فقط كاحتياط أخير.
+     *
+     * عمق الأعمال:
+     *  - بالنسبة للمستند (CommercialDocument): «اسم نوع المستند + رقم المستند»
+     *    مثل «فاتورة بيع INV-02» — الهوية التجارية الحقيقية وليست #id.
+     *  - بالنسبة لسطر مستند (CommercialDocumentLine): «منتج «الاسم» في رقم المستند»
+     *    مثل «منتج «حليب» في فاتورة بيع INV-02» — السطر وحده بلا هوية للمستخدم.
      */
     public function displayLabel(?Model $model): string
     {
@@ -177,6 +183,16 @@ class AuditLabelService
             return trim(($firstName ?? '') . ' ' . ($lastName ?? ''));
         }
 
+        // المستند: اسم نوع المستند + رقم المستند («فاتورة بيع INV-02»).
+        if ($model instanceof \App\Models\CommercialDocument) {
+            return $this->documentDisplayLabel($model);
+        }
+
+        // سطر مستند: اربط بهوية السطر (المنتج) داخل المستند الأب.
+        if ($model instanceof \App\Models\CommercialDocumentLine) {
+            return $this->documentLineDisplayLabel($model);
+        }
+
         foreach (['name', 'label', 'title', 'document_number', 'reference', 'ref', 'code', 'username', 'display_name', 'commercial_name'] as $field) {
             $value = $model->{$field} ?? null;
             if ($value !== null && $value !== '') {
@@ -185,6 +201,88 @@ class AuditLabelService
         }
 
         return '#' . $model->getKey();
+    }
+
+    /**
+     * اسم عرض للمستند: «نوع المستند + رقم المستند» (فاتورة بيع INV-02).
+     */
+    protected function documentDisplayLabel(\App\Models\CommercialDocument $doc): string
+    {
+        $num = (string) ($doc->document_number ?? '');
+        $typeName = '';
+        try {
+            $typeName = (string) ($doc->documentType?->name ?? '');
+        } catch (\Throwable $e) {
+            $typeName = '';
+        }
+        $label = trim(($typeName !== '' ? $typeName . ' ' : '') . $num);
+        if ($label !== '') {
+            return $label;
+        }
+        return '#' . $doc->getKey();
+    }
+
+    /**
+     * اسم عرض لسطر مستند: «منتج «الاسم»» داخل المستند الأب إن توفر.
+     */
+    protected function documentLineDisplayLabel(\App\Models\CommercialDocumentLine $line): string
+    {
+        $productName = '';
+        try {
+            $productName = (string) (($line->product?->name) ?? '');
+        } catch (\Throwable $e) {
+            $productName = '';
+        }
+
+        $docLabel = '';
+        try {
+            if ($line->commercialDocument) {
+                $docLabel = $this->documentDisplayLabel($line->commercialDocument);
+            }
+        } catch (\Throwable $e) {
+            $docLabel = '';
+        }
+
+        if ($productName !== '') {
+            $base = 'منتج «' . $productName . '»';
+            if ($docLabel !== '') {
+                $base .= ' في ' . $docLabel;
+            }
+            return $base;
+        }
+        if ($docLabel !== '') {
+            return $docLabel;
+        }
+        return '#' . $line->getKey();
+    }
+
+    /**
+     * جملة عربية تصف العملية كاملة: «أنشأ أحمد فاتورة بيع INV-02».
+     *
+     * بالنسبة للمستندات وأسطرها يرد اسم النوع داخل displayLabel نفسه
+     * («فاتورة بيع INV-02»، «منتج «حليب» في فاتورة بيع INV-02»)، لذا لا نكرّر
+     * typeLabel العام («مستند» / «سطر مستند») لتجنّب «أنشأ مستند فاتورة بيع …».
+     */
+    public function actionSummary(?string $event, ?Model $auditable, ?Model $user): string
+    {
+        $action = match ($event) {
+            'created' => 'أنشأ',
+            'deleted' => 'حذف',
+            default   => 'عدّل',
+        };
+
+        $who = $user ? $this->displayLabel($user) : 'مستخدم';
+
+        if (!$auditable) {
+            return "{$who} {$action}";
+        }
+
+        if ($auditable instanceof \App\Models\CommercialDocument
+            || $auditable instanceof \App\Models\CommercialDocumentLine) {
+            return "{$who} {$action} " . $this->displayLabel($auditable);
+        }
+
+        return "{$who} {$action} {$this->typeLabel($auditable)} " . $this->displayLabel($auditable);
     }
 
     /**

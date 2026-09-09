@@ -17,6 +17,8 @@ export interface AuditLog {
   auditable_type_label: string;
   auditable_id:  number;
   event:         'created' | 'updated' | 'deleted';
+  event_label:   string;
+  action_summary: string;
   old_values:    Record<string, unknown>;
   new_values:    Record<string, unknown>;
   url:           string;
