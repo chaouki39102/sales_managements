@@ -155,6 +155,7 @@ export interface PrintTemplate {
   updated_at?:  string;
 
   paper_width_mm:   number;
+  thermal_render_mode?: 'text' | 'auto' | 'raster';
   page_orientation: PageOrientation;
   margin_top:       number;
   margin_bottom:    number;

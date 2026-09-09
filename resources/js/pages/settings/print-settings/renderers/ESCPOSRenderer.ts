@@ -4,6 +4,7 @@ import type { UniversalDocumentData } from '../types/data';
 import { printFieldResolver } from '../services/PrintFieldResolver';
 import { COLUMN_DEFAULTS } from '../services/SettingsRegistry';
 import { EscPosBuilder, fmt, lineRow, mapFontSizeToEscPos, mapInfoFontSizeToEscPos, mapAlignToEscPos } from './EscPosBuilder';
+import { thermalRasterRenderer } from './raster/RasterThermalRenderer';
 
 type _Tpl = PrintTemplate & Record<string, unknown>;
 type _Data = UniversalDocumentData & Record<string, unknown>;
@@ -340,6 +341,11 @@ export const escposRenderer: IRenderer<Uint8Array> = {
     const data = ctx.data as _Data;
     const template = ctx.template as _Tpl;
     const docNumber = data.doc?.number;
+
+    if (template.thermal_render_mode && template.thermal_render_mode !== 'text') {
+      const raster = await thermalRasterRenderer.render(ctx);
+      if (raster) return raster;
+    }
 
     const b = new EscPosBuilder().init();
 
