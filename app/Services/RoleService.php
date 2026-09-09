@@ -53,6 +53,11 @@ class RoleService extends BaseService
     {
         $companyId = $this->getCurrentCompanyId();
 
+        // الروابط العالمية (company_id IS NULL) — تشمل super-admin — يجب ألا
+        // تظهر لمستخدمي الشركات العاديين إطلاقاً (عزل super-admin عن المستأجرين).
+        // يُسمح بها فقط للمستخدم الذي يحمل الدور العالمي super-admin فعلاً.
+        $isSuperAdmin = $this->currentUserHasFullControl($companyId);
+
         return [
             'search_fields'          => Role::$searchableFields,
             'filters'                => Role::$filterable,
@@ -63,17 +68,41 @@ class RoleService extends BaseService
             'relations'              => Role::$allowedIncludes,
             'cache_tags'             => Role::$cacheTags,
 
-            'modifyQuery' => function ($qb, $request) use ($companyId) {
+            'modifyQuery' => function ($qb, $request) use ($companyId, $isSuperAdmin) {
                 if ($companyId) {
-                    $qb->where(function ($q) use ($companyId) {
-                        $q->where('company_id', $companyId)
-                            ->orWhereNull('company_id');
+                    $qb->where(function ($q) use ($companyId, $isSuperAdmin) {
+                        $q->where('company_id', $companyId);
+
+                        // أدوار الشركة الحالية فقط للمستخدمين العاديين.
+                        // الروابط العالمية (super-admin …) تُضاف فقط لمن يملك السيطرة الكاملة.
+                        if ($isSuperAdmin) {
+                            $q->orWhereNull('company_id');
+                        }
                     });
                 }
 
                 return $qb;
             },
         ];
+    }
+
+    /**
+     * هل يملك المستخدم الحالي الدور العالمي super-admin؟
+     * فقط هكذا تظهر الروابط العالمية (company_id IS NULL) في قائمة الأدوار.
+     * مالك الشركة — وإن كان "مالكاً" — ليس super-admin ولا يرى دوره أو صلاحياته.
+     */
+    protected function currentUserHasFullControl(?int $companyId): bool
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        // فقط المستخدم الذي يحمل الدور العالمي super-admin يرى الروابط العامة
+        // (company_id IS NULL). مالك الشركة — وإن كان "مالكاً" — ليس super-admin
+        // ولا يجب أن يرى دور super-admin أو صلاحياته إطلاقاً.
+        return method_exists($user, 'hasRole') && $user->hasRole('super-admin');
     }
 
     // ══════════════════════════════════════════════════════════════

@@ -92,6 +92,67 @@ it('6. GET /roles — مفتوح → 200', function () {
     getJson("/api/v1/{$slug}/roles")->assertOk();
 });
 
+// ─── 6d. عزل super-admin عن مستخدمي الشركة (RoleService::getListConfig) ──
+
+it('6d1. GET /roles — مستخدم/مالك الشركة لا يرى دور super-admin العالمي', function () {
+    actingAsAuthenticatedTenantUser();
+    $slug    = testCompanySlug();
+    $company = Company::query()->where('slug', TEST_COMPANY_SLUG)->first();
+
+    // أنشئ دوراً عالمياً (company_id IS NULL) باسم super-admin
+    Role::query()->firstOrCreate(
+        ['name' => 'super-admin', 'guard_name' => 'web', 'company_id' => null],
+        ['name' => 'super-admin', 'guard_name' => 'web', 'company_id' => null],
+    );
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    // حتى لو كان المستخدم مالك الشركة — يجب ألا يظهر له دور super-admin
+    $user = User::query()->where('email', TEST_TENANT_EMAIL)->first();
+    $company->update(['owner_id' => $user->id]);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $content = getJson("/api/v1/{$slug}/roles")->assertOk()->getContent();
+
+    expect($content)->not->toContain('super-admin');
+    expect($content)->toContain((string)$company->id); // أدوار الشركة تبقى ظاهرة
+});
+
+it('6d2. GET /roles — super-admin الحقيقي يرى الدور العالمي', function () {
+    $company = Company::query()->where('slug', TEST_COMPANY_SLUG)->first()
+        ?? Company::query()->create(['name' => 'Test Company', 'slug' => TEST_COMPANY_SLUG, 'active' => true]);
+    $slug = $company->slug;
+
+    // أنشئ دور super-admin العالمي وأسنده لمستخدم
+    Role::query()->firstOrCreate(
+        ['name' => 'super-admin', 'guard_name' => 'web', 'company_id' => null],
+        ['name' => 'super-admin', 'guard_name' => 'web', 'company_id' => null],
+    );
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $user = User::query()->firstOrCreate(
+        ['email' => TEST_TENANT_EMAIL],
+        ['name' => 'Test Tenant', 'password' => 'password'],
+    );
+    DB::table('company_user')->updateOrInsert(
+        ['company_id' => $company->id, 'user_id' => $user->id],
+        [
+            'role'       => 'member',
+            'active'     => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+    );
+
+    $user->assignRole('super-admin');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    Sanctum::actingAs($user);
+
+    $content = getJson("/api/v1/{$slug}/roles")->assertOk()->getContent();
+
+    expect($content)->toContain('super-admin');
+});
+
 it('7a. PUT /roles/999 — بدون صلاحية → 403', function () {
     actingAsAuthenticatedTenantUser();
     $slug = testCompanySlug();
