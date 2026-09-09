@@ -2,10 +2,13 @@
 
 namespace App\Services;
 
-use App\Models\Role;
+use App\Core\Exceptions\BusinessRuleException;
 use App\Core\Services\BaseService;
+use App\Models\Permission;
+use App\Models\Role;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -134,10 +137,62 @@ class RoleService extends BaseService
     protected function afterCreate(Model $item, array $data, ?Request $request): void
     {
         if (!empty($data['permission_ids']) && is_array($data['permission_ids'])) {
+            $this->assertCanAssignPermissions($data['permission_ids']);
             $item->syncPermissions($data['permission_ids']);
         }
         $item->load('permissions');
         $this->forgetSpatieCache();
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // ✅ override create() — تجاوز Role::create() (static) الخاص بـ Spatie
+    //
+    // BaseService::create() يستدعي $this->model::create($data) أي
+    // Role::create() (static)، الذي يمر عبر
+    // PermissionRegistrar::getRole() → findByParam(['name','guard_name'])
+    // وهو بحث عالَـمي يتجاهل company_id تماماً — فيرصد دوراً بنفس الاسم
+    // لدى شركة أخرى ويرمي Spatie RoleAlreadyExists → HTTP 500 (كان هذا
+    // سبب 20a/20b) رغم أن قيد التفرد في قاعدة البيانات مفصول بالشركة.
+    //
+    // الحل: لا نستخدم البنّاء الثابت الخاص بـ Spatie إطلاقاً — نسجّل عبر
+    // new $this->model($data) + save() (fillable يشمل company_id)،
+    // ونطبّق نفس حارس التصعيد (409) + تفرد الاسم داخل نفس الشركة (422)
+    // قبل أي كتابة.
+    // ══════════════════════════════════════════════════════════════
+
+    public function create(array $data, Request $request = null): Model
+    {
+        // استخرج permission_ids قبل أن يحذفها beforeCreate (BaseService)
+        $permissionIds = array_key_exists('permission_ids', $data)
+            ? ($data['permission_ids'] ?? [])
+            : null;
+
+        // 1) حارس تصعيد الصلاحيات — قبل أي كتابة (409).
+        if ($permissionIds !== null) {
+            $this->assertCanAssignPermissions($permissionIds);
+        }
+
+        // 2) تفرد اسم الدور داخل نفس الشركة — قبل أي كتابة (422).
+        $this->assertUniqueRoleName($data);
+
+        $data = $this->beforeCreate($data, $request);
+
+        $item = DB::transaction(function () use ($data, $permissionIds, $request) {
+            // bypass Spatie static create: new + save لا يمر عبر findByParam العالمي
+            /** @var Role $item */
+            $item = new $this->model($data);
+            $item->save();
+
+            if ($permissionIds !== null) {
+                $item->syncPermissions($permissionIds);
+            }
+
+            $this->afterCreate($item, $data, $request);
+            return $this->loadDefaultRelations($item);
+        });
+
+        $this->performPostCommitOperations($item, $data, $request, 'create');
+        return $item;
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -153,9 +208,13 @@ class RoleService extends BaseService
             ? ($data['permission_ids'] ?? [])
             : null;
 
+        // اسم الدور فريد داخل نفس الشركة — باستثناء الدور نفسه (422).
+        $this->assertUniqueRoleName($data, $item->id, $item->company_id);
+
         $item = parent::update($item, $data, $request);
 
         if ($permissionIds !== null) {
+            $this->assertCanAssignPermissions($permissionIds);
             $item->syncPermissions($permissionIds);
             $this->forgetSpatieCache();
         }
@@ -183,6 +242,114 @@ class RoleService extends BaseService
     // ══════════════════════════════════════════════════════════════
     // Helpers
     // ══════════════════════════════════════════════════════════════
+
+    /**
+     * ═══ تفرد اسم الدور داخل نفس الشركة ═══
+     *
+     * القاعدة: لا يجوز لدورين في نفس الشركة (نفس guard_name) أن يحملا
+     * نفس الاسم. أدوار المؤسسات مفصولة بـ company_id، بينما الأدوار
+     * العالمية (super-admin …) ذوو company_id NULL — لذا الفحص يُنفَّذ
+     * داخل نطاق company_id فقط، وليس عالمياً.
+     *
+     * يُستدعى كفحص مسبق قبل أي كتابة في create()/update() لأن مسار
+     * الإنشاء لا يمر عبر FormRequest validation (قاعدة LSP في Phase 17 —
+     * RegisterRequest rules لا تُنفَّذ إطلاقاً على هذا المسار)، وقاعدة
+     * `unique` العالمية في StoreRoleRequest عديمة الفائدة أصلاً.
+     */
+    protected function assertUniqueRoleName(array $data, ?int $ignoreId = null, ?int $companyId = null): void
+    {
+        $companyId ??= $data['company_id'] ?? $this->getCurrentCompanyId();
+        $name = $data['name'] ?? null;
+
+        if (! $companyId || ! $name) {
+            return;
+        }
+
+        $exists = Role::query()
+            ->where('company_id', $companyId)
+            ->where('name', $name)
+            ->where('guard_name', $data['guard_name'] ?? 'web')
+            ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
+            ->exists();
+
+        if ($exists) {
+            throw new BusinessRuleException(
+                "اسم الدور «{$name}» مستخدم مسبقاً في هذه الشركة.",
+                422
+            );
+        }
+    }
+
+    /**
+     * ═══ حارس تصعيد الصلاحيات (Privilege Escalation Guard) ═══
+     *
+     * القاعدة الأمنية: «لا يمكنك منح ما لا تملك» (Azure / AWS IAM
+     * delegation standard — متعدد المستأجرين وقابل للتوسع).
+     *
+     * كل الصلاحيات عالمية (company_id NULL) وتمنح لأي دور للشركة.
+     * أي مستخدم يحمل manage_roles (المالك يحملها، ودور مخصص قد يحملها)
+     * يستطيع منح أي صلاحية عالمية — متضمناً الصلاحيات العليا مثل
+     * manage_settings / manage_backup / update_company /
+     * transfer_ownership / view_audit_log — ما لم يُقيَّد هذا.
+     *
+     * الحل: مستخدم غير super-admin لا يجوز له إلا تعيين الصلاحيات
+     * التي يملكها فعلاً بنفسه (getAllPermissions = أدواره ∪ صلاحياته
+     * المباشرة):
+     *   - super-admin  → يملك كل الصلاحيات → يستطيع تعيين أي شيء.
+     *   - مالك الشركة (owner role) → يملك كل صلاحيات الشركة → يستطيع
+     *     تعيين أي صلاحية نطاق الشركة.
+     *   - دور مخصص يحمل manage_roles فقط → يُمنَع من منح صلاحية عليا
+     *     لا يملكها.
+     *
+     * يفشل النظام بصمت (لا كتابة) قبل أي syncPermissions — بمجرد
+     * مصادفة صلاحية لا يملكها الطالب — عبر BusinessRuleException (409).
+     */
+    protected function assertCanAssignPermissions(array $permissionIds): void
+    {
+        if (empty($permissionIds)) {
+            return;
+        }
+
+        $user = auth()->user();
+
+        // CLI / console / بلا جلسة → لا قيد (لا يوجد مهاجم محتمل).
+        if (! $user || ! method_exists($user, 'getAllPermissions')) {
+            return;
+        }
+
+        // super-admin يملك كل الصلاحيات فعلياً → لا قيد.
+        if (method_exists($user, 'hasRole') && $user->hasRole('super-admin')) {
+            return;
+        }
+
+        // الصلاحيات التي يملكها الطالب بنفسه (أدواره ∪ المباشرة).
+        $held = $user->getAllPermissions()
+            ->pluck('name')
+            ->flip(); // name => true  (بحث O(1))
+
+        // أسماء الصلاحيات المطلوب منحها (استعلام واحد لتجنب N+1).
+        $requested = Permission::query()
+            ->whereIn('id', $permissionIds)
+            ->pluck('name', 'id')
+            ->toArray();
+
+        $blocked = [];
+        foreach ($requested as $id => $name) {
+            if (! $held->has($name)) {
+                $blocked[] = $name;
+            }
+        }
+
+        if ($blocked) {
+            sort($blocked);
+            $listed = implode('، ', array_slice($blocked, 0, 5));
+            $over = count($blocked) > 5 ? ' …' : '';
+
+            throw new BusinessRuleException(
+                "لا يمكنك منح هذه الصلاحيات لأنك لا تملكها بنفسك: {$listed}{$over}. القاعدة: لا يمكنك منح ما لا تملك."
+            );
+        }
+    }
 
     private function forgetSpatieCache(): void
     {

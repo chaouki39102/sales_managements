@@ -513,6 +513,172 @@ it('18d. PUT users/{id} — تعديل مباشر بـ [] لا يمسح صلاح
     getJson("/api/v1/{$slug}/settings")->assertOk();
 });
 
+// ─── 19. حارس تصعيد الصلاحيات (assertCanAssignPermissions في RoleService) ──
+// القاعدة: «لا يمكنك منح ما لا تملك» — مستخدم غير super-admin قد يمنح فقط
+// الصلاحيات التي يملكها بنفسه. أي صلاحية عليا (transfer_ownership وغيرها)
+// غير محمولة → BusinessRuleException 409 قبل أي كتابة.
+
+it('19a. POST /roles — مستخدم manage_roles لا يملك صلاحية عليا → 409 (منع تصعيد)', function () {
+    $company = Company::query()->where('slug', TEST_COMPANY_SLUG)->first()
+        ?? Company::query()->create(['name' => 'Test Company', 'slug' => TEST_COMPANY_SLUG, 'active' => true]);
+    $slug = $company->slug;
+
+    // تأكد من وجود الصلاحيتين عالميتين
+    foreach (['manage_roles', 'transfer_ownership'] as $permName) {
+        Permission::query()->firstOrCreate(
+            ['name' => $permName, 'guard_name' => 'web', 'company_id' => null],
+            ['name' => $permName, 'guard_name' => 'web', 'company_id' => null],
+        );
+    }
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    // مستخدم بمستوى manager يملك manage_roles فقط (ليس transfer_ownership)
+    actingAsRole('custom-manager', ['manage_roles']);
+    $owner = Permission::query()->where('name', 'transfer_ownership')->first();
+
+    // محاولة إنشاء دور يمنح صلاحية عليا غير محمولة → 409
+    postJson("/api/v1/{$slug}/roles", [
+        'name'           => 'evil-role',
+        'guard_name'     => 'web',
+        'permission_ids' => [$owner->id],
+    ])->assertStatus(409);
+});
+
+it('19b. POST /roles — المستخدم يملك الصلاحية التي يمنحها → 201', function () {
+    $company = Company::query()->where('slug', TEST_COMPANY_SLUG)->first()
+        ?? Company::query()->create(['name' => 'Test Company', 'slug' => TEST_COMPANY_SLUG, 'active' => true]);
+    $slug = $company->slug;
+
+    foreach (['manage_roles', 'view_roles'] as $permName) {
+        Permission::query()->firstOrCreate(
+            ['name' => $permName, 'guard_name' => 'web', 'company_id' => null],
+            ['name' => $permName, 'guard_name' => 'web', 'company_id' => null],
+        );
+    }
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $view = Permission::query()->where('name', 'view_roles')->first();
+
+    // مدير يملك manage_roles + view_roles → يستطيع منح view_roles لطرف جديد
+    actingAsRole('custom-manager', ['manage_roles', 'view_roles']);
+
+    postJson("/api/v1/{$slug}/roles", [
+        'name'           => 'safe-role',
+        'guard_name'     => 'web',
+        'permission_ids' => [$view->id],
+    ])->assertCreated();
+});
+
+it('19c. POST /roles — super-admin يستطيع منح أي صلاحية (تجاوز الحارس)', function () {
+    $company = Company::query()->where('slug', TEST_COMPANY_SLUG)->first()
+        ?? Company::query()->create(['name' => 'Test Company', 'slug' => TEST_COMPANY_SLUG, 'active' => true]);
+    $slug = $company->slug;
+
+    foreach (['super-admin', 'manage_roles', 'transfer_ownership'] as $name) {
+        if ($name === 'super-admin') {
+            Role::query()->firstOrCreate(
+                ['name' => 'super-admin', 'guard_name' => 'web', 'company_id' => null],
+                ['name' => 'super-admin', 'guard_name' => 'web', 'company_id' => null],
+            );
+            continue;
+        }
+        Permission::query()->firstOrCreate(
+            ['name' => $name, 'guard_name' => 'web', 'company_id' => null],
+            ['name' => $name, 'guard_name' => 'web', 'company_id' => null],
+        );
+    }
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $user = User::query()->firstOrCreate(
+        ['email' => TEST_TENANT_EMAIL],
+        ['name' => 'Test Tenant', 'password' => 'password'],
+    );
+    DB::table('company_user')->updateOrInsert(
+        ['company_id' => $company->id, 'user_id' => $user->id],
+        ['role' => 'member', 'active' => true, 'created_at' => now(), 'updated_at' => now()],
+    );
+    $user->assignRole('super-admin');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    Sanctum::actingAs($user);
+
+    $owner = Permission::query()->where('name', 'transfer_ownership')->first();
+
+    postJson("/api/v1/{$slug}/roles", [
+        'name'           => 'super-role',
+        'guard_name'     => 'web',
+        'permission_ids' => [$owner->id],
+    ])->assertCreated();
+});
+
+it('19d. PUT roles/{id} — تعديل دور بصلاحية عليا غير محمولة → 409', function () {
+    $company = Company::query()->where('slug', TEST_COMPANY_SLUG)->first()
+        ?? Company::query()->create(['name' => 'Test Company', 'slug' => TEST_COMPANY_SLUG, 'active' => true]);
+    $slug = $company->slug;
+
+    foreach (['manage_roles', 'view_roles', 'manage_backup'] as $permName) {
+        Permission::query()->firstOrCreate(
+            ['name' => $permName, 'guard_name' => 'web', 'company_id' => null],
+            ['name' => $permName, 'guard_name' => 'web', 'company_id' => null],
+        );
+    }
+
+    $role = Role::query()->firstOrCreate(
+        ['name' => 'victim-role', 'guard_name' => 'web', 'company_id' => $company->id],
+        ['name' => 'victim-role', 'guard_name' => 'web', 'company_id' => $company->id],
+    );
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    actingAsRole('custom-manager', ['manage_roles']);
+    $backup = Permission::query()->where('name', 'manage_backup')->first();
+
+    putJson("/api/v1/{$slug}/roles/{$role->id}", [
+        'permission_ids' => [$backup->id],
+    ])->assertStatus(409);
+});
+
+// ─── 20. تفرد اسم الدور لكل شركة (company-scoped) ─────────────────
+
+it('20a. POST /roles — اسم مكرر داخل نفس الشركة → 422', function () {
+    $company = Company::query()->where('slug', TEST_COMPANY_SLUG)->first()
+        ?? Company::query()->create(['name' => 'Test Company', 'slug' => TEST_COMPANY_SLUG, 'active' => true]);
+    $slug = $company->slug;
+
+    Role::query()->firstOrCreate(
+        ['name' => 'dup-role', 'guard_name' => 'web', 'company_id' => $company->id],
+        ['name' => 'dup-role', 'guard_name' => 'web', 'company_id' => $company->id],
+    );
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    actingAsRole('custom-manager', ['manage_roles']);
+
+    postJson("/api/v1/{$slug}/roles", [
+        'name'       => 'dup-role',
+        'guard_name' => 'web',
+    ])->assertStatus(422);
+});
+
+it('20b. POST /roles — نفس الاسم في شركة أخرى مسموح (متعدد المستأجرين)', function () {
+    $company = Company::query()->where('slug', TEST_COMPANY_SLUG)->first()
+        ?? Company::query()->create(['name' => 'Test Company', 'slug' => TEST_COMPANY_SLUG, 'active' => true]);
+    $other = Company::query()->create(['name' => 'Other Co', 'slug' => 'other-company-unique', 'active' => true]);
+    $slug = $company->slug;
+
+    // في الشركة الأخرى يوجد اسم same-role
+    Role::query()->firstOrCreate(
+        ['name' => 'same-role', 'guard_name' => 'web', 'company_id' => $other->id],
+        ['name' => 'same-role', 'guard_name' => 'web', 'company_id' => $other->id],
+    );
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    actingAsRole('custom-manager', ['manage_roles']);
+
+    // نفس الاسم مسموح في شركتنا (لم يُخلق هنا)
+    postJson("/api/v1/{$slug}/roles", [
+        'name'       => 'same-role',
+        'guard_name' => 'web',
+    ])->assertCreated();
+});
+
 it('18e. PUT users/{id} — صلاحية من شركة أخرى تُفلتَر بصمت ولا تُمنح', function () {
     actingAsAuthenticatedTenantUser();
     $slug         = testCompanySlug();
