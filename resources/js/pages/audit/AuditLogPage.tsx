@@ -4,7 +4,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import React, { useState } from 'react';
-import { useAuditLogs, type AuditListParams } from '@/lib/api/endpoints/audits';
+import { useAuditLogs, type AuditListParams, type AuditDiffRow } from '@/lib/api/endpoints/audits';
 import PageHeader from '@/components/ui/PageHeader';
 import Badge from '@/components/ui/Badge';
 import Skeleton from '@/components/ui/Skeleton';
@@ -25,6 +25,10 @@ const TYPE_LABELS: Record<string, string> = {
   Expense: 'مصروف', Check: 'شيك', Family: 'فئة', Brand: 'علامة',
   Warehouse: 'مستودع', User: 'مستخدم', Employee: 'موظف', Company: 'شركة',
   TreasuryAccount: 'خزينة', ExpenseCategory: 'فئة مصروف', ApprovalThreshold: 'عتبة موافقة',
+  Unit: 'وحدة', Role: 'دور', Permission: 'صلاحية', Currency: 'عملة',
+  DocumentType: 'نوع مستند', FiscalYear: 'سنة مالية', PaymentMode: 'طريقة دفع',
+  PortalOrder: 'طلب بوابة', PortalUser: 'مستخدم بوابة', PrintTemplate: 'قالب طباعة',
+  StockMovement: 'حركة مخزون', Attachment: 'مرفق', Setting: 'إعداد', Wilaya: 'ولاية', Commune: 'بلدية',
 };
 
 function formatDate(d: string) {
@@ -34,31 +38,32 @@ function formatDate(d: string) {
   });
 }
 
-function DiffView({ oldValues, newValues }: { oldValues: Record<string, unknown>; newValues: Record<string, unknown> }) {
-  const allKeys = [...new Set([...Object.keys(oldValues), ...Object.keys(newValues)])];
-  if (allKeys.length === 0) return <span style={{ color: 'var(--t4)', fontSize: 12 }}>—</span>;
+function typeFallback(auditableType: string) {
+  const base = auditableType.split('\\').pop() ?? '';
+  return TYPE_LABELS[base] ?? base;
+}
+
+function DiffView({ diff }: { diff: AuditDiffRow[] }) {
+  if (!diff || diff.length === 0) return <span style={{ color: 'var(--t4)', fontSize: 12 }}>—</span>;
 
   return (
     <div style={{ fontSize: 12, lineHeight: 1.8 }}>
-      {allKeys.map(key => {
-        const oldVal = oldValues[key];
-        const newVal = newValues[key];
-        if (oldVal === newVal) return null;
-        return (
-          <div key={key} style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
-            <span style={{ color: 'var(--t4)', fontWeight: 600, minWidth: 90, fontFamily: 'monospace', fontSize: 11 }}>{key}</span>
-            {oldVal !== undefined && (
-              <span style={{ color: 'var(--red)', textDecoration: 'line-through', opacity: 0.8 }}>
-                {String(oldVal ?? '—')}
-              </span>
-            )}
-            {oldVal !== undefined && <span style={{ color: 'var(--t4)' }}>→</span>}
-            <span style={{ color: 'var(--em)', fontWeight: 500 }}>
-              {String(newVal ?? '—')}
+      {diff.map(row => (
+        <div key={row.key} style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
+          <span style={{ color: 'var(--t4)', fontWeight: 600, minWidth: 110, fontSize: 11 }}>{row.label}</span>
+          {row.old !== null && row.old !== undefined && row.old !== '—' && (
+            <span style={{ color: 'var(--red)', textDecoration: 'line-through', opacity: 0.8 }}>
+              {String(row.old)}
             </span>
-          </div>
-        );
-      })}
+          )}
+          {row.old !== null && row.old !== undefined && row.old !== '—' && (
+            <span style={{ color: 'var(--t4)' }}>→</span>
+          )}
+          <span style={{ color: 'var(--em)', fontWeight: 500 }}>
+            {String(row.new ?? '—')}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -129,7 +134,8 @@ export default function AuditLogPage() {
                   {items.map(log => {
                     const evt = EVENT_CONFIG[log.event] ?? EVENT_CONFIG.updated;
                     const isExpanded = expandedId === log.id;
-                    const typeLabel = TYPE_LABELS[log.auditable_type.split('\\').pop() ?? ''] ?? log.auditable_type.split('\\').pop();
+                    const typeLabel = log.auditable_type_label ?? typeFallback(log.auditable_type);
+                    const displayLabel = log.auditable?.display_label;
                     return (
                       <React.Fragment key={log.id}>
                         <TableRow
@@ -142,7 +148,7 @@ export default function AuditLogPage() {
                           </TableCell>
                           <TableCell className="audit-td">
                             <span style={{ fontWeight: 600 }}>
-                              {log.user?.name ?? `#${log.user_id}`}
+                              {log.user_label || '—'}
                             </span>
                           </TableCell>
                           <TableCell className="audit-td">
@@ -154,8 +160,12 @@ export default function AuditLogPage() {
                           <TableCell className="audit-td" style={{ color: 'var(--t2)' }}>
                             {typeLabel}
                           </TableCell>
-                          <TableCell className="audit-td" style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--t4)' }}>
-                            #{log.auditable_id}
+                          <TableCell className="audit-td" style={{ fontSize: 12 }}>
+                            {displayLabel ? (
+                              <span style={{ fontWeight: 600, color: 'var(--t2)' }}>{displayLabel}</span>
+                            ) : (
+                              <span style={{ color: 'var(--t4)' }}>#{log.auditable_id}</span>
+                            )}
                           </TableCell>
                           <TableCell className="audit-td" style={{ textAlign: 'center' }}>
                             <i
@@ -167,7 +177,7 @@ export default function AuditLogPage() {
                         {isExpanded && (
                           <TableRow>
                             <TableCell colSpan={6} style={{ padding: '16px 20px', background: 'var(--bg3)' }}>
-                              <DiffView oldValues={log.old_values} newValues={log.new_values} />
+                              <DiffView diff={log.humanized_diff} />
                               {log.ip_address && (
                                 <div style={{ marginTop: 10, fontSize: 11, color: 'var(--t4)', display: 'flex', gap: 12 }}>
                                   <span><i className="ti ti-world" style={{ marginLeft: 4 }} />IP: {log.ip_address}</span>

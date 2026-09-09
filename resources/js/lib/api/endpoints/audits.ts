@@ -14,6 +14,7 @@ export interface AuditLog {
   id:            number;
   company_id:    number;
   auditable_type: string;
+  auditable_type_label: string;
   auditable_id:  number;
   event:         'created' | 'updated' | 'deleted';
   old_values:    Record<string, unknown>;
@@ -22,9 +23,19 @@ export interface AuditLog {
   ip_address:    string;
   user_agent:    string;
   user_id:       number | null;
-  user?:         { id: number; name: string; email: string };
+  user?:         { id: number; name: string; email: string } | null;
+  user_label:    string;
+  auditable?:    { id: number; type_label: string; display_label: string } | null;
+  humanized_diff: AuditDiffRow[];
   tags:          string | null;
   created_at:    string;
+}
+
+export interface AuditDiffRow {
+  key:   string;
+  label: string;
+  old:   unknown;
+  new:   unknown;
 }
 
 export interface AuditListParams extends ListParams {
