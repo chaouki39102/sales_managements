@@ -11,6 +11,7 @@ class DocumentMailService
 {
     public function __construct(
         private CompanyContextService $companyContext,
+        private MailConfigService $mailConfig,
     ) {}
 
     public function sendToParty(CommercialDocument $document, ?string $customMessage = null): bool
@@ -20,6 +21,8 @@ class DocumentMailService
             Log::warning("Cannot send document {$document->id}: party has no email");
             return false;
         }
+
+        $this->mailConfig->apply($document->company_id);
 
         $pdfContent = $this->generatePdf($document);
         $messageText = $customMessage ?: $this->defaultMessage($document);

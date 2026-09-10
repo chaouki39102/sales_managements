@@ -28,6 +28,7 @@ export const TABS = [
     { id: "inventory", label: "المخزون", icon: "ti-box" },
     { id: "import", label: "الاستيراد", icon: "ti-file-import" },
     { id: "alerts", label: "الإشعارات", icon: "ti-bell" },
+    { id: "mail", label: "البريد", icon: "ti-mail" },
     { id: "portal", label: "بوابة الزبائن", icon: "ti-world" },
     { id: "documents", label: "المستندات", icon: "ti-file-text" },
     { id: "conversions", label: "خريطة التحويل", icon: "ti-transfer" },

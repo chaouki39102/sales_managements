@@ -173,6 +173,10 @@ class SettingController extends BaseApiController
             'alert_g12', 'alert_g12bis', 'alert_draft_docs', 'draft_docs_days',
             'email_notifications', 'notif_email',
 
+            // mail — إعدادات البريد لكل شركة (SMTP)
+            'mail_mailer', 'mail_host', 'mail_port', 'mail_username',
+            'mail_password', 'mail_encryption', 'mail_from_address', 'mail_from_name',
+
             // documents
             'default_warehouse_id', 'default_currency_id', 'default_price_level_id',
             'default_payment_mode_id', 'default_treasury_account_id',

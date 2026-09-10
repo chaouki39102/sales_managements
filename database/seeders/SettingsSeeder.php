@@ -437,6 +437,83 @@ class SettingsSeeder extends Seeder
             ],
 
             // ══════════════════════════════════════════
+            // group: mail — البريد الإلكتروني لكل شركة (SMTP)
+            // فارغ = استخدام إعدادات النظام (.env)
+            // ══════════════════════════════════════════
+            'mail_mailer' => [
+                'value'         => '',
+                'group'         => 'mail',
+                'type'          => 'string',
+                'description'   => 'ناقل البريد (smtp / log / sendmail …) — فارغ = إعدادات النظام',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 70,
+            ],
+            'mail_host' => [
+                'value'         => '',
+                'group'         => 'mail',
+                'type'          => 'string',
+                'description'   => 'مضيف خادم البريد (SMTP) — فارغ = إعدادات النظام',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 71,
+            ],
+            'mail_port' => [
+                'value'         => '',
+                'group'         => 'mail',
+                'type'          => 'string',
+                'description'   => 'منفذ خادم البريد — فارغ = إعدادات النظام',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 72,
+            ],
+            'mail_username' => [
+                'value'         => '',
+                'group'         => 'mail',
+                'type'          => 'string',
+                'description'   => 'اسم المستخدم للبريد — فارغ = إعدادات النظام',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 73,
+            ],
+            'mail_password' => [
+                'value'         => '',
+                'group'         => 'mail',
+                'type'          => 'string',
+                'description'   => 'كلمة مرور البريد — فارغ = إعدادات النظام',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 74,
+            ],
+            'mail_encryption' => [
+                'value'         => '',
+                'group'         => 'mail',
+                'type'          => 'string',
+                'description'   => 'التشفير (tls / ssl) — فارغ = إعدادات النظام',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 75,
+            ],
+            'mail_from_address' => [
+                'value'         => '',
+                'group'         => 'mail',
+                'type'          => 'string',
+                'description'   => 'البريد المُرسِل — فارغ = إعدادات النظام',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 76,
+            ],
+            'mail_from_name' => [
+                'value'         => '',
+                'group'         => 'mail',
+                'type'          => 'string',
+                'description'   => 'اسم المُرسِل — فارغ = إعدادات النظام',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 77,
+            ],
+
+            // ══════════════════════════════════════════
             // group: portal — بوابة الزبائن (اطلب سلعة)
             // ══════════════════════════════════════════
             'portal_enabled' => [

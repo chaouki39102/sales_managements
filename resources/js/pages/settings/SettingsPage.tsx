@@ -9,6 +9,7 @@
 //   - tabs/FiscalTab.tsx    → المالية والضرائب
 //   - tabs/InventoryTab.tsx → المخزون
 //   - tabs/AlertsTab.tsx    → الإشعارات
+//   - tabs/MailTab.tsx      → البريد (SMTP)
 //   - tabs/PortalTab.tsx    → بوابة الزبائن
 //   - tabs/DocumentsTab.tsx → المستندات
 //   - tabs/ConversionsTab.tsx → خريطة التحويل
@@ -36,6 +37,7 @@ import { FiscalTab } from "./tabs/FiscalTab";
 import { InventoryTab } from "./tabs/InventoryTab";
 import { ImportTab } from "./tabs/ImportTab";
 import { AlertsTab } from "./tabs/AlertsTab";
+import { MailTab } from "./tabs/MailTab";
 import { PortalTab } from "./tabs/PortalTab";
 import { DocumentsTab } from "./tabs/DocumentsTab";
 import { ConversionsTab } from "./tabs/ConversionsTab";
@@ -235,6 +237,12 @@ export default function SettingsPage() {
                     <AlertsTab
                         onDirty={() => markTabDirty("alerts")}
                         onClean={() => markTabClean("alerts")}
+                    />
+                )}
+                {tab === "mail" && (
+                    <MailTab
+                        onDirty={() => markTabDirty("mail")}
+                        onClean={() => markTabClean("mail")}
                     />
                 )}
                 {tab === "portal" && (
