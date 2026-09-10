@@ -14,7 +14,15 @@ import {
     makeGs,
     settingsApi,
 } from "@/lib/api/endpoints/settings";
+import {
+    useEmailTemplates,
+    useEmailTemplateMutations,
+    usePlaceholders,
+    type EmailTemplate,
+} from "@/lib/api/endpoints/emailTemplates";
 import { useNotification } from "@/hooks/useNotification";
+import { useConfirm } from "@/hooks/useConfirm";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { tenantKeys } from "@/lib/api/core/queryKeys";
 import { useActiveSlug } from "@/lib/store/appStore";
 import {
@@ -25,8 +33,19 @@ import {
     SaveButton,
     SettingsLastModified,
 } from "./_shared";
+import { DOC_TYPE_LIST } from "../print-settings/types/domain";
+import { usePermissions, PERMISSION } from "@/lib/permissions";
 
 const EMPTY_PLACEHOLDER = "فارغ = استخدام إعدادات النظام";
+
+interface TplDraft {
+    name: string;
+    doc_type_code: string | null;
+    subject: string;
+    body: string;
+    is_default: boolean;
+    is_active: boolean;
+}
 
 export function MailTab({
     onDirty,
@@ -137,6 +156,192 @@ export function MailTab({
     };
 
     useAutoSave(isDirty, doSave, true, 2000);
+
+    // ─── قوالب البريد (التوثيق/القوائم/الأوامر… تُرسل بعنوان وموضوع جاهزين) ─────
+    const { confirm, confirmDialogProps } = useConfirm();
+    const { can } = usePermissions();
+    const manageTemplates = can(PERMISSION.MANAGE_SETTINGS);
+
+    const { data: templates = [], isLoading: tplLoading } = useEmailTemplates();
+    const tplMutations = useEmailTemplateMutations();
+    const { data: placeholders = [] } = usePlaceholders();
+
+    const [tplFilter, setTplFilter] = useState<string>("");
+    const [draft, setDraft] = useState<TplDraft | null>(null);
+    const [editingId, setEditingId] = useState<number | null>(null);
+    const [savingTpl, setSavingTpl] = useState(false);
+    const [tplField, setTplField] = useState<"subject" | "body">("body");
+
+    const up = (patch: Partial<TplDraft>) =>
+        setDraft((d) => (d ? { ...d, ...patch } : d));
+
+    const docTypeLabel = (code: string | null) => {
+        if (code === null) return "عام (كل الأنواع)";
+        return DOC_TYPE_LIST.find((t) => t.code === code)?.name ?? code;
+    };
+
+    const filteredTemplates = templates.filter((t) => {
+        if (tplFilter === "") return true;
+        if (tplFilter === "generic") return t.doc_type_code === null;
+        return t.doc_type_code === tplFilter;
+    });
+
+    const openCreate = () => {
+        setDraft({
+            name: "",
+            doc_type_code: null,
+            subject: "",
+            body: "",
+            is_default: false,
+            is_active: true,
+        });
+        setEditingId(null);
+        setTplField("body");
+    };
+
+    const openEdit = (t: EmailTemplate) => {
+        setDraft({
+            name: t.name,
+            doc_type_code: t.doc_type_code,
+            subject: t.subject ?? "",
+            body: t.body ?? "",
+            is_default: t.is_default,
+            is_active: t.is_active,
+        });
+        setEditingId(t.id);
+        setTplField("body");
+    };
+
+    const handleSaveTpl = async () => {
+        if (!draft) return;
+        if (!draft.name.trim()) {
+            notify.error("الاسم مطلوب", "أدخل اسماً للقالب قبل الحفظ.");
+            return;
+        }
+        setSavingTpl(true);
+        try {
+            const payload = {
+                name: draft.name.trim(),
+                doc_type_code: draft.doc_type_code,
+                subject: draft.subject,
+                body: draft.body,
+                is_default: draft.is_default,
+                is_active: draft.is_active,
+            };
+            if (editingId !== null) {
+                await tplMutations.update.mutateAsync({ id: editingId, ...payload });
+                notify.success("تم تحديث القالب", `«${draft.name.trim()}»`);
+            } else {
+                await tplMutations.create.mutateAsync(payload);
+                notify.success("تم إنشاء القالب", `«${draft.name.trim()}»`);
+            }
+            setDraft(null);
+            setEditingId(null);
+        } catch (e: unknown) {
+            const msg = (e as Error).message || "تعذّر حفظ القالب";
+            notify.error("تعذّر حفظ القالب", msg);
+        } finally {
+            setSavingTpl(false);
+        }
+    };
+
+    const handleDeleteTpl = async (t: EmailTemplate) => {
+        const ok = await confirm(`حذف القالب «${t.name}» نهائياً مع تنسيقه؟`, {
+            title: "حذف قالب البريد",
+            confirmText: "حذف",
+            cancelText: "إلغاء",
+            variant: "danger",
+        });
+        if (!ok) return;
+        try {
+            await tplMutations.delete.mutateAsync(t.id);
+            notify.success("تم حذف القالب", `«${t.name}»`);
+        } catch (e: unknown) {
+            notify.error("تعذّر حذف القالب", (e as Error).message);
+        }
+    };
+
+    const handleSetDefault = async (t: EmailTemplate) => {
+        if (t.is_default || !manageTemplates) return;
+        try {
+            await tplMutations.setDefault.mutateAsync(t.id);
+            notify.success("قالب افتراضي", `«${t.name}» أصبح الافتراضي.`);
+        } catch (e: unknown) {
+            notify.error("تعذّر التحديد", (e as Error).message);
+        }
+    };
+
+    const handleToggleActive = async (t: EmailTemplate) => {
+        if (!manageTemplates) return;
+        try {
+            await tplMutations.update.mutateAsync({
+                id: t.id,
+                is_active: !t.is_active,
+            });
+        } catch (e: unknown) {
+            notify.error("تعذّر التحديث", (e as Error).message);
+        }
+    };
+
+    const insertPlaceholder = (key: string) => {
+        if (!draft || !manageTemplates) return;
+        const token = `{{${key}}}`;
+        if (tplField === "subject") {
+            up({ subject: `${draft.subject} ${token}`.trim() });
+        } else {
+            up({ body: `${draft.body}\n${token}`.trim() });
+        }
+        markDirty();
+        onDirty?.();
+    };
+
+    const TplToggle = ({
+        checked,
+        disabled,
+        onChange,
+    }: {
+        checked: boolean;
+        disabled?: boolean;
+        onChange: () => void;
+    }) => (
+        <button
+            type="button"
+            role="switch"
+            aria-checked={checked}
+            disabled={disabled}
+            onClick={(e) => {
+                e.stopPropagation();
+                onChange();
+            }}
+            style={{
+                position: "relative",
+                width: 34,
+                height: 20,
+                borderRadius: 10,
+                border: "1px solid var(--b2)",
+                background: checked ? "var(--em)" : "var(--b3)",
+                cursor: disabled ? "not-allowed" : "pointer",
+                opacity: disabled ? 0.6 : 1,
+                flexShrink: 0,
+                display: "inline-flex",
+                alignItems: "center",
+                padding: 0,
+            }}
+        >
+            <span
+                style={{
+                    position: "absolute",
+                    top: 2,
+                    left: checked ? 16 : 2,
+                    width: 14,
+                    height: 14,
+                    borderRadius: 7,
+                    background: "#fff",
+                    transition: "left .15s ease",
+                }}
+            />
+        </button>
+    );
 
     const F = ({
         label,
@@ -661,6 +866,406 @@ export function MailTab({
                 </div>
             </Card>
 
+            <Card>
+                <SecHead
+                    icon="ti-mail-opened"
+                    label="قوالب البريد"
+                    sub="قوالب الموضوع والنص تُستبدل عند إرسال مستند بالبريد (يُملأ {{الاسم}} والمستحقات تلقائياً)."
+                />
+                <div
+                    style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                    }}
+                >
+                    <select
+                        value={tplFilter}
+                        onChange={(e) => setTplFilter(e.target.value)}
+                        style={{ width: "auto", minWidth: 180 }}
+                    >
+                        <option value="">كل القوالب</option>
+                        <option value="generic">عام (كل الأنواع)</option>
+                        {DOC_TYPE_LIST.map((t) => (
+                            <option key={t.code} value={t.code}>
+                                {t.name}
+                            </option>
+                        ))}
+                    </select>
+                    {manageTemplates && (
+                        <Button
+                            onClick={openCreate}
+                            icon={<i className="ti ti-plus" />}
+                        >
+                            قالب جديد
+                        </Button>
+                    )}
+                </div>
+
+                <div
+                    style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 6,
+                        alignItems: "center",
+                    }}
+                >
+                    <span style={{ fontSize: 11, color: "var(--t4)" }}>
+                        العناصر النائبة:
+                    </span>
+                    {placeholders.length === 0 && (
+                        <span style={{ fontSize: 11, color: "var(--t4)" }}>
+                            جارٍ تحميل…
+                        </span>
+                    )}
+                    {placeholders.map((p) => (
+                        <button
+                            key={p.key}
+                            type="button"
+                            disabled={!manageTemplates || !draft}
+                            title={p.label}
+                            onClick={() => insertPlaceholder(p.key)}
+                            style={{
+                                fontSize: 11,
+                                direction: "ltr",
+                                padding: "2px 8px",
+                                borderRadius: 6,
+                                border: "1px dashed var(--b2)",
+                                background: "var(--bg2)",
+                                color: "var(--t2)",
+                                cursor:
+                                    !manageTemplates || !draft
+                                        ? "not-allowed"
+                                        : "pointer",
+                            }}
+                        >
+                            {"{{" + p.key + "}}"}
+                        </button>
+                    ))}
+                </div>
+
+                {tplLoading ? (
+                    <p style={{ fontSize: 12, color: "var(--t4)", margin: 0 }}>
+                        جارٍ تحميل القوالب…
+                    </p>
+                ) : filteredTemplates.length === 0 ? (
+                    <p style={{ fontSize: 12, color: "var(--t4)", margin: 0 }}>
+                        لا توجد قوالب مطابقة.
+                    </p>
+                ) : (
+                    <div
+                        style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 6,
+                        }}
+                    >
+                        {filteredTemplates.map((t) => (
+                            <div
+                                key={t.id}
+                                style={{
+                                    border: "1px solid var(--b1)",
+                                    borderRadius: 8,
+                                    padding: 8,
+                                    background: "var(--bg2)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 10,
+                                }}
+                            >
+                                <button
+                                    type="button"
+                                    disabled={t.is_default || !manageTemplates}
+                                    title="تعيين كقالب افتراضي لهذا النوع"
+                                    onClick={() => handleSetDefault(t)}
+                                    style={{
+                                        border: "none",
+                                        background: "transparent",
+                                        cursor:
+                                            t.is_default || !manageTemplates
+                                                ? "default"
+                                                : "pointer",
+                                        color: t.is_default ? "var(--gold)" : "var(--t4)",
+                                        fontSize: 18,
+                                        padding: 0,
+                                        display: "inline-flex",
+                                    }}
+                                >
+                                    <i
+                                        className={`ti ${
+                                            t.is_default
+                                                ? "ti-star-filled"
+                                                : "ti-star"
+                                        }`}
+                                    />
+                                </button>
+                                <div
+                                    style={{
+                                        flex: 1,
+                                        minWidth: 0,
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: 2,
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 8,
+                                            flexWrap: "wrap",
+                                        }}
+                                    >
+                                        <span
+                                            style={{
+                                                fontWeight: 600,
+                                                fontSize: 13,
+                                            }}
+                                        >
+                                            {t.name}
+                                        </span>
+                                        <span
+                                            style={{
+                                                fontSize: 10,
+                                                padding: "1px 6px",
+                                                borderRadius: 4,
+                                                background: "var(--bg3)",
+                                                color: "var(--t4)",
+                                            }}
+                                        >
+                                            {docTypeLabel(t.doc_type_code)}
+                                        </span>
+                                        {!t.is_active && (
+                                            <span
+                                                style={{
+                                                    fontSize: 10,
+                                                    padding: "1px 6px",
+                                                    borderRadius: 4,
+                                                    background: "var(--red-soft, #fde)",
+                                                    color: "var(--red)",
+                                                }}
+                                            >
+                                                معطّل
+                                            </span>
+                                        )}
+                                    </div>
+                                    <span
+                                        style={{
+                                            fontSize: 11,
+                                            color: "var(--t4)",
+                                            direction: "ltr",
+                                            textAlign: "left",
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                            whiteSpace: "nowrap",
+                                        }}
+                                    >
+                                        {(t.subject || "—")}
+                                    </span>
+                                </div>
+                                <TplToggle
+                                    checked={t.is_active}
+                                    disabled={!manageTemplates}
+                                    onChange={() => handleToggleActive(t)}
+                                />
+                                {manageTemplates && (
+                                    <>
+                                        <Button
+                                            size="xs"
+                                            variant="outline"
+                                            onClick={() => openEdit(t)}
+                                            icon={<i className="ti ti-pencil" />}
+                                        >
+                                            تعديل
+                                        </Button>
+                                        <Button
+                                            size="xs"
+                                            variant="danger"
+                                            onClick={() => handleDeleteTpl(t)}
+                                            icon={<i className="ti ti-trash" />}
+                                        >
+                                            حذف
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {draft && manageTemplates && (
+                    <div
+                        style={{
+                            marginTop: 12,
+                            border: "1px solid var(--b1)",
+                            borderRadius: 8,
+                            padding: 12,
+                            background: "var(--bg2)",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 10,
+                        }}
+                    >
+                        <div style={{ display: "flex", overflow: "hidden", borderRadius: 6, border: "1px solid var(--b2)", width: "max-content" }}>
+                            {(["body", "subject"] as const).map((f) => (
+                                <button
+                                    key={f}
+                                    type="button"
+                                    onClick={() => setTplField(f)}
+                                    style={{
+                                        padding: "4px 14px",
+                                        fontSize: 12,
+                                        border: "none",
+                                        background:
+                                            tplField === f ? "var(--em)" : "transparent",
+                                        color: tplField === f ? "#fff" : "var(--t2)",
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    {f === "subject" ? "الموضوع" : "المحتوى"}
+                                </button>
+                            ))}
+                        </div>
+                        <F
+                            label="اسم القالب"
+                            val={draft.name}
+                            set={(v) => up({ name: v })}
+                            placeholder="مثال: فاتورة — تذكير"
+                            hint={`النوع: ${docTypeLabel(draft.doc_type_code)}`}
+                        />
+                        <select
+                            value={draft.doc_type_code ?? "generic"}
+                            onChange={(e) =>
+                                up({
+                                    doc_type_code:
+                                        e.target.value === "generic"
+                                            ? null
+                                            : e.target.value,
+                                })
+                            }
+                        >
+                            <option value="generic">عام (كل الأنواع)</option>
+                            {DOC_TYPE_LIST.map((t) => (
+                                <option key={t.code} value={t.code}>
+                                    {t.name}
+                                </option>
+                            ))}
+                        </select>
+                        <F
+                            label="الموضوع"
+                            val={draft.subject}
+                            set={(v) => {
+                                setTplField("subject");
+                                up({ subject: v });
+                            }}
+                            placeholder="مثال: فاتورة {{document_number}}"
+                            dir="rtl"
+                        />
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <label style={{ fontSize: 12, color: "var(--t4)" }}>
+                                نص الرسالة (محتوى)
+                            </label>
+                            <textarea
+                                rows={6}
+                                value={draft.body}
+                                dir="auto"
+                                onFocus={() => setTplField("body")}
+                                onChange={(e) => {
+                                    setTplField("body");
+                                    up({ body: e.target.value });
+                                }}
+                                placeholder={
+                                    "مثال:\nمرحباً {{party_name}}،\nنرفق لكم فاتورة {{document_number}} بمبلغ {{net_to_pay}}."
+                                }
+                                style={{
+                                    width: "100%",
+                                    boxSizing: "border-box",
+                                    resize: "vertical",
+                                }}
+                            />
+                        </div>
+                        <div
+                            style={{
+                                display: "flex",
+                                alignItems: "flex-start",
+                                gap: 16,
+                                flexWrap: "wrap",
+                            }}
+                        >
+                            <label
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 6,
+                                    fontSize: 12,
+                                }}
+                            >
+                                <TplToggle
+                                    checked={draft.is_default}
+                                    onChange={() =>
+                                        up({ is_default: !draft.is_default })
+                                    }
+                                />
+                                <span>
+                                    افتراضي
+                                </span>
+                            </label>
+                            <label
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 6,
+                                    fontSize: 12,
+                                }}
+                            >
+                                <TplToggle
+                                    checked={draft.is_active}
+                                    onChange={() =>
+                                        up({ is_active: !draft.is_active })
+                                    }
+                                />
+                                <span>
+                                    مفعّل
+                                </span>
+                            </label>
+                        </div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                            <Button
+                                onClick={handleSaveTpl}
+                                loading={savingTpl}
+                                disabled={!draft.name.trim()}
+                                icon={<i className="ti ti-device-floppy" />}
+                            >
+                                {editingId !== null ? "حفظ التعديلات" : "إنشاء القالب"}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => setDraft(null)}
+                            >
+                                إلغاء
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {!manageTemplates && (
+                    <p
+                        style={{
+                            fontSize: 11,
+                            color: "var(--t4)",
+                            margin: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                        }}
+                    >
+                        <i className="ti ti-lock" />
+                        تحتاج صلاحية «إدارة الإعدادات» لإنشاء أو تعديل قوالب البريد.
+                    </p>
+                )}
+            </Card>
+
             <div
                 style={{
                     display: "flex",
@@ -685,6 +1290,7 @@ export function MailTab({
                     />
                 </div>
             </div>
+            <ConfirmDialog {...confirmDialogProps} />
         </div>
     );
 }

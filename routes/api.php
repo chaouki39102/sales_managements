@@ -50,6 +50,7 @@ use App\Http\Controllers\Api\V1\SubsidizedSalesController;
 use App\Http\Controllers\Api\V1\G50DeclarationController;
 use App\Http\Controllers\Api\V1\IFUDeclarationController;
 use App\Http\Controllers\Api\V1\PrintTemplateController;
+use App\Http\Controllers\Api\V1\EmailTemplateController;
 use App\Http\Controllers\Api\V1\PdfExportController;
 use App\Http\Controllers\Api\V1\DocumentLineTemplateController;
 use App\Http\Controllers\Api\V1\Portal\PortalAuthController;
@@ -838,6 +839,20 @@ Route::prefix('v1')->group(function () {
                 Route::post('print-templates/{id}/set-default',  [PrintTemplateController::class, 'setDefault']);
                 Route::post('print-templates/{id}/duplicate',    [PrintTemplateController::class, 'duplicate']);
                 Route::post('print-templates/upload-logo',       [PrintTemplateController::class, 'uploadLogo']);
+            });
+
+            // ✅ email-templates: قوالب البريد الإلكتروني — قراءة لكل أعضاء الشركة،
+            //    كتابة للمدراء (can:manage_settings — صفحة الإعدادات تفرضها أصلاً)
+            Route::get('email-templates',                    [EmailTemplateController::class, 'index']);
+            // ✅ رموز القوالب المدعومة — قبل {id} وإلا التُقطت كمعرّف قالب
+            Route::get('email-templates/placeholders',       [EmailTemplateController::class, 'placeholders']);
+            Route::get('email-templates/{id}',               [EmailTemplateController::class, 'show']);
+
+            Route::middleware('can:manage_settings')->group(function () {
+                Route::post('email-templates',                   [EmailTemplateController::class, 'store']);
+                Route::put('email-templates/{id}',               [EmailTemplateController::class, 'update']);
+                Route::delete('email-templates/{id}',            [EmailTemplateController::class, 'destroy']);
+                Route::post('email-templates/{id}/set-default',  [EmailTemplateController::class, 'setDefault']);
             });
 
             // line-templates: قوالب أسطر المستندات — CRUD كامل

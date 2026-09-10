@@ -106,6 +106,9 @@ class CompanySeeder extends Seeder
         // ─── المرحلة 7ب: قوالب الطباعة الافتراضية ────────────────
         PrintTemplateSeeder::seedForCompany($companyId, $this->command);
 
+        // ─── المرحلة 7ج: قالب المراسلة الافتراضي ────────────────
+        EmailTemplateSeeder::seedForCompany($companyId, $this->command);
+
         // ─── المرحلة 8: الأدوار الخاصة بالشركة ──────────────────
         // (admin, manager, cashier, viewer — company_id = $companyId)
         $this->roleService->seedRoles($companyId);

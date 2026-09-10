@@ -68,4 +68,5 @@ export * from './endpoints/approvals';
 export * from './endpoints/audits';
 export * from './endpoints/reconciliation';
 export * from './endpoints/attachments';
+export * from './endpoints/emailTemplates';
 
