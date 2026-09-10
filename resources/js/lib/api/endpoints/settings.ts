@@ -10,7 +10,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiPatch } from '../core/client';
+import { apiGet, apiPatch, apiPost } from '../core/client';
 import { tenantKeys } from '../core/queryKeys';
 import { useActiveSlug } from '../../store/appStore';
 
@@ -67,6 +67,17 @@ export const settingsApi = {
    */
   getValue: (key: string) =>
     apiGet<{ key: string; value: unknown; group: string; type: string }>(`/settings/${key}`),
+
+  /**
+   * POST /settings/test-email → إرسال بريد اختبار بإعدادات SMTP المحفوظة
+   * يقبل: { to (email مطلوب), subject (اختياري) }
+   * يُرجع: { to, subject, mailer, from }
+   */
+  testEmail: (to: string, subject?: string) =>
+    apiPost<{ to: string; subject: string; mailer: string; from: string | null }>(
+      '/settings/test-email',
+      { to, subject },
+    ),
 
 } as const;
 

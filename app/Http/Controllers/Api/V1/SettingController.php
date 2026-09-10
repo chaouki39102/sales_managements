@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Core\Http\Controllers\BaseApiController;
 use App\Services\SettingService;
+use App\Services\MailConfigService;
+use App\Services\CompanyContextService;
 use App\Models\Setting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 
 /**
  * ════════════════════════════════════════════════════════════════════
@@ -18,6 +21,7 @@ use Illuminate\Http\Request;
  * PUT    /{company}/settings              → update()   — تحديث متعدد
  * GET    /{company}/settings/group/{grp}  → byGroup()  — array
  * GET    /{company}/settings/{key}        → getValue() — object واحد
+ * POST   /{company}/settings/test-email   → sendTestEmail() — إرسال بريد اختبار
  * ════════════════════════════════════════════════════════════════════
  */
 class SettingController extends BaseApiController
@@ -113,6 +117,40 @@ class SettingController extends BaseApiController
 
         } catch (\Throwable $e) {
             return $this->handleError($e, 'getValue');
+        }
+    }
+
+    // ─── POST /{company}/settings/test-email ──────────────────────────
+
+    public function sendTestEmail(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'to'      => ['required', 'email'],
+                'subject' => ['nullable', 'string', 'max:190'],
+            ]);
+
+            $companyId = app(CompanyContextService::class)->get();
+            app(MailConfigService::class)->apply($companyId);
+
+            $to      = $validated['to'];
+            $subject = $validated['subject'] ?: 'بريد اختبار — إعدادات البريد';
+
+            Mail::raw(
+                "مرحباً،\n\nهذا بريد اختبار من نظام إدارة المبيعات.\nإذا وصلك هذا البريد فإعدادات البريد (SMTP) تعمل بشكل صحيح.\n\nالمُرسِل: " . (config('mail.from.address') ?: 'غير محدّد') . "\nالوقت: " . now()->format('Y-m-d H:i:s'),
+                function ($message) use ($to, $subject) {
+                    $message->to($to)->subject($subject);
+                }
+            );
+
+            return $this->successResponse([
+                'to'      => $to,
+                'subject' => $subject,
+                'mailer'  => config('mail.default'),
+                'from'    => config('mail.from.address'),
+            ], 'تم إرسال بريد الاختبار بنجاح');
+        } catch (\Throwable $e) {
+            return $this->handleError($e, 'sendTestEmail');
         }
     }
 

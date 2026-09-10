@@ -820,6 +820,7 @@ Route::prefix('v1')->group(function () {
             Route::middleware('can:manage_settings')->group(function () {
                 Route::patch('settings',               [SettingController::class, 'update']);
                 Route::put('settings',                 [SettingController::class, 'update']);
+                Route::post('settings/test-email',     [SettingController::class, 'sendTestEmail']);
             });
 
             // ✅ print-templates: قوالب الطباعة — قراءة لكل أعضاء الشركة، كتابة للمدراء (can:manage_print_templates)

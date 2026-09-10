@@ -7,11 +7,14 @@
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Card from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
 import {
     useSettingsByGroup,
     useUpdateSettings,
     makeGs,
+    settingsApi,
 } from "@/lib/api/endpoints/settings";
+import { useNotification } from "@/hooks/useNotification";
 import { tenantKeys } from "@/lib/api/core/queryKeys";
 import { useActiveSlug } from "@/lib/store/appStore";
 import {
@@ -35,6 +38,7 @@ export function MailTab({
     const qc = useQueryClient();
     const slug = useActiveSlug() ?? "";
     const { isDirty, markDirty, markClean } = useDirtyState();
+    const notify = useNotification();
 
     const { data: rawSettings = [] } = useSettingsByGroup("mail");
     const gs = makeGs(rawSettings);
@@ -79,6 +83,43 @@ export function MailTab({
         });
         markClean();
         onClean?.();
+    };
+
+    const [testTo, setTestTo] = useState("");
+    const [testSubject, setTestSubject] = useState("");
+    const [testSending, setTestSending] = useState(false);
+    const [testResult, setTestResult] = useState<
+        { ok: boolean; msg: string } | null
+    >(null);
+
+    const handleSendTest = async () => {
+        if (!testTo.trim()) {
+            notify.error(
+                "أدخل بريداً صالحاً",
+                "حدِّد عنوان المستلم قبل إرسال بريد الاختبار.",
+            );
+            return;
+        }
+        setTestSending(true);
+        setTestResult(null);
+        try {
+            await doSave();
+            const res = await settingsApi.testEmail(
+                testTo.trim(),
+                testSubject.trim() || undefined,
+            );
+            const detail = `وصل إلى ${res.to} · المُرسِل: ${
+                res.from ?? "إعدادات النظام"
+            } · الخادم: ${res.mailer}`;
+            setTestResult({ ok: true, msg: detail });
+            notify.success("تم إرسال بريد الاختبار", detail);
+        } catch (e: unknown) {
+            const msg = (e as Error).message || "تعذّر إرسال بريد الاختبار";
+            setTestResult({ ok: false, msg });
+            notify.error("فشل إرسال بريد الاختبار", msg);
+        } finally {
+            setTestSending(false);
+        }
     };
 
     useAutoSave(isDirty, doSave, true, 2000);
@@ -136,6 +177,103 @@ export function MailTab({
                 تعني أن المؤسسة تعتمد على إعدادات النظام المحدَّدة في ملف{" "}
                 <code dir="ltr">.env</code>.
             </p>
+
+            <Card>
+                <SecHead
+                    icon="ti-brand-google"
+                    label="الإرسال عبر Gmail"
+                    color="var(--red)"
+                />
+                <div
+                    style={{
+                        padding: "2px 14px 12px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10,
+                    }}
+                >
+                    <p
+                        style={{
+                            fontSize: 12,
+                            color: "var(--t3)",
+                            margin: 0,
+                            lineHeight: 1.7,
+                        }}
+                    >
+                        لاستخدام حساب Gmail كخادم إرسال، أنشئ «كلمة مرور للتطبيقات»
+                        (تحتاج أولاً إلى تفعيل «التحقق بخطوتين» على حساب Google):
+                    </p>
+                    <a
+                        href="https://myaccount.google.com/apppasswords"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                            fontSize: 12,
+                            color: "var(--em)",
+                            fontWeight: 700,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 5,
+                        }}
+                    >
+                        <i className="ti ti-external-link" />
+                        myaccount.google.com/apppasswords
+                    </a>
+                    <div
+                        style={{
+                            border: "1px solid var(--b2)",
+                            borderRadius: "var(--r2)",
+                            background: "var(--bg3)",
+                            overflow: "hidden",
+                        }}
+                    >
+                        {(
+                            [
+                                ["Mailer", "smtp"],
+                                ["Host", "smtp.gmail.com"],
+                                ["Port", "587"],
+                                ["Encryption", "tls"],
+                                ["اسم المستخدم", "بريد Gmail كاملاً (you@gmail.com)"],
+                                ["كلمة المرور", "كلمة مرور التطبيق (16 حرفاً)"],
+                            ] as const
+                        ).map(([k, v]) => (
+                            <div
+                                key={k}
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    gap: 10,
+                                    padding: "7px 12px",
+                                    borderBottom: "1px solid var(--b1)",
+                                    fontSize: 11.5,
+                                }}
+                            >
+                                <span style={{ color: "var(--t4)", fontWeight: 700 }}>
+                                    {k}
+                                </span>
+                                <code
+                                    dir="ltr"
+                                    style={{ color: "var(--t2)", fontSize: 11.5 }}
+                                >
+                                    {v}
+                                </code>
+                            </div>
+                        ))}
+                    </div>
+                    <p
+                        style={{
+                            fontSize: 11,
+                            color: "var(--t4)",
+                            margin: 0,
+                            lineHeight: 1.6,
+                        }}
+                    >
+                        <i className="ti ti-shield-lock" style={{ marginLeft: 4 }} />
+                        كلمة مرور التطبيق تُستعمل فقط داخل هذا النظام ولا تُفصح لأي جهة.
+                    </p>
+                </div>
+            </Card>
 
             <Card>
                 <SecHead
@@ -222,6 +360,120 @@ export function MailTab({
                         set={setMailFromName}
                         hint="اسم المؤسسة كما يظهر للمستلم"
                     />
+                </div>
+            </Card>
+
+            <Card>
+                <SecHead
+                    icon="ti-send"
+                    label="إرسال بريد اختبار"
+                    color="var(--gold)"
+                />
+                <div
+                    style={{
+                        padding: "2px 14px 12px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 12,
+                    }}
+                >
+                    <div
+                        style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 4,
+                        }}
+                    >
+                        <label style={{ fontSize: 12, color: "var(--t4)" }}>
+                            عنوان المستلم
+                        </label>
+                        <input
+                            type="email"
+                            value={testTo}
+                            dir="ltr"
+                            autoComplete="off"
+                            onChange={(e) => setTestTo(e.target.value)}
+                            placeholder="you@example.com"
+                            style={{ width: "100%", boxSizing: "border-box" }}
+                        />
+                        <span style={{ fontSize: 11, color: "var(--t4)" }}>
+                            بعث رسالة تجريبية للتأكد من عمل خادم البريد.
+                        </span>
+                    </div>
+                    <div
+                        style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 4,
+                        }}
+                    >
+                        <label style={{ fontSize: 12, color: "var(--t4)" }}>
+                            الموضوع (اختياري)
+                        </label>
+                        <input
+                            type="text"
+                            value={testSubject}
+                            dir="ltr"
+                            autoComplete="off"
+                            onChange={(e) => setTestSubject(e.target.value)}
+                            placeholder="بريد اختبار"
+                            style={{ width: "100%", boxSizing: "border-box" }}
+                        />
+                    </div>
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            flexWrap: "wrap",
+                        }}
+                    >
+                        <Button
+                            onClick={handleSendTest}
+                            disabled={testSending}
+                            icon={
+                                testSending ? (
+                                    <i
+                                        className="ti ti-loader"
+                                        style={{
+                                            animation: "spin .7s linear infinite",
+                                        }}
+                                    />
+                                ) : (
+                                    <i className="ti ti-send" />
+                                )
+                            }
+                        >
+                            {testSending ? "جاري الإرسال..." : "إرسال بريد اختبار"}
+                        </Button>
+                        {testResult && (
+                            <span
+                                style={{
+                                    fontSize: 12,
+                                    color: testResult.ok
+                                        ? "var(--em)"
+                                        : "var(--red)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 5,
+                                }}
+                            >
+                                <i
+                                    className={`ti ${
+                                        testResult.ok
+                                            ? "ti-circle-check"
+                                            : "ti-alert-triangle"
+                                    }`}
+                                />
+                                {testResult.msg}
+                            </span>
+                        )}
+                    </div>
+                    <p style={{ fontSize: 11, color: "var(--t4)", margin: 0 }}>
+                        <i className="ti ti-info-circle" style={{ marginLeft: 4 }} />
+                        سيُحفظ كل ما في هذا التبويب أولاً، ثم يُرسل بريد الاختبار
+                        عبر هذه الإعدادات.
+                    </p>
                 </div>
             </Card>
 
