@@ -388,8 +388,8 @@ function DocumentViewModal({
     const fmt = (n: number) => n.toLocaleString("fr-DZ", { maximumFractionDigits: 2 });
     const dtf = (d: string | null | undefined) => d ? new Date(d).toLocaleDateString("ar-DZ") : "—";
 
-    type DocTab = 'details' | 'lines' | 'payments' | 'audit';
-    const [activeTab, setActiveTab] = React.useState<DocTab>('details');
+    type DocTab = 'doc' | 'audit';
+    const [activeTab, setActiveTab] = React.useState<DocTab>('doc');
 
     if (isLoading || !data) {
         return (
@@ -541,11 +541,9 @@ function DocumentViewModal({
         >
             {/* ── Tabs ── */}
             {(() => {
-                const tabs: { key: DocTab; label: string; icon: string; count?: number; color?: string }[] = [
-                    { key: 'details',  label: 'التفاصيل',  icon: 'ti-file-text' },
-                    { key: 'lines',    label: 'البنود',     icon: 'ti-list',         count: lines.length },
-                    { key: 'payments', label: 'المدفوعات',  icon: 'ti-wallet',       count: payments.length },
-                    { key: 'audit',    label: 'سجل التدقيق', icon: 'ti-history',      color: '#7c3aed' },
+                const tabs: { key: DocTab; label: string; icon: string; color?: string }[] = [
+                    { key: 'doc',   label: 'المستند',      icon: 'ti-file-text' },
+                    { key: 'audit', label: 'سجل التدقيق',  icon: 'ti-history',      color: '#7c3aed' },
                 ];
 
                 return (
@@ -562,11 +560,6 @@ function DocumentViewModal({
                                     >
                                         <i className={`ti ${t.icon}`} style={{ fontSize: 14, color: isActive ? (t.color ?? 'var(--em)') : undefined }} />
                                         <span>{t.label}</span>
-                                        {t.count != null && t.count > 0 && (
-                                            <span className={`doc-view-tab-count px-5 py-1 rounded-full text-xs font-bold ${isActive ? 'doc-view-tab-count--active' : ''}`}>
-                                                {t.count}
-                                            </span>
-                                        )}
                                     </button>
                                 );
                             })}
@@ -574,7 +567,7 @@ function DocumentViewModal({
 
                         {/* Tab content */}
                         <div style={{ minHeight: 400, maxHeight: 'calc(85vh - 200px)', overflowY: 'auto' }}>
-                            {activeTab === 'details' && (
+                            {activeTab === 'doc' && (
                                 <div className="doc-view-tab-content animate-in">
                                     {/* Header icon + status */}
                                     <div className="flex items-center justify-between mb-10">
@@ -661,8 +654,51 @@ function DocumentViewModal({
                                         </div>
                                     </div>
 
+                                    {/* Lines Section */}
+                                    <div className="mb-8">
+                                        <div className="flex items-center justify-between mb-8">
+                                            <div className="flex items-center gap-6">
+                                                <span className="font-bold text-base">بنود المستند</span>
+                                                <span className="text-xs text-t4 bg-3 px-8 py-2 rounded-md">{lines.length} بند</span>
+                                            </div>
+                                        </div>
+                                        <SimpleTable
+                                            columns={lineColumns}
+                                            data={lines.map((line, i) => ({ ...line, _key: `l-${i}`, _idx: i + 1 })) as unknown as Record<string, unknown>[]}
+                                            rowKey="_key"
+                                            className="border border-b1 rounded-lg"
+                                        />
+                                    </div>
+
+                                    {/* Payments Section */}
+                                    {payments.length > 0 && (
+                                        <div className="mb-12">
+                                            <div className="flex items-center gap-6 mb-8">
+                                                <span className="font-bold text-base">المدفوعات</span>
+                                                <span className="text-xs text-t4 bg-3 px-8 py-2 rounded-md">{payments.length} دفعة</span>
+                                            </div>
+                                            {payments.map((p, i) => {
+                                                const pm = p.paymentMode as Record<string, unknown> | undefined;
+                                                const iconMap: Record<string, string> = { cash: "ti-cash", bank: "ti-building-bank", ccp: "ti-mail", cib: "ti-credit-card", check: "ti-checks" };
+                                                const icon = iconMap[pm?.code as string] ?? "ti-cash";
+                                                return (
+                                                    <div key={p.id as number ?? i} className="flex items-center justify-between p-10 mb-4 rounded-md bg-3">
+                                                        <div className="flex items-center gap-8">
+                                                            <div className="ic ic-sm text-t4"><i className={`ti ${icon}`} /></div>
+                                                            <div>
+                                                                <div className="font-bold text-sm">{pm?.name as string ?? "—"}</div>
+                                                                <div className="text-xs text-t4">{p.reference ? String(p.reference) : ""} {p.payment_date ? `• ${dtf(p.payment_date as string)}` : ""}</div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="font-extrabold font-mono">{fmt(Number(p.amount ?? 0))} <span className="text-t4">دج</span></div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
                                     {/* Totals — 3-card grid */}
-                                    <div className="g3">
+                                    <div className="g3 mb-4">
                                         {(Number(d.total_discount ?? 0) > 0 || Number(d.total_stamp ?? 0) > 0) && (
                                             <div className="p-10 rounded-lg bg-3">
                                                 <div className="text-xs text-t4 font-bold mb-6">التخفيضات</div>
@@ -724,60 +760,7 @@ function DocumentViewModal({
                                 </div>
                             )}
 
-                            {activeTab === 'lines' && (
-                                <div className="doc-view-tab-content animate-in">
-                                    <div className="flex items-center justify-between mb-8">
-                                        <div className="flex items-center gap-6">
-                                            <span className="font-bold text-base">بنود المستند</span>
-                                            <span className="text-xs text-t4 bg-3 px-8 py-2 rounded-md">{lines.length} بند</span>
-                                        </div>
-                                    </div>
-                                    <SimpleTable
-                                        columns={lineColumns}
-                                        data={lines.map((line, i) => ({ ...line, _key: `l-${i}`, _idx: i + 1 })) as unknown as Record<string, unknown>[]}
-                                        rowKey="_key"
-                                        className="border border-b1 rounded-lg"
-                                    />
-                                </div>
-                            )}
-
-                            {activeTab === 'payments' && (
-                                <div className="doc-view-tab-content animate-in">
-                                    <div className="flex items-center gap-6 mb-8">
-                                        <span className="font-bold text-base">المدفوعات</span>
-                                        <span className="text-xs text-t4 bg-3 px-8 py-2 rounded-md">{payments.length} دفعة</span>
-                                    </div>
-                                    {payments.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center py-24">
-                                            <div className="w-48 h-48 rounded-full bg-3 flex items-center justify-center mb-8">
-                                                <i className="ti ti-wallet-off text-t4" style={{ fontSize: 24 }} />
-                                            </div>
-                                            <span className="text-sm font-medium text-t3">لا توجد مدفوعات</span>
-                                            <span className="text-xs text-t4 mt-2">لم يتم تسجيل أي دفعة على هذا المستند</span>
-                                        </div>
-                                    ) : (
-                                        payments.map((p, i) => {
-                                            const pm = p.paymentMode as Record<string, unknown> | undefined;
-                                            const iconMap: Record<string, string> = { cash: "ti-cash", bank: "ti-building-bank", ccp: "ti-mail", cib: "ti-credit-card", check: "ti-checks" };
-                                            const icon = iconMap[pm?.code as string] ?? "ti-cash";
-                                            return (
-                                                <div key={p.id as number ?? i} className="flex items-center justify-between p-10 mb-4 rounded-lg bg-3 border border-b3">
-                                                    <div className="flex items-center gap-8">
-                                                        <div className="w-32 h-32 rounded-lg flex items-center justify-center" style={{ background: 'var(--em3)', color: 'var(--em)' }}>
-                                                            <i className={`ti ${icon}`} />
-                                                        </div>
-                                                        <div>
-                                                            <div className="font-bold text-sm">{pm?.name as string ?? "—"}</div>
-                                                            <div className="text-xs text-t4">{p.reference ? String(p.reference) : ""} {p.payment_date ? `• ${dtf(p.payment_date as string)}` : ""}</div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="font-extrabold font-mono text-lg">{fmt(Number(p.amount ?? 0))} <span className="text-t4 text-sm">دج</span></div>
-                                                </div>
-                                            );
-                                        })
-                                    )}
-                                </div>
-                            )}
+                            
 
                             {activeTab === 'audit' && (
                                 <div className="doc-view-tab-content animate-in">

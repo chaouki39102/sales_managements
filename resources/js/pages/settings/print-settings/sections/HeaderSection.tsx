@@ -9,7 +9,7 @@ import { isSettingVisible, FONT_OPTIONS } from '../services/SettingsRegistry';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import { RowManager, type FieldOption } from '../components/RowManager';
 
-const COMPANY_FIELD_OPTIONS: FieldOption[] = [
+export const COMPANY_FIELD_OPTIONS: FieldOption[] = [
   { value: 'company.name',            label: 'اسم الشركة' },
   { value: 'company.commercialName',  label: 'الاسم التجاري' },
   { value: 'company.address',         label: 'العنوان' },

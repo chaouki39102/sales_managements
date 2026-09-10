@@ -6,7 +6,7 @@ import { Field, ColorField, Textarea, Input } from '../components/ui';
 import { isSettingVisible, FONT_OPTIONS } from '../services/SettingsRegistry';
 import { RowManager, type FieldOption } from '../components/RowManager';
 
-const CUSTOMER_FIELD_OPTIONS: FieldOption[] = [
+export const CUSTOMER_FIELD_OPTIONS: FieldOption[] = [
   { value: 'customer.name',            label: 'اسم العميل' },
   { value: 'customer.nif',             label: 'NIF العميل' },
   { value: 'customer.commercialName',  label: 'الاسم التجاري' },
