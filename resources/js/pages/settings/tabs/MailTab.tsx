@@ -122,6 +122,19 @@ export function MailTab({
         }
     };
 
+    const fillGmailDefaults = () => {
+        setMailMailer("smtp");
+        setMailHost("smtp.gmail.com");
+        setMailPort("587");
+        setMailEncryption("tls");
+        markDirty();
+        onDirty?.();
+        notify.info(
+            "تمت تعبئة قيم خادم Gmail",
+            "أدخل الآن بريدك الكامل في «اسم المستخدم» وكلمة مرور التطبيق في «كلمة المرور».",
+        );
+    };
+
     useAutoSave(isDirty, doSave, true, 2000);
 
     const F = ({
@@ -200,8 +213,8 @@ export function MailTab({
                             lineHeight: 1.7,
                         }}
                     >
-                        لاستخدام حساب Gmail كخادم إرسال، أنشئ «كلمة مرور للتطبيقات»
-                        (تحتاج أولاً إلى تفعيل «التحقق بخطوتين» على حساب Google):
+                        لاستخدام Gmail كخادم إرسال تحتاج «كلمة مرور للتطبيقات»
+                        (لا تطبق كلمة مرور حسابك المعتادة). اتبع الخطوات بالترتيب:
                     </p>
                     <a
                         href="https://myaccount.google.com/apppasswords"
@@ -221,45 +234,146 @@ export function MailTab({
                     </a>
                     <div
                         style={{
-                            border: "1px solid var(--b2)",
-                            borderRadius: "var(--r2)",
-                            background: "var(--bg3)",
-                            overflow: "hidden",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 8,
                         }}
                     >
-                        {(
-                            [
-                                ["Mailer", "smtp"],
-                                ["Host", "smtp.gmail.com"],
-                                ["Port", "587"],
-                                ["Encryption", "tls"],
-                                ["اسم المستخدم", "بريد Gmail كاملاً (you@gmail.com)"],
-                                ["كلمة المرور", "كلمة مرور التطبيق (16 حرفاً)"],
-                            ] as const
-                        ).map(([k, v]) => (
+                        {[
+                            "فعّل «التحقق بخطوتين» من إعدادات حساب Google — بدونها لا يظهر خيار «كلمة مرور التطبيقات».",
+                            "افتح صفحة كلمات مرور التطبيقات من الرابط أعلاه وسجّل الدخول.",
+                            "في «اسم التطبيق» اكتب اسماً تذكره (مثل POSDZ) ثم اضغط «إنشاء».",
+                            "ستظهر كلمة مرور من 16 حرفاً (مثل «abcd efgh ijkl mnop») — انسخها الآن قبل إغلاق الصفحة.",
+                            "ارجع إلى هذا التبويب واضغط «تعبئة قيم Gmail» بالأسفل (يملأ الخادم والمنفذ والتشفير تلقائياً).",
+                            "ضع بريد Gmail كاملاً (you@gmail.com) في حقل «اسم المستخدم» ببطاقة «خادم البريد».",
+                            "الصق كلمة مرور التطبيق من الخطوة 4 في حقل «كلمة المرور» أسفل «اسم المستخدم» مباشرة.",
+                            "اضغط «إرسال بريد اختبار» للتحقق ثم «حفظ».",
+                        ].map((s, i) => (
                             <div
-                                key={k}
+                                key={i}
                                 style={{
                                     display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    gap: 10,
-                                    padding: "7px 12px",
-                                    borderBottom: "1px solid var(--b1)",
-                                    fontSize: 11.5,
+                                    gap: 8,
+                                    alignItems: "flex-start",
+                                    fontSize: 12,
+                                    lineHeight: 1.7,
                                 }}
                             >
-                                <span style={{ color: "var(--t4)", fontWeight: 700 }}>
-                                    {k}
-                                </span>
-                                <code
-                                    dir="ltr"
-                                    style={{ color: "var(--t2)", fontSize: 11.5 }}
+                                <span
+                                    style={{
+                                        minWidth: 20,
+                                        width: 20,
+                                        height: 20,
+                                        borderRadius: "50%",
+                                        background: "var(--em)",
+                                        color: "var(--bg)",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: 11,
+                                        fontWeight: 800,
+                                        marginTop: 2,
+                                        flexShrink: 0,
+                                    }}
                                 >
-                                    {v}
-                                </code>
+                                    {i + 1}
+                                </span>
+                                <span style={{ color: "var(--t2)" }}>{s}</span>
                             </div>
                         ))}
+                    </div>
+                    <div
+                        style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 4,
+                        }}
+                    >
+                        <strong style={{ fontSize: 12, color: "var(--t4)" }}>
+                            أين أضع كل قيمة من صفحة Google؟
+                        </strong>
+                        <div
+                            style={{
+                                border: "1px solid var(--b2)",
+                                borderRadius: "var(--r2)",
+                                background: "var(--bg3)",
+                                overflow: "hidden",
+                            }}
+                        >
+                            {(
+                                [
+                                    ["smtp", "الحقل «Mailer»"],
+                                    ["smtp.gmail.com", "الحقل «المُضيف (Host)»"],
+                                    ["587", "الحقل «المنفذ (Port)»"],
+                                    ["tls", "الحقل «التشفير (Encryption)»"],
+                                    ["you@gmail.com", "الحقل «اسم المستخدم»"],
+                                    ["كلمة مرور التطبيق", "الحقل «كلمة المرور»"],
+                                ] as const
+                            ).map(([k, v]) => (
+                                <div
+                                    key={k}
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        gap: 10,
+                                        padding: "7px 12px",
+                                        borderBottom: "1px solid var(--b1)",
+                                        fontSize: 11.5,
+                                    }}
+                                >
+                                    <code
+                                        dir="ltr"
+                                        style={{
+                                            color: "var(--t2)",
+                                            fontSize: 11.5,
+                                        }}
+                                    >
+                                        {k}
+                                    </code>
+                                    <span
+                                        style={{
+                                            color: "var(--t4)",
+                                            fontWeight: 700,
+                                            textAlign: "right",
+                                        }}
+                                    >
+                                        {v}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            flexWrap: "wrap",
+                            background: "rgba(10, 138, 92, 0.08)",
+                            border: "1px solid var(--b2)",
+                            borderRadius: "var(--r2)",
+                            padding: "10px 12px",
+                        }}
+                    >
+                        <Button
+                            onClick={fillGmailDefaults}
+                            icon={<i className="ti ti-brand-google" />}
+                        >
+                            تعبئة قيم Gmail
+                        </Button>
+                        <span
+                            style={{
+                                fontSize: 11.5,
+                                color: "var(--t3)",
+                                flex: 1,
+                                minWidth: 180,
+                            }}
+                        >
+                            يملأ تلقائياً: Mailer = smtp · Host = smtp.gmail.com ·
+                            Port = 587 · Encryption = tls. أدخل أنت فقط بريدك وكلمة
+                            مرور التطبيق في بطاقة «خادم البريد».
+                        </span>
                     </div>
                     <p
                         style={{
@@ -270,7 +384,9 @@ export function MailTab({
                         }}
                     >
                         <i className="ti ti-shield-lock" style={{ marginLeft: 4 }} />
-                        كلمة مرور التطبيق تُستعمل فقط داخل هذا النظام ولا تُفصح لأي جهة.
+                        كلمة مرور التطبيق تُستعمل فقط داخل هذا النظام ولا تُفصح لأي
+                        جهة. تُقبل مع المسافات أو بدونها (abcd efgh ijkl mnop ≡
+                        abcdefghijklmnop).
                     </p>
                 </div>
             </Card>
