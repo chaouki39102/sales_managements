@@ -388,6 +388,9 @@ function DocumentViewModal({
     const fmt = (n: number) => n.toLocaleString("fr-DZ", { maximumFractionDigits: 2 });
     const dtf = (d: string | null | undefined) => d ? new Date(d).toLocaleDateString("ar-DZ") : "—";
 
+    type DocTab = 'details' | 'lines' | 'payments' | 'audit';
+    const [activeTab, setActiveTab] = React.useState<DocTab>('details');
+
     if (isLoading || !data) {
         return (
             <Modal open={!!docId} onClose={onClose} size="xl" title={docType?.name ?? "المستند"}>
@@ -538,8 +541,6 @@ function DocumentViewModal({
         >
             {/* ── Tabs ── */}
             {(() => {
-                type DocTab = 'details' | 'lines' | 'payments' | 'audit';
-                const [activeTab, setActiveTab] = React.useState<DocTab>('details');
                 const tabs: { key: DocTab; label: string; icon: string; count?: number; color?: string }[] = [
                     { key: 'details',  label: 'التفاصيل',  icon: 'ti-file-text' },
                     { key: 'lines',    label: 'البنود',     icon: 'ti-list',         count: lines.length },
