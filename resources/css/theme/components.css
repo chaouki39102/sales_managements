@@ -1117,3 +1117,59 @@ body.dark .al-p{background:var(--purb);border-color:var(--purbo);color:var(--pur
   transition: all .15s;
 }
 .pwa-banner-x:hover { background: var(--bg3); color: var(--t1); }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Document View Modal — Tabs
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.doc-view-tab {
+  position: relative;
+  white-space: nowrap;
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+  transition: all .15s ease;
+}
+.doc-view-tab:hover:not(.doc-view-tab--active) {
+  background: var(--bg2);
+  color: var(--t1);
+}
+.doc-view-tab--active {
+  background: var(--bg1);
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  color: var(--em, #0a8a5c);
+}
+.doc-view-tab--active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 20%;
+  right: 20%;
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--em, #0a8a5c);
+}
+.doc-view-tab--inactive {
+  color: var(--t4);
+}
+.doc-view-tab-count {
+  background: var(--bg2);
+  color: var(--t4);
+  min-width: 20px;
+  text-align: center;
+  line-height: 1;
+  padding: 2px 6px;
+}
+.doc-view-tab-count--active {
+  background: var(--em3);
+  color: var(--em);
+}
+.doc-view-tab-content {
+  animation: fadeIn .2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
