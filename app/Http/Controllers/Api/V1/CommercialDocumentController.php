@@ -663,7 +663,7 @@ class CommercialDocumentController extends BaseApiController
      *
      * @param \App\Models\CommercialDocument $commercialDocument
      */
-    public function auditLog(Request $request, CommercialDocument $commercialDocument): JsonResponse
+    public function auditLog(Request $request, Company $company, CommercialDocument $commercialDocument): JsonResponse
     {
         try {
             $this->authorizeAction('view', $commercialDocument);
