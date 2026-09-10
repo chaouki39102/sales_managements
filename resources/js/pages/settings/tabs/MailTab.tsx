@@ -53,6 +53,7 @@ export function MailTab({
     const [mailEncryption, setMailEncryption] = useState("");
     const [mailFromAddress, setMailFromAddress] = useState("");
     const [mailFromName, setMailFromName] = useState("");
+    const [pwdVisible, setPwdVisible] = useState(false);
 
     useEffect(() => {
         if (!rawSettings.length) return;
@@ -145,6 +146,7 @@ export function MailTab({
         type = "text",
         dir,
         hint,
+        autoComplete = "off",
     }: {
         label: string;
         val: string;
@@ -153,6 +155,7 @@ export function MailTab({
         type?: string;
         dir?: "ltr" | "rtl";
         hint?: string;
+        autoComplete?: string;
     }) => (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 12, color: "var(--t4)" }}>{label}</label>
@@ -160,7 +163,7 @@ export function MailTab({
                 type={type}
                 value={val}
                 dir={dir}
-                autoComplete="off"
+                autoComplete={autoComplete}
                 onChange={(e) => {
                     setFn(e.target.value);
                     markDirty();
@@ -431,14 +434,79 @@ export function MailTab({
                         val={mailUsername}
                         set={setMailUsername}
                         dir="ltr"
+                        autoComplete="new-username"
+                        hint="كامل: you@gmail.com"
                     />
-                    <F
-                        label="كلمة المرور"
-                        val={mailPassword}
-                        set={setMailPassword}
-                        dir="ltr"
-                        type="password"
-                    />
+                    <div
+                        style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 4,
+                        }}
+                    >
+                        <label style={{ fontSize: 12, color: "var(--t4)" }}>
+                            كلمة المرور
+                        </label>
+                        <div style={{ position: "relative" }}>
+                            <input
+                                type={pwdVisible ? "text" : "password"}
+                                value={mailPassword}
+                                dir="ltr"
+                                autoComplete="new-password"
+                                onChange={(e) => {
+                                    setMailPassword(e.target.value);
+                                    markDirty();
+                                    onDirty?.();
+                                }}
+                                placeholder={EMPTY_PLACEHOLDER}
+                                style={{
+                                    width: "100%",
+                                    boxSizing: "border-box",
+                                    paddingLeft: 30,
+                                }}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setPwdVisible((v) => !v)}
+                                title={
+                                    pwdVisible
+                                        ? "إخفاء كلمة المرور"
+                                        : "إظهار كلمة المرور"
+                                }
+                                aria-label={
+                                    pwdVisible
+                                        ? "إخفاء كلمة المرور"
+                                        : "إظهار كلمة المرور"
+                                }
+                                style={{
+                                    position: "absolute",
+                                    left: 6,
+                                    top: "50%",
+                                    transform: "translateY(-50%)",
+                                    border: "none",
+                                    background: "transparent",
+                                    color: "var(--t4)",
+                                    cursor: "pointer",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    padding: 2,
+                                }}
+                            >
+                                <i
+                                    className={`ti ${
+                                        pwdVisible
+                                            ? "ti-eye-off"
+                                            : "ti-eye"
+                                    }`}
+                                />
+                            </button>
+                        </div>
+                        <span style={{ fontSize: 11, color: "var(--t4)" }}>
+                            كلمة مرور التطبيق من Google (16 حرفاً) — تُقبل مع
+                            المسافات أو بدونها.
+                        </span>
+                    </div>
                     <F
                         label="التشفير (Encryption)"
                         val={mailEncryption}
