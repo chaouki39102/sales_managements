@@ -8,10 +8,10 @@
 
 ---
 
-## Status (2026-09-10)
+## Status (2026-09-12)
 
-- **Todos 1–5b COMPLETE** (backend CRUD + Settings → Mail template manager UI). `tsc --noEmit` clean.
-- **Todos 6–8 REMAINING** — send-modal upgrade, wiring into more entry points, final verify + push.
+- **Todos 1–8 COMPLETE** — backend CRUD + MailTab manager (1–5b), send-modal upgrade on shared `Modal` with template picker + placeholders + PDF toggle (6), wired into documents list + document view + invoices page (7), verified + pushed (8).
+- Git log: Todo 6/7/8 verification green under commit `e6d3268` (pushed to `origin/main`); this doc update follows.
 
 ---
 
@@ -47,7 +47,7 @@
 
 ---
 
-## REMAINING — Todo 6: Upgrade the send-mail modal (template picker + subject/body + PDF toggle)
+## COMPLETED ✅ — Todo 6: Upgrade the send-mail modal (template picker + subject/body + PDF toggle)
 
 ### Frontend — `resources/js/pages/documents/components/SendDocumentMailModal.tsx`
 Current state: OLD simple version — a `message`-only textarea, inline-styled native overlay (not the shared `Modal`), directly calls `apiPost('/documents/${documentId}/send-mail', { message })`. Props: `documentId`, `documentNumber`, `partyName?`, `partyEmail?`, `onClose`.
@@ -69,7 +69,7 @@ Required upgrade:
 
 ---
 
-## REMAINING — Todo 7: Wire send-mail into more entry points
+## COMPLETED ✅ — Todo 7: Wire send-mail into more entry points
 
 Currently the ONLY entry point is `CommercialDocumentsPage.tsx` (import `:60`, usage `:2296`).
 
@@ -79,7 +79,7 @@ Currently the ONLY entry point is `CommercialDocumentsPage.tsx` (import `:60`, u
 
 ---
 
-## REMAINING — Todo 8: Verify + commit + push
+## COMPLETED ✅ — Todo 8: Verify + commit + push
 
 1. `npx tsc --noEmit` — 0 errors.
 2. `npm test` — all suites green.
