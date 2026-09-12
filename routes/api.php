@@ -246,6 +246,35 @@ Route::prefix('v1')->group(function () {
     });
 
     // ═══════════════════════════════════════════
+    // ①-e WHATSAPP WEBHOOK (واتساب) — استقبال طلبات الزبائن عبر واتساب
+    // ═══════════════════════════════════════════
+    // مدخل واجهة Meta WhatsApp Business Cloud API لكل مؤسسة على حدة.
+    // قواعد الأمان:
+    //   1. GET /webhook — تحقق الاشتراك (verify_token من إعدادات المؤسسة)؛
+    //      يُستخدم من Meta وقت ربط/إعادة ربط الـ webhook.
+    //   2. POST /webhook — استقبال إشعار الرسائل؛ في الوضع live يُتحقق من
+    //      توقيع X-Hub-Signature-256 (HMAC-SHA256 بمفتاح whatsapp_app_secret)
+    //      على BODY الخام — دون التوقيع الصحيح 403. القرار التجاري يرجع
+    //      دائماً 200 (يمنع Meta إعادة محاولة بلا نهائي ولا يُغلق webhook
+    //      المؤسسة عند خطأ تحليل منزلي). إشعارات delivery/read لا نصّ لها
+    //      فتُتجاهل في المتحكم.
+    //   3. POST /mock-send — محاكاة وصول رسالة (تجربة التدفق الكامل من
+    //      لوحة الإعدادات بدون حساب Meta)؛ محدود بـ throttle:30,1.
+    // بدون SubstituteBindings: نفس الحجة المستعملة في مجموعة portal —
+    // {company} يُحل بواسطة SetPortalCompanyContext (portal.company)،
+    // وليس بزرع model binding العام (الذي يقبل slug فقط، لا portal_slug).
+    Route::prefix('{company}/whatsapp')
+        ->middleware('portal.company')
+        ->withoutMiddleware(\Illuminate\Routing\Middleware\SubstituteBindings::class)
+        ->group(function () {
+            $wa = \App\Http\Controllers\Api\V1\WhatsApp\WhatsAppWebhookController::class;
+
+            Route::get('/webhook', [$wa, 'verify']);
+            Route::post('/webhook', [$wa, 'message']);
+            Route::post('/mock-send', [$wa, 'mockSend'])->middleware('throttle:30,1');
+        });
+
+    // ═══════════════════════════════════════════
     // ② USER COMPANIES
     // ═══════════════════════════════════════════
     Route::middleware(['auth:sanctum', '2fa.verified'])->prefix('companies')->group(function () {
