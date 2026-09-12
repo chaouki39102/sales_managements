@@ -737,6 +737,68 @@ class SettingsSeeder extends Seeder
             ],
 
             // ══════════════════════════════════════════
+            // group: portal — الطلب عبر واتساب (Meta WhatsApp Business Cloud API)
+            // Webhook يستقبل رسالة الزبون، يطابق رقمه مع طرف/زبون، يقرأ نص
+            // الطلب، وينشئ طلب CMD عبر بوابة الطلبات، ثم يرد برسالة عربية
+            // بالملخص + رابط التتبع/الدفع. وضع mock يعمل فوراً بلا حساب
+            // Meta؛ الوضع live يستدعي Graph API (يتطلب توكن وصول + phone_number_id).
+            // ══════════════════════════════════════════
+            'whatsapp_enabled' => [
+                'value'         => false,
+                'group'         => 'portal',
+                'type'          => 'boolean',
+                'description'   => 'تفعيل الطلب عبر واتساب (استقبال طلبات الزبائن من رسائل واتساب وإنشاء طلبات CMD تلقائياً)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 123,
+            ],
+            'whatsapp_mode' => [
+                'value'         => 'mock',
+                'group'         => 'portal',
+                'type'          => 'string',
+                'description'   => 'وضع تشغيل الطلب عبر واتساب: mock (تجريبي، لا يرسل فعلياً عبر Meta) | live (إنتاجي عبر Graph API)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 124,
+            ],
+            'whatsapp_verify_token' => [
+                'value'         => '',
+                'group'         => 'portal',
+                'type'          => 'string',
+                'description'   => 'رمز التحقق للـ webhook (يُطابق hub.verify_token عند إعداد التطبيق على Meta)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 125,
+            ],
+            'whatsapp_app_secret' => [
+                'value'         => '',
+                'group'         => 'portal',
+                'type'          => 'string',
+                'description'   => 'سر تطبيق Meta (X-Hub-Signature-256 للتحقق من صحة الإشعارات)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 126,
+            ],
+            'whatsapp_phone_number_id' => [
+                'value'         => '',
+                'group'         => 'portal',
+                'type'          => 'string',
+                'description'   => 'معرّف رقم الهاتف في Meta (لإرسال الرد في وضع live)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 127,
+            ],
+            'whatsapp_access_token' => [
+                'value'         => '',
+                'group'         => 'portal',
+                'type'          => 'string',
+                'description'   => 'توكن وصول النظام للأطراف الخارجية (Meta Graph API) لإرسال الردود في وضع live',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 128,
+            ],
+
+            // ══════════════════════════════════════════
             // group: documents — إعدادات المستندات الافتراضية
             // ══════════════════════════════════════════
             'default_warehouse_id' => [
