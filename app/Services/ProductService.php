@@ -251,7 +251,7 @@ class ProductService extends \App\Core\Services\BaseService
     // Public Helpers
     // =========================================================
 
-    public function findById($id, array $with = null): Model
+    public function findById($id, ?array $with = null): Model
     {
         return $this->model::with($with ?? $this->showWith)->findOrFail($id);
     }

@@ -38,7 +38,7 @@ abstract class BaseService
     /**
      * ✅ FIXED: findById الآن يدعم soft deletes بشكل صحيح
      */
-    public function findById($id, array $with = null): Model
+    public function findById($id, ?array $with = null): Model
     {
         $relations = $with ?? array_unique(array_merge($this->defaultWith, $this->showWith));
 
@@ -48,7 +48,7 @@ abstract class BaseService
         return $query->findOrFail($id);
     }
 
-    public function findMany(array $ids, array $with = null): Collection
+    public function findMany(array $ids, ?array $with = null): Collection
     {
         $query = $this->model::with($with ?? $this->defaultWith)
             ->whereIn('id', $ids);
@@ -95,7 +95,7 @@ abstract class BaseService
     // 2. الإنشاء
     // ═══════════════════════════════════════════════════════════════
 
-    public function create(array $data, Request $request = null): Model
+    public function create(array $data, ?Request $request = null): Model
     {
         \Log::debug('[BaseService.create] BEFORE beforeCreate', [
             'data_keys' => array_keys($data),
@@ -122,7 +122,7 @@ abstract class BaseService
         return $item;
     }
 
-    public function bulkCreate(array $records, Request $request = null): Collection
+    public function bulkCreate(array $records, ?Request $request = null): Collection
     {
         $created = new Collection();
 
@@ -146,7 +146,7 @@ abstract class BaseService
     // 3. التحديث
     // ═══════════════════════════════════════════════════════════════
 
-    public function update(Model $item, array $data, Request $request = null): Model
+    public function update(Model $item, array $data, ?Request $request = null): Model
     {
         $this->beforeUpdate($item, $data, $request);
 
@@ -161,7 +161,7 @@ abstract class BaseService
         return $item;
     }
 
-    public function bulkUpdate(array $ids, array $data, Request $request = null): int
+    public function bulkUpdate(array $ids, array $data, ?Request $request = null): int
     {
         $count   = 0;
         $updated = new Collection();
@@ -300,7 +300,7 @@ abstract class BaseService
     // 4. الحذف والاستعادة
     // ═══════════════════════════════════════════════════════════════
 
-    public function delete(Model $item, Request $request = null): bool
+    public function delete(Model $item, ?Request $request = null): bool
     {
         $this->beforeDelete($item);
 
@@ -314,7 +314,7 @@ abstract class BaseService
         return $deleted;
     }
 
-    public function bulkDelete(array $ids, Request $request = null): int
+    public function bulkDelete(array $ids, ?Request $request = null): int
     {
         $count   = 0;
         $deleted = new Collection();
@@ -337,7 +337,7 @@ abstract class BaseService
         return $count;
     }
 
-    public function forceDelete(Model $item, Request $request = null): bool
+    public function forceDelete(Model $item, ?Request $request = null): bool
     {
         $this->beforeDelete($item);
 
@@ -353,7 +353,7 @@ abstract class BaseService
         return $deleted;
     }
 
-    public function restore(Model $item, Request $request = null): Model
+    public function restore(Model $item, ?Request $request = null): Model
     {
         if (!method_exists($item, 'restore')) {
             throw new BusinessRuleException('هذا المورد لا يدعم الاستعادة.', 400);

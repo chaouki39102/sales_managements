@@ -280,7 +280,7 @@ class ModelCacheObserver
     /**
      * ✅ Get invalidation statistics
      */
-    public static function getStats(string $date = null): array
+    public static function getStats(?string $date = null): array
     {
         $date = $date ?? date('Y-m-d');
         $key = "cache:invalidations:{$date}";

@@ -33,7 +33,7 @@ class AttachmentService extends \App\Core\Services\BaseService
         return $attachment->file_path;
     }
 
-    protected function beforeCreate(array $data, Request $request = null): array
+    protected function beforeCreate(array $data, ?Request $request = null): array
     {
         if (!$request || !$request->hasFile('file')) {
             throw new BusinessRuleException('الملف مطلوب للإرفاق.', 422);

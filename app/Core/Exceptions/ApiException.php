@@ -19,7 +19,7 @@ class ApiException extends \Exception
         $statusCode = 400,
         $data = [],
         $code = 0,
-        \Throwable $previous = null
+        ?\Throwable $previous = null
     ) {
         parent::__construct($message, $code, $previous);
 

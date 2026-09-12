@@ -18,7 +18,7 @@ trait HasApiList
     /**
      * جلب القائمة اعتمادًا على إعدادات الموديل الموجود في الكاش.
      */
-    protected function apiList(string $modelClass, Request $request = null)
+    protected function apiList(string $modelClass, ?Request $request = null)
     {
         try {
             $request = $request ?? request();
@@ -32,7 +32,7 @@ trait HasApiList
     /**
      * apiList مع config إضافي (مثلاً cache_tags, cache_ttl)
      */
-    protected function apiListWithConfig(string $modelClass, array $extraConfig = [], Request $request = null)
+    protected function apiListWithConfig(string $modelClass, array $extraConfig = [], ?Request $request = null)
     {
         $request = $request ?? request();
         $base = ModelConfigService::getResolvedConfig($modelClass);
@@ -43,7 +43,7 @@ trait HasApiList
     /**
      * apiList مع callback لتعديل الـ QueryBuilder مباشرة
      */
-    protected function apiListWithCallback(string $modelClass, callable $callback, Request $request = null, array $extraConfig = [])
+    protected function apiListWithCallback(string $modelClass, callable $callback, ?Request $request = null, array $extraConfig = [])
     {
         $request = $request ?? request();
         $base = ModelConfigService::getResolvedConfig($modelClass);
@@ -55,7 +55,7 @@ trait HasApiList
     /**
      * Cached API list: explicit wrapper
      */
-    protected function cachedApiList(string $modelClass, string $cacheKey, int $ttl, Request $request = null, array $extraConfig = [])
+    protected function cachedApiList(string $modelClass, string $cacheKey, int $ttl, ?Request $request = null, array $extraConfig = [])
     {
         $request = $request ?? request();
         $base = ModelConfigService::getResolvedConfig($modelClass);

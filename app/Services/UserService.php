@@ -29,7 +29,7 @@ class UserService extends \App\Core\Services\BaseService
     // ثم يمرر $data بدونها لـ afterUpdate — فلا تُحفظ الصلاحيات أبداً.
     // الحل: نتجاوز update() ونعالج permission_ids قبل استدعاء الـ parent.
 
-    public function update(Model $item, array $data, Request $request = null): Model
+    public function update(Model $item, array $data, ?Request $request = null): Model
     {
         // نستخرج permission_ids قبل أن يأخذها BaseService ويفقدها
         $permissionIds = array_key_exists('permission_ids', $data)
@@ -291,7 +291,7 @@ class UserService extends \App\Core\Services\BaseService
     // ═══════════════════════════════════════════
     // دوال الاستعلام
     // ═══════════════════════════════════════════
-    public function findById($id, array $with = null): Model
+    public function findById($id, ?array $with = null): Model
     {
         $relations = $with ?? array_unique(array_merge($this->defaultWith, $this->showWith));
         $companyId = $this->getCurrentCompanyId();

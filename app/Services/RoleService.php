@@ -160,7 +160,7 @@ class RoleService extends BaseService
     // قبل أي كتابة.
     // ══════════════════════════════════════════════════════════════
 
-    public function create(array $data, Request $request = null): Model
+    public function create(array $data, ?Request $request = null): Model
     {
         // استخرج permission_ids قبل أن يحذفها beforeCreate (BaseService)
         $permissionIds = array_key_exists('permission_ids', $data)
