@@ -42,6 +42,7 @@ import { useActiveCompany } from "@/lib/store/appStore";
 import { usePrintTemplatesList, mapCompany } from '@/pages/settings/print-settings/runtime';
 const TemplatePrintModal = React.lazy(() => import('@/pages/settings/print-settings/components/shared/TemplatePrintModal'));
 import { ReturnDocumentModal } from '@/pages/documents/components/ReturnDocumentModal';
+import { SendDocumentMailModal } from '@/pages/documents/components/SendDocumentMailModal';
 
 // ── Status helpers ─────────────────────────────────
 const STATUS_BADGE: Record<
@@ -63,6 +64,14 @@ export default function InvoicesPage() {
   const [filters, setFilters] = useState<Record<string, any>>({ page: 1, per_page: 20, fiscal_year_id: selectedYear?.id });
   const [selected,  setSelected]  = useState<Set<number>>(new Set());
   const [viewingId, setViewingId] = useState<number | null>(null);
+
+  const [mailModal, setMailModal] = useState<{
+    id: number;
+    documentNumber: string;
+    partyName: string;
+    partyEmail: string | null;
+    docTypeCode?: string;
+  } | null>(null);
 
   const detail   = useModal();
   const newInv   = useModal();
@@ -703,6 +712,7 @@ export default function InvoicesPage() {
                 }}
                 onPrint={() => viewingId && setPrintDocId(viewingId)}
                 onReturn={() => setShowReturnModal(true)}
+                onMail={(o) => setMailModal({ ...o, docTypeCode: 'FV' })}
             />{/* end InvoiceDetailModal */}
 
             {/* Single-doc print preview */}
@@ -736,6 +746,17 @@ export default function InvoicesPage() {
                 />
             )}
 
+            {mailModal && (
+                <SendDocumentMailModal
+                    documentId={mailModal.id}
+                    documentNumber={mailModal.documentNumber}
+                    partyName={mailModal.partyName}
+                    partyEmail={mailModal.partyEmail}
+                    docTypeCode={mailModal.docTypeCode}
+                    onClose={() => setMailModal(null)}
+                />
+            )}
+
             <ConfirmDialog {...confirmDialogProps} />
         </div>
     );
@@ -750,6 +771,7 @@ function InvoiceDetailModal({
     onDelete,
     onPrint,
     onReturn,
+    onMail,
 }: {
     open: boolean;
     invoiceId: number | null;
@@ -758,6 +780,7 @@ function InvoiceDetailModal({
     onDelete?: () => void;
     onPrint?: () => void;
     onReturn?: () => void;
+    onMail?: (opts: { id: number; documentNumber: string; partyName: string; partyEmail: string | null }) => void;
 }) {
     const { data: invoice, isLoading } = useDocument(invoiceId);
 
@@ -883,7 +906,12 @@ function InvoiceDetailModal({
                             اعتماد
                         </Button>
                     )}
-                    <Button size="sm" variant="info" icon={<i className="ti ti-mail" />} onClick={onClose}>
+                    <Button size="sm" variant="info" icon={<i className="ti ti-mail" />} onClick={() => onMail?.({
+                        id: invoice.id as number,
+                        documentNumber: String(invoice.document_number ?? `#${invoice.id}`),
+                        partyName: invoice.party?.name ?? "",
+                        partyEmail: ((invoice.party as Record<string, unknown> | undefined)?.email as string) ?? null,
+                    })}>
                         إرسال
                     </Button>
                     <Button size="sm" variant="primary" icon={<i className="ti ti-printer" />} onClick={onPrint || onClose}>

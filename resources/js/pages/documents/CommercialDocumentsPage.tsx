@@ -371,8 +371,8 @@ function getRowPermissions(row: CommercialDocument, isReadOnly: boolean) {
 // ════════════════════════════════════════════════════════════════════════════
 
 function DocumentViewModal({
-    docId, docType, onClose, onEdit, isReadOnly, onDeleteDoc, onPrint,
-}: { docId: number; docType: DocumentType | null; onClose: () => void; onEdit: () => void; isReadOnly: boolean; onDeleteDoc?: () => void; onPrint?: () => void }) {
+    docId, docType, onClose, onEdit, isReadOnly, onDeleteDoc, onPrint, onMail,
+}: { docId: number; docType: DocumentType | null; onClose: () => void; onEdit: () => void; isReadOnly: boolean; onDeleteDoc?: () => void; onPrint?: () => void; onMail?: (opts: { id: number; documentNumber: string; partyName: string; partyEmail: string | null }) => void }) {
     const slug    = useActiveSlug();
     const isPurch = PURCHASE_CODES.has(docType?.code ?? "");
 
@@ -530,6 +530,19 @@ function DocumentViewModal({
                         return (
                             <Button size="sm" variant="primary" icon={<i className="ti ti-brand-whatsapp" />} style={{ background: '#25D366', borderColor: '#25D366', color: '#fff' }} onClick={handleClick}>
                                 واتساب
+                            </Button>
+                        );
+                    })()}
+                    {!isReadOnly && (() => {
+                        const pty = d.party as Record<string, unknown> | undefined;
+                        return (
+                            <Button size="sm" variant="info" icon={<i className="ti ti-mail" />} onClick={() => onMail?.({
+                                id: d.id as number,
+                                documentNumber: String(d.document_number ?? `#${d.id}`),
+                                partyName: getPartyName(data),
+                                partyEmail: (pty?.email as string) ?? null,
+                            })}>
+                                إرسال
                             </Button>
                         );
                     })()}
@@ -813,6 +826,7 @@ export default function CommercialDocumentsPage() {
         documentNumber: string;
         partyName: string;
         partyEmail: string | null;
+        docTypeCode?: string;
     } | null>(null);
 
     // ── Batch print ───────────────────────────────────────────────────────────
@@ -1721,6 +1735,7 @@ export default function CommercialDocumentsPage() {
                             documentNumber: String(row.document_number ?? `#${row.id}`),
                             partyName: String(party?.name ?? ''),
                             partyEmail: (party?.email as string) ?? null,
+                            docTypeCode: typeCode ?? '',
                         });
                     },
                 });
@@ -1903,6 +1918,7 @@ export default function CommercialDocumentsPage() {
                                 documentNumber: String(row.document_number ?? `#${row.id}`),
                                 partyName: String(party?.name ?? ''),
                                 partyEmail: (party?.email as string) ?? null,
+                                docTypeCode: typeCode ?? '',
                             });
                         }}
                     />
@@ -2230,6 +2246,7 @@ export default function CommercialDocumentsPage() {
                         }
                     }}
                     onPrint={() => { closeModal(); setPrintDocId(viewDocId); }}
+                    onMail={(o) => { closeModal(); setMailModal({ ...o, docTypeCode: typeCode ?? '' }); }}
                 />
             )}
 
@@ -2338,6 +2355,7 @@ export default function CommercialDocumentsPage() {
                     documentNumber={mailModal.documentNumber}
                     partyName={mailModal.partyName}
                     partyEmail={mailModal.partyEmail}
+                    docTypeCode={mailModal.docTypeCode}
                     onClose={() => setMailModal(null)}
                 />
             )}

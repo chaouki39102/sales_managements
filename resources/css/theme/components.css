@@ -1173,3 +1173,72 @@ body.dark .al-p{background:var(--purb);border-color:var(--purbo);color:var(--pur
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ── إرسال مستند بالبريد (SendDocumentMailModal) ── */
+.em-recipient {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+}
+.em-recipient-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--t1);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.em-recipient-mail {
+  font-size: 12px;
+  color: var(--t3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.em-recipient-mail.ok { color: var(--em); }
+.em-recipient-mail.missing { color: var(--red); font-weight: 600; }
+.em-warn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--red) 8%, transparent);
+  color: var(--red);
+  font-size: 12px;
+}
+.em-note {
+  font-size: 11.5px;
+  color: var(--t4);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.em-chips-wrap { display: flex; flex-direction: column; gap: 8px; }
+.em-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.em-chip {
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  color: var(--em);
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1.4;
+  transition: all .15s ease;
+}
+.em-chip:hover { border-color: var(--em); background: var(--em3); }
+.em-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--t2);
+  cursor: pointer;
+}
+.em-check input { accent-color: var(--em); width: 15px; height: 15px; cursor: pointer; }

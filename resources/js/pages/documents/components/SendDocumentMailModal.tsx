@@ -1,29 +1,111 @@
 // ════════════════════════════════════════════════════════════════════════════
 // pages/documents/components/SendDocumentMailModal.tsx
-// مودال إرسال المستند بالبريد الإلكتروني
+// مودال إرسال المستند بالبريد الإلكتروني — قوالب بريد جاهزة + رموز ديناميكية + إرفاق PDF
 // ════════════════════════════════════════════════════════════════════════════
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiPost } from '@/lib/api/core/client';
 import { useNotification } from '@/hooks/useNotification';
+import { useEmailTemplatesList, usePlaceholders } from '@/lib/api/endpoints/emailTemplates';
+import Modal from '@/components/ui/Modal';
+import Button from '@/components/ui/Button';
 
 interface SendDocumentMailModalProps {
   documentId:   number;
   documentNumber: string;
   partyName?:   string;
   partyEmail?:  string | null;
+  docTypeCode?: string;
   onClose:      () => void;
 }
 
-export function SendDocumentMailModal({ documentId, documentNumber, partyName, partyEmail, onClose }: SendDocumentMailModalProps) {
+type InsertTarget = 'subject' | 'body';
+
+export function SendDocumentMailModal({
+  documentId,
+  documentNumber,
+  partyName,
+  partyEmail,
+  docTypeCode,
+  onClose,
+}: SendDocumentMailModalProps) {
   const notify = useNotification();
-  const [message, setMessage] = useState('');
+
+  const templates = useEmailTemplatesList(docTypeCode);
+  const placeholders = usePlaceholders();
+
+  const templateList = templates.data ?? [];
+
+  const [templateId, setTemplateId] = useState<number | ''>('');
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
+  const [attachPdf, setAttachPdf] = useState(true);
   const [sending, setSending] = useState(false);
+
+  const subjectRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const lastTarget = useRef<InsertTarget>('body');
+
+  // بِذر القالب الافتراضي عند تحميل قوالب نوع المستند (مرة واحدة فقط).
+  useEffect(() => {
+    const list = templates.data ?? [];
+    if (!list.length || templateId !== '') return;
+    const def = list.find(t => t.is_default) ?? list[0];
+    if (def) {
+      setTemplateId(def.id);
+      setSubject(def.subject ?? '');
+      setBody(def.body ?? '');
+    }
+  }, [templates.data, templateId]);
+
+  const handleTemplateChange = (value: string) => {
+    const id = value === '' ? ('' as const) : Number(value);
+    setTemplateId(id);
+    if (id === '') {
+      setSubject('');
+      setBody('');
+      return;
+    }
+    const t = templateList.find(x => x.id === id);
+    setSubject(t?.subject ?? '');
+    setBody(t?.body ?? '');
+  };
+
+  const insertPlaceholder = (key: string) => {
+    const token = `{{${key}}}`;
+    const el = lastTarget.current === 'subject' ? subjectRef.current : bodyRef.current;
+
+    if (!el) {
+      if (lastTarget.current === 'subject') setSubject(s => s + token);
+      else setBody(b => b + token);
+      return;
+    }
+
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? start;
+    const before = el.value.slice(0, start);
+    const after = el.value.slice(end);
+    const newValue = before + token + after;
+    const cursorPos = start + token.length;
+
+    if (lastTarget.current === 'subject') setSubject(newValue);
+    else setBody(newValue);
+
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(cursorPos, cursorPos);
+    });
+  };
 
   const handleSend = async () => {
     setSending(true);
     try {
-      await apiPost(`/documents/${documentId}/send-mail`, { message: message || undefined });
+      await apiPost(`/documents/${documentId}/send-mail`, {
+        template_id: templateId === '' ? undefined : templateId,
+        subject: subject.trim() || undefined,
+        body: body.trim() || undefined,
+        attach_pdf: attachPdf,
+      });
       notify.success(`تم إرسال المستند ${documentNumber} للزبون بنجاح`);
       onClose();
     } catch (err: unknown) {
@@ -35,118 +117,121 @@ export function SendDocumentMailModal({ documentId, documentNumber, partyName, p
   };
 
   return (
-    <div
-      role="dialog" aria-modal="true" aria-label="إرسال المستند بالبريد"
-      style={{
-        position: 'fixed', inset: 0, zIndex: 500,
-        background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(4px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-        direction: 'rtl',
-      }}
-      onClick={onClose}
+    <Modal
+      open
+      onClose={onClose}
+      title="إرسال بالبريد الإلكتروني"
+      subtitle={`المستند: ${documentNumber}`}
+      size="md"
+      footer={
+        <>
+          <Button variant="gray" onClick={onClose}>إلغاء</Button>
+          <Button
+            variant="info"
+            icon={<i className="ti ti-send" />}
+            loading={sending}
+            disabled={!partyEmail}
+            onClick={handleSend}
+          >
+            إرسال
+          </Button>
+        </>
+      }
     >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          width: '100%', maxWidth: 480, background: 'var(--bg1)',
-          borderRadius: 'var(--r3)', padding: 24,
-          boxShadow: '0 24px 64px rgba(0,0,0,.22)',
-        }}
-      >
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: 'color-mix(in srgb, var(--blue) 12%, transparent)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <i className="ti ti-mail" style={{ fontSize: 18, color: 'var(--blue)' }} />
-          </div>
-          <div>
-            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>إرسال بالبريد الإلكتروني</h3>
-            <p style={{ margin: 0, fontSize: 12, color: 'var(--t3)' }}>
-              المستند: {documentNumber}
-            </p>
-          </div>
-        </div>
-
-        {/* Recipient info */}
-        <div style={{
-          padding: '10px 14px', borderRadius: 8, background: 'var(--bg2)',
-          marginBottom: 16, fontSize: 13,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* المستلم */}
+        <div className="em-recipient">
+          <div className="em-recipient-name">
             <i className="ti ti-user" style={{ fontSize: 14, color: 'var(--t3)' }} />
-            <span style={{ fontWeight: 600 }}>{partyName || '—'}</span>
+            {partyName || '—'}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-            <i className="ti ti-mail" style={{ fontSize: 14, color: 'var(--t3)' }} />
-            <span style={{ color: partyEmail ? 'var(--t1)' : 'var(--red)' }}>
-              {partyEmail || 'الزبون لا يملك بريد إلكتروني'}
-            </span>
+          <div className={partyEmail ? 'em-recipient-mail ok' : 'em-recipient-mail missing'}>
+            <i className="ti ti-mail" style={{ fontSize: 14 }} />
+            {partyEmail || 'الزبون لا يملك بريد إلكتروني'}
           </div>
         </div>
 
         {!partyEmail && (
-          <div style={{
-            padding: '8px 12px', borderRadius: 8,
-            background: 'color-mix(in srgb, var(--red) 8%, transparent)',
-            color: 'var(--red)', fontSize: 12, marginBottom: 16,
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
+          <div className="em-warn">
             <i className="ti ti-alert-triangle" style={{ fontSize: 14 }} />
             لا يمكن إرسال البريد — الزبون لا يملك عنوان بريد إلكتروني.
             قم بتحديث بيانات الزبون أولاً.
           </div>
         )}
 
-        {/* Message */}
-        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--t3)', display: 'block', marginBottom: 6 }}>
-          رسالة اختيارية
-        </label>
-        <textarea
-          value={message}
-          onChange={e => setMessage(e.target.value)}
-          placeholder="مرفق لكم المستند..."
-          rows={3}
-          style={{
-            width: '100%', padding: '8px 12px', borderRadius: 8,
-            border: '1px solid var(--border)', background: 'var(--bg2)',
-            fontSize: 13, resize: 'vertical', boxSizing: 'border-box',
-          }}
-        />
-
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-start' }}>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '8px 20px', borderRadius: 8,
-              border: '1px solid var(--border)', background: 'var(--bg2)',
-              cursor: 'pointer', fontSize: 13,
-            }}
+        {/* القالب */}
+        <div className="fg">
+          <label>القالب</label>
+          <select
+            value={templateId}
+            onChange={e => handleTemplateChange(e.target.value)}
           >
-            إلغاء
-          </button>
-          <button
-            onClick={handleSend}
-            disabled={sending || !partyEmail}
-            style={{
-              padding: '8px 20px', borderRadius: 8,
-              border: 'none', background: 'var(--blue)', color: '#fff',
-              cursor: 'pointer', fontSize: 13, fontWeight: 600,
-              opacity: sending || !partyEmail ? 0.5 : 1,
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}
-          >
-            {sending ? (
-              <><i className="ti ti-loader-2" style={{ fontSize: 14, animation: 'spin 1s linear infinite' }} /> جاري الإرسال...</>
-            ) : (
-              <><i className="ti ti-send" style={{ fontSize: 14 }} /> إرسال</>
-            )}
-          </button>
+            <option value="">قالب تلقائي (حسب نوع المستند)</option>
+            {templateList.map(t => (
+              <option key={t.id} value={t.id}>
+                {t.name}{t.is_default ? ' ★' : ''}
+              </option>
+            ))}
+          </select>
         </div>
+
+        {/* الموضوع */}
+        <div className="fg">
+          <label>الموضوع</label>
+          <input
+            ref={subjectRef}
+            value={subject}
+            onChange={e => setSubject(e.target.value)}
+            onFocus={() => { lastTarget.current = 'subject'; }}
+            placeholder="مثال: فاتورتك {{doc_number}}"
+            maxLength={200}
+          />
+        </div>
+
+        {/* النص */}
+        <div className="fg">
+          <label>نص الرسالة</label>
+          <textarea
+            ref={bodyRef}
+            value={body}
+            onChange={e => setBody(e.target.value)}
+            onFocus={() => { lastTarget.current = 'body'; }}
+            placeholder="السيد {{party_name}}، مرفق لكم مستند {{doc_type}} رقم {{doc_number}}..."
+            rows={6}
+          />
+        </div>
+
+        {/* الرموز الديناميكية */}
+        <div className="em-chips-wrap">
+          <div className="em-note">
+            <i className="ti ti-bolt" style={{ fontSize: 13 }} />
+            إدراج رمز في {lastTarget.current === 'subject' ? 'الموضوع' : 'نص الرسالة'} — تُستبدل تلقائياً بقيم المستند عند الإرسال
+          </div>
+          <div className="em-chips">
+            {(placeholders.data ?? []).map(p => (
+              <button
+                key={p.key}
+                type="button"
+                className="em-chip"
+                title={p.label}
+                onClick={() => insertPlaceholder(p.key)}
+              >
+                {`{{${p.key}}}`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* إرفاق PDF */}
+        <label className="em-check">
+          <input
+            type="checkbox"
+            checked={attachPdf}
+            onChange={e => setAttachPdf(e.target.checked)}
+          />
+          إرفاق نسخة PDF من المستند
+        </label>
       </div>
-    </div>
+    </Modal>
   );
 }

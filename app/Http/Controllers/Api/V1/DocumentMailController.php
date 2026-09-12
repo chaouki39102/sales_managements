@@ -20,11 +20,25 @@ class DocumentMailController extends BaseApiController
     {
         try {
             $validated = $request->validate([
-                'message' => 'nullable|string|max:5000',
+                'message'     => 'nullable|string|max:5000',
+                'subject'     => 'nullable|string|max:200',
+                'body'        => 'nullable|string|max:20000',
+                'template_id' => 'nullable|integer',
+                'attach_pdf'  => 'nullable|boolean',
             ]);
 
             $document = CommercialDocument::findOrFail($documentId);
-            $success = $this->mailService->sendToParty($document, $validated['message'] ?? null);
+            $options = [
+                'template_id' => $validated['template_id'] ?? null,
+                'subject'     => $validated['subject'] ?? null,
+                'body'        => $validated['body'] ?? null,
+                'attach_pdf'  => $validated['attach_pdf'] ?? true,
+            ];
+            $success = $this->mailService->sendToParty(
+                $document,
+                $validated['message'] ?? null,
+                $options,
+            );
 
             if ($success) {
                 return response()->json(['message' => 'تم إرسال المستند للزبون بنجاح']);

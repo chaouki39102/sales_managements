@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\CommercialDocument;
+use App\Models\EmailTemplate;
 use App\Models\Party;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -14,7 +15,7 @@ class DocumentMailService
         private MailConfigService $mailConfig,
     ) {}
 
-    public function sendToParty(CommercialDocument $document, ?string $customMessage = null): bool
+    public function sendToParty(CommercialDocument $document, ?string $customMessage = null, array $options = []): bool
     {
         $party = $document->party;
         if (!$party || !$party->email) {
@@ -24,14 +25,27 @@ class DocumentMailService
 
         $this->mailConfig->apply($document->company_id);
 
-        $pdfContent = $this->generatePdf($document);
-        $messageText = $customMessage ?: $this->defaultMessage($document);
+        $template = $this->resolveTemplate($document, $options);
+        $data     = EmailTemplateService::dataForDocument($document);
+
+        // تسلسل الموضوع: موضوع صريح ← قالب ← عنوان افتراضي.
+        $subject = $this->resolveText($options['subject'] ?? null, $data)
+            ?: ($template ? EmailTemplateService::fill((string) $template->subject, $data) : '')
+            ?: "مستند {$document->document_number}";
+
+        // تسلسل النص: جسم صريح ← قالب ← رسالة مخصصة ← رسالة افتراضية.
+        $body = $this->resolveText($options['body'] ?? null, $data)
+            ?: ($template ? EmailTemplateService::fill((string) $template->body, $data) : '')
+            ?: ($customMessage ?: $this->defaultMessage($document));
+
+        $attachPdf  = $options['attach_pdf'] ?? true;
+        $pdfContent = $attachPdf ? $this->generatePdf($document) : null;
 
         try {
-            Mail::send([], [], function ($mail) use ($party, $document, $pdfContent, $messageText) {
+            Mail::send([], [], function ($mail) use ($party, $document, $pdfContent, $subject, $body) {
                 $mail->to($party->email, $party->name)
-                    ->subject("مستند {$document->document_number}")
-                    ->setBody($messageText, 'text/plain');
+                    ->subject($subject)
+                    ->setBody($body, 'text/plain');
 
                 if ($pdfContent) {
                     $mail->attachData($pdfContent, "{$document->document_number}.pdf", [
@@ -48,6 +62,27 @@ class DocumentMailService
             Log::error("Failed to send document {$document->id} email: {$e->getMessage()}");
             return false;
         }
+    }
+
+    private function resolveTemplate(CommercialDocument $document, array $options): ?EmailTemplate
+    {
+        if (!empty($options['template_id'])) {
+            return EmailTemplate::where('company_id', $document->company_id)
+                ->where('id', (int) $options['template_id'])
+                ->where('is_active', true)
+                ->first();
+        }
+
+        return EmailTemplateService::resolveTemplate($document->company_id, $document->documentType?->code);
+    }
+
+    private function resolveText(mixed $value, array $data): string
+    {
+        if ($value === null || (is_string($value) && trim($value) === '')) {
+            return '';
+        }
+
+        return EmailTemplateService::fill((string) $value, $data);
     }
 
     private function generatePdf(CommercialDocument $document): ?string
