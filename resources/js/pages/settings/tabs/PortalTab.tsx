@@ -56,6 +56,12 @@ export function PortalTab({
     const [onlinePaymentMode, setOnlinePaymentMode] = useState("sandbox");
     const [onlinePaymentMerchantId, setOnlinePaymentMerchantId] = useState("");
     const [onlinePaymentSecretKey, setOnlinePaymentSecretKey] = useState("");
+    const [whatsappEnabled, setWhatsappEnabled] = useState(false);
+    const [whatsappMode, setWhatsappMode] = useState("mock");
+    const [whatsappVerifyToken, setWhatsappVerifyToken] = useState("");
+    const [whatsappAppSecret, setWhatsappAppSecret] = useState("");
+    const [whatsappPhoneNumberId, setWhatsappPhoneNumberId] = useState("");
+    const [whatsappAccessToken, setWhatsappAccessToken] = useState("");
 
     useEffect(() => {
         if (!rawSettings.length) return;
@@ -82,6 +88,12 @@ export function PortalTab({
         setOnlinePaymentMode(str(gs("online_payment_mode", "sandbox")));
         setOnlinePaymentMerchantId(str(gs("online_payment_merchant_id", "")));
         setOnlinePaymentSecretKey(str(gs("online_payment_secret_key", "")));
+        setWhatsappEnabled(gs<boolean>("whatsapp_enabled", false));
+        setWhatsappMode(str(gs("whatsapp_mode", "mock")));
+        setWhatsappVerifyToken(str(gs("whatsapp_verify_token", "")));
+        setWhatsappAppSecret(str(gs("whatsapp_app_secret", "")));
+        setWhatsappPhoneNumberId(str(gs("whatsapp_phone_number_id", "")));
+        setWhatsappAccessToken(str(gs("whatsapp_access_token", "")));
     }, [rawSettings]);
 
     const doSave = async () => {
@@ -109,6 +121,12 @@ export function PortalTab({
             online_payment_mode: onlinePaymentMode,
             online_payment_merchant_id: onlinePaymentMerchantId,
             online_payment_secret_key: onlinePaymentSecretKey,
+            whatsapp_enabled: whatsappEnabled,
+            whatsapp_mode: whatsappMode,
+            whatsapp_verify_token: whatsappVerifyToken,
+            whatsapp_app_secret: whatsappAppSecret,
+            whatsapp_phone_number_id: whatsappPhoneNumberId,
+            whatsapp_access_token: whatsappAccessToken,
         };
         await saveSettings(payload);
         qc.invalidateQueries({
@@ -441,6 +459,208 @@ export function PortalTab({
                                     صفحة محاكاة تقبل التأكيد أو الإلغاء دون أموال حقيقية.
                                     سيُستبدل الموفر الحقيقي (EDAHABIA / CIB / CTPay) لاحقاً
                                     بملء معرف التاجر والمفتاح السري أعلاه.
+                                </p>
+                            </>
+                        )}
+                    </div>
+                </Card>
+            )}
+
+            {portalEnabled && (
+                <Card>
+                    <SecHead
+                        icon="ti-brand-whatsapp"
+                        label="الطلب عبر واتساب"
+                        color="#25D366"
+                        sub="استقبال طلبات الزبائن من رسائل واتساب وإنشاء طلبات CMD تلقائياً"
+                    />
+                    <div
+                        style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                    >
+                        {tr(
+                            "تفعيل الطلب عبر واتساب",
+                            "يستقبل Webhook رسالة الزبون، يطابق رقمه مع طرف/زبون، ويقرأ نص الطلب ثم ينشئ طلب CMD ويرد بملخص عربي",
+                            whatsappEnabled,
+                            setWhatsappEnabled,
+                        )}
+                        {whatsappEnabled && (
+                            <>
+                                <div
+                                    style={{
+                                        display: "grid",
+                                        gridTemplateColumns: "1fr 1fr",
+                                        gap: 10,
+                                    }}
+                                >
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                        <label
+                                            style={{
+                                                fontSize: 12,
+                                                fontWeight: 600,
+                                                color: "var(--t2)",
+                                            }}
+                                        >
+                                            وضع التشغيل
+                                        </label>
+                                        <select
+                                            value={whatsappMode}
+                                            onChange={(e) => {
+                                                setWhatsappMode(e.target.value);
+                                                markDirty();
+                                                onDirty?.();
+                                            }}
+                                            style={{
+                                                padding: "8px 10px",
+                                                fontSize: 13,
+                                                borderRadius: 8,
+                                                border: "1px solid var(--b2)",
+                                                background: "var(--bg1)",
+                                                color: "var(--t1)",
+                                                fontFamily: "inherit",
+                                            }}
+                                        >
+                                            <option value="mock">
+                                                Mock (تجريبي — لا يرسل عبر Meta)
+                                            </option>
+                                            <option value="live">
+                                                Live (إنتاجي عبر Meta Graph API)
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                    <label
+                                        style={{
+                                            fontSize: 12,
+                                            fontWeight: 600,
+                                            color: "var(--t2)",
+                                        }}
+                                    >
+                                        رمز التحقق للـ Webhook
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={whatsappVerifyToken}
+                                        onChange={(e) => {
+                                            setWhatsappVerifyToken(e.target.value);
+                                            markDirty();
+                                            onDirty?.();
+                                        }}
+                                        placeholder="يُطابق hub.verify_token عند ربط الـ Webhook على Meta"
+                                        style={{
+                                            padding: "8px 10px",
+                                            fontSize: 13,
+                                            borderRadius: 8,
+                                            border: "1px solid var(--b2)",
+                                            background: "var(--bg1)",
+                                            color: "var(--t1)",
+                                            fontFamily: "inherit",
+                                        }}
+                                    />
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                    <label
+                                        style={{
+                                            fontSize: 12,
+                                            fontWeight: 600,
+                                            color: "var(--t2)",
+                                        }}
+                                    >
+                                        سر التطبيق (App Secret)
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={whatsappAppSecret}
+                                        onChange={(e) => {
+                                            setWhatsappAppSecret(e.target.value);
+                                            markDirty();
+                                            onDirty?.();
+                                        }}
+                                        placeholder="X-Hub-Signature-256 للتحقق من إشعارات Meta"
+                                        style={{
+                                            padding: "8px 10px",
+                                            fontSize: 13,
+                                            borderRadius: 8,
+                                            border: "1px solid var(--b2)",
+                                            background: "var(--bg1)",
+                                            color: "var(--t1)",
+                                            fontFamily: "inherit",
+                                        }}
+                                    />
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                    <label
+                                        style={{
+                                            fontSize: 12,
+                                            fontWeight: 600,
+                                            color: "var(--t2)",
+                                        }}
+                                    >
+                                        معرّف رقم الهاتف (Phone Number ID)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={whatsappPhoneNumberId}
+                                        onChange={(e) => {
+                                            setWhatsappPhoneNumberId(e.target.value);
+                                            markDirty();
+                                            onDirty?.();
+                                        }}
+                                        placeholder="مطلوب لوضع live لإرسال الرد"
+                                        style={{
+                                            padding: "8px 10px",
+                                            fontSize: 13,
+                                            borderRadius: 8,
+                                            border: "1px solid var(--b2)",
+                                            background: "var(--bg1)",
+                                            color: "var(--t1)",
+                                            fontFamily: "inherit",
+                                        }}
+                                    />
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                    <label
+                                        style={{
+                                            fontSize: 12,
+                                            fontWeight: 600,
+                                            color: "var(--t2)",
+                                        }}
+                                    >
+                                        توكن الوصول (Access Token)
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={whatsappAccessToken}
+                                        onChange={(e) => {
+                                            setWhatsappAccessToken(e.target.value);
+                                            markDirty();
+                                            onDirty?.();
+                                        }}
+                                        placeholder="لإرسال الردود عبر Meta Graph API (live)"
+                                        style={{
+                                            padding: "8px 10px",
+                                            fontSize: 13,
+                                            borderRadius: 8,
+                                            border: "1px solid var(--b2)",
+                                            background: "var(--bg1)",
+                                            color: "var(--t1)",
+                                            fontFamily: "inherit",
+                                        }}
+                                    />
+                                </div>
+                                <p
+                                    style={{
+                                        fontSize: 12,
+                                        lineHeight: 1.6,
+                                        color: "var(--t3)",
+                                        margin: 0,
+                                    }}
+                                >
+                                    وضع mock يعمل فوراً دون حساب Meta: أرسل رسالة مشابهة
+                                    لأي زبون عبر «POST /{'{company}'}/whatsapp/mock-send»
+                                    لاختبار التدفق الكامل. لوضع live أدخل رمز التحقق وسر
+                                    التطبيق ومعرّف الهاتف والتوكن ثم اربط الـ Webhook على
+                                    `{'{company}'}/whatsapp/webhook`.
                                 </p>
                             </>
                         )}
