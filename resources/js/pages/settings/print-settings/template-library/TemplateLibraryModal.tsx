@@ -4,11 +4,7 @@ import { TEMPLATE_CATEGORIES } from './categories';
 import type { LibraryTemplateEntry, FavoriteEntry, InstallHistoryEntry } from './types';
 import type { PrintTemplate } from '../types';
 import type { UniversalDocumentData } from '../types/data';
-import {
-  MODAL_MAX_WIDTH, CARD_MIN_WIDTH, CARD_PREVIEW_HEIGHT,
-  CARD_PREVIEW_SCALE, MODAL_BORDER_RADIUS, CARD_BORDER_RADIUS,
-  GRID_GAP,
-} from './constants';
+import Modal from '../../../../components/ui/Modal';
 import { getMockDocumentData } from './mockData';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -17,12 +13,11 @@ import { getMockDocumentData } from './mockData';
 
 const UniversalPreview = lazy(() => import('../components/preview/UniversalPreview'));
 
+const HINT_ROW_CLASS = 'tpl-lib-fallback';
+
 function PreviewFallback() {
   return (
-    <div style={{
-      height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: 11, color: '#bbb', background: '#f9fafb',
-    }}>
+    <div className={HINT_ROW_CLASS}>
       <i className="ti ti-loader-2 spin" style={{ fontSize: 20 }} />
     </div>
   );
@@ -77,6 +72,13 @@ function addRecent(templateId: string): void {
   localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, MAX_RECENT)));
 }
 
+function loadHistory(): InstallHistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
 function addHistory(entry: InstallHistoryEntry): void {
   try {
     const raw = localStorage.getItem(HISTORY_KEY);
@@ -90,150 +92,35 @@ function addHistory(entry: InstallHistoryEntry): void {
 //  Component
 // ════════════════════════════════════════════════════════════════════════════
 
-const STYLES = {
-  overlay: {
-    position: 'fixed', inset: 0, zIndex: 9999,
-    background: 'rgba(0,0,0,.5)', display: 'flex',
-    alignItems: 'center', justifyContent: 'center',
-    padding: 20, direction: 'rtl' as const,
-  },
-  modal: {
-    background: '#fff', borderRadius: MODAL_BORDER_RADIUS,
-    width: '100%', maxWidth: MODAL_MAX_WIDTH, maxHeight: '90vh',
-    display: 'flex' as const, flexDirection: 'column' as const,
-    boxShadow: '0 25px 60px rgba(0,0,0,.25)',
-    overflow: 'hidden',
-  },
-  header: {
-    padding: '14px 20px', borderBottom: '1px solid #e5e7eb',
-    display: 'flex' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const,
-    flexShrink: 0,
-  },
-  headerTitle: {
-    fontSize: 17, fontWeight: 800, color: '#111',
-    display: 'flex' as const, alignItems: 'center' as const, gap: 8,
-  },
-  closeBtn: {
-    width: 32, height: 32, borderRadius: 8, border: 'none',
-    background: '#f3f4f6', cursor: 'pointer', fontSize: 16,
-    display: 'flex' as const, alignItems: 'center' as const, justifyContent: 'center' as const,
-    color: '#666',
-  },
-  body: {
-    padding: 0, overflow: 'hidden', flex: 1,
-    display: 'flex' as const, flexDirection: 'column' as const,
-  },
-  toolbar: {
-    padding: '12px 20px', borderBottom: '1px solid #e5e7eb',
-    display: 'flex' as const, flexWrap: 'wrap' as const, gap: 8,
-    alignItems: 'center' as const, background: '#fafafa',
-  },
-  searchInput: {
-    flex: 1, minWidth: 180, padding: '7px 12px', borderRadius: 8,
-    border: '1px solid #d1d5db', fontSize: 13, outline: 'none',
-    fontFamily: 'Tajawal, sans-serif',
-  },
-  filterSelect: {
-    padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db',
-    fontSize: 12, fontFamily: 'Tajawal, sans-serif', background: '#fff',
-  },
-  grid: {
-    display: 'grid' as const, gridTemplateColumns: `repeat(auto-fill, minmax(${CARD_MIN_WIDTH}px, 1fr))`,
-    gap: GRID_GAP, padding: 20, overflowY: 'auto' as const, flex: 1,
-  },
-  card: {
-    borderRadius: CARD_BORDER_RADIUS, border: '1px solid #e5e7eb',
-    overflow: 'hidden', display: 'flex' as const, flexDirection: 'column' as const,
-    transition: 'box-shadow .2s', background: '#fff',
-  },
-  cardPreviewWrapper: {
-    height: CARD_PREVIEW_HEIGHT, overflow: 'hidden', position: 'relative' as const,
-    background: '#f9fafb', cursor: 'pointer',
-  },
-  cardPreviewContent: {
-    transform: `scale(${CARD_PREVIEW_SCALE})`,
-    transformOrigin: 'top right',
-    width: `${100 / CARD_PREVIEW_SCALE}%`,
-  },
-  cardBody: {
-    padding: '12px 14px', flex: 1, display: 'flex' as const,
-    flexDirection: 'column' as const, gap: 6,
-  },
-  cardName: {
-    fontSize: 14, fontWeight: 700, color: '#111',
-    display: 'flex' as const, alignItems: 'center' as const, gap: 6,
-  },
-  cardDesc: {
-    fontSize: 11, color: '#666', lineHeight: 1.5, flex: 1,
-    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const,
-    overflow: 'hidden',
-  },
-  tagRow: {
-    display: 'flex' as const, gap: 4, flexWrap: 'wrap' as const,
-  },
-  tagDoc: {
-    fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4,
-    background: '#eef2ff', color: '#4338ca',
-    display: 'flex' as const, alignItems: 'center' as const, gap: 3,
-  },
-  tagSize: {
-    fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4,
-    background: '#f0fdf4', color: '#15803d',
-    display: 'flex' as const, alignItems: 'center' as const, gap: 3,
-  },
-  tagCategory: {
-    fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4,
-    background: '#fef3c7', color: '#92400e',
-    display: 'flex' as const, alignItems: 'center' as const, gap: 3,
-  },
-  installBtn: {
-    padding: '8px 16px', border: 'none', borderRadius: 6,
-    background: '#1a1a2e', color: '#fff', cursor: 'pointer',
-    fontSize: 12, fontWeight: 700, fontFamily: 'Tajawal, sans-serif',
-    display: 'flex' as const, alignItems: 'center' as const, justifyContent: 'center' as const,
-    gap: 6, marginTop: 8, transition: 'opacity .2s',
-  },
-  favBtn: {
-    background: 'none', border: 'none', cursor: 'pointer',
-    fontSize: 14, padding: 0, lineHeight: 1,
-  },
-  emptyState: {
-    textAlign: 'center' as const, padding: 60, color: '#999', fontSize: 13,
-    display: 'flex' as const, flexDirection: 'column' as const, alignItems: 'center' as const, gap: 8,
-  },
-  recentRow: {
-    padding: '10px 20px', borderBottom: '1px solid #e5e7eb',
-    display: 'flex' as const, gap: 12, alignItems: 'center' as const,
-    background: '#f7f7ff', fontSize: 12, color: '#555',
-  },
-  zoomControls: {
-    display: 'flex' as const, gap: 4,
-  },
-  zoomBtn: {
-    width: 28, height: 28, borderRadius: 6, border: '1px solid #d1d5db',
-    background: '#fff', cursor: 'pointer', fontSize: 12,
-    display: 'flex' as const, alignItems: 'center' as const, justifyContent: 'center' as const,
-    color: '#555',
-  },
-};
-
-export default function TemplateLibraryModal({ open, onClose, onInstall, activeDoc: _activeDoc }: Props) {
+export default function TemplateLibraryModal({ open, onClose, onInstall, activeDoc }: Props) {
   // ── State ──────────────────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
-  const [filterDocType, setFilterDocType] = useState<string | null>(_activeDoc ?? null);
+  const [filterDocType, setFilterDocType] = useState<string | null>(activeDoc ?? null);
   const [filterPaperSize, setFilterPaperSize] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
+  const [filterCountry, setFilterCountry] = useState<string | null>(null);
+  const [filterTags, setFilterTags] = useState<string[]>([]);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [view, setView] = useState<'library' | 'history'>('library');
   const [installing, setInstalling] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(loadFavorites);
   const [recentIds, setRecentIds] = useState<string[]>(loadRecent);
-  const [_previewZoom, _setPreviewZoom] = useState<'fit' | '100' | 'page'>('fit');
+  const [history, setHistory] = useState<InstallHistoryEntry[]>(loadHistory);
+  const [zoomEntry, setZoomEntry] = useState<LibraryTemplateEntry | null>(null);
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   // ── Cached mock data (never recreate) ──────────────────────────────────────
   const mockDataRef = useRef<UniversalDocumentData | null>(null);
   if (!mockDataRef.current) {
     mockDataRef.current = getMockDocumentData();
   }
+
+  // ── Entry lookup from template id ──────────────────────────────────────────
+  const entryById = useCallback(
+    (id: string) => templateRegistry.get(id),
+    [],
+  );
 
   // ── Filtered list ──────────────────────────────────────────────────────────
   const allTemplates = useMemo(() => templateRegistry.getAll(), []);
@@ -258,14 +145,26 @@ export default function TemplateLibraryModal({ open, onClose, onInstall, activeD
     if (filterDocType) list = list.filter(e => e.meta.documentType === filterDocType);
     if (filterPaperSize) list = list.filter(e => e.meta.paperSize === filterPaperSize);
     if (filterCategory) list = list.filter(e => e.meta.category === filterCategory);
+    if (filterCountry) list = list.filter(e => e.meta.country === filterCountry);
+    if (filterTags.length) list = list.filter(e => filterTags.every(t => e.meta.tags.includes(t)));
     if (favoritesOnly) list = list.filter(e => favorites.has(e.meta.id));
     return list;
-  }, [allTemplates, search, filterDocType, filterPaperSize, filterCategory, favoritesOnly, favorites]);
+  }, [allTemplates, search, filterDocType, filterPaperSize, filterCategory, filterCountry, filterTags, favoritesOnly, favorites]);
 
   // ── Derived filter options ─────────────────────────────────────────────────
   const docTypeOptions = useMemo(() => templateRegistry.getDocTypes(), [allTemplates]);
   const paperSizeOptions = useMemo(() => templateRegistry.getPaperSizes(), [allTemplates]);
   const categoryOptions = useMemo(() => templateRegistry.getCategories(), [allTemplates]);
+  const countryOptions = useMemo(
+    () => [...new Set(allTemplates.map(e => e.meta.country).filter(Boolean) as string[])],
+    [allTemplates],
+  );
+  const availableTags = useMemo(() => templateRegistry.getTags(), [allTemplates]);
+
+  const hasActiveFilters = Boolean(
+    search || filterDocType || filterPaperSize || filterCategory || filterCountry ||
+    filterTags.length || favoritesOnly,
+  );
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const toggleFavorite = useCallback((id: string) => {
@@ -276,6 +175,10 @@ export default function TemplateLibraryModal({ open, onClose, onInstall, activeD
       saveFavorites(next);
       return next;
     });
+  }, []);
+
+  const toggleTag = useCallback((tag: string) => {
+    setFilterTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
   }, []);
 
   const handleInstall = useCallback(async (entry: LibraryTemplateEntry) => {
@@ -292,6 +195,7 @@ export default function TemplateLibraryModal({ open, onClose, onInstall, activeD
         version: entry.meta.version,
         createdTplId: null,
       });
+      setHistory(loadHistory());
     } finally {
       setInstalling(null);
     }
@@ -302,194 +206,322 @@ export default function TemplateLibraryModal({ open, onClose, onInstall, activeD
     setFilterDocType(null);
     setFilterPaperSize(null);
     setFilterCategory(null);
+    setFilterCountry(null);
+    setFilterTags([]);
     setFavoritesOnly(false);
+    setView('library');
   }, []);
 
-  // ── Keyboard handler ──────────────────────────────────────────────────────
+  const clearHistory = useCallback(() => {
+    try {
+      localStorage.removeItem(HISTORY_KEY);
+      setHistory([]);
+    } catch { /* ignore */ }
+  }, []);
+
+  const reinstallFromHistory = useCallback(
+    async (entry: InstallHistoryEntry) => {
+      const tpl = entryById(entry.templateId);
+      if (!tpl) return;
+      setInstalling(entry.templateId);
+      try {
+        const config = tpl.createConfig();
+        await onInstall(entry.templateId, config);
+        addRecent(entry.templateId);
+        setRecentIds(loadRecent());
+      } finally {
+        setInstalling(null);
+      }
+    },
+    [entryById, onInstall],
+  );
+
+  // ── Reset filters when the modal opens ─────────────────────────────────────
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
     if (open) {
-      window.addEventListener('keydown', handler);
-      document.body.style.overflow = 'hidden';
+      setFavorites(loadFavorites());
+      setRecentIds(loadRecent());
+      setHistory(loadHistory());
     }
-    return () => {
-      window.removeEventListener('keydown', handler);
-      document.body.style.overflow = '';
-    };
-  }, [open, onClose]);
+  }, [open]);
 
-  if (!open) return null;
-
-  // ── Filter tag pills display ───────────────────────────────────────────────
-  const hasActiveFilters = search || filterDocType || filterPaperSize || filterCategory || favoritesOnly;
+  // ════════════════════════════════════════════════════════════════════════════
+  //  Render
+  // ════════════════════════════════════════════════════════════════════════════
 
   return (
-    <div style={STYLES.overlay as React.CSSProperties} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={STYLES.modal}>
-        {/* Header */}
-        <div style={STYLES.header}>
-          <div style={STYLES.headerTitle}>
-            <i className="ti ti-library" />
-            مكتبة القوالب الجاهزة
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button
-              type="button"
-              onClick={resetFilters}
-              style={{
-                ...STYLES.closeBtn, fontSize: 11, width: 'auto', padding: '0 10px',
-                color: hasActiveFilters ? 'var(--em)' : '#999',
-                fontWeight: hasActiveFilters ? 700 : 400,
-              }}
-              title="إعادة ضبط الفلاتر"
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={
+        <>
+          <i className="ti ti-library" />
+          مكتبة القوالب الجاهزة
+        </>
+      }
+      size="xl"
+      bodyHeight="min(72vh, 640px)"
+    >
+      <div className="tpl-lib-body">
+        {/* ── Toolbar: search + selects + favorite toggle ── */}
+        <div className="tpl-lib-toolbar">
+          <input
+            type="text"
+            className="tpl-lib-search"
+            placeholder="🔍 بحث في القوالب..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          <select
+            className="tpl-lib-select"
+            value={filterDocType ?? ''}
+            onChange={e => setFilterDocType(e.target.value || null)}
+          >
+            <option value="">كل المستندات</option>
+            {docTypeOptions.map(dt => (
+              <option key={dt} value={dt}>{dt}</option>
+            ))}
+          </select>
+          <select
+            className="tpl-lib-select"
+            value={filterPaperSize ?? ''}
+            onChange={e => setFilterPaperSize(e.target.value || null)}
+          >
+            <option value="">كل الأحجام</option>
+            {paperSizeOptions.map(ps => (
+              <option key={ps} value={ps}>{ps}</option>
+            ))}
+          </select>
+          <select
+            className="tpl-lib-select"
+            value={filterCategory ?? ''}
+            onChange={e => setFilterCategory(e.target.value || null)}
+          >
+            <option value="">كل التصنيفات</option>
+            {categoryOptions.map(cat => {
+              const label = TEMPLATE_CATEGORIES.find(c => c.id === cat);
+              return (
+                <option key={cat} value={cat}>{label?.nameAr ?? cat}</option>
+              );
+            })}
+          </select>
+          {countryOptions.length > 1 && (
+            <select
+              className="tpl-lib-select"
+              value={filterCountry ?? ''}
+              onChange={e => setFilterCountry(e.target.value || null)}
             >
-              <i className="ti ti-filter-off" style={{ marginLeft: 4 }} />
-              {hasActiveFilters ? 'مسح الكل' : 'فلاتر'}
-            </button>
-            <button type="button" style={STYLES.closeBtn} onClick={onClose}>✕</button>
-          </div>
+              <option value="">كل البلدان</option>
+              {countryOptions.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          )}
+          <button
+            type="button"
+            className={`tpl-lib-chip ${favoritesOnly ? 'on' : ''}`}
+            onClick={() => setFavoritesOnly(f => !f)}
+          >
+            <i className="ti ti-star" />
+            المفضلة
+          </button>
+          <button
+            type="button"
+            className="tpl-lib-reset"
+            onClick={resetFilters}
+            title="إعادة ضبط الفلاتر"
+          >
+            <i className="ti ti-filter-off" />
+            {hasActiveFilters ? 'مسح الكل' : 'الفلاتر'}
+          </button>
         </div>
 
-        {/* Body */}
-        <div style={STYLES.body}>
-          {/* Search + Filters toolbar */}
-          <div style={STYLES.toolbar}>
-            <input
-              type="text"
-              placeholder="🔍 بحث في القوالب..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={STYLES.searchInput}
-            />
-            <select
-              value={filterDocType ?? ''}
-              onChange={e => setFilterDocType(e.target.value || null)}
-              style={STYLES.filterSelect}
-            >
-              <option value="">كل المستندات</option>
-              {docTypeOptions.map(dt => (
-                <option key={dt} value={dt}>{dt}</option>
-              ))}
-            </select>
-            <select
-              value={filterPaperSize ?? ''}
-              onChange={e => setFilterPaperSize(e.target.value || null)}
-              style={STYLES.filterSelect}
-            >
-              <option value="">كل الأحجام</option>
-              {paperSizeOptions.map(ps => (
-                <option key={ps} value={ps}>{ps}</option>
-              ))}
-            </select>
-            <select
-              value={filterCategory ?? ''}
-              onChange={e => setFilterCategory(e.target.value || null)}
-              style={STYLES.filterSelect}
-            >
-              <option value="">كل التصنيفات</option>
-              {categoryOptions.map(cat => {
-                const label = TEMPLATE_CATEGORIES.find(c => c.id === cat);
-                return (
-                  <option key={cat} value={cat}>{label?.nameAr ?? cat}</option>
-                );
-              })}
-            </select>
+        {/* ── View toggle + counters ── */}
+        <div className="tpl-lib-toolbar">
+          <div className="tpl-lib-tabs" role="tablist">
             <button
               type="button"
-              onClick={() => setFavoritesOnly(f => !f)}
-              style={{
-                ...STYLES.filterSelect, cursor: 'pointer',
-                background: favoritesOnly ? '#fef3c7' : '#fff',
-                fontWeight: favoritesOnly ? 700 : 400,
-              }}
+              role="tab"
+              aria-selected={view === 'library'}
+              className={`tpl-lib-tab ${view === 'library' ? 'on' : ''}`}
+              onClick={() => setView('library')}
             >
-              <i className="ti ti-star" style={{ marginLeft: 4 }} />
-              المفضلة
+              <i className="ti ti-library" />
+              المكتبة
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'history'}
+              className={`tpl-lib-tab ${view === 'history' ? 'on' : ''}`}
+              onClick={() => setView('history')}
+            >
+              <i className="ti ti-history" />
+              سجل التثبيت
             </button>
           </div>
+          <span className="tpl-lib-count">
+            {view === 'library'
+              ? `عرض ${filtered.length} قالب من أصل ${allTemplates.length}`
+              : `${history.length} عملية تثبيت`}
+          </span>
+        </div>
 
-          {/* Recently installed */}
-          {recentTemplates.length > 0 && !search && !favoritesOnly && (
-            <div style={STYLES.recentRow}>
-              <i className="ti ti-history" style={{ fontSize: 14, color: '#6366f1' }} />
-              <span style={{ fontWeight: 700, color: '#444' }}>المثبتة مؤخراً:</span>
-              {recentTemplates.slice(0, 3).map(t => (
-                <button
-                  key={t.meta.id}
-                  type="button"
-                  style={{
-                    background: '#eef2ff', border: 'none', borderRadius: 4,
-                    padding: '2px 8px', fontSize: 11, color: '#4338ca', cursor: 'pointer',
-                  }}
-                  onClick={() => {
-                    setSearch('');
-                    setFilterDocType(t.meta.documentType);
-                  }}
-                >
-                  {t.meta.nameAr}
-                </button>
-              ))}
-            </div>
-          )}
+        {/* ── Tag chips ── */}
+        <div className="tpl-lib-tags">
+          <span className="tpl-lib-tags-lab">الوسوم:</span>
+          {availableTags.map(tag => (
+            <button
+              key={tag}
+              type="button"
+              className={`tpl-lib-tags-chip ${filterTags.includes(tag) ? 'on' : ''}`}
+              onClick={() => toggleTag(tag)}
+            >
+              {filterTags.includes(tag) && <i className="ti ti-check" />}
+              {tag}
+            </button>
+          ))}
+        </div>
 
-          {/* Grid */}
-          <div style={STYLES.grid}>
+        {/* ── Recently installed ── */}
+        {recentTemplates.length > 0 && !search && !favoritesOnly && view === 'library' && (
+          <div className="tpl-lib-recent">
+            <span className="tpl-lib-recent-lab">
+              <i className="ti ti-clock" />
+              المثبتة مؤخراً:
+            </span>
+            {recentTemplates.slice(0, 3).map(t => (
+              <button
+                key={t.meta.id}
+                type="button"
+                className="tpl-lib-recent-chip"
+                onClick={() => {
+                  setSearch('');
+                  setFilterDocType(t.meta.documentType);
+                }}
+              >
+                <i className="ti ti-folder" />
+                {t.meta.nameAr}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ── Library grid ── */}
+        {view === 'library' ? (
+          <div
+            className="tpl-lib-grid"
+            ref={gridRef}
+            onKeyDown={e => {
+              if ((e.target as HTMLElement).closest('input, select, textarea')) return;
+              if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                if (!focusedId || filtered.length === 0) {
+                  if (filtered.length) {
+                    const first = filtered[0].meta.id;
+                    setFocusedId(first);
+                    const el = gridRef.current?.querySelector('#tpl-lib-card-' + first) as HTMLElement | null;
+                    el?.focus();
+                  }
+                  return;
+                }
+                const idx = filtered.findIndex(entry => entry.meta.id === focusedId);
+                if (idx === -1) return;
+                const next = e.key === 'ArrowLeft' ? (idx + 1) % filtered.length : (idx - 1 + filtered.length) % filtered.length;
+                const id = filtered[next].meta.id;
+                setFocusedId(id);
+                const el = gridRef.current?.querySelector('#tpl-lib-card-' + id) as HTMLElement | null;
+                el?.focus();
+              }
+            }}
+          >
             {filtered.length === 0 ? (
-              <div style={{ ...STYLES.emptyState, gridColumn: '1 / -1' }}>
-                <i className="ti ti-files-off" style={{ fontSize: 32 }} />
-                {hasActiveFilters ? 'لا توجد نتائج للبحث' : 'لا توجد قوالب جاهزة'}
+              <div className="tpl-lib-empty" style={{ gridColumn: '1 / -1' }}>
+                <i className={hasActiveFilters ? 'ti ti-files-off' : 'ti ti-folder-off'} />
+                {hasActiveFilters ? 'لا توجد نتائج للبحث عن القوالب' : 'لا توجد قوالب جاهزة'}
+                {hasActiveFilters && (
+                  <button type="button" className="tpl-lib-reset" onClick={resetFilters}>
+                    <i className="ti ti-filter-off" />
+                    مسح الفلاتر
+                  </button>
+                )}
               </div>
             ) : filtered.map(entry => {
               const { meta } = entry;
               const isBusy = installing === meta.id;
               const isFav = favorites.has(meta.id);
               const categoryObj = TEMPLATE_CATEGORIES.find(c => c.id === meta.category);
+              const isFocused = focusedId === meta.id;
 
               return (
-                <div key={meta.id} style={STYLES.card}>
-                  {/* Preview */}
-                  <div style={STYLES.cardPreviewWrapper}>
-                    <div style={STYLES.cardPreviewContent}>
+                <div
+                  key={meta.id}
+                  className={`tpl-lib-card ${isBusy ? '' : isFocused ? 'on' : ''}`}
+                  id={`tpl-lib-card-${meta.id}`}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`تثبيت ${meta.nameAr}`}
+                  onFocus={() => setFocusedId(meta.id)}
+                  onBlur={() => setFocusedId(null)}
+                  onKeyDown={e => {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    if (e.target !== e.currentTarget) return;
+                    e.preventDefault();
+                    handleInstall(entry);
+                  }}
+                >
+                  {/* Preview (click to zoom) */}
+                  <div
+                    className="tpl-lib-prev"
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`تكبير معاينة ${meta.nameAr}`}
+                    onClick={() => setZoomEntry(entry)}
+                    onKeyDown={e => {
+                      if (e.key !== 'Enter' && e.key !== ' ') return;
+                      if (e.target !== e.currentTarget) return;
+                      e.preventDefault();
+                      setZoomEntry(entry);
+                    }}
+                  >
+                    <div className="tpl-lib-prev-inner">
                       <Suspense fallback={<PreviewFallback />}>
-                          <UniversalPreview
-                            tpl={entry.createConfig()}
-                            data={mockDataRef.current!}
-                          />
+                        <UniversalPreview
+                          tpl={entry.createConfig()}
+                          data={mockDataRef.current!}
+                        />
                       </Suspense>
+                    </div>
+                    <div className="tpl-lib-prev-ic">
+                      <i className="ti ti-zoom-in" />
                     </div>
                     {/* Favorite toggle */}
                     <button
                       type="button"
-                      onClick={() => toggleFavorite(meta.id)}
-                      style={{
-                        ...STYLES.favBtn, position: 'absolute', top: 6, left: 6,
-                      }}
+                      className={`tpl-lib-fav ${isFav ? 'on' : ''}`}
+                      onClick={e => { e.stopPropagation(); toggleFavorite(meta.id); }}
                       title={isFav ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}
                     >
-                      {isFav ? '⭐' : '☆'}
+                      <i className={`ti ${isFav ? 'ti-star-filled' : 'ti-star'}`} />
                     </button>
                   </div>
 
                   {/* Info */}
-                  <div style={STYLES.cardBody}>
-                    <div style={STYLES.cardName}>
-                      {meta.nameAr}
-                    </div>
-                    <div style={STYLES.cardDesc}>{meta.descriptionAr}</div>
-                    <div style={STYLES.tagRow}>
-                      <span style={STYLES.tagDoc}>
-                        <i className="ti ti-file-text" style={{ fontSize: 8 }} />
+                  <div className="tpl-lib-body2">
+                    <div className="tpl-lib-name">{meta.nameAr}</div>
+                    <div className="tpl-lib-desc">{meta.descriptionAr}</div>
+                    <div className="tpl-lib-tagsrow">
+                      <span className="tpl-lib-tag tpl-lib-tag--doc">
+                        <i className="ti ti-file-text" />
                         {meta.documentType}
                       </span>
-                      <span style={STYLES.tagSize}>
-                        <i className="ti ti-dimensions" style={{ fontSize: 8 }} />
+                      <span className="tpl-lib-tag tpl-lib-tag--size">
+                        <i className="ti ti-dimensions" />
                         {meta.paperSize}
                       </span>
                       {categoryObj && (
-                        <span style={STYLES.tagCategory}>
-                          <i className="ti ti-folder" style={{ fontSize: 8 }} />
+                        <span className="tpl-lib-tag tpl-lib-tag--cat">
+                          <i className="ti ti-folder" />
                           {categoryObj.nameAr}
                         </span>
                       )}
@@ -498,11 +530,7 @@ export default function TemplateLibraryModal({ open, onClose, onInstall, activeD
                     {/* Install */}
                     <button
                       type="button"
-                      style={{
-                        ...STYLES.installBtn,
-                        opacity: isBusy ? 0.6 : 1,
-                        cursor: isBusy ? 'wait' : 'pointer',
-                      }}
+                      className="tpl-lib-install"
                       onClick={() => handleInstall(entry)}
                       disabled={isBusy}
                     >
@@ -517,8 +545,89 @@ export default function TemplateLibraryModal({ open, onClose, onInstall, activeD
               );
             })}
           </div>
-        </div>
+        ) : (
+          /* ── History view ── */
+          <div className="tpl-lib-history">
+            {history.length === 0 ? (
+              <div className="tpl-lib-empty">
+                <i className="ti ti-history" />
+                لا توجد عمليات تثبيت بعد
+              </div>
+            ) : (
+              <>
+                {history.map((h, idx) => {
+                  const entry = entryById(h.templateId);
+                  const missing = !entry;
+                  const isBusy = installing === h.templateId;
+                  return (
+                    <div key={h.templateId + '-' + idx} className="tpl-lib-hist-row">
+                      <div className="tpl-lib-hist-ic">
+                        <i className={missing ? 'ti ti-file-x' : 'ti ti-file-check'} />
+                      </div>
+                      <div className="tpl-lib-hist-info">
+                        <div className="tpl-lib-hist-name">
+                          {missing ? `${h.templateNameAr} (غير متوفر)` : h.templateNameAr}
+                        </div>
+                        <div className="tpl-lib-hist-meta">
+                          {h.version}
+                          {h.createdTplId ? ` · id ${h.createdTplId}` : ''}
+                        </div>
+                        <div className="tpl-lib-hist-date">
+                          {new Date(h.installedAt).toLocaleString('ar-DZ')}
+                        </div>
+                      </div>
+                      <div className="tpl-lib-hist-actions">
+                        {!missing && (
+                          <button
+                            type="button"
+                            className="tpl-lib-hist-btn"
+                            onClick={() => reinstallFromHistory(h)}
+                            disabled={isBusy}
+                          >
+                            {isBusy ? <i className="ti ti-loader-2 spin" /> : <i className="ti ti-download" />}
+                            إعادة التثبيت
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                <button type="button" className="tpl-lib-hist-btn tpl-lib-hist-btn--clear" onClick={clearHistory}>
+                  <i className="ti ti-trash" />
+                  مسح السجل
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
-    </div>
+
+      {/* ── Zoom modal (nested) ── */}
+      <Modal
+        open={Boolean(zoomEntry)}
+        onClose={() => setZoomEntry(null)}
+        title={
+          zoomEntry
+            ? <><i className="ti ti-zoom-in" /> {zoomEntry.meta.nameAr}</>
+            : 'معاينة'
+        }
+        size="xl"
+        resizable={false}
+      >
+        <div className="tpl-lib-zoom">
+          {zoomEntry && (
+            <Suspense fallback={<PreviewFallback />}>
+              <UniversalPreview
+                tpl={zoomEntry.createConfig()}
+                data={mockDataRef.current!}
+              />
+            </Suspense>
+          )}
+        </div>
+        <div className="tpl-lib-zoom-hint">
+          المعاينة بالمقاس الحقيقي — أغلِق بالنقر خارج النافذة أو بمفتاح Esc
+        </div>
+      </Modal>
+    </Modal>
   );
 }
