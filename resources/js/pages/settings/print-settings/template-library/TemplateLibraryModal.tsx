@@ -5,6 +5,9 @@ import type { LibraryTemplateEntry, FavoriteEntry, InstallHistoryEntry } from '.
 import type { PrintTemplate } from '../types';
 import type { UniversalDocumentData } from '../types/data';
 import Modal from '../../../../components/ui/Modal';
+import { Button, Badge, EmptyState, Tabs } from '../../../../components/ui';
+import SearchInput from '../../../../components/ui/SearchInput';
+import Dropdown from '../../../../components/ui/Dropdown';
 import { getMockDocumentData } from './mockData';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -265,101 +268,82 @@ export default function TemplateLibraryModal({ open, onClose, onInstall, activeD
       <div className="tpl-lib-body">
         {/* ── Toolbar: search + selects + favorite toggle ── */}
         <div className="tpl-lib-toolbar">
-          <input
-            type="text"
-            className="tpl-lib-search"
-            placeholder="🔍 بحث في القوالب..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          <select
-            className="tpl-lib-select"
-            value={filterDocType ?? ''}
-            onChange={e => setFilterDocType(e.target.value || null)}
-          >
-            <option value="">كل المستندات</option>
-            {docTypeOptions.map(dt => (
-              <option key={dt} value={dt}>{dt}</option>
-            ))}
-          </select>
-          <select
-            className="tpl-lib-select"
-            value={filterPaperSize ?? ''}
-            onChange={e => setFilterPaperSize(e.target.value || null)}
-          >
-            <option value="">كل الأحجام</option>
-            {paperSizeOptions.map(ps => (
-              <option key={ps} value={ps}>{ps}</option>
-            ))}
-          </select>
-          <select
-            className="tpl-lib-select"
-            value={filterCategory ?? ''}
-            onChange={e => setFilterCategory(e.target.value || null)}
-          >
-            <option value="">كل التصنيفات</option>
-            {categoryOptions.map(cat => {
-              const label = TEMPLATE_CATEGORIES.find(c => c.id === cat);
-              return (
-                <option key={cat} value={cat}>{label?.nameAr ?? cat}</option>
-              );
-            })}
-          </select>
+          <div className="tpl-lib-filter tpl-lib-filter--search">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              onSearch={setSearch}
+              placeholder="بحث في القوالب..."
+              debounce={250}
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div className="tpl-lib-filter">
+            <Dropdown
+              options={docTypeOptions.map(dt => ({ label: dt, value: dt }))}
+              value={filterDocType ?? ''}
+              onChange={v => setFilterDocType(typeof v === 'string' ? (v || null) : String(v))}
+              placeholder="كل المستندات"
+            />
+          </div>
+          <div className="tpl-lib-filter">
+            <Dropdown
+              options={paperSizeOptions.map(ps => ({ label: ps, value: ps }))}
+              value={filterPaperSize ?? ''}
+              onChange={v => setFilterPaperSize(typeof v === 'string' ? (v || null) : String(v))}
+              placeholder="كل الأحجام"
+            />
+          </div>
+          <div className="tpl-lib-filter">
+            <Dropdown
+              options={categoryOptions.map(cat => {
+                const label = TEMPLATE_CATEGORIES.find(c => c.id === cat);
+                return { label: label?.nameAr ?? cat, value: cat };
+              })}
+              value={filterCategory ?? ''}
+              onChange={v => setFilterCategory(typeof v === 'string' ? (v || null) : String(v))}
+              placeholder="كل التصنيفات"
+            />
+          </div>
           {countryOptions.length > 1 && (
-            <select
-              className="tpl-lib-select"
-              value={filterCountry ?? ''}
-              onChange={e => setFilterCountry(e.target.value || null)}
-            >
-              <option value="">كل البلدان</option>
-              {countryOptions.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
+            <div className="tpl-lib-filter">
+              <Dropdown
+                options={countryOptions.map(c => ({ label: c, value: c }))}
+                value={filterCountry ?? ''}
+                onChange={v => setFilterCountry(typeof v === 'string' ? (v || null) : String(v))}
+                placeholder="كل البلدان"
+              />
+            </div>
           )}
-          <button
-            type="button"
-            className={`tpl-lib-chip ${favoritesOnly ? 'on' : ''}`}
+          <Button
+            variant={favoritesOnly ? 'primary' : 'gray'}
+            size="sm"
+            icon={<i className="ti ti-star" />}
             onClick={() => setFavoritesOnly(f => !f)}
           >
-            <i className="ti ti-star" />
             المفضلة
-          </button>
-          <button
-            type="button"
-            className="tpl-lib-reset"
+          </Button>
+          <Button
+            variant="gray"
+            size="sm"
+            icon={<i className="ti ti-filter-off" />}
             onClick={resetFilters}
             title="إعادة ضبط الفلاتر"
           >
-            <i className="ti ti-filter-off" />
             {hasActiveFilters ? 'مسح الكل' : 'الفلاتر'}
-          </button>
+          </Button>
         </div>
 
         {/* ── View toggle + counters ── */}
         <div className="tpl-lib-toolbar">
-          <div className="tpl-lib-tabs" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === 'library'}
-              className={`tpl-lib-tab ${view === 'library' ? 'on' : ''}`}
-              onClick={() => setView('library')}
-            >
-              <i className="ti ti-library" />
-              المكتبة
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === 'history'}
-              className={`tpl-lib-tab ${view === 'history' ? 'on' : ''}`}
-              onClick={() => setView('history')}
-            >
-              <i className="ti ti-history" />
-              سجل التثبيت
-            </button>
-          </div>
+          <Tabs
+            tabs={[
+              { key: 'library', label: 'المكتبة', icon: <i className="ti ti-library" /> },
+              { key: 'history', label: 'سجل التثبيت', icon: <i className="ti ti-history" /> },
+            ]}
+            active={view}
+            onChange={k => setView(k as 'library' | 'history')}
+          />
           <span className="tpl-lib-count">
             {view === 'library'
               ? `عرض ${filtered.length} قالب من أصل ${allTemplates.length}`
@@ -371,15 +355,15 @@ export default function TemplateLibraryModal({ open, onClose, onInstall, activeD
         <div className="tpl-lib-tags">
           <span className="tpl-lib-tags-lab">الوسوم:</span>
           {availableTags.map(tag => (
-            <button
+            <Button
               key={tag}
-              type="button"
-              className={`tpl-lib-tags-chip ${filterTags.includes(tag) ? 'on' : ''}`}
+              variant={filterTags.includes(tag) ? 'primary' : 'gray'}
+              size="xs"
+              icon={filterTags.includes(tag) ? <i className="ti ti-check" /> : undefined}
               onClick={() => toggleTag(tag)}
             >
-              {filterTags.includes(tag) && <i className="ti ti-check" />}
               {tag}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -391,18 +375,18 @@ export default function TemplateLibraryModal({ open, onClose, onInstall, activeD
               المثبتة مؤخراً:
             </span>
             {recentTemplates.slice(0, 3).map(t => (
-              <button
+              <Button
                 key={t.meta.id}
-                type="button"
-                className="tpl-lib-recent-chip"
+                variant="gray"
+                size="xs"
+                icon={<i className="ti ti-folder" />}
                 onClick={() => {
                   setSearch('');
                   setFilterDocType(t.meta.documentType);
                 }}
               >
-                <i className="ti ti-folder" />
                 {t.meta.nameAr}
-              </button>
+              </Button>
             ))}
           </div>
         )}
@@ -436,16 +420,22 @@ export default function TemplateLibraryModal({ open, onClose, onInstall, activeD
             }}
           >
             {filtered.length === 0 ? (
-              <div className="tpl-lib-empty" style={{ gridColumn: '1 / -1' }}>
-                <i className={hasActiveFilters ? 'ti ti-files-off' : 'ti ti-folder-off'} />
-                {hasActiveFilters ? 'لا توجد نتائج للبحث عن القوالب' : 'لا توجد قوالب جاهزة'}
-                {hasActiveFilters && (
-                  <button type="button" className="tpl-lib-reset" onClick={resetFilters}>
-                    <i className="ti ti-filter-off" />
+              <div style={{ gridColumn: '1 / -1' }}>
+              <EmptyState
+                icon={<i className={`ti ${hasActiveFilters ? 'ti-files-off' : 'ti-folder-off'}`} />}
+                title={hasActiveFilters ? 'لا توجد نتائج للبحث عن القوالب' : 'لا توجد قوالب جاهزة'}
+                action={hasActiveFilters ? (
+                  <Button
+                    variant="gray"
+                    size="sm"
+                    icon={<i className="ti ti-filter-off" />}
+                    onClick={resetFilters}
+                  >
                     مسح الفلاتر
-                  </button>
-                )}
-              </div>
+                  </Button>
+                ) : undefined}
+              />
+            </div>
             ) : filtered.map(entry => {
               const { meta } = entry;
               const isBusy = installing === meta.id;
@@ -511,35 +501,34 @@ export default function TemplateLibraryModal({ open, onClose, onInstall, activeD
                     <div className="tpl-lib-name">{meta.nameAr}</div>
                     <div className="tpl-lib-desc">{meta.descriptionAr}</div>
                     <div className="tpl-lib-tagsrow">
-                      <span className="tpl-lib-tag tpl-lib-tag--doc">
+                      <Badge noDot variant="gray">
                         <i className="ti ti-file-text" />
                         {meta.documentType}
-                      </span>
-                      <span className="tpl-lib-tag tpl-lib-tag--size">
+                      </Badge>
+                      <Badge noDot variant="teal">
                         <i className="ti ti-dimensions" />
                         {meta.paperSize}
-                      </span>
+                      </Badge>
                       {categoryObj && (
-                        <span className="tpl-lib-tag tpl-lib-tag--cat">
+                        <Badge noDot variant="purple">
                           <i className="ti ti-folder" />
                           {categoryObj.nameAr}
-                        </span>
+                        </Badge>
                       )}
                     </div>
 
                     {/* Install */}
-                    <button
+                    <Button
                       type="button"
-                      className="tpl-lib-install"
-                      onClick={() => handleInstall(entry)}
+                      variant="success"
+                      size="sm"
+                      fullWidth
                       disabled={isBusy}
+                      icon={isBusy ? <i className="ti ti-loader-2 spin" /> : <i className="ti ti-download" />}
+                      onClick={() => handleInstall(entry)}
                     >
-                      {isBusy ? (
-                        <><i className="ti ti-loader-2 spin" /> جارٍ التثبيت...</>
-                      ) : (
-                        <><i className="ti ti-download" /> تثبيت القالب</>
-                      )}
-                    </button>
+                      {isBusy ? 'جارٍ التثبيت...' : 'تثبيت القالب'}
+                    </Button>
                   </div>
                 </div>
               );
@@ -549,10 +538,10 @@ export default function TemplateLibraryModal({ open, onClose, onInstall, activeD
           /* ── History view ── */
           <div className="tpl-lib-history">
             {history.length === 0 ? (
-              <div className="tpl-lib-empty">
-                <i className="ti ti-history" />
-                لا توجد عمليات تثبيت بعد
-              </div>
+              <EmptyState
+                icon={<i className="ti ti-history" />}
+                title="لا توجد عمليات تثبيت بعد"
+              />
             ) : (
               <>
                 {history.map((h, idx) => {
@@ -578,24 +567,24 @@ export default function TemplateLibraryModal({ open, onClose, onInstall, activeD
                       </div>
                       <div className="tpl-lib-hist-actions">
                         {!missing && (
-                          <button
+                          <Button
                             type="button"
-                            className="tpl-lib-hist-btn"
-                            onClick={() => reinstallFromHistory(h)}
+                            variant="gray"
+                            size="sm"
                             disabled={isBusy}
+                            icon={isBusy ? <i className="ti ti-loader-2 spin" /> : <i className="ti ti-download" />}
+                            onClick={() => reinstallFromHistory(h)}
                           >
-                            {isBusy ? <i className="ti ti-loader-2 spin" /> : <i className="ti ti-download" />}
                             إعادة التثبيت
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </div>
                   );
                 })}
-                <button type="button" className="tpl-lib-hist-btn tpl-lib-hist-btn--clear" onClick={clearHistory}>
-                  <i className="ti ti-trash" />
+                <Button type="button" variant="ghost" size="sm" icon={<i className="ti ti-trash" />} onClick={clearHistory}>
                   مسح السجل
-                </button>
+                </Button>
               </>
             )}
           </div>
