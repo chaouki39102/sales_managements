@@ -12,39 +12,19 @@ import { renderPayments } from './PaymentsSection';
 import { renderFooter } from './FooterSection';
 import { renderReport } from './ReportSection';
 import DeliveryReceiptA5 from './DeliveryReceiptA5';
-import { rulesEngine } from '../../services/engines/RulesEngine';
-import { formulaEngine, type EvaluationContext, type ExpressionValue } from '../../services/engines/FormulaEngine';
-import { calculatedFieldService } from '../../services/CalculatedFieldService';
 import { PageFrame } from './PageFrame';
 import StickerLabel from './StickerLabel';
 import { isStickerPaper, stickerDims } from './stickerDims';
+import FreeformSections from './FreeformSections';
+import { formulaEngine } from '../../services/engines/FormulaEngine';
+import {
+  computeRuleResult, getOrderedSections, showSection,
+  sectionHighlight, sectionWidthPct, sectionAlign, isFreeformTpl,
+} from './previewHelpers';
 
 export interface UniversalPreviewProps {
   tpl:      PrintTemplate;
   data:     UniversalDocumentData;
-}
-
-function buildEvalContext(data: UniversalDocumentData): EvaluationContext {
-  const t = data.totals;
-  const computed: Record<string, ExpressionValue> = {
-    totalHt:      t.totalHt,
-    totalTva:     t.totalTva,
-    totalTtc:     t.totalTtc,
-    totalDiscount: t.totalDiscount,
-    fiscalStamp:  t.fiscalStamp,
-    paid:         t.paid,
-    change:       t.change,
-    remaining:    t.remaining,
-    lineCount:    data.lines.length,
-    itemCount:    data.lines.reduce((s, l) => s + (l.quantity || 0), 0),
-    prevBalance:  data.balance?.previous ?? 0,
-    newBalance:   data.balance?.current ?? 0,
-    docNumber:    data.doc.number,
-    docDate:      data.doc.date,
-  };
-  const calcFields = calculatedFieldService.computeAll(data);
-  Object.assign(computed, calcFields);
-  return { data, computed };
 }
 
 interface SectionRendererProps {
@@ -77,15 +57,6 @@ function wrapSection({ widthPct, align }: SectionRendererProps, content: React.R
     </div>
   );
 }
-
-const SECTION_DIM_SETTINGS: Record<SectionTarget, { w: keyof PrintTemplate; a: keyof PrintTemplate }> = {
-  'header':   { w: 'section_header_width',   a: 'section_header_align'   },
-  'doc-info': { w: 'section_doc_info_width', a: 'section_doc_info_align' },
-  'items':    { w: 'section_items_width',    a: 'section_items_align'    },
-  'totals':   { w: 'section_totals_width',   a: 'section_totals_align'   },
-  'payments': { w: 'section_header_width',   a: 'section_header_align'   },
-  'footer':   { w: 'section_footer_width',   a: 'section_footer_align'   },
-};
 
 const PRINT_CSS_ID = 'ps-print-styles';
 
@@ -128,42 +99,13 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
   const paperWidth   = isThermal ? tpl.paper_width_mm * 3.78 : (isLandscape ? portraitH : portraitW);
   const minHeight    = isThermal ? 'auto' : (isLandscape ? portraitW : portraitH);
 
-  const ruleResult = useMemo(() => {
-    if (!tpl.rules || tpl.rules.length === 0) return null;
-    try {
-      const ctx = buildEvalContext(data);
-      return rulesEngine.evaluate(tpl.rules, ctx, formulaEngine);
-    } catch {
-      return null;
-    }
-  }, [tpl.rules, data]);
-
-  const sectionVisible = (section: string): boolean => {
-    if (ruleResult && ruleResult.visibility[section] === false) return false;
-    return true;
-  };
-
-  const sectionHighlight = (section: string): Record<string, string> | null => {
-    if (ruleResult && ruleResult.highlights[section]) return ruleResult.highlights[section];
-    return null;
-  };
+  const ruleResult = useMemo(() => computeRuleResult(tpl, data), [tpl.rules, data]);
 
   const paddingTop   = mm(tpl.margin_top);
   const paddingSide  = mm(tpl.margin_sides);
   const paddingBottom = mm(tpl.margin_bottom);
 
-  const orderedSections = tpl.sections_order
-    ? [...tpl.sections_order].sort((a, b) => a.order - b.order)
-    : [];
-
-  const showSection = (key: SectionTarget): boolean => {
-    const visibilityKey = `show_${key.replace('-', '_')}_section` as keyof PrintTemplate;
-    if (visibilityKey in tpl && !(tpl as any)[visibilityKey]) return false;
-    if (!sectionVisible(key)) return false;
-    const meta = orderedSections.find(s => s.key === key);
-    if (meta && !meta.visible) return false;
-    return true;
-  };
+  const orderedSections = getOrderedSections(tpl);
 
   const frameConfig = tpl.page_frame;
 
@@ -199,22 +141,17 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
               </div>
             ))}
           </div>
+        ) : isFreeformTpl(tpl) ? (
+          <FreeformSections tpl={tpl} data={data} paperWidth={paperWidth} />
         ) : (
           <>
             {orderedSections.map(meta => {
-              if (!showSection(meta.key)) return null;
+              if (!showSection(tpl, meta.key, ruleResult, orderedSections)) return null;
               const renderer = SECTION_RENDERERS[meta.key];
               if (!renderer) return null;
-              const dims = SECTION_DIM_SETTINGS[meta.key];
-              // Thermal strips are fixed-width hardware: every section spans the
-              // full printable area. The % width sliders are page-paper controls
-              // (registry gates them to PAGE), so a stored 60% default must never
-              // shrink an 80mm/58mm receipt's totals into a narrow column.
-              const widthPct = isThermal ? 100 : dims ? Number((tpl as any)[dims.w]) || 100 : 100;
-              const align = dims ? ((tpl as any)[dims.a] as AlignOption) || 'right' : 'right';
               return (
-                <SectionWrap key={meta.key} highlight={sectionHighlight(meta.key)} style={{ marginTop: meta.marginTop ?? 0, marginBottom: meta.marginBottom ?? 0 }}>
-                  {renderer({ tpl, data, isThermal, paperWidth, widthPct, align })}
+                <SectionWrap key={meta.key} highlight={sectionHighlight(ruleResult, meta.key)} style={{ marginTop: meta.marginTop ?? 0, marginBottom: meta.marginBottom ?? 0 }}>
+                  {renderer({ tpl, data, isThermal, paperWidth, widthPct: sectionWidthPct(tpl, meta.key, isThermal), align: sectionAlign(tpl, meta.key) })}
                 </SectionWrap>
               );
             })}
