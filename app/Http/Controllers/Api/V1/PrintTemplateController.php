@@ -230,7 +230,7 @@ class PrintTemplateController extends BaseApiController
             // تُنتج null دائماً فلا يطابق فحص التكرار أي قالب مثبَّت مسبقاً.
             $duplicate = PrintTemplate::where('name', $payload['name'] ?? null)
                 ->where('doc_type_code', $payload['doc_type_code'] ?? null)
-                ->where('company_id', CompanyContextService::get() ?? 0)
+                ->where('company_id', app(CompanyContextService::class)->get() ?? 0)
                 ->exists();
 
             if ($duplicate) {
