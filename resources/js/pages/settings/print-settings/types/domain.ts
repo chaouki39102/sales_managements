@@ -347,6 +347,7 @@ export interface PrintTemplate {
   col_styles:       ColumnStyleConfig[];
   page_frame:       PageFrameConfig;
   sections_order:   SectionMeta[];
+  positions?:       Partial<Record<SectionTarget, SectionPosition>>; // freeform block layout (A4 designer)
   totals_grid:      TotalsGridConfig;
   watermark:        WatermarkConfig;
 
@@ -467,6 +468,14 @@ export type SectionMeta = {
   marginTop?: number;     // px
   marginBottom?: number;  // px
   minHeight?: number;     // px
+};
+
+/** Freeform block position, in % of the printable content box.
+ *  x = distance from the RIGHT edge (RTL), y = distance from top. */
+export type SectionPosition = {
+  x: number;      // % from right edge
+  y: number;      // % from top
+  width: number;  // % of content width
 };
 
 export interface ColumnStyleConfig {
