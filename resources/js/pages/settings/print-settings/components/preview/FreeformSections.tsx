@@ -23,13 +23,13 @@ export interface FreeformSectionsProps {
   blockProps?: (key: SectionTarget, pos: SectionPosition) => Record<string, unknown>;
 }
 
-interface FreeRendererProps {
+export interface FreeRendererProps {
   tpl: PrintTemplate;
   data: UniversalDocumentData;
   paperWidth: number;
 }
 
-const FREE_RENDERERS: Record<SectionTarget, (p: FreeRendererProps) => React.ReactNode> = {
+export const FREE_RENDERERS: Record<SectionTarget, (p: FreeRendererProps) => React.ReactNode> = {
   'header':   (p) => renderHeader(p.tpl, p.data, false, p.paperWidth),
   'doc-info': (p) => renderDocInfo(p.tpl, p.data, false),
   'items':    (p) => renderItems(p.tpl, p.data, false),
