@@ -55,7 +55,7 @@ interface A4DesignerStageProps {
 export default function A4DesignerStage({ tpl, data, onPositionsChange }: A4DesignerStageProps) {
   const [zoom, setZoom] = useState(0.75);
   const [selectedKey, setSelectedKey] = useState<SectionTarget | null>(null);
-  const [refresh, setRefresh] = useState(0);
+  const [, setRefresh] = useState(0);
 
   const stageRef = useRef<HTMLDivElement | null>(null);
   const blockElsRef = useRef<Partial<Record<SectionTarget, HTMLDivElement>>>({});
@@ -151,7 +151,7 @@ export default function A4DesignerStage({ tpl, data, onPositionsChange }: A4Desi
     setRefresh((v) => v + 1);
   }, []);
 
-  const handlePointerUp = useCallback((e: PointerEvent) => {
+  const handlePointerUp = useCallback(() => {
     const d = dragRef.current;
     if (!d) return;
     const stage = stageRef.current;
@@ -175,7 +175,7 @@ export default function A4DesignerStage({ tpl, data, onPositionsChange }: A4Desi
   useEffect(() => { setRefresh((v) => v + 1); }, [selectedKey]);
   useEffect(() => { setRefresh((v) => v + 1); }, []);
 
-  const handleResize: OnResize = useCallback((e) => {
+  const handleResize = useCallback((e: OnResize) => {
     const key = selectedKeyRef.current;
     const el = key ? blockElsRef.current[key] : null;
     if (!key || !el) return;
@@ -188,7 +188,7 @@ export default function A4DesignerStage({ tpl, data, onPositionsChange }: A4Desi
     setRefresh((v) => v + 1);
   }, []);
 
-  const handleResizeEnd: OnResizeEnd = useCallback((e) => {
+  const handleResizeEnd = useCallback((e: OnResizeEnd) => {
     if (!e.isDrag) return;
     commitRef.current();
     liveRef.current = null;
