@@ -6,6 +6,7 @@ import {
   usePrintTemplates, usePrintTemplateMutations,
 } from './api/printTemplatesApi';
 import PreviewSelector from './components/PreviewSelector';
+import A4DesignerStage from './components/A4DesignerStage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { TemplateControls } from './components/TemplateControls';
 import { QuickNav } from './components/QuickNav';
@@ -73,6 +74,7 @@ export default function PrintSettingsPage() {
   const deleteConfirm = useConfirm();
   const [useRealData,       setUseRealData]       = useState(true);
   const [showLibrary,       setShowLibrary]       = useState(false);
+  const [designerActive,    setDesignerActive]    = useState(false);
 
   const historyRef    = useRef<PrintTemplate[]>([]);
   const historyPos    = useRef(-1);
@@ -737,6 +739,26 @@ export default function PrintSettingsPage() {
                 <i className="ti ti-printer" /> طباعة تجريبية
               </button>
             )}
+            {localTpl && !isStickerPaper(localTpl.paper_size) && localTpl.paper_size === 'A4' && localTpl.doc_type_code !== 'RPT' && (
+              <button
+                onClick={() => setDesignerActive(v => !v)}
+                type="button"
+                title="تصميم السحب والإفلات"
+                aria-pressed={designerActive}
+                style={{
+                  ...toolBtnStyle,
+                  padding: '5px 11px', fontSize: 12,
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  color: designerActive ? 'var(--em)' : 'var(--t3)',
+                  borderColor: designerActive ? 'var(--em)' : 'var(--b2)',
+                  background: designerActive ? 'var(--emb)' : 'transparent',
+                  fontWeight: designerActive ? 700 : 500,
+                }}
+              >
+                <i className={`ti ${designerActive ? 'ti-eye' : 'ti-arrows-move'}`} />
+                {designerActive ? 'عرض المعاينة' : 'تصميم الحر'}
+              </button>
+            )}
             {localTpl && (
               <button onClick={handleSave} disabled={!isDirty || isSaving} type="button"
                 style={{
@@ -758,18 +780,31 @@ export default function PrintSettingsPage() {
             )}
           </div>
 
-          <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', justifyContent: 'center' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', justifyContent: 'center', minHeight: 0 }}>
             {localTpl ? (
-              <div style={{
-                boxShadow: '0 4px 24px rgba(0,0,0,.14)',
-                border: '1px solid var(--b3)',
-                borderRadius: 2,
-                display: 'inline-block',
-              }}>
-                <ErrorBoundary>
-                  <PreviewSelector tpl={localTpl} data={useRealData ? previewData : null} />
-                </ErrorBoundary>
-              </div>
+              localTpl.paper_size === 'A4'
+              && !isStickerPaper(localTpl.paper_size)
+              && localTpl.doc_type_code !== 'RPT'
+              && designerActive ? (
+                <div style={{ width: '100%', maxWidth: '100%', height: '100%', minHeight: 0 }}>
+                  <A4DesignerStage
+                    tpl={localTpl}
+                    data={useRealData ? previewData : null}
+                    onPositionsChange={(pos) => update('positions', pos)}
+                  />
+                </div>
+              ) : (
+                <div style={{
+                  boxShadow: '0 4px 24px rgba(0,0,0,.14)',
+                  border: '1px solid var(--b3)',
+                  borderRadius: 2,
+                  display: 'inline-block',
+                }}>
+                  <ErrorBoundary>
+                    <PreviewSelector tpl={localTpl} data={useRealData ? previewData : null} />
+                  </ErrorBoundary>
+                </div>
+              )
             ) : (
               <div style={{ color: 'var(--t4)', fontSize: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
                 <i className="ti ti-device-desktop-off" style={{ fontSize: 24, opacity: 0.4 }} />
