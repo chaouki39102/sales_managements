@@ -486,6 +486,16 @@ export function registerBuiltinTemplates(): void {
       show_capital: true,
       show_bank_name: true,
       show_rib: true,
+      show_activity: true,
+      show_client: true,
+      show_client_nif: true,
+      show_client_phone: true,
+      show_client_address: true,
+      show_customer_commercial_name: true,
+      show_customer_rc: true,
+      show_customer_nis: true,
+      show_customer_ai: true,
+      show_payment_details: true,
       header_layout: {
         mode: 'columns',
         columns: [
