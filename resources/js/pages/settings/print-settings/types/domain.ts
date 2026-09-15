@@ -400,6 +400,8 @@ export interface PrintTemplate {
   section_totals_align:   AlignOption;
   section_footer_width:   number;
   section_footer_align:   AlignOption;
+  section_payments_width: number;
+  section_payments_align: AlignOption;
   header_columns_gap:     number;
   client_card_width:      number;
 

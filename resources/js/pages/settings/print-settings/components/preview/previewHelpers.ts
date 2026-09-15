@@ -72,15 +72,13 @@ export function showSection(
 
 /**
  * Registry of per-section width/align setting keys.
- * NOTE: `payments` has no dedicated settings yet — it reuses the header pair
- * (see task (d): add `section_payments_width` / `section_payments_align`).
  */
 export const SECTION_DIM_SETTINGS: Record<SectionTarget, { w: keyof PrintTemplate; a: keyof PrintTemplate }> = {
   'header':   { w: 'section_header_width',   a: 'section_header_align'   },
   'doc-info': { w: 'section_doc_info_width', a: 'section_doc_info_align' },
   'items':    { w: 'section_items_width',    a: 'section_items_align'    },
   'totals':   { w: 'section_totals_width',   a: 'section_totals_align'   },
-  'payments': { w: 'section_header_width',   a: 'section_header_align'   },
+  'payments': { w: 'section_payments_width', a: 'section_payments_align' },
   'footer':   { w: 'section_footer_width',   a: 'section_footer_align'   },
 };
 

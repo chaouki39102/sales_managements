@@ -244,6 +244,8 @@ export function createMockTemplate(
     section_totals_align: 'left',
     section_footer_width: 100,
     section_footer_align: 'center',
+    section_payments_width: 100,
+    section_payments_align: 'right',
     header_columns_gap: 30,
     client_card_width: 50,
 
