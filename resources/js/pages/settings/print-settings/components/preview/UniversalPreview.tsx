@@ -27,7 +27,7 @@ export interface UniversalPreviewProps {
   data:     UniversalDocumentData;
 }
 
-interface SectionRendererProps {
+export interface SectionRendererProps {
   tpl: PrintTemplate;
   data: UniversalDocumentData;
   isThermal: boolean;
@@ -36,7 +36,7 @@ interface SectionRendererProps {
   align: AlignOption;
 }
 
-const SECTION_RENDERERS: Record<SectionTarget, (props: SectionRendererProps) => React.ReactNode> = {
+export const SECTION_RENDERERS: Record<SectionTarget, (props: SectionRendererProps) => React.ReactNode> = {
   'header':   (p) => wrapSection(p, renderHeader(p.tpl, p.data, p.isThermal, p.paperWidth)),
   'doc-info': (p) => wrapSection(p, renderDocInfo(p.tpl, p.data, p.isThermal)),
   'items':    (p) => wrapSection(p, renderItems(p.tpl, p.data, p.isThermal)),
@@ -45,7 +45,7 @@ const SECTION_RENDERERS: Record<SectionTarget, (props: SectionRendererProps) => 
   'footer':   (p) => wrapSection(p, renderFooter(p.tpl, p.data, p.isThermal)),
 };
 
-function wrapSection({ widthPct, align }: SectionRendererProps, content: React.ReactNode) {
+export function wrapSection({ widthPct, align }: SectionRendererProps, content: React.ReactNode) {
   const marginSide = align === 'center' ? 'auto' : align === 'left' ? '0 0 0 auto' : '0 auto 0 0';
   return (
     <div style={{

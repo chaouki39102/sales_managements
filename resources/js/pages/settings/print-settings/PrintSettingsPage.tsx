@@ -22,10 +22,14 @@ import { resolveTemplate } from './runtime';
 import type { UniversalDocumentData } from './types/data';
 import { TemplateLibraryModal } from './template-library';
 import { isStickerPaper, stickerDims, STICKER_SIZE_OPTIONS } from './components/preview/stickerDims';
+import { isFreeformTpl } from './components/preview/previewHelpers';
+import { buildDefaultSectionsOrder } from './services/layoutMigration';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useApiClient, useNotifier, useCompany, useSlug } from './providers/PrintSettingsContext';
 import { validateTemplateIntegrity } from './services/SettingsSerializer';
+
+const PuckSectionComposer = React.lazy(() => import('./components/puck/PuckSectionComposer'));
 
 const PAPER_DIM: Record<string, { w: number; h: number }> = {
   '80mm':    { w: 80,  h: 0   },
@@ -75,6 +79,7 @@ export default function PrintSettingsPage() {
   const [useRealData,       setUseRealData]       = useState(true);
   const [showLibrary,       setShowLibrary]       = useState(false);
   const [designerActive,    setDesignerActive]    = useState(false);
+  const [puckComposerActive, setPuckComposerActive] = useState(false);
 
   const historyRef    = useRef<PrintTemplate[]>([]);
   const historyPos    = useRef(-1);
@@ -741,7 +746,11 @@ export default function PrintSettingsPage() {
             )}
             {localTpl && !isStickerPaper(localTpl.paper_size) && localTpl.paper_size === 'A4' && localTpl.doc_type_code !== 'RPT' && (
               <button
-                onClick={() => setDesignerActive(v => !v)}
+                onClick={() => {
+                  const next = !designerActive;
+                  setDesignerActive(next);
+                  if (next) setPuckComposerActive(false);
+                }}
                 type="button"
                 title="تصميم السحب والإفلات"
                 aria-pressed={designerActive}
@@ -757,6 +766,30 @@ export default function PrintSettingsPage() {
               >
                 <i className={`ti ${designerActive ? 'ti-eye' : 'ti-arrows-move'}`} />
                 {designerActive ? 'عرض المعاينة' : 'تصميم الحر'}
+              </button>
+            )}
+            {localTpl && !isStickerPaper(localTpl.paper_size) && localTpl.doc_type_code !== 'RPT' && !isFreeformTpl(localTpl) && (
+              <button
+                onClick={() => {
+                  const next = !puckComposerActive;
+                  setPuckComposerActive(next);
+                  if (next) setDesignerActive(false);
+                }}
+                type="button"
+                title="إعادة ترتيب أقسام المستند بالسحب"
+                aria-pressed={puckComposerActive}
+                style={{
+                  ...toolBtnStyle,
+                  padding: '5px 11px', fontSize: 12,
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  color: puckComposerActive ? 'var(--em)' : 'var(--t3)',
+                  borderColor: puckComposerActive ? 'var(--em)' : 'var(--b2)',
+                  background: puckComposerActive ? 'var(--emb)' : 'transparent',
+                  fontWeight: puckComposerActive ? 700 : 500,
+                }}
+              >
+                <i className={`ti ${puckComposerActive ? 'ti-eye' : 'ti-rows'}`} />
+                {puckComposerActive ? 'عرض المعاينة' : 'ترتيب الأقسام'}
               </button>
             )}
             {localTpl && (
@@ -782,6 +815,26 @@ export default function PrintSettingsPage() {
 
           <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', justifyContent: 'center', minHeight: 0 }}>
             {localTpl ? (
+              puckComposerActive
+              && localTpl.doc_type_code !== 'RPT'
+              && !isStickerPaper(localTpl.paper_size)
+              && !isFreeformTpl(localTpl) ? (
+                <div style={{ width: '100%', maxWidth: '100%', height: '100%', minHeight: 0 }}>
+                  <React.Suspense fallback={(
+                    <div style={{ color: 'var(--t4)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 6 }}>
+                      <i className="ti ti-loader-2 spin" style={{ fontSize: 16 }} />
+                      جارٍ تحميل محرر الأقسام...
+                    </div>
+                  )}>
+                    <PuckSectionComposer
+                      tpl={localTpl}
+                      data={useRealData ? previewData : null}
+                      onOrderChange={(next) => update('sections_order', next)}
+                      onResetOrder={() => update('sections_order', buildDefaultSectionsOrder())}
+                    />
+                  </React.Suspense>
+                </div>
+              ) : (
               localTpl.paper_size === 'A4'
               && !isStickerPaper(localTpl.paper_size)
               && localTpl.doc_type_code !== 'RPT'
@@ -804,6 +857,7 @@ export default function PrintSettingsPage() {
                     <PreviewSelector tpl={localTpl} data={useRealData ? previewData : null} />
                   </ErrorBoundary>
                 </div>
+              )
               )
             ) : (
               <div style={{ color: 'var(--t4)', fontSize: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
