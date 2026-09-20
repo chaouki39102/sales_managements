@@ -513,3 +513,26 @@ public function validate(User $user, CommercialDocument $doc) {
 - كل مهمة تُنفَّذ وتُوثَّق + تُدفَع بشكل مستقل
 - التحقق: `npx tsc --noEmit` + `npm test` + `npm run build` + `vendor/bin/pest`
 - لا يُنصح بتفعيل `require_document_approval` في بيئة الإنتاج حتى تكتمل المهام 5–8 واختبارها
+
+
+
+1. «سلم الآن» — I skip the docs, commit nothing new, hand over as-is.
+2. «وثّق وسلّم» — I write the 2 docs (fast), verify, commit, push — then hand over.
+3. «أكتب وثيقة واحدة فقط» — only the PRINT_PATTERNS.md, skip the token SSOT.I'll repeat in Arabic (you asked "explain here"), since that's clearest for you:
+ما تبقّى — وشرح بسيط
+المهمة	ما هي؟	الفائدة	هل تمنع التسليم؟
+1. كتابة docs/reports/PRINT_PATTERNS.md	تقرير توثيقي يسجّل القرار الذي اخترته: إبقاء اسمَي headerBg/footerBg كما هما (بدون إعادة تسمية). توثيق فقط، بدون أي تعديل كود.	أي جلسة تطوير قادمة لن «تصلح» الأسماء مجدداً (هذا ما حدث سابقاً — تكررت إعادة التسمية). ويوثّق أن لا يوجد token طباعة اسمه footerBg.	لا
+2. توثيق SSOT لرموز الطباعة	قائمة قصيرة بالرموز الموجودة فعلاً (headerBg, headerText, table_header_bg)	يمنع تكرار حلقة إعادة التسمية	لا
+3. التحقق + commit + push	تشغيل الاختبارات والبناء ثم رفع التغييرات	تسليمك يكون بنسخة نظيفة ومرفوعة بدل تغييرات غير محفوظة	لا — لكنه مُستحسن
+الخلاصة
+هذه المهام توثيق فقط، بلا أي خطر على الكود. فائدتها الوحيدة: منع المشروع من الدخول مجدداً في متاهة تغيير الأسماء.
+يمكنك التسليم الآن بدونها — المستودع في حالة جيدة (main نظيف، الاختبارات خضراء).
+اختر واحداً:
+1. «سلم الآن» — أتخطى التوثيق، لا أضيف أي commit، أسلم كما هو.
+2. «وثّق وسلّم» — أكتب الوثيقتين (سريع)، أتحقق، commit، push — ثم أسلم.
+3. «وثيقة واحدة فقط» — أكتب PRINT_PATTERNS.md فقط وأتخطى SSOT الرموز.
+▣  Build · Big Pickle · 50.1s
+&&
+Build·Big PickleOpenCode Zen
+C:\xampp\htdocs\sales_managements124.8K (62%)
+
