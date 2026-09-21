@@ -2,6 +2,7 @@ import type { PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
 import { renderLayoutRows, borderStyle, type FieldStyleOverride } from './shared';
 import { TotalsGrid } from './TotalsGrid';
+import { Pos } from './Pos';
 
 const TOTALS_FIELD_OVERRIDES: (tpl: PrintTemplate) => Record<string, FieldStyleOverride> = (tpl) => ({
   'totals.ttc': {
@@ -68,7 +69,15 @@ function renderPageTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
 
 export function renderTotals(tpl: PrintTemplate, data: UniversalDocumentData, isThermal: boolean) {
   if (!isThermal && tpl.totals_grid?.enabled) {
-    return <TotalsGrid config={tpl.totals_grid} tpl={tpl} data={data} />;
+    return (
+      <Pos dragKey="totals.block" tpl={tpl}>
+        <TotalsGrid config={tpl.totals_grid} tpl={tpl} data={data} />
+      </Pos>
+    );
   }
-  return isThermal ? renderThermalTotals(tpl, data) : renderPageTotals(tpl, data);
+  return (
+    <Pos dragKey="totals.block" tpl={tpl}>
+      {isThermal ? renderThermalTotals(tpl, data) : renderPageTotals(tpl, data)}
+    </Pos>
+  );
 }

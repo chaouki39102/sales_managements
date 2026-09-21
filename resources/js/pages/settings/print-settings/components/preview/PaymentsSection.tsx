@@ -2,9 +2,11 @@ import type { PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
 import { Separator, align, fontFamily } from './shared';
 import { printFieldResolver } from '../../services';
+import { Pos } from './Pos';
 
 function renderThermalPayments(tpl: PrintTemplate, data: UniversalDocumentData) {
   return (
+    <Pos dragKey="payments.block" tpl={tpl}>
     <div style={{ fontSize: tpl.payment_font_size, fontFamily: fontFamily(tpl.payments_font_family), textAlign: align(tpl.payments_align), marginBottom: 4 }}>
       <Separator style="dashed" />
       <div style={{ fontWeight: 700, marginBottom: 2 }}>وسائل الدفع:</div>
@@ -16,6 +18,7 @@ function renderThermalPayments(tpl: PrintTemplate, data: UniversalDocumentData) 
       ))}
       <Separator style="dashed" />
     </div>
+    </Pos>
   );
 }
 
@@ -23,6 +26,7 @@ function renderPagePayments(tpl: PrintTemplate, data: UniversalDocumentData) {
   const isA4 = tpl.paper_size === 'A4';
   if (isA4) {
     return (
+      <Pos dragKey="payments.block" tpl={tpl}>
       <div style={{ fontSize: tpl.payment_font_size, marginBottom: 16, textAlign: align(tpl.payments_align) }}>
         <div style={{ fontWeight: 700, marginBottom: 8 }}>تفاصيل الدفع</div>
         <table style={{ width: 320, borderCollapse: 'collapse', direction: 'ltr' }}>
@@ -36,10 +40,12 @@ function renderPagePayments(tpl: PrintTemplate, data: UniversalDocumentData) {
           </tbody>
         </table>
       </div>
+      </Pos>
     );
   }
 
   return (
+    <Pos dragKey="payments.block" tpl={tpl}>
     <div style={{ fontSize: tpl.payment_font_size, marginBottom: 10, textAlign: align(tpl.payments_align) }}>
       <div style={{ fontWeight: 700, marginBottom: 4 }}>وسائل الدفع:</div>
       {data.payments.map((p, i) => (
@@ -49,6 +55,7 @@ function renderPagePayments(tpl: PrintTemplate, data: UniversalDocumentData) {
         </div>
       ))}
     </div>
+    </Pos>
   );
 }
 

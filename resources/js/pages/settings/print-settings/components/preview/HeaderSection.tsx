@@ -106,24 +106,28 @@ function renderThermalHeader(tpl: PrintTemplate, data: UniversalDocumentData) {
   return (
     <div style={{ textAlign: align(tpl.company_info_align), marginBottom: 5 }}>
         {/* logo removed from left column -- now rendered in logoAndTitle block above */}
-      {tpl.show_company_name && (
-        <div style={{
-          textAlign: align(tpl.company_name_align),
-          fontSize: tpl.company_name_size,
-          fontWeight: tpl.company_name_bold ? 900 : 400,
-          color: tpl.company_name_color,
-          marginBottom: 3,
-          fontFamily: "'Tajawal', sans-serif",
-        }}>
-          {r('company.name', data, tpl)}
-        </div>
-      )}
-      {renderCompanyInfo(tpl, data, true)}
-      {tpl.header_custom_text && (
-        <div style={{ fontSize: tpl.company_info_size, color: '#555', marginTop: 2 }}>
-          {tpl.header_custom_text}
-        </div>
-      )}
+      <Pos dragKey="header.company-name" tpl={tpl}>
+        {tpl.show_company_name && (
+          <div style={{
+            textAlign: align(tpl.company_name_align),
+            fontSize: tpl.company_name_size,
+            fontWeight: tpl.company_name_bold ? 900 : 400,
+            color: tpl.company_name_color,
+            marginBottom: 3,
+            fontFamily: "'Tajawal', sans-serif",
+          }}>
+            {r('company.name', data, tpl)}
+          </div>
+        )}
+      </Pos>
+      <Pos dragKey="header.company-info" tpl={tpl}>{renderCompanyInfo(tpl, data, true)}</Pos>
+      <Pos dragKey="header.custom-text" tpl={tpl}>
+        {tpl.header_custom_text && (
+          <div style={{ fontSize: tpl.company_info_size, color: '#555', marginTop: 2 }}>
+            {tpl.header_custom_text}
+          </div>
+        )}
+      </Pos>
       <Separator style={tpl.header_separator} />
     </div>
   );
@@ -138,19 +142,21 @@ function renderPageHeader(tpl: PrintTemplate, data: UniversalDocumentData, paper
   const logoAndTitle = (
     <>
       {tpl.show_logo && <Pos dragKey="header.logo" tpl={tpl}>{renderLogo(tpl, data)}</Pos>}
-      {tpl.title_text && (
-      <div style={{
-        fontSize: tpl.title_size + (isA4 ? 4 : 2),
-        fontWeight: tpl.title_bold ? 900 : 400,
-        color: tpl.title_color,
-        textAlign: align(tpl.title_align),
-        marginBottom: isA4 ? 12 : 8,
-        wordBreak: 'break-word',
-        overflowWrap: 'break-word',
-      }}>
-        {tpl.title_text}
-      </div>
-      )}
+      <Pos dragKey="header.title" tpl={tpl}>
+        {tpl.title_text && (
+        <div style={{
+          fontSize: tpl.title_size + (isA4 ? 4 : 2),
+          fontWeight: tpl.title_bold ? 900 : 400,
+          color: tpl.title_color,
+          textAlign: align(tpl.title_align),
+          marginBottom: isA4 ? 12 : 8,
+          wordBreak: 'break-word',
+          overflowWrap: 'break-word',
+        }}>
+          {tpl.title_text}
+        </div>
+        )}
+      </Pos>
     </>
   );
 
@@ -158,10 +164,12 @@ function renderPageHeader(tpl: PrintTemplate, data: UniversalDocumentData, paper
     const columns = renderHeaderColumns(tpl.header_layout, data, tpl, paperWidth);
     if (columns) {
       return (
-        <div style={{ marginBottom: isA4 ? 30 : 16 }}>
-          {logoAndTitle}
-          {columns}
-        </div>
+        <Pos dragKey="header.columns" tpl={tpl}>
+          <div style={{ marginBottom: isA4 ? 30 : 16 }}>
+            {logoAndTitle}
+            {columns}
+          </div>
+        </Pos>
       );
     }
   }
@@ -185,46 +193,52 @@ function renderPageHeader(tpl: PrintTemplate, data: UniversalDocumentData, paper
           overflowWrap: 'break-word',
         }}>
 
-        {tpl.show_company_name && (
-          <div style={{
-            fontSize: tpl.company_name_size + (isA4 ? 4 : 2),
-            fontWeight: tpl.company_name_bold ? 900 : 400,
-            color: tpl.company_name_color,
-            textAlign: align(tpl.company_name_align),
-            fontFamily: "'Tajawal', sans-serif",
-            marginBottom: 4,
-          }}>
-            {r('company.name', data, tpl)}
-          </div>
-        )}
-        {renderCompanyInfo(tpl, data, false)}
-        {tpl.header_custom_text && (
-          <div style={{ fontSize: tpl.company_info_size, color: '#555', marginTop: 4 }}>
-            {tpl.header_custom_text}
-          </div>
-        )}
+        <Pos dragKey="header.company-name" tpl={tpl}>
+          {tpl.show_company_name && (
+            <div style={{
+              fontSize: tpl.company_name_size + (isA4 ? 4 : 2),
+              fontWeight: tpl.company_name_bold ? 900 : 400,
+              color: tpl.company_name_color,
+              textAlign: align(tpl.company_name_align),
+              fontFamily: "'Tajawal', sans-serif",
+              marginBottom: 4,
+            }}>
+              {r('company.name', data, tpl)}
+            </div>
+          )}
+        </Pos>
+        <Pos dragKey="header.company-info" tpl={tpl}>{renderCompanyInfo(tpl, data, false)}</Pos>
+        <Pos dragKey="header.custom-text" tpl={tpl}>
+          {tpl.header_custom_text && (
+            <div style={{ fontSize: tpl.company_info_size, color: '#555', marginTop: 4 }}>
+              {tpl.header_custom_text}
+            </div>
+          )}
+        </Pos>
       </div>
 
-      <div style={{
-        textAlign: 'left',
-        width: `${docInfoW}%`,
-        minWidth: 0,
-        wordBreak: 'break-word',
-        overflowWrap: 'break-word',
-      }}>
-        <table style={{ fontSize: tpl.company_info_size, borderCollapse: 'collapse', width: '100%' }}>
-          <tbody>
-            {tpl.show_doc_number && <InfoRow label={isA4 ? 'رقم الفاتورة' : 'رقم'} value={r('document.number', data, tpl) as string} />}
-            {tpl.show_date && <InfoRow label="التاريخ" value={formatDate(r('document.date', data, tpl) as string)} />}
-            {tpl.show_due_date && r('document.dueDate', data, tpl) && <InfoRow label="تاريخ الاستحقاق" value={r('document.dueDate', data, tpl) as string} />}
-            {tpl.show_cashier && (r('customer.cashierName', data, tpl)) && (
-              <InfoRow label="الكاشير" value={r('customer.cashierName', data, tpl) as string} />
-            )}
-            {tpl.show_session && r('session.code', data, tpl) && <InfoRow label="الجلسة" value={r('session.code', data, tpl) as string} />}
-            {tpl.show_payment_term && r('document.paymentTerm', data, tpl) && <InfoRow label="شروط الدفع" value={r('document.paymentTerm', data, tpl) as string} />}
-          </tbody>
-        </table>
-      </div>
+      <Pos dragKey="header.doc-info" tpl={tpl}>
+        <div style={{
+          textAlign: 'left',
+          width: `${docInfoW}%`,
+          minWidth: 0,
+          wordBreak: 'break-word',
+          overflowWrap: 'break-word',
+        }}>
+          <table style={{ fontSize: tpl.company_info_size, borderCollapse: 'collapse', width: '100%' }}>
+            <tbody>
+              {tpl.show_doc_number && <InfoRow label={isA4 ? 'رقم الفاتورة' : 'رقم'} value={r('document.number', data, tpl) as string} />}
+              {tpl.show_date && <InfoRow label="التاريخ" value={formatDate(r('document.date', data, tpl) as string)} />}
+              {tpl.show_due_date && r('document.dueDate', data, tpl) && <InfoRow label="تاريخ الاستحقاق" value={r('document.dueDate', data, tpl) as string} />}
+              {tpl.show_cashier && (r('customer.cashierName', data, tpl)) && (
+                <InfoRow label="الكاشير" value={r('customer.cashierName', data, tpl) as string} />
+              )}
+              {tpl.show_session && r('session.code', data, tpl) && <InfoRow label="الجلسة" value={r('session.code', data, tpl) as string} />}
+              {tpl.show_payment_term && r('document.paymentTerm', data, tpl) && <InfoRow label="شروط الدفع" value={r('document.paymentTerm', data, tpl) as string} />}
+            </tbody>
+          </table>
+        </div>
+      </Pos>
     </div>
     </div>
   );

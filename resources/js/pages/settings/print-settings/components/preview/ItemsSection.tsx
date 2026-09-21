@@ -3,6 +3,7 @@ import type { UniversalDocumentData, DocumentLine } from '../../types/data';
 import { getVisibleCols, colWidth, colAlign, colDefaultHeader, borderStyle, align, fontFamily } from './shared';
 import { COLUMN_DEFAULTS } from '../../services/SettingsRegistry';
 import { printFieldResolver } from '../../services';
+import { Pos } from './Pos';
 
 const COL_WIDTH_DEFAULTS: Partial<Record<ColumnKey, number>> = Object.fromEntries(
   (Object.keys(COLUMN_DEFAULTS) as ColumnKey[]).map(k => [k, COLUMN_DEFAULTS[k].width]),
@@ -64,6 +65,7 @@ function renderThermalItems(tpl: PrintTemplate, data: UniversalDocumentData) {
   const cp = tpl.table_cell_padding || 6;
 
   return (
+    <Pos dragKey="items.table" tpl={tpl}>
     <div style={{ fontSize: tpl.items_font_size, fontFamily: ff, marginBottom: 4 }}>
       {tpl.show_col_header && (
         <div style={{
@@ -107,6 +109,7 @@ function renderThermalItems(tpl: PrintTemplate, data: UniversalDocumentData) {
         </div>
       ))}
     </div>
+    </Pos>
   );
 }
 
@@ -124,6 +127,7 @@ function renderPageItems(tpl: PrintTemplate, data: UniversalDocumentData) {
   const thR = tpl.table_header_radius || 0;
 
   return (
+    <Pos dragKey="items.table" tpl={tpl}>
     <div style={{ marginBottom: isA4 ? 20 : 12, fontFamily: ff }}>
       <table style={{ width: '100%', borderCollapse: thR ? 'separate' : 'collapse', borderSpacing: 0, fontSize: tpl.items_font_size }}>
         {tpl.show_col_header && (
@@ -175,6 +179,7 @@ function renderPageItems(tpl: PrintTemplate, data: UniversalDocumentData) {
         </tbody>
       </table>
     </div>
+    </Pos>
   );
 }
 

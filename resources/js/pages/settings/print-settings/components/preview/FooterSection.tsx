@@ -2,6 +2,7 @@ import type { AlignOption, PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
 import { Separator, borderStyle, align, fontFamily as _fontFamily } from './shared';
 import FiscalQR from './FiscalQR';
+import { Pos } from './Pos';
 
 function barcodeText(tpl: PrintTemplate, data: UniversalDocumentData): string {
   if (tpl.barcode_content === 'custom') return tpl.barcode_custom_text;
@@ -73,25 +74,34 @@ function renderThermalFooter(tpl: PrintTemplate, data: UniversalDocumentData) {
       <Separator style={tpl.footer_separator} />
 
       {tpl.show_bank_details && tpl.bank_details_text && (
+        <Pos dragKey="footer.bank-details" tpl={tpl}>
         <div style={{ marginBottom: 6, padding: '4px 0', borderBottom: '1px solid #ddd' }}>
           <div style={{ fontWeight: 700, fontSize: tpl.base_font_size - 0.5, marginBottom: 2 }}>البيانات البنكية</div>
           <div style={{ fontSize: tpl.base_font_size - 1, color: '#555', whiteSpace: 'pre-line' }}>
             {tpl.bank_details_text}
           </div>
         </div>
+        </Pos>
       )}
 
+      <Pos dragKey="footer.lines" tpl={tpl}>
+        <div>
       {tpl.footer_line1 && <div style={{ marginBottom: 2 }}>{tpl.footer_line1}</div>}
       {tpl.footer_line2 && <div style={{ marginBottom: 2 }}>{tpl.footer_line2}</div>}
       {tpl.footer_line3 && <div style={{ marginBottom: 2 }}>{tpl.footer_line3}</div>}
+        </div>
+      </Pos>
 
       {tpl.show_returns_policy && tpl.returns_policy_text && (
+        <Pos dragKey="footer.returns-policy" tpl={tpl}>
         <div style={{ fontSize: tpl.base_font_size - 1, color: '#666', marginBottom: 3 }}>
           {tpl.returns_policy_text}
         </div>
+        </Pos>
       )}
 
       {tpl.show_thank_you && (
+        <Pos dragKey="footer.thank-you" tpl={tpl}>
         <div style={{
           fontSize: tpl.thank_you_size,
           fontWeight: 700,
@@ -101,15 +111,19 @@ function renderThermalFooter(tpl: PrintTemplate, data: UniversalDocumentData) {
         }}>
           {tpl.thank_you_text}
         </div>
+        </Pos>
       )}
 
       {tpl.footer_legal_text && (
+        <Pos dragKey="footer.legal" tpl={tpl}>
         <div style={{ fontSize: tpl.base_font_size - 2, color: '#999', marginTop: 3 }}>
           {tpl.footer_legal_text}
         </div>
+        </Pos>
       )}
 
       {tpl.show_barcode && (
+        <Pos dragKey="footer.barcode" tpl={tpl}>
         <div style={{ margin: '8px 0 4px' }}>
           <div style={{ display: 'inline-flex', gap: 1, alignItems: 'flex-end' }}>
             {Array.from({ length: 48 }, (_, i) => (
@@ -124,11 +138,17 @@ function renderThermalFooter(tpl: PrintTemplate, data: UniversalDocumentData) {
             {barcodeText(tpl, data)}
           </div>
         </div>
+        </Pos>
       )}
 
-      {qrActive(tpl) && QRBlock(tpl, data, qrSize(tpl, 48), 7, qrAlignOf(tpl))}
+      {qrActive(tpl) && (
+        <Pos dragKey="footer.qr" tpl={tpl}>
+        {QRBlock(tpl, data, qrSize(tpl, 48), 7, qrAlignOf(tpl))}
+        </Pos>
+      )}
 
       {(tpl.show_cashier_signature || tpl.show_client_signature) && (
+        <Pos dragKey="footer.signatures" tpl={tpl}>
         <div style={{
           display: 'flex', justifyContent: 'space-around',
           marginTop: 14, fontSize: tpl.base_font_size - 1,
@@ -146,9 +166,11 @@ function renderThermalFooter(tpl: PrintTemplate, data: UniversalDocumentData) {
             </div>
           )}
         </div>
+        </Pos>
       )}
 
       {tpl.show_stamp && (
+        <Pos dragKey="footer.stamp" tpl={tpl}>
         <div style={{
           width: 44, height: 44, margin: '8px auto',
           border: '2px solid #111', borderRadius: '50%',
@@ -157,6 +179,7 @@ function renderThermalFooter(tpl: PrintTemplate, data: UniversalDocumentData) {
         }}>
           ختم
         </div>
+        </Pos>
       )}
     </div>
   );
@@ -182,22 +205,30 @@ function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
       color: tpl.footer_text_color,
     }}>
       {tpl.show_bank_details && tpl.bank_details_text && (
+        <Pos dragKey="footer.bank-details" tpl={tpl}>
         <div style={{ marginBottom: 12 }}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>البيانات البنكية</div>
           <div style={{ fontSize: tpl.base_font_size - 1, color: '#555', whiteSpace: 'pre-line' }}>
             {tpl.bank_details_text}
           </div>
         </div>
+        </Pos>
       )}
 
+      <Pos dragKey="footer.lines" tpl={tpl}>
+        <div>
       {tpl.footer_line1 && <div style={{ margin: '4px 0' }}>{tpl.footer_line1}</div>}
       {tpl.footer_line2 && <div style={{ margin: '4px 0' }}>{tpl.footer_line2}</div>}
       {tpl.footer_line3 && <div style={{ margin: '4px 0' }}>{tpl.footer_line3}</div>}
+        </div>
+      </Pos>
 
       {tpl.show_returns_policy && tpl.returns_policy_text && (
+        <Pos dragKey="footer.returns-policy" tpl={tpl}>
         <div style={{ fontSize: tpl.base_font_size - 1, color: '#555', margin: '6px 0' }}>
           {tpl.returns_policy_text}
         </div>
+        </Pos>
       )}
 
       {tpl.show_thank_you && (
@@ -217,6 +248,7 @@ function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
       )}
 
       {tpl.show_barcode && (
+        <Pos dragKey="footer.barcode" tpl={tpl}>
         <div style={{ margin: '8px 0 4px', textAlign: 'center' }}>
           <div style={{ display: 'inline-flex', gap: 1, alignItems: 'flex-end' }}>
             {Array.from({ length: 48 }, (_, i) => (
@@ -231,11 +263,17 @@ function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
             {barcodeText(tpl, data)}
           </div>
         </div>
+        </Pos>
       )}
 
-      {qrActive(tpl) && QRBlock(tpl, data, qrSize(tpl, 48), 7, qrAlignOf(tpl))}
+      {qrActive(tpl) && (
+        <Pos dragKey="footer.qr" tpl={tpl}>
+        {QRBlock(tpl, data, qrSize(tpl, 48), 7, qrAlignOf(tpl))}
+        </Pos>
+      )}
 
       {(tpl.show_cashier_signature || tpl.show_client_signature) && (
+        <Pos dragKey="footer.signatures" tpl={tpl}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24, fontSize: tpl.base_font_size }}>
           {tpl.show_cashier_signature && (
             <div style={{ textAlign: 'center' }}>
@@ -250,9 +288,11 @@ function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
             </div>
           )}
         </div>
+        </Pos>
       )}
 
       {tpl.show_stamp && (
+        <Pos dragKey="footer.stamp" tpl={tpl}>
         <div style={{
           width: 60, height: 60, margin: '16px auto',
           border: '2px solid #111', borderRadius: '50%',
@@ -262,6 +302,7 @@ function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
         }}>
           ختم
         </div>
+        </Pos>
       )}
     </div>
   );
@@ -286,21 +327,29 @@ function renderA5Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
       paddingTop: 10,
     }}>
       {tpl.show_bank_details && tpl.bank_details_text && (
+        <Pos dragKey="footer.bank-details" tpl={tpl}>
         <div style={{ marginBottom: 6, padding: '4px 0', borderBottom: '1px solid #ddd' }}>
           <div style={{ fontWeight: 700, fontSize: tpl.base_font_size - 0.5, marginBottom: 2 }}>البيانات البنكية</div>
           <div style={{ fontSize: tpl.base_font_size - 1, color: '#555', whiteSpace: 'pre-line' }}>
             {tpl.bank_details_text}
           </div>
         </div>
+        </Pos>
       )}
+      <Pos dragKey="footer.lines" tpl={tpl}>
+        <div>
       {tpl.footer_line1 && <div style={{ marginBottom: 1 }}>{tpl.footer_line1}</div>}
       {tpl.footer_line2 && <div style={{ marginBottom: 1 }}>{tpl.footer_line2}</div>}
       {tpl.footer_line3 && <div style={{ marginBottom: 1 }}>{tpl.footer_line3}</div>}
+        </div>
+      </Pos>
 
       {tpl.show_returns_policy && tpl.returns_policy_text && (
+        <Pos dragKey="footer.returns-policy" tpl={tpl}>
         <div style={{ fontSize: tpl.base_font_size - 1, color: '#666', marginBottom: 3 }}>
           {tpl.returns_policy_text}
         </div>
+        </Pos>
       )}
 
       {tpl.show_thank_you && (
@@ -319,6 +368,7 @@ function renderA5Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
       )}
 
       {tpl.show_barcode && (
+        <Pos dragKey="footer.barcode" tpl={tpl}>
         <div style={{ margin: '6px 0 4px' }}>
           <div style={{ display: 'inline-flex', gap: 1, alignItems: 'flex-end' }}>
             {Array.from({ length: 36 }, (_, i) => (
@@ -333,11 +383,17 @@ function renderA5Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
             {barcodeText(tpl, data)}
           </div>
         </div>
+        </Pos>
       )}
 
-      {qrActive(tpl) && QRBlock(tpl, data, qrSize(tpl, 36), 6, qrAlignOf(tpl))}
+      {qrActive(tpl) && (
+        <Pos dragKey="footer.qr" tpl={tpl}>
+        {QRBlock(tpl, data, qrSize(tpl, 36), 6, qrAlignOf(tpl))}
+        </Pos>
+      )}
 
       {(tpl.show_cashier_signature || tpl.show_client_signature) && (
+        <Pos dragKey="footer.signatures" tpl={tpl}>
         <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 16 }}>
           {tpl.show_cashier_signature && (
             <div style={{ textAlign: 'center' }}>
@@ -352,9 +408,11 @@ function renderA5Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
             </div>
           )}
         </div>
+        </Pos>
       )}
 
       {tpl.show_stamp && (
+        <Pos dragKey="footer.stamp" tpl={tpl}>
         <div style={{
           width: 50, height: 50, margin: '10px auto',
           border: '2px solid #111', borderRadius: '50%',
@@ -363,6 +421,7 @@ function renderA5Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
         }}>
           ختم
         </div>
+        </Pos>
       )}
     </div>
   );

@@ -2,6 +2,7 @@ import type { PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
 import { align, formatDate, DocRow, Separator, renderLayoutRows, fontFamily } from './shared';
 import { printFieldResolver } from '../../services';
+import { Pos } from './Pos';
 
 function r(fieldId: string, data: UniversalDocumentData, tpl: PrintTemplate) {
   return printFieldResolver.resolve(fieldId, data, tpl);
@@ -55,6 +56,7 @@ function renderThermalDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
               )}
             </>
         }
+        <Pos dragKey="doc-info.client-card" tpl={tpl}>
         {hasCustomerRows
           ? <div style={cs}>{renderLayoutRows(tpl.customer_info_rows, data, tpl, { sectionAlign: tpl.customer_info_align })}</div>
           : tpl.show_client && (
@@ -77,6 +79,7 @@ function renderThermalDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
               </div>
             )
         }
+        </Pos>
         {tpl.show_payment_term && r('document.paymentTerm', data, tpl) && (
           <DocRow label="شروط الدفع:" value={r('document.paymentTerm', data, tpl) as string} />
         )}
@@ -100,6 +103,7 @@ function renderPageDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
     return (
       <div style={{ textAlign: align(tpl.doc_info_align) }}>
         <div style={{ display: 'flex', gap: 30, marginBottom: 24 }}>
+          <Pos dragKey="doc-info.client-card" tpl={tpl}>
           <div style={{ flex: 1, padding: 12, background: '#f9fafb', borderRadius: 4, border: '1px solid #e2e8f0' }}>
             <div style={{ ...cs, fontWeight: 700, fontSize: tpl.customer_info_size + 1, marginBottom: 6, color: '#111' }}>بيانات العميل</div>
             <div style={{ ...cs, color: '#333' }}>
@@ -119,11 +123,13 @@ function renderPageDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
                     {tpl.show_customer_activity && <div>{labelOf('label_customer_activity', tpl) || 'النشاط'}: {r('customer.activity', data, tpl) as string}</div>}
                     {tpl.show_client_address && <div>{labelOf('label_client_address', tpl) || 'العنوان'}: {r('customer.address', data, tpl) as string}</div>}
                     {tpl.show_customer_bank_name && <div>{labelOf('label_customer_bank_name', tpl) || 'البنك'}: {r('customer.bankName', data, tpl) as string}</div>}
-                    {tpl.show_customer_rib  && <div>{labelOf('label_customer_rib', tpl) || 'RIB'}: {r('customer.rib', data, tpl) as string}</div>}
-                  </>
+{tpl.show_customer_rib  && <div>{labelOf('label_customer_rib', tpl) || 'RIB'}: {r('customer.rib', data, tpl) as string}</div>}
+              </>
               }
             </div>
           </div>
+          </Pos>
+          <Pos dragKey="doc-info.delivery-card" tpl={tpl}>
           {tpl.show_delivery_address && (
             <div style={{ flex: 1, padding: 12, background: '#f9fafb', borderRadius: 4, border: '1px solid #e2e8f0' }}>
               <div style={{ ...cs, fontWeight: 700, fontSize: tpl.customer_info_size + 1, marginBottom: 6, color: '#111' }}>{labelOf('label_delivery_address', tpl) || 'عنوان التسليم'}</div>
@@ -132,6 +138,7 @@ function renderPageDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
               </div>
             </div>
           )}
+          </Pos>
         </div>
         {tpl.doc_separator && tpl.doc_separator !== 'none' && <Separator style={tpl.doc_separator} />}
       </div>
@@ -139,6 +146,7 @@ function renderPageDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
   }
 
   return (
+    <Pos dragKey="doc-info.client-card" tpl={tpl}>
     <div style={{
       ...cs, marginBottom: 10,
       padding: 8, background: '#f9fafb', borderRadius: 4,
@@ -165,6 +173,7 @@ function renderPageDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
       }
       {tpl.doc_separator && tpl.doc_separator !== 'none' && <Separator style={tpl.doc_separator} />}
     </div>
+    </Pos>
   );
 }
 
