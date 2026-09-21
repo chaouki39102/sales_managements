@@ -49,6 +49,44 @@ const ME_BODY = {
   },
 };
 
+// /me/roles → { roles, permissions: string[] } (top-level effective set).
+// Listed explicitly (NOT `super-admin`) so RequireCompany (routes/index.tsx:195)
+// keeps tenant pages reachable; mirrors the PERMISSION object in lib/permissions.ts.
+const MY_ROLES_BODY = {
+  data: {
+    roles: [{ id: 2, name: 'manager' }],
+    permissions: [
+      'view_dashboard',
+      'view_any_party',
+      'view_any_product',
+      'view_any_commercial_document',
+      'view_any_payment',
+      'view_any_user',
+      'view_roles',
+      'view_audit_log',
+      'manage_settings',
+      'manage_portal_orders',
+      'manage_backup',
+      'manage_printer',
+      'create_sales_document',
+      'view_sales_report',
+      'view_purchase_report',
+      'view_inventory_report',
+      'view_financial_report',
+      'view_cost_price',
+      'change_price_commercial_document',
+      'apply_discount_commercial_document',
+      'override_stock_commercial_document',
+      'view_print_templates',
+      'manage_print_templates',
+      'view_settings',
+      'manage_roles',
+      'manage_company_members',
+      'update_company',
+    ],
+  },
+};
+
 const FISCAL_YEARS_BODY = {
   data: [
     { id: 1, name: '2026', starts_at: '2026-01-01', ends_at: '2026-12-31', is_current: true, is_closed: false },
@@ -124,6 +162,10 @@ export async function bootstrapApp(page: Page, templates: MockTemplate[] = []) {
 
   await page.route('**/api/v1/auth/me', (route) => {
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ME_BODY) });
+  });
+
+  await page.route('**/api/v1/*/me/roles', (route) => {
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MY_ROLES_BODY) });
   });
 
   await page.route('**/api/v1/*/fiscal-years*', (route) => {
