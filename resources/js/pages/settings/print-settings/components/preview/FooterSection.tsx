@@ -232,6 +232,7 @@ function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
       )}
 
       {tpl.show_thank_you && (
+        <Pos dragKey="footer.thank-you" tpl={tpl}>
         <div style={{
           fontWeight: 700, margin: '8px 0',
           fontSize: tpl.thank_you_size,
@@ -239,12 +240,15 @@ function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
         }}>
           {tpl.thank_you_text}
         </div>
+        </Pos>
       )}
 
       {tpl.footer_legal_text && (
+        <Pos dragKey="footer.legal" tpl={tpl}>
         <div style={{ fontSize: tpl.base_font_size - 1.5, color: '#888', margin: '6px 0' }}>
           {tpl.footer_legal_text}
         </div>
+        </Pos>
       )}
 
       {tpl.show_barcode && (
@@ -353,18 +357,22 @@ function renderA5Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
       )}
 
       {tpl.show_thank_you && (
+        <Pos dragKey="footer.thank-you" tpl={tpl}>
         <div style={{
           fontWeight: 700, fontSize: tpl.thank_you_size,
           color: tpl.thank_you_color, margin: '4px 0',
         }}>
           {tpl.thank_you_text}
         </div>
+        </Pos>
       )}
 
       {tpl.footer_legal_text && (
+        <Pos dragKey="footer.legal" tpl={tpl}>
         <div style={{ fontSize: tpl.base_font_size - 1.5, color: '#888' }}>
           {tpl.footer_legal_text}
         </div>
+        </Pos>
       )}
 
       {tpl.show_barcode && (
