@@ -4,6 +4,7 @@ import { renderLogo } from './LogoRenderer';
 import { align, formatDate, Separator, InfoRow, renderLayoutRows, fontFamily } from './shared';
 import { printFieldResolver } from '../../services';
 import { renderHeaderColumns } from './HeaderColumns';
+import { Pos } from './Pos';
 
 function r(fieldId: string, data: UniversalDocumentData, tpl: PrintTemplate) {
   return printFieldResolver.resolve(fieldId, data, tpl);
@@ -136,7 +137,7 @@ function renderPageHeader(tpl: PrintTemplate, data: UniversalDocumentData, paper
 
   const logoAndTitle = (
     <>
-      {tpl.show_logo && renderLogo(tpl, data)}
+      {tpl.show_logo && <Pos dragKey="header.logo" tpl={tpl}>{renderLogo(tpl, data)}</Pos>}
       {tpl.title_text && (
       <div style={{
         fontSize: tpl.title_size + (isA4 ? 4 : 2),

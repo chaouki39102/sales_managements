@@ -348,6 +348,7 @@ export interface PrintTemplate {
   page_frame:       PageFrameConfig;
   sections_order:   SectionMeta[];
   positions?:       Partial<Record<SectionTarget, SectionPosition>>; // freeform block layout (A4 designer)
+  element_positions?: Partial<Record<ElementKey, ElementPosition>>; // element-level freeform (drag on live preview)
   totals_grid:      TotalsGridConfig;
   watermark:        WatermarkConfig;
 
@@ -478,6 +479,37 @@ export type SectionPosition = {
   x: number;      // % from right edge
   y: number;      // % from top
   width: number;  // % of content width
+};
+
+export type ElementKey =
+  | 'header.logo'
+  | 'header.title'
+  | 'header.company-name'
+  | 'header.company-info'
+  | 'header.custom-text'
+  | 'header.doc-info'
+  | 'header.columns'
+  | 'doc-info.client-card'
+  | 'doc-info.delivery-card'
+  | 'items.table'
+  | 'totals.block'
+  | 'payments.block'
+  | 'footer.bank-details'
+  | 'footer.lines'
+  | 'footer.returns-policy'
+  | 'footer.thank-you'
+  | 'footer.legal'
+  | 'footer.barcode'
+  | 'footer.qr'
+  | 'footer.signatures'
+  | 'footer.stamp';
+
+/** Element-level freeform position, in % of the printable content box.
+ *  Shares SectionPosition semantics: x = % from RIGHT edge (RTL), y = % from top. */
+export type ElementPosition = {
+  x: number;
+  y: number;
+  width: number;
 };
 
 export interface ColumnStyleConfig {

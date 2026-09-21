@@ -7,6 +7,7 @@ import {
 } from './api/printTemplatesApi';
 import PreviewSelector from './components/PreviewSelector';
 import A4DesignerStage from './components/A4DesignerStage';
+import { ElementDesignerStage } from './components/ElementDesignerStage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { TemplateControls } from './components/TemplateControls';
 import { QuickNav } from './components/QuickNav';
@@ -80,6 +81,7 @@ export default function PrintSettingsPage() {
   const [showLibrary,       setShowLibrary]       = useState(false);
   const [designerActive,    setDesignerActive]    = useState(false);
   const [puckComposerActive, setPuckComposerActive] = useState(false);
+  const [elementActive,     setElementActive]     = useState(false);
 
   const historyRef    = useRef<PrintTemplate[]>([]);
   const historyPos    = useRef(-1);
@@ -792,6 +794,33 @@ export default function PrintSettingsPage() {
                 {puckComposerActive ? 'عرض المعاينة' : 'ترتيب الأقسام'}
               </button>
             )}
+            {localTpl && !isStickerPaper(localTpl.paper_size) && localTpl.paper_size === 'A4' && localTpl.doc_type_code !== 'RPT' && (
+              <button
+                onClick={() => {
+                  const next = !elementActive;
+                  setElementActive(next);
+                  if (next) {
+                    setDesignerActive(false);
+                    setPuckComposerActive(false);
+                  }
+                }}
+                type="button"
+                title="سحب وإفلات العناصر داخل المستند"
+                aria-pressed={elementActive}
+                style={{
+                  ...toolBtnStyle,
+                  padding: '5px 11px', fontSize: 12,
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  color: elementActive ? 'var(--em)' : 'var(--t3)',
+                  borderColor: elementActive ? 'var(--em)' : 'var(--b2)',
+                  background: elementActive ? 'var(--emb)' : 'transparent',
+                  fontWeight: elementActive ? 700 : 500,
+                }}
+              >
+                <i className={`ti ${elementActive ? 'ti-eye' : 'ti-drag-drop'}`} />
+                {elementActive ? 'عرض المعاينة' : 'تحريك العناصر'}
+              </button>
+            )}
             {localTpl && (
               <button onClick={handleSave} disabled={!isDirty || isSaving} type="button"
                 style={{
@@ -838,6 +867,18 @@ export default function PrintSettingsPage() {
               localTpl.paper_size === 'A4'
               && !isStickerPaper(localTpl.paper_size)
               && localTpl.doc_type_code !== 'RPT'
+              && elementActive ? (
+                <div style={{ width: '100%', maxWidth: '100%', height: '100%', minHeight: 0 }}>
+                  <ElementDesignerStage
+                    tpl={localTpl}
+                    data={useRealData ? previewData : null}
+                    onPositionChange={(key, pos) => update('element_positions', { ...(localTpl.element_positions ?? {}), [key]: pos })}
+                  />
+                </div>
+              ) : (
+              localTpl.paper_size === 'A4'
+              && !isStickerPaper(localTpl.paper_size)
+              && localTpl.doc_type_code !== 'RPT'
               && designerActive ? (
                 <div style={{ width: '100%', maxWidth: '100%', height: '100%', minHeight: 0 }}>
                   <A4DesignerStage
@@ -857,6 +898,7 @@ export default function PrintSettingsPage() {
                     <PreviewSelector tpl={localTpl} data={useRealData ? previewData : null} />
                   </ErrorBoundary>
                 </div>
+              )
               )
               )
             ) : (

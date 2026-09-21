@@ -221,6 +221,7 @@ export function ensureLayoutFields(tpl: PrintTemplate): PrintTemplate {
     page_frame: tpl.page_frame ?? { enabled: false } as PageFrameConfig,
     totals_grid: tpl.totals_grid ?? { enabled: false, columns: [] } as TotalsGridConfig,
     watermark: tpl.watermark ?? { enabled: false } as WatermarkConfig,
+    element_positions: tpl.element_positions ?? {},
   };
   return result;
 }
