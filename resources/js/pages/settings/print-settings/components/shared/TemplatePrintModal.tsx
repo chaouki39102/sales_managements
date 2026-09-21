@@ -9,6 +9,9 @@ import { stickerDims } from '@/pages/settings/print-settings/components/preview/
 import UniversalPrintPipeline, { renderPipelineToPopup } from '@/pages/settings/print-settings/runtime/UniversalPrintPipeline';
 import StickerLabel from '@/pages/settings/print-settings/components/preview/StickerLabel';
 import { exportSourceToPdf } from '@/pages/settings/print-settings/runtime/exportPdf';
+import { trySilentPrintDocument } from '@/pages/settings/print-settings/runtime/silentPrint';
+import { useActiveSlug } from '@/lib/store/appStore';
+import { useNotification } from '@/hooks/useNotification';
 
 // ─── ApiDocument ────────────────────────────────────────────────────────────
 // Minimal shape expected by DocumentDataBuilder.fromApiDocument().
@@ -69,6 +72,8 @@ const STK_SCALE = 0.38;
 
 function TemplatePrintModal({ open, onClose, document, company, template, templates, docTypeCode, data: overrideData, prevBalance, newBalance, copies = 1 }: TemplatePrintModalProps) {
   const navigate = useNavigate();
+  const slug = useActiveSlug();
+  const notify = useNotification();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
@@ -103,10 +108,32 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
     return null;
   }, [overrideData, document, prevBalance, newBalance]);
 
-  const handlePrint = useCallback(() => {
+  const handlePrint = useCallback(async () => {
     if (!tpl || !source) return;
+
+    // المسار الصامت أولاً لأحجام الورق الفعلية A4/A5: اختيار طابعة ويندوز
+    // تلقائياً + POST /system/printers/html (Edge headless ← لقطة ← GDI)
+    // بدون نافذة معاينة أو اختيار طابعة. عند الفشل يُفتح حوار المعاينة.
+    if (tpl.paper_size === 'A4' || tpl.paper_size === 'A5') {
+      const res = await trySilentPrintDocument({
+        template: tpl,
+        company,
+        source: source as any,
+        slug,
+        copies,
+      });
+      if (res.ok) {
+        notify.success('تمت الطباعة', `على «${res.printer}»`);
+        return;
+      }
+      if (res.reason === 'no-target' || res.reason === 'error') {
+        notify.error('تعذرت الطباعة الصامتة', res.message);
+      }
+      // unsupported-paper → لا تنبيه، يفتح لذلك حوار المعاينة مباشرة.
+    }
+
     renderPipelineToPopup(source as any, tpl, company, copies);
-  }, [tpl, source, company, copies]);
+  }, [tpl, source, company, copies, slug, notify]);
 
   const handlePdf = useCallback(async () => {
     if (!tpl || !source || pdfBusy) return;
