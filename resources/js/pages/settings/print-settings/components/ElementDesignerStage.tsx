@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { ElementKey, ElementPosition, PrintTemplate } from '../types';
 import type { UniversalDocumentData } from '../types/data';
+import { clampGeometry, defaultElementMode, normalizeElementGeometry, pageBoxMm, rectToGeometry } from '../services/freeformGeometry';
 import PreviewSelector from './PreviewSelector';
 
 interface ActiveDrag {
@@ -9,10 +10,6 @@ interface ActiveDrag {
   wrapper: HTMLElement;
   startX: number;
   startY: number;
-}
-
-function clampPct(v: number): number {
-  return Math.max(0, Math.min(100, Math.round(v * 100) / 100));
 }
 
 export interface ElementDesignerStageProps {
@@ -26,6 +23,8 @@ export function ElementDesignerStage({ tpl, data, onPositionChange }: ElementDes
   const dragRef = useRef<ActiveDrag | null>(null);
   const onPositionChangeRef = useRef(onPositionChange);
   onPositionChangeRef.current = onPositionChange;
+  const tplRef = useRef(tpl);
+  tplRef.current = tpl;
 
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
@@ -46,11 +45,25 @@ export function ElementDesignerStage({ tpl, data, onPositionChange }: ElementDes
       document.body.style.userSelect = '';
       dragRef.current = null;
       if (wr.width >= 1 && wr.height >= 1) {
-        onPositionChangeRef.current(d.key, {
-          x: clampPct(((wr.right - br.right) / wr.width) * 100),
-          y: clampPct(((br.top - wr.top) / wr.height) * 100),
-          width: clampPct((br.width / wr.width) * 100),
-        });
+        const current = tplRef.current;
+        const box = pageBoxMm(current);
+        const prev = normalizeElementGeometry(current.element_positions?.[d.key], box);
+        const geo = rectToGeometry(
+          { left: br.left, top: br.top, width: br.width, height: br.height },
+          { left: wr.left, top: wr.top, width: wr.width, height: wr.height },
+        );
+        const mode = defaultElementMode(d.key, prev);
+        onPositionChangeRef.current(d.key, clampGeometry({
+          ...geo,
+          // A flow element keeps its NATURAL vertical position: `geo.y` is an
+          // absolute page offset while `flowBoxStyle` reads `y` as a nudge, and
+          // a measured `h` would pin the auto-growing box to one page's height.
+          y: mode === 'flow' ? 0 : geo.y,
+          h: mode === 'flow' ? undefined : geo.h,
+          rotate: prev?.rotate ?? 0,
+          z: prev?.z ?? 0,
+          mode,
+        }, box));
       }
     };
     const cancelDrag = () => {
@@ -135,9 +148,9 @@ export function ElementDesignerStage({ tpl, data, onPositionChange }: ElementDes
   return (
     <div ref={rootRef} style={{ position: 'relative' }}>
       <div style={{ marginBottom: 8, fontSize: 12, color: '#666' }}>
-        اسحب شعار المستند لوضعه في أي مكان داخل الصفحة — يُحفظ الوضع تلقائياً عند ترك المؤشر.
+        اسحب أي عنصر داخل الصفحة لتثبيته في مكانه بالملّيمتر — يُحفظ الموضع تلقائياً عند ترك المؤشر. العناصر غير المسحوبة تبقى في تدفّقها الطبيعي.
       </div>
-      <PreviewSelector tpl={{ ...tpl, positions: undefined }} data={data} />
+      <PreviewSelector tpl={tpl} data={data} />
     </div>
   );
 }

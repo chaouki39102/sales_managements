@@ -347,8 +347,8 @@ export interface PrintTemplate {
   col_styles:       ColumnStyleConfig[];
   page_frame:       PageFrameConfig;
   sections_order:   SectionMeta[];
-  positions?:       Partial<Record<SectionTarget, SectionPosition>>; // freeform block layout (A4 designer)
-  element_positions?: Partial<Record<ElementKey, ElementPosition>>; // element-level freeform (drag on live preview)
+  positions?:       Partial<Record<SectionTarget, SectionPosition>>; // LEGACY block freeform — accepted for tolerance, never rendered (see ElementPosition)
+  element_positions?: Partial<Record<ElementKey, ElementPosition | LegacyElementPosition>>; // freeform element geometry, mm on the PAGE box
   totals_grid:      TotalsGridConfig;
   watermark:        WatermarkConfig;
 
@@ -473,8 +473,11 @@ export type SectionMeta = {
   minHeight?: number;     // px
 };
 
-/** Freeform block position, in % of the printable content box.
- *  x = distance from the RIGHT edge (RTL), y = distance from top. */
+/** LEGACY freeform block position, in % of the printable content box.
+ *  x = distance from the RIGHT edge (RTL), y = distance from top.
+ *  Superseded by `ElementPosition` (millimetres). Kept so an old template that
+ *  still carries `positions` round-trips through the serializer untouched — the
+ *  renderer IGNORES it and falls back to the flow layout. */
 export type SectionPosition = {
   x: number;      // % from right edge
   y: number;      // % from top
@@ -504,9 +507,37 @@ export type ElementKey =
   | 'footer.signatures'
   | 'footer.stamp';
 
-/** Element-level freeform position, in % of the printable content box.
- *  Shares SectionPosition semantics: x = % from RIGHT edge (RTL), y = % from top. */
+/** How a freeform element is placed on the page.
+ *  - `fixed` — absolute box in page millimetres; the element leaves the document
+ *    flow entirely and the user owns its placement (clipped to `h` when set).
+ *  - `flow`  — stays in the normal document flow, so the box GROWS and paginates
+ *    (required for the items table across pages). In this mode `y` is a NUDGE in
+ *    millimetres from the natural flow position, NOT a page coordinate; capture
+ *    a flow element with `y: 0` and let `w` set its width. */
+export type ElementMode = 'fixed' | 'flow';
+
+/** A4 sheet in millimetres. The freeform canvas uses the PAGE (not the padded
+ *  content box) as its coordinate space, so (0,0) is the top-right corner. */
+export const A4_MM = { w: 210, h: 297 } as const;
+
+/** Freeform element geometry, in MILLIMETRES on the page box.
+ *  Shares the RTL convention: `x` is the distance from the RIGHT edge, which is
+ *  exactly what CSS `right` wants, so no flip is needed at render time. */
 export type ElementPosition = {
+  x: number;          // mm from right edge
+  y: number;          // mm from top — `mode: 'fixed'`; a nudge from the natural
+                      // flow position when `mode: 'flow'`
+  w: number;          // mm width
+  h?: number;         // mm height — fixed mode only; flow mode auto-grows
+  rotate?: number;    // degrees, clockwise
+  z?: number;         // stacking order (higher = on top)
+  mode?: ElementMode; // default 'fixed'
+};
+
+/** LEGACY percentage geometry written by the first freeform prototype
+ *  (`{ x, y, width }` in % of the padded content box). Detected by the missing
+ *  `w` and converted to millimetres on read — never written again. */
+export type LegacyElementPosition = {
   x: number;
   y: number;
   width: number;

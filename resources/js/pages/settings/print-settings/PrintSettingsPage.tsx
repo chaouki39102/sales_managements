@@ -6,7 +6,6 @@ import {
   usePrintTemplates, usePrintTemplateMutations,
 } from './api/printTemplatesApi';
 import PreviewSelector from './components/PreviewSelector';
-import A4DesignerStage from './components/A4DesignerStage';
 import { ElementDesignerStage } from './components/ElementDesignerStage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { TemplateControls } from './components/TemplateControls';
@@ -23,7 +22,6 @@ import { resolveTemplate } from './runtime';
 import type { UniversalDocumentData } from './types/data';
 import { TemplateLibraryModal } from './template-library';
 import { isStickerPaper, stickerDims, STICKER_SIZE_OPTIONS } from './components/preview/stickerDims';
-import { isFreeformTpl } from './components/preview/previewHelpers';
 import { buildDefaultSectionsOrder } from './services/layoutMigration';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useConfirm } from '@/hooks/useConfirm';
@@ -79,7 +77,6 @@ export default function PrintSettingsPage() {
   const deleteConfirm = useConfirm();
   const [useRealData,       setUseRealData]       = useState(true);
   const [showLibrary,       setShowLibrary]       = useState(false);
-  const [designerActive,    setDesignerActive]    = useState(false);
   const [puckComposerActive, setPuckComposerActive] = useState(false);
   const [elementActive,     setElementActive]     = useState(false);
 
@@ -746,36 +743,11 @@ export default function PrintSettingsPage() {
                 <i className="ti ti-printer" /> طباعة تجريبية
               </button>
             )}
-            {localTpl && !isStickerPaper(localTpl.paper_size) && localTpl.paper_size === 'A4' && localTpl.doc_type_code !== 'RPT' && (
-              <button
-                onClick={() => {
-                  const next = !designerActive;
-                  setDesignerActive(next);
-                  if (next) setPuckComposerActive(false);
-                }}
-                type="button"
-                title="تصميم السحب والإفلات"
-                aria-pressed={designerActive}
-                style={{
-                  ...toolBtnStyle,
-                  padding: '5px 11px', fontSize: 12,
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  color: designerActive ? 'var(--em)' : 'var(--t3)',
-                  borderColor: designerActive ? 'var(--em)' : 'var(--b2)',
-                  background: designerActive ? 'var(--emb)' : 'transparent',
-                  fontWeight: designerActive ? 700 : 500,
-                }}
-              >
-                <i className={`ti ${designerActive ? 'ti-eye' : 'ti-arrows-move'}`} />
-                {designerActive ? 'عرض المعاينة' : 'تصميم الحر'}
-              </button>
-            )}
-            {localTpl && !isStickerPaper(localTpl.paper_size) && localTpl.doc_type_code !== 'RPT' && !isFreeformTpl(localTpl) && (
+            {localTpl && !isStickerPaper(localTpl.paper_size) && localTpl.doc_type_code !== 'RPT' && !elementActive && (
               <button
                 onClick={() => {
                   const next = !puckComposerActive;
                   setPuckComposerActive(next);
-                  if (next) setDesignerActive(false);
                 }}
                 type="button"
                 title="إعادة ترتيب أقسام المستند بالسحب"
@@ -799,10 +771,7 @@ export default function PrintSettingsPage() {
                 onClick={() => {
                   const next = !elementActive;
                   setElementActive(next);
-                  if (next) {
-                    setDesignerActive(false);
-                    setPuckComposerActive(false);
-                  }
+                  if (next) setPuckComposerActive(false);
                 }}
                 type="button"
                 title="سحب وإفلات العناصر داخل المستند"
@@ -846,8 +815,7 @@ export default function PrintSettingsPage() {
             {localTpl ? (
               puckComposerActive
               && localTpl.doc_type_code !== 'RPT'
-              && !isStickerPaper(localTpl.paper_size)
-              && !isFreeformTpl(localTpl) ? (
+              && !isStickerPaper(localTpl.paper_size) ? (
                 <div style={{ width: '100%', maxWidth: '100%', height: '100%', minHeight: 0 }}>
                   <React.Suspense fallback={(
                     <div style={{ color: 'var(--t4)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 6 }}>
@@ -863,7 +831,7 @@ export default function PrintSettingsPage() {
                     />
                   </React.Suspense>
                 </div>
-              ) : (
+              ) :
               localTpl.paper_size === 'A4'
               && !isStickerPaper(localTpl.paper_size)
               && localTpl.doc_type_code !== 'RPT'
@@ -873,18 +841,6 @@ export default function PrintSettingsPage() {
                     tpl={localTpl}
                     data={useRealData ? previewData : null}
                     onPositionChange={(key, pos) => update('element_positions', { ...(localTpl.element_positions ?? {}), [key]: pos })}
-                  />
-                </div>
-              ) : (
-              localTpl.paper_size === 'A4'
-              && !isStickerPaper(localTpl.paper_size)
-              && localTpl.doc_type_code !== 'RPT'
-              && designerActive ? (
-                <div style={{ width: '100%', maxWidth: '100%', height: '100%', minHeight: 0 }}>
-                  <A4DesignerStage
-                    tpl={localTpl}
-                    data={useRealData ? previewData : null}
-                    onPositionsChange={(pos) => update('positions', pos)}
                   />
                 </div>
               ) : (
@@ -899,9 +855,8 @@ export default function PrintSettingsPage() {
                   </ErrorBoundary>
                 </div>
               )
-              )
-              )
-            ) : (
+            )
+            : (
               <div style={{ color: 'var(--t4)', fontSize: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
                 <i className="ti ti-device-desktop-off" style={{ fontSize: 24, opacity: 0.4 }} />
                 اختر قالباً لعرض المعاينة

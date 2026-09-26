@@ -1,11 +1,12 @@
-// Pure, React-free helpers shared by UniversalPreview (flow layout) and
-// FreeformSections / A4DesignerStage (freeform block layout). No JSX, no
-// component state — everything here is deterministic from (tpl, data).
-import type { PrintTemplate, SectionTarget, AlignOption, SectionMeta, SectionPosition } from '../../types';
+// Pure, React-free helpers shared by UniversalPreview (layout, section order,
+// rules) and the freeform designer (element geometry). No JSX, no component
+// state — everything here is deterministic from (tpl, data).
+import type { PrintTemplate, SectionTarget, AlignOption, SectionMeta } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
 import { rulesEngine, type RuleEvaluationResult } from '../../services/engines/RulesEngine';
 import { formulaEngine, type EvaluationContext, type ExpressionValue } from '../../services/engines/FormulaEngine';
 import { calculatedFieldService } from '../../services/CalculatedFieldService';
+import { hasElementGeometry } from '../../services/freeformGeometry';
 
 export function buildEvalContext(data: UniversalDocumentData): EvaluationContext {
   const t = data.totals;
@@ -94,18 +95,18 @@ export function sectionAlign(tpl: PrintTemplate, key: SectionTarget): AlignOptio
 }
 
 /**
- * A template uses the freeform block layout when it carries explicit block
- * positions on the A4 page. RPT (report) and STK (sticker) templates and any
- * non-A4 paper are always excluded — those keep their dedicated renderers.
+ * A template is in freeform mode when at least one REPORT ELEMENT carries an
+ * explicit millimetre (or legacy percentage) position. This is the single check
+ * the designer gates on to offer/hide freeform tools, and the same signal the
+ * settings UI uses to hide the legacy section-width controls.
+ *
+ * Element-level on purpose: the old block-level `tpl.positions` map is retained
+ * only so an old template deserializes without data loss — it no longer affects
+ * rendering or mode. RPT (report) and STK (sticker) templates and any non-A4
+ * paper are always excluded, since those keep their dedicated renderers.
  */
 export function isFreeformTpl(tpl: PrintTemplate): boolean {
   if (tpl.doc_type_code === 'RPT' || tpl.doc_type_code === 'STK') return false;
   if (tpl.paper_size !== 'A4') return false;
-  const positions = tpl.positions;
-  if (!positions || Object.keys(positions).length === 0) return false;
-  return true;
-}
-
-export function sectionPositionOf(tpl: PrintTemplate, key: SectionTarget): SectionPosition | undefined {
-  return tpl.positions?.[key];
+  return hasElementGeometry(tpl);
 }

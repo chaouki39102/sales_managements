@@ -1,4 +1,5 @@
 import type { DocTypeCode, PaperSize, PrintTemplate, ColumnKey, AlignOption, BorderStyle, PriceMode, PageOrientation, FontFamily } from '../types/domain';
+import { hasElementGeometry } from './freeformGeometry';
 
 export type SettingComponent = 'toggle' | 'input' | 'select' | 'pills' | 'slider' | 'color' | 'textarea' | 'column-manager' | 'rules-editor' | 'logo-upload';
 
@@ -425,11 +426,32 @@ export const COLUMN_DEFAULTS: Record<ColumnKey, ColumnDefault> = {
   total:     { header: 'المجموع',   width: 16, align: 'right'  },
 };
 
+/**
+ * Legacy layout settings that only describe where a section sits inside the
+ * normal document flow. Once a template carries freeform element geometry the
+ * real positions live in `element_positions` (millimetres on the page), so
+ * these controls are meaningless and are hidden by `isSettingVisible`.
+ *
+ * Deliberately NOT hidden: the settings INSIDE a freeform box (`col_*`,
+ * `table_*`, `items_*`) — they still govern how the table renders once the box
+ * has been placed.
+ */
+const FREEFORM_OBSOLETE_KEYS = new Set<string>([
+  'section_header_width', 'section_header_align',
+  'section_doc_info_width', 'section_doc_info_align',
+  'section_items_width', 'section_items_align',
+  'section_totals_width', 'section_totals_align',
+  'section_payments_width', 'section_payments_align',
+  'section_footer_width', 'section_footer_align',
+  'header_columns_gap', 'client_card_width',
+]);
+
 export function isSettingVisible(key: string, docType: DocTypeCode, paperSize: PaperSize, tpl?: Partial<PrintTemplate>): boolean {
   const meta = SETTINGS_REGISTRY[key];
   if (!meta) return true;
   if (!meta.supportedDocs.includes(docType)) return false;
   if (!meta.supportedPapers.includes(paperSize)) return false;
+  if (tpl && FREEFORM_OBSOLETE_KEYS.has(key) && hasElementGeometry(tpl)) return false;
 
   // Walk the dependsOn chain — a setting is only visible when ALL ancestors are satisfied
   let currentKey: string | undefined = key;

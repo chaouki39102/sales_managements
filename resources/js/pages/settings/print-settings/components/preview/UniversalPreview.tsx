@@ -1,9 +1,11 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import type { UniversalDocumentData } from '../../types/data';
 import type { PrintTemplate, SectionTarget, AlignOption } from '../../types';
 import {
   mm, fontFamily, SectionWrap,
 } from './shared';
+import { pageBoxMm } from '../../services/freeformGeometry';
+import { PrintPageProvider } from './PrintPageContext';
 import { renderHeader } from './HeaderSection';
 import { renderDocInfo } from './DocInfoSection';
 import { renderItems } from './ItemsSection';
@@ -15,11 +17,10 @@ import DeliveryReceiptA5 from './DeliveryReceiptA5';
 import { PageFrame } from './PageFrame';
 import StickerLabel from './StickerLabel';
 import { isStickerPaper, stickerDims } from './stickerDims';
-import FreeformSections from './FreeformSections';
 import { formulaEngine } from '../../services/engines/FormulaEngine';
 import {
   computeRuleResult, getOrderedSections, showSection,
-  sectionHighlight, sectionWidthPct, sectionAlign, isFreeformTpl,
+  sectionHighlight, sectionWidthPct, sectionAlign,
 } from './previewHelpers';
 
 export interface UniversalPreviewProps {
@@ -76,11 +77,22 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
     const w = sz === 'A4' ? (landscape ? '297mm' : '210mm') : sz === 'A5' ? (landscape ? '210mm' : '148mm') : sd ? `${Math.round(sd.w / 8)}mm` : sz === '80mm' ? '80mm' : '58mm';
     const h = sz === 'A4' ? (landscape ? '210mm' : '297mm') : sz === 'A5' ? (landscape ? '148mm' : '210mm') : sd ? `${Math.round(sd.h / 8)}mm` : 'auto';
     el.textContent = `
-      @page { size: ${w} ${h}; margin: ${tpl.margin_top ?? 5}mm ${tpl.margin_sides ?? 5}mm ${tpl.margin_bottom ?? 5}mm; }
+      @page { size: ${w} ${h}; margin: 0; }
       body * { visibility: hidden !important; }
       .ps-preview-wrapper { position: absolute !important; left: 0 !important; top: 0 !important; }
       .ps-preview-wrapper, .ps-preview-wrapper * { visibility: visible !important; }
-      .ps-preview-inner { width: 100% !important; min-height: auto !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; }
+      /* The wrapper IS the page (border-box width/min-height already equal the
+         sheet), so the sheet margins live in its padding and @page must NOT
+         add them again. Printing the wrapper in exact millimetres is what keeps
+         screen and paper identical. */
+      .ps-preview-wrapper {
+        width: ${w} !important;
+        min-height: ${h === 'auto' ? 'auto' : h} !important;
+        padding: ${tpl.margin_top ?? 5}mm ${tpl.margin_sides ?? 5}mm ${tpl.margin_bottom ?? 5}mm !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+      }
+      .ps-freeform-layer { position: absolute !important; inset: 0 !important; }
     `;
     return () => { if (el?.parentNode) el.parentNode.removeChild(el); };
   }, [tpl.paper_size, tpl.page_orientation, tpl.margin_top, tpl.margin_sides, tpl.margin_bottom]);
@@ -94,8 +106,11 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
   const isLandscape = !isThermal && tpl.page_orientation === 'landscape';
   const labelDims   = isSticker && isLabel ? stickerDims(tpl.paper_size) : null;
 
-  const portraitW = isA4 ? 794 : labelDims ? labelDims.w : 559;
-  const portraitH = isA4 ? 1123 : labelDims ? labelDims.h : 794;
+  // A4 screen size is derived from the SAME 3.78 px/mm the freeform geometry
+  // uses, so a millimetre position on screen lands on the same millimetre on
+  // paper (210mm is exactly 210 * 3.78px, not a rounded 794px stand-in).
+  const portraitW = isA4 ? mm(210) : labelDims ? labelDims.w : 559;
+  const portraitH = isA4 ? mm(297) : labelDims ? labelDims.h : 794;
   const paperWidth   = isThermal ? tpl.paper_width_mm * 3.78 : (isLandscape ? portraitH : portraitW);
   const minHeight    = isThermal ? 'auto' : (isLandscape ? portraitW : portraitH);
 
@@ -111,7 +126,21 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
 
   const watermark = tpl.watermark;
 
+  // Page box (paper + margins) in mm, shared with every `Pos` wrapper so fixed
+  // geometry is measured against the SHEET rather than a nested section.
+  const box = useMemo(
+    () => pageBoxMm(tpl),
+    [tpl.paper_size, tpl.page_orientation, tpl.margin_top, tpl.margin_sides, tpl.margin_bottom, tpl.paper_width_mm],
+  );
+
+  // The freeform layer is always mounted (even with no geometry yet) so the very
+  // first drag has a portal target and does not need a second render pass.
+  const [layerEl, setLayerEl] = useState<HTMLElement | null>(null);
+  const setLayerRef = useCallback((el: HTMLElement | null) => setLayerEl(el), []);
+  const pageValue = useMemo(() => ({ box, layerEl, setLayerEl }), [box, layerEl]);
+
   return (
+    <PrintPageProvider value={pageValue}>
     <div className="ps-preview-wrapper" style={{
       width: paperWidth,
       direction: 'rtl',
@@ -141,8 +170,6 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
               </div>
             ))}
           </div>
-        ) : isFreeformTpl(tpl) ? (
-          <FreeformSections tpl={tpl} data={data} paperWidth={paperWidth} />
         ) : (
           <>
             {orderedSections.map(meta => {
@@ -176,7 +203,13 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
           {watermark.text || ''}
         </div>
       )}
+      {/* Freeform layer: sits on the sheet, NOT inside a section, so an
+          absolutely positioned element is never offset by an ancestor and never
+          clipped by a section's overflow. Pointer-transparent so the flow
+          content underneath stays interactive; the fixed boxes opt back in. */}
+      <div ref={setLayerRef} className="ps-freeform-layer" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5 }} />
     </div>
+    </PrintPageProvider>
   );
 }
 

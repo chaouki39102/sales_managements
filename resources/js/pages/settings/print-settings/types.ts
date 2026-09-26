@@ -4,7 +4,8 @@ export type {
   LayoutRow, LayoutColumn, LayoutBlock, LogicalSide, LogicalAlign, CellStyle, BoxBorder, BoxSpacing,
   HeaderLayout, PageFrameConfig, TotalsGridConfig, TotalsGridColumn,
   ColumnStyleConfig, SectionMeta, WatermarkConfig,
-  SectionPosition, ElementKey, ElementPosition, StickerElementGeometry,
+  SectionPosition, ElementKey, ElementPosition, ElementMode, LegacyElementPosition,
+  StickerElementGeometry,
 } from './types/domain';
 
 export {

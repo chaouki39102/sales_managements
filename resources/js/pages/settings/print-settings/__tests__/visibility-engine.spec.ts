@@ -178,3 +178,83 @@ describe('VisibilityEngine — dependsOnValue Gating (non-toggle parents)', () =
     expect(isSettingVisible('barcode_custom_text', 'FV', '80mm', tpl)).toBe(false);
   });
 });
+
+/**
+ * The 14 legacy layout settings that only describe where a section sits inside
+ * the normal document flow. Once a template carries freeform element geometry
+ * the real positions live in `element_positions` (millimetres on the page), so
+ * these controls become meaningless.
+ *
+ * All 14 are `supportedPapers: PAGE` + `supportedDocs: ALL_DOCS` with no
+ * `dependsOn`, so FV/A4 is a clean "would normally be visible" baseline.
+ */
+const FREEFORM_OBSOLETE_KEYS = [
+  'section_header_width', 'section_header_align',
+  'section_doc_info_width', 'section_doc_info_align',
+  'section_items_width', 'section_items_align',
+  'section_totals_width', 'section_totals_align',
+  'section_payments_width', 'section_payments_align',
+  'section_footer_width', 'section_footer_align',
+  'header_columns_gap', 'client_card_width',
+];
+
+/** Settings that live INSIDE a freeform box — they must survive the gate. */
+const FREEFORM_KEPT_KEYS = [
+  'col_order', 'col_widths', 'col_show', 'col_aligns', 'col_headers',
+  'table_cell_padding', 'table_header_bg', 'table_header_bold',
+  'items_font_family', 'items_font_size',
+  'show_barcode', 'font_family',
+];
+
+describe('VisibilityEngine — freeform geometry gate', () => {
+  const geometryTpl = (positions: unknown) =>
+    makeTpl('FV', 'A4', { element_positions: positions });
+
+  it('every gated key is natively visible on FV/A4 without geometry', () => {
+    const tpl = makeTpl('FV', 'A4');
+    for (const key of FREEFORM_OBSOLETE_KEYS) {
+      expect(SETTINGS_REGISTRY[key], `${key} must exist in the registry`).toBeDefined();
+      expect(isSettingVisible(key, 'FV', 'A4', tpl), `${key} should start visible`).toBe(true);
+    }
+  });
+
+  it('hides all 14 positional keys once element geometry exists', () => {
+    const tpl = geometryTpl({ 'items.table': { x: 0, y: 0, w: 200, mode: 'flow' } });
+    for (const key of FREEFORM_OBSOLETE_KEYS) {
+      expect(isSettingVisible(key, 'FV', 'A4', tpl), `${key} should be hidden`).toBe(false);
+    }
+  });
+
+  it('a single positioned element is enough to arm the gate', () => {
+    const tpl = geometryTpl({ 'header.logo': { x: 10, y: 10, w: 20, h: 20 } });
+    expect(isSettingVisible('section_header_width', 'FV', 'A4', tpl)).toBe(false);
+  });
+
+  it('keeps the gate armed for legacy percentage geometry (width instead of w)', () => {
+    const tpl = geometryTpl({ 'header.logo': { x: 0, y: 0, width: 20 } });
+    expect(isSettingVisible('client_card_width', 'FV', 'A4', tpl)).toBe(false);
+  });
+
+  it('an empty or absent element_positions map leaves the layout controls alone', () => {
+    for (const positions of [{}, undefined, null]) {
+      const tpl = geometryTpl(positions);
+      for (const key of FREEFORM_OBSOLETE_KEYS) {
+        expect(isSettingVisible(key, 'FV', 'A4', tpl), `${key} should stay visible`).toBe(true);
+      }
+    }
+  });
+
+  it('never hides the settings that render INSIDE a freeform box', () => {
+    const tpl = geometryTpl({ 'items.table': { x: 0, y: 0, w: 200, mode: 'flow' } });
+    for (const key of FREEFORM_KEPT_KEYS) {
+      expect(SETTINGS_REGISTRY[key], `${key} must exist in the registry`).toBeDefined();
+      expect(isSettingVisible(key, 'FV', 'A4', tpl), `${key} must stay visible`).toBe(true);
+    }
+  });
+
+  it('leaves a template with no tpl argument untouched (gate is opt-in)', () => {
+    for (const key of FREEFORM_OBSOLETE_KEYS) {
+      expect(isSettingVisible(key, 'FV', 'A4')).toBe(true);
+    }
+  });
+});
