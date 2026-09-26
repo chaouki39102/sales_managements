@@ -5,6 +5,7 @@ import type { ElementKey, PrintTemplate } from '../../types';
 import {
   fixedBoxStyle,
   flowBoxStyle,
+  isFreeformTemplate,
   normalizeElementGeometry,
   pageBoxMm,
   hasElementGeometry,
@@ -41,8 +42,10 @@ export function Pos({ dragKey, tpl, children }: PosProps) {
   const ownBox = useMemo(() => pageBoxMm(tpl), [tpl]);
   const box = ctxBox ?? ownBox;
   const geo = useMemo(
-    () => normalizeElementGeometry(tpl.element_positions?.[dragKey], box),
-    [tpl.element_positions, dragKey, box],
+    () => (isFreeformTemplate(tpl)
+      ? normalizeElementGeometry(tpl.element_positions?.[dragKey], box)
+      : null),
+    [tpl, dragKey, box],
   );
 
   if (!geo) {

@@ -172,6 +172,27 @@ export function hasElementGeometry(tpl: Pick<PrintTemplate, 'element_positions'>
   return (Object.keys(raw) as ElementKey[]).some(k => !!raw[k] && typeof raw[k] === 'object');
 }
 
+/** Is this template allowed to render stored geometry AT ALL?
+ *
+ *  Freeform is an A4-only feature: RPT keeps its own multi-page report
+ *  renderer, STK its own label renderer, and thermal/roll papers (80mm/58mm) or
+ *  A5 have page boxes that cannot hold millimetres measured against an A4 sheet.
+ *  A template that was designed on A4 and later switched to another paper can
+ *  still carry geometry in its config, so the renderer must be able to ask
+ *  "may I apply this?" — otherwise stale A4 boxes would be laid out on an 80mm
+ *  roll.
+ *
+ *  This is the SSOT for that decision: the settings registry, the designer gate
+ *  and `Pos` all go through it, so no two copies can drift.
+ */
+export function isFreeformTemplate(
+  tpl: Pick<PrintTemplate, 'doc_type_code' | 'paper_size' | 'element_positions'>,
+): boolean {
+  if (tpl.doc_type_code === 'RPT' || tpl.doc_type_code === 'STK') return false;
+  if (tpl.paper_size !== 'A4') return false;
+  return hasElementGeometry(tpl);
+}
+
 /** Absolute box for `mode: 'fixed'`. */
 export function fixedBoxStyle(geo: ResolvedGeometry): CssLike {
   return {

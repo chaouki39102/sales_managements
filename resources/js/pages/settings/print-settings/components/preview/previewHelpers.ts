@@ -6,7 +6,7 @@ import type { UniversalDocumentData } from '../../types/data';
 import { rulesEngine, type RuleEvaluationResult } from '../../services/engines/RulesEngine';
 import { formulaEngine, type EvaluationContext, type ExpressionValue } from '../../services/engines/FormulaEngine';
 import { calculatedFieldService } from '../../services/CalculatedFieldService';
-import { hasElementGeometry } from '../../services/freeformGeometry';
+import { isFreeformTemplate } from '../../services/freeformGeometry';
 
 export function buildEvalContext(data: UniversalDocumentData): EvaluationContext {
   const t = data.totals;
@@ -104,9 +104,10 @@ export function sectionAlign(tpl: PrintTemplate, key: SectionTarget): AlignOptio
  * only so an old template deserializes without data loss — it no longer affects
  * rendering or mode. RPT (report) and STK (sticker) templates and any non-A4
  * paper are always excluded, since those keep their dedicated renderers.
+ *
+ * The predicate itself lives in `freeformGeometry.ts` (`isFreeformTemplate`) so
+ * the settings registry, the designer gate and `Pos` cannot drift apart.
  */
 export function isFreeformTpl(tpl: PrintTemplate): boolean {
-  if (tpl.doc_type_code === 'RPT' || tpl.doc_type_code === 'STK') return false;
-  if (tpl.paper_size !== 'A4') return false;
-  return hasElementGeometry(tpl);
+  return isFreeformTemplate(tpl);
 }

@@ -5,6 +5,7 @@ import {
   normalizeElementGeometry,
   resolveGeometryMap,
   hasElementGeometry,
+  isFreeformTemplate,
   fixedBoxStyle,
   flowBoxStyle,
   geometryToPx,
@@ -128,6 +129,31 @@ describe('freeformGeometry — map helpers', () => {
     expect(hasElementGeometry({ element_positions: { 'header.logo': { x: 0, y: 0, w: 1 } } } as never)).toBe(true);
     expect(hasElementGeometry({ element_positions: {} } as never)).toBe(false);
     expect(hasElementGeometry({} as never)).toBe(false);
+  });
+});
+
+describe('freeformGeometry — isFreeformTemplate', () => {
+  const withGeo = { element_positions: { 'header.logo': { x: 5, y: 5, w: 40 } } };
+
+  it('accepts an A4 document template that carries geometry', () => {
+    expect(isFreeformTemplate({ doc_type_code: 'FV', paper_size: 'A4', ...withGeo } as never)).toBe(true);
+    expect(isFreeformTemplate({ doc_type_code: 'POS', paper_size: 'A4', ...withGeo } as never)).toBe(true);
+  });
+
+  it('rejects templates without any geometry', () => {
+    expect(isFreeformTemplate({ doc_type_code: 'FV', paper_size: 'A4' } as never)).toBe(false);
+    expect(isFreeformTemplate({ doc_type_code: 'FV', paper_size: 'A4', element_positions: {} } as never)).toBe(false);
+  });
+
+  it('rejects report and sticker templates, which own dedicated renderers', () => {
+    expect(isFreeformTemplate({ doc_type_code: 'RPT', paper_size: 'A4', ...withGeo } as never)).toBe(false);
+    expect(isFreeformTemplate({ doc_type_code: 'STK', paper_size: '40x20mm', ...withGeo } as never)).toBe(false);
+  });
+
+  it('rejects every non-A4 paper, so stale A4 boxes are never laid out on a roll', () => {
+    for (const paper of ['80mm', '58mm', 'A5', '30x20mm', '60x40mm', '80x50mm', '100x50mm']) {
+      expect(isFreeformTemplate({ doc_type_code: 'FV', paper_size: paper, ...withGeo } as never)).toBe(false);
+    }
   });
 });
 
