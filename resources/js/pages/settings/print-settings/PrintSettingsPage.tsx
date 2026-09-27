@@ -738,7 +738,6 @@ export default function PrintSettingsPage() {
             )}
             {localTpl && (
               <button onClick={handleTestPrint} type="button"
-                data-testid="ps-test-print"
                 style={{
                   ...toolBtnStyle,
                   padding: '5px 11px', fontSize: 12,
