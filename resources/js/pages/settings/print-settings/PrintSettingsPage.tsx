@@ -841,6 +841,11 @@ export default function PrintSettingsPage() {
                     tpl={localTpl}
                     data={useRealData ? previewData : null}
                     onPositionChange={(key, pos) => update('element_positions', { ...(localTpl.element_positions ?? {}), [key]: pos })}
+                    onResetElement={(key) => {
+                      const next = { ...(localTpl.element_positions ?? {}) };
+                      delete next[key];
+                      update('element_positions', next);
+                    }}
                   />
                 </div>
               ) : (

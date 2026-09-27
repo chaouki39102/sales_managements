@@ -283,9 +283,14 @@ export const FLOW_FIRST_ELEMENTS: ReadonlySet<string> = new Set<string>(['items.
 
 /** The mode a freshly captured element should get.
  *
- *  An element that is ALREADY flow or fixed keeps that mode — re-dragging must
- *  never silently promote a paginating table to a clipped fixed box. Only an
- *  element with no stored mode falls back to the element's natural default.
+ *  A flow-first element is ALWAYS `flow`, even when it already stores `fixed`:
+ *  its content can exceed one page, so a fixed box would clip every row past
+ *  the first page and stop `<thead>` from repeating. Forcing it here self-heals
+ *  templates captured before the guard existed — this is the read-side chokepoint
+ *  that both the designer and `Pos` go through.
+ *
+ *  Every other element keeps its stored mode — re-dragging must never silently
+ *  change a deliberate fixed/flow choice.
  *
  *  A captured `flow` element must store `y: 0` (natural placement): `geo.y`
  *  from `rectToGeometry` is an ABSOLUTE page offset, and `flowBoxStyle` reads
@@ -296,9 +301,48 @@ export function defaultElementMode(
   key: string,
   prev?: { mode?: ElementMode } | null,
 ): ElementMode {
+  if (FLOW_FIRST_ELEMENTS.has(key)) return 'flow';
   if (prev?.mode === 'flow') return 'flow';
   if (prev?.mode === 'fixed') return 'fixed';
-  return FLOW_FIRST_ELEMENTS.has(key) ? 'flow' : 'fixed';
+  return 'fixed';
+}
+
+/** Switch an element between the two placement modes, dropping the fields the
+ *  target mode does not read.
+ *
+ *  Going fixed → flow must CLEAR `h` (a height captured on the page would pin
+ *  the auto-growing box to one page and silently break pagination), plus
+ *  `rotate`/`z` and the page coordinate `x`. `y` is re-based to `0` because in
+ *  flow it is a NUDGE from the natural position, not a page offset — carrying a
+ *  measured page offset over would displace the element twice.
+ *
+ *  Going flow → fixed keeps the width and re-clamps to the page; `y: 0` means
+ *  "top of the natural slot", which is the correct absolute reading for a fixed
+ *  box captured out of the flow. An already-`fixed` geometry is only re-clamped.
+ *
+ *  A flow-first element can NEVER be promoted to `fixed`, even when the caller
+ *  asks for it. `FLOW_FIRST_ELEMENTS` is the invariant guard, not merely a
+ *  default: `items.table` growing across pages is the whole point of the table,
+ *  so an explicit `fixed` request is downgraded to the flow geometry rather than
+ *  clipping every row past the first page. Pass `key` to get that guard — this
+ *  is the ONE place the rule is enforced, so the inspector, the drag commit and
+ *  any future caller cannot diverge.
+ */
+export function applyMode(
+  geo: ResolvedGeometry,
+  mode: ElementMode,
+  box: PageBox,
+  key?: string,
+): ResolvedGeometry {
+  const target: ElementMode = key && FLOW_FIRST_ELEMENTS.has(key) ? 'flow' : mode;
+  // `flow` is always rebuilt from scratch, even when the geometry already claims
+  // to be flow: a stale `h`/`x`/`y` captured by an older build must not survive
+  // and re-pin the box. That keeps the call idempotent AND canonical.
+  if (target === 'flow') {
+    return clampGeometry({ x: 0, y: 0, w: geo.w, rotate: 0, z: 0, mode: 'flow' }, box);
+  }
+  if (geo.mode === 'fixed') return clampGeometry(geo, box);
+  return clampGeometry({ x: geo.x, y: geo.y, w: geo.w, rotate: geo.rotate, z: geo.z, mode: 'fixed' }, box);
 }
 
 /** Convert legacy percentage geometry to millimetres for every stored element.

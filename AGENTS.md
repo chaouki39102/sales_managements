@@ -22,6 +22,36 @@
 ## Date
 2026-09-07
 
+### Phase 93 — Print Freeform Designer: Numeric mm Inspector + 3-Way Mode Switch + Reset (Sep 7)
+
+**Request**: the freeform designer (Phases built on `0d03a28` / `6e82f3b`) let you drag an element and showed no numbers, no way back, and no way to change an element's placement mode. Add a numeric millimeter inspector, a per-element reset, and explicit mode control; then document the invariants.
+
+**What was built**:
+- **Numeric mm inspector** (`ElementDesignerStage.tsx`): clicking an element selects it and opens an Arabic inspector row — `ELEMENT_LABELS` maps every real `ElementKey` (`header.company-name`, `items.table`, `footer.qr`, …) to a display name, with the raw key shown as a `<code>` hint. Fields are `type="number"` mm inputs: X (from the right edge), Y (from the top), W, H, rotation, layer, plus ▲▼/◀▶ nudge buttons. Commit goes through `clampGeometry` so a typed value can never escape the page box.
+- **Measured-geometry fallback**: an element with NO stored geometry still shows real numbers — a `useEffect` measures its DOM rect against `.ps-preview-wrapper` and feeds `measuredGeometryOf`, so committing one field doesn't blank the others.
+- **THREE-way mode switch — `تلقائي` / `ثابت` / `تدفّق`**: reads `shownMode` from the STORE (`stored ? stored.mode : 'auto'`) instead of guessing `defaultElementMode`. `تلقائي` calls `onResetElement`.
+- **Per-element reset** (`PrintSettingsPage.tsx`): `onResetElement` clones `localTpl.element_positions ?? {}`, **`delete`s** the key, and calls `update`. It replaces the separate reset button so the mode selector is the single control for placement.
+- **`applyMode(geo, mode, box, key?)`** (NEW in `freeformGeometry.ts`): the ONE mode-switch policy. `fixed → flow` clears `h`/`rotate`/`z`/`x` and re-bases `y` to `0`; `flow → fixed` keeps width and re-clamps; an already-`fixed` geometry is only re-clamped. A `flow` target is ALWAYS rebuilt from scratch so a stale `h`/`x`/`y` written by an older build cannot re-pin the box (idempotent + canonical). Covered by 5 tests (46 in that file).
+- **`FLOW_FIRST_ELEMENTS` is an INVARIANT guard, not a default.** `items.table` can NEVER become `fixed`, and it is enforced in **two** places: `defaultElementMode` returns `flow` for a flow-first key **even when it already stores `fixed`** (self-heals templates captured before the guard existed), and `applyMode(..., key)` downgrades an explicit `fixed` request to the flow geometry. The inspector additionally renders the `ثابت` button `disabled` with an explanatory title, because silently ignoring the click would look broken.
+- **Drag snapping**: `x`/`y`/`w`/`h` are passed through `snapMm(...)` (1 mm) **on drop only**.
+- **Keyboard nudging**: window `keydown` — arrows = 1 mm, Shift+arrows = 5 mm. Registered once with a refs mirror (`nudgeRef`/`selectedRef`), yields to `input, textarea, select, [contenteditable="true"], .ov`.
+- **Empty-area deselect**: `onPointerDown` on the stage root clears the selection when the click misses every `[data-drag-key]`.
+- Exported `PageBox` and `ResolvedGeometry` from `freeformGeometry.ts` so the stage no longer re-declares those shapes.
+
+**Key architectural rules**:
+- **`x` is from the RIGHT edge, `y` from the TOP**, in page millimetres — `MM_PER_PX = 1 / 3.78` in `freeformGeometry.ts` is the single conversion SSOT. Never introduce a second px↔mm constant.
+- **"No stored geometry" is a THIRD state, not `fixed`.** `Pos` renders it as `data-ff-mode="auto"` + `display: contents` (natural document flow). The mode selector must read the truth from the store — deriving the label from `defaultElementMode(key, null)` makes the UI claim "ثابت" for an element that is actually in flow.
+- **A mode switch must DROP the fields the target mode doesn't read.** fixed → flow MUST clear `h`: a height measured on the page pins the auto-growing box to one page height and silently breaks table pagination. `y` must be re-based to `0` because in flow it is a NUDGE from the natural slot, not a page offset (carrying a measured offset displaces the element twice).
+- **Reset = DELETE the key, never a merge write.** `onPositionChange` merges into the existing entry, so a "reset" patch would leave every old field in place; only `onResetElement`'s `delete` truly returns an element to natural flow.
+- **Snap on DROP, not during `pointermove`.** A 1 mm jump every frame reads as a broken drag — the box must track the pointer 1:1 while moving and land on a clean number when released.
+- **`items.table` must never be pinned** — `FLOW_FIRST_ELEMENTS` is the invariant guard, enforced in `defaultElementMode` (read side, self-healing) AND `applyMode` (write side); the inspector can change an items table to flow but the table keeps growing across pages.
+- **Freeform is A4-only.** `isFreeformTpl()` excludes RPT and STK, and A5/thermal previews are excluded at the entry gate — never apply A4 millimetre boxes to another paper size.
+- A global `keydown` handler must yield to text entry (`input, textarea, select, [contenteditable], .ov`) or it fights arrow-editable number inputs and modals.
+
+**Files modified (5 + SW + doc)**: `components/ElementDesignerStage.tsx` (inspector, labels, 3-way switch, snapping, keyboard nudge, measured fallback, deselect); `PrintSettingsPage.tsx` (`onResetElement`); `services/freeformGeometry.ts` (`applyMode` + `PageBox`/`ResolvedGeometry` exports + flow-first guard in `defaultElementMode`); `__tests__/freeform-geometry.spec.ts` (+5 `applyMode` cases, +1 self-heal case); `public/sw.js` (refreshed by build); `AGENTS.md` (this phase). Baseline pushed as `0d03a28` + `6e82f3b`.
+
+**Verification**: `npx tsc --noEmit` clean · vitest **509/509** (28 files; `freeform-geometry.spec.ts` 46/46) · `npm run build` 0 errors, **259 precache entries** · **SW MATCH** (`public/sw.js` hash == `public/build/sw.js` hash). No PHP touched → pest not re-run. **Deferred**: 8-handle resizing; browser print smoke (A4/A5/thermal) still pending.
+
 ### Phase 92 — Tailscale Funnel Public-Ingress Health Probe + Self-Heal (Sep 7)
 
 **Request (follow-up to Phase 67)**: after the 2026-09-07 incident — the public order page was unreachable from an external phone while `tailscale funnel status` still printed "Funnel on". The status check only proves the LOCAL config; on this PC the ts.net name resolves to the MagicDNS 100.x tailnet IP and still answers while the PUBLIC ingress backhaul is dead, so a status-only guard cannot detect an outage. Both funnel-maintaining scripts must probe the PUBLIC path and self-heal. User approved the hardening.

@@ -12,6 +12,7 @@ import {
   rectToGeometry,
   clampGeometry,
   snapMm,
+  applyMode,
   migrateLegacyGeometry,
   defaultElementMode,
   FLOW_FIRST_ELEMENTS,
@@ -282,6 +283,57 @@ describe('freeformGeometry — snapMm', () => {
   });
 });
 
+describe('freeformGeometry — applyMode', () => {
+  const box: PageBox = a4();
+
+  it('fixed → flow drops the page coordinate, height, rotation and layer', () => {
+    const out = applyMode(
+      { x: 40, y: 120, w: 90, h: 30, rotate: 15, z: 4, mode: 'fixed' },
+      'flow',
+      box,
+    );
+    expect(out.mode).toBe('flow');
+    expect(out.x).toBe(0);
+    // `y` is a NUDGE in flow, so a measured page offset must not survive.
+    expect(out.y).toBe(0);
+    expect(out.h).toBeUndefined();
+    expect(out.rotate).toBe(0);
+    expect(out.z).toBe(0);
+    expect(out.w).toBe(90);
+  });
+
+  it('flow → fixed keeps the width and re-clamps the box onto the page', () => {
+    const out = applyMode({ x: 0, y: 0, w: 260, rotate: 0, z: 0, mode: 'flow' }, 'fixed', box);
+    expect(out.mode).toBe('fixed');
+    expect(out.w).toBe(210);
+    expect(out.x).toBe(0);
+  });
+
+  it('is a no-op re-clamp when the mode is unchanged', () => {
+    const geo = { x: 10, y: 20, w: 30, h: 40, rotate: 0, z: 0, mode: 'fixed' } as const;
+    expect(applyMode(geo, 'fixed', box)).toEqual(geo);
+  });
+
+  it('refuses to pin a flow-first element even when fixed is requested', () => {
+    // `items.table` growing across pages IS the feature; an absolute mm box
+    // would clip every row past the first page and stop `<thead>` repeating.
+    const out = applyMode(
+      { x: 0, y: 0, w: 180, h: 40, rotate: 0, z: 0, mode: 'flow' },
+      'fixed',
+      box,
+      'items.table',
+    );
+    expect(out.mode).toBe('flow');
+    expect(out.h).toBeUndefined();
+    expect(out.w).toBe(180);
+  });
+
+  it('still honours fixed for a normal element even when a key is passed', () => {
+    const out = applyMode({ x: 0, y: 0, w: 260, rotate: 0, z: 0, mode: 'flow' }, 'fixed', box, 'header.logo');
+    expect(out.mode).toBe('fixed');
+  });
+});
+
 describe('freeformGeometry — migrateLegacyGeometry', () => {
   const box: PageBox = a4();
 
@@ -315,8 +367,15 @@ describe('freeformGeometry — defaultElementMode', () => {
   });
 
   it('keeps an element that is already fixed', () => {
-    expect(defaultElementMode('items.table', { mode: 'fixed' })).toBe('fixed');
     expect(defaultElementMode('header.logo', { mode: 'fixed' })).toBe('fixed');
+    expect(defaultElementMode('totals.block', { mode: 'fixed' })).toBe('fixed');
+  });
+
+  it('self-heals a flow-first element that was captured as fixed', () => {
+    // A template stored before the guard existed can still hold `mode: 'fixed'`
+    // for the table. Reading it back as `flow` repairs the clipped pagination
+    // instead of perpetuating it.
+    expect(defaultElementMode('items.table', { mode: 'fixed' })).toBe('flow');
   });
 
   it('defaults a never-positioned paginating element to flow', () => {
