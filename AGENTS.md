@@ -50,7 +50,38 @@
 
 **Files modified (5 + SW + doc)**: `components/ElementDesignerStage.tsx` (inspector, labels, 3-way switch, snapping, keyboard nudge, measured fallback, deselect); `PrintSettingsPage.tsx` (`onResetElement`); `services/freeformGeometry.ts` (`applyMode` + `PageBox`/`ResolvedGeometry` exports + flow-first guard in `defaultElementMode`); `__tests__/freeform-geometry.spec.ts` (+5 `applyMode` cases, +1 self-heal case); `public/sw.js` (refreshed by build); `AGENTS.md` (this phase). Baseline pushed as `0d03a28` + `6e82f3b`.
 
-**Verification**: `npx tsc --noEmit` clean · vitest **509/509** (28 files; `freeform-geometry.spec.ts` 46/46) · `npm run build` 0 errors, **259 precache entries** · **SW MATCH** (`public/sw.js` hash == `public/build/sw.js` hash). No PHP touched → pest not re-run. **Deferred**: 8-handle resizing; browser print smoke (A4/A5/thermal) still pending.
+**Verification**: `npx tsc --noEmit` clean · vitest **509/509** (28 files; `freeform-geometry.spec.ts` 46/46) · `npm run build` 0 errors, **259 precache entries** · **SW MATCH** (`public/sw.js` hash == `public/build/sw.js` hash). No PHP touched → pest not re-run. **Deferred**: 8-handle resizing; a PHYSICAL printer smoke (A4/A5/thermal) — the browser-level print coverage arrived in the follow-up below.
+
+### Phase 93 follow-up — Freeform Browser Coverage (Playwright 50/50) + 3 Real Interaction Bugs (Sep 7)
+
+**Request**: "continue" — close the browser-coverage gap for Phase 93: get the Playwright suite fully green and prove the new inspector in a real browser.
+
+**Three REAL bugs the browser tests exposed** (not flakes — the failing create-product case reproduced deterministically, and a warm-cache assumption was the wrong first read):
+1. **Click-to-select silently PINNED the element.** `finishDrag` ran on every `pointerup`, so a press that never travelled still committed a fixed box and reported the mode as `ثابت`. A 1px `DRAG_THRESHOLD_PX` now marks the gesture inside `pointermove`; a press without travel returns early and leaves the store alone, so the element keeps reading `تلقائي` until it is actually placed. The dashed outline + `user-select` lock moved from `pointerdown` to first movement, so a plain click never shows drag affordances.
+2. **The `ثابت` button was DEAD.** `setMode` guarded `active.mode === next`, but with nothing stored `active.mode` already resolves to `'fixed'` — the guard returned early and wrote nothing. It now guards on `shownMode` (the mode the STORE reports), so automatic → ثابت genuinely persists the measured box and becomes a real pin.
+3. **Clicking the inspector cleared its own selection.** The inspector row is a CHILD of the stage root, so the empty-area deselect matched the mode buttons and the mm inputs. Deselect now ignores `[data-ff-inspector]`.
+
+**New coverage**:
+- `freeform-designer.pw.spec.ts` (6 tests): selecting an element opens it in `تلقائي` showing its real key; `ثابت` → `تدفّق` → `تلقائي` round-trips and drops the fields each mode ignores; `items.table`'s fixed button is disabled + explained; arrows nudge 1 mm and Shift+arrows 5 mm; typed millimetres clamp inside the page box; clicking empty page area deselects.
+- `paper-gate.pw.spec.ts` (4 tests): **freeform is A4-ONLY** — A4 exposes the designer entry and the mm stage, while A5 / 80mm / 58mm render the normal preview with no freeform affordances (so A4 boxes can never reach another paper).
+
+**Four rotted specs repaired**:
+- `print-settings-e2e` — a `//`-style JSX comment nested inside JSX made the file fail to PARSE, so the entire 4-test suite had been silently never running. Now 4/4.
+- `fiscalqr` — the footer QR moved into the freeform designer on A4, so the old selector matched a HIDDEN non-freeform `img` and asserted a stale SVG. Now scoped to `.ps-preview-wrapper:visible` and asserts a real raster QR.
+- `barcode-scan` — `GlobalDocumentFAB` is hidden on `/documents/*`, so the FV case now opens the type menu from `/dashboard`. The seeded type is `فـاتـورة مبيعات` (tatweel): an exact Arabic match misses, and a bare `/مبيعات/` also hits the sidebar `المبيعات` — the locator is scoped to the quick-create type menu.
+- `camera-capture` — both toasts auto-close at 4 s, so under a cold/loaded browser the earlier one could expire before the assertion polled. Raised to a 20 s budget and added `pageerror`/`console` logging so a future failure reports WHY instead of a bare "element not found".
+
+**Key architectural rules**:
+- **A pointer gesture must declare its own intent before it mutates the store.** `pointerdown` starts a gesture and `pointerup` commits it — but only if the pointer actually TRAVELLED. Without a threshold flag a plain click is indistinguishable from a 0 px drag and silently writes geometry.
+- **Guard a mode switch on the mode the STORE reports, never on the resolved geometry.** `active.mode` is already `fixed` when no box is stored, so guarding on it makes the fixed button a no-op exactly when the user needs it. (This extends the "no stored geometry is a THIRD state" rule above to the button's early-return logic.)
+- **An overlay rendered INSIDE a click-to-dismiss root must exclude itself from that root's hit test.** The inspector is a child of the stage, so `[data-ff-inspector]` belongs in the deselect `closest()` selector — otherwise editing a control clears the selection it edits.
+- **A browser assertion on a TRANSIENT toast needs a budget wider than the toast's own `autoClose`,** or the test races the UI it verifies. Assert the durable contract (the network counters) for correctness; treat the toast as feedback only.
+- **`data-ff-stage=""` is the only honest "designer is open" signal.** `Pos` emits `data-drag-key` / `data-ff-mode` in the INERT normal preview too, so neither can distinguish live dragging from a dead layer.
+- Specs that bind to repeated Arabic label chains rot silently. `data-testid` hooks on the doc category/tab, template, paper, designer entry, test-print and save controls make the specs structural rather than textual.
+
+**Files modified (8 + SW + doc)**: `components/ElementDesignerStage.tsx` (3 fixes + `data-ff-stage`); `PrintSettingsPage.tsx` (6 `data-testid` hooks); NEW `__tests__/freeform-designer.pw.spec.ts`; NEW `__tests__/paper-gate.pw.spec.ts`; `__tests__/{barcode-scan,camera-capture,fiscalqr,print-settings-e2e}.pw.spec.ts`; `public/sw.js` (refreshed by build); `AGENTS.md` (this follow-up). Commits `00e4849` + `56a2f9c`, both pushed.
+
+**Verification**: Playwright **50/50** (3 workers, 47.7 s) · vitest **509/509** (28 files) · `npx tsc --noEmit` clean · **SW MATCH** (`public/sw.js` hash == `public/build/sw.js` hash) · worktree clean, `main` in sync at `56a2f9c`. No PHP touched → pest not re-run. **Deferred**: 8-handle resizing; a PHYSICAL printer smoke — `paper-gate` + `silent-print` cover the RENDER and the silent-print REQUEST against mocks, not a real spooler.
 
 ### Phase 92 — Tailscale Funnel Public-Ingress Health Probe + Self-Heal (Sep 7)
 
