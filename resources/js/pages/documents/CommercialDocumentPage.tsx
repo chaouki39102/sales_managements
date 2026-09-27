@@ -477,16 +477,10 @@ export default function CommercialDocumentPage() {
             style={narrow ? undefined : ({ '--party-col-h': `${partyMaxHeight ?? 320}px` } as React.CSSProperties)}
           >
             <DocumentHeaderBand
-              variant="party-card"
-              docCode={docCode}
               isEdit={isEdit}
               isReadOnly={isReadOnly}
               isLinesReadOnly={isLinesReadOnly}
               isPurchase={isPurchase}
-              needsParty={needsParty}
-              compact={compact}
-              narrow={narrow}
-              maxHeight={narrow ? undefined : partyMaxHeight}
               form={form as unknown as Record<string, unknown>}
               errors={errors}
               set={set}
