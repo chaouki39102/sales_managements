@@ -48,6 +48,28 @@
 
 **Deferred / explicitly not touched**: every backend template — including all six A4/A5 ones and the client-installable `dz-invoice-a4` — carries `paper_width_mm => 80` in its config, so the A4-A5 `paper_width_mm` pollution ruled out in Phase 11 is still, harmlessly, present across the whole library. It is a **library-wide convention, not a parity bug**: `paper_size` (what the picker honours) is `A4`/`A5`/`80mm`/`40x20mm` and always inside the client `PaperSize` union, and the A4/A5 renderers ignore `paper_width_mm`, so nothing renders wrong; stripping the key from six templates would change nothing visible while touching six payloads, so it is deliberately left. Backend-only `show_ice` / `payment_term_text` config key names are NOT renamed to their client names, because the rename would change rendered output. A real Windows **spooler** smoke is still uncovered (Phase 85) — `paper-gate` and `silent-print` only prove the render + the silent-print request.
 
+### Phase 94 follow-up — Portal Document Detail: Strip On-Screen UI Chrome From the Print (Sep 27)
+
+**Request**: printing a portal order (`CMD-2026-000001`, `2026-08-03`, `553.00`) put the on-screen document header and metadata block onto the paper around the real content. User confirmed the reading: the block "prints but shouldn't".
+
+**Root cause**: `PortalDocumentDetailPage` prints with a raw `window.print()`, and the single `@media print` block in `resources/css/theme/portal.css` (line 2279) hid only *generic* chrome (`.portal-hd`, `.portal-mobile-bar`, `.portal-toolbar`, `.portal-nav`, `.portal-btn`, `.portal-print-btn`, `.portal-pager`, `.portal-actions`). The detail page's own blocks were never listed, so they printed: `.portal-doc-hd` (invoice number + type + status badge), `.portal-doc-meta` (التاريخ / تاريخ الاستحقاق / المبلغ الإجمالي TTC / المدفوع / المتبقي), the status-step tracker, and the `تقدم السداد` progress bar.
+
+**What was built**:
+- `PortalDocumentDetailPage.tsx` — added two print hooks: `portal-doc-steps` on the `StatusSteps` card and `portal-doc-progress` on the payment-progress card. Both are otherwise anonymous `.portal-card` elements, so the print block had no selector that could reach them; these classes exist ONLY for the print hide list and deliberately carry no base CSS rule.
+- `portal.css` — ONE added line inside `@media print` hiding `.portal-doc-hd, .portal-doc-meta, .portal-doc-steps, .portal-doc-progress`. The products table, totals summary and linked-payments table keep printing.
+
+**Key architectural rules**:
+- A raw `window.print()` prints the WHOLE on-screen tree, so the print stylesheet must enumerate the page's chrome by class — "hide the global nav" does not cover page-local cards. When a page's chrome is anonymous, add a namespaced class purely as a print hook; never reach for `:nth-of-type` or `:has()`.
+- **Print rules must be scoped by owning page.** `.portal-doc-hd`/`.portal-doc-meta` were grep-verified to be used ONLY in `PortalDocumentDetailPage.tsx`, so hiding them in the shared `@media print` block has no cross-page blast radius. Check a class is single-consumer BEFORE adding it to a shared media block.
+- `portal.css` has exactly ONE `@media print` block (line 2279), so there is no end-of-file override to fight (the Phase 63/64 trap).
+- On-screen metadata is not document content: the customer's authoritative printed document goes through the print-template pipeline (`TemplatePrintModal`), never this page's `window.print()`.
+
+**Files committed (3)**: `resources/css/theme/portal.css`; `resources/js/pages/portal/PortalDocumentDetailPage.tsx`; `public/sw.js` (refreshed by the build; the delta is exactly 2 content-hashed `assets/` lines).
+
+**Verification**: `npx tsc --noEmit` clean · `npx eslint` on the touched page → 0 errors, 1 pre-existing `no-restricted-syntax` warning (raw `useQuery()` in `pages/`, untouched) · `npm test` **509/509** (28 files) · `npm run build` 0 errors, **259 precache entries** (unchanged), **SW MATCH** · `git diff --check` clean. No PHP touched → pest not re-run.
+
+**Deferred**: the printed copy no longer carries the invoice number, date, status or totals — that was the reported offender, so it is intentional. If a physical copy must be self-identifying, re-add number/date as a print-only `@page` header rather than by un-hiding the on-screen block.
+
 ## Date
 2026-09-07
 

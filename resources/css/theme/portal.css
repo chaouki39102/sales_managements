@@ -2279,6 +2279,7 @@ html.dark .portal-prod-discs--ov .portal-disc-chip { background: rgba(20,22,28,.
 @media print {
   .portal-hd, .portal-mobile-bar, .portal-toolbar, .portal-nav, .portal-btn,
   .portal-print-btn, .portal-pager, .portal-actions { display: none !important; }
+  .portal-doc-hd, .portal-doc-meta, .portal-doc-steps, .portal-doc-progress { display: none !important; }
   .portal-body { padding: 0; max-width: 100%; }
   .portal-card { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
 }

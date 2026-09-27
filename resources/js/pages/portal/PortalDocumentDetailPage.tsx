@@ -62,7 +62,7 @@ export default function PortalDocumentDetailPage() {
       </div>
 
       {/* ─── خطوات الحالة ─── */}
-      <div className="portal-card portal-mb-16">
+      <div className="portal-card portal-doc-steps portal-mb-16">
         <div className="portal-card-bd">
           <StatusSteps steps={statusSteps} />
         </div>
@@ -93,7 +93,7 @@ export default function PortalDocumentDetailPage() {
       </div>
 
       {/* ─── شريط السداد ─── */}
-      <div className="portal-card portal-mb-20">
+      <div className="portal-card portal-doc-progress portal-mb-20">
         <div className="portal-card-bd">
           <div className="portal-between portal-mb-8">
             <span className="portal-doc-prog-title">
