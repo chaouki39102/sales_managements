@@ -11,7 +11,15 @@ interface ActiveDrag {
   wrapper: HTMLElement;
   startX: number;
   startY: number;
+  /** A press that never travels is a SELECTION, not a drag. Without this flag a
+   *  plain click wrote a fixed box on pointerup, silently pinning an element the
+   *  user had only clicked — and reporting its mode as "ثابت" instead of
+   *  "تلقائي". */
+  moved: boolean;
 }
+
+/** Pointer travel (px) required before a press counts as a drag. */
+const DRAG_THRESHOLD_PX = 1;
 
 export interface ElementDesignerStageProps {
   tpl: PrintTemplate;
@@ -80,6 +88,13 @@ export function ElementDesignerStage({ tpl, data, onPositionChange, onResetEleme
       if (!d) return;
       const dx = e.clientX - d.startX;
       const dy = e.clientY - d.startY;
+      if (!d.moved) {
+        if (Math.abs(dx) < DRAG_THRESHOLD_PX && Math.abs(dy) < DRAG_THRESHOLD_PX) return;
+        d.moved = true;
+        d.box.style.outline = '2px dashed var(--em)';
+        d.box.style.outlineOffset = '2px';
+        document.body.style.userSelect = 'none';
+      }
       d.box.style.transform = `translate(${dx}px, ${dy}px)`;
     };
     const finishDrag = () => {
@@ -92,6 +107,9 @@ export function ElementDesignerStage({ tpl, data, onPositionChange, onResetEleme
       d.box.style.transform = '';
       document.body.style.userSelect = '';
       dragRef.current = null;
+      // A press that never moved was a selection: leave the store alone so the
+      // element keeps reporting "تلقائي" until the user really places it.
+      if (!d.moved) return;
       if (wr.width >= 1 && wr.height >= 1) {
         const current = tplRef.current;
         const box = pageBoxMm(current);
@@ -155,16 +173,14 @@ export function ElementDesignerStage({ tpl, data, onPositionChange, onResetEleme
       } catch {
         /* capture is best-effort; window listeners still track the drag */
       }
-      box.style.outline = '2px dashed var(--em)';
-      box.style.outlineOffset = '2px';
       box.style.touchAction = 'none';
-      document.body.style.userSelect = 'none';
       dragRef.current = {
         key,
         box,
         wrapper,
         startX: e.clientX,
         startY: e.clientY,
+        moved: false,
       };
     };
 
@@ -283,7 +299,12 @@ export function ElementDesignerStage({ tpl, data, onPositionChange, onResetEleme
    *  `applyMode` also refuses `fixed` for flow-first elements (the items table
    *  must keep paginating), so the guard lives in one place for every caller. */
   const setMode = (next: 'fixed' | 'flow') => {
-    if (!active || !selectedKey || active.mode === next) return;
+    if (!active || !selectedKey) return;
+    // Guard on the mode the STORE reports, not on `active.mode`: with no stored
+    // geometry the resolved mode already reads `fixed`, so an `active.mode`
+    // guard would leave ثابت a dead button. Reading `shownMode` lets automatic →
+    // ثابت actually write the measured box (it becomes a real pin).
+    if (shownMode === next) return;
     commit(applyMode(active, next, box, selectedKey));
   };
   /** Back to automatic: drop the stored geometry entirely, which is the only way
@@ -320,12 +341,20 @@ export function ElementDesignerStage({ tpl, data, onPositionChange, onResetEleme
     </label>
   );
 
+  // `data-ff-stage` marks the ACTIVE freeform layer. `Pos` emits `data-drag-key`
+  // / `data-ff-mode` in the normal (non-freeform) preview too, so neither can
+  // tell "designer open" from "inert" — the stage root is the only honest signal
+  // that dragging is live. Browser tests assert on it instead.
   return (
     <div
       ref={rootRef}
+      data-ff-stage=""
       style={{ position: 'relative' }}
       onPointerDown={(e) => {
-        if (!(e.target as HTMLElement).closest?.('[data-drag-key]')) setSelectedKey(null);
+        // Only EMPTY page area deselects. The inspector row lives inside this
+        // same root, so without the `[data-ff-inspector]` guard every click on a
+        // mode button or an mm input would clear the selection it edits.
+        if (!(e.target as HTMLElement).closest?.('[data-drag-key], [data-ff-inspector]')) setSelectedKey(null);
       }}
     >
       <div style={{ marginBottom: 8, fontSize: 12, color: '#666' }}>
@@ -335,7 +364,7 @@ export function ElementDesignerStage({ tpl, data, onPositionChange, onResetEleme
       </div>
 
       {active && selectedKey && (
-        <div style={{
+        <div data-ff-inspector="" style={{
           display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10,
           padding: '6px 8px', marginBottom: 8, fontSize: 11, color: '#333',
           background: '#f7f8fa', border: '1px solid #e3e6ea', borderRadius: 6,
