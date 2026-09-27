@@ -35,6 +35,8 @@ export function Sparkline({
   barGap = 1,
   ariaLabel = 'مخطط مصغّر',
 }: SparklineProps): React.ReactElement | null {
+  const plotId = React.useId().replace(/:/g, '');
+
   if (!data || data.length === 0) return null;
 
   const PAD = 2;
@@ -49,7 +51,6 @@ export function Sparkline({
   const y = (v: number): number =>
     height - PAD - ((v - lo) / range) * (height - PAD * 2);
 
-  const plotId = React.useId().replace(/:/g, '');
   const gradId = `spark-${plotId}`;
 
   if (type === 'bar') {

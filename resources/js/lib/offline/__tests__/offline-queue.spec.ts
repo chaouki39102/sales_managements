@@ -76,7 +76,7 @@ describe('offline write queue (db.ts)', () => {
 
     await updatePendingOp(id as number, { status: 'failed', lastError: 'التزير 422', retries: 1 });
     expect(await getFailedOpsCount()).toBe(1);
-    let failed = await getPendingOpsByStatus('failed');
+    const failed = await getPendingOpsByStatus('failed');
     expect(failed).toHaveLength(1);
     expect(failed[0].lastError).toContain('422');
     expect(failed[0].retries).toBe(1);

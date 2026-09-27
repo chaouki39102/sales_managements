@@ -2209,7 +2209,7 @@ Report: `docs/reports/PRINT_SETTINGS_UNIVERSAL_PREVIEW_RUNTIME_FIX_REPORT.md`
 - ~~`show()` route in controller has no consumer~~ — **RESOLVED as not-a-bug**: `GET print-templates/{id}` (`routes/api.php`) is a live REST endpoint. The SPA uses the list endpoint, but the resource is a public API and its controller method is legitimately reachable
 - Config JSON column could benefit from `version` field for future schema migrations
 - UniversalPreview lazy chunk reduced from 428 KB to 33 KB (shared deps moved to app chunk — neutral total load, worse initial load)
-- ESLint warnings: 28 `any` casts, 10 unused vars, 4 hook deps, 5 misc (unchanged from pre-audit)
+- ~~ESLint warnings: 28 `any` casts, 10 unused vars, 4 hook deps, 5 misc (unchanged from pre-audit)~~ — **numbers superseded** by the fresh repo-wide `npx eslint resources/js --ext .ts,.tsx --format json` audit (2026-09-27): **0 errors, 1393 warnings** = 1057 `@typescript-eslint/no-explicit-any`, 193 `no-restricted-syntax`, 127 `react-hooks/exhaustive-deps`, 14 non-rule (parse/suppression) + 2 `@typescript-eslint/no-unused-vars`. That audit also **found and fixed 3 real errors** that the old "0 errors" note hid: a conditional `React.useId()` in `DataTable/Sparkline.tsx` (called after the early return → "Rendered more hooks than during the previous render" when a Sparkline re-renders from empty to non-empty data) plus two `prefer-const` (`offline-queue.spec.ts`, `POSProMobilePage.tsx`).
 - Full lifecycle empirical verification (8 stages × 144 settings) requires manual browser testing
 - Playwright PWAD (BrowserStack) not configured in CI — 7 browser tests excluded from vitest
 
@@ -2476,7 +2476,7 @@ Report: `docs/reports/PRINT_RUNTIME_SEPARATION_REPORT.md`
 
 `confirm()` calls left unchanged — they serve a different purpose (Yes/No confirmation for destructive actions) and cannot be replaced with non-blocking toasts.
 
-`DataTable.usage.tsx:288` left unchanged — demo file, not used in production.
+~~`DataTable.usage.tsx:288` left unchanged — demo file, not used in production.~~ — **file no longer exists** (verified 2026-09-27: no `DataTable.usage.tsx` anywhere under `resources/js`, and no `*.usage.tsx` demo file remains), so this historical note is now moot.
 
 **Build**: 0 errors, 1044 modules, 2.42s.
 

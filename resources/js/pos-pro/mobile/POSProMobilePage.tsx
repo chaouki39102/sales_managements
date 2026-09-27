@@ -370,7 +370,7 @@ export default function POSProMobilePage() {
 
   // ── إضافة منتج (نفس حِرس سطح المكتب، بلا مودال وزن في v1) ────────────────
   const handleAddItem = useCallback((v: ProductVariant, packaging: ProductPackaging | null = null) => {
-    let effective = v;
+    const effective = v;
     if (effective.is_sold_by_weight ?? effective.product?.is_sold_by_weight ?? false) {
       posRef.current.addItem(effective, 1, packaging);
       safeToast.info(`${effective.product?.name ?? ''} — قم بتعديل الكمية في السلة`, { id: 'ppm-weight-hint', duration: 2000 });
