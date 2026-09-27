@@ -493,6 +493,7 @@ export default function PrintSettingsPage() {
             <div key={cat.key}>
               <button
                 onClick={() => setActiveCat(cat.key)} type="button"
+                data-testid="ps-doc-cat" data-cat={cat.key}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 7,
                   padding: '8px 12px', border: 'none', cursor: 'pointer',
@@ -513,6 +514,7 @@ export default function PrintSettingsPage() {
                   <button
                     key={doc.code}
                     onClick={() => setActiveDoc(doc.code)} type="button"
+                    data-testid="ps-doc-tab" data-code={doc.code}
                     style={{
                       width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       padding: '7px 12px 7px 16px', border: 'none', cursor: 'pointer',
@@ -568,6 +570,7 @@ export default function PrintSettingsPage() {
                     setSelectedTplId(tpl.id); setLocalTpl(tpl); setIsDirty(false);
                   }}
                   type="button"
+                  data-testid="ps-tpl" data-tpl-id={tpl.id} data-paper={tpl.paper_size}
                   style={{
                     padding: '4px 9px', border: 'none', background: 'transparent',
                     cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', fontSize: 12,
@@ -643,6 +646,7 @@ export default function PrintSettingsPage() {
                     <button
                       key={s} type="button"
                       onClick={() => update('paper_size', s)}
+                      data-testid="ps-paper" data-paper={s}
                       style={{
                         flex: 1, padding: '3px 4px', fontSize: 10.5, borderRadius: 'var(--r1)',
                         border: `1px solid ${localTpl.paper_size === s ? 'var(--em)' : 'var(--b2)'}`,
@@ -734,6 +738,7 @@ export default function PrintSettingsPage() {
             )}
             {localTpl && (
               <button onClick={handleTestPrint} type="button"
+                data-testid="ps-test-print"
                 style={{
                   ...toolBtnStyle,
                   padding: '5px 11px', fontSize: 12,
@@ -776,6 +781,7 @@ export default function PrintSettingsPage() {
                 type="button"
                 title="سحب وإفلات العناصر داخل المستند"
                 aria-pressed={elementActive}
+                data-testid="ps-designer-entry"
                 style={{
                   ...toolBtnStyle,
                   padding: '5px 11px', fontSize: 12,
@@ -792,6 +798,7 @@ export default function PrintSettingsPage() {
             )}
             {localTpl && (
               <button onClick={handleSave} disabled={!isDirty || isSaving} type="button"
+                data-testid="ps-save"
                 style={{
                   ...toolBtnStyle,
                   padding: '5px 11px', fontSize: 12,

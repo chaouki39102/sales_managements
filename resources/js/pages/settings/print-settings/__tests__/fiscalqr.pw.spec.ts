@@ -16,7 +16,10 @@ test.describe('Print Settings — Fiscal QR rendering', () => {
 
     // The new FiscalQR component renders an <img> whose src is a data:image/png
     // data URL (encoded client-side via the `qrcode` npm lib).
-    const qrImg = page.locator('img[alt="QR"]');
+    // Scope to the VISIBLE preview wrapper: the always-mounted TemplateLibraryModal
+    // renders a mini preview of the same template, so a bare `img[alt="QR"]`
+    // matches 2 elements and trips strict mode.
+    const qrImg = page.locator('.ps-preview-wrapper:visible img[alt="QR"]');
     await expect(qrImg).toBeVisible();
     const src = await qrImg.getAttribute('src');
     expect(src).toMatch(/^data:image\/png;base64,/);

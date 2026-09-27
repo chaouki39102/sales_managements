@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { bootstrapApp, navigateToPrintSettings, MockTemplate } from './helpers/test-utils';
 
 const FV_TPL: MockTemplate = {
@@ -21,13 +21,29 @@ const POS_TPL: MockTemplate = {
   config: {},
 };
 
+/**
+ * The page opens on the POS document type, so an FV test must select the sales
+ * category, then the FV tab, then a template row. Everything keys off the stable
+ * data-testid hooks: Arabic accessible names are unusable (Tabler's `<i>` icon
+ * `::before` is folded into the accname) and the always-mounted
+ * TemplateLibraryModal duplicates the template names. `data-cat`/`data-code`
+ * are used rather than labels because the POS category label is the literal
+ * string 'POS', not 'نقاط البيع'.
+ */
+async function selectDocType(page: Page, code: 'FV' | 'POS') {
+  await page.locator(`[data-testid="ps-doc-cat"][data-cat="${code === 'FV' ? 'sales' : 'pos'}"]`).click();
+  await page.locator(`[data-testid="ps-doc-tab"][data-code="${code}"]`).click();
+  await page.getByTestId('ps-tpl').first().click();
+}
+
 test.describe('Print Settings — E2E Workflow', () => {
   test('page loads and shows template controls + live preview', async ({ page }) => {
     await bootstrapApp(page, [FV_TPL]);
     await navigateToPrintSettings(page);
+    await selectDocType(page, 'FV');
 
-    await expect(page.getByText('فاتورة مبيعات', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'حفظ (Ctrl+S)' })).toBeVisible();
+    await expect(page.getByTestId('ps-tpl')).toHaveAttribute('data-tpl-id', '1');
+    await expect(page.getByTestId('ps-save')).toBeVisible();
     await expect(page.getByText('معاينة حية')).toBeVisible();
   });
 
@@ -48,11 +64,12 @@ test.describe('Print Settings — E2E Workflow', () => {
     });
 
     await navigateToPrintSettings(page);
+    await selectDocType(page, 'FV');
 
-    const saveBtn = page.getByRole('button', { name: 'حفظ (Ctrl+S)' });
+    const saveBtn = page.getByTestId('ps-save');
     await expect(saveBtn).toBeDisabled();
 
-    await page.getByRole('button', { name: 'A4', exact: true }).click();
+    await page.getByTestId('ps-paper').filter({ hasText: 'A4' }).click();
     await expect(saveBtn).toBeEnabled();
 
     await saveBtn.click();
@@ -63,15 +80,17 @@ test.describe('Print Settings — E2E Workflow', () => {
     await bootstrapApp(page, [FV_TPL, POS_TPL]);
     await navigateToPrintSettings(page);
 
-    await expect(page.getByText('فاتورة مبيعات', { exact: true })).toBeVisible();
+    await selectDocType(page, 'POS');
+    await expect(page.getByTestId('ps-tpl').first()).toHaveAttribute('data-paper', '80mm');
 
-    await page.getByRole('button', { name: /نقاط البيع/ }).click();
-    await expect(page.getByText('إيصال نقاط البيع', { exact: true })).toBeVisible();
+    await selectDocType(page, 'FV');
+    await expect(page.getByTestId('ps-tpl').first()).toHaveAttribute('data-paper', 'A4');
   });
 
   test('quick-nav scrolls to section', async ({ page }) => {
     await bootstrapApp(page, [FV_TPL]);
     await navigateToPrintSettings(page);
+    await selectDocType(page, 'FV');
 
     const headerNav = page.locator('button', { hasText: 'العنوان' }).first();
     if (await headerNav.isVisible()) {

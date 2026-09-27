@@ -15,6 +15,13 @@ import { bootstrapApp } from './helpers/test-utils';
 // AFTER `await bootstrapApp(page)` to take precedence over it.
 test.describe('B.2 Camera photograph — product form', () => {
   test.beforeEach(async ({ page }) => {
+    // Surface page/console failures so a load-related failure reports WHY the
+    // post-save toast never appeared, instead of a bare "element not found".
+    page.on('pageerror', (e) => console.log(`[pageerror] ${e.message}`));
+    page.on('console', (m) => {
+      if (m.type() === 'error') console.log(`[console.error] ${m.text()}`);
+    });
+
     await page.addInitScript(() => {
       // ── Camera feed mock ──
       Object.defineProperty(navigator, 'mediaDevices', {
@@ -118,9 +125,13 @@ test.describe('B.2 Camera photograph — product form', () => {
     // Save (fields already filled above)
     await page.getByRole('button', { name: /إنشاء المنتج/ }).click();
 
-    // Product created, then the pending photo uploaded via the existing endpoint
-    await expect(page.getByText('تمت إضافة المنتج بنجاح')).toBeVisible();
-    await expect(page.getByText('تم رفع الصورة الملتقطة')).toBeVisible();
+    // Product created, then the pending photo uploaded via the existing endpoint.
+    // Both toasts auto-close after 4s, so under a cold/loaded browser the earlier
+    // one can expire before the assertions below poll — give them room and let the
+    // network counters (the real contract) carry the correctness guarantee.
+    const SAVE_TIMEOUT = 20_000;
+    await expect(page.getByText('تمت إضافة المنتج بنجاح')).toBeVisible({ timeout: SAVE_TIMEOUT });
+    await expect(page.getByText('تم رفع الصورة الملتقطة')).toBeVisible({ timeout: SAVE_TIMEOUT });
     expect(created).toBe(1);
     expect(imageUploaded).toBe(1);
   });

@@ -91,15 +91,29 @@ test.describe('B.1 Camera scan everywhere — non-POS pages', () => {
         body: JSON.stringify({ data: [{ id: 1, name: 'زبون نقدي' }] }) });
     });
 
-    await page.goto('/documents/FV/new');
+    // The camera icon button lives in the lines section's scan bar. The full-page
+    // editor now passes `hideScanBar` (CommercialDocumentPage.tsx) and the global
+    // FAB is suppressed on /documents/* routes, so the affordance is reached
+    // through the globally-mounted quick-create modal (DocumentQuickCreateProvider)
+    // opened from a neutral page.
+    //
+    // Count 0 BEFORE opening is the regression guard for the modal body gating fix:
+    // the closed quick-create modal used to keep its whole form in the DOM
+    // (opacity:0), leaking a hidden camera button onto every page. Its body is now
+    // unmounted, and count 1 AFTER opening proves the affordance itself still works.
+    await page.goto('/dashboard');
 
-    // The camera icon button next to the barcode input in the lines section.
-    // Strict global count: exactly ONE such button must exist on the page. This is
-    // the regression guard for the CommercialDocumentModal body gating fix — the
-    // globally-mounted quick-create modal (App.tsx DocumentQuickCreateProvider)
-    // used to keep its full form in the DOM when closed (opacity:0), leaking a
-    // hidden duplicate camera button onto every page; its body is now unmounted.
     const camBtn = page.locator('button[title="مسح الباركود بالكاميرا"]');
+    await expect(camBtn).toHaveCount(0);
+
+    // No last-used type yet → the FAB opens the type menu, then the modal.
+    // The seeded type name carries tatweel (فـاتـورة مبيعات) which breaks any exact
+    // Arabic match, so target the tatweel-free word and scope the click to the
+    // type menu itself («المبيعات» is also the sidebar group label).
+    await page.getByTitle(/مستند جديد/).first().click();
+    const typeMenu = page.getByText('إنشاء مستند جديد').locator('..');
+    await typeMenu.getByRole('button', { name: /مبيعات/ }).click();
+
     await expect(camBtn).toHaveCount(1);
     await expect(camBtn).toBeVisible();
 
