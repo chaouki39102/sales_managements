@@ -942,7 +942,7 @@
 4. **N+1 + truncated payloads in the orders list** — `paginate()` preloaded partial `party:id,name,code,phone` + `document:id,...`, then `toArray()`'s `loadMissing` ran 6+ extra queries PER ROW (documentType, lines, product.tva/unit, histories) and the truncated selects silently dropped `party.is_tva_exempt` and `document.warehouse_id` from list payloads. Fix: `paginate()` now eager-loads the full graph `['party:id,name,code,phone,is_tva_exempt', 'document.documentType', 'document.lines.product.tva', 'document.lines.product.unit', 'histories']` so `toArray`'s `loadMissing` is a no-op and the list payload carries the same fields as the detail.
 5. **`catalog` per_page could be 0** → `paginate(0)` exception. Clamped to `min(max(per_page,1),100)`.
 
-**Verified NOT bugs / intentionally kept**: `portalApi.orderDetail` is defined but unused by the SPA (legit public API, kept); the customer `update(Request, $id)` unused `$id` is a deliberate BaseApiController-shaped signature (`findOwnOrder` resolves via `resolveRouteId()`); portal base pricing stays company-default level (matching the engine), only the discount tier list became accurate.
+**Verified NOT bugs / intentionally kept**: the customer `update(Request, $id)` unused `$id` is a deliberate BaseApiController-shaped signature (`findOwnOrder` resolves via `resolveRouteId()`); portal base pricing stays company-default level (matching the engine), only the discount tier list became accurate. (`portalApi.orderDetail` was flagged unused at the time but is since consumed by `PortalOrdersAdminPage`.)
 
 **Key architectural rules**:
 - The catalog is a PREVIEW of the engine: it must resolve the effective price level and TVA-exemption with the SAME inputs as `createDocumentLines` (`party.default_price_level_id ?? company default`; `party.is_tva_exempt`), or it shows numbers the customer won't be charged. Never filter the catalog's tier list by the company default alone.
@@ -1707,7 +1707,7 @@
 
 **Verification**: `tsc --noEmit` clean, `npm run build` 0 errors, `npm test` 174/174 pass.
 
-**Remaining (non-blocking)**: `Sidebar.tsx`/`SidebarSection.tsx`/`SidebarItem.tsx` still empty placeholders (dead code) — could be wired up or deleted; keyboard first-letter nav; group item-count badges when collapsed.
+**Remaining (non-blocking)**: ~~`Sidebar.tsx`/`SidebarSection.tsx`/`SidebarItem.tsx` still empty placeholders (dead code)~~ — **since deleted**; the nav is inline in `DashboardLayout.tsx` and those three files no longer exist. Still open: keyboard first-letter nav; group item-count badges when collapsed.
 
 ### Phase 33 — Sticker Designer Full Alignment Control (align/valign) + Price 2 Decimals (July 31)
 
@@ -2205,8 +2205,8 @@ Report: `docs/reports/PRINT_SETTINGS_UNIVERSAL_PREVIEW_RUNTIME_FIX_REPORT.md`
 
 ### Remaining Minor Issues
 - `barcode_custom_text` dependsOn `barcode_content` (pills, not toggle) — auto-gating skipped, handled manually in section
-- `usePrintTemplate` (singular hook) is dead — preserved as public API via `reporting/index.ts`
-- `show()` route in controller has no consumer — preserved for external access
+- ~~`usePrintTemplate` (singular hook) is dead~~ — **no longer exists**; every consumer migrated to the runtime hook `usePrintTemplatesList` (Phase 14/15) and the designer kept the plural `usePrintTemplates`. Nothing is left to clean up
+- ~~`show()` route in controller has no consumer~~ — **RESOLVED as not-a-bug**: `GET print-templates/{id}` (`routes/api.php`) is a live REST endpoint. The SPA uses the list endpoint, but the resource is a public API and its controller method is legitimately reachable
 - Config JSON column could benefit from `version` field for future schema migrations
 - UniversalPreview lazy chunk reduced from 428 KB to 33 KB (shared deps moved to app chunk — neutral total load, worse initial load)
 - ESLint warnings: 28 `any` casts, 10 unused vars, 4 hook deps, 5 misc (unchanged from pre-audit)
