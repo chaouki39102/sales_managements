@@ -2901,20 +2901,32 @@ body.dark .pay-hero-amount { text-shadow: none; }
 /* ════════════════════════════════════════════════════
    PRINT
 ════════════════════════════════════════════════════ */
+/* Phase 95: `body > * { display: none !important; }` was REMOVED here.
+   It killed every direct child of <body> — including `#app`, the whole SPA —
+   so ANY print from the app produced a blank sheet. Its only reveal target,
+   `#invoice-preview`, has never existed: no JSX/TS file references it, and the
+   POS receipt actually prints through the shared `<Modal>` (`.ov.on` / `.modal`),
+   not a dedicated preview root.
+
+   The POS receipt therefore uses the SAME global print isolation as every other
+   dedicated print root — the `body:has(.print-only), body:has(.ov.on)` gate in
+   resources/css/theme/pages.css. Do not reintroduce a global `body *` /
+   `body > *` print kill here; isolate a ROOT, never the page. */
 @media print {
-  body > * { display: none !important; }
-  #invoice-preview {
-    display: block !important;
-    position: fixed;
-    inset: 0;
-    z-index: 99999;
-    background: #fff;
-    padding: 20px;
-    font-family: 'Tajawal', sans-serif;
-    color: #000;
-    direction: rtl;
-  }
   .receipt-wrap { padding: 0; }
+
+  /* `.pr-receipt-body` (pos.css:3781) = `flex:1; overflow-y:auto; padding:16px`.
+     هذه القيم من **الستايل شيت** لا inline، لذلك قواعد `pages.css` المعتمدة على
+     `[style*="overflow"]` لا تصل إليها إطلاقاً. ولأن `.modal` صار `display:block`
+     أثناء الطباعة، `flex:1` لا يُطبَّق أصلاً — لكن `overflow-y:auto` يبقى
+     عنصر قابل للاقتطاع في الطباعة، فنلغيه صراحةً. `padding` نتركه: `@page`
+     عنده هامش 10mm وهذا الحشو يعطي تنفُّساً للإيصال بدل التصاقه بحافة الورق. */
+  body:has(.ov.on) .ov.on .pr-receipt-body {
+    flex: none !important;
+    overflow: visible !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
 }
 
 /* ════════════════════════════════════════════════

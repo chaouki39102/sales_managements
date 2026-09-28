@@ -421,71 +421,139 @@
   }
 }
 
-/* ═══════════════ PRINT — كشف حساب ═══════════════ */
+/* ═══════════════ PRINT — عزل الطباعة داخل المودال المفتوح ═══════════════ */
 @media print {
-  body * { visibility: hidden; }
-  .no-print, .no-print * { display: none !important; }
-  #sidebar, #topbar, .page-header, .page-header *,
-  .tabs, .kpis, .srch, .btn, button,
-  .modal-overlay, .modal-footer, .modal-header,
-  [class*="no-print"] { display: none !important; }
+  /* ── Phase 95 ──────────────────────────────────────────────────────────────
+     سلوك سابق: `body * { visibility: hidden }` + `display: none` لكل عناصر
+     الواجهة بلا أي شرط ⇒ أي `window.print()` من أي صفحة كان يخرج ورقة فارغة
+     (منها صفحة المستند في البوابة `PortalDocumentDetailPage`، وكل زر طباعة
+     عادي في الجداول والتقارير).
 
-  .modal {
-    position: fixed !important;
-    inset: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    height: 100% !important;
+     الآن العزل يعمل **فقط** عند وجود مودال مفتوح — الجذر الوحيد هو `.ov.on`
+     (`<Modal>` يضع `ov on` عند الفتح و`ov hidden` عند الإغلاق، والمودال
+     المغلق لا يفعّل العزل). عنصر `.print-only` (كشف الحساب —
+     `TransactionHistoryModal:592`) يعيش **داخل** `<Modal>` دائماً، فليس
+     جذراً مستقلاً ولا يحتاج قاعدة خاصة به غير إظهاره أثناء الطباعة.
+
+     `.no-print` تبقى بلا شرط: إخفاء واجهة الطابعة مفيد في كل الحالات.
+     الصفحات العادية بلا مودال مفتوح تُطبع تماماً كما قبل.
+     `body:has()` مدعومة في Chromium الحديث (مستخدمة أصلاً في pos.css).
+     ─────────────────────────────────────────────────────────────────────────── */
+
+  /* 1) بوابة العزل — sibling strategy: نخفي كل عنصر ليس داخل الشجرة المفتوحة
+        وليس ascendant لها. لا `visibility` (تُبقي التخطيط) ولا قاعدة عريضة بلا
+        شرط: في غياب المودال لا يُطبَّق شيء فتصبح الطباعة العادية سليمة. */
+  body:has(.ov.on) *:not(.ov.on):not(.ov.on *):not(:has(.ov.on)) {
+    display: none !important;
+  }
+
+  .no-print, .no-print * { display: none !important; }
+
+  /* 2) واجهة المودال — الترويسة/التذييل/زر الإغلاق/مقبض التحجيم. الأزرار
+        النصية داخل المحتوى (نصوص مراجع، أرقام) تبقى للطباعة؛ لا نخفي
+        `button`/`.btn` عَاماً لأن `app.css:29-58` يخفيهما أصلاً على مستوى
+        الصفحة، وداخل المودال نريد الإبقاء على كل ما هو نصي. */
+  body:has(.ov.on) :is(.m-hd, .m-hd *, .m-foot, .m-foot *, .m-x, .modal-resize-handle) {
+    display: none !important;
+  }
+
+  /* أزرار أيقونية فقط (بلا نص) — لا معنى لها على الورق. */
+  body:has(.ov.on) button:has(> i:only-child),
+  body:has(.ov.on) button:has(> svg:only-child) { display: none !important; }
+
+  /* 2-ب) استعادة الأزرار النصية داخل جسم المودال فقط.
+     `app.css:34` يخفي `button` و`.btn` على مستوى الصفحة عند الطباعة
+     (لإخفاء أزرار الواجهة)، وقاعدته تأتي **بعد** `@import theme/pages.css`
+     في نفس الملف، فبـ `!important` في الطبقتين، الأخصّية تسبق الترتيب. النتيجة لو تُركت:
+     مراجع السندات داخل كشف الحساب (`TransactionHistoryModal:125,830` —
+     نصوص `FAC-…`/`ACH-…` قابلة للنقر) تختفي عن الورق وهي **محتوى
+     المستند** لا واجهة.
+
+     الاستعادة محصورة في `.m-body` (خارجها الترويسة/التذييل/الإغلاق/مقبض
+     التحجيم مخفيون أصلاً بالقاعدة أعلاه) و«تستثني» علىшими:
+       • `.no-print` وذريّته (تبقى مخفية في كل الحالات)
+       • `.srch` وذريّته (حقول/واجهة بحث، لا معنى لها على الورق)
+       • الأزرار الأيقونية فقط (بدون `i` ولا `svg` وحيدة) — أعلاه
+     القاعدة أعلاه للأيقونية تخصيصها 0,3,3 وهذه 0,8,3، فتبقى الأيقونية
+     مخفية حتى لو تطابقت الشروط. */
+  body:has(.ov.on) .ov.on .m-body :is(button, .btn):not(.srch, .srch *):not(.no-print, .no-print *):not(:has(> i:only-child)):not(:has(> svg:only-child)) {
+    display: inline-flex !important;
+  }
+
+  /* 3) هندسة الطباعة — الـ overlay يصبح كتلة عادية، والـ modal يأخذ الصفحة
+        كاملة بدل box ثابت محدود بـ vh. مهم: `padding: 0` لا `16px`، ولا
+        `inset/width/height` عريضة (بعض العناصر تحمل `style*="width"` ولا
+        نريد توسيع السلسلة). */
+  body:has(.ov.on) .ov.on {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
     max-height: none !important;
     margin: 0 !important;
-    padding: 16px !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    z-index: 99999 !important;
-    overflow: visible !important;
-    background: #fff !important;
+    padding: 0 !important;
+    background: none !important;
+    backdrop-filter: none !important;
+    opacity: 1 !important;
   }
 
-  .modal > * { visibility: visible !important; }
+  body:has(.ov.on) .ov.on .modal {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    overflow: visible !important;
+  }
 
-  .modal .modal-body,
-  .modal > div {
+  /* 4) إلغاء الـ scroller الداخلي: `Modal` يضبط `height/minHeight/flex`
+        inline، و`TransactionHistoryModal` يضع `maxHeight/overflow` inline
+        على حاويات داخلية. القواعد هنا بـ !important ف تتغلّب على inline
+        غير المهم. */
+  body:has(.ov.on) .ov.on :is(.m-body, .modal-body) {
+    flex: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  /* `.tpl-chooser` يستخدم هامشاً سالباً ليأخذ عرض الـ m-body كاملاً */
+  body:has(.ov.on) .ov.on :is(.m-body, .modal-body) > .tpl-chooser { padding: 0 !important; }
+
+  body:has(.ov.on) .ov.on [style*="max-height"],
+  body:has(.ov.on) .ov.on [style*="overflow"] {
     max-height: none !important;
     overflow: visible !important;
   }
 
-  /* جداول داخل المودال */
-  .modal table { page-break-inside: auto; }
-  .modal tr    { page-break-inside: avoid; }
-  .modal thead { display: table-header-group; }
+  /* 5) إظهار العنصر المخصص للطباعة (inline `display:none` في الشاشة) */
+  body:has(.ov.on) .ov.on .print-only { display: block !important; }
 
-  /* إخفاء عناصر غير ضرورية للطباعة */
-  .modal [class*="badge"],
-  .modal button,
-  .modal .no-print { display: none !important; }
+  /* 6) جداول داخل المودال — صفّ يبقى كاملاً، والترويسة تتكرر كل صفحة */
+  body:has(.ov.on) .ov.on table { page-break-inside: auto; }
+  body:has(.ov.on) .ov.on tr    { page-break-inside: avoid; break-inside: avoid; }
+  body:has(.ov.on) .ov.on thead { display: table-header-group; }
+  body:has(.ov.on) .ov.on th    { position: static !important; }
 
-  /* حجم خط موحّد */
-  .modal, .modal * {
-    font-size: 11pt !important;
+  /* 7) حبر الطباعة — نص أسود بلا خلفيات، مع استثناء إيصال الـ POS الذي له
+        تصميمه اللوني الخاص (`#pos-receipt-print`). لا نلمس `font-size`. */
+  body:has(.ov.on) .ov.on :is(.modal, .modal *):not(#pos-receipt-print):not(#pos-receipt-print *) {
     color: #000 !important;
     background: transparent !important;
-  }
-
-  /* إظهار النتائج والجداول فقط */
-  .modal table,
-  .modal table * {
-    visibility: visible !important;
-  }
-
-  /* إظهار العناصر المخصصة للطباعة */
-  .print-only {
-    display: block !important;
-    visibility: visible !important;
-  }
-
-  @page {
-    margin: 10mm;
-    size: A4 landscape;
+    box-shadow: none !important;
   }
 }
 

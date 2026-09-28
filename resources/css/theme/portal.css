@@ -2282,6 +2282,11 @@ html.dark .portal-prod-discs--ov .portal-disc-chip { background: rgba(20,22,28,.
   .portal-doc-hd, .portal-doc-meta, .portal-doc-steps, .portal-doc-progress { display: none !important; }
   .portal-body { padding: 0; max-width: 100%; }
   .portal-card { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
+  /* Chrome is display:none, so nothing occupies the top of the sheet. The first
+     CONTENT card (`.portal-sec`, margin-top: 22px on screen) must start at the
+     top; the following sections keep a small gap so they stay distinct. */
+  .portal-sec { margin-top: 0 !important; }
+  .portal-sec ~ .portal-sec { margin-top: 14px !important; }
 }
 
 /* ─── خط أنابيب طلبات البوابة (OrderPipeline) ───────────────────────────── */
