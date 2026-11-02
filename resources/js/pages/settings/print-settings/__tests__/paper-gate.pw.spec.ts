@@ -75,26 +75,31 @@ async function openTemplate(page: Page, templateId: number) {
 
 const stage = (page: Page) => page.locator('.ps-preview-wrapper:visible').first();
 
-test.describe('Print Settings — freeform is A4-only', () => {
-  test('A4 exposes the designer entry and the mm stage', async ({ page }) => {
-    await bootstrapApp(page, [A4_TPL, A5_TPL, M80_TPL, M58_TPL]);
-    await mockPreviewDocument(page);
-    await navigateToPrintSettings(page);
-    await openTemplate(page, 1);
+test.describe('Print Settings — freeform is a PAGE-paper feature (A4 + A5)', () => {
+  // A4 and A5 are both finite sheets with known millimetre dimensions, so the
+  // freeform designer must be available for BOTH — the gate is
+  // `supportsFreeformPaper()` and nothing else. Roll/label papers stay out.
+  for (const [label, id] of [['A4', 1], ['A5', 2]] as const) {
+    test(`${label} exposes the designer entry and the mm stage`, async ({ page }) => {
+      await bootstrapApp(page, [A4_TPL, A5_TPL, M80_TPL, M58_TPL]);
+      await mockPreviewDocument(page);
+      await navigateToPrintSettings(page);
+      await openTemplate(page, id);
 
-    await expect(page.getByTestId('ps-designer-entry')).toBeVisible();
-    await page.getByTestId('ps-designer-entry').click();
-    // The ACTIVE stage mounts (the honest "designer is open" signal), and it
-    // wraps its OWN `.ps-preview-wrapper`, so probe the stage globally rather
-    // than from inside a wrapper that the stage sits above.
-    const active = page.locator('[data-ff-stage]');
-    await expect(active).toHaveCount(1);
-    await expect(active.locator('.ps-preview-wrapper [data-drag-key]').first()).toBeVisible();
-    await expect(active.locator('.ps-preview-wrapper [data-drag-key="items.table"]')).toHaveCount(1);
-    await expect(page.locator('[data-ff-inspector]')).toHaveCount(0);
-  });
+      await expect(page.getByTestId('ps-designer-entry')).toBeVisible();
+      await page.getByTestId('ps-designer-entry').click();
+      // The ACTIVE stage mounts (the honest "designer is open" signal), and it
+      // wraps its OWN `.ps-preview-wrapper`, so probe the stage globally rather
+      // than from inside a wrapper that the stage sits above.
+      const active = page.locator('[data-ff-stage]');
+      await expect(active).toHaveCount(1);
+      await expect(active.locator('.ps-preview-wrapper [data-drag-key]').first()).toBeVisible();
+      await expect(active.locator('.ps-preview-wrapper [data-drag-key="items.table"]')).toHaveCount(1);
+      await expect(page.locator('[data-ff-inspector]')).toHaveCount(0);
+    });
+  }
 
-  for (const [label, id] of [['A5', 2], ['80mm', 3], ['58mm', 4]] as const) {
+  for (const [label, id] of [['80mm', 3], ['58mm', 4]] as const) {
     test(`${label} renders the normal preview with no freeform affordances`, async ({ page }) => {
       await bootstrapApp(page, [A4_TPL, A5_TPL, M80_TPL, M58_TPL]);
       await mockPreviewDocument(page);

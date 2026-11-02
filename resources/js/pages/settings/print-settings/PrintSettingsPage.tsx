@@ -22,6 +22,7 @@ import { resolveTemplate } from './runtime';
 import type { UniversalDocumentData } from './types/data';
 import { TemplateLibraryModal } from './template-library';
 import { isStickerPaper, stickerDims, STICKER_SIZE_OPTIONS } from './components/preview/stickerDims';
+import { supportsFreeformPaper } from './services/freeformGeometry';
 import { buildDefaultSectionsOrder } from './services/layoutMigration';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useConfirm } from '@/hooks/useConfirm';
@@ -770,7 +771,7 @@ export default function PrintSettingsPage() {
                 {puckComposerActive ? 'عرض المعاينة' : 'ترتيب الأقسام'}
               </button>
             )}
-            {localTpl && !isStickerPaper(localTpl.paper_size) && localTpl.paper_size === 'A4' && localTpl.doc_type_code !== 'RPT' && (
+            {localTpl && !isStickerPaper(localTpl.paper_size) && supportsFreeformPaper(localTpl.paper_size) && localTpl.doc_type_code !== 'RPT' && (
               <button
                 onClick={() => {
                   const next = !elementActive;
@@ -838,7 +839,7 @@ export default function PrintSettingsPage() {
                   </React.Suspense>
                 </div>
               ) :
-              localTpl.paper_size === 'A4'
+              supportsFreeformPaper(localTpl.paper_size)
               && !isStickerPaper(localTpl.paper_size)
               && localTpl.doc_type_code !== 'RPT'
               && elementActive ? (

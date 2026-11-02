@@ -172,15 +172,30 @@ export function hasElementGeometry(tpl: Pick<PrintTemplate, 'element_positions'>
   return (Object.keys(raw) as ElementKey[]).some(k => !!raw[k] && typeof raw[k] === 'object');
 }
 
+/** Which sheet sizes the freeform element designer supports.
+ *
+ *  A4 (210×297mm) and A5 (148×210mm) are both real PAGE boxes with known
+ *  millimetre dimensions (`PAPER_MM`), so `pageBoxMm()` can give every stored
+ *  geometry a valid coordinate space on either. Thermal/roll papers (80mm/58mm)
+ *  and sticker labels are continuous or fixed-label media — millimetres measured
+ *  against a sheet mean nothing there.
+ *
+ *  GATE SSOT: the renderer (`isFreeformTemplate`), the designer entry button and
+ *  the designer stage all ask THIS function, so the three can never drift into
+ *  "button visible but stage refuses" or vice versa.
+ */
+export function supportsFreeformPaper(paper: PrintTemplate['paper_size']): boolean {
+  return paper === 'A4' || paper === 'A5';
+}
+
 /** Is this template allowed to render stored geometry AT ALL?
  *
- *  Freeform is an A4-only feature: RPT keeps its own multi-page report
- *  renderer, STK its own label renderer, and thermal/roll papers (80mm/58mm) or
- *  A5 have page boxes that cannot hold millimetres measured against an A4 sheet.
- *  A template that was designed on A4 and later switched to another paper can
- *  still carry geometry in its config, so the renderer must be able to ask
- *  "may I apply this?" — otherwise stale A4 boxes would be laid out on an 80mm
- *  roll.
+ *  RPT keeps its own multi-page report renderer and STK its own label renderer.
+ *  For everything else the paper must be a supported page size
+ *  (`supportsFreeformPaper`): a template that was designed on A4 and later
+ *  switched to another paper can still carry geometry in its config, so the
+ *  renderer must be able to ask "may I apply this?" — otherwise stale A4 boxes
+ *  would be laid out on an 80mm roll.
  *
  *  This is the SSOT for that decision: the settings registry, the designer gate
  *  and `Pos` all go through it, so no two copies can drift.
@@ -189,7 +204,7 @@ export function isFreeformTemplate(
   tpl: Pick<PrintTemplate, 'doc_type_code' | 'paper_size' | 'element_positions'>,
 ): boolean {
   if (tpl.doc_type_code === 'RPT' || tpl.doc_type_code === 'STK') return false;
-  if (tpl.paper_size !== 'A4') return false;
+  if (!supportsFreeformPaper(tpl.paper_size)) return false;
   return hasElementGeometry(tpl);
 }
 

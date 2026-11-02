@@ -6,6 +6,7 @@ import {
   resolveGeometryMap,
   hasElementGeometry,
   isFreeformTemplate,
+  supportsFreeformPaper,
   fixedBoxStyle,
   flowBoxStyle,
   geometryToPx,
@@ -133,12 +134,17 @@ describe('freeformGeometry — map helpers', () => {
   });
 });
 
-describe('freeformGeometry — isFreeformTemplate', () => {
-  const withGeo = { element_positions: { 'header.logo': { x: 5, y: 5, w: 40 } } };
+const withGeo = { element_positions: { 'header.logo': { x: 5, y: 5, w: 40 } } };
 
+describe('freeformGeometry — isFreeformTemplate', () => {
   it('accepts an A4 document template that carries geometry', () => {
     expect(isFreeformTemplate({ doc_type_code: 'FV', paper_size: 'A4', ...withGeo } as never)).toBe(true);
     expect(isFreeformTemplate({ doc_type_code: 'POS', paper_size: 'A4', ...withGeo } as never)).toBe(true);
+  });
+
+  it('accepts an A5 document template that carries geometry', () => {
+    expect(isFreeformTemplate({ doc_type_code: 'FV', paper_size: 'A5', ...withGeo } as never)).toBe(true);
+    expect(isFreeformTemplate({ doc_type_code: 'FA', paper_size: 'A5', ...withGeo } as never)).toBe(true);
   });
 
   it('rejects templates without any geometry', () => {
@@ -151,9 +157,27 @@ describe('freeformGeometry — isFreeformTemplate', () => {
     expect(isFreeformTemplate({ doc_type_code: 'STK', paper_size: '40x20mm', ...withGeo } as never)).toBe(false);
   });
 
-  it('rejects every non-A4 paper, so stale A4 boxes are never laid out on a roll', () => {
-    for (const paper of ['80mm', '58mm', 'A5', '30x20mm', '60x40mm', '80x50mm', '100x50mm']) {
+  it('rejects roll and label papers, so stale sheet boxes are never laid out on a roll', () => {
+    for (const paper of ['80mm', '58mm', '30x20mm', '60x40mm', '80x50mm', '100x50mm']) {
       expect(isFreeformTemplate({ doc_type_code: 'FV', paper_size: paper, ...withGeo } as never)).toBe(false);
+    }
+  });
+});
+
+describe('freeformGeometry — supportsFreeformPaper', () => {
+  it('is the gate SSOT: A4 and A5 are page boxes, everything else is not', () => {
+    expect(supportsFreeformPaper('A4')).toBe(true);
+    expect(supportsFreeformPaper('A5')).toBe(true);
+    for (const paper of ['80mm', '58mm', '40x20mm', '30x20mm', '60x40mm', '80x50mm', '100x50mm', 'none'] as const) {
+      expect(supportsFreeformPaper(paper)).toBe(false);
+    }
+  });
+
+  it('agrees with isFreeformTemplate for every paper size', () => {
+    const papers = ['A4', 'A5', '80mm', '58mm', '40x20mm', '30x20mm', '60x40mm', '80x50mm', '100x50mm', 'none'] as const;
+    for (const paper of papers) {
+      const tpl = { doc_type_code: 'FV', paper_size: paper, ...withGeo } as never;
+      expect(isFreeformTemplate(tpl)).toBe(supportsFreeformPaper(paper));
     }
   });
 });
