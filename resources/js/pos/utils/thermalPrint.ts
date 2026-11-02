@@ -6,6 +6,7 @@
 // توصيلها، وكروم لا يستطيع فك الحجز على ويندوز.
 //
 // سلسلة الاحتياط عند فشل WebUSB (كلها صامتة — بدون معاينة أو حوار):
+// 0. طابعة شبكية مُفعَّلة (RAW TCP) → إرسال مباشر بلا spooler ولا تعريف نظام.
 // 1. طابعة حرارية مسجّلة/مكتشفة → بايتات ESC/POS خام عبر spooler ويندوز.
 // 2. أي طابعة ويندوز عادية (ليزر/حبر مثل Canon) + HTML متوفر → طباعة HTML
 //    بدقة كاملة عبر Edge headless ← لقطة PNG ← GDI PrintDocument
@@ -24,7 +25,14 @@ import {
   KICK_DRAWER_PIN2,
   type ThermalPrintResult,
 } from './printService';
-import { systemPrintersApi } from '@/lib/api/endpoints/systemPrinters';
+// رسالة نجاح الطباعة معروضة من هنا أيضاً حتى تستورد صفحات POS الثلاثة
+// (printThermalSmart + الرسالة) من وحدة واحدة.
+export { thermalPrintSuccessMessage } from './printService';
+import {
+  systemPrintersApi,
+  readRawTcpConfig,
+  type RawTcpConfig,
+} from '@/lib/api/endpoints/systemPrinters';
 import {
   THERMAL_RE,
   bytesToBase64,
@@ -144,12 +152,56 @@ export function escPosToPlainLines(bytes: Uint8Array): string[] {
   return out.replace(/\r/g, '').split('\n');
 }
 
+/**
+ * محاولة RAW TCP قبل ويندوز.
+ *
+ * الطابعات الحرارية الشبكية (Ethernet/Wi-Fi) لا تُعرَّف في ويندوز أصلاً،
+ * فكل مسارات ويندوز تفشل معها بينما المقبس الصندوقي ينجح. نقرأ الإعدادات
+ * (بذاكرة 30 ثانية لكل مؤسسة) ونعيد `null` إن كانت معطّلة أو بلا مضيف حتى
+ * لا نُضيف طلباً بلا فائدة لكل إيصال.
+ *
+ * طابعة `printer_id` المُرجعة هي طابعة ويندوز الإجبارية لمسار الاحتياط التالي
+ * (طابعة USB/لاسلكية اختيارية تعمل عند انقطاع الشبكة) — طابعة الشبكة نفسها
+ * لا تحتاج تعريفاً في ويندوز.
+ */
+async function rawTcpFallback(
+  bytes: Uint8Array,
+  slug?: string | null,
+): Promise<{ result: ThermalPrintResult | null; config: RawTcpConfig | null }> {
+  const config = await readRawTcpConfig(slug ?? '');
+  if (!config || !config.enabled || !config.host) {
+    return { result: null, config: null };
+  }
+
+  try {
+    const res = await systemPrintersApi.rawTcp(bytesToBase64(bytes));
+    return {
+      result: {
+        ok: true,
+        method: 'raw_tcp',
+        message: `تمت الطباعة عبر الشبكة (${config.host}:${res.port})`,
+      },
+      config,
+    };
+  } catch (err: any) {
+    console.warn(
+      '[print] raw tcp path failed, falling back to windows:',
+      err?.response?.data?.message ?? err?.message,
+    );
+    // نحتفظ بالإعدادات حتى يستعمل المسار التالي `printer_id` كطابعة ويندوز
+    // إجبارية (طابعة USB/لاسلكية اختيارية). ذاكرة الـ30 ثانية تخصّ قراءة
+    // الإعدادات لا نتيجة الفشل، فلا نُخزّن الفشل ولا نُلغي الاستعمال.
+    return { result: null, config };
+  }
+}
+
 async function windowsRawFallback(
   bytes: Uint8Array,
   slug?: string | null,
   html?: string,
+  forcedTarget?: string | null,
 ): Promise<ThermalPrintResult> {
-  const target = await resolveWindowsTarget(slug);
+  const target = forcedTarget || (await resolveWindowsTarget(slug));
   if (!target) {
     return {
       ok: false,
@@ -203,8 +255,9 @@ async function windowsRawFallback(
 
 /**
  * إرسال بايتات ESC/POS: WebUSB أولاً (يعمل حين لا يحجز تعريف النظام
- * الواجهة)، ثم fallback تلقائي إلى ويندوز. بعد أول نجاح لويندوز على هذا
- * الجهاز يصير ويندوز هو المسار الأول مباشرة — طباعة أسرع بلا محاولة USB.
+ * الواجهة)، ثم RAW TCP للطابعات الحرارية الشبكية (لا تحتاج تعريفاً في
+ * ويندوز إطلاقاً)، ثم fallback تلقائي إلى ويندوز. بعد أول نجاح لويندوز على
+ * هذا الجهاز يصير ويندوز هو المسار الأول مباشرة — طباعة أسرع بلا محاولة USB.
  * إذا فشل ويندوز تُعاد محاولة WebUSB كحل أخير.
  */
 export async function sendBytesToPrinterSmart(
@@ -219,7 +272,13 @@ export async function sendBytesToPrinterSmart(
     if (usbRes.ok) return usbRes;
   }
 
-  const winRes = await windowsRawFallback(bytes, slug, html);
+  // RAW TCP: الطابعات الحرارية الشبكية لا تظهر في ويندوز، فكل مسارات
+  // ويندوز تفشل معها بينما المقبس الصندوقي ينجح. لا طلب ولا محاولة إن كانت
+  // الإعدادات معطّلة أو بلا مضيف.
+  const { result: tcpRes, config: tcpConfig } = await rawTcpFallback(bytes, slug);
+  if (tcpRes?.ok) return tcpRes;
+
+  const winRes = await windowsRawFallback(bytes, slug, html, tcpConfig?.printer_id);
   if (winRes.ok) return winRes;
 
   if (!usbRes) usbRes = await sendBytesToReceiptPrinter(bytes);

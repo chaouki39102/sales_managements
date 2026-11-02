@@ -1040,6 +1040,57 @@ class SettingsSeeder extends Seeder
                 'is_editable'   => true,
                 'display_order' => 90,
             ],
+
+            // ─── print:raw_tcp — طباعة مباشرة عبر RAW TCP (ESC/POS) ────────────
+            // أغلب طابعات الفواتير الحرارية تُركَّب كطابعة شبكية (Ethernet/Wi-Fi)
+            // وتستقبل بايتات ESC/POS مباشرة على منفذ 9100 دون تعريف نظام.
+            // هذا هو المسار الوحيد الذي ينجح مع مثل هذه الطابعات على خادم
+            // ويندوز، لأن WebUSB و spooler ويندوز يعتمدان على تعريف مثبَّت.
+            'print:raw_tcp_enabled' => [
+                'value'         => false,
+                'group'         => 'print',
+                'type'          => 'boolean',
+                'description'   => 'تفعيل الإرسال المباشر لبايتات ESC/POS عبر منفذ RAW TCP (الطابعات الشبكية)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 91,
+            ],
+            'print:raw_tcp_host' => [
+                'value'         => '',
+                'group'         => 'print',
+                'type'          => 'string',
+                'description'   => 'عنوان IP أو اسم المضيف لطابعة RAW TCP (مثال: 192.168.1.50)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 92,
+            ],
+            'print:raw_tcp_port' => [
+                'value'         => 9100,
+                'group'         => 'print',
+                'type'          => 'integer',
+                'description'   => 'منفذ الطابعة الشبكية (الافتراضي 9100)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 93,
+            ],
+            'print:raw_tcp_timeout' => [
+                'value'         => 5,
+                'group'         => 'print',
+                'type'          => 'integer',
+                'description'   => 'مهلة الاتصال والإرسال بالثواني (الافتراضي 5)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 94,
+            ],
+            'print:raw_tcp_printer_id' => [
+                'value'         => null,
+                'group'         => 'print',
+                'type'          => 'string',
+                'description'   => 'معرّف طابعة ويندوز المستعملة للطباعة الاحتياطية بعد فشل TCP (اختياري)',
+                'is_public'     => false,
+                'is_editable'   => true,
+                'display_order' => 95,
+            ],
         ];
     }
 

@@ -12,8 +12,37 @@ import { escposRenderer } from '@/pages/settings/print-settings/renderers/ESCPOS
 
 export interface ThermalPrintResult {
   ok:      boolean;
-  method:  'webusb' | 'blob' | 'none' | 'windows';
+  /**
+   * المسار الذي نجح (أو فشل أخيراً):
+   * - `webusb`: WebUSB مباشرة على الطابعة
+   * - `blob`: فتح نافذة طباعة المتصفح
+   * - `raw_tcp`: إرسال مباشر على منفذ شبكة RAW (9100 افتراضياً) — طابعة شبكية
+   * - `windows`: spooler ويندوز (خام / HTML / نص GDI)
+   * - `none`: فشلت كل المسارات
+   *
+   * `raw_tcp` مثل `webusb` في أن بايتاتها ESC/POS خام، فالمستهلكون
+   * الذين يعاملون «غير windows» كطابعة حرارية يبقون صحيحين.
+   */
+  method:  'webusb' | 'blob' | 'raw_tcp' | 'none' | 'windows';
   message: string;
+}
+
+/**
+ * رسالة نجاح واحدة لكل مسار طباعة، بدل تكرار الشرط في صفحات POS الثلاث.
+ *
+ * `raw_tcp` و`webusb` ليسا «ويندوز» لكنهما أيّهما إرسال حقيقي بايتات
+ * ESC/POS، فالنص يحدّد المسار عمداً: المستخدم يقرأ «عبر الشبكة» فيعرف أن
+ * الإيصال خرج من طابعة الشبكة لا من spooler ويندوز.
+ *
+ * لا إيموجي هنا: كل صفحة تحتفظ بأسلوبها (بعضها تضيف `✅` بنفسها).
+ */
+export function thermalPrintSuccessMessage(method: ThermalPrintResult['method']): string {
+  switch (method) {
+    case 'windows': return 'تمت الطباعة (ويندوز)';
+    case 'raw_tcp':  return 'تمت الطباعة عبر الشبكة';
+    case 'blob':     return 'تمت الطباعة (نافذة المتصفح)';
+    default:         return 'تمت الطباعة الحرارية';
+  }
 }
 
 // ─── Capability check ─────────────────────────────────────────────────────────

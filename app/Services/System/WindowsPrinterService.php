@@ -676,6 +676,86 @@ CS;
     }
 
     /**
+     * إرسال بايتات ESC/POS مباشرة عبر منفذ RAW TCP إلى طابعة شبكية.
+     *
+     * لماذا هذا المسار؟ أغلب طابعات الفواتير الحرارية الشبكية
+     * (Ethernet / Wi-Fi) لا تُعرَّف في ويندوز ولا تحتاج تعريفاً أصلاً:
+     * تستقبل بايتات ESC/POS على منفذ 9100 مباشرة. لذلك WebUSB (يحتاج
+     * تعريفاً) و spooler ويندوز (يحتاج طابعة مثبتة) كلاهما يفشل معها،
+     * بينما المقبس الصندوقي ينجح مباشرة.
+     *
+     * بلا نافذة حوار وبلا spooler وبلا تعريف نظام — بايتات فقط.
+     *
+     * $host قد يكون IP أو اسم مضيف؛ يُحجب timeout على الفتح والإرسال معاً
+     * حتى لا يعلّق الطلب أبداً على طابعة مطفأة.
+     *
+     * @throws \RuntimeException عند فشل الفتح أو الإرسال (بما فيه المهلة)
+     */
+    public function rawTcpPrint(string $host, int $port, string $base64Data, int $timeout = 5): int
+    {
+        $host = trim($host);
+        if ($host === '') {
+            throw new \RuntimeException('عنوان طابعة RAW TCP غير محدد.');
+        }
+
+        $port = ($port >= 1 && $port <= 65535) ? $port : 9100;
+        $timeout = max(1, min(30, $timeout));
+
+        $bytes = base64_decode($base64Data, true);
+        if ($bytes === false || strlen($bytes) === 0) {
+            throw new \RuntimeException('بيانات الطباعة غير صالحة.');
+        }
+        if (strlen($bytes) > 1024 * 1024) {
+            throw new \RuntimeException('حجم بيانات الطباعة كبير جداً.');
+        }
+
+        $errno = 0;
+        $errstr = '';
+        $sock = @fsockopen($host, $port, $errno, $errstr, $timeout);
+        if ($sock === false) {
+            $reason = trim($errstr) !== '' ? trim($errstr) : ('رمز الخطأ ' . $errno);
+            throw new \RuntimeException(
+                "تعذر الاتصال بطابعة RAW TCP على {$host}:{$port} — {$reason}",
+            );
+        }
+
+        try {
+            // المهلة تُطبَّق على كل عملية كتابة/قراءة، فالإرسال يتوقف فور
+            // انتهاء المهلة بدل أن يبقى المحبس مفتوحاً على طابعة صامتة.
+            stream_set_timeout($sock, $timeout);
+
+            $written = 0;
+            $total = strlen($bytes);
+
+            while ($written < $total) {
+                $chunk = @fwrite($sock, substr($bytes, $written));
+                if ($chunk === false) {
+                    $meta = stream_get_meta_data($sock);
+                    if (!empty($meta['timed_out'])) {
+                        throw new \RuntimeException(
+                            "انتهت مهلة الإرسال إلى طابعة RAW TCP على {$host}:{$port}.",
+                        );
+                    }
+
+                    throw new \RuntimeException(
+                        "فشل إرسال البيانات إلى طابعة RAW TCP على {$host}:{$port}.",
+                    );
+                }
+                if ($chunk === 0) {
+                    throw new \RuntimeException(
+                        "طابعة RAW TCP على {$host}:{$port} لم تستقبل أي بيانات.",
+                    );
+                }
+                $written += $chunk;
+            }
+
+            return $written;
+        } finally {
+            @fclose($sock);
+        }
+    }
+
+    /**
      * طباعة نص عادي (GDI) على أي طابعة مثبتة — صامتة تماماً: بدون معاينة
      * ولا نافذة حوار، وتعمل على الطابعات العادية (ليزر/حبر) التي لا تفهم
      * بايتات ESC/POS الخام (مثل Canon MF3010).

@@ -809,6 +809,11 @@ Route::prefix('v1')->group(function () {
                 Route::post('system/printers/raw',  [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'rawPrint']);
                 Route::post('system/printers/raw-text', [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'rawText']);
                 Route::post('system/printers/html', [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'htmlPrint']);
+                // طابعة ESC/POS الشبكية: إرسال مباشر على منفذ RAW TCP (9100 افتراضياً).
+                // لا تمرّ بـ spooler ولا تحتاج تعريفاً في ويندوز — عكس بقية المسارات.
+                // GET للقراءة فقط (يقرّر العميل هل يحاول الشبكة)؛ POST للإرسال.
+                Route::get('system/printers/raw-tcp',  [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'rawTcpConfig']);
+                Route::post('system/printers/raw-tcp', [\App\Http\Controllers\Api\V1\SystemPrinterController::class, 'rawTcp']);
             });
 
             // ── طلبات بوابة الزبائن (إدارة المسؤول) — can:manage_portal_orders ──

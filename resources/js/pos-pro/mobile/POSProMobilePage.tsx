@@ -47,7 +47,7 @@ import { productToVariant, isVariantOutOfStock } from '@/pos/utils/posHelpers';
 import { usePOSSettings, checkDiscountAllowed } from '@/pos/hooks/usePOSSettings';
 import { usePrintSettings } from '@/pos/hooks/usePrintSettings';
 import { printReceiptDirect } from '@/pos/utils/printUtils';
-import { printThermalSmart, openCashDrawerSmart } from '@/pos/utils/thermalPrint';
+import { printThermalSmart, openCashDrawerSmart, thermalPrintSuccessMessage } from '@/pos/utils/thermalPrint';
 import { playSaleSound, playAddSound } from '@/pos/utils/posSounds';
 import type { SoundPresetId } from '@/pos/utils/posSounds';
 import { htToTtc } from '@/pos/utils/calculations';
@@ -526,7 +526,7 @@ export default function POSProMobilePage() {
         const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
         const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug, html);
         if (result.ok) {
-          safeToast.success(result.method === 'windows' ? 'تمت الطباعة (ويندوز)' : 'تمت الطباعة الحرارية');
+          safeToast.success(thermalPrintSuccessMessage(result.method));
         } else {
           safeToast.error(`خطأ في الطباعة الحرارية: ${result.message}`);
           await printReceiptDirect({

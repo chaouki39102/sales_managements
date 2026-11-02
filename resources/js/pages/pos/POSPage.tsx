@@ -79,7 +79,7 @@ import { playAddSound, playSaleSound } from '@/pos/utils/posSounds';
 import type { SoundPresetId } from '@/pos/utils/posSounds';
 import { renderPreviewToHtml }  from '@/pages/settings/print-settings/runtime/renderPreviewToHtml';
 import { mapCompany }           from '@/pages/settings/print-settings/runtime/PrintRuntimeAdapter';
-import { printThermalSmart } from '@/pos/utils/thermalPrint';
+import { printThermalSmart, thermalPrintSuccessMessage } from '@/pos/utils/thermalPrint';
 import { useQueryClient }       from '@tanstack/react-query';
 import { partyBalancesApi } from '@/lib/api/endpoints/partyBalances';
 import { tenantKeys, invalidatePosQueries, invalidateDashboardQueries } from '@/lib/api/core/queryKeys';
@@ -1063,7 +1063,7 @@ function POSPage() {
         const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
         const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug, html);
         if (result.ok) {
-          safeToast.success(result.method === 'windows' ? '✅ تمت الطباعة (ويندوز)' : '✅ تمت الطباعة الحرارية');
+          safeToast.success(`✅ ${thermalPrintSuccessMessage(result.method)}`);
         } else {
           safeToast.error(`خطأ في الطباعة الحرارية: ${result.message}`);
           await printReceiptDirect({
