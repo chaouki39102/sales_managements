@@ -8,7 +8,6 @@ import { useTheme } from '@/hooks/useTheme';
 import { apiGet, apiPost } from '@/lib/api/core/client';
 import { useTopbarTitle } from '@/hooks/useTopbarTitle';
 import OfflineIndicator from '@/components/OfflineIndicator';
-import NotificationBell from '@/components/topbar/NotificationBell';
 import { AlertBell } from '@/pages/documents/components/AlertBell';
 import PrintQueuePanel from '@/pages/settings/print-settings/components/shared/PrintQueuePanel';
 import { usePermissions, permissionForNavPath } from '@/lib/permissions';
@@ -887,7 +886,6 @@ const meta = useTopbarTitle();
               <span className="srch-ic ic ic-xs"><i className="ti ti-search" /></span>
               <input type="text" placeholder="بحث سريع..." />
             </div>
-            <NotificationBell />
             <AlertBell />
             {!isDocEditor && (
               <button className="ib" onClick={toggleTheme} title={dark ? 'الوضع الفاتح' : 'الوضع الداكن'}>

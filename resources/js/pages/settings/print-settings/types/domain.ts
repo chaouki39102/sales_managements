@@ -348,7 +348,13 @@ export interface PrintTemplate {
   page_frame:       PageFrameConfig;
   sections_order:   SectionMeta[];
   positions?:       Partial<Record<SectionTarget, SectionPosition>>; // LEGACY block freeform — accepted for tolerance, never rendered (see ElementPosition)
-  element_positions?: Partial<Record<ElementKey, ElementPosition | LegacyElementPosition>>; // freeform element geometry, mm on the PAGE box
+  // Freeform element geometry, mm on the PAGE box. Keys are the fixed
+  // `ElementKey` ids plus the ids of user-added `custom_elements`.
+  element_positions?: Partial<Record<ElementKey | string, ElementPosition | LegacyElementPosition>>;
+  /** User-added printable elements (text / image / divider / spacer). Only
+   *  meaningful for freeform A4/A5 templates, where each one is placed through
+   *  `element_positions[custom.id]`. */
+  custom_elements?: CustomElement[];
   totals_grid:      TotalsGridConfig;
   watermark:        WatermarkConfig;
 
@@ -506,6 +512,30 @@ export type ElementKey =
   | 'footer.qr'
   | 'footer.signatures'
   | 'footer.stamp';
+
+/** The kinds of block a user can add to an A4/A5 freeform template on top of
+ *  the fixed `ElementKey` set. Every kind renders inside a normal `Pos` box, so
+ *  it obeys the same millimetre geometry / mode rules as a built-in element. */
+export type CustomElementKind = 'text' | 'image' | 'divider' | 'spacer';
+
+/** A user-added freeform element. Its `id` is the key used in
+ *  `element_positions`, which is why it is persisted on the template rather
+ *  than held in designer state: the geometry lookup must survive a save/reload
+ *  and the print pipeline reads exactly the same map as the designer. */
+export type CustomElement = {
+  id: string;                 // `custom-<n>` — also the `element_positions` key
+  kind: CustomElementKind;
+  text?: string;              // text kind
+  src?: string;               // image kind (URL or data URI)
+  align?: AlignOption;        // text kind
+  fontSize?: number;          // px, text kind
+  color?: string;             // text kind
+  bold?: boolean;
+  italic?: boolean;
+  borderStyle?: BorderStyle;  // divider kind
+  borderColor?: string;
+  borderWidth?: number;       // px
+};
 
 /** How a freeform element is placed on the page.
  *  - `fixed` — absolute box in page millimetres; the element leaves the document

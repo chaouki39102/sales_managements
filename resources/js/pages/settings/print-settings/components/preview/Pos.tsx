@@ -13,7 +13,9 @@ import {
 import { usePrintPage } from './PrintPageContext';
 
 export interface PosProps {
-  dragKey: ElementKey;
+  /** A built-in `ElementKey` or the id of a user-added `custom_elements` entry —
+   *  both are keys of `element_positions`, so the geometry lookup is identical. */
+  dragKey: ElementKey | string;
   tpl: PrintTemplate;
   children: ReactNode;
 }

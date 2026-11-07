@@ -2550,18 +2550,18 @@ export default function OpenSessionModal({
               })()}
             </div>
 
-            {/* ملاحظة وردية */}
+            {/* ملاحظة جلسة */}
             <div className="osm-field">
               <label className="osm-label">
                 <i className="ti ti-notes" />
-                ملاحظة الوردية (اختياري)
+                ملاحظة الجلسة (اختياري)
               </label>
               <input
                 className="osm-inp"
                 type="text"
                 value={note}
                 onChange={e => setNote(e.target.value)}
-                placeholder="مثال: وردية صباح، صندوق 1..."
+                placeholder="مثال: جلسة صباح، صندوق 1..."
               />
             </div>
 

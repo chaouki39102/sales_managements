@@ -5,7 +5,7 @@ export type {
   HeaderLayout, PageFrameConfig, TotalsGridConfig, TotalsGridColumn,
   ColumnStyleConfig, SectionMeta, WatermarkConfig,
   SectionPosition, ElementKey, ElementPosition, ElementMode, LegacyElementPosition,
-  StickerElementGeometry,
+  StickerElementGeometry, CustomElement, CustomElementKind,
 } from './types/domain';
 
 export {

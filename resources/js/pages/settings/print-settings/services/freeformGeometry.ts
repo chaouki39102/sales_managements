@@ -149,15 +149,19 @@ export function normalizeElementGeometry(
   };
 }
 
-/** Every element that has usable geometry, already in millimetres. */
+/** Every element that has usable geometry, already in millimetres.
+ *
+ *  Keys are built-in `ElementKey`s AND the ids of user-added `custom_elements`,
+ *  which is why the map is not narrowed to `ElementKey`: narrowing here would
+ *  silently drop custom geometry between save and reload. */
 export function resolveGeometryMap(
   tpl: Pick<PrintTemplate, 'element_positions'>,
   box: PageBox,
-): Partial<Record<ElementKey, ResolvedGeometry>> {
-  const out: Partial<Record<ElementKey, ResolvedGeometry>> = {};
+): Partial<Record<ElementKey | string, ResolvedGeometry>> {
+  const out: Partial<Record<ElementKey | string, ResolvedGeometry>> = {};
   const raw = tpl.element_positions;
   if (!raw) return out;
-  for (const key of Object.keys(raw) as ElementKey[]) {
+  for (const key of Object.keys(raw)) {
     const geo = normalizeElementGeometry(raw[key], box);
     if (geo) out[key] = geo;
   }
@@ -169,7 +173,7 @@ export function resolveGeometryMap(
 export function hasElementGeometry(tpl: Pick<PrintTemplate, 'element_positions'>): boolean {
   const raw = tpl.element_positions;
   if (!raw) return false;
-  return (Object.keys(raw) as ElementKey[]).some(k => !!raw[k] && typeof raw[k] === 'object');
+  return Object.keys(raw).some(k => !!raw[k] && typeof raw[k] === 'object');
 }
 
 /** Which sheet sizes the freeform element designer supports.
@@ -366,11 +370,11 @@ export function applyMode(
 export function migrateLegacyGeometry(
   positions: PrintTemplate['element_positions'],
   box: PageBox,
-): { map: Partial<Record<ElementKey, ElementPosition>>; changed: boolean } {
-  const map: Partial<Record<ElementKey, ElementPosition>> = {};
+): { map: Partial<Record<ElementKey | string, ElementPosition>>; changed: boolean } {
+  const map: Partial<Record<ElementKey | string, ElementPosition>> = {};
   let changed = false;
   if (!positions) return { map, changed };
-  for (const key of Object.keys(positions) as ElementKey[]) {
+  for (const key of Object.keys(positions)) {
     const raw = positions[key];
     if (!raw || typeof raw !== 'object') continue;
     if (isLegacy(raw)) {

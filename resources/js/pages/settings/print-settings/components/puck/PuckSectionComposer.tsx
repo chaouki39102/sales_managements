@@ -166,7 +166,7 @@ export default function PuckSectionComposer({ tpl, data, onOrderChange, onResetO
         height="100%"
       />
       <style>{`
-        .ps-puck-composer { height: 100%; min-height: 0; display: flex; flex-direction: column; }
+        .ps-puck-composer { ; min-height: 0; display: flex; flex-direction: column; }
         .ps-puck-composer .Puck { flex: 1 1 auto; min-height: 0; }
         .ps-puck-hd { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--b1); background: var(--bg1); }
         .ps-puck-hd-title { font-weight: 600; color: var(--tx2); }

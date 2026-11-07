@@ -228,7 +228,7 @@ export default function OpenSessionModal({
                 type="text"
                 value={note}
                 onChange={e => setNote(e.target.value)}
-                placeholder="مثال: وردية صباح..."
+                placeholder="مثال: جلسة صباح..."
               />
             </div>
 

@@ -1,12 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ElementKey, ElementPosition, PrintTemplate } from '../types';
+import type {
+  AlignOption,
+  BorderStyle,
+  CustomElement,
+  CustomElementKind,
+  ElementKey,
+  ElementPosition,
+  PrintTemplate,
+} from '../types';
 import type { UniversalDocumentData } from '../types/data';
 import type { PageBox, ResolvedGeometry } from '../services/freeformGeometry';
 import { applyMode, clampGeometry, defaultElementMode, FLOW_FIRST_ELEMENTS, normalizeElementGeometry, pageBoxMm, rectToGeometry, snapMm } from '../services/freeformGeometry';
 import PreviewSelector from './PreviewSelector';
 
 interface ActiveDrag {
-  key: ElementKey;
+  key: ElementKey | string;
   box: HTMLElement;
   wrapper: HTMLElement;
   startX: number;
@@ -24,13 +32,17 @@ const DRAG_THRESHOLD_PX = 1;
 export interface ElementDesignerStageProps {
   tpl: PrintTemplate;
   data?: UniversalDocumentData | null;
-  onPositionChange: (key: ElementKey, pos: ElementPosition) => void;
+  onPositionChange: (key: ElementKey | string, pos: ElementPosition) => void;
   /** Clears the element's stored geometry so it returns to natural document flow. */
-  onResetElement?: (key: ElementKey) => void;
+  onResetElement?: (key: ElementKey | string) => void;
+  /** User-defined elements persisted on the template (`custom_elements`). */
+  customElements?: CustomElement[];
+  /** Writes the full custom-element list back to the template. */
+  onCustomElementsChange?: (els: CustomElement[]) => void;
 }
 
 /** Arabic labels for the known element keys; unknown keys fall back to the raw key. */
-const ELEMENT_LABELS: Partial<Record<ElementKey, string>> = {
+const ELEMENT_LABELS: Record<string, string> = {
   'header.logo': 'شعار المؤسسة',
   'header.title': 'عنوان المستند',
   'header.company-name': 'اسم المؤسسة',
@@ -54,12 +66,35 @@ const ELEMENT_LABELS: Partial<Record<ElementKey, string>> = {
   'footer.stamp': 'الختم',
 };
 
-function labelOf(key: ElementKey): string {
+function labelOf(key: string): string {
   return ELEMENT_LABELS[key] ?? key;
 }
 
+/** Arabic labels for the user-added element kinds. */
+const CUSTOM_KIND_LABELS: Record<CustomElementKind, string> = {
+  text: 'نص مخصص',
+  image: 'صورة مخصصة',
+  divider: 'فاصل',
+  spacer: 'فراغ',
+};
+
+/** Design-time starting box (mm) per kind. A 1mm box would be invisible and
+ *  `normalizeElementGeometry` rejects `w <= 0`, so every kind needs real size. */
+const CUSTOM_DEFAULT_SIZE: Record<CustomElementKind, { w: number; h: number }> = {
+  text: { w: 60, h: 12 },
+  image: { w: 40, h: 30 },
+  divider: { w: 60, h: 4 },
+  spacer: { w: 60, h: 10 },
+};
+
+/** `<input type="color">` only accepts 6-digit hex, so a short custom default
+ *  (`#111`) has to be expanded before it can be bound to the control. */
+function hex6(value?: string): string {
+  return /^#[0-9a-f]{6}$/i.test(value ?? '') ? (value as string) : '#111111';
+}
+
 /** The box a flow/fixed element would take if captured from the DOM right now. */
-function measuredGeometryOf(key: ElementKey, measured: ElementPosition, box: PageBox): ResolvedGeometry {
+function measuredGeometryOf(key: string, measured: ElementPosition, box: PageBox): ResolvedGeometry {
   const mode = defaultElementMode(key, null);
   return clampGeometry({
     x: mode === 'flow' ? 0 : measured.x,
@@ -72,14 +107,17 @@ function measuredGeometryOf(key: ElementKey, measured: ElementPosition, box: Pag
   }, box);
 }
 
-export function ElementDesignerStage({ tpl, data, onPositionChange, onResetElement }: ElementDesignerStageProps) {
+export function ElementDesignerStage({
+  tpl, data, onPositionChange, onResetElement,
+  customElements = [], onCustomElementsChange,
+}: ElementDesignerStageProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<ActiveDrag | null>(null);
   const onPositionChangeRef = useRef(onPositionChange);
   onPositionChangeRef.current = onPositionChange;
   const tplRef = useRef(tpl);
   tplRef.current = tpl;
-  const [selectedKey, setSelectedKey] = useState<ElementKey | null>(null);
+  const [selectedKey, setSelectedKey] = useState<ElementKey | string | null>(null);
   const [measured, setMeasured] = useState<ElementPosition | null>(null);
 
   useEffect(() => {
@@ -161,7 +199,7 @@ export function ElementDesignerStage({ tpl, data, onPositionChange, onResetEleme
     let attempts = 0;
     const cleanups: Array<() => void> = [];
 
-    const attachDrag = (e: PointerEvent, key: ElementKey) => {
+    const attachDrag = (e: PointerEvent, key: ElementKey | string) => {
       const box = e.currentTarget as HTMLElement;
       if (e.button !== 0) return;
       const wrapper = box.closest('.ps-preview-wrapper');
@@ -196,7 +234,7 @@ export function ElementDesignerStage({ tpl, data, onPositionChange, onResetEleme
         return;
       }
       wrappers.forEach((w) => {
-        const key = (w.getAttribute('data-drag-key') ?? 'header.logo') as ElementKey;
+        const key = w.getAttribute('data-drag-key') ?? 'header.logo';
         const box =
           w.style.display === 'contents'
             ? (w.firstElementChild as HTMLElement | null) || w
@@ -253,7 +291,7 @@ export function ElementDesignerStage({ tpl, data, onPositionChange, onResetEleme
   // any text field — the inspector's own mm inputs are arrow-editable, and a
   // global handler would fight them.
   const nudgeRef = useRef<((dx: number, dy: number) => void) | null>(null);
-  const selectedRef = useRef<ElementKey | null>(null);
+  const selectedRef = useRef<ElementKey | string | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -341,6 +379,53 @@ export function ElementDesignerStage({ tpl, data, onPositionChange, onResetEleme
     </label>
   );
 
+  // ── Custom elements: user-added text / image / divider / spacer ───────────
+  // They are printed through the SAME `Pos` + `element_positions` pipeline as
+  // the built-in elements, so the box written here is the only thing the
+  // renderer needs. Adding an element and writing its geometry happen in ONE
+  // action: an id with no stored box would be skipped at render time.
+  const customList = customElements;
+  const selectedCustom = selectedKey ? customList.find((el) => el.id === selectedKey) ?? null : null;
+  const elementLabel = (key: string): string => {
+    const custom = customList.find((el) => el.id === key);
+    return custom ? CUSTOM_KIND_LABELS[custom.kind] : labelOf(key);
+  };
+  const nextCustomId = (): string => {
+    const used = new Set<string>([
+      ...customList.map((el) => el.id),
+      ...Object.keys(tpl.element_positions ?? {}),
+    ]);
+    let n = 1;
+    while (used.has(`custom-${n}`)) n += 1;
+    return `custom-${n}`;
+  };
+  const patchCustom = (id: string, patch: Partial<CustomElement>) => {
+    if (!onCustomElementsChange) return;
+    onCustomElementsChange(customList.map((el) => (el.id === id ? { ...el, ...patch } : el)));
+  };
+  const removeCustom = (id: string) => {
+    if (!onCustomElementsChange) return;
+    onCustomElementsChange(customList.filter((el) => el.id !== id));
+    // The geometry key must go with the element, or a later element reusing the
+    // same id would inherit a stale box.
+    onResetElement?.(id);
+    if (selectedKey === id) setSelectedKey(null);
+  };
+  const addCustom = (kind: CustomElementKind) => {
+    if (!onCustomElementsChange) return;
+    const id = nextCustomId();
+    const size = CUSTOM_DEFAULT_SIZE[kind];
+    const el: CustomElement = {
+      id,
+      kind,
+      mode: 'fixed',
+      ...(kind === 'text' ? { text: 'نص جديد' } : {}),
+    };
+    onCustomElementsChange([...customList, el]);
+    onPositionChange(id, clampGeometry({ x: 0, y: 0, ...size, mode: 'fixed', rotate: 0, z: 0 }, box));
+    setSelectedKey(id);
+  };
+
   // `data-ff-stage` marks the ACTIVE freeform layer. `Pos` emits `data-drag-key`
   // / `data-ff-mode` in the normal (non-freeform) preview too, so neither can
   // tell "designer open" from "inert" — the stage root is the only honest signal
@@ -380,7 +465,7 @@ export function ElementDesignerStage({ tpl, data, onPositionChange, onResetEleme
             ] as const).map(([m, label]) => {
               // A flow-first element can never be pinned: disabling the control
               // explains why, where silently ignoring the click would not.
-              const blocked = m === 'fixed' && FLOW_FIRST_ELEMENTS.has(selectedKey as ElementKey);
+              const blocked = m === 'fixed' && FLOW_FIRST_ELEMENTS.has(selectedKey);
               const noHandler = m === 'auto' ? !onResetElement : blocked;
               return (
                 <button

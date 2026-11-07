@@ -16,6 +16,7 @@ import { renderReport } from './ReportSection';
 import DeliveryReceiptA5 from './DeliveryReceiptA5';
 import { PageFrame } from './PageFrame';
 import StickerLabel from './StickerLabel';
+import { CustomElementLayer } from './CustomElementLayer';
 import { isStickerPaper, stickerDims } from './stickerDims';
 import { formulaEngine } from '../../services/engines/FormulaEngine';
 import {
@@ -208,6 +209,10 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
           clipped by a section's overflow. Pointer-transparent so the flow
           content underneath stays interactive; the fixed boxes opt back in. */}
       <div ref={setLayerRef} className="ps-freeform-layer" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5 }} />
+      {/* User-added freeform elements. Their boxes are portalled into the layer
+          above (same as every built-in fixed element), so their DOM position
+          here has no visual effect — this is only the mount point. */}
+      <CustomElementLayer tpl={tpl} />
     </div>
     </PrintPageProvider>
   );
