@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardService
 {
+    public function __construct(
+        private CompanyContextService $companyContext
+    ) {}
     public function getSummary(): array
     {
         $currentYear = Carbon::now()->year;
@@ -72,6 +75,8 @@ class DashboardService
         $outOfStockCount = collect($stockData)->filter(fn($r) => (float) $r['current_stock'] <= 0 && (bool) $r['manages_stock'])->count();
 
         // Month profit (sales HT - cost of goods sold)
+        $companyId = $this->companyContext->get();
+
         $monthSalesHt = CommercialDocument::whereYear('document_date', $currentYear)
             ->whereMonth('document_date', $currentMonth)
             ->whereHas('documentType', $saleScope)
@@ -80,6 +85,8 @@ class DashboardService
         $monthCogs = DB::table('commercial_document_lines as cdl')
             ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
             ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->where('cd.company_id', $companyId)
+            ->where('cdl.company_id', $companyId)
             ->whereNull('cd.deleted_at')
             ->whereYear('cd.document_date', $currentYear)
             ->whereMonth('cd.document_date', $currentMonth)
