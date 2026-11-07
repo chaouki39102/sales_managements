@@ -5,8 +5,8 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/admin';
-import { dbApi } from '@/lib/api/admin';
-import type { DbStatus } from '@/lib/api/admin';
+import { dbApi, funnelApi } from '@/lib/api/admin';
+import type { DbStatus, FunnelStatus } from '@/lib/api/admin';
 import PageHeader from '@/components/ui/PageHeader';
 import type { SystemSettings } from '@/types/admin';
 import { useNotification } from '@/hooks/useNotification';
@@ -156,6 +156,55 @@ export default function AdminSettingsPage() {
   });
 
   const [dbSwitchError, setDbSwitchError] = useState<{ message: string; detail?: string; hint?: string } | null>(null);
+
+  // ── Tailscale Funnel (public sharing link) ──────────────────────────────────
+  const [tailscaleCliPath, setTailscaleCliPath] = useState('C:\\Program Files\\Tailscale\\tailscale.exe');
+  const [tailscaleAppPort, setTailscaleAppPort] = useState(8000);
+  const [funnelError, setFunnelError] = useState<{ message: string; detail?: string; hint?: string } | null>(null);
+
+  useEffect(() => {
+    if (!form) return;
+    if (typeof form.tailscale_cli_path === 'string' && form.tailscale_cli_path.trim()) {
+      setTailscaleCliPath(form.tailscale_cli_path);
+    }
+    if (typeof form.tailscale_app_port === 'number' && form.tailscale_app_port > 0) {
+      setTailscaleAppPort(form.tailscale_app_port);
+    }
+  }, [form?.tailscale_cli_path, form?.tailscale_app_port]);
+
+  const { data: funnelStatus, isLoading: funnelLoading, refetch: refetchFunnel } = useQuery<FunnelStatus>({
+    queryKey: ['admin', 'system', 'funnel-status', tailscaleCliPath, tailscaleAppPort],
+    queryFn:  () => funnelApi.status({ cli_path: tailscaleCliPath, port: tailscaleAppPort }),
+    staleTime: 30_000,
+  });
+
+  const funnelEnableMut = useMutation({
+    mutationFn: () => funnelApi.enable({ cli_path: tailscaleCliPath, port: tailscaleAppPort }),
+    onSuccess: (data) => {
+      setFunnelError(null);
+      qc.invalidateQueries({ queryKey: ['admin', 'system', 'funnel-status'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'system', 'settings'] });
+      notify.success(data.message ?? 'تم إنشاء الرابط ✓');
+      if (data.url) {
+        setForm(f => f ? { ...f, public_funnel_url: data.url ?? undefined, tailscale_cli_path: tailscaleCliPath, tailscale_app_port: tailscaleAppPort } : f);
+      }
+    },
+    onError: (e: any) => {
+      const err = { message: e?.message ?? e?.error ?? 'فشل إنشاء الرابط', detail: e?.detail, hint: e?.hint };
+      setFunnelError(err);
+      notify.error(err.message);
+    },
+  });
+
+  const saveFunnelConfigMut = useMutation({
+    mutationFn: () => adminApi.updateSettings({ tailscale_cli_path: tailscaleCliPath, tailscale_app_port: tailscaleAppPort }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'system', 'settings'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'system', 'funnel-status'] });
+      notify.success('تم حفظ إعدادات Tailscale ✓');
+    },
+    onError: (e: any) => notify.error(e?.message ?? 'فشل حفظ الإعدادات'),
+  });
 
   const dbSwitchMut = useMutation({
     mutationFn: (driver: string) => dbApi.switchTo(driver),
@@ -574,6 +623,170 @@ export default function AdminSettingsPage() {
           </>
         ) : (
           <div style={{ padding: '14px 0', color: 'var(--t4)', fontSize: 12 }}>تعذّر جلب الحالة</div>
+        )}
+      </Section>
+
+      {/* رابط المشاركة العام — Tailscale Funnel */}
+      <Section title="رابط المشاركة العام (Tailscale)" icon="ti-world-share" color="#14b8a6">
+        <div style={{ fontSize: 12, color: 'var(--t3)', lineHeight: 1.7, padding: '10px 0 12px' }}>
+          يتحقق النظام من تثبيت Tailscale على هذا الجهاز، ثم ينشئ رابط Funnel العام الموافق للجهاز من الإعدادات أدناه (المسار والمنفذ). يبقى الرابط دائماً ما دام الجهاز متصلاً وTailscale يعمل.
+        </div>
+
+        {/* Config */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: 10, paddingBottom: 12, borderBottom: '1px solid var(--b1)' }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--t2)', marginBottom: 5 }}>مسار Tailscale (tailscale.exe)</div>
+            <input
+              value={tailscaleCliPath}
+              onChange={e => setTailscaleCliPath(e.target.value)}
+              placeholder="C:\Program Files\Tailscale\tailscale.exe"
+              style={{
+                width: '100%', padding: '8px 10px', borderRadius: 8,
+                border: '1.5px solid var(--b2)', background: 'var(--bg1)',
+                color: 'var(--t1)', fontSize: 12.5, fontFamily: 'Consolas, monospace', outline: 'none',
+              }}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--t2)', marginBottom: 5 }}>منفذ الخادم</div>
+            <input
+              type="number" min={1} max={65535} value={tailscaleAppPort}
+              onChange={e => setTailscaleAppPort(+e.target.value || 8000)}
+              style={{
+                width: '100%', padding: '8px 10px', borderRadius: 8,
+                border: '1.5px solid var(--b2)', background: 'var(--bg1)',
+                color: 'var(--t1)', fontSize: 13, textAlign: 'center', fontFamily: 'Tajawal,sans-serif', outline: 'none',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Status */}
+        <div style={{
+          marginTop: 12, padding: '12px 14px', borderRadius: 10,
+          background: funnelLoading ? 'var(--bg3)' : (funnelStatus?.installed ? '#14b8a610' : '#f59e0b10'),
+          border: `1px solid ${funnelStatus?.installed ? '#14b8a630' : '#f59e0b30'}`,
+        }}>
+          {funnelLoading ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--t4)', fontSize: 12.5 }}>
+              <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} /> جارٍ التحقق من Tailscale...
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <i className={`ti ${funnelStatus?.installed ? 'ti-circle-check' : 'ti-alert-circle'}`}
+                   style={{ color: funnelStatus?.installed ? '#14b8a6' : '#f59e0b', fontSize: 17 }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>
+                  {funnelStatus?.installed ? 'Tailscale مثبت على هذا الجهاز' : 'Tailscale غير مثبت أو المسار غير صحيح'}
+                </span>
+                {funnelStatus?.funnel_active && (
+                  <span style={{ marginRight: 'auto', padding: '2px 8px', borderRadius: 6, background: '#10b98120', color: 'var(--green)', fontSize: 11, fontWeight: 700 }}>Funnel مفعّل</span>
+                )}
+              </div>
+              {!funnelStatus?.installed && (
+                <div style={{ fontSize: 11.5, color: 'var(--t4)' }}>
+                  المسار: <span style={{ direction: 'ltr', display: 'inline-block', fontFamily: 'Consolas, monospace' }}>{funnelStatus?.cli_path}</span>
+                </div>
+              )}
+              {(funnelStatus?.url || funnelStatus?.configured_url) && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 11.5, color: 'var(--t4)', marginBottom: 4 }}>الرابط العام لهذا الجهاز:</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <a
+                      href={funnelStatus?.url ?? funnelStatus?.configured_url ?? '#'}
+                      target="_blank" rel="noreferrer"
+                      style={{ fontSize: 13, fontWeight: 700, color: '#14b8a6', direction: 'ltr', wordBreak: 'break-all' }}
+                    >
+                      {funnelStatus?.url ?? funnelStatus?.configured_url}
+                    </a>
+                    <button
+                      onClick={() => {
+                        const u = funnelStatus?.url ?? funnelStatus?.configured_url;
+                        if (u) navigator.clipboard?.writeText(u).then(() => notify.success('تم نسخ الرابط'), () => {});
+                      }}
+                      style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid var(--b2)', background: 'var(--bg2)', cursor: 'pointer', fontSize: 11, color: 'var(--t2)', fontFamily: 'Tajawal,sans-serif' }}
+                    >
+                      <i className="ti ti-copy" /> نسخ
+                    </button>
+                  </div>
+                </div>
+              )}
+              {funnelStatus?.detail && !funnelStatus?.url && (
+                <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--t4)', whiteSpace: 'pre-wrap', direction: 'ltr', textAlign: 'left' }}>{funnelStatus.detail}</div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+          <button
+            disabled={funnelEnableMut.isPending}
+            onClick={() => funnelEnableMut.mutate()}
+            style={{
+              padding: '10px 16px', borderRadius: 9, border: 'none', cursor: 'pointer',
+              background: '#14b8a6', color: '#fff', fontSize: 12.5, fontWeight: 700,
+              fontFamily: 'Tajawal,sans-serif', display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            {funnelEnableMut.isPending
+              ? <><i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} /> جارٍ الإنشاء...</>
+              : <><i className="ti ti-link-plus" /> إنشاء / تحديث الرابط</>}
+          </button>
+          <button
+            disabled={saveFunnelConfigMut.isPending}
+            onClick={() => saveFunnelConfigMut.mutate()}
+            style={{
+              padding: '10px 16px', borderRadius: 9, border: '1px solid var(--b2)', cursor: 'pointer',
+              background: 'var(--bg2)', color: 'var(--t1)', fontSize: 12.5, fontWeight: 700,
+              fontFamily: 'Tajawal,sans-serif', display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            {saveFunnelConfigMut.isPending
+              ? <i className="ti ti-loader-2" style={{ animation: 'spin .8s linear infinite' }} />
+              : <i className="ti ti-device-floppy" />}
+            حفظ المسار والمنفذ
+          </button>
+          <button
+            disabled={funnelLoading}
+            onClick={() => { refetchFunnel(); }}
+            style={{
+              padding: '10px 14px', borderRadius: 9, border: '1px solid var(--b2)', cursor: 'pointer',
+              background: 'var(--bg2)', color: 'var(--t2)', fontSize: 12.5, fontWeight: 600,
+              fontFamily: 'Tajawal,sans-serif', display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            <i className="ti ti-refresh" /> تحديث الحالة
+          </button>
+        </div>
+
+        {funnelError && (
+          <div style={{
+            marginTop: 12, padding: '10px 12px', borderRadius: 9,
+            background: '#ef444415', border: '1px solid #ef444440',
+            display: 'flex', gap: 10, alignItems: 'flex-start',
+          }}>
+            <i className="ti ti-alert-triangle" style={{ color: '#ef4444', fontSize: 16, marginTop: 2 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: '#ef4444', fontSize: 12.5, fontWeight: 700 }}>{funnelError.message}</div>
+              {funnelError.detail && (
+                <div style={{ color: 'var(--t3)', fontSize: 11.5, marginTop: 4, wordBreak: 'break-word', direction: 'ltr', textAlign: 'left', whiteSpace: 'pre-wrap' }}>
+                  {funnelError.detail}
+                </div>
+              )}
+              {funnelError.hint && (
+                <div style={{ color: '#f59e0b', fontSize: 11.5, marginTop: 6 }}>
+                  <i className="ti ti-bulb" style={{ marginInlineEnd: 4 }} />{funnelError.hint}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setFunnelError(null)}
+              title="إغلاق"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--t3)', padding: 2, lineHeight: 1 }}>
+              <i className="ti ti-x" />
+            </button>
+          </div>
         )}
       </Section>
 

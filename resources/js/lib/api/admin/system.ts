@@ -51,6 +51,34 @@ export const dbApi = {
   switchTo: (driver: string) => apiPost<DbSwitchResult>('/admin/system/switch-db', { driver }),
 } as const;
 
+export interface FunnelStatus {
+  installed: boolean;
+  cli_path: string;
+  app_port: number;
+  url: string | null;
+  funnel_active: boolean;
+  configured_url?: string | null;
+  detail?: string | null;
+}
+
+export interface FunnelEnableResult {
+  message: string;
+  url?: string | null;
+  app_port?: number;
+  cli_path?: string;
+  installed: boolean;
+  created?: boolean;
+  detail?: string | null;
+  hint?: string | null;
+}
+
+export const funnelApi = {
+  status:  (p?: { cli_path?: string; port?: number }) =>
+    apiGet<FunnelStatus>('/admin/system/funnel-status', p as any),
+  enable: (p: { cli_path?: string; port?: number }) =>
+    apiPost<FunnelEnableResult>('/admin/system/funnel-enable', p),
+} as const;
+
 export const maintenanceApi = {
   status:    ()              => apiGet<{ maintenance_mode: boolean; message?: string }>('/admin/system/maintenance'),
   enable:    (msg?: string)  => apiPost('/admin/system/maintenance/enable',   { message: msg }),

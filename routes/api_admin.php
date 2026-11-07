@@ -48,6 +48,10 @@ Route::prefix('v1/admin')
             Route::get('db-status',  [AdminSystemSettingsController::class, 'dbStatus'])  ->name('db.status');
             Route::post('switch-db', [AdminSystemSettingsController::class, 'switchDb']) ->name('db.switch');
 
+            // Tailscale Funnel — رابط عام للجهاز
+            Route::get('funnel-status',  [AdminSystemSettingsController::class, 'funnelStatus']) ->name('funnel.status');
+            Route::post('funnel-enable', [AdminSystemSettingsController::class, 'funnelEnable']) ->name('funnel.enable');
+
             // الصيانة
             Route::get('maintenance',              [AdminMaintenanceController::class, 'status'])     ->name('maintenance');
             Route::post('maintenance/enable',      [AdminMaintenanceController::class, 'enable'])     ->name('maintenance.enable');

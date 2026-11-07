@@ -93,6 +93,9 @@ export interface SystemSettings {
   free_trial_days:      number;
   free_max_users:       number;
   starter_max_products: number;
+  tailscale_cli_path?:  string;
+  tailscale_app_port?:  number;
+  public_funnel_url?:   string;
 }
 
 export interface AdminDashboardStats {

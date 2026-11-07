@@ -19,6 +19,7 @@ import {
   systemBootApi,
   activityApi,
   dbApi,
+  funnelApi,
 } from './api/admin';
 
 // ─── Named re-exports ────────────────────────────────────────────────────────
@@ -34,6 +35,7 @@ export {
   systemBootApi,
   activityApi,
   dbApi,
+  funnelApi,
 };
 
 // ─── adminApi — wrapper بدون تكرار كود ───────────────────────────────────────
@@ -118,6 +120,10 @@ export const adminApi = {
   // Database
   getDbStatus:  dbApi.status,
   switchDb:     dbApi.switchTo,
+
+  // Tailscale Funnel
+  getFunnelStatus:  funnelApi.status,
+  enableFunnel:     funnelApi.enable,
 
   // Reports
   getReports: (period: '7d' | '30d' | '90d') =>
