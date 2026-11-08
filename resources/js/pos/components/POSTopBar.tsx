@@ -98,6 +98,36 @@ export default function POSTopBar({
     return () => { document.removeEventListener('mousedown', h); document.removeEventListener('keydown', esc); };
   }, [showTarifDrop]);
 
+  const actionsScrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollActionsLeft, setCanScrollActionsLeft] = useState(false);
+  const [canScrollActionsRight, setCanScrollActionsRight] = useState(false);
+  const checkActionsScroll = useCallback(() => {
+    const el = actionsScrollRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    const maxScroll = Math.max(0, scrollWidth - clientWidth);
+    if (maxScroll === 0) { setCanScrollActionsLeft(false); setCanScrollActionsRight(false); return; }
+    if (scrollLeft < 0) {
+      setCanScrollActionsLeft(scrollLeft < -1);
+      setCanScrollActionsRight(scrollLeft > -maxScroll + 1);
+    } else {
+      setCanScrollActionsLeft(scrollLeft > 1);
+      setCanScrollActionsRight(scrollLeft < maxScroll - 1);
+    }
+  }, []);
+  useEffect(() => {
+    const el = actionsScrollRef.current;
+    if (!el) return;
+    checkActionsScroll();
+    el.addEventListener('scroll', checkActionsScroll, { passive: true });
+    const ro = new ResizeObserver(checkActionsScroll);
+    ro.observe(el);
+    return () => { el.removeEventListener('scroll', checkActionsScroll); ro.disconnect(); };
+  }, [checkActionsScroll, priceLevels.length, !!editingDocumentNumber, isEmpty, showQuickbar]);
+  const scrollActionsBy = useCallback((dir: 'left' | 'right') => {
+    actionsScrollRef.current?.scrollBy({ left: dir === 'left' ? 180 : -180, behavior: 'smooth' });
+  }, []);
+
   return (
     <div className="pos-topbar">
       <div className="pos-stats-row">
@@ -213,7 +243,16 @@ export default function POSTopBar({
         )}
       </div>
 
-      <div className="pos-actions-row">
+      <div className="pos-actions-scroll">
+        <button
+          type="button"
+          className={`pos-actions-scroll-btn ${canScrollActionsLeft ? 'show' : ''}`}
+          onClick={() => scrollActionsBy('left')}
+          aria-label="تمرير الإجراءات"
+        >
+          <i className="ti ti-chevron-right" />
+        </button>
+        <div className="pos-actions-row" ref={actionsScrollRef}>
 
         {priceLevels.length > 0 && (
           <div className="tarif-wrap" ref={tarifRef}>
@@ -372,6 +411,15 @@ export default function POSTopBar({
             <span className="tb-txt"> كاشير</span>
           </button>
         </FloatingTooltip>
+        </div>
+        <button
+          type="button"
+          className={`pos-actions-scroll-btn ${canScrollActionsRight ? 'show' : ''}`}
+          onClick={() => scrollActionsBy('right')}
+          aria-label="تمرير الإجراءات"
+        >
+          <i className="ti ti-chevron-left" />
+        </button>
       </div>
     </div>
   );

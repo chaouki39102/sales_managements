@@ -129,14 +129,21 @@
 .pos-tool-icon--active { color: var(--em); border-color: var(--embo); background: var(--emb); }
 
 /* Actions row (POSTopBar buttons) */
-.pos-actions-row {
+.pos-actions-scroll {
   display: flex;
   align-items: center;
-  gap: 4px;
   margin-inline-start: auto;
   flex: 1 1 0%;
   min-width: 0;
   max-width: 100%;
+  gap: 2px;
+}
+.pos-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 0%;
+  min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
   flex-wrap: nowrap;
@@ -145,6 +152,32 @@
   -webkit-overflow-scrolling: touch;
 }
 .pos-actions-row::-webkit-scrollbar { display: none; }
+.pos-actions-scroll-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg3);
+  color: var(--t3);
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 13px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s, color .15s, background .15s;
+}
+.pos-actions-scroll-btn.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.pos-actions-scroll-btn:hover {
+  color: var(--t1);
+  background: var(--emb);
+}
 .tb-txt { font-size: 11px; }
 .tb-sep {
   width: 1px;
