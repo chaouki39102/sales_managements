@@ -134,8 +134,13 @@
   align-items: center;
   gap: 4px;
   margin-right: auto;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+.pos-actions-row::-webkit-scrollbar { display: none; }
 .tb-txt { font-size: 11px; }
 .tb-sep {
   width: 1px;
