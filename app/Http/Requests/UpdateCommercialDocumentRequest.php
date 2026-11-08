@@ -51,11 +51,13 @@ class UpdateCommercialDocumentRequest extends FormRequest
             'lines'                            => 'sometimes|array|min:1',
 
             // ✅ required_with:lines — الحقول إلزامية فقط إذا أُرسلت lines
-            'lines.*.product_id'               => 'required_with:lines|integer|exists:products,id',
+            // المنتج اختياري للسطر اليدوي — يُحفظ اسمه في description
+            'lines.*.product_id'               => 'nullable|integer|exists:products,id|required_without:lines.*.description',
             'lines.*.quantity'                 => ['required_with:lines', 'numeric', 'min:0.0001', function ($attr, $value, $fail) use ($request) {
                 $index       = (int) explode('.', $attr)[1];
                 $packagingId = $request->input("lines.$index.packaging_id");
-                $product     = \App\Models\Product::find($request->input("lines.$index.product_id"));
+                $productId   = $request->input("lines.$index.product_id");
+                $product     = $productId ? \App\Models\Product::find($productId) : null;
 
                 if ($product && !($product->is_sold_by_weight ?? false) && !$packagingId) {
                     if (abs(round($value) - $value) > 0.0001) {
@@ -97,7 +99,8 @@ class UpdateCommercialDocumentRequest extends FormRequest
     {
         return [
             'lines.min'                        => 'إذا أُرسلت الأسطر، يجب أن يكون هناك سطر واحد على الأقل.',
-            'lines.*.product_id.required_with' => 'يجب تحديد المنتج لكل سطر.',
+            'lines.*.product_id.required_without' => 'يجب تحديد المنتج أو إدخال وصف للسطر اليدوي.',
+            'lines.*.product_id.exists'          => 'المنتج المحدد غير موجود.',
             'lines.*.quantity.required_with'   => 'يجب تحديد الكمية لكل سطر.',
             'lines.*.unit_price_ht.required_with' => 'يجب تحديد السعر لكل سطر.',
             'lines.*.discount_amount_per_unit.min' => 'الخصم الثابت لا يمكن أن يكون سالباً.',

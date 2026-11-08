@@ -61,11 +61,13 @@ class StoreCommercialDocumentRequest extends FormRequest
 
             // ── الأسطر ───────────────────────────────────────────────
             'lines'                            => 'required|array|min:1',
-            'lines.*.product_id'               => 'required|integer|exists:products,id',
+            // المنتج اختياري للسطر اليدوي (منتج غير موجود في الكتالوج) — يُحفظ اسمه في description
+            'lines.*.product_id'               => 'nullable|integer|exists:products,id|required_without:lines.*.description',
             'lines.*.quantity'                 => ['required', 'numeric', 'min:0.0001', function ($attr, $value, $fail) use ($request) {
                 $index       = (int) explode('.', $attr)[1];
                 $packagingId = $request->input("lines.$index.packaging_id");
-                $product     = \App\Models\Product::find($request->input("lines.$index.product_id"));
+                $productId   = $request->input("lines.$index.product_id");
+                $product     = $productId ? \App\Models\Product::find($productId) : null;
 
                 if ($product && !($product->is_sold_by_weight ?? false) && !$packagingId) {
                     if (abs(round($value) - $value) > 0.0001) {
@@ -133,8 +135,9 @@ class StoreCommercialDocumentRequest extends FormRequest
             'document_type_id.required'   => 'يجب تحديد نوع الوثيقة.',
             'lines.required'              => 'يجب إضافة سطر واحد على الأقل.',
             'lines.min'                   => 'يجب إضافة سطر واحد على الأقل.',
-            'lines.*.product_id.required' => 'يجب تحديد المنتج لكل سطر.',
-            'lines.*.quantity.required'   => 'يجب تحديد الكمية لكل سطر.',
+            'lines.*.product_id.required_without' => 'يجب تحديد المنتج أو إدخال وصف للسطر اليدوي.',
+            'lines.*.product_id.exists'          => 'المنتج المحدد غير موجود.',
+            'lines.*.quantity.required'          => 'يجب تحديد الكمية لكل سطر.',
             'lines.*.quantity.min'        => 'يجب أن تكون الكمية أكبر من الصفر.',
             'lines.*.unit_price_ht.required' => 'يجب تحديد السعر لكل سطر.',
             'lines.*.unit_price_ht.min'   => 'يجب أن يكون السعر غير سلبي.',

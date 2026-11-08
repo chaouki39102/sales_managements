@@ -876,7 +876,15 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
     {
         foreach ($lines as $order => $line) {
             $pid = $line['product_id'] ?? null;
-            if ($pid === null || $pid === '' || (int) $pid <= 0) {
+            $hasProduct = $pid !== null && $pid !== '' && (int) $pid > 0;
+            $desc = trim((string) ($line['description'] ?? ''));
+            if (!$hasProduct && $desc === '') {
+                throw new BusinessRuleException(
+                    'يجب تحديد منتج أو إدخال وصف للسطر اليدوي (' . ($order + 1) . ').',
+                    422
+                );
+            }
+            if ($pid !== null && $pid !== '' && (int) $pid <= 0 && $desc === '') {
                 throw new BusinessRuleException(
                     'المنتج ذو المعرف غير صالح في السطر ' . ($order + 1) . '.',
                     422
@@ -884,7 +892,10 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             }
         }
 
-        $productIds = array_values(array_filter(array_column($lines, 'product_id')));
+        $productIds = array_values(array_filter(array_map(function ($l) {
+            $pid = $l['product_id'] ?? null;
+            return ($pid !== null && $pid !== '' && (int) $pid > 0) ? (int) $pid : null;
+        }, $lines)));
         if (!empty($productIds)) {
             $intIds = array_map('intval', $productIds);
             $this->validateTenantRelationsMany(
@@ -942,15 +953,20 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 'original' => $originalLinesByOrder[$lineOrder] ?? null,
             ]);
 
-            // Override TVA rate if party is exempt
-            $product = isset($lineData['product_id'])
-                ? Product::find((int) $lineData['product_id'])
-                : null;
+            // Resolve product (null for manual/custom lines — no catalog product)
+            $rawPid = $lineData['product_id'] ?? null;
+            $pidInt = ($rawPid !== null && $rawPid !== '' && (int) $rawPid > 0) ? (int) $rawPid : null;
+            $product = $pidInt ? Product::find($pidInt) : null;
+
+            // TVA: party exemption forces 0 even for manual lines; otherwise keep payload rate
+            // (manual lines carry user-specified TVA; catalog lines may be forced by tax rules).
             if ($party && $product) {
                 $rule = $taxSvc->getEffectiveTvaRate($party, $product);
                 if ($rule['forced']) {
                     $lineData['tva_rate'] = $rule['rate'];
                 }
+            } elseif ($party && $pidInt === null && ($party->is_tva_exempt ?? false)) {
+                $lineData['tva_rate'] = 0;
             }
 
             // Freeze the packaging-to-base-unit conversion factor at time of sale.
@@ -1038,12 +1054,21 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             // Observer calculates total_ht, discount_amount, total_tva, total_ttc
             // from discount_amount_per_unit (fixed) or discount_percentage (pct)
 
+            $manualDesc = $lineData['description'] ?? null;
+            $lineAttributes = $this->buildLineAttributes($lineData);
+            if ($pidInt === null) {
+                $lineAttributes = array_merge($lineAttributes ?? [], ['is_manual' => true]);
+                if ($manualDesc !== null && trim((string) $manualDesc) === '' && isset($lineData['product_name'])) {
+                    $manualDesc = $lineData['product_name'];
+                }
+            }
+
             $document->lines()->create([
                 'company_id'             => $document->company_id,
                 'commercial_document_id' => $document->id,
                 'line_order'             => $order + 1,
-                'product_id'             => (int) $lineData['product_id'],
-                'description'            => $lineData['description'] ?? null,
+                'product_id'             => $pidInt,
+                'description'            => $manualDesc,
                 'quantity'               => (float) $lineData['quantity'],
                 'unit_price_ht'          => (float) $lineData['unit_price_ht'],
                 'discount_percentage'    => (float) ($lineData['discount_percentage'] ?? 0),
@@ -1053,7 +1078,7 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 'packaging_id'           => $lineData['packaging_id'] ?? null,
                 'packaging_units_snapshot' => $packagingUnitsSnapshot,
                 'stock_lot_id'           => $lineData['stock_lot_id'] ?? null,
-                'line_attributes'        => $this->buildLineAttributes($lineData),
+                'line_attributes'        => $lineAttributes,
                 'notes'                  => $lineData['notes'] ?? null,
             ]);
 
@@ -1062,7 +1087,8 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
                 'company_id' => $document->company_id,
                 'field_name' => 'line_' . ($order + 1),
                 'new_value'  => [
-                    'product_id'  => (int) $lineData['product_id'],
+                    'product_id'  => $pidInt,
+                    'description' => $manualDesc,
                     'quantity'    => (float) $lineData['quantity'],
                     'unit_price'  => (float) $lineData['unit_price_ht'],
                     'tva_rate'    => (float) ($lineData['tva_rate'] ?? 0),

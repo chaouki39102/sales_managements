@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import React, { Suspense, useMemo, useRef, useState } from 'react';
 import { useNotification }             from '@/hooks/useNotification';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { usePOS }                     from '@/pos/hooks/usePOS';
@@ -18,16 +18,19 @@ import {
   buildIncrementInput,
 } from '@/lib/api/endpoints/posSession';
 import {
+  makeFakeVariant,
   productToVariant,
   type ViewMode, type GridSize, type SortMode,
 } from '@/pos/utils/posHelpers';
-import { formatDZD }         from '@/pos/utils/calculations';
+import { formatDZD, ttcToHt }         from '@/pos/utils/calculations';
 import { settingsApi }                from '@/lib/api/endpoints/settings';
 import { getThermalAutoPrint } from '@/pos/utils/printService';
 import { printThermalSmart } from '@/pos/utils/thermalPrint';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
 import { renderPreviewToHtml } from '@/pages/settings/print-settings/runtime/renderPreviewToHtml';
 import { usePrintSettings }           from '@/pos/hooks/usePrintSettings';
+
+const ManualProductModal = React.lazy(() => import('@/pos/components/ManualProductModal'));
 
 import type { PaginatedResponse }      from '@/lib/api/core/types';
 import type { Product, ProductVariant, CartItem, CartTotals } from '@/types';
@@ -69,7 +72,7 @@ export default function POSKioskPage() {
   const [gridSize,         setGridSize]         = useState<GridSize>('md');
   const [view,             setView]             = useState<ViewMode>('grid');
   const [sortBy,           setSortBy]           = useState<SortMode>('name');
-  const [modal,            setModal]            = useState<'none' | 'payment' | 'receipt'>('none');
+  const [modal,            setModal]            = useState<'none' | 'payment' | 'receipt' | 'manual'>('none');
   const [lastDocNum,       setLastDocNum]       = useState<string | undefined>();
   const [sessionError,     setSessionError]     = useState<string | null>(null);
   const [receiptSnapshot,  setReceiptSnapshot]  = useState<{
@@ -209,19 +212,23 @@ export default function POSKioskPage() {
         document_date:    new Date().toISOString().slice(0, 10),
         notes:            null,
         pos_session_id:   currentSession?.id ?? null,
-        lines: pos.items.map(i => ({
-          product_id:          i.product_id,
-          quantity:            i.quantity,
-          // Contract: unit_price_ht is the PER-UNIT base price; the backend stores
-          // the PACK price (per-unit × frozen packaging_units_snapshot).
-          pack_qty:            i.pack_qty ?? 1,
-          unit_price_ht:       (i.pack_qty && i.pack_qty > 1)
-            ? Math.round((i.unit_price_ht / i.pack_qty) * 10000) / 10000
-            : i.unit_price_ht,
-          discount_percentage: i.discount_percentage,
-          tva_rate:            i.tva_rate,
-          packaging_id:        i.packaging_id ?? null,
-        })),
+        lines: pos.items.map(i => {
+          const isManual = !i.product_id || i.product_id <= 0;
+          return {
+            product_id:          isManual ? null : i.product_id,
+            description:         i.product_name || null,
+            quantity:            i.quantity,
+            // Contract: unit_price_ht is the PER-UNIT base price; the backend stores
+            // the PACK price (per-unit × frozen packaging_units_snapshot).
+            pack_qty:            i.pack_qty ?? 1,
+            unit_price_ht:       (i.pack_qty && i.pack_qty > 1)
+              ? Math.round((i.unit_price_ht / i.pack_qty) * 10000) / 10000
+              : i.unit_price_ht,
+            discount_percentage: i.discount_percentage,
+            tva_rate:            i.tva_rate,
+            packaging_id:        i.packaging_id ?? null,
+          };
+        }),
         payments: apiPayments,
       });
 
@@ -349,7 +356,7 @@ export default function POSKioskPage() {
             gridSize={gridSize}
             loading={false}
             onAdd={v => pos.addItem(v)}
-            onAddManual={() => {}}
+            onAddManual={() => setModal('manual')}
             onPin={() => {}}
             isPinned={() => false}
             priceLevels={[]}
@@ -418,6 +425,18 @@ export default function POSKioskPage() {
           onPrint={() => window.print()}
           onNewSale={() => { setModal('none'); setReceiptSnapshot(null); pos.clearCart(); }}
         />
+      )}
+
+      {modal === 'manual' && (
+        <Suspense fallback={null}>
+          <ManualProductModal
+            onClose={() => setModal('none')}
+            onAdd={(name, priceTtc, qty, tvaRate) => {
+              pos.addItem(makeFakeVariant(name, ttcToHt(priceTtc, tvaRate), tvaRate), qty);
+              setModal('none');
+            }}
+          />
+        </Suspense>
       )}
 
     </div>

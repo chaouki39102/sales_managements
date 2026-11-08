@@ -703,8 +703,10 @@ export default function POSProPage() {
         const perUnitPrice = (i.pack_qty && i.pack_qty > 1)
           ? Math.round((i.unit_price_ht / i.pack_qty) * 10000) / 10000
           : i.unit_price_ht;
+        const isManual = !i.product_id || i.product_id <= 0;
         return {
-          product_id:               i.product_id,
+          product_id:               isManual ? null : i.product_id,
+          description:              i.product_name || null,
           quantity:                 i.quantity,
           pack_qty:                 i.pack_qty ?? 1,
           unit_price_ht:            perUnitPrice,
@@ -1039,7 +1041,7 @@ export default function POSProPage() {
         return;
       }
 
-      const items: CartItem[] = doc.lines.map(line => {
+      const items: CartItem[] = doc.lines.map((line, idx) => {
         const v    = line.product_variant;
         const prod = line.product;
         const pkg  = (line as any).packaging ?? null;
@@ -1062,11 +1064,17 @@ export default function POSProPage() {
           discountAmount = apiTotalDisc > 0 ? apiTotalDisc : gross * (discPct / 100);
           discountMode   = 'percentage';
         }
+        const isManual = !line.product_id;
+        const manualName = (line as any).description ?? (line as any).product_name ?? '';
+        const productName = isManual
+          ? (manualName || 'منتج يدوي')
+          : (manualName || v?.product?.name || prod?.name || '');
         return {
           id:                  nanoid(8),
-          product_id:          line.product_id ?? prod?.id ?? 0,
-          variant_id:          line.product_id ?? prod?.id ?? 0,
-          product_name:        line.description ?? v?.product?.name ?? prod?.name ?? '',
+          product_id:          isManual ? 0 : (line.product_id ?? prod?.id ?? 0),
+          // Manual lines have no catalog product; keep variant_id unique per row to avoid collisions.
+          variant_id:          isManual ? -(Number(line.id) || (idx + 1)) : (line.product_id ?? prod?.id ?? 0),
+          product_name:        productName,
           variant_name:        v?.variant_name ?? null,
           ref:                 v?.ref ?? prod?.ref ?? '',
           barcode:             v?.barcode ?? null,

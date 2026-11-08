@@ -43,14 +43,19 @@ export interface DocumentPaymentInput {
 
 export interface DocumentLineInput {
   id?:                    number;
-  product_id:             number;
+  /** Nullable for manual/custom lines (not linked to a catalog product). */
+  product_id:             number | null;
   description?:           string | null;
   quantity:               number;
   unit_price_ht:          number;
   discount_percentage?:   number;
   discount_amount?:       number;
+  /** Fixed discount per unit (takes precedence over discount_percentage when > 0) */
+  discount_amount_per_unit?: number | null;
   tva_rate:               number;
   packaging_id?:          number | null;
+  /** Packaging factor (units per pack) — backend stores pack price using frozen snapshot. */
+  pack_qty?:              number;
   packaging_price?:       number | null;
   price_level_id?:        number | null;
   stock_lot_id?:          number | null;

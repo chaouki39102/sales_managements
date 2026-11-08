@@ -597,8 +597,10 @@ export default function POSProMobilePage() {
         const perUnitPrice = (i.pack_qty && i.pack_qty > 1)
           ? Math.round((i.unit_price_ht / i.pack_qty) * 10000) / 10000
           : i.unit_price_ht;
+        const isManual = !i.product_id || i.product_id <= 0;
         return {
-          product_id: i.product_id,
+          product_id: isManual ? null : i.product_id,
+          description: i.product_name || null,
           quantity: i.quantity,
           pack_qty: i.pack_qty ?? 1,
           unit_price_ht: perUnitPrice,
