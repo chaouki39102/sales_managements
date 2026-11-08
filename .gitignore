@@ -32,6 +32,11 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 
+# generated/debug dumps
+eslint-output.json
+/console errors
+/console-errors*
+
 # machine-generated DB-switch backups + stray dump artifacts
 .env.bak-*
 public/sales_management/
