@@ -1239,31 +1239,44 @@ class ReportService
             ->whereIn('dt.code', array_merge(self::SALE_CODES, ['BL', 'BCC']))
             ->select(
                 'cdl.product_id',
+                DB::raw("MAX(CASE WHEN cdl.product_id IS NULL THEN cdl.description ELSE NULL END) as manual_description"),
                 DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity ELSE cdl.quantity END) as total_qty"),
                 DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.total_ht ELSE cdl.total_ht END) as total_ht"),
                 DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity * cdl.cost_price_ht ELSE cdl.quantity * cdl.cost_price_ht END) as total_cost")
             );
         if ($fyId) $rows->where('cd.fiscal_year_id', $fyId);
 
-        $rows = $rows->groupBy('cdl.product_id')
+        // Catalog products group by product_id; manual (null product_id) lines group by description.
+        $rows = $rows->groupBy('cdl.product_id', DB::raw("CASE WHEN cdl.product_id IS NULL THEN COALESCE(cdl.description, '') ELSE '' END"))
             ->orderByDesc('total_ht')
             ->limit(50)
             ->get();
 
-        $productIds = $rows->pluck('product_id');
-        $products   = Product::whereIn('id', $productIds)->get()->keyBy('id');
+        $productIds = $rows->pluck('product_id')->filter()->unique()->values();
+        $products   = $productIds->isNotEmpty()
+            ? Product::whereIn('id', $productIds)->get()->keyBy('id')
+            : collect();
 
-        $items = $rows->map(fn($r) => [
-            'product_id'    => $r->product_id,
-            'product_name'  => $products->get($r->product_id)?->name ?? 'â€”',
-            'product_ref'   => $products->get($r->product_id)?->ref ?? 'â€”',
-            'total_qty'     => (float) $r->total_qty,
-            'total_ht'      => round((float) $r->total_ht, 2),
-            'cost_price'    => (float) $r->total_qty > 0 ? round((float) $r->total_cost / (float) $r->total_qty, 2) : 0,
-            'cost_total'    => round((float) $r->total_cost, 2),
-            'margin_amount' => 0,
-            'margin_pct'    => 0,
-        ])->map(fn($i) => [
+        $items = $rows->map(function ($r) use ($products) {
+            $isManual = $r->product_id === null || $r->product_id === '';
+            $product  = !$isManual ? $products->get($r->product_id) : null;
+            $name     = $isManual
+                ? (trim((string) ($r->manual_description ?? '')) ?: 'منتج يدوي')
+                : ($product?->name ?? '—');
+            $ref      = $isManual ? 'يدوي' : ($product?->ref ?? '—');
+            return [
+                'product_id'    => $r->product_id,
+                'is_manual'     => $isManual,
+                'product_name'  => $name,
+                'product_ref'   => $ref,
+                'total_qty'     => (float) $r->total_qty,
+                'total_ht'      => round((float) $r->total_ht, 2),
+                'cost_price'    => (float) $r->total_qty > 0 ? round((float) $r->total_cost / (float) $r->total_qty, 2) : 0,
+                'cost_total'    => round((float) $r->total_cost, 2),
+                'margin_amount' => 0,
+                'margin_pct'    => 0,
+            ];
+        })->map(fn($i) => [
             ...$i,
             'margin_amount' => round($i['total_ht'] - $i['cost_total'], 2),
             'margin_pct'    => $i['total_ht'] > 0
