@@ -22,7 +22,6 @@ import { DocumentQuickCreateProvider } from '@/lib/store/documentQuickCreateStor
 import { GlobalDocumentFAB }         from '@/components/global/GlobalDocumentFAB';
 import { PwaInstallBanner }          from '@/components/global/PwaInstallBanner';
 import { AppRoutes }                 from '@/routes/index';
-import NotificationContainer        from '@/components/notifications/NotificationContainer';
 
 // CSS
 import '../css/theme/tokens.css';
@@ -50,7 +49,6 @@ export default function App() {
                   <GlobalDocumentFAB />
                   <PwaInstallBanner />
                 </DocumentQuickCreateProvider>
-                <NotificationContainer />
               </PrintRuntimeAdapter>
             </FiscalYearProvider>
           </RememberMeBoot>
