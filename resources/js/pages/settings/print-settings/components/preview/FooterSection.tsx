@@ -1,8 +1,49 @@
 import type { AlignOption, PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
-import { Separator, borderStyle, align, fontFamily as _fontFamily } from './shared';
+import { Separator, borderStyle, align, fontFamily as _fontFamily, partyLabel } from './shared';
 import FiscalQR from './FiscalQR';
+import { buildBarcode } from '@/lib/barcodeRenderer';
 import { Pos } from './Pos';
+
+/** Value encoded in the barcode: Code 39 only carries A-Z 0-9 - . $ / + % and
+ *  space, so the «total» option encodes the bare amount (the caption keeps «دج»). */
+function barcodeValue(tpl: PrintTemplate, data: UniversalDocumentData): string {
+  if (tpl.barcode_content === 'custom') return tpl.barcode_custom_text;
+  if (tpl.barcode_content === 'total') return Number(data.totals.totalTtc).toFixed(2);
+  return data.doc.number;
+}
+
+/**
+ * Scannable Code 39 barcode. The footer used to draw 48 decorative bars that
+ * did not encode anything — it looked like a barcode but no scanner could read
+ * it (and the documents page can reopen a document from its printed code).
+ * Drawn in millimetres as SVG so it stays crisp on any printer; it shrinks
+ * horizontally (never taller/shorter) when the paper is narrower than the code.
+ */
+function DocBarcode({ value, caption, heightMm, captionSize }: {
+  value: string; caption: string; heightMm: number; captionSize: number;
+}) {
+  const bc = buildBarcode(value, 'code39', 0.3);
+  if (!bc) return null;
+  const w = bc.totalWidth.toFixed(2);
+  return (
+    <div style={{ margin: '8px 0 4px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <svg
+        width={`${w}mm`} height={`${heightMm}mm`}
+        viewBox={`0 0 ${w} ${heightMm}`} preserveAspectRatio="none"
+        style={{ display: 'block', maxWidth: '100%', direction: 'ltr' }}
+        data-barcode="code39"
+      >
+        {bc.bars.map((b, i) => (
+          <rect key={i} x={b.x} y={0} width={b.width} height={heightMm} fill="#000" shapeRendering="crispEdges" />
+        ))}
+      </svg>
+      <div style={{ fontSize: captionSize, letterSpacing: 2, marginTop: 2, direction: 'ltr', fontFamily: "'Courier New', monospace" }}>
+        {caption}
+      </div>
+    </div>
+  );
+}
 
 function barcodeText(tpl: PrintTemplate, data: UniversalDocumentData): string {
   if (tpl.barcode_content === 'custom') return tpl.barcode_custom_text;
@@ -124,20 +165,7 @@ function renderThermalFooter(tpl: PrintTemplate, data: UniversalDocumentData) {
 
       {tpl.show_barcode && (
         <Pos dragKey="footer.barcode" tpl={tpl}>
-        <div style={{ margin: '8px 0 4px' }}>
-          <div style={{ display: 'inline-flex', gap: 1, alignItems: 'flex-end' }}>
-            {Array.from({ length: 48 }, (_, i) => (
-              <div key={i} style={{
-                width: i % 3 === 0 ? 2 : 1,
-                height: i % 5 === 0 ? 28 : 22,
-                background: '#111',
-              }} />
-            ))}
-          </div>
-          <div style={{ fontSize: tpl.base_font_size - 1, letterSpacing: 2, marginTop: 2 }}>
-            {barcodeText(tpl, data)}
-          </div>
-        </div>
+        <DocBarcode value={barcodeValue(tpl, data)} caption={barcodeText(tpl, data)} heightMm={10} captionSize={tpl.base_font_size - 1} />
         </Pos>
       )}
 
@@ -185,6 +213,20 @@ function renderThermalFooter(tpl: PrintTemplate, data: UniversalDocumentData) {
   );
 }
 
+function stampMark(size: number) {
+  return (
+    <div style={{
+      width: size, height: size, margin: '0 auto', flexShrink: 0,
+      border: '2px solid #111', borderRadius: '50%',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 10, fontWeight: 900,
+      transform: 'rotate(-15deg)',
+    }}>
+      ختم
+    </div>
+  );
+}
+
 function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
   const hasContent =
     tpl.footer_line1 || tpl.footer_line2 || tpl.footer_line3 ||
@@ -199,8 +241,8 @@ function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
     <div style={{
       fontSize: tpl.base_font_size - 0.5,
       borderTop: tpl.footer_separator === 'none' ? 'none' : `2px ${borderStyle(tpl.footer_separator)} #111`,
-      paddingTop: 16,
-      marginTop: 12,
+      paddingTop: 10,
+      marginTop: 10,
       textAlign: align(tpl.footer_align),
       color: tpl.footer_text_color,
     }}>
@@ -251,63 +293,49 @@ function renderA4Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
         </Pos>
       )}
 
-      {tpl.show_barcode && (
-        <Pos dragKey="footer.barcode" tpl={tpl}>
-        <div style={{ margin: '8px 0 4px', textAlign: 'center' }}>
-          <div style={{ display: 'inline-flex', gap: 1, alignItems: 'flex-end' }}>
-            {Array.from({ length: 48 }, (_, i) => (
-              <div key={i} style={{
-                width: i % 3 === 0 ? 2 : 1,
-                height: i % 5 === 0 ? 28 : 22,
-                background: '#111',
-              }} />
-            ))}
+      {/* Codes row: barcode and QR side by side instead of stacked — the
+          stacked layout pushed a 6-line quote onto a second sheet. */}
+      {(() => {
+        const hasSignatures = tpl.show_cashier_signature || tpl.show_client_signature;
+        // Without signatures the stamp joins the codes row instead of taking
+        // a row of its own.
+        const stampInRow = tpl.show_stamp && !hasSignatures;
+        if (!tpl.show_barcode && !qrActive(tpl) && !stampInRow) return null;
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginTop: 8, breakInside: 'avoid' }}>
+            {tpl.show_barcode ? (
+              <Pos dragKey="footer.barcode" tpl={tpl}>
+                <DocBarcode value={barcodeValue(tpl, data)} caption={barcodeText(tpl, data)} heightMm={10} captionSize={tpl.base_font_size - 1} />
+              </Pos>
+            ) : <span />}
+            {stampInRow && <Pos dragKey="footer.stamp" tpl={tpl}>{stampMark(54)}</Pos>}
+            {qrActive(tpl) ? (
+              <Pos dragKey="footer.qr" tpl={tpl}>
+              {QRBlock(tpl, data, qrSize(tpl, 48), 7, qrAlignOf(tpl))}
+              </Pos>
+            ) : <span />}
           </div>
-          <div style={{ fontSize: tpl.base_font_size - 1, letterSpacing: 2, marginTop: 2 }}>
-            {barcodeText(tpl, data)}
+        );
+      })()}
+
+      {/* Signatures with the stamp between them (one row instead of three). */}
+      {(tpl.show_cashier_signature || tpl.show_client_signature) && (() => {
+        const sigLine = (label: string) => (
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ width: 150, height: 1, borderTop: '1px solid #111', marginBottom: 4 }} />
+            <span>{label}</span>
           </div>
-        </div>
-        </Pos>
-      )}
-
-      {qrActive(tpl) && (
-        <Pos dragKey="footer.qr" tpl={tpl}>
-        {QRBlock(tpl, data, qrSize(tpl, 48), 7, qrAlignOf(tpl))}
-        </Pos>
-      )}
-
-      {(tpl.show_cashier_signature || tpl.show_client_signature) && (
-        <Pos dragKey="footer.signatures" tpl={tpl}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24, fontSize: tpl.base_font_size }}>
-          {tpl.show_cashier_signature && (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ width: 150, height: 1, borderTop: '1px solid #111', marginBottom: 4 }} />
-              <span>إمضاء الكاشير</span>
+        );
+        return (
+          <Pos dragKey="footer.signatures" tpl={tpl}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 12, fontSize: tpl.base_font_size, breakInside: 'avoid', breakBefore: 'avoid' }}>
+              {tpl.show_cashier_signature ? sigLine('إمضاء الكاشير') : <span style={{ width: 150 }} />}
+              {tpl.show_stamp ? <Pos dragKey="footer.stamp" tpl={tpl}>{stampMark(54)}</Pos> : null}
+              {tpl.show_client_signature ? sigLine(partyLabel('إمضاء العميل', tpl)) : <span style={{ width: 150 }} />}
             </div>
-          )}
-          {tpl.show_client_signature && (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ width: 150, height: 1, borderTop: '1px solid #111', marginBottom: 4 }} />
-              <span>إمضاء العميل</span>
-            </div>
-          )}
-        </div>
-        </Pos>
-      )}
-
-      {tpl.show_stamp && (
-        <Pos dragKey="footer.stamp" tpl={tpl}>
-        <div style={{
-          width: 60, height: 60, margin: '16px auto',
-          border: '2px solid #111', borderRadius: '50%',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 10, fontWeight: 900,
-          transform: 'rotate(-15deg)',
-        }}>
-          ختم
-        </div>
-        </Pos>
-      )}
+          </Pos>
+        );
+      })()}
     </div>
   );
 }
@@ -377,20 +405,7 @@ function renderA5Footer(tpl: PrintTemplate, data: UniversalDocumentData) {
 
       {tpl.show_barcode && (
         <Pos dragKey="footer.barcode" tpl={tpl}>
-        <div style={{ margin: '6px 0 4px' }}>
-          <div style={{ display: 'inline-flex', gap: 1, alignItems: 'flex-end' }}>
-            {Array.from({ length: 36 }, (_, i) => (
-              <div key={i} style={{
-                width: i % 3 === 0 ? 2 : 1,
-                height: i % 5 === 0 ? 22 : 16,
-                background: '#111',
-              }} />
-            ))}
-          </div>
-          <div style={{ fontSize: tpl.base_font_size - 1.5, letterSpacing: 2, marginTop: 2 }}>
-            {barcodeText(tpl, data)}
-          </div>
-        </div>
+        <DocBarcode value={barcodeValue(tpl, data)} caption={barcodeText(tpl, data)} heightMm={8} captionSize={tpl.base_font_size - 1.5} />
         </Pos>
       )}
 

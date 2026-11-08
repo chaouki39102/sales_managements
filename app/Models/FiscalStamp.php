@@ -31,8 +31,8 @@ class FiscalStamp extends Model
         'max_amount' => 'decimal:4',
         'stamp_value' => 'decimal:4',
         'active' => 'boolean',
-        'valid_from' => 'date',
-        'valid_to' => 'date',
+        'valid_from' => 'date:Y-m-d',
+        'valid_to' => 'date:Y-m-d',
     ];
 
     public static array $searchableFields = ['name', 'stamp_value', 'type'];

@@ -67,7 +67,7 @@ class Party extends Model
 
     protected $casts = [
         'capital_amount'       => 'decimal:4',
-        'rc_date'              => 'date',
+        'rc_date'              => 'date:Y-m-d',
         'credit_limit'         => 'decimal:4',
         'credit_days'          => 'integer',
         'allow_credit_sale'    => 'boolean',
@@ -76,7 +76,7 @@ class Party extends Model
         'is_taxable'           => 'boolean',
         'is_final_consumer'    => 'boolean',
         'is_vat_registered'    => 'boolean',
-        'vat_registration_date'=> 'date',
+        'vat_registration_date'=> 'date:Y-m-d',
         'additional_data'      => 'array',
         'active'               => 'boolean',
         'created_at'           => 'datetime',

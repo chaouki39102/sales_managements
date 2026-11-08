@@ -25,7 +25,7 @@ class NumberingSeriesResource extends JsonResource
             'reset_monthly'      => $this->reset_monthly,
             'current_year'       => $this->current_year,
             'current_month'      => $this->current_month,
-            'reset_date'         => $this->reset_date,
+            'reset_date'         => $this->reset_date?->format('Y-m-d'),
             'active'             => $this->active,
             'is_locked'          => $this->is_locked,
             'created_at'         => $this->created_at,

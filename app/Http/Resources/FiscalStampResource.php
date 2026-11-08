@@ -18,8 +18,8 @@ class FiscalStampResource extends JsonResource
             'stamp_value' => $this->stamp_value,
             'type'        => $this->type,
             'active'      => $this->active,
-            'valid_from'  => $this->valid_from,
-            'valid_to'    => $this->valid_to,
+            'valid_from'  => $this->valid_from?->format('Y-m-d'),
+            'valid_to'    => $this->valid_to?->format('Y-m-d'),
             'created_at'  => $this->created_at,
             'updated_at'  => $this->updated_at,
         ];

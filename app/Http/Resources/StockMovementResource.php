@@ -30,7 +30,7 @@ class StockMovementResource extends JsonResource
             'price_source'                => $this->price_source,
             'stock_balance_after'         => $this->stock_balance_after,
             'lot_number'                  => $this->lot_number,
-            'expiration_date'             => $this->expiration_date,
+            'expiration_date'             => $this->expiration_date?->format('Y-m-d'),
             'stock_lot_id'                => $this->stock_lot_id,
             'reason'                      => $this->reason,
             'notes'                       => $this->notes,

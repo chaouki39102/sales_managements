@@ -406,12 +406,28 @@ export const DocumentDataBuilder = {
 
 // ─── Internal builders ────────────────────────────────────────────────────────
 
+function docTime(doc: ApiDocument): string {
+  const d = doc as unknown as { created_at?: string | null; validated_at?: string | null; issued_at?: string | null };
+  // issued_at is often just the date at midnight; prefer a real timestamp.
+  const candidates = [d.created_at, d.validated_at, d.issued_at];
+  for (const c of candidates) {
+    if (!c || !/T\d{2}:\d{2}/.test(String(c))) continue;
+    const t = new Date(String(c));
+    if (!Number.isNaN(t.getTime())) {
+      return t.toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' });
+    }
+  }
+  return new Date().toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' });
+}
+
 function buildDocInfo(doc: ApiDocument): DocumentInfo {
   return {
     number:   doc.document_number ?? '—',
     date:     doc.document_date   ?? new Date().toLocaleDateString('ar-DZ'),
     dueDate:  doc.due_date        ?? null,
-    time:     new Date().toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' }),
+    // The document's own time (when it was issued/created), not the moment of
+    // printing — a reprint next week must still show the original time.
+    time:     docTime(doc),
     typeCode: doc.document_type?.code ?? undefined,
     typeName: doc.document_type?.name ?? undefined,
     status:   doc.document_status?.code ?? doc.document_status?.name ?? undefined,
@@ -472,9 +488,21 @@ function buildUnitLabel(line: ApiDocumentLine): string | null {
   return `${lbl} (${qtyStr})`;
 }
 
+/**
+ * Normalize a TVA rate to a FRACTION (0.19). The backend stores and returns the
+ * rate as a PERCENTAGE (`tva_rate: "19.00"`), while the print model works in
+ * fractions (POS snapshots already divide by 100). Treating 19 as a fraction
+ * printed «TVA 1900%» and computed TTC prices 20× too high. Algerian rates are
+ * 0 / 9 / 19 %, so anything above 1 is unambiguously a percentage.
+ */
+function rateToFraction(raw: unknown): number {
+  const v = num(raw);
+  return v > 1 ? v / 100 : v;
+}
+
 function buildLineFromApi(line: ApiDocumentLine, index: number): DocumentLine {
-  const tvaRate   = num(line.tva_rate);
-  const tvaPct    = Math.round(tvaRate * 100);
+  const tvaRate   = rateToFraction(line.tva_rate);
+  const tvaPct    = Math.round(tvaRate * 10000) / 100;
   const discPct   = num(line.discount_percentage);
   const discAmt   = num(line.discount_amount);
   const totalHt   = num(line.total_ht);
@@ -514,8 +542,8 @@ function buildLinesFromSnapshot(
   items: POSSaleSnapshot['items'],
 ): DocumentLine[] {
   return items.map((item, i) => {
-    const tvaRate  = item.tva_rate ?? 0;
-    const tvaPct   = Math.round(tvaRate * 100);
+    const tvaRate  = rateToFraction(item.tva_rate ?? 0);
+    const tvaPct   = Math.round(tvaRate * 10000) / 100;
     const totalHt  = item.total_ht ?? 0;
     const totalTva = totalHt * tvaRate;
     return {

@@ -725,7 +725,7 @@ export default function POSProMobilePage() {
         docDate: today,
         client: currentClient,
         payments: params.payments?.filter((p) => p.amount > 0).map((p) => ({
-          mode: String(p.paymentModeId), amount: p.amount,
+          mode: (paymentModes ?? []).find(m => m.id === p.paymentModeId)?.name ?? String(p.paymentModeId), amount: p.amount,
         })) ?? [],
         dueDate: params.dueDate,
         prevBalance: res?.balance_data?.previous_balance ?? null,

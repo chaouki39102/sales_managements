@@ -41,7 +41,7 @@ class Expense extends Model
     ];
 
     protected $casts = [
-        'date' => 'date',
+        'date' => 'date:Y-m-d',
         'amount' => 'decimal:4',
         'has_attachments' => 'boolean',
         'is_paid' => 'boolean',

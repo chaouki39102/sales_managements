@@ -35,6 +35,7 @@ test.describe('Print Settings — Fiscal QR rendering', () => {
     await expect(page.getByText('POS Template', { exact: true })).toBeVisible();
     // The old hardcoded 10x10 QR pattern rendered `<rect>` inside an <svg>;
     // the new component must not leak any of those.
-    await expect(page.locator('svg rect')).toHaveCount(0);
+    // (The document barcode is a real Code 39 SVG of <rect>s — excluded.)
+    await expect(page.locator('svg:not([data-barcode]) rect')).toHaveCount(0);
   });
 });

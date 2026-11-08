@@ -1,6 +1,6 @@
 import type { PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
-import { align, formatDate, DocRow, Separator, renderLayoutRows, fontFamily } from './shared';
+import { align, formatDate, DocRow, Separator, renderLayoutRows, fontFamily, cleanLabel, partyLabel } from './shared';
 import { printFieldResolver } from '../../services';
 import { Pos } from './Pos';
 
@@ -19,7 +19,7 @@ function customerInfoStyle(tpl: PrintTemplate) {
 }
 
 function labelOf(key: string, tpl: PrintTemplate): string {
-  return ((tpl as any)[key] || '') as string;
+  return partyLabel(cleanLabel((tpl as any)[key] || ''), tpl);
 }
 
 function renderThermalDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
@@ -61,13 +61,13 @@ function renderThermalDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
           ? <div style={cs}>{renderLayoutRows(tpl.customer_info_rows, data, tpl, { sectionAlign: tpl.customer_info_align })}</div>
           : tpl.show_client && (
               <div style={cs}>
-                {r('customer.name', data, tpl) && <DocRow label={(labelOf('label_client', tpl) || 'العميل') + ':'} value={r('customer.name', data, tpl) as string} />}
-                {tpl.show_client_nif     && <DocRow label={(labelOf('label_client_nif', tpl) || 'NIF العميل') + ':'} value={r('customer.nif', data, tpl) as string} />}
+                {r('customer.name', data, tpl) && <DocRow label={labelOf('label_client', tpl) || partyLabel('العميل', tpl)} value={r('customer.name', data, tpl) as string} />}
+                {tpl.show_client_nif     && <DocRow label={(labelOf('label_client_nif', tpl) || partyLabel('NIF العميل', tpl)) + ':'} value={r('customer.nif', data, tpl) as string} />}
                 {tpl.show_customer_commercial_name && <DocRow label={(labelOf('label_customer_commercial_name', tpl) || 'الاسم التجاري') + ':'} value={r('customer.commercialName', data, tpl) as string} />}
                 {tpl.show_customer_rc    && <DocRow label={(labelOf('label_customer_rc', tpl) || 'RC') + ':'} value={r('customer.rc', data, tpl) as string} />}
                 {tpl.show_customer_nis   && <DocRow label={(labelOf('label_customer_nis', tpl) || 'NIS') + ':'} value={r('customer.nis', data, tpl) as string} />}
                 {tpl.show_customer_ai    && <DocRow label={(labelOf('label_customer_ai', tpl) || 'المادة الجبائية') + ':'} value={r('customer.ai', data, tpl) as string} />}
-                {tpl.show_client_phone   && <DocRow label={(labelOf('label_client_phone', tpl) || 'هاتف العميل') + ':'} value={r('customer.phone', data, tpl) as string} />}
+                {tpl.show_client_phone   && <DocRow label={(labelOf('label_client_phone', tpl) || partyLabel('هاتف العميل', tpl)) + ':'} value={r('customer.phone', data, tpl) as string} />}
                 {tpl.show_customer_mobile && <DocRow label={(labelOf('label_customer_mobile', tpl) || 'المحمول') + ':'} value={r('customer.mobile', data, tpl) as string} />}
                 {tpl.show_customer_fax   && <DocRow label={(labelOf('label_customer_fax', tpl) || 'الفاكس') + ':'} value={r('customer.fax', data, tpl) as string} />}
                 {tpl.show_customer_email && <DocRow label={(labelOf('label_customer_email', tpl) || 'البريد الإلكتروني') + ':'} value={r('customer.email', data, tpl) as string} />}
@@ -102,10 +102,10 @@ function renderPageDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
   if (isA4) {
     return (
       <div style={{ textAlign: align(tpl.doc_info_align) }}>
-        <div style={{ display: 'flex', gap: 30, marginBottom: 24 }}>
+        <div style={{ display: 'flex', gap: 30, marginBottom: 16 }}>
           <Pos dragKey="doc-info.client-card" tpl={tpl}>
           <div style={{ flex: 1, padding: 12, background: '#f9fafb', borderRadius: 4, border: '1px solid #e2e8f0' }}>
-            <div style={{ ...cs, fontWeight: 700, fontSize: tpl.customer_info_size + 1, marginBottom: 6, color: '#111' }}>بيانات العميل</div>
+            <div style={{ ...cs, fontWeight: 700, fontSize: tpl.customer_info_size + 1, marginBottom: 6, color: '#111' }}>{partyLabel('بيانات العميل', tpl)}</div>
             <div style={{ ...cs, color: '#333' }}>
               {hasCustomerRows
                 ? renderLayoutRows(tpl.customer_info_rows, data, tpl, { sectionAlign: tpl.customer_info_align })
@@ -130,7 +130,7 @@ function renderPageDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
           </div>
           </Pos>
           <Pos dragKey="doc-info.delivery-card" tpl={tpl}>
-          {tpl.show_delivery_address && (
+          {tpl.show_delivery_address && r('customer.deliveryAddress', data, tpl) && (
             <div style={{ flex: 1, padding: 12, background: '#f9fafb', borderRadius: 4, border: '1px solid #e2e8f0' }}>
               <div style={{ ...cs, fontWeight: 700, fontSize: tpl.customer_info_size + 1, marginBottom: 6, color: '#111' }}>{labelOf('label_delivery_address', tpl) || 'عنوان التسليم'}</div>
               <div style={{ ...cs, color: '#333' }}>
@@ -155,7 +155,7 @@ function renderPageDocInfo(tpl: PrintTemplate, data: UniversalDocumentData) {
       {hasCustomerRows
         ? renderLayoutRows(tpl.customer_info_rows, data, tpl, { sectionAlign: tpl.customer_info_align })
         : <>
-            <span style={{ fontWeight: 700 }}>{labelOf('label_client', tpl) || 'العميل'}: </span>{clientName}
+            <span style={{ fontWeight: 700 }}>{labelOf('label_client', tpl) || partyLabel('العميل', tpl)}: </span>{clientName}
             {tpl.show_client_nif     && <span style={{ marginRight: 12 }}>{labelOf('label_client_nif', tpl) || 'NIF'}: {r('customer.nif', data, tpl) as string}</span>}
             {tpl.show_customer_commercial_name && <span style={{ marginRight: 12 }}>{labelOf('label_customer_commercial_name', tpl) || 'الاسم التجاري'}: {r('customer.commercialName', data, tpl) as string}</span>}
             {tpl.show_customer_rc    && <span style={{ marginRight: 12 }}>{labelOf('label_customer_rc', tpl) || 'RC'}: {r('customer.rc', data, tpl) as string}</span>}

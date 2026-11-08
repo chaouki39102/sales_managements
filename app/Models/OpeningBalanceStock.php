@@ -30,8 +30,8 @@ class OpeningBalanceStock extends Model
     protected $casts = [
         'opening_quantity' => 'decimal:3',
         'opening_value' => 'decimal:4',
-        'manufacturing_date' => 'date',
-        'expiration_date' => 'date',
+        'manufacturing_date' => 'date:Y-m-d',
+        'expiration_date' => 'date:Y-m-d',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

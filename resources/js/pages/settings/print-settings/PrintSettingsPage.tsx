@@ -18,7 +18,7 @@ import {
   type PrintTemplate, type DocTypeCode,
 } from './types';
 import { DocumentDataBuilder } from './types/data/DocumentDataBuilder';
-import { resolveTemplate } from './runtime';
+import { resolveTemplate, openPrintPopup } from './runtime';
 import type { UniversalDocumentData } from './types/data';
 import { TemplateLibraryModal } from './template-library';
 import { isStickerPaper, stickerDims, STICKER_SIZE_OPTIONS } from './components/preview/stickerDims';
@@ -349,37 +349,21 @@ export default function PrintSettingsPage() {
     if (!localTpl) return;
     const mmW = PAPER_DIM[localTpl.paper_size]?.w ?? localTpl.paper_width_mm;
     const winW = Math.min(Math.round(mmW * 3.78) + 60, 900);
-    const win  = window.open('', '_blank', `width=${winW},height=700`);
-    if (!win) { window.print(); return; }
-    const printCss = `
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { background: #fff; display: flex; justify-content: center; }
-      @media print { body { padding: 0; } @page { margin: 0; } }
-    `;
-    win.document.write(`<!DOCTYPE html><html dir="rtl"><head>
-      <meta charset="UTF-8"/>
-      <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Mono:wght@400;500&family=Cairo:wght@300;400;500;600;700;800;900&family=Almarai:wght@300;400;700;800&family=Noto+Kufi+Arabic:wght@400;500;600;700;800&family=El+Messiri:wght@400;500;600;700&family=Amiri:wght@400;700&family=Zain:wght@300;400;700;800;900&display=swap" rel="stylesheet"/>
-      <style>${printCss}</style>
-    </head><body><div id="r"></div></body></html>`);
-    win.document.close();
+    // Shared print popup: CSS reset, waits until the sheet, QR, images and
+    // fonts are ready (was a fixed 400ms), and UniversalPreview sets the real
+    // @page size inside the popup.
+    const win = openPrintPopup(winW, 700, undefined, { title: localTpl.name || 'Test print' });
+    if (!win) { notifier.error('تعذر فتح نافذة الطباعة — اسمح بالنوافذ المنبثقة'); return; }
     const { createRoot } = await import('react-dom/client');
-    const root = win.document.getElementById('r');
+    const root = win.document.getElementById('print-root');
     if (!root) return;
-    const reactRoot = createRoot(root);
-    reactRoot.render(
+    createRoot(root).render(
       React.createElement(PreviewSelector, {
         tpl: localTpl,
         data: useRealData ? previewData : null,
       }),
     );
-    await win.document.fonts.ready;
-    await new Promise(r => requestAnimationFrame(r));
-    await new Promise(r => setTimeout(r, 400));
-    if (win.closed) return;
-    win.focus();
-    win.print();
-    setTimeout(() => { if (!win.closed) win.close(); }, 500);
-  }, [localTpl, companyCtx, previewData, useRealData]);
+  }, [localTpl, companyCtx, previewData, useRealData, notifier]);
 
   const refs = useRef({ handleSave, handleUndo, handleRedo, isDirty, isSaving });
   useEffect(() => { refs.current = { handleSave, handleUndo, handleRedo, isDirty, isSaving }; });

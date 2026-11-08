@@ -22,7 +22,7 @@ class CompanyResource extends JsonResource
             'ai'                  => $this->ai,
             'legal_form_id'       => $this->legal_form_id,
             'capital_amount'      => $this->capital_amount,
-            'rc_date'             => $this->rc_date,
+            'rc_date'             => $this->rc_date?->format('Y-m-d'),
             'address'             => $this->address,
             'commune_id'          => $this->commune_id,
             'wilaya_id'           => $this->wilaya_id,

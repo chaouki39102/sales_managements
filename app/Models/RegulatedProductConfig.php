@@ -31,7 +31,7 @@ class RegulatedProductConfig extends Model
     protected $casts = [
         'regulated_max_price' => 'decimal:4',
         'regulated_margin'    => 'decimal:4',
-        'effective_date'      => 'date',
+        'effective_date'      => 'date:Y-m-d',
         'active'              => 'boolean',
     ];
 
