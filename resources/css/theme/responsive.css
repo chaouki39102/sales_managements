@@ -27,11 +27,19 @@
 .tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .row-wrap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 
+/* Super-admin layout pieces (AdminLayout.tsx) — hidden on desktop. */
+.adm-menu-btn {
+  display: none; width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0;
+  align-items: center; justify-content: center; font-size: 18px;
+  border: 1px solid var(--b2); background: var(--bg3); color: var(--t2); cursor: pointer;
+}
+.adm-backdrop { display: none; }
+
 /* ── ≤1024px: tablets ───────────────────────────────────────────────────── */
 @media (max-width: 1024px) {
   .rgrid-5, .rgrid-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  #main [style*="grid-template-columns: repeat(5, 1fr)"],
-  #main [style*="grid-template-columns: repeat(6, 1fr)"] {
+  :is(#main, .adm-main) [style*="grid-template-columns: repeat(5, 1fr)"],
+  :is(#main, .adm-main) [style*="grid-template-columns: repeat(6, 1fr)"] {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
 }
@@ -55,38 +63,57 @@
 
   /* Tables: scroll sideways inside their card instead of being clipped by
      an inline overflow:hidden wrapper. */
-  #main div:has(> table) {
+  :is(#main, .adm-main) div:has(> table) {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
   }
-  #main table th { white-space: nowrap; }
+  :is(#main, .adm-main) table th { white-space: nowrap; }
 
   /* Tab rows / chip rows built as inline flex rows scroll horizontally. */
-  #main [role="tablist"] { overflow-x: auto; scrollbar-width: none; }
-  #main [role="tablist"]::-webkit-scrollbar { display: none; }
+  :is(#main, .adm-main) [role="tablist"] { overflow-x: auto; scrollbar-width: none; }
+  :is(#main, .adm-main) [role="tablist"]::-webkit-scrollbar { display: none; }
 
   /* Inline tab bars (a flex row of tab buttons over a bottom border, or the
      page-header tabs) scroll sideways instead of cutting the last tab. */
   .ph-tabs > div,
-  #main div[style*="display: flex"][style*="border-bottom: 2px solid"]:has(> button + button) {
+  :is(#main, .adm-main) div[style*="display: flex"][style*="border-bottom: 2px solid"]:has(> button + button) {
     overflow-x: auto !important;
     flex-wrap: nowrap !important;
     scrollbar-width: none;
   }
   .ph-tabs > div > button,
-  #main div[style*="display: flex"][style*="border-bottom: 2px solid"]:has(> button + button) > button {
+  :is(#main, .adm-main) div[style*="display: flex"][style*="border-bottom: 2px solid"]:has(> button + button) > button {
     flex-shrink: 0;
   }
 
   /* Other inline rows of buttons (toolbars, header action groups) wrap. */
-  #main div[style*="display: flex"]:not([style*="border-bottom: 2px solid"]):not([style*="flex-direction: column"]):has(> button) {
+  :is(#main, .adm-main) div[style*="display: flex"]:not([style*="border-bottom: 2px solid"]):not([style*="flex-direction: column"]):has(> button) {
     flex-wrap: wrap;
   }
 
   /* Grid «tables» built from divs (e.g. users list rows): keep their columns
      and let the card scroll sideways. */
-  #main div:has(> .u-row) { overflow-x: auto !important; }
-  #main div:has(> .u-row) > * { min-width: 640px; }
+  :is(#main, .adm-main) div:has(> .u-row) { overflow-x: auto !important; }
+  :is(#main, .adm-main) div:has(> .u-row) > * { min-width: 640px; }
+
+  /* Super-admin panel: the 230px sidebar was a fixed column that left the
+     page a third of the screen. On phones it is an off-canvas drawer. */
+  .adm-sidebar {
+    position: fixed !important; top: 0; bottom: 0; right: 0;
+    width: min(280px, 84vw) !important; height: 100dvh !important;
+    z-index: 400; transform: translateX(105%);
+    transition: transform .22s cubic-bezier(.4,0,.2,1) !important;
+    box-shadow: var(--shadow3);
+  }
+  .adm-sidebar.open { transform: none; }
+  .adm-backdrop.open {
+    display: block; position: fixed; inset: 0; z-index: 390;
+    background: rgba(0, 0, 0, .35);
+  }
+  .adm-menu-btn { display: inline-flex; }
+  .adm-hide-sm { display: none !important; }
+  .adm-header { padding: 0 12px !important; gap: 8px; }
+  .adm-main { padding: 14px !important; }
 
   /* Template designers (print settings, stickers): list / canvas / controls stack vertically
      (three side-by-side panes of 200px + canvas + 340px cannot fit a phone). */
@@ -102,9 +129,9 @@
 
   /* Wide inline grids collapse. */
   .rgrid-3, .rgrid-4, .rgrid-5, .rgrid-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  #main [style*="grid-template-columns: repeat(4, 1fr)"],
-  #main [style*="grid-template-columns: repeat(5, 1fr)"],
-  #main [style*="grid-template-columns: repeat(6, 1fr)"] {
+  :is(#main, .adm-main) [style*="grid-template-columns: repeat(4, 1fr)"],
+  :is(#main, .adm-main) [style*="grid-template-columns: repeat(5, 1fr)"],
+  :is(#main, .adm-main) [style*="grid-template-columns: repeat(6, 1fr)"] {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 
@@ -115,11 +142,11 @@
 
 /* ── ≤640px: phones ─────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  #main [style*="grid-template-columns: repeat(3, 1fr)"]:has(> .kpi) {
+  :is(#main, .adm-main) [style*="grid-template-columns: repeat(3, 1fr)"]:has(> .kpi) {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
   /* Two-pane «sidebar + content» inline grids stack. */
-  #main [style*="grid-template-columns: 1fr 1fr"]:has(> .card) {
+  :is(#main, .adm-main) [style*="grid-template-columns: 1fr 1fr"]:has(> .card) {
     grid-template-columns: 1fr !important;
   }
 }
