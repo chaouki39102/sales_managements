@@ -1,5 +1,4 @@
 import React from 'react';
-import { layoutEngine, type LayoutElement } from '../../engines/LayoutEngine';
 import type { PrintTemplate, HeaderLayout, LayoutBlock } from '../../types/domain';
 import type { UniversalDocumentData } from '../../types/data';
 import { renderLayoutRows, boxBorderCss, cellStyleCss } from './shared';
@@ -33,28 +32,24 @@ export function renderHeaderColumns(
   const cols = layout.columns.filter(c => c.visible).sort((a, b) => a.order - b.order);
   if (cols.length === 0) return null;
 
+  // Column widths are percentages of the CONTENT box. The row used to be sized
+  // to the full paper width while sitting inside the page margins, so it was
+  // 2×margin too wide and the last column (the invoice reference box) ran past
+  // the margin and was clipped on paper.
   const evenWidth = 100 / cols.length;
-  const elements: LayoutElement[] = cols.map(col => ({
-    id: col.id,
-    type: 'text',
-    mode: 'flex',
-    width: ((col.width ?? evenWidth) / 100) * paperWidth,
-    flexBasis: ((col.width ?? evenWidth) / 100) * paperWidth,
-    height: 0,
-    order: col.order,
-  }));
-
-  const computed = layoutEngine.compute(elements, paperWidth);
+  const rawTotal = cols.reduce((s, c) => s + (c.width ?? evenWidth), 0) || 100;
+  const pct = (c: LayoutBlock) => ((c.width ?? evenWidth) / rawTotal) * 100;
+  void paperWidth;
 
   return (
-    <div style={{ display: 'flex', width: paperWidth, marginBottom: 16, alignItems: 'stretch' }}>
+    <div style={{ display: 'flex', width: '100%', marginBottom: 16, alignItems: 'stretch', gap: 0 }}>
       {cols.map(col => {
-        const c = computed.elements.get(col.id);
         return (
           <div
             key={col.id}
             style={{
-              width: c?.width ?? `${evenWidth}%`,
+              width: `${pct(col)}%`,
+              flex: `0 0 ${pct(col)}%`,
               boxSizing: 'border-box',
               textAlign: alignCss(col.align),
               padding: spacingCss(col.padding),

@@ -50,8 +50,8 @@ class TaxDeclarationPeriod extends Model
         'ifu_minimum'    => 'decimal:4',
         'amount_due'     => 'decimal:4',
         'amount_paid'    => 'decimal:4',
-        'submitted_at'   => 'date',
-        'paid_at'        => 'date',
+        'submitted_at'   => 'date:Y-m-d',
+        'paid_at'        => 'date:Y-m-d',
     ];
 
     public function fiscalYear(): BelongsTo

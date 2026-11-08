@@ -144,7 +144,7 @@ const DOC_FULL = {
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
 test.describe('Official PDF export', () => {
-  test('invoices list → TemplatePrintModal → PDF download named {number}.pdf', async ({ page }) => {
+  test('invoices list → TemplatePrintModal → PDF via print popup titled {number}', async ({ page }) => {
     await bootstrapApp(page, [FV_TPL]);
 
     // ── document-types: the invoices list query is gated on the FV doc type ──
@@ -184,22 +184,26 @@ test.describe('Official PDF export', () => {
 
     await expect(page.getByText('طباعة حسب القالب')).toBeVisible({ timeout: 10000 });
 
-    // The PDF button lives in the modal footer.
-    const downloadPromise = page.waitForEvent('download');
+    // The PDF button opens the print popup (the browser's «Save as PDF» is the
+    // only engine that shapes Arabic correctly — dompdf.js printed «????» or
+    // disconnected, reversed letters). Its title is the PDF file name.
+    const popupPromise = page.context().waitForEvent('page');
     const pdfBtn = page.getByRole('button', { name: /PDF/ });
     await expect(pdfBtn).toBeVisible();
     await pdfBtn.click();
 
-    const download = await downloadPromise;
-    expect(download.suggestedFilename()).toBe(`${FV_NUMBER}.pdf`);
+    const popup = await popupPromise;
+    await popup.evaluate(() => { (window as any).print = () => {}; (window as any).close = () => {}; });
+    await expect(popup).toHaveTitle(FV_NUMBER);
+    await expect(popup.locator('.ps-preview-wrapper')).toBeVisible({ timeout: 10000 });
+    await expect(popup.locator('.ps-preview-wrapper')).toContainText(FV_NUMBER);
 
-    const path = await download.path();
-    const fs = await import('node:fs');
-    const head = fs.readFileSync(path as unknown as string).subarray(0, 5).toString();
-    expect(head).toBe('%PDF-');
-
-    // The exported PDF is a real rendered document (non-trivial size).
-    const size = fs.statSync(path as unknown as string).size;
-    expect(size).toBeGreaterThan(5000);
+    // Printed as a real A4 sheet with real (shaped) Arabic text.
+    await popup.emulateMedia({ media: 'print' });
+    const pdf = await popup.pdf({ preferCSSPageSize: true, printBackground: true });
+    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+    expect(pdf.length).toBeGreaterThan(5000);
+    const pageCss = await popup.evaluate(() => document.getElementById('ps-print-styles')?.textContent ?? '');
+    expect(pageCss).toContain('size: 210mm 297mm');
   });
 });

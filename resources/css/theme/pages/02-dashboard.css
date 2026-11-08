@@ -1,0 +1,225 @@
+/* ═══════════════════════════════════════════════
+   Dashboard — جدول آخر الفواتير على الموبايل
+   نخفي: TVA (عمود 4) + التاريخ (عمود 6) + الإجراء (عمود 7)
+   ونبقي: رقم + الزبون + المبلغ + الحالة
+═══════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* الجدول يأخذ عرض الكارد فقط، بدون scroll أفقي */
+  #p-dashboard .tw {
+    overflow-x: hidden;
+  }
+  #p-dashboard table {
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  /* إخفاء TVA (th:4, td:4) */
+  #p-dashboard thead tr th:nth-child(4),
+  #p-dashboard tbody tr td:nth-child(4) { display: none; }
+
+  /* إخفاء التاريخ (th:6, td:6) */
+  #p-dashboard thead tr th:nth-child(6),
+  #p-dashboard tbody tr td:nth-child(6) { display: none; }
+
+  /* إخفاء زر الإجراء (th:7, td:7) */
+  #p-dashboard thead tr th:nth-child(7),
+  #p-dashboard tbody tr td:nth-child(7) { display: none; }
+
+  /* توزيع عرض الأعمدة المتبقية: رقم | الزبون | المبلغ | الحالة */
+  #p-dashboard thead tr th:nth-child(1),
+  #p-dashboard tbody tr td:nth-child(1) { width: 18%; }
+
+  #p-dashboard thead tr th:nth-child(2),
+  #p-dashboard tbody tr td:nth-child(2) { width: 38%; }
+
+  #p-dashboard thead tr th:nth-child(3),
+  #p-dashboard tbody tr td:nth-child(3) { width: 24%; }
+
+  #p-dashboard thead tr th:nth-child(5),
+  #p-dashboard tbody tr td:nth-child(5) { width: 20%; }
+
+  /* اقتطاع النص الطويل في خانة الزبون */
+  #p-dashboard tbody tr td:nth-child(2) span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 90px;
+  }
+}
+
+/* ═══════════════ PRINT — عزل الطباعة داخل المودال المفتوح ═══════════════ */
+@media print {
+  /* ── Phase 95 ──────────────────────────────────────────────────────────────
+     سلوك سابق: `body * { visibility: hidden }` + `display: none` لكل عناصر
+     الواجهة بلا أي شرط ⇒ أي `window.print()` من أي صفحة كان يخرج ورقة فارغة
+     (منها صفحة المستند في البوابة `PortalDocumentDetailPage`، وكل زر طباعة
+     عادي في الجداول والتقارير).
+
+     الآن العزل يعمل **فقط** عند وجود مودال مفتوح — الجذر الوحيد هو `.ov.on`
+     (`<Modal>` يضع `ov on` عند الفتح و`ov hidden` عند الإغلاق، والمودال
+     المغلق لا يفعّل العزل). عنصر `.print-only` (كشف الحساب —
+     `TransactionHistoryModal:592`) يعيش **داخل** `<Modal>` دائماً، فليس
+     جذراً مستقلاً ولا يحتاج قاعدة خاصة به غير إظهاره أثناء الطباعة.
+
+     `.no-print` تبقى بلا شرط: إخفاء واجهة الطابعة مفيد في كل الحالات.
+     الصفحات العادية بلا مودال مفتوح تُطبع تماماً كما قبل.
+     `body:has()` مدعومة في Chromium الحديث (مستخدمة أصلاً في pos.css).
+     ─────────────────────────────────────────────────────────────────────────── */
+
+  /* 1) بوابة العزل — sibling strategy: نخفي كل عنصر ليس داخل الشجرة المفتوحة
+        وليس ascendant لها. لا `visibility` (تُبقي التخطيط) ولا قاعدة عريضة بلا
+        شرط: في غياب المودال لا يُطبَّق شيء فتصبح الطباعة العادية سليمة. */
+  body:has(.ov.on) *:not(.ov.on):not(.ov.on *):not(:has(.ov.on)) {
+    display: none !important;
+  }
+
+  .no-print, .no-print * { display: none !important; }
+
+  /* 2) واجهة المودال — الترويسة/التذييل/زر الإغلاق/مقبض التحجيم. الأزرار
+        النصية داخل المحتوى (نصوص مراجع، أرقام) تبقى للطباعة؛ لا نخفي
+        `button`/`.btn` عَاماً لأن `app.css:29-58` يخفيهما أصلاً على مستوى
+        الصفحة، وداخل المودال نريد الإبقاء على كل ما هو نصي. */
+  body:has(.ov.on) :is(.m-hd, .m-hd *, .m-foot, .m-foot *, .m-x, .modal-resize-handle) {
+    display: none !important;
+  }
+
+  /* أزرار أيقونية فقط (بلا نص) — لا معنى لها على الورق. */
+  body:has(.ov.on) button:has(> i:only-child),
+  body:has(.ov.on) button:has(> svg:only-child) { display: none !important; }
+
+  /* 2-ب) استعادة الأزرار النصية داخل جسم المودال فقط.
+     `app.css:34` يخفي `button` و`.btn` على مستوى الصفحة عند الطباعة
+     (لإخفاء أزرار الواجهة)، وقاعدته تأتي **بعد** `@import theme/pages.css`
+     في نفس الملف، فبـ `!important` في الطبقتين، الأخصّية تسبق الترتيب. النتيجة لو تُركت:
+     مراجع السندات داخل كشف الحساب (`TransactionHistoryModal:125,830` —
+     نصوص `FAC-…`/`ACH-…` قابلة للنقر) تختفي عن الورق وهي **محتوى
+     المستند** لا واجهة.
+
+     الاستعادة محصورة في `.m-body` (خارجها الترويسة/التذييل/الإغلاق/مقبض
+     التحجيم مخفيون أصلاً بالقاعدة أعلاه) و«تستثني» علىшими:
+       • `.no-print` وذريّته (تبقى مخفية في كل الحالات)
+       • `.srch` وذريّته (حقول/واجهة بحث، لا معنى لها على الورق)
+       • الأزرار الأيقونية فقط (بدون `i` ولا `svg` وحيدة) — أعلاه
+     القاعدة أعلاه للأيقونية تخصيصها 0,3,3 وهذه 0,8,3، فتبقى الأيقونية
+     مخفية حتى لو تطابقت الشروط. */
+  body:has(.ov.on) .ov.on .m-body :is(button, .btn):not(.srch, .srch *):not(.no-print, .no-print *):not(:has(> i:only-child)):not(:has(> svg:only-child)) {
+    display: inline-flex !important;
+  }
+
+  /* 3) هندسة الطباعة — الـ overlay يصبح كتلة عادية، والـ modal يأخذ الصفحة
+        كاملة بدل box ثابت محدود بـ vh. مهم: `padding: 0` لا `16px`، ولا
+        `inset/width/height` عريضة (بعض العناصر تحمل `style*="width"` ولا
+        نريد توسيع السلسلة). */
+  body:has(.ov.on) .ov.on {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: none !important;
+    backdrop-filter: none !important;
+    opacity: 1 !important;
+  }
+
+  body:has(.ov.on) .ov.on .modal {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    overflow: visible !important;
+  }
+
+  /* 4) إلغاء الـ scroller الداخلي: `Modal` يضبط `height/minHeight/flex`
+        inline، و`TransactionHistoryModal` يضع `maxHeight/overflow` inline
+        على حاويات داخلية. القواعد هنا بـ !important ف تتغلّب على inline
+        غير المهم. */
+  body:has(.ov.on) .ov.on :is(.m-body, .modal-body) {
+    flex: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  /* `.tpl-chooser` يستخدم هامشاً سالباً ليأخذ عرض الـ m-body كاملاً */
+  body:has(.ov.on) .ov.on :is(.m-body, .modal-body) > .tpl-chooser { padding: 0 !important; }
+
+  body:has(.ov.on) .ov.on [style*="max-height"],
+  body:has(.ov.on) .ov.on [style*="overflow"] {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* 5) إظهار العنصر المخصص للطباعة (inline `display:none` في الشاشة) */
+  body:has(.ov.on) .ov.on .print-only { display: block !important; }
+
+  /* 6) جداول داخل المودال — صفّ يبقى كاملاً، والترويسة تتكرر كل صفحة */
+  body:has(.ov.on) .ov.on table { page-break-inside: auto; }
+  body:has(.ov.on) .ov.on tr    { page-break-inside: avoid; break-inside: avoid; }
+  body:has(.ov.on) .ov.on thead { display: table-header-group; }
+  body:has(.ov.on) .ov.on th    { position: static !important; }
+
+  /* 7) حبر الطباعة — نص أسود بلا خلفيات، مع استثناء إيصال الـ POS الذي له
+        تصميمه اللوني الخاص (`#pos-receipt-print`). لا نلمس `font-size`. */
+  body:has(.ov.on) .ov.on :is(.modal, .modal *):not(#pos-receipt-print):not(#pos-receipt-print *) {
+    color: #000 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+}
+
+/* ═══════════════ LOGIN — 2FA CODE STEP ═══════════════ */
+.auth-2fa{display:flex;flex-direction:column;gap:16px;}
+.auth-2fa-ic{width:56px;height:56px;border-radius:16px;background:var(--grad-em);display:flex;align-items:center;justify-content:center;margin:0 auto;color:#fff;font-size:26px;box-shadow:var(--emglow);}
+.auth-2fa-title{font-size:17px;font-weight:900;color:var(--t1);text-align:center;margin:0;}
+.auth-2fa-tx{font-size:12.5px;color:var(--t4);text-align:center;line-height:1.7;margin:0;}
+.auth-2fa-pre{display:flex;align-items:center;color:var(--t4);font-size:15px;padding:0 10px;border-left:1px solid var(--b3);}
+.auth-2fa-code-inp{text-align:center;letter-spacing:8px;font-size:20px;font-weight:800;direction:ltr;}
+.auth-2fa-code-inp::placeholder{letter-spacing:2px;font-weight:500;}
+.auth-2fa-btn{width:100%;padding:12px 20px;border-radius:var(--r2);border:none;background:var(--em);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:var(--emglow);transition:.2s;margin-top:4px;}
+.auth-2fa-btn:disabled{background:var(--bg4);color:var(--t4);cursor:not-allowed;box-shadow:none;}
+.auth-2fa-back{margin-top:4px;padding:8px;border:none;background:none;color:var(--t4);font-size:12.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'Tajawal',sans-serif;transition:.15s;}
+.auth-2fa-back:hover{color:var(--em);}
+.auth-2fa-al{border-radius:var(--r2);padding:10px 14px;}
+.auth-2fa-al-tx{font-size:13px;}
+
+/* ═══════════════ SECURITY TAB (2FA) ═══════════════ */
+.sec-stack{display:flex;flex-direction:column;gap:14px;max-width:860px;}
+.sec-loading{text-align:center;padding:30px 0;color:var(--t4);font-size:13px;}
+.sec-status{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.sec-status-badge{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;font-size:12.5px;font-weight:800;background:color-mix(in srgb, var(--red) 12%, transparent);color:var(--red);}
+.sec-status-badge.on{background:color-mix(in srgb, var(--em) 14%, transparent);color:var(--em);}
+.sec-hint{font-size:12.5px;color:var(--t3);line-height:1.8;margin:0;}
+.sec-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+.sec-enroll{display:flex;flex-direction:column;align-items:center;gap:14px;}
+.sec-qr{width:180px;height:180px;background:#fff;border-radius:12px;border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;padding:10px;flex-shrink:0;}
+.sec-qr svg{width:100%;height:100%;display:block;}
+.sec-qr img{width:100%;height:100%;object-fit:contain;display:block;}
+.sec-secret-box{width:100%;max-width:420px;}
+.sec-secret-lbl{font-size:11.5px;color:var(--t4);margin-bottom:6px;}
+.sec-secret-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.sec-secret{flex:1;min-width:180px;font-family:'Consolas','Courier New',monospace;font-size:13px;direction:ltr;text-align:left;background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:9px 12px;color:var(--t1);letter-spacing:1px;}
+.sec-uri{width:100%;max-width:420px;font-size:11px;direction:ltr;text-align:left;color:var(--t4);word-break:break-all;margin:0;}
+.sec-verify-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.sec-code-inp{width:150px;text-align:center;letter-spacing:6px;font-size:18px;font-weight:800;direction:ltr;padding:9px 12px;border-radius:10px;border:1px solid var(--b2);background:var(--bg3);color:var(--t1);font-family:'Tajawal',sans-serif;}
+.sec-code-inp::placeholder{letter-spacing:2px;font-weight:500;}
+.sec-warn{display:flex;align-items:flex-start;gap:8px;padding:10px 14px;background:color-mix(in srgb, var(--gold) 10%, transparent);border:1px solid color-mix(in srgb, var(--gold) 30%, transparent);border-radius:10px;font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.7;}
+.sec-warn i{color:var(--gold);margin-top:2px;flex-shrink:0;}
+.sec-codes{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;}
+.sec-code-chip{font-family:'Consolas','Courier New',monospace;font-size:12.5px;direction:ltr;text-align:center;background:var(--bg3);border:1px dashed var(--b3);border-radius:8px;padding:8px 10px;color:var(--t1);letter-spacing:1px;user-select:all;}

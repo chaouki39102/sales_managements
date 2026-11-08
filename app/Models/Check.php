@@ -39,10 +39,10 @@ class Check extends Model
     ];
 
     protected $casts = [
-        'check_date' => 'date',
-        'due_date' => 'date',
+        'check_date' => 'date:Y-m-d',
+        'due_date' => 'date:Y-m-d',
         'amount' => 'decimal:4',
-        'cleared_date' => 'date',
+        'cleared_date' => 'date:Y-m-d',
         'metadata' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',

@@ -81,10 +81,10 @@ class CommercialDocument extends Model
 
     protected $casts = [
         'exchange_rate' => 'decimal:8',
-        'document_date' => 'date',
+        'document_date' => 'date:Y-m-d',
         'issued_at' => 'datetime',
-        'due_date' => 'date',
-        'delivery_date' => 'date',
+        'due_date' => 'date:Y-m-d',
+        'delivery_date' => 'date:Y-m-d',
         'total_ht' => 'decimal:4',
         'total_tva' => 'decimal:4',
         'total_discount' => 'decimal:4',

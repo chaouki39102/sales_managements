@@ -36,9 +36,9 @@ class ProductLot extends Model
     ];
 
     protected $casts = [
-        'manufacturing_date' => 'date',
-        'expiration_date' => 'date',
-        'purchase_date' => 'date',
+        'manufacturing_date' => 'date:Y-m-d',
+        'expiration_date' => 'date:Y-m-d',
+        'purchase_date' => 'date:Y-m-d',
         'purchase_price' => 'decimal:4',
         'legal_selling_price' => 'decimal:4',
         'margin_percentage' => 'decimal:4',

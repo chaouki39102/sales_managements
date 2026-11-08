@@ -12,6 +12,21 @@ const TOTALS_FIELD_OVERRIDES: (tpl: PrintTemplate) => Record<string, FieldStyleO
   },
 });
 
+/**
+ * Documents that are not financial events (quote, orders, price request,
+ * transfer) have no payments and do not move the party's balance, so «المدفوع /
+ * الباقي / الرصيد السابق / الرصيد الجديد» on them was misleading (a quote
+ * printed a «new balance» equal to the old one) and wasted space.
+ */
+const NON_FINANCIAL_DOCS = new Set(['DEV', 'BCC', 'CMD', 'BCF', 'DDP', 'BT']);
+const PAYMENT_BALANCE_FIELDS = new Set(['totals.paid', 'totals.change', 'totals.remaining', 'balance.previous', 'balance.current']);
+
+function totalsRowsFor(tpl: PrintTemplate) {
+  const rows = tpl.totals_rows ?? [];
+  if (!NON_FINANCIAL_DOCS.has(tpl.doc_type_code)) return rows;
+  return rows.filter(r => !PAYMENT_BALANCE_FIELDS.has(r.field ?? ''));
+}
+
 function renderThermalTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
   const textAlign =
     tpl.totals_align === 'left'  ? 'left' :
@@ -34,7 +49,7 @@ function renderThermalTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
           paddingTop: 4,
         }} />
       )}
-      {renderLayoutRows(tpl.totals_rows, data, tpl, { fieldStyleOverrides: TOTALS_FIELD_OVERRIDES(tpl), sectionAlign: tpl.totals_align })}
+      {renderLayoutRows(totalsRowsFor(tpl), data, tpl, { fieldStyleOverrides: TOTALS_FIELD_OVERRIDES(tpl), sectionAlign: tpl.totals_align })}
     </div>
   );
 }
@@ -47,8 +62,9 @@ function renderPageTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
 
   return (
     <div style={{
-      marginBottom: isA4 ? 24 : 12,
+      marginBottom: isA4 ? 14 : 10,
       width: '100%',
+      breakInside: 'avoid',
     }}>
       <div style={{
         fontSize: tpl.totals_font_size,
@@ -61,7 +77,7 @@ function renderPageTotals(tpl: PrintTemplate, data: UniversalDocumentData) {
             paddingTop: 4,
           }} />
         )}
-        {renderLayoutRows(tpl.totals_rows, data, tpl, { fieldStyleOverrides: TOTALS_FIELD_OVERRIDES(tpl), sectionAlign: tpl.totals_align })}
+        {renderLayoutRows(totalsRowsFor(tpl), data, tpl, { fieldStyleOverrides: TOTALS_FIELD_OVERRIDES(tpl), sectionAlign: tpl.totals_align })}
       </div>
     </div>
   );

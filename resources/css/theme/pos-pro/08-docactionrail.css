@@ -1,0 +1,360 @@
+/* ════════════════════════════════════════════════════
+   الشريط الرأسي لمحرر المستندات الفنية (DocActionRail)
+   يعيد استخدام بنية .pp-rail — يضيف القوائم المنبثقة فقط
+╔═══════════════════════════════════════════════════ */
+.doc-rail {
+  z-index: 5;
+}
+
+.doc-rail-menu {
+  position: absolute;
+  top: 0;
+  inset-inline-start: calc(100% + 6px);
+  z-index: 60;
+  min-width: 176px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--bg2);
+  border: 1px solid var(--b2);
+  border-radius: var(--r2);
+  box-shadow: var(--shadow2);
+}
+
+/* Portaled variant (rendered into document.body via createPortal): the base
+   .doc-rail-menu uses `position:absolute; inset-inline-start: calc(100% + 6px)`
+   which was designed for the in-sidebar wrapper. When portaled the menu is
+   positioned by RailMenu with an inline `left`/`top` — neutralize the base
+   logical offsets and the absolute anchor so the fixed positioning wins and it
+   can never stretch/clip to the wrong side in RTL. */
+.doc-rail-menu--pop {
+  position: fixed;
+  top: 0;
+  inset-inline-start: auto;
+  inset-inline-end: auto;
+  left: auto;
+  right: auto;
+}
+
+.doc-rail-menu--tpl {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.doc-rail-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--r1);
+  background: transparent;
+  color: var(--t2);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: start;
+  white-space: nowrap;
+  transition: background var(--d1), color var(--d1);
+}
+
+.doc-rail-menu-item i { font-size: 15px; color: var(--t4); }
+
+.doc-rail-menu-item:hover { background: var(--emb); color: var(--em); }
+.doc-rail-menu-item:hover i { color: var(--em); }
+.doc-rail-menu-item.on { color: var(--em); }
+.doc-rail-menu-item.danger { color: var(--red); }
+.doc-rail-menu-item.danger i { color: var(--red); }
+.doc-rail-menu-item.danger:hover { background: var(--redb); color: var(--red); }
+.doc-rail-menu-item.danger:hover i { color: var(--red); }
+
+/* شارة "دائم" للأزرار الإلزامية (رجوع/حفظ) في مودال تخصيص الشريط */
+.doc-rail-custom-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--b2);
+  border-radius: var(--r1);
+  background: var(--bg2);
+  color: var(--t4);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.doc-rail-custom-lock i { font-size: 12px; }
+
+/* ═══════════════ المستند التجاري — تطبيق الصناديق (CommercialDocumentPage) ═══════════════ */
+
+/* إدخال ملف مخفي (رفع صورة فاتورة المورد) */
+.doc-hidden-input {
+  display: none;
+}
+
+/* أيقونة عنوان نافذة منبثقة */
+.doc-modal-title-ic {
+  margin-inline-end: 5px;
+}
+
+/* حالة التحميل */
+.doc-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 100vh;
+  background: var(--bg1);
+}
+.doc-loading-spin {
+  font-size: 32px;
+  color: var(--em);
+  animation: spin 0.8s linear infinite;
+}
+.doc-loading-text {
+  font-size: 13px;
+  color: var(--t3);
+}
+
+/* جذر الصفحة — الارتفاع يطابق .pos-pro أسفل الشريط العلوي للقالب (--tb) */
+.doc-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--tb));
+  direction: rtl;
+  overflow: hidden;
+  background: var(--bg1);
+}
+@media (max-width: 720px) {
+  .doc-page { height: calc(100vh - var(--tb) - var(--mb)); }
+  /* The rail becomes a fixed bottom bar (generic @media720 .pp-rail rule, z-index 40)
+     but the app's bottom nav (#mob-nav, z-index 9999, height var(--mb)) sits above it
+     and intercepts pointer events on the doc rail's buttons (e.g. تخصيص الشريط/الرجوع).
+     Lift the doc rail up onto the nav's own block so it is visible AND clickable. */
+  .doc-rail { bottom: var(--mb); }
+}
+.doc-page--cancelled { background: var(--bg3); }
+
+/* الهيكل الرئيسي */
+.doc-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  overflow: hidden;
+}
+.doc-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* شريط التنبيهات القابل للطي */
+.doc-alerts {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--b1);
+  background: var(--bg2);
+}
+.doc-alerts-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 20px;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: var(--t4);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  text-align: right;
+}
+.doc-alerts-chevron { font-size: 10px; }
+.doc-alerts-list {
+  padding: 0 20px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* شريط رسائل النجاح/الخطأ */
+.doc-msg-slot {
+  flex-shrink: 0;
+  padding: 8px 20px 0;
+}
+
+/* تنبيه تغيير المتعامل */
+.doc-party-warn {
+  flex-shrink: 0;
+  padding: 10px 20px 0;
+}
+.doc-party-warn-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--r2);
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
+  border: 1px solid var(--orange);
+  font-size: 12.5px;
+  color: var(--orange);
+}
+.doc-party-warn-icon { margin-top: 1px; flex-shrink: 0; }
+.doc-party-warn-body { flex: 1; min-width: 0; }
+.doc-party-warn-title { font-weight: 700; margin-bottom: 3px; }
+.doc-party-warn-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--orange);
+  padding: 0;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+/* صف الأدوات العلوي */
+.doc-ed-top {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 16px 0;
+}
+.doc-ed-top--compact { gap: 8px; padding: 10px 10px 0; }
+.doc-ed-top-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.doc-ed-top-row--compact { gap: 8px; }
+.doc-ed-top-row--narrow {
+  gap: 8px;
+  align-items: stretch;
+  flex-direction: column;
+}
+
+/* عمود المتعامل + المجاميع */
+.party-col {
+  flex: 0 0 340px;
+  width: 340px;
+  min-width: 0;
+  height: var(--party-col-h, 320px);
+  overflow: hidden;
+}
+.party-col--narrow {
+  flex: 0 0 auto;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.totals-col {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* شريط المسح */
+.doc-scan-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  flex-shrink: 0;
+}
+.doc-scan-row--compact { padding: 6px 10px; }
+.doc-scan-grow {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* بطاقة الأسطر */
+.doc-lines-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 16px;
+  gap: 14px;
+}
+.doc-lines-card--compact { padding: 10px; gap: 10px; }
+.doc-lines-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* غلاف المعاينة */
+.doc-preview-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+/* غلاف قائمة الإجراءات في الشريط الجانبي */
+.doc-rail-menu-wrap { position: relative; }
+
+/* ═══ توحيد أزرار شريط المحرر مع POS PRO (ارتفاعات متساوية) ════════════ */
+/* غلاف القوائم (تصدير/قالب/المزيد) يعمل كعنصر تمرير خالٍ: الزر الداخلي
+   يستوعب عرض وارتفاع الغلاف بالكامل، فيطابق أزرار .pp-rail-btn المباشرة. */
+.doc-rail .doc-rail-menu-wrap {
+  display: flex;
+  flex: 0 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+.doc-rail .doc-rail-menu-wrap > .pp-rail-btn {
+  flex: 1 1 auto;
+  width: 100%;
+  align-self: stretch;
+}
+
+/* كل أزرار الشريط تأخذ العرض الكامل وتسمية من سطر واحد ثابت
+   (لا التفاف) → ارتفاعات متساوية بغضّ النظر عن طول النص. */
+.doc-rail .pp-rail-btn {
+  width: 100%;
+}
+.doc-rail .pp-rail-btn > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  line-height: 1.3;
+}
+
+/* بطاقة المتعامل داخل الرأس */
+.doc-party-card {
+  height: 100%;
+  box-sizing: border-box;
+  min-height: 0;
+  padding: 18px 24px;
+}
+.doc-party-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+}
+
+/* حقل إدخال مع مؤشر تحميل */
+.doc-field-rel { position: relative; }
+.doc-field-spin {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: var(--t4);
+  pointer-events: none;
+  animation: spin 1s linear infinite;
+}

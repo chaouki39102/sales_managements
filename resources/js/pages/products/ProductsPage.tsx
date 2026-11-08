@@ -424,21 +424,32 @@ export default function ProductsPage() {
     if (!companyInfo) return null;
     const targets = selectedIds.length > 0 ? products.filter(p => selectedIds.includes(p.id)) : products;
     if (targets.length === 0) return null;
-    const baseLines = targets.map((p, i) => ({
+    // Shelf labels show the consumer price: the product's default selling price
+    // (server-computed from the default price level, any pricing method) plus
+    // its TVA. Before, only a «fixed» price was read and it was printed as TTC
+    // without tax — and products priced by rate/margin printed «0.00».
+    const tvas = productLookups?.tvas ?? [];
+    const baseLines = targets.map((p, i) => {
+      const fixed = p.prices?.find(pr => pr.active && pr.pricing_method === 'fixed')?.price;
+      const ht = Number((p as any).default_selling_price_ht ?? fixed ?? 0) || 0;
+      const ratePct = Number(tvas.find(t => t.id === (p as any).tva_id)?.rate ?? 0) || 0;
+      const ttc = Math.round(ht * (1 + ratePct / 100) * 100) / 100;
+      return {
       rowNumber: i + 1,
       name: p.name,
       ref: p.ref ?? null,
       barcode: p.barcode ?? null,
       quantity: 1,
-      unitPriceHt: p.prices?.find(pr => pr.active && pr.pricing_method === 'fixed')?.price ?? 0,
-      unitPriceTtc: p.prices?.find(pr => pr.active && pr.pricing_method === 'fixed')?.price ?? 0,
-      tvaRate: 0, tvaPct: 0, discountPct: 0, discountAmt: 0,
+      unitPriceHt: ht,
+      unitPriceTtc: ttc,
+      tvaRate: ratePct / 100, tvaPct: ratePct, discountPct: 0, discountAmt: 0,
       totalHt: 0, totalTva: 0, totalTtc: 0,
       imageUrl: (p as any).images?.[0] ?? null,
       brand: (p as any).brand?.name ?? null,
       unit: null,
       lot: null, notes: null,
-    }));
+      };
+    });
     // Multiply lines by labelPrintQty
     const lines: typeof baseLines = [];
     for (let copy = 0; copy < labelPrintQty; copy++) {
@@ -453,7 +464,7 @@ export default function ProductsPage() {
       totals: { totalHt: 0, totalTva: 0, totalTtc: 0, fiscalStamp: 0, totalDiscount: 0, paid: 0, change: 0, remaining: 0, netToPay: 0 },
       taxBreakdown: [], payments: [], computed: {},
     };
-  }, [companyInfo, products, selectedIds, labelPrintQty]);
+  }, [companyInfo, products, selectedIds, labelPrintQty, productLookups]);
 
   // ── Render ──
   return (

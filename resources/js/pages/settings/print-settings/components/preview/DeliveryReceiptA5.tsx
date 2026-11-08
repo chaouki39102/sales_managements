@@ -295,8 +295,11 @@ function DeliveryReceiptA5({ tpl, data }: { tpl: PrintTemplate; data: UniversalD
   };
 
   // ── Footer ──
+  // Printed-by meta and barcode share one row and stay together, so the
+  // barcode is never orphaned alone on a second sheet.
   const footerStyle: React.CSSProperties = {
-    marginTop: 4, textAlign: 'center',
+    marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    gap: 8, breakInside: 'avoid',
   };
 
   const printedMeta: React.CSSProperties = {
@@ -393,7 +396,7 @@ function DeliveryReceiptA5({ tpl, data }: { tpl: PrintTemplate; data: UniversalD
             {tpl.show_date && (
               <div>التاريخ: <b style={VALUE_STYLE}>{fmt(formatDate(docDate))}</b></div>
             )}
-            <div>الصفحة: <b style={VALUE_STYLE}>1/1</b></div>
+            {/* «الصفحة: 1/1» was hard-coded and printed on multi-page notes too. */}
           </div>
 
           {tpl.show_client && clientName && (
@@ -581,22 +584,24 @@ function DeliveryReceiptA5({ tpl, data }: { tpl: PrintTemplate; data: UniversalD
       <div style={footerStyle}>
         <div style={printedMeta}>
           {tpl.show_date && docDate && (
-            <div>{fmt(formatDate(docDate))} : مطبوعة</div>
+            <div>{fmt(formatDate(new Date().toLocaleDateString('en-CA')))} : مطبوعة</div>
           )}
           {tpl.show_cashier && cashier && (
             <div>{cashier} : من طرف</div>
           )}
         </div>
         {barcode && (
-          <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <svg
               width={`${barcode.totalWidth.toFixed(2)}mm`}
-              height="13mm"
-              viewBox={`0 0 ${barcode.totalWidth.toFixed(2)} 13`}
+              height="9mm"
+              viewBox={`0 0 ${barcode.totalWidth.toFixed(2)} 9`}
+              preserveAspectRatio="none"
               style={{ direction: 'ltr', display: 'block' }}
+              data-barcode="code39"
             >
               {barcode.bars.map((bar, i) => (
-                <rect key={i} x={bar.x} y={0} width={bar.width} height={13} fill={INK} />
+                <rect key={i} x={bar.x} y={0} width={bar.width} height={9} fill={INK} />
               ))}
             </svg>
             <div style={{

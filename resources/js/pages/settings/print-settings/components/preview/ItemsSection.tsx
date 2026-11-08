@@ -37,8 +37,10 @@ function colValue(col: ColumnKey, line: DocumentLine, _tpl: PrintTemplate, idx: 
     return pct > 0 ? `${pct}%` : '';
   }
   if (col === 'tva') {
-    const pct = printFieldResolver.resolveItemField('item.tvaPct', line, idx) as number;
-    return pct != null ? `${pct}%` : 'معفى';
+    // item.tvaPct is a computed field that is not in the registry, so
+    // resolveItemField() returned undefined and EVERY line printed «معفى».
+    const pct = line.tvaPct ?? Math.round((line.tvaRate ?? 0) * 10000) / 100;
+    return pct > 0 ? `${pct}%` : 'معفى';
   }
   if (col === 'price') {
     const display = _tpl.price_display === 'ttc' ? line.unitPriceTtc : line.unitPriceHt;
@@ -128,7 +130,7 @@ function renderPageItems(tpl: PrintTemplate, data: UniversalDocumentData) {
 
   return (
     <Pos dragKey="items.table" tpl={tpl}>
-    <div style={{ marginBottom: isA4 ? 20 : 12, fontFamily: ff }}>
+    <div style={{ marginBottom: isA4 ? 14 : 10, fontFamily: ff }}>
       <table style={{ width: '100%', borderCollapse: thR ? 'separate' : 'collapse', borderSpacing: 0, fontSize: tpl.items_font_size }}>
         {tpl.show_col_header && (
         <thead>

@@ -46,7 +46,7 @@ class NumberingSeries extends Model
         'reset_monthly' => 'boolean',
         'current_year' => 'integer',
         'current_month' => 'integer',
-        'reset_date' => 'date',
+        'reset_date' => 'date:Y-m-d',
         'active' => 'boolean',
         'is_locked' => 'boolean',
         'created_at' => 'datetime',

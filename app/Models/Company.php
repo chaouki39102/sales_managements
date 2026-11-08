@@ -34,7 +34,7 @@ class Company extends Model
     protected $casts = [
         'active' => 'boolean',
         'capital_amount' => 'decimal:4',
-        'rc_date' => 'date',
+        'rc_date' => 'date:Y-m-d',
         'suspended_at' => 'datetime',
         'deactivated_at' => 'datetime',
         'trial_ends_at' => 'datetime',

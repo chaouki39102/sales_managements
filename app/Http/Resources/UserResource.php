@@ -19,7 +19,7 @@ class UserResource extends JsonResource
             'avatar'              => $this->avatar ? asset('storage/' . $this->avatar) : null,
             'bio'                 => $this->bio,
             'job_title'           => $this->job_title,
-            'birth_date'          => $this->birth_date,
+            'birth_date'          => $this->birth_date?->format('Y-m-d'),
             'gender_id'           => $this->gender_id,
             'national_id'         => $this->national_id,
             'address'             => $this->address,

@@ -16,7 +16,7 @@ class FiscalYearResource extends JsonResource
             'start_date'    => $this->start_date?->format('Y-m-d'),
             'end_date'      => $this->end_date?->format('Y-m-d'),
             'is_closed'     => $this->is_closed,
-            'closed_at'     => $this->closed_at,
+            'closed_at'     => $this->closed_at?->format('Y-m-d'),
             'closed_by'     => $this->closed_by,
             'is_current'    => $this->is_current,
             'closing_notes' => $this->closing_notes,

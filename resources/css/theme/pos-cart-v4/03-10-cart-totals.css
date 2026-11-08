@@ -1,0 +1,402 @@
+/* ══════════════════════════════════════════
+   10. CART TOTALS — محسّن
+══════════════════════════════════════════ */
+.cart-totals {
+  padding: 9px 12px 0;
+  border-top: 1px solid var(--b2);
+  flex-shrink: 0;
+  background: var(--bg3);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ct-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--fs-xs);
+  color: var(--t3);
+}
+.ct-row span:last-child {
+  font-weight: 700;
+  color: var(--t2);
+  direction: ltr;
+}
+.ct-disc { color: var(--red) !important; }
+.ct-disc span:last-child { color: var(--red); }
+
+.ct-grand {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 9px 0 10px;
+  margin-top: 5px;
+  border-top: 2px solid var(--b2);
+}
+.ct-grand-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--t3);
+}
+.grand-amount {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--em);
+  direction: ltr;
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+.grand-currency {
+  font-size: 13px;
+  color: var(--em2);
+  opacity: .7;
+}
+
+/* ══════════════════════════════════════════
+   11. CART ACTIONS — محسّن
+══════════════════════════════════════════ */
+.cart-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--b2);
+  flex-shrink: 0;
+  background: var(--bg2);
+}
+.cart-hold-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 9px 14px;
+  border-radius: var(--r2);
+  border: 1.5px solid transparent;
+  background: transparent;
+  color: var(--t3);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Tajawal', sans-serif;
+  transition: .14s;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.cart-hold-btn:hover { background: var(--bg3); border-color: var(--b3); color: var(--t1); }
+.cart-hold-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.cart-sell-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 16px;
+  border-radius: var(--r2);
+  border: none;
+  background: var(--em);
+  color: #fff;
+  font-size: var(--fs-md);
+  font-weight: 800;
+  cursor: pointer;
+  font-family: 'Tajawal', sans-serif;
+  box-shadow: var(--emglow);
+  transition: .14s;
+  position: relative;
+  white-space: nowrap;
+}
+.cart-sell-btn:hover:not(:disabled) {
+  background: var(--em2);
+  box-shadow: var(--emglow2);
+  transform: translateY(-1px);
+}
+.cart-sell-btn:active:not(:disabled) { transform: translateY(0) scale(.98); }
+.cart-sell-btn:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+
+.cart-quick-sell {
+  flex: 0 0 auto;
+  padding: 16px 14px;
+  background: var(--em2);
+  gap: 5px;
+}
+.cart-quick-sell:hover:not(:disabled) { background: #065d3d; }
+.cart-quick-sell i { font-size: 16px; }
+/* ══════════════════════════════════════════
+   12. PRODUCT CARD — تحسينات إضافية
+══════════════════════════════════════════ */
+/* شارة "في السلة" أكبر وأوضح */
+.incart-badge {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  padding: 0 5px;
+  background: var(--em);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(10,138,92,.45);
+  border: 2px solid var(--bg2);
+  animation: badgePop .2s cubic-bezier(.34,1.4,.64,1);
+}
+@keyframes badgePop {
+  from { transform: scale(0); }
+  to   { transform: scale(1); }
+}
+
+/* ══════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════ */
+/* Portal popup — rendered in document.body via createPortal */
+.cr-popup--portal {
+  position: fixed;
+  right: auto;
+  z-index: 10000;
+  overflow: visible;
+  width: max-content;
+  max-width: 260px;
+}
+.cr-popup--portal .cr-popup-arrow {
+  display: none;
+}
+@media (max-width: 860px) {
+  .cr-popup {
+    right: auto;
+    left: 0;
+    min-width: 200px;
+  }
+  .cr-popup-arrow { right: auto; left: 16px; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   7. CART DENSITY — كثافة عرض قابلة للتبديل (مريح / مضغوط)
+   ══════════════════════════════════════════════════════════════════════
+   الهدف: تكبير عدد المنتجات المرئية في السلة دفعة واحدة بدون تمرير،
+   بنفس فلسفة أزرار S/M/L/XL في شبكة المنتجات (ProductGrid). زر التبديل
+   موجود في شريط أزرار السلة (cart-acts2) ويمرَّر كـ density="compact"
+   من ProfessionalCart إلى كل CartRow، فيضيف كل صف صنف .cr--compact
+   على نفسه مباشرة (وليس على حاوية أب) — أبسط وأكثر أماناً لأنه لا
+   يعتمد على انتقاء وراثي عبر شجرة DOM قد تتغيّر مستقبلاً.
+
+   الفكرة الأساسية للوضع المضغوط:
+   - صف واحد بارتفاع ثابت (~34px) بدل ~70-90px.
+   - دمج "السعر + الخصم" في شارة واحدة قابلة للنقر بدل زرّين منفصلين،
+     فتُفتح نفس الـ popover الحالية دون أي تغيير في المنطق.
+   - إخفاء عناصر ثانوية (اسم المتغيّر، TVA، خط HT المشطوب) — تبقى
+     متاحة عبر الـ popover / التلميح (title) عند الحاجة.
+   - إخفاء زر الحذف بالتفويح فقط، ليكون ظاهراً دائماً بحجم أصغر بدل
+     الاعتماد على :hover (أفضل للمس على الأجهزة اللوحية أيضاً).
+════════════════════════════════════════════════════════════════════════ */
+
+/* زر تبديل الكثافة في شريط أزرار السلة */
+.density-toggle-btn.on {
+  background: var(--emb);
+  border-color: var(--embo);
+  color: var(--em);
+}
+
+.cr--compact {
+  grid-template-columns: 3px 14px 1fr auto auto 22px;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px 4px 6px;
+  min-height: 34px;
+}
+
+/* اسم المنتج + السعر على نفس السطر بدل سطرين */
+.cr--compact .cr-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.cr--compact .cr-name {
+  font-size: 11.5px;
+  margin-bottom: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cr--compact .cr-variant { display: none; } /* متاح عبر title على الاسم */
+
+/* شارة السعر+الخصم المدمجة تحل محل صف price-row الكامل */
+.cr--compact .cr-price-row {
+  flex-wrap: nowrap;
+  flex: 0 0 auto;
+  gap: 4px;
+  margin-top: 0;
+}
+.cr--compact .cr-tva { display: none; } /* يبقى ظاهراً في popover السعر */
+.cr--compact .cr-price,
+.cr--compact .cr-disc,
+.cr--compact .cr-disc-add {
+  padding: 1px 6px;
+  font-size: 10.5px;
+}
+.cr--compact .cr-price-edit-ic { display: none; }
+
+/* عناصر التحكّم بالكمية مصغّرة */
+.cr--compact .cr-qty-ctrl { padding: 1px 2px; }
+.cr--compact .cq-btn { width: 19px; height: 19px; font-size: 9.5px; }
+.cr--compact .cq-val,
+.cr--compact .cq-inp { font-size: 11.5px; min-width: 20px; }
+.cr--compact .cq-unit { display: none; } /* الوحدة معروفة من اسم المنتج/popover */
+
+/* الإجمالي — رقم واحد فقط، بدون خط HT المشطوب */
+.cr--compact .cr-total { min-width: 58px; }
+.cr--compact .cr-ttc { font-size: 12px; }
+.cr--compact .cr-ht--strike { display: none; }
+
+/* زر الحذف ظاهر دائماً بحجم مصغّر (لا يعتمد على hover) */
+.cr--compact .cr-del {
+  opacity: .55;
+  width: 20px;
+  height: 20px;
+  align-self: center;
+  padding-top: 0;
+}
+.cr--compact .cr-del:hover { opacity: 1; }
+
+/* أي popover مفتوح يفرض تلقائياً الرجوع للارتفاع الطبيعي لتلك البطاقة
+   فقط (بدون أن يزعزع بقية القائمة) لأن الـ popover موضعه absolute. */
+
+/* ══════════════════════════════════════════════════════════════════════
+   8. TOTALS COLLAPSE — طيّ تفاصيل الحساب
+   ══════════════════════════════════════════════════════════════════════
+   الهدف: تحرير مساحة رأسية دائمة (~90-100px) لصالح قائمة الأصناف. يظهر
+   افتراضياً سطر واحد فقط (الإجمالي TTC قابل للنقر)، والتفاصيل الكاملة
+   (HT/TVA/الخصومات/رصيد الزبون) تُطوى/تُفرد عند الطلب فقط.
+════════════════════════════════════════════════════════════════════════ */
+.cart-totals { padding: 8px 12px; }
+
+.ct-grand--toggle {
+  cursor: pointer;
+  padding: 4px 0;
+  margin: 0;
+  border-top: none;         /* أصبح أول عنصر في الكتلة، لا حاجة لفاصل أعلاه */
+  user-select: none;
+}
+.ct-grand--toggle:hover .ct-grand-lbl { color: var(--em); }
+.ct-grand-lbl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: color .12s;
+}
+.ct-toggle-ic {
+  font-size: 13px;
+  color: var(--t4);
+  transition: transform .15s;
+}
+.ct-toggle-ic.open { transform: rotate(180deg); }
+
+/* عند فتح التفاصيل: خط فاصل تحت سطر الإجمالي بدل فوقه */
+.ct-grand--toggle + .ct-row {
+  border-top: 1px solid var(--b2);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   9. TARIF DROPDOWN — زر تعريفة مدمج بدل شريط دائم
+   ══════════════════════════════════════════════════════════════════════
+   يستبدل شريط أزرار Tarif Gros/Demi-Gros/Détail الدائم (~32px مساحة
+   ثابتة) بزر واحد صغير يعرض التعريفة الحالية، ويفتح قائمة منسدلة فقط
+   عند الحاجة لتغييرها.
+════════════════════════════════════════════════════════════════════════ */
+.tarif-wrap {
+  display: inline-flex;
+}
+.tarif-drop {
+  z-index: 200;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px;
+  background: var(--bg2);
+  border: 1.5px solid var(--b2);
+  border-radius: var(--r2);
+  box-shadow: var(--shadow2);
+  animation: slideDown .12s ease;
+}
+.tarif-drop .cmode {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: var(--r1);
+  border: none;
+  background: transparent;
+  color: var(--t1);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Tajawal', sans-serif;
+  transition: .1s;
+  white-space: nowrap;
+  text-align: right;
+}
+.tarif-drop .cmode:hover { background: var(--bg4); }
+.tarif-drop .cmode.on { background: var(--emb); color: var(--em); font-weight: 700; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   10. CART ZOOM — تكبير/تصغير السلة
+   ══════════════════════════════════════════════════════════════════════
+   --cart-zoom (0.75–1.25) يُضبط من ProfessionalCart عبر +/- ويحفظ في
+   localStorage. يضرب كل font-size, padding, gap داخل .pos-cart.
+   القيمة 1 = عادي، >1 = كبير، <1 = صغير.
+   ══════════════════════════════════════════════════════════════════════ */
+.pos-cart {
+  --cz: var(--cart-zoom, 1);
+}
+.pos-cart .cr {
+  gap: calc(6px * var(--cz));
+  padding: calc(9px * var(--cz)) calc(10px * var(--cz)) calc(9px * var(--cz)) calc(8px * var(--cz));
+}
+.pos-cart .cr-name  { font-size: calc(12.5px * var(--cz)); }
+.pos-cart .cr-num   { font-size: calc(10px * var(--cz)); }
+.pos-cart .cr-price-num  { font-size: calc(12px * var(--cz)); }
+.pos-cart .cr-price-unit { font-size: calc(9.5px * var(--cz)); }
+.pos-cart .cr-disc  { font-size: calc(11px * var(--cz)); }
+.pos-cart .cr-disc-add { font-size: calc(11px * var(--cz)); }
+.pos-cart .cr-tva   { font-size: calc(9.5px * var(--cz)); }
+.pos-cart .cq-val   { font-size: calc(13px * var(--cz)); min-width: calc(30px * var(--cz)); }
+.pos-cart .cq-btn   { width: calc(24px * var(--cz)); height: calc(24px * var(--cz)); }
+.pos-cart .cr-ttc   { font-size: calc(13.5px * var(--cz)); }
+.pos-cart .cr-dzd   { font-size: calc(10px * var(--cz)); }
+.pos-cart .cr-ht--strike { font-size: calc(10px * var(--cz)); }
+.pos-cart .cr-qty-ctrl   { padding: calc(2px * var(--cz)) calc(3px * var(--cz)); }
+.pos-cart .cart-ttl      { font-size: calc(14px * var(--cz)); }
+.pos-cart .cart-pill     { font-size: calc(11px * var(--cz)); min-width: calc(22px * var(--cz)); height: calc(22px * var(--cz)); }
+.pos-cart .ct-row        { font-size: calc(11px * var(--cz)); }
+.pos-cart .grand-amount  { font-size: calc(22px * var(--cz)); }
+.pos-cart .grand-currency { font-size: calc(13px * var(--cz)); }
+.pos-cart .cart-sell-btn { font-size: calc(14px * var(--cz)); padding: calc(13px * var(--cz)); }
+.pos-cart .cart-hold-btn { font-size: calc(12px * var(--cz)); padding: calc(9px * var(--cz)) calc(14px * var(--cz)); }
+.pos-cart .ct-grand-label { font-size: calc(13px * var(--cz)); }
+.pos-cart .cq-unit       { font-size: calc(9.5px * var(--cz)); }
+.pos-cart .cr-variant    { font-size: calc(11.5px * var(--cz)); }
+.pos-cart .cr-price      { padding: calc(2px * var(--cz)) calc(7px * var(--cz)) calc(2px * var(--cz)) calc(5px * var(--cz)); }
+.pos-cart .cr-total      { min-width: calc(72px * var(--cz)); }
+
+/* الوضع المضغوط */
+.pos-cart .cr--compact {
+  gap: calc(5px * var(--cz));
+  padding: calc(4px * var(--cz)) calc(8px * var(--cz)) calc(4px * var(--cz)) calc(6px * var(--cz));
+  min-height: calc(34px * var(--cz));
+}
+.pos-cart .cr--compact .cr-name  { font-size: calc(11.5px * var(--cz)); }
+.pos-cart .cr--compact .cr-price,
+.pos-cart .cr--compact .cr-disc,
+.pos-cart .cr--compact .cr-disc-add { font-size: calc(10.5px * var(--cz)); padding: calc(1px * var(--cz)) calc(6px * var(--cz)); }
+.pos-cart .cr--compact .cq-btn    { width: calc(19px * var(--cz)); height: calc(19px * var(--cz)); font-size: calc(9.5px * var(--cz)); }
+.pos-cart .cr--compact .cq-val,
+.pos-cart .cr--compact .cq-inp   { font-size: calc(11.5px * var(--cz)); min-width: calc(20px * var(--cz)); }
+.pos-cart .cr--compact .cr-total  { min-width: calc(58px * var(--cz)); }
+.pos-cart .cr--compact .cr-ttc    { font-size: calc(12px * var(--cz)); }
+.pos-cart .cr--compact .cr-del    { width: calc(20px * var(--cz)); height: calc(20px * var(--cz)); }

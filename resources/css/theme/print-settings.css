@@ -407,6 +407,10 @@
   .ps-printers-grid { grid-template-columns: 1fr; }
 }
 
+/* Empty logo slot: hidden everywhere (inline display:none) except in the
+   active freeform designer, where it must stay grabbable. */
+[data-ff-stage] .ps-logo-placeholder { display: flex !important; }
+
 /* ═══ PRINT ═══ */
 @media print {
   .ps-header,

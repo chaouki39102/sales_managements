@@ -275,7 +275,10 @@ function StickerLabel({ tpl, data }: { tpl: PrintTemplate; data: UniversalDocume
       borderRadius: br,
       display: 'flex',
       flexDirection: isSideBySide ? 'row' : 'column',
-      justifyContent: 'center',
+      // «safe»: when the content is a little taller than the label, start at
+      // the top instead of overflowing both edges — plain «center» clipped the
+      // company name's Arabic dots against the top border.
+      justifyContent: 'safe center',
       alignItems: 'center',
       gap: isSideBySide ? 4 : 4,
       textAlign: 'center',

@@ -25,6 +25,40 @@ export function formatDate(iso: string): string {
   return `${s.slice(0, 10)} ${s.slice(sp + 1)}`;
 }
 
+/** Strip a trailing colon from a label. Renderers append their own «: », and
+ *  migrated/user labels often already end with one («رقم:»), which printed
+ *  «رقم::». */
+export function cleanLabel(label: unknown): string {
+  return String(label ?? '').replace(/\s*[:：]\s*$/, '');
+}
+
+/** Purchase-side documents: the party is a supplier, not a client. */
+const PURCHASE_DOCS = new Set(['FA', 'BR', 'BCF', 'DDP', 'AA']);
+export function isPurchaseDoc(code?: string | null): boolean {
+  return !!code && PURCHASE_DOCS.has(code);
+}
+
+/** On purchase documents print «المورد» where the template says «العميل». */
+export function partyLabel(label: string, tpl: { doc_type_code?: string | null }): string {
+  if (!isPurchaseDoc(tpl.doc_type_code)) return label;
+  return label.replace(/العميل|الزبون/g, 'المورد');
+}
+
+/** Number label that matches the document («رقم الفاتورة» only on invoices). */
+export function docNumberLabel(code?: string | null): string {
+  switch (code) {
+    case 'FV': case 'FA': case 'POS': return 'رقم الفاتورة';
+    case 'AV': case 'AA': return 'رقم الفاتورة المضادة';
+    case 'DEV': return 'رقم العرض';
+    case 'BL': return 'رقم الوصل';
+    case 'BR': return 'رقم وصل الاستلام';
+    case 'BCC': case 'BCF': case 'CMD': return 'رقم الطلبية';
+    case 'DDP': return 'رقم الطلب';
+    case 'BT': return 'رقم التحويل';
+    default: return 'رقم المستند';
+  }
+}
+
 // ─── Styling helpers ────────────────────────────────────────────────────────────
 
 export function mm(v: number): number {
@@ -146,7 +180,7 @@ interface DocRowProps {
 function DocRowFn({ label, value, mono }: DocRowProps): JSX.Element {
   return (
     <div style={{ display: 'flex', gap: 4, marginBottom: 2 }}>
-      <span style={{ fontWeight: 700, flexShrink: 0 }}>{label}</span>
+      <span style={{ fontWeight: 700, flexShrink: 0 }}>{cleanLabel(label)}:</span>
       <span style={{ fontFamily: mono ? "'Courier New', monospace" : undefined }}>{value}</span>
     </div>
   );
@@ -185,7 +219,7 @@ function InfoRowFn({ label, value }: InfoRowProps): JSX.Element {
   return (
     <tr>
       <td style={{ color: '#555', padding: '2px 0', whiteSpace: 'nowrap', fontWeight: 600, verticalAlign: 'top' }}>
-        {label}:
+        {cleanLabel(label)}:
       </td>
       <td style={{ padding: '2px 0', paddingRight: 12, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
         {value}
@@ -245,10 +279,14 @@ export function cellStyleCss(s?: CellStyle): React.CSSProperties {
 
 function formatFieldValue(fieldId: string, value: unknown): string {
   if (fieldId === 'literal') return String(value ?? '');
+  // TVA breakdown rows carry money amounts; they used to print raw floats
+  // («934.4000000000001», «32.4», «0»).
+  if (fieldId === 'totals.tvaBreakdownGroup') return Number(value ?? 0).toFixed(2);
   const def = printFieldRegistry.get(fieldId);
-  if (!def) return String(value ?? '');
+  if (!def) return typeof value === 'number' ? String(Number(value.toFixed(4))) : String(value ?? '');
   if (def.type === 'currency') return Number(value ?? 0).toFixed(2);
-  if (def.type === 'number')   return String(Number(value ?? 0));
+  // Round away binary floating-point noise (0.1+0.2) without forcing decimals.
+  if (def.type === 'number')   return String(Number(Number(value ?? 0).toFixed(4)));
   if (def.type === 'date')     return formatDate(String(value ?? ''));
   return String(value ?? '');
 }
@@ -325,7 +363,7 @@ function LayoutColumnCellFn({
 
   return (
     <div style={css}>
-      <span>{label}: </span>
+      <span>{partyLabel(cleanLabel(label), tpl)}: </span>
       <span dir="auto">{formatFieldValue(column.field, value)}</span>
     </div>
   );

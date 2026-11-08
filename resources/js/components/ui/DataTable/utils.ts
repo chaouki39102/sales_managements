@@ -381,38 +381,47 @@ export function exportToPrint<T>(
     }),
   );
 
+  // Values are data, not markup: a «<» or «&» in a name used to break the table.
+  const esc = (v: string) => v.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
   const tableRows = rows.map(r =>
-    `<tr>${r.map(cell => `<td>${cell}</td>`).join('')}</tr>`,
+    `<tr>${r.map(cell => `<td>${esc(cell)}</td>`).join('')}</tr>`,
   ).join('');
+  // Wide tables print landscape, narrow lists portrait.
+  const orientation = headers.length > 6 ? 'landscape' : 'portrait';
 
   const html = `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="utf-8"/>
-  <title>${title ?? fileName}</title>
+  <title>${esc(String(title ?? fileName))}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; font-size: 11px; color: #111; direction: rtl; padding: 16px; }
+    /* print-color-adjust: without it browsers drop backgrounds when printing
+       and the white-on-dark header row came out white-on-white (invisible). */
+    body { font-family: 'Tajawal', 'Segoe UI', Tahoma, Arial, sans-serif; font-size: 11px; color: #111; direction: rtl; padding: 16px;
+           -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     h2 { font-size: 14px; margin-bottom: 12px; color: #222; border-bottom: 2px solid #333; padding-bottom: 6px; }
     .meta { font-size: 10px; color: #666; margin-bottom: 12px; }
     table { width: 100%; border-collapse: collapse; }
     th { background: #1a1a2e; color: #fff; padding: 6px 8px; text-align: right; font-size: 10px; font-weight: 700; }
     td { padding: 5px 8px; border-bottom: 1px solid #e0e0e0; vertical-align: middle; }
+    thead { display: table-header-group; }
+    tr { break-inside: avoid; page-break-inside: avoid; }
     tr:nth-child(even) td { background: #f9f9f9; }
     @media print {
       body { padding: 0; }
-      @page { margin: 15mm; size: A4 landscape; }
+      @page { margin: 12mm; size: A4 ${orientation}; }
     }
   </style>
 </head>
 <body>
-  ${title ? `<h2>${title}</h2>` : ''}
+  ${title ? `<h2>${esc(String(title))}</h2>` : ''}
   <div class="meta">
     عدد السجلات: ${data.length} &nbsp;|&nbsp;
     تاريخ الطباعة: ${new Date().toLocaleDateString('ar-DZ')}
   </div>
   <table>
-    <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+    <thead><tr>${headers.map(h => `<th>${esc(String(h))}</th>`).join('')}</tr></thead>
     <tbody>${tableRows}</tbody>
   </table>
 </body>

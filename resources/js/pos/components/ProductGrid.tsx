@@ -68,6 +68,7 @@ export default function ProductGrid({
   // ── Grid view (virtualised) ──────────────────────────────────────────────
   const gridWrapRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(4);
+  const hasItems = variants.length > 0;
 
   useLayoutEffect(() => {
   if (view !== 'grid') return;
@@ -83,7 +84,11 @@ export default function ProductGrid({
   const obs = new ResizeObserver(calc);
   obs.observe(el);
   return () => obs.disconnect();
-  }, [view, gridSize, loading]);
+  // `hasItems`: the grid container only mounts once there are products. When
+  // they arrived after `loading` had already flipped, this effect never saw the
+  // container, so the column count stayed at its initial 4 on every screen
+  // (4 squeezed columns with cut prices on phones).
+  }, [view, gridSize, loading, hasItems]);
 
   const rows = useMemo(() => {
     if (view !== 'grid' || columns < 1) return [] as RowItem[][];

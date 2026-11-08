@@ -171,7 +171,24 @@ class PrintTemplateSeeder extends Seeder
         'report_col_headers'              => ['product' => 'المنتج', 'quantity' => 'الكمية', 'total' => 'الإجمالي'],
     ];
 
-    private const DOC_TYPES = ['FV', 'BL', 'DEV', 'BCC', 'AA', 'FA', 'BR', 'AV', 'DDP', 'BT', 'POS'];
+    private const DOC_TYPES = ['FV', 'BL', 'DEV', 'BCC', 'CMD', 'AA', 'FA', 'BR', 'BCF', 'AV', 'DDP', 'BT', 'POS'];
+
+    /** Printed title per document type (every type used to print «فاتورة بيع»). */
+    public const DOC_TITLES = [
+        'FV'  => 'فاتورة بيع',
+        'BL'  => 'وصل تسليم',
+        'DEV' => 'عرض سعر',
+        'BCC' => 'طلبية زبون',
+        'CMD' => 'أمر زبون',
+        'AV'  => 'فاتورة مضادة',
+        'FA'  => 'فاتورة شراء',
+        'BR'  => 'وصل استلام',
+        'BCF' => 'طلبية مورد',
+        'AA'  => 'فاتورة مضادة على الشراء',
+        'DDP' => 'طلب عرض سعر',
+        'BT'  => 'وصل تحويل',
+        'POS' => 'إيصال بيع',
+    ];
 
     public function run(): void
     {
@@ -207,14 +224,14 @@ class PrintTemplateSeeder extends Seeder
             }
 
             $config = self::DEFAULT_CONFIG;
-            $config['title_text'] = $docCode === 'POS' ? 'إيصال بيع' : 'فاتورة بيع';
+            $config['title_text'] = self::DOC_TITLES[$docCode] ?? 'فاتورة بيع';
             $config['show_session'] = $docCode === 'POS';
             $config['show_fiscal_stamp'] = in_array($docCode, ['FV', 'BL', 'FA', 'BR', 'AV']);
             $config['show_qr_code'] = $docCode === 'FV';
 
             $rowsToInsert[] = [
                 'company_id'    => $companyId,
-                'name'          => 'قالب ' . ($docCode === 'POS' ? 'إيصال' : 'فاتورة') . ' افتراضي',
+                'name'          => 'قالب ' . (self::DOC_TITLES[$docCode] ?? 'فاتورة') . ' افتراضي',
                 'doc_type_code' => $docCode,
                 'paper_size'    => '80mm',
                 'is_default'    => true,

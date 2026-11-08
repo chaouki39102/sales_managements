@@ -452,7 +452,10 @@ class TemplateLibraryService
         ],
         'dz-purchase-order-a4' => [
             'name'          => 'أمر الشراء الجزائري A4',
-            'doc_type_code' => 'AV',
+            // BCF = Bon de commande fournisseur. It was filed under AV (sales
+            // credit note), so a purchase order could not use it and credit
+            // notes were offered a purchase-order layout.
+            'doc_type_code' => 'BCF',
             'paper_size'    => 'A4',
             'is_default'    => false,
             'is_active'     => true,
@@ -968,14 +971,14 @@ class TemplateLibraryService
             ],
             'dz-purchase-order-a4' => [
                 'id'            => 'dz-purchase-order-a4',
-                'name'          => 'Algerian Purchase Order A4 (AV)',
+                'name'          => 'Algerian Purchase Order A4 (BCF)',
                 'name_ar'       => 'أمر الشراء الجزائري A4',
                 'description'   => 'Official Algerian purchase order in A4 with company details, items table, delivery address and signature block.',
                 'description_ar'=> 'أمر شراء جزائري رسمي بصيغة A4 مع تفاصيل الشركة وجدول المواد وعنوان التسليم والتوقيع',
-                'document_type' => 'AV',
+                'document_type' => 'BCF',
                 'paper_size'    => 'A4',
                 'category'      => 'purchase-orders',
-                'tags'          => ['algeria', 'arabic', 'official', 'purchase-order', 'av', 'a4'],
+                'tags'          => ['algeria', 'arabic', 'official', 'purchase-order', 'bcf', 'a4'],
                 'version'       => '1.0.0',
                 'revision'      => 1,
                 'country'       => 'DZ',

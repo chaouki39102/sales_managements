@@ -142,12 +142,12 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
     setPdfBusy(true);
     try {
       await exportSourceToPdf({ source: source as any, template: tpl, company, filename: `${safe}.pdf` });
-    } catch (err) {
-      console.error('PDF export failed', err);
+    } catch (err: any) {
+      notify.error('تعذر تصدير PDF', err?.message ?? '');
     } finally {
       setPdfBusy(false);
     }
-  }, [tpl, source, company, overrideData, document, pdfBusy]);
+  }, [tpl, source, company, overrideData, document, pdfBusy, notify]);
 
   return (
     <Modal
@@ -169,7 +169,8 @@ function TemplatePrintModal({ open, onClose, document, company, template, templa
             </button>
           )}
           <button className="btn btn-secondary" onClick={onClose}>إلغاء</button>
-          <button className="btn btn-b" onClick={handlePdf} disabled={!tpl || !source || pdfBusy}>
+          <button className="btn btn-b" onClick={handlePdf} disabled={!tpl || !source || pdfBusy}
+            title="اختر «حفظ كـ PDF» في نافذة الطباعة">
             <i className="ti ti-file-download" /> {pdfBusy ? 'جاري التصدير…' : 'PDF'}
           </button>
           <button className="btn btn-p" onClick={handlePrint} disabled={!tpl || !source}>

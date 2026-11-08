@@ -28,8 +28,8 @@ class EmploymentContract extends Model
     ];
 
     protected $casts = [
-        'start_date' => 'date',
-        'end_date' => 'date',
+        'start_date' => 'date:Y-m-d',
+        'end_date' => 'date:Y-m-d',
         'base_salary' => 'decimal:4',
         'active' => 'boolean',
         'created_at' => 'datetime',

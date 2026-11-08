@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState, useCallback } from 'react';
+import React, { useMemo, useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import type { UniversalDocumentData } from '../../types/data';
 import type { PrintTemplate, SectionTarget, AlignOption } from '../../types';
 import {
@@ -62,41 +62,104 @@ export function wrapSection({ widthPct, align }: SectionRendererProps, content: 
 
 const PRINT_CSS_ID = 'ps-print-styles';
 
+/** CSS px per millimetre (96dpi / 25.4) — what the print engine uses. */
+const PX_PER_MM = 96 / 25.4;
+
 function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
   useEffect(() => { formulaEngine.clearCache(); }, [data]);
+
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const isThermalPaper = tpl.paper_size === '80mm' || tpl.paper_size === '58mm';
+
+  // A thermal roll has no fixed sheet height. The page height is measured from
+  // the rendered receipt so the whole receipt prints as ONE continuous page
+  // (no cut in the middle of the items, no blank Letter/A4 sheet around it).
+  const [thermalHeightMm, setThermalHeightMm] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const el = wrapperRef.current;
+    if (!el || !isThermalPaper) return;
+    const measure = () => {
+      const h = Math.ceil(el.scrollHeight / PX_PER_MM) + 2;
+      setThermalHeightMm(prev => (prev === h ? prev : h));
+    };
+    measure();
+    const RO = (el.ownerDocument.defaultView as (Window & typeof globalThis) | null)?.ResizeObserver ?? ResizeObserver;
+    const ro = new RO(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isThermalPaper]);
+
   useEffect(() => {
-    let el = document.getElementById(PRINT_CSS_ID);
+    // The preview may be rendered into a print popup (createRoot from the app
+    // window). The print rules must go into the document that actually holds
+    // the preview — the global `document` is the app window, and writing there
+    // left the popup without any page size (it printed on Letter/A4 defaults).
+    const doc = wrapperRef.current?.ownerDocument ?? document;
+    let el = doc.getElementById(PRINT_CSS_ID);
     if (!el) {
-      el = document.createElement('style');
+      el = doc.createElement('style');
       el.id = PRINT_CSS_ID;
       el.setAttribute('media', 'print');
-      document.head.appendChild(el);
+      doc.head.appendChild(el);
     }
     const sz = tpl.paper_size;
     const landscape = !['80mm','58mm'].includes(sz) && tpl.page_orientation === 'landscape';
     const sd = isStickerPaper(sz) ? stickerDims(sz) : null;
-    const w = sz === 'A4' ? (landscape ? '297mm' : '210mm') : sz === 'A5' ? (landscape ? '210mm' : '148mm') : sd ? `${Math.round(sd.w / 8)}mm` : sz === '80mm' ? '80mm' : '58mm';
-    const h = sz === 'A4' ? (landscape ? '210mm' : '297mm') : sz === 'A5' ? (landscape ? '148mm' : '210mm') : sd ? `${Math.round(sd.h / 8)}mm` : 'auto';
+    const thermalW = `${tpl.paper_width_mm || (sz === '58mm' ? 58 : 80)}mm`;
+    const w = sz === 'A4' ? (landscape ? '297mm' : '210mm') : sz === 'A5' ? (landscape ? '210mm' : '148mm') : sd ? `${Math.round(sd.w / 8)}mm` : thermalW;
+    const h = sz === 'A4' ? (landscape ? '210mm' : '297mm') : sz === 'A5' ? (landscape ? '148mm' : '210mm') : sd ? `${Math.round(sd.h / 8)}mm` : null;
+    const pageH = h ?? `${thermalHeightMm ?? 297}mm`;
+    // Fixed sheets: the wrapper fills the page minus 1mm so sub-pixel rounding
+    // never spills an empty trailing page.
+    const minH = h ? `calc(${h} - 1mm)` : 'auto';
     el.textContent = `
-      @page { size: ${w} ${h}; margin: 0; }
+      @page { size: ${w} ${pageH}; margin: 0; }
+      html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
       body * { visibility: hidden !important; }
       .ps-preview-wrapper { position: absolute !important; left: 0 !important; top: 0 !important; }
       .ps-preview-wrapper, .ps-preview-wrapper * { visibility: visible !important; }
       /* The wrapper IS the page (border-box width/min-height already equal the
          sheet), so the sheet margins live in its padding and @page must NOT
          add them again. Printing the wrapper in exact millimetres is what keeps
-         screen and paper identical. */
+         screen and paper identical. box-decoration-break: clone repeats the
+         top/bottom margins on every page of a multi-page document. */
       .ps-preview-wrapper {
         width: ${w} !important;
-        min-height: ${h === 'auto' ? 'auto' : h} !important;
+        min-height: ${minH} !important;
         padding: ${tpl.margin_top ?? 5}mm ${tpl.margin_sides ?? 5}mm ${tpl.margin_bottom ?? 5}mm !important;
         margin: 0 !important;
         box-shadow: none !important;
+        transform: none !important;
+        -webkit-box-decoration-break: clone;
+        box-decoration-break: clone;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
       }
+      .ps-preview-wrapper tr, .ps-preview-wrapper img, .ps-preview-wrapper svg { break-inside: avoid; page-break-inside: avoid; }
+      .ps-preview-wrapper thead { display: table-header-group; }
       .ps-freeform-layer { position: absolute !important; inset: 0 !important; }
+      ${sd ? `
+      /* Stickers are designed at 8 px/mm; the print engine works at 96 dpi
+         (3.78 px/mm). Without this zoom a 40×20mm label was laid out at twice
+         its size and sliced across three label pages. Each label is exactly
+         one label page, centred. */
+      .ps-preview-wrapper {
+        width: ${sd.w}px !important;
+        min-height: 0 !important;
+        padding: 0 !important;
+        zoom: ${(PX_PER_MM / 8).toFixed(5)};
+      }
+      .ps-sticker-stack { gap: 0 !important; }
+      .ps-sticker-page {
+        width: ${sd.w}px; height: ${sd.h}px; overflow: hidden;
+        display: flex; align-items: center; justify-content: center;
+        break-after: page; page-break-after: always;
+      }
+      .ps-sticker-page:last-child { break-after: auto; page-break-after: auto; }
+      ` : ''}
     `;
     return () => { if (el?.parentNode) el.parentNode.removeChild(el); };
-  }, [tpl.paper_size, tpl.page_orientation, tpl.margin_top, tpl.margin_sides, tpl.margin_bottom]);
+  }, [tpl.paper_size, tpl.page_orientation, tpl.paper_width_mm, tpl.margin_top, tpl.margin_sides, tpl.margin_bottom, thermalHeightMm]);
 
   const isThermal   = tpl.paper_size === '80mm' || tpl.paper_size === '58mm';
   const isA4        = tpl.paper_size === 'A4';
@@ -142,7 +205,7 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
 
   return (
     <PrintPageProvider value={pageValue}>
-    <div className="ps-preview-wrapper" style={{
+    <div ref={wrapperRef} className="ps-preview-wrapper" style={{
       width: paperWidth,
       direction: 'rtl',
       fontFamily: fontFamily(tpl.font_family),
@@ -160,9 +223,9 @@ function UniversalPreview({ tpl, data }: UniversalPreviewProps) {
         {isDeliveryA5 ? (
           <DeliveryReceiptA5 tpl={tpl} data={data} />
         ) : isSticker ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }}>
+          <div className="ps-sticker-stack" style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }}>
             {data.lines.map((line, idx) => (
-              <div key={idx}
+              <div key={idx} className="ps-sticker-page"
                 style={{
                   pageBreakAfter: idx < data.lines.length - 1 ? 'always' as any : undefined,
                   breakAfter: idx < data.lines.length - 1 ? 'page' as any : undefined,

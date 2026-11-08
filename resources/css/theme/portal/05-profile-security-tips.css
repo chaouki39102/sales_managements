@@ -1,0 +1,538 @@
+/* ─── Profile: security tips ─── */
+.pr-security-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 18px;
+  background: var(--bg2);
+  border: 1px solid var(--b1);
+  border-radius: 14px;
+}
+.pr-security-tip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t3);
+}
+.pr-security-tip i { font-size: 16px; flex-shrink: 0; }
+
+/* ─── Toast (Enhanced) ─── */
+.portal-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 24px;
+  border-radius: 14px;
+  background: var(--grad-em);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 8px 32px rgba(10,138,92,.3);
+  z-index: 999;
+  animation: toastIn .4s cubic-bezier(.4,0,.2,1), toastOut .3s ease 2.5s forwards;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px) scale(.95); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+@keyframes toastOut {
+  from { opacity: 1; transform: translateX(-50%) translateY(0); }
+  to { opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(8px); }
+}
+
+/* ─── شريط البحث والفلاتر ─── */
+.portal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--b1);
+  flex-wrap: wrap;
+}
+/* B.3 — أزرار «تتبع بالمسح»/مسح الرقم في شريط طلباتي: تُدفع إلى الطرف المقابل */
+.portal-toolbar-sp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: auto;
+  flex-wrap: wrap;
+}
+.portal-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 200px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1.5px solid var(--b2);
+  background: var(--bg3);
+  transition: all .25s cubic-bezier(.4,0,.2,1);
+}
+.portal-search:focus-within {
+  border-color: var(--em);
+  box-shadow: 0 0 0 4px var(--emb);
+  background: var(--bg2);
+}
+.portal-search i { color: var(--t4); font-size: 15px; flex-shrink: 0; }
+.portal-search input {
+  flex: 1;
+  border: none;
+  background: none;
+  color: var(--t1);
+  font-size: 13px;
+  font-family: 'Tajawal', sans-serif;
+  outline: none;
+  min-width: 0;
+}
+.portal-search input::placeholder { color: var(--t4); }
+.portal-search-x {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg4, var(--bg3));
+  color: var(--t4);
+  cursor: pointer;
+  padding: 0;
+  font-size: 12px;
+  transition: all .2s;
+}
+.portal-search-x:hover { background: var(--redb); color: var(--red); }
+
+.portal-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.portal-filters select {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--b2);
+  background: var(--bg3);
+  color: var(--t2);
+  font-size: 12px;
+  font-family: 'Tajawal', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .25s;
+}
+.portal-filters select:focus {
+  border-color: var(--em);
+  box-shadow: 0 0 0 4px var(--emb);
+  outline: none;
+}
+
+.portal-hd-count {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--t4);
+  background: var(--bg3);
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--b1);
+}
+
+/* ─── فلاتر الحالة (طلباتي) ─── */
+.portal-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--b2);
+  background: var(--bg3);
+  color: var(--t3);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-family: 'Tajawal', sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .2s cubic-bezier(.4,0,.2,1);
+}
+.portal-tab:hover { border-color: var(--em); color: var(--em); }
+.portal-tab.on {
+  background: var(--em);
+  border-color: var(--em);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(10,138,92,.25);
+}
+
+/* ─── Print receipt button ─── */
+.portal-print-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1.5px solid var(--blue);
+  background: var(--blueb);
+  color: var(--blue);
+  font-size: 12.5px;
+  font-weight: 700;
+  font-family: 'Tajawal', sans-serif;
+  cursor: pointer;
+  transition: all .25s cubic-bezier(.4,0,.2,1);
+}
+.portal-print-btn:hover {
+  background: var(--blue);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(59,130,246,.25);
+}
+
+/* ─── متجاوب ─── */
+@media (max-width: 760px) {
+  .portal-hd-in { flex-wrap: wrap; padding: 8px 14px; }
+  .portal-nav { order: 3; width: 100%; justify-content: flex-start; padding-bottom: 2px; }
+  .portal-body { padding: 16px 12px 40px; }
+  .portal-kpis { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .portal-form-row { grid-template-columns: 1fr; }
+  .portal-stmt-sum { grid-template-columns: 1fr 1fr; }
+  .portal-doc-cards { grid-template-columns: 1fr; }
+  .pr-grid { grid-template-columns: 1fr; }
+  .pr-form-row { grid-template-columns: 1fr; }
+  .pr-hero { flex-direction: column; text-align: center; padding: 24px 20px; }
+  .pr-hero-tags { justify-content: center; }
+  .pr-hero-txt h2 { font-size: 20px; }
+  .pr-credit-amounts { gap: 14px; }
+  .pr-credit-num { font-size: 18px; }
+  .pr-acct-stats { grid-template-columns: 1fr; }
+  .pr-tabs { gap: 0; }
+  .pr-tab { padding: 10px 14px; font-size: 12px; }
+}
+
+@media (max-width: 480px) {
+  .portal-kpis { grid-template-columns: 1fr; }
+  .portal-stmt-sum { grid-template-columns: 1fr; }
+  .portal-doc-meta { grid-template-columns: 1fr 1fr; }
+  .portal-steps { flex-direction: column; align-items: stretch; gap: 8px; }
+  .portal-step::after { display: none !important; }
+}
+
+/* ─── كتالوج الطلبات (وصل طلب سلعة) ─── */
+.portal-catalog {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+  padding: 18px 22px;
+  max-width: 100%;
+}
+.portal-prod {
+  position: relative;
+  border: 1px solid var(--b1);
+  border-radius: 14px;
+  background: var(--bg2);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  transition: all .25s cubic-bezier(.4,0,.2,1);
+}
+.portal-prod:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.08);
+  border-color: var(--b2);
+}
+.portal-prod.on { border-color: var(--em); background: var(--emb); }
+.portal-prod-hd { min-width: 0; }
+.portal-prod-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--t1);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.portal-prod-ref {
+  font-size: 11px;
+  color: var(--t4);
+  font-weight: 600;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.portal-prod-price {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--em);
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.portal-prod-price-old {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--t4);
+  text-decoration: line-through;
+}
+.portal-prod-price-now {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--em);
+}
+.portal-prod-unit {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--t3);
+  background: var(--bg3);
+  border: 1px solid var(--b1);
+  border-radius: 7px;
+  padding: 2px 7px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.portal-disc-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--em);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.portal-prod-discs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+}
+.portal-disc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--t3);
+  background: var(--bg2);
+  border: 1px solid var(--b1);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.portal-disc-chip i { font-size: 11px; }
+.portal-disc-chip.on {
+  color: var(--em);
+  background: var(--emb);
+  border-color: rgba(10,138,92,.35);
+}
+
+/* شرائح الخصم فوق الصورة — لا تستهلك مساحة من البطاقة (جميع البطاقات متساوية الارتفاع) */
+.portal-prod-discs--ov {
+  position: absolute;
+  inset-inline-start: 8px;
+  bottom: 8px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  max-width: calc(100% - 20px);
+  pointer-events: none;
+}
+.portal-prod-discs--ov .portal-disc-chip {
+  background: rgba(255,255,255,.94);
+  border-color: color-mix(in srgb, var(--t4) 28%, transparent);
+  box-shadow: 0 3px 10px rgba(15,23,42,.14);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  font-size: 10px;
+}
+html.dark .portal-prod-discs--ov .portal-disc-chip { background: rgba(20,22,28,.9); }
+.portal-prod-discs--ov .portal-disc-chip.on {
+  color: var(--em);
+  background: var(--emb);
+  border-color: rgba(10,138,92,.5);
+}
+.portal-cart-disc {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 5px;
+  margin-top: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--em);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.portal-cart-disc .portal-cart-disc-txt {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.portal-cart-disc i { font-size: 12px; flex: none; }
+.portal-cart-disc span {
+  font-weight: 900;
+  flex: none;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.portal-cart-total-row--disc b { color: var(--em); }
+.portal-order-disc {
+  margin-top: 8px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: var(--emb);
+  border: 1px solid rgba(10,138,92,.25);
+  color: var(--em);
+  font-size: 11.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.portal-order-disc b { font-weight: 900; }
+.portal-prod-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--t4);
+  flex-wrap: wrap;
+}
+.portal-prod-stock { color: #059669; }
+.portal-prod-stock.out { color: var(--red); }
+.portal-prod-exempt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(5, 150, 105, .12);
+  border: 1px solid rgba(5, 150, 105, .35);
+  color: #059669;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.portal-prod-exempt i { font-size: 11px; }
+/* ─── إضافة سريعة: زر + يضيف مباشرة، ويتحول إلى عداد عند الإضافة ─── */
+.portal-prod-quick { display: flex; }
+.portal-prod-quick .portal-prod-qty { margin: 0 auto; }
+.portal-prod-quick-btn {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 11px;
+  border: none;
+  background: var(--em);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Tajawal', sans-serif;
+  cursor: pointer;
+  transition: all .2s;
+  box-shadow: 0 6px 16px rgba(10,138,92,.25);
+}
+.portal-prod-quick-btn:hover { filter: brightness(1.06); }
+.portal-prod-quick-btn i { font-size: 15px; }
+.portal-prod-pkg {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--b2);
+  background: var(--bg1);
+  color: var(--t2);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-family: 'Tajawal', sans-serif;
+  cursor: pointer;
+  transition: all .2s;
+  text-overflow: ellipsis;
+}
+.portal-prod-pkg:hover,
+.portal-prod-pkg:focus {
+  border-color: var(--em);
+  box-shadow: 0 0 0 3px var(--emb);
+  outline: none;
+}
+.portal-prod-packinfo {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--t4);
+  text-align: center;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: var(--bg3);
+  border: 1px dashed var(--b2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.portal-prod-qty {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--b1);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg1);
+}
+.portal-prod-qty button {
+  width: 28px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--t3);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all .15s;
+}
+.portal-prod-qty button:hover:not(:disabled) { color: var(--em); background: var(--emb); }
+.portal-prod-qty button:disabled { opacity: .35; cursor: not-allowed; }
+.portal-prod-qty input {
+  width: 44px;
+  height: 30px;
+  border: none;
+  border-inline: 1px solid var(--b1);
+  background: transparent;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--t1);
+  font-family: 'Tajawal', sans-serif;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.portal-prod-qty input::-webkit-inner-spin-button,
+.portal-prod-qty input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.portal-btn--added { background: var(--em); color: #fff; border-color: var(--em); }
+.portal-btn--added:hover {
+  background: var(--em);
+  border-color: var(--em);
+  color: #fff;
+  filter: brightness(1.05);
+  box-shadow: 0 6px 16px rgba(10,138,92,.3);
+}

@@ -673,7 +673,14 @@ export function useCommercialDocumentController({
         });
       });
     } else if (format === 'pdf') {
-      window.print();
+      // window.print() here printed the whole editor screen (form, sidebar,
+      // buttons), not the document. PDF goes through the print-template modal,
+      // whose PDF button renders the real document layout.
+      if (existingDocument && companyInfo) {
+        setPrintModalOpen(true);
+      } else {
+        notify.error('احفظ المستند أولاً ثم صدّره PDF');
+      }
     } else if (format === 'json') {
       const blob = new Blob([JSON.stringify(formData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);

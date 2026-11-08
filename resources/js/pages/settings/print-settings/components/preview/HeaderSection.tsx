@@ -1,7 +1,7 @@
 import type { PrintTemplate } from '../../types';
 import type { UniversalDocumentData } from '../../types/data';
 import { renderLogo } from './LogoRenderer';
-import { align, formatDate, Separator, InfoRow, renderLayoutRows, fontFamily } from './shared';
+import { align, formatDate, Separator, InfoRow, renderLayoutRows, fontFamily, docNumberLabel } from './shared';
 import { printFieldResolver } from '../../services';
 import { renderHeaderColumns } from './HeaderColumns';
 import { Pos } from './Pos';
@@ -165,7 +165,7 @@ function renderPageHeader(tpl: PrintTemplate, data: UniversalDocumentData, paper
     if (columns) {
       return (
         <Pos dragKey="header.columns" tpl={tpl}>
-          <div style={{ marginBottom: isA4 ? 30 : 16 }}>
+          <div style={{ marginBottom: isA4 ? 18 : 12 }}>
             {logoAndTitle}
             {columns}
           </div>
@@ -175,13 +175,13 @@ function renderPageHeader(tpl: PrintTemplate, data: UniversalDocumentData, paper
   }
 
   return (
-    <div style={{ marginBottom: isA4 ? 30 : 16 }}>
+    <div style={{ marginBottom: isA4 ? 18 : 12 }}>
     {logoAndTitle}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         gap: gap,
-        paddingBottom: isA4 ? 20 : 10,
+        paddingBottom: isA4 ? 12 : 8,
         borderBottom: tpl.header_separator === 'none' ? 'none'
           : `2px ${tpl.header_separator === 'double' ? 'double' : tpl.header_separator === 'dashed' ? 'dashed' : 'solid'} #111`,
       }}>
@@ -227,7 +227,7 @@ function renderPageHeader(tpl: PrintTemplate, data: UniversalDocumentData, paper
         }}>
           <table style={{ fontSize: tpl.company_info_size, borderCollapse: 'collapse', width: '100%' }}>
             <tbody>
-              {tpl.show_doc_number && <InfoRow label={isA4 ? 'رقم الفاتورة' : 'رقم'} value={r('document.number', data, tpl) as string} />}
+              {tpl.show_doc_number && <InfoRow label={isA4 ? docNumberLabel(tpl.doc_type_code ?? data.doc?.typeCode) : 'رقم'} value={r('document.number', data, tpl) as string} />}
               {tpl.show_date && <InfoRow label="التاريخ" value={formatDate(r('document.date', data, tpl) as string)} />}
               {tpl.show_due_date && r('document.dueDate', data, tpl) && <InfoRow label="تاريخ الاستحقاق" value={r('document.dueDate', data, tpl) as string} />}
               {tpl.show_cashier && (r('customer.cashierName', data, tpl)) && (

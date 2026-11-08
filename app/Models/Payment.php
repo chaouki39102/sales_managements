@@ -47,11 +47,11 @@ class Payment extends Model
     ];
 
     protected $casts = [
-        'payment_date' => 'date',
+        'payment_date' => 'date:Y-m-d',
         'amount' => 'decimal:4',
         'amount_local' => 'decimal:4',
         'is_reconciled' => 'boolean',
-        'reconciliation_date' => 'date',
+        'reconciliation_date' => 'date:Y-m-d',
         'clearing_date' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',

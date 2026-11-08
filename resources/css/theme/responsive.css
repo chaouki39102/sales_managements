@@ -1,0 +1,152 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   responsive.css — phone/tablet safety layer (imported LAST in app.css)
+
+   Breakpoints (the only ones to use in new CSS):
+     --bp-sm   640px   phones
+     --bp-md   768px   small tablets / large phones landscape (mobile layout)
+     --bp-lg  1024px   tablets
+   (CSS custom properties cannot be used inside @media, so the numbers are
+   written literally; keep them to these three values.)
+
+   Why this file exists: many pages lay themselves out with static inline
+   styles (grid-template-columns: repeat(6, 1fr), a table inside an
+   overflow:hidden card, button rows without flex-wrap). Inline styles cannot
+   respond to the screen width, so on a phone those layouts were squeezed or
+   cut off. The rules below adapt those patterns globally. New code must use
+   the responsive classes in components.css (.kpis, .rgrid-*, .tbl-scroll,
+   .row-wrap) instead of inline layout — see docs/architecture/STYLE_GUIDE.md.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Responsive helper classes (preferred for new code) ─────────────────── */
+.rgrid { display: grid; gap: 14px; }
+.rgrid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.rgrid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.rgrid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.rgrid-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.rgrid-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.row-wrap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* Super-admin layout pieces (AdminLayout.tsx) — hidden on desktop. */
+.adm-menu-btn {
+  display: none; width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0;
+  align-items: center; justify-content: center; font-size: 18px;
+  border: 1px solid var(--b2); background: var(--bg3); color: var(--t2); cursor: pointer;
+}
+.adm-backdrop { display: none; }
+
+/* ── ≤1024px: tablets ───────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .rgrid-5, .rgrid-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  :is(#main, .adm-main) [style*="grid-template-columns: repeat(5, 1fr)"],
+  :is(#main, .adm-main) [style*="grid-template-columns: repeat(6, 1fr)"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+/* ── ≤768px: mobile layout ──────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Topbar: the page title/breadcrumb was squeezed to 0px and «فاتورة جديدة»
+     was pushed off-screen. The page header already shows the title and the
+     bottom nav has «بيع», so both are hidden on phones. */
+  #topbar .tb-info { display: none; }
+  #topbar .tb-actions { min-width: 0; flex-shrink: 1; margin-inline-start: auto; }
+  #topbar .tb-actions .tb-btn.p,
+  #topbar .tb-actions .tb-btn.p + .tb-sep { display: none; }
+  #topbar .offline-indicator > span { display: none; }
+  #topbar .offline-indicator { padding-inline: 8px; }
+
+  /* Page header actions wrap instead of running off the left edge. */
+  .ph-actions,
+  .ph-actions > div { flex-wrap: wrap !important; }
+  .ph-actions { width: 100%; }
+
+  /* Tables: scroll sideways inside their card instead of being clipped by
+     an inline overflow:hidden wrapper. */
+  :is(#main, .adm-main) div:has(> table) {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  :is(#main, .adm-main) table th { white-space: nowrap; }
+
+  /* Tab rows / chip rows built as inline flex rows scroll horizontally. */
+  :is(#main, .adm-main) [role="tablist"] { overflow-x: auto; scrollbar-width: none; }
+  :is(#main, .adm-main) [role="tablist"]::-webkit-scrollbar { display: none; }
+
+  /* Inline tab bars (a flex row of tab buttons over a bottom border, or the
+     page-header tabs) scroll sideways instead of cutting the last tab. */
+  .ph-tabs > div,
+  :is(#main, .adm-main) div[style*="display: flex"][style*="border-bottom: 2px solid"]:has(> button + button) {
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    scrollbar-width: none;
+  }
+  .ph-tabs > div > button,
+  :is(#main, .adm-main) div[style*="display: flex"][style*="border-bottom: 2px solid"]:has(> button + button) > button {
+    flex-shrink: 0;
+  }
+
+  /* Other inline rows of buttons (toolbars, header action groups) wrap. */
+  :is(#main, .adm-main) div[style*="display: flex"]:not([style*="border-bottom: 2px solid"]):not([style*="flex-direction: column"]):has(> button) {
+    flex-wrap: wrap;
+  }
+
+  /* Grid «tables» built from divs (e.g. users list rows): keep their columns
+     and let the card scroll sideways. */
+  :is(#main, .adm-main) div:has(> .u-row) { overflow-x: auto !important; }
+  :is(#main, .adm-main) div:has(> .u-row) > * { min-width: 640px; }
+
+  /* Super-admin panel: the 230px sidebar was a fixed column that left the
+     page a third of the screen. On phones it is an off-canvas drawer. */
+  .adm-sidebar {
+    position: fixed !important; top: 0; bottom: 0; right: 0;
+    width: min(280px, 84vw) !important; height: 100dvh !important;
+    z-index: 400; transform: translateX(105%);
+    transition: transform .22s cubic-bezier(.4,0,.2,1) !important;
+    box-shadow: var(--shadow3);
+  }
+  .adm-sidebar.open { transform: none; }
+  .adm-backdrop.open {
+    display: block; position: fixed; inset: 0; z-index: 390;
+    background: rgba(0, 0, 0, .35);
+  }
+  .adm-menu-btn { display: inline-flex; }
+  .adm-hide-sm { display: none !important; }
+  .adm-header { padding: 0 12px !important; gap: 8px; }
+  .adm-main { padding: 14px !important; }
+
+  /* Template designers (print settings, stickers): list / canvas / controls stack vertically
+     (three side-by-side panes of 200px + canvas + 340px cannot fit a phone). */
+  .stk-shell { height: auto !important; overflow: visible !important; }
+  .stk-panes { flex-direction: column; overflow: visible !important; }
+  .stk-pane {
+    width: 100% !important; max-height: none;
+    border-left: 0 !important; border-bottom: 1px solid var(--b2);
+  }
+
+  /* POS Pro cart header: action buttons wrap instead of pushing «إفراغ» out. */
+  .pp-cart-hd-actions { flex-wrap: wrap; min-width: 0; row-gap: 6px; }
+
+  /* Wide inline grids collapse. */
+  .rgrid-3, .rgrid-4, .rgrid-5, .rgrid-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :is(#main, .adm-main) [style*="grid-template-columns: repeat(4, 1fr)"],
+  :is(#main, .adm-main) [style*="grid-template-columns: repeat(5, 1fr)"],
+  :is(#main, .adm-main) [style*="grid-template-columns: repeat(6, 1fr)"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  /* Modals: full-width sheet content never wider than the screen. */
+  .modal .m-body { overflow-x: hidden; }
+  .modal .m-body > * { max-width: 100%; }
+}
+
+/* ── ≤640px: phones ─────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  :is(#main, .adm-main) [style*="grid-template-columns: repeat(3, 1fr)"]:has(> .kpi) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  /* Two-pane «sidebar + content» inline grids stack. */
+  :is(#main, .adm-main) [style*="grid-template-columns: 1fr 1fr"]:has(> .card) {
+    grid-template-columns: 1fr !important;
+  }
+}

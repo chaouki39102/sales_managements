@@ -69,8 +69,10 @@ class PrintFieldResolver {
 
     // 3) Computed fields
     if (fieldId === 'totals.amountInWords') {
-      const total = data.totals?.totalTtc ?? 0;
-      return numberToArabicWords(total);
+      // Words describe the amount actually due (stamp included), in the
+      // document's currency.
+      const total = data.totals?.netToPay ?? data.totals?.totalTtc ?? 0;
+      return numberToArabicWords(total, (data as any).currency?.code ?? 'DZD');
     }
 
     // 3.5) Datetime composition — when the template's «إظهار الوقت» (show_time)
@@ -80,6 +82,13 @@ class PrintFieldResolver {
     if (fieldId === 'document.date') {
       const raw = getByPath(data, def.sourcePath);
       if (!raw || !template?.show_time) return raw;
+      // A layout that already has its own «الوقت» row must not get the time a
+      // second time inside the date row («التاريخ: … 07:06» + «الوقت: 07:06»).
+      const rows = (template as any).doc_info_rows as Array<{ field?: string; columns?: Array<{ field?: string }> }> | undefined;
+      const hasTimeRow = Array.isArray(rows) && rows.some(
+        r => r?.field === 'document.time' || (Array.isArray(r?.columns) && r.columns.some(c => c?.field === 'document.time')),
+      );
+      if (hasTimeRow) return String(raw).slice(0, 10);
       const time = getByPath(data, 'doc.time');
       if (!time) return raw;
       // Normalize full ISO timestamps ("2026-08-23T16:45:00.000000Z", the shape
@@ -106,7 +115,7 @@ class PrintFieldResolver {
 
     // Computed item fields
     if (fieldId === 'item.index') return lineIndex + 1;
-    if (fieldId === 'item.tvaPct') return Math.round((line.tvaRate ?? 0) * 100);
+    if (fieldId === 'item.tvaPct') return line.tvaPct ?? Math.round((line.tvaRate ?? 0) * 10000) / 100;
     if (fieldId === 'item.discountAmt') return (line.totalHt ?? 0) * ((line.discountPct ?? 0) / 100);
 
     // Relative path for repeating fields

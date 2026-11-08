@@ -13,7 +13,7 @@ class PaymentResource extends JsonResource
             'id'                  => $this->id,
             'company_id'          => $this->company_id,
             'payment_number'      => $this->payment_number,
-            'payment_date'        => $this->payment_date,
+            'payment_date'        => $this->payment_date?->format('Y-m-d'),
             'direction'           => $this->direction,
             'amount'              => (float) $this->amount,
             'total_applied'       => $this->relationLoaded('commercialDocuments')
@@ -35,7 +35,7 @@ class PaymentResource extends JsonResource
             'notes'               => $this->notes,
             'status'              => $this->status,
             'is_reconciled'       => $this->is_reconciled,
-            'reconciliation_date' => $this->reconciliation_date,
+            'reconciliation_date' => $this->reconciliation_date?->format('Y-m-d'),
             'clearing_date'       => $this->clearing_date,
             'user_id'             => $this->user_id,
             'created_by'          => $this->created_by,

@@ -25,6 +25,9 @@
 @import 'theme/print-settings.css';
 @import 'theme/roles-matrix.css';
 
+/* phone/tablet safety layer — keep LAST */
+@import 'theme/responsive.css';
+
 /* ═══════════════ PRINT — صفحات التقارير ═══════════════ */
 @media print {
   .no-print, .no-print * { display: none !important; }

@@ -41,9 +41,9 @@ class Employee extends Model
     ];
 
     protected $casts = [
-        'birth_date' => 'date',
-        'hire_date' => 'date',
-        'termination_date' => 'date',
+        'birth_date' => 'date:Y-m-d',
+        'hire_date' => 'date:Y-m-d',
+        'termination_date' => 'date:Y-m-d',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',

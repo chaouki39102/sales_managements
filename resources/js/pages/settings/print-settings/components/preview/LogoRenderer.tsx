@@ -9,7 +9,26 @@ function resolveLogoUrl(tpl: PrintTemplate, data: UniversalDocumentData): string
 
 export function renderLogo(tpl: PrintTemplate, data: UniversalDocumentData) {
   const logoUrl = resolveLogoUrl(tpl, data);
-  const companyName = data.company?.name || '';
+  // No logo → print nothing. The old fallback painted a solid black square
+  // with the company's first letter on every document of a company without a
+  // logo (a fake logo, a block of toner, and ~20mm of header height).
+  // The freeform designer still needs something to grab and position, so a
+  // dashed slot is rendered hidden and only revealed inside the active
+  // designer stage (`[data-ff-stage] .ps-logo-placeholder` in
+  // print-settings.css) — never in previews, popups or on paper.
+  if (!logoUrl) {
+    return (
+      <div className="ps-logo-placeholder" style={{
+        display: 'none',
+        width: tpl.logo_size, height: tpl.logo_size,
+        border: '1px dashed #94a3b8', borderRadius: `${tpl.logo_border_radius}%`,
+        alignItems: 'center', justifyContent: 'center',
+        color: '#94a3b8', fontSize: 10,
+      }}>
+        الشعار
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -17,26 +36,14 @@ export function renderLogo(tpl: PrintTemplate, data: UniversalDocumentData) {
       justifyContent: tpl.logo_align === 'right' ? 'flex-start' : tpl.logo_align === 'left' ? 'flex-end' : 'center',
       marginBottom: 4,
     }}>
-      {logoUrl ? (
-        <img src={logoUrl} alt="logo"
-          style={{
-            width: tpl.logo_size, height: tpl.logo_size,
-            objectFit: 'contain',
-            borderRadius: `${tpl.logo_border_radius}%`,
-          }}
-          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-        />
-      ) : (
-        <div style={{
+      <img src={logoUrl} alt="logo"
+        style={{
           width: tpl.logo_size, height: tpl.logo_size,
-          background: '#111',
+          objectFit: 'contain',
           borderRadius: `${tpl.logo_border_radius}%`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontSize: tpl.logo_size * 0.35, fontWeight: 900,
-        }}>
-          {companyName.charAt(0)}
-        </div>
-      )}
+        }}
+        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+      />
     </div>
   );
 }

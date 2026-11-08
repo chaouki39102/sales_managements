@@ -51,6 +51,8 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
 
     protected array $showWith = [
         'payments',
+        // printed documents show the payment method name («نقداً», «شيك»…)
+        'payments.paymentMode',
         'lines.product.quantityDiscounts',
     ];
 

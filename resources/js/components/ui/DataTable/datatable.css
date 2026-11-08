@@ -1941,7 +1941,7 @@
     right: 0;
     z-index: 2;
     background: var(--bg2);
-    border-left: 2px solid color-mix(in srgb, var(--em, #0a8a5c) 30%, transparent) !important;
+    border-left: 2px solid color-mix(in srgb, var(--em, var(--em)) 30%, transparent) !important;
     border-right: none !important;
 }
 
@@ -1961,7 +1961,7 @@
     left: 0;
     z-index: 2;
     background: var(--bg2);
-    border-right: 2px solid color-mix(in srgb, var(--em, #0a8a5c) 30%, transparent) !important;
+    border-right: 2px solid color-mix(in srgb, var(--em, var(--em)) 30%, transparent) !important;
     border-left: none !important;
 }
 
@@ -2001,7 +2001,7 @@
 }
 
 .dt-group-row:hover {
-    background: color-mix(in srgb, var(--em, #0a8a5c) 8%, var(--bg3, #f0f0f0));
+    background: color-mix(in srgb, var(--em, var(--em)) 8%, var(--bg3, #f0f0f0));
 }
 
 .dt-group-row td {
@@ -2045,14 +2045,14 @@
 }
 
 .dt-group-subtotal td {
-    background: color-mix(in srgb, var(--em, #0a8a5c) 5%, var(--bg2));
+    background: color-mix(in srgb, var(--em, var(--em)) 5%, var(--bg2));
     border-top: 1px dashed var(--b2, #e0e0e0);
     font-size: 11px;
     padding: 4px 10px;
 }
 
 .dt-pinned {
-    background: color-mix(in srgb, var(--em, #0a8a5c) 6%, var(--bg3)) !important;
+    background: color-mix(in srgb, var(--em, var(--em)) 6%, var(--bg3)) !important;
 }
 
 .dt-table thead .dt-pinned {
@@ -2131,7 +2131,7 @@
 .dt-col-pin-badge {
     font-size: 10px;
     margin-right: auto;
-    color: var(--em, #0a8a5c);
+    color: var(--em, var(--em));
 }
 
 .dt-pin-btn {
@@ -2147,9 +2147,9 @@
 }
 
 .dt-pin-btn.active {
-    background: var(--em, #0a8a5c);
+    background: var(--em, var(--em));
     color: #fff;
-    border-color: var(--em, #0a8a5c);
+    border-color: var(--em, var(--em));
 }
 
 .dt-pin-btn:hover {
@@ -2157,12 +2157,12 @@
 }
 
 .dt-v7:focus {
-    outline: 2px solid var(--em, #0a8a5c);
+    outline: 2px solid var(--em, var(--em));
     outline-offset: -2px;
 }
 
 .dt-v7:focus-visible {
-    outline: 2px solid var(--em, #0a8a5c);
+    outline: 2px solid var(--em, var(--em));
 }
 
 .dt-cell-active {
@@ -2209,8 +2209,8 @@
     align-items: center;
     justify-content: space-between;
     padding: 10px 14px;
-    background: color-mix(in srgb, var(--em, #0a8a5c) 8%, var(--bg2));
-    border-top: 1px solid color-mix(in srgb, var(--em, #0a8a5c) 20%, transparent);
+    background: color-mix(in srgb, var(--em, var(--em)) 8%, var(--bg2));
+    border-top: 1px solid color-mix(in srgb, var(--em, var(--em)) 20%, transparent);
     gap: 10px;
     animation: slide-up-bar .2s ease;
     border-bottom: none;
@@ -2397,7 +2397,7 @@
 }
 
 .dt-dialog-title .ti {
-    color: var(--em, #0a8a5c);
+    color: var(--em, var(--em));
     font-size: 16px;
 }
 
@@ -3023,7 +3023,7 @@
     .dt-v7 {
         border: 1px solid #ddd;
         box-shadow: none;
-        border-top: 2px solid #0a8a5c;
+        border-top: 2px solid var(--em);
     }
     .dt-v7 thead th {
         background: #f5f5f5 !important;
@@ -3040,7 +3040,7 @@
         background: color-mix( in srgb, var(--bg1, #111) 60%, var(--bg2, #1e1e1e) );
     }
     .dt-cell-active {
-        background: color-mix( in srgb, var(--em, #0a8a5c) 15%, var(--bg2, #1e1e1e) ) !important;
+        background: color-mix( in srgb, var(--em, var(--em)) 15%, var(--bg2, #1e1e1e) ) !important;
     }
     .dt-cell-pending {
         background: color-mix( in srgb, #f59e0b 12%, var(--bg2, #1e1e1e) ) !important;
@@ -3250,9 +3250,9 @@
 
 .dt-copy-btn.dt-copy-ok {
     display: flex !important;
-    color: #16a34a;
+    color: var(--green);
     background: #dcfce7;
-    border-color: #16a34a;
+    border-color: var(--green);
 }
 
 .dt-td.dt-td-editable > .dt-copy-btn {

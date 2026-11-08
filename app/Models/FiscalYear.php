@@ -30,10 +30,10 @@ class FiscalYear extends Model
     ];
 
     protected $casts = [
-        'start_date' => 'date',
-        'end_date' => 'date',
+        'start_date' => 'date:Y-m-d',
+        'end_date' => 'date:Y-m-d',
         'is_closed' => 'boolean',
-        'closed_at' => 'date',
+        'closed_at' => 'date:Y-m-d',
         'is_current' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',

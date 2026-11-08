@@ -59,9 +59,23 @@ export default function AdminLayout() {
   const location            = useLocation();
   const { data: stats }     = useAdminDashboard();
   const { dark, toggle: toggleTheme } = useTheme();
-  const [collapsed, setCollapsed] = useState(() => {
+  const [collapsedPref, setCollapsed] = useState(() => {
     try { return localStorage.getItem('admin_sidebar_collapsed') === 'true'; } catch { return false; }
   });
+  // Phones: the sidebar is an off-canvas drawer (CSS .adm-sidebar in
+  // responsive.css). It always shows full labels there, opens from the header
+  // menu button and closes on navigation / backdrop tap.
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const on = () => { setIsMobile(mq.matches); if (!mq.matches) setMobileOpen(false); };
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
+  const collapsed = collapsedPref && !isMobile;
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
@@ -91,6 +105,7 @@ export default function AdminLayout() {
     >
       {/* SIDEBAR */}
       <aside
+        className={`adm-sidebar${mobileOpen ? ' open' : ''}`}
         style={{
           width: collapsed ? 58 : 230,
           transition: 'width .22s cubic-bezier(.4,0,.2,1)',
@@ -208,6 +223,7 @@ export default function AdminLayout() {
 
         <div style={{ padding: '10px 6px', borderTop: '1px solid var(--b2)', flexShrink: 0 }}>
           <button
+            className="adm-hide-sm"
             onClick={() => setCollapsed(c => { const next = !c; try { localStorage.setItem('admin_sidebar_collapsed', String(next)); } catch {}; return next; })}
             style={{
               display: 'flex', alignItems: 'center', gap: 10,
@@ -250,10 +266,11 @@ export default function AdminLayout() {
           )}
         </div>
       </aside>
+      <div className={`adm-backdrop${mobileOpen ? ' open' : ''}`} onClick={() => setMobileOpen(false)} />
 
       {/* MAIN */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-        <header style={{
+        <header className="adm-header" style={{
           height: 54, display: 'flex', alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0 20px',
@@ -264,18 +281,26 @@ export default function AdminLayout() {
           position: 'sticky', top: 0, zIndex: 50,
           boxShadow: '0 1px 6px rgba(0,0,0,.05)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            <button
+              type="button"
+              className="adm-menu-btn"
+              aria-label="القائمة"
+              onClick={() => setMobileOpen(true)}
+            >
+              <i className="ti ti-menu-2" />
+            </button>
+            <span className="adm-hide-sm" style={{
               fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: 6,
               background: 'rgba(220,38,38,.1)', color: '#dc2626', letterSpacing: '.5px',
             }}>
               SUPER ADMIN
             </span>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--t1)', lineHeight: 1.2 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--t1)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {meta.title}
               </div>
-              <div style={{ fontSize: 10.5, color: 'var(--t4)' }}>{meta.sub}</div>
+              <div className="adm-hide-sm" style={{ fontSize: 10.5, color: 'var(--t4)' }}>{meta.sub}</div>
             </div>
           </div>
 
@@ -292,7 +317,7 @@ export default function AdminLayout() {
                 )}
               </button>
               {notifOpen && (
-                <div style={{ position: 'absolute', top: 42, left: 0, width: 280, background: 'var(--bg2)', border: '1px solid var(--b2)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,.12)', zIndex: 200, overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: 42, left: 0, width: 'min(280px, calc(100vw - 24px))', background: 'var(--bg2)', border: '1px solid var(--b2)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,.12)', zIndex: 200, overflow: 'hidden' }}>
                   <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--b2)', fontSize: 12, fontWeight: 700, color: 'var(--t1)', display: 'flex', justifyContent: 'space-between' }}>
                     <span>الإشعارات</span>
                     <span style={{ fontSize: 10, color: 'var(--t4)', fontWeight: 400 }}>وضع علامة مقروء</span>
@@ -312,15 +337,15 @@ export default function AdminLayout() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 12, color: 'var(--t2)', fontWeight: 600 }}>{user?.name}</span>
+              <span className="adm-hide-sm" style={{ fontSize: 12, color: 'var(--t2)', fontWeight: 600 }}>{user?.name}</span>
               <button onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(220,38,38,.3)', background: 'transparent', cursor: 'pointer', color: '#dc2626', fontSize: 12, fontWeight: 700, fontFamily: 'Tajawal, sans-serif' }}>
-                <i className="ti ti-logout" /> خروج
+                <i className="ti ti-logout" /> <span className="adm-hide-sm">خروج</span>
               </button>
             </div>
           </div>
         </header>
 
-        <main style={{ flex: 1, overflow: 'auto', padding: 24 }}>
+        <main className="adm-main" style={{ flex: 1, overflow: 'auto', padding: 24 }}>
           <Outlet />
         </main>
       </div>
