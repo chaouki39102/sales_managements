@@ -382,7 +382,7 @@ export default function PrintSettingsPage() {
   const docsInCat = DOC_TYPE_LIST.filter(d => d.category === activeCat);
 
   return (
-    <><div style={{ display: 'flex', flexDirection: 'column', height: '100vh', direction: 'rtl', overflow: 'hidden' }}>
+    <><div className="stk-shell" style={{ display: 'flex', flexDirection: 'column', height: '100vh', direction: 'rtl', overflow: 'hidden' }}>
 
       <div style={{
         padding: '10px 18px', borderBottom: '1px solid var(--b2)',
@@ -468,9 +468,9 @@ export default function PrintSettingsPage() {
         )}
       </div>
 
-      <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div className="stk-panes" style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
-        <div style={{
+        <div className="stk-pane" style={{
           width: 200, flexShrink: 0, borderLeft: '1px solid var(--b2)',
           background: 'var(--bg2)', overflowY: 'auto', display: 'flex', flexDirection: 'column',
         }}>
@@ -527,7 +527,7 @@ export default function PrintSettingsPage() {
           ))}
         </div>
 
-        <div style={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--b2)' }}>
+        <div className="stk-pane" style={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--b2)' }}>
 
           <div style={{
             padding: '8px 10px', borderBottom: '1px solid var(--b2)',

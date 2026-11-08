@@ -1,0 +1,355 @@
+/* ─── View Toggle ─── */
+.portal-view-toggle {
+  display: inline-flex;
+  background: var(--bg3);
+  border-radius: 10px;
+  padding: 3px;
+  border: 1px solid var(--b1);
+}
+.portal-view-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--t4);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all .2s;
+}
+.portal-view-btn.on {
+  background: var(--bg2);
+  color: var(--em);
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+
+/* ─── Payment Timeline View ─── */
+.portal-pay-timeline {
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.portal-pay-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0;
+  position: relative;
+}
+.portal-pay-item:not(:last-child) {
+  border-bottom: 1px solid var(--b1);
+}
+.portal-pay-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.portal-pay-icon--in { background: rgba(16,185,129,.10); color: #059669; }
+.portal-pay-icon--out { background: var(--redb); color: var(--red); }
+.portal-pay-info { flex: 1; min-width: 0; }
+.portal-pay-num { font-size: 13px; font-weight: 700; color: var(--t1); }
+.portal-pay-meta { font-size: 11.5px; color: var(--t4); margin-top: 2px; }
+.portal-pay-amt {
+  font-size: 16px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.portal-pay-amt--in { color: #059669; }
+.portal-pay-amt--out { color: var(--red); }
+
+/* ─── فوتر الترحيل ─── */
+.portal-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--b1);
+}
+.portal-pager-info { font-size: 11.5px; color: var(--t4); font-weight: 600; }
+.portal-pager-btns { display: flex; gap: 4px; }
+
+.portal-pgbtn {
+  min-width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--b2);
+  background: var(--bg2);
+  color: var(--t2);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Tajawal', sans-serif;
+  transition: all .2s cubic-bezier(.4,0,.2,1);
+}
+.portal-pgbtn:hover:not(:disabled) {
+  border-color: var(--em);
+  color: var(--em);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(10,138,92,.1);
+}
+.portal-pgbtn:disabled { opacity: .4; cursor: not-allowed; }
+.portal-pgbtn.on {
+  background: var(--grad-em);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(10,138,92,.2);
+}
+
+/* ─── شريط التحميل / الحالة ─── */
+.portal-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 80px 20px;
+  color: var(--t4);
+  font-size: 13px;
+  font-weight: 600;
+}
+.portal-loading i { font-size: 28px; color: var(--em); }
+.portal-loading-dots {
+  display: flex;
+  gap: 6px;
+}
+.portal-loading-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--em);
+  animation: loadBounce 1.4s infinite ease-in-out both;
+}
+.portal-loading-dots span:nth-child(1) { animation-delay: -.32s; }
+.portal-loading-dots span:nth-child(2) { animation-delay: -.16s; }
+@keyframes loadBounce {
+  0%, 80%, 100% { transform: scale(.4); opacity: .3; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+.portal-empty {
+  text-align: center;
+  padding: 56px 20px;
+  color: var(--t4);
+}
+.portal-empty i {
+  font-size: 48px;
+  opacity: .15;
+  display: block;
+  margin-bottom: 14px;
+}
+.portal-empty div { font-size: 13px; font-weight: 600; }
+
+.portal-err {
+  margin: 0 0 16px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: var(--redb);
+  border: 1px solid var(--redbo);
+  color: var(--red);
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ─── صفحة تسجيل الدخول (Creative) ─── */
+.portal-login {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(700px 500px at 85% 10%, rgba(10,138,92,.12), transparent 60%),
+    radial-gradient(600px 450px at 10% 90%, rgba(26,79,214,.08), transparent 60%),
+    radial-gradient(500px 400px at 50% 50%, rgba(10,138,92,.05), transparent 60%),
+    var(--bg0);
+  direction: rtl;
+  position: relative;
+  overflow: hidden;
+}
+.portal-login::before {
+  content: '';
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(10,138,92,.06), transparent 70%);
+  top: -100px;
+  right: -100px;
+  animation: loginFloat 20s ease-in-out infinite;
+}
+.portal-login::after {
+  content: '';
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(26,79,214,.05), transparent 70%);
+  bottom: -80px;
+  left: -80px;
+  animation: loginFloat 15s ease-in-out infinite reverse;
+}
+@keyframes loginFloat {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(30px, -20px); }
+}
+
+.portal-login-box {
+  width: 100%;
+  max-width: 420px;
+  background: rgba(255,255,255,.8);
+  border: 1px solid rgba(0,0,0,.06);
+  border-radius: 20px;
+  padding: 40px 36px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.08), 0 0 0 1px rgba(255,255,255,.5) inset;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  position: relative;
+  z-index: 1;
+  animation: loginBoxIn .6s cubic-bezier(.4,0,.2,1);
+}
+html.dark .portal-login-box {
+  background: rgba(30,33,40,.85);
+  border-color: rgba(255,255,255,.08);
+}
+@keyframes loginBoxIn {
+  from { opacity: 0; transform: translateY(24px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.portal-login-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: var(--grad-em);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 28px;
+  margin: 0 auto 20px;
+  box-shadow: 0 6px 24px rgba(10,138,92,.3), 0 0 0 4px rgba(10,138,92,.08);
+  animation: loginLogoPulse 3s ease-in-out infinite;
+}
+@keyframes loginLogoPulse {
+  0%, 100% { box-shadow: 0 6px 24px rgba(10,138,92,.3), 0 0 0 4px rgba(10,138,92,.08); }
+  50% { box-shadow: 0 8px 32px rgba(10,138,92,.4), 0 0 0 8px rgba(10,138,92,.04); }
+}
+
+.portal-login-title {
+  text-align: center;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--t1);
+  margin-bottom: 6px;
+  letter-spacing: .3px;
+}
+.portal-login-sub {
+  text-align: center;
+  font-size: 13px;
+  color: var(--t4);
+  margin-bottom: 32px;
+}
+
+/* ─── Form inputs (Enhanced) ─── */
+.portal-login .fg input,
+.portal-form-input {
+  width: 100%;
+  padding: 8.5px 35px !important;
+  border-radius: 12px !important;
+  border: 1.5px solid var(--b2) !important;
+  background: var(--bg3) !important;
+  color: var(--t1);
+  font-size: 13.5px !important;
+  font-family: 'Tajawal', sans-serif;
+  transition: all .25s cubic-bezier(.4,0,.2,1) !important;
+  outline: none;
+}
+.portal-login .fg input:focus,
+.portal-form-input:focus {
+  border-color: var(--em) !important;
+  box-shadow: 0 0 0 4px var(--emb) !important;
+  background: var(--bg2) !important;
+}
+
+/* ─── كشف الحساب ─── */
+.portal-stmt-sum {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.portal-stmt-item {
+  background: var(--bg1);
+  border: 1px solid var(--b1);
+  border-radius: 14px;
+  padding: 16px 18px;
+  transition: all .25s cubic-bezier(.4,0,.2,1);
+}
+.portal-stmt-item:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,.05);
+  transform: translateY(-1px);
+}
+.portal-stmt-item .k { font-size: 11px; color: var(--t4); margin-bottom: 5px; font-weight: 600; letter-spacing: .3px; }
+.portal-stmt-item .v { font-size: 17px; font-weight: 900; color: var(--t1); font-variant-numeric: tabular-nums; }
+
+.portal-row-credit td { color: #059669; }
+.portal-row-debit td { color: var(--red); }
+
+/* Statement balance bar */
+.portal-stmt-bal-bar {
+  height: 4px;
+  border-radius: 2px;
+  margin-top: 6px;
+  transition: width .6s cubic-bezier(.4,0,.2,1);
+}
+
+/* ─── تفاصيل مستند ─── */
+.portal-doc-hd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.portal-doc-hd h2 { margin: 0; font-size: 22px; font-weight: 900; color: var(--t1); }
+
+.portal-doc-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 22px;
+}
+.portal-doc-meta .portal-stmt-item { background: var(--bg2); }
+
+.portal-sec { margin-top: 22px; }
+
+/* ─── ملخص المبالغ (Summary rows) ─── */
+.portal-card .sr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--b1);
+}
+.portal-card .sr:last-child { border-bottom: none; }
+.portal-card .sr-l { font-size: 12.5px; color: var(--t3); font-weight: 600; }
+.portal-card .sr-v { font-size: 13.5px; font-weight: 800; color: var(--t1); font-variant-numeric: tabular-nums; }

@@ -1,0 +1,442 @@
+/* ════════════════════════════════════════════════════════════════════════
+   pos-cart-v4.css
+   أضف هذا بعد pos.css  (يُلغي قواعد .cr القديمة)
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ══════════════════════════════════════════
+   1. CART ROW — البطاقة الجديدة
+══════════════════════════════════════════ */
+.cr {
+  display: grid;
+  /* شريط | رقم | معلومات | كمية | إجمالي | حذف */
+  grid-template-columns: 3px 18px 1fr auto auto 26px;
+  align-items: start;           /* start حتى يمتد الـ accent بالكامل */
+  gap: 6px;
+  padding: 9px 10px 9px 8px;
+  border-bottom: 1px solid var(--b1);
+  cursor: pointer;
+  transition: background .11s;
+  position: relative;
+  background: var(--bg2);
+}
+.cr:hover  { background: var(--bg3); }
+.cr.sel    { background: var(--emb); }
+.cr.sel .cr-accent { background: var(--em); }
+.cr.has-disc .cr-accent { background: var(--red); }
+.cr.sel.has-disc .cr-accent { background: var(--em); }
+
+/* الشريط الجانبي الملون */
+.cr-accent {
+  grid-row: 1;
+  align-self: stretch;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--b3);
+  transition: background .15s;
+  margin: 0;
+}
+
+/* رقم الصنف */
+.cr-num {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--t4);
+  text-align: center;
+  padding-top: 2px;
+  line-height: 1;
+  align-self: center;
+}
+
+/* معلومات */
+.cr-info {
+  min-width: 0;
+  padding-top: 1px;
+  position: relative; /* لأجل الـ popup */
+}
+.cr-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--t1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+  margin-bottom: 4px;
+}
+.cr-variant {
+  font-weight: 500;
+  color: var(--t4);
+  font-size: 11.5px;
+}
+
+.cr-pkg-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--blue);
+  background: var(--blueb);
+  border: 1px solid rgba(59,130,246,.2);
+  padding: 0 5px;
+  border-radius: 4px;
+  margin-bottom: 3px;
+  line-height: 1.5;
+}
+
+.cr-pkg-badge--selectable {
+  cursor: pointer;
+  border-style: dashed;
+  transition: all .15s ease;
+}
+.cr-pkg-badge--selectable:hover {
+  background: rgba(59,130,246,.15);
+  border-color: var(--blue);
+}
+.cr-pkg-badge--active {
+  background: var(--blue) !important;
+  color: #fff !important;
+  border-style: solid !important;
+}
+.cr-pkg-multi { font-weight: 700; }
+.cr-pkg-chevron { font-size: 8px; margin-inline-start: 2px; opacity: .6; }
+
+/* ── Packaging popup ── */
+.cr-popup--pkg { min-width: 180px; padding: 8px; }
+.cr-popup-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--t3);
+  margin-bottom: 6px;
+}
+.cr-pkg-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--b2);
+  border-radius: 6px;
+  background: var(--bg1);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--t1);
+  margin-bottom: 4px;
+  transition: all .12s ease;
+}
+.cr-pkg-option:last-child { margin-bottom: 0; }
+.cr-pkg-option:hover { border-color: var(--blue); background: var(--blueb); }
+.cr-pkg-option.on { border-color: var(--em); background: var(--emb); }
+.cr-pkg-opt-label { font-weight: 700; }
+.cr-pkg-opt-detail { font-size: 10px; color: var(--t4); }
+
+/* صف السعر + الخصم */
+.cr-price-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+/* ── زر السعر ── */
+.cr-price {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  padding: 2px 7px 2px 5px;
+  border-radius: var(--r1);
+  border: 1px solid var(--b2);
+  background: var(--bg3);
+  cursor: pointer;
+  transition: .12s;
+  font-family: 'Tajawal', sans-serif;
+  white-space: nowrap;
+}
+.cr-price:hover, .cr-price--active {
+  background: var(--emb);
+  border-color: var(--embo);
+  color: var(--em);
+}
+.cr-price-num {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--t2);
+}
+.cr-price:hover .cr-price-num,
+.cr-price--active .cr-price-num { color: var(--em); }
+.cr-price-unit {
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--t4);
+}
+.cr-price-edit-ic {
+  font-size: 9px;
+  color: var(--t4);
+  opacity: 0;
+  transition: opacity .12s;
+  margin-right: -2px;
+}
+.cr-price:hover .cr-price-edit-ic { opacity: 1; }
+
+/* ── زر الخصم (عند وجوده) ── */
+.cr-disc {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid var(--redbo);
+  background: var(--redb);
+  color: var(--red);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: 'Tajawal', sans-serif;
+  transition: .12s;
+  white-space: nowrap;
+}
+.cr-disc i { font-size: 10px; }
+.cr-disc:hover, .cr-disc--active {
+  background: var(--red);
+  color: #fff;
+  border-color: var(--red);
+}
+
+/* ── زر "إضافة خصم" (عند غيابه) ── */
+.cr-disc-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px dashed var(--b3);
+  background: transparent;
+  color: var(--t4);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Tajawal', sans-serif;
+  transition: .12s;
+  white-space: nowrap;
+  opacity: 0;                 /* مخفي حتى hover */
+  transition: opacity .15s, background .12s;
+}
+.cr:hover .cr-disc-add,
+.cr.sel  .cr-disc-add       { opacity: 1; }
+.cr-disc-add:hover,
+.cr-disc-add--active {
+  background: var(--emb);
+  border-color: var(--embo);
+  color: var(--em);
+  border-style: solid;
+  opacity: 1;
+}
+.cr-disc-add i { font-size: 10px; }
+
+/* TVA badge */
+.cr-tva {
+  font-size: 9.5px;
+  color: var(--t4);
+  background: var(--bg4);
+  padding: 1px 5px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════
+   2. POPUP — الخصم والسعر
+══════════════════════════════════════════ */
+.cr-popup {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 300;
+  background: var(--bg2);
+  border: 1px solid var(--b3);
+  border-radius: var(--r3);
+  box-shadow: var(--shadow2);
+  padding: 12px;
+  min-width: 220px;
+  animation: popupIn .15s cubic-bezier(.34,1.4,.64,1);
+}
+@keyframes popupIn {
+  from { opacity: 0; transform: translateY(-6px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+.cr-popup--price { min-width: 190px; }
+
+/* مثلث الإشارة */
+.cr-popup-arrow {
+  position: absolute;
+  top: -5px;
+  right: 16px;
+  width: 10px;
+  height: 10px;
+  background: var(--bg2);
+  border-top: 1px solid var(--b3);
+  border-right: 1px solid var(--b3);
+  transform: rotate(-45deg);
+}
+
+.cr-popup-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--t4);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+/* أزرار التبديل */
+.cr-popup-modes {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.cr-popup-mode {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 8px;
+  border-radius: var(--r2);
+  border: 1.5px solid var(--b2);
+  background: var(--bg3);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--t3);
+  cursor: pointer;
+  font-family: 'Tajawal', sans-serif;
+  transition: .13s;
+}
+.cr-popup-mode:hover { background: var(--bg4); color: var(--t1); }
+.cr-popup-mode.on {
+  background: var(--emb);
+  border-color: var(--em);
+  color: var(--em);
+}
+
+/* حقل الإدخال */
+.cr-popup-inp-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.cr-popup-inp {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: var(--r2);
+  border: 2px solid var(--em);
+  background: var(--bg2);
+  font-size: 18px;
+  font-weight: 800;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--t1);
+  outline: none;
+  text-align: center;
+  box-shadow: 0 0 0 3px var(--emb);
+  letter-spacing: .5px;
+  transition: border-color .12s;
+}
+.cr-popup-inp:focus { border-color: var(--em); }
+.cr-popup-unit {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--t3);
+  flex-shrink: 0;
+  min-width: 24px;
+  text-align: center;
+}
+
+/* معاينة */
+.cr-popup-preview {
+  font-size: 11.5px;
+  color: var(--t3);
+  margin-bottom: 8px;
+  padding: 5px 9px;
+  background: var(--bg3);
+  border-radius: var(--r1);
+  text-align: center;
+}
+.cr-popup-preview strong { color: var(--em); }
+
+/* أزرار سريعة للنسب */
+.cr-popup-quick {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.cr-popup-qbtn {
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--b2);
+  background: var(--bg3);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--t3);
+  cursor: pointer;
+  font-family: 'Tajawal', sans-serif;
+  transition: .12s;
+}
+.cr-popup-qbtn:hover { background: var(--emb); border-color: var(--embo); color: var(--em); }
+.cr-popup-qbtn.on { background: var(--em); border-color: var(--em); color: #fff; }
+
+/* أزرار التأكيد */
+.cr-popup-actions {
+  display: flex;
+  gap: 5px;
+  justify-content: flex-end;
+  border-top: 1px solid var(--b1);
+  padding-top: 9px;
+  margin-top: 2px;
+}
+.cr-popup-clear {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 10px;
+  border-radius: var(--r2);
+  border: 1px solid var(--redbo);
+  background: var(--redb);
+  color: var(--red);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Tajawal', sans-serif;
+  transition: .12s;
+  margin-left: auto;       /* يدفع إلى أقصى اليسار */
+}
+.cr-popup-clear:hover { background: var(--red); color: #fff; }
+
+.cr-popup-cancel {
+  padding: 5px 12px;
+  border-radius: var(--r2);
+  border: 1px solid var(--b2);
+  background: var(--bg3);
+  color: var(--t3);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Tajawal', sans-serif;
+  transition: .12s;
+}
+.cr-popup-cancel:hover { background: var(--bg4); color: var(--t1); }
+
+.cr-popup-ok {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 14px;
+  border-radius: var(--r2);
+  border: none;
+  background: var(--em);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: 'Tajawal', sans-serif;
+  transition: .12s;
+  box-shadow: var(--emglow);
+}
+.cr-popup-ok:hover { background: var(--em2); }

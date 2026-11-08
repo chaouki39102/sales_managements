@@ -1,0 +1,100 @@
+/* ═══ RETURNS MODAL ═══ */
+.ret-inp-w{width:80px;}
+.ret-doc-meta{color:var(--t4);font-size:12px;}
+
+/* ═══ PROFESSIONAL RECEIPT ═══ */
+.pr-modal{max-height:95vh;display:flex;flex-direction:column;}
+.pr-receipt-body{flex:1;overflow-y:auto;padding:16px;}
+
+/* ═══ PROFESSIONAL PAYMENT MODAL v2 ═══ */
+.modal-pay-v2{max-width:780px;display:grid;grid-template-rows:auto 1fr auto;max-height:calc(100vh - 40px);overflow:hidden;}
+.pay-npk.clear{grid-column:span 3;}
+.pay-sec-title{margin-bottom:8px;}
+.pay-sec-title-sm{margin-bottom:6px;}
+.pay-sec-title-m{margin:10px 0 6px;}
+.pay-status-wrap{margin:12px 0 8px;}
+.pay-add-mode{margin-top:6px;}
+.pay-error-mt{margin-top:10px;}
+.pay-btn-confirm{min-width:200px;font-size:14px;}
+.pay-change-txt{margin-right:8px;font-size:12px;opacity:.85;}
+.pay-bal-dash{border-top:1px dashed var(--b3);padding-top:6px;margin-top:2px;}
+.pay-bal-solid{border-top:1px solid var(--b3);padding-top:6px;margin-top:2px;}
+.pay-bal-edit-mt{margin-top:4px;}
+.pay-hint-sub{font-size:11px;opacity:.6;}
+.pay-hint-opt{opacity:.5;font-weight:400;}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   20. FORM CONTROL — إدخال عام
+══════════════════════════════════════════════════════════════════════════════ */
+.form-control {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--r2);
+  border: 1.5px solid var(--b2);
+  background: var(--bg2);
+  font-family: 'Tajawal', sans-serif;
+  font-size: 13px;
+  color: var(--t1);
+  outline: none;
+  transition: border-color .12s, box-shadow .12s;
+}
+.form-control:focus {
+  border-color: var(--em);
+  box-shadow: 0 0 0 3px var(--emb);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   21. CATEGORY TABS ARROW BUTTONS
+══════════════════════════════════════════════════════════════════════════════ */
+.pos-cats-btn-left {
+  border-radius: 50% 0 0 50%;
+}
+.pos-cats-btn-right {
+  border-radius: 0 50% 50% 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   22. QUICK BAR SCROLL LEFT
+══════════════════════════════════════════════════════════════════════════════ */
+.pqb-scroll-l {
+  border-right: 1px solid var(--b2);
+  border-left: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   23. POS SESSION TABLE ROW BASE
+══════════════════════════════════════════════════════════════════════════════ */
+.pss-tr {
+  transition: background .1s;
+}
+.pss-tr:hover { background: var(--bg3); }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   24. EDITING CHIP — وضع التعديل
+══════════════════════════════════════════════════════════════════════════════ */
+.pos-chip.editing {
+  background: rgba(239, 68, 68, .15);
+  border-color: rgba(239, 68, 68, .35);
+  color: var(--red);
+  animation: editPulse 1.6s ease-in-out infinite;
+}
+.pos-chip.editing .pic-ic,
+.pos-chip.editing .pos-chip-label,
+.pos-chip.editing .pos-chip-val {
+  color: var(--red) !important;
+}
+@keyframes editPulse {
+  0%, 100% { background: rgba(239, 68, 68, .15); border-color: rgba(239, 68, 68, .35); }
+  50% { background: rgba(239, 68, 68, .30); border-color: rgba(239, 68, 68, .55); }
+}
+
+/* ── Laptop: wider landscape layout ── */
+@media (min-width: 900px) {
+  .wem-card { max-width: 520px; }
+
+  .wem-hero-field .wem-inp { font-size: 42px !important; }
+
+  .wem-quick { grid-template-columns: repeat(9, 1fr); }
+
+  .wem-tier-badge { padding: 3px 9px; }
+}

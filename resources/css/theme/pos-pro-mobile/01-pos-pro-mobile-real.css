@@ -1,0 +1,362 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   POS Pro Mobile — معاينة الهاتف (real phone order page)
+   Ported from docs/mockups/pos-pro-mobile-live.html v5. All classes namespaced .ppm-*
+   so they never collide with desktop pos.css / pos-pro.css (.pcard, .line,
+   .sheet, .fab, .badge, ...). Theme tokens only — no hardcoded colors.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.ppm-screen {
+    width: 100%;
+    height: 100dvh;
+    background: var(--bg1);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding-top: env(safe-area-inset-top, 0px);
+    overflow: hidden;
+    overflow: clip;
+    font-family: "Tajawal", system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+
+.ppm-screen button {
+    font-family: inherit;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: inherit;
+}
+.ppm-screen input {
+    font-family: inherit;
+}
+
+.ppm-mono {
+    font-family:
+        ui-monospace, "Cascadia Mono", "Consolas", "Segoe UI Mono", monospace;
+    direction: ltr;
+}
+.ppm-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--em);
+    flex-shrink: 0;
+}
+
+/* ─── Swatches (product thumbnails) ─────────────────────────────────────── */
+.ppm-sw {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--r2);
+    box-shadow: inset 0 0 0 1px rgba(13, 27, 42, 0.05);
+    font-weight: 800;
+    font-size: 15px;
+}
+.ppm-sw-gold {
+    background: var(--goldb);
+    color: var(--gold);
+}
+.ppm-sw-blue {
+    background: var(--blueb);
+    color: var(--blue);
+}
+.ppm-sw-orange {
+    background: var(--orb);
+    color: var(--orange);
+}
+.ppm-sw-purple {
+    background: var(--purb);
+    color: var(--purple);
+}
+.ppm-sw-teal {
+    background: var(--tealb);
+    color: var(--teal);
+}
+.ppm-sw-indigo {
+    background: var(--indigob);
+    color: var(--indigo);
+}
+.ppm-avatar-init {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 800;
+    flex-shrink: 0;
+}
+
+/* ─── App bar ───────────────────────────────────────────────────────────── */
+.ppm-appbar {
+    height: 56px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px;
+    gap: 8px;
+}
+.ppm-customer-chip {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 5px 12px 5px 5px;
+    border-radius: 999px;
+    background: var(--bg2);
+    box-shadow: var(--shadow);
+    flex-shrink: 1;
+    min-width: 0;
+    flex: 1;
+    max-width: 230px;
+    text-align: right;
+}
+.ppm-customer-chip .ppm-av {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    font-size: 11px;
+    box-shadow:
+        0 0 0 2px var(--bg2),
+        0 0 0 3px var(--embo);
+}
+.ppm-customer-chip .ppm-av.placeholder {
+    background: var(--bg4) !important;
+    color: var(--t4) !important;
+    box-shadow:
+        0 0 0 2px var(--bg2),
+        0 0 0 3px var(--b2);
+}
+.ppm-customer-chip .ppm-txt {
+    min-width: 0;
+    text-align: right;
+}
+.ppm-customer-chip .ppm-txt .ppm-name {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--t1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ppm-customer-chip .ppm-txt .ppm-bal {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--em);
+    font-family: ui-monospace, "Consolas", monospace;
+    direction: ltr;
+    display: inline-block;
+}
+.ppm-customer-chip .ppm-txt .ppm-bal.debtor {
+    color: var(--red);
+}
+.ppm-customer-chip .ppm-txt .ppm-cta {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--t3);
+}
+.ppm-appbar-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--bg2);
+    box-shadow: var(--shadow);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--t3);
+    flex-shrink: 0;
+    position: relative;
+}
+.ppm-appbar-btn .ti {
+    font-size: 19px;
+}
+.ppm-badge {
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 3px;
+    border-radius: 999px;
+    background: var(--gold);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.ppm-appbar-title {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.2;
+}
+.ppm-appbar-title strong {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--t1);
+}
+.ppm-appbar-title span {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--t4);
+    font-family: ui-monospace, "Consolas", monospace;
+    letter-spacing: 0.3px;
+}
+
+.ppm-session-strip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 18px 8px;
+    flex-shrink: 0;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--t4);
+    font-family: ui-monospace, "Consolas", monospace;
+    letter-spacing: 0.3px;
+}
+.ppm-session-strip .ppm-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--em);
+    box-shadow: 0 0 0 3px var(--embo);
+    flex-shrink: 0;
+}
+.ppm-session-strip .ppm-debug-btn {
+    margin-inline-start: auto;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--bg3);
+    color: var(--t4);
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+}
+.ppm-session-offline {
+    margin-inline-start: auto;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--red);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 800;
+}
+.ppm-offline-btn {
+    color: var(--red);
+}
+.ppm-offline-btn--sync {
+    color: var(--em);
+    animation: ppm-sync-pulse 1.2s ease-in-out infinite;
+}
+@keyframes ppm-sync-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+}
+
+/* ─── Total card ────────────────────────────────────────────────────────── */
+.ppm-total-card {
+    margin: 2px 14px 10px;
+    padding: 14px 18px;
+    border-radius: var(--r3);
+    background: var(--bg2);
+    box-shadow: var(--shadow2);
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+}
+.ppm-total-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 3px;
+    background: var(--grad-em);
+}
+.ppm-total-top {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+}
+.ppm-total-top .ppm-l {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--t4);
+    letter-spacing: 0.4px;
+}
+.ppm-total-top .ppm-val {
+    font-family: ui-monospace, "Consolas", monospace;
+    font-weight: 800;
+    font-size: 30px;
+    color: var(--em);
+    direction: ltr;
+    letter-spacing: -1px;
+    line-height: 1;
+}
+.ppm-total-top .ppm-unit {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--t3);
+    margin-inline-start: 4px;
+}
+.ppm-total-chips {
+    display: flex;
+    gap: 6px;
+    margin-top: 9px;
+    flex-wrap: wrap;
+}
+.ppm-tchip {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: var(--bg3);
+    color: var(--t3);
+    font-family: ui-monospace, "Consolas", monospace;
+    direction: ltr;
+}
+.ppm-tchip.disc {
+    background: var(--redb);
+    color: var(--red);
+}
+
+/* ─── Quick actions strip ───────────────────────────────────────────────── */
+.ppm-qa-strip {
+    display: flex;
+    gap: 8px;
+    padding: 0 14px 12px;
+    flex-shrink: 0;
+}
+.ppm-qa-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 9px 4px;
+    border-radius: var(--r2);
+    background: var(--bg2);
+    box-shadow: var(--shadow);
+    color: var(--t3);
+    font-size: 10px;
+    font-weight: 700;
+}
+.ppm-qa-btn .ti {
+    font-size: 16px;
+}
+.ppm-qa-btn:active {
+    color: var(--em);
+}

@@ -1,0 +1,348 @@
+/* ─── سلة الطلب ─── */
+.portal-cart { padding: 6px 22px; }
+.portal-cart-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--b1);
+}
+.portal-cart-item:last-child { border-bottom: none; }
+.portal-cart-info { flex: 1; min-width: 0; }
+.portal-cart-total {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--t1);
+  min-width: 88px;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+.portal-cart-x {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: var(--redb);
+  color: var(--red);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all .15s;
+}
+.portal-cart-x:hover { background: var(--red); color: #fff; }
+.portal-cart-item--ro .portal-cart-info { flex: 1; min-width: 0; }
+.portal-cart-item--ro .portal-cart-total { min-width: 92px; }
+.portal-cart-foot { padding: 14px 22px 20px; border-top: 1px solid var(--b1); display: flex; flex-direction: column; gap: 12px; }
+.portal-cart-foot-actions { display: flex; gap: 10px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.portal-cart-actions { display: flex; gap: 10px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.portal-cart-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px dashed var(--b2);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.portal-cart-total-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+  color: var(--t3);
+  font-weight: 600;
+}
+.portal-cart-total-row b { color: var(--t1); font-variant-numeric: tabular-nums; }
+.portal-cart-total-row--final {
+  border-top: 1px solid var(--b1);
+  padding-top: 8px;
+  margin-top: 2px;
+  font-size: 14px;
+  color: var(--em);
+  font-weight: 800;
+}
+.portal-cart-total-row--final b { color: var(--em); font-size: 16px; }
+.portal-cart-totals--muted .portal-cart-total-row {
+  color: var(--t3);
+  font-size: 12.5px;
+  font-weight: 600;
+  justify-content: flex-start;
+}
+
+/* ─── قائمة طلباتي ─── */
+.portal-order-list { padding: 6px 22px 14px; }
+.portal-order { border: 1px solid var(--b1); border-radius: 12px; overflow: hidden; margin-bottom: 10px; background: var(--bg2); }
+.portal-order-hd {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: start;
+  font-family: 'Tajawal', sans-serif;
+  transition: background .15s;
+  flex-wrap: wrap;
+}
+.portal-order-hd:hover { background: var(--bg3); }
+.portal-order-info { min-width: 0; overflow: hidden; }
+.portal-order-ref { font-size: 13px; font-weight: 800; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.portal-order-side { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.portal-order-amt { font-size: 13.5px; font-weight: 900; color: var(--t1); font-variant-numeric: tabular-nums; }
+.portal-order-detail { border-top: 1px solid var(--b1); padding: 4px 14px; background: var(--bg1); }
+.portal-order-notes {
+  font-size: 11.5px;
+  color: var(--t3);
+  font-weight: 600;
+  padding: 8px 2px 12px;
+  white-space: pre-wrap;
+}
+.portal-order-notes--ok  { color: var(--g, var(--green)); }
+.portal-order-notes--warn { color: var(--red); }
+.portal-order-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0 12px;
+}
+
+@media (max-width: 640px) {
+  .portal-toolbar { padding: 12px 14px; gap: 8px; }
+  .portal-search { min-width: 0; }
+  /* كتالوج الهاتف: صفوف قائمة أفقية بدل شبكة، زر + دائري يتحول إلى عداد */
+  .portal-catalog { grid-template-columns: 1fr; padding: 12px 14px; gap: 10px; }
+  .portal-prod {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+    padding: 12px 14px;
+    overflow: hidden;
+  }
+  .portal-prod-hd { flex: 1 1 0; min-width: 0; }
+  .portal-prod-name { font-size: 13px; }
+  .portal-prod-ref { font-size: 10.5px; }
+  .portal-prod-price { flex: 0 0 auto; order: 1; font-size: 14px; }
+  .portal-prod-price-old { font-size: 10.5px; }
+  .portal-prod-price-now { font-size: 14px; }
+  .portal-prod-unit { font-size: 9.5px; padding: 1px 6px; }
+  .portal-disc-tag { font-size: 9.5px; padding: 1px 7px; }
+  .portal-prod-quick {
+    flex: 0 0 auto;
+    order: 2;
+    margin-inline-start: auto;
+  }
+  .portal-prod-quick-btn {
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 18px;
+    box-shadow: 0 6px 18px rgba(10,138,92,.32);
+  }
+  .portal-prod-quick-txt { display: none; }
+  .portal-prod-quick .portal-prod-qty button { width: 32px; height: 34px; }
+  .portal-prod-quick .portal-prod-qty input { width: 36px; height: 34px; }
+  .portal-prod-meta { flex: 1 1 100%; order: 3; }
+  .portal-prod-discs { flex: 1 1 100%; order: 4; }
+  .portal-prod-pkg { flex: 1 1 100%; order: 5; margin-top: 2px; }
+  .portal-prod-packinfo { flex: 1 1 100%; order: 6; text-align: start; }
+  .portal-cart { padding: 6px 14px; }
+  .portal-cart-foot { padding: 14px; }
+  .portal-order-list { padding: 6px 14px 12px; }
+  .portal-cart-item { flex-wrap: wrap; }
+  .portal-cart-item:not(.portal-cart-item--ro) .portal-cart-info { flex: 1 1 100%; }
+  .portal-cart-item--ro { flex-wrap: nowrap; }
+  /* أزرار السلة بعرض كامل فوق بعضها في الهاتف */
+  .portal-cart-actions { flex-direction: column; align-items: stretch; }
+  .portal-cart-actions .portal-btn { width: 100%; justify-content: center; }
+  /* تبويبات الحالة: تمرير أفقي بدل التفاف في عدة أسطر */
+  .portal-toolbar--tight { overflow: hidden; }
+  .portal-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    margin-bottom: -6px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .portal-filters::-webkit-scrollbar { display: none; }
+  .portal-tab { flex-shrink: 0; }
+  /* منع تكبير iOS تلقائياً عند التركيز على الحقول */
+  .portal-search input,
+  .portal-prod-qty input,
+  .portal-prod-pkg,
+.portal-form-input { font-size: 16px !important; }
+  /* التوست فوق الشريط السفلي الثابت */
+  .portal-toast { bottom: 84px; }
+}
+
+/* ─── شريط تنقل موبايل سفلي ─── */
+.portal-mobile-bar { display: none; }
+
+@media (max-width: 640px) {
+  .portal-nav { display: none; }
+  .portal-mobile-bar {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 60;
+    background: rgba(255,255,255,.85);
+    border-top: 1px solid rgba(0,0,0,.06);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    justify-content: space-around;
+    padding: 6px 0 env(safe-area-inset-bottom, 6px);
+    box-shadow: 0 -4px 24px rgba(0,0,0,.08);
+  }
+  html.dark .portal-mobile-bar {
+    background: rgba(20,22,28,.85);
+    border-top-color: rgba(255,255,255,.06);
+  }
+  .portal-mobile-bar a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 4px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--t4);
+    text-decoration: none;
+    transition: all .2s;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .portal-mobile-bar a span {
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .portal-mobile-bar a i { font-size: 20px; }
+  .portal-mobile-bar a.on { color: var(--em); background: var(--emb); }
+  .portal-body { padding-bottom: 80px !important; }
+  .portal-hd-user span:not(.portal-user-pill) { display: none; }
+}
+
+/* ─── Scrollbar styling ─── */
+.portal-body::-webkit-scrollbar { width: 6px; }
+.portal-body::-webkit-scrollbar-track { background: transparent; }
+.portal-body::-webkit-scrollbar-thumb { background: var(--b2); border-radius: 3px; }
+.portal-body::-webkit-scrollbar-thumb:hover { background: var(--b3, var(--b2)); }
+
+/* ─── Print styles ─── */
+@media print {
+  .portal-hd, .portal-mobile-bar, .portal-toolbar, .portal-nav, .portal-btn,
+  .portal-print-btn, .portal-pager, .portal-actions { display: none !important; }
+  .portal-doc-hd, .portal-doc-meta, .portal-doc-steps, .portal-doc-progress { display: none !important; }
+  .portal-body { padding: 0; max-width: 100%; }
+  .portal-card { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
+  /* Chrome is display:none, so nothing occupies the top of the sheet. The first
+     CONTENT card (`.portal-sec`, margin-top: 22px on screen) must start at the
+     top; the following sections keep a small gap so they stay distinct. */
+  .portal-sec { margin-top: 0 !important; }
+  .portal-sec ~ .portal-sec { margin-top: 14px !important; }
+}
+
+/* ─── خط أنابيب طلبات البوابة (OrderPipeline) ───────────────────────────── */
+.opipe {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 4px 14px;
+  direction: rtl;
+}
+.opipe-step {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  cursor: default;
+}
+.opipe-step[role="button"] { cursor: pointer; }
+.opipe-node {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg2, #f5f7fb);
+  border: 2px solid var(--b3, #e2e8f0);
+  color: var(--t4, #94a3b8);
+  font-size: 14px;
+  transition: all .2s;
+  z-index: 1;
+}
+.opipe-step.done .opipe-node {
+  background: var(--g, var(--green));
+  border-color: var(--g, var(--green));
+  color: #fff;
+}
+.opipe-step.now .opipe-node {
+  background: var(--em, #2563eb);
+  border-color: var(--em, #2563eb);
+  color: #fff;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--em, #2563eb) 18%, transparent);
+  animation: opipe-pulse 1.8s ease-in-out infinite;
+}
+.opipe-step.sum .opipe-node {
+  background: var(--bg1, #fff);
+  border-color: var(--b3, #e2e8f0);
+  color: var(--t3, #64748b);
+}
+.opipe-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--t4, #94a3b8);
+  white-space: nowrap;
+}
+.opipe-step.done .opipe-label { color: var(--g, var(--green)); }
+.opipe-step.now .opipe-label { color: var(--em, #2563eb); }
+.opipe-step.sum .opipe-label { color: var(--t3, #64748b); }
+.opipe-count {
+  min-width: 18px; height: 17px;
+  padding: 0 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 99px;
+  background: var(--bg2, #f5f7fb);
+  border: 1px solid var(--b3, #e2e8f0);
+  color: var(--t4, #94a3b8);
+  font-size: 10px; font-weight: 800;
+}
+.opipe-count.has { background: var(--em, #2563eb); border-color: var(--em, #2563eb); color: #fff; }
+.opipe-link {
+  flex: 1 1 0;
+  min-width: 10px;
+  height: 2px;
+  margin-top: 14px;
+  background: var(--b3, #e2e8f0);
+  border-radius: 2px;
+}
+.opipe-link.done { background: var(--g, var(--green)); }
+.opipe-branch {
+  align-self: center;
+  display: inline-flex; align-items: center; gap: 4px;
+  margin: 0 6px;
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 11px; font-weight: 800;
+  white-space: nowrap;
+}
+.opipe-branch.cancelled { background: #fee2e2; color: #dc2626; }
+.opipe-branch.returned  { background: #fef3c7; color: #b45309; }
+.opipe-branch--passive  { background: var(--bg2, #f5f7fb); color: var(--t4, #94a3b8); border: 1px dashed var(--b3, #e2e8f0); }
+.opipe-branch-count { font-size: 11px; }
+.opipe--summary { gap: 6px; }
+.opipe--summary .opipe-step { flex: 1 1 0; }
+
+@keyframes opipe-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--em, #2563eb) 18%, transparent); }
+  50%      { box-shadow: 0 0 0 8px color-mix(in srgb, var(--em, #2563eb) 6%, transparent); }
+}

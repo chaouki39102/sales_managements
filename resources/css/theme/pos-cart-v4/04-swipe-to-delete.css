@@ -1,0 +1,30 @@
+/* ════════════════════════════════════════════════════════════════════════
+   SWIPE-TO-DELETE — لمس فقط
+   ════════════════════════════════════════════════════════════════════════ */
+.cr-swipe-wrap {
+  position: relative;
+  overflow: hidden;
+}
+.cr-swipe-del {
+  position: absolute;
+  top: 0; bottom: 0; right: 0;
+  width: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e74c3c;
+  color: #fff;
+  font-size: 20px;
+  opacity: 0;
+  transition: opacity .2s ease;
+  pointer-events: none;
+}
+.cr-swipe-wrap.cr-swipe-active .cr-swipe-del {
+  opacity: 1;
+}
+.cr-swipe-wrap .cr {
+  touch-action: pan-y;
+  will-change: transform;
+}
+
+/* ── حجم xs: إخفاء بادج البيع ── */

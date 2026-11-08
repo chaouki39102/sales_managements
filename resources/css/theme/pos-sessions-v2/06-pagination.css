@@ -1,0 +1,117 @@
+/* ══════════════════════════════════════════
+   PAGINATION
+══════════════════════════════════════════ */
+.pss-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg2);
+  border: 1px solid var(--b2);
+  border-radius: var(--r3);
+}
+.pss-pagination-info {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--t4);
+}
+.pss-pagination-btns {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.pss-page-btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: var(--r1);
+  border: 1px solid var(--b2);
+  background: var(--bg3);
+  color: var(--t2);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: .12s;
+  font-family: 'Tajawal', sans-serif;
+}
+.pss-page-btn:hover:not(:disabled) { background: var(--emb); color: var(--em); border-color: var(--embo); }
+.pss-page-btn.on { background: var(--em); color: #fff; border-color: var(--em); }
+.pss-page-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+/* ══════════════════════════════════════════
+   SPINNER (shared)
+══════════════════════════════════════════ */
+.spin { animation: spin360 1s linear infinite; }
+@keyframes spin360 { to { transform: rotate(360deg); } }
+
+/* ══════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════ */
+@media (max-width: 1200px) {
+  .pss-kpi-row { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 900px) {
+  .pss-kpi-row { grid-template-columns: repeat(2, 1fr); }
+  .pss-live-stats { display: none; }
+  .pss-table td:nth-child(5),
+  .pss-table th:nth-child(5),
+  .pss-table td:nth-child(8),
+  .pss-table th:nth-child(8) { display: none; }
+}
+@media (max-width: 640px) {
+  .pss-page       { padding: 14px; gap: 12px; }
+  .pss-topbar-title { font-size: 16px; }
+  .pss-kpi-row    { grid-template-columns: 1fr 1fr; }
+  .pss-filters    { gap: 8px; }
+  .pss-search     { min-width: 100%; order: -1; }
+  .pss-cards-grid { grid-template-columns: 1fr; }
+  .pss-live-banner { flex-wrap: wrap; }
+  .pss-live-actions { width: 100%; }
+  .pss-live-btn   { flex: 1; justify-content: center; }
+  .pss-table td:nth-child(4),
+  .pss-table th:nth-child(4),
+  .pss-table td:nth-child(5),
+  .pss-table th:nth-child(5),
+  .pss-table td:nth-child(7),
+  .pss-table th:nth-child(7) { display: none; }
+}
+
+/* ─── Device info grid ──────────────────────────────────────────────── */
+.ssm-device-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+.ssm-device-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--bg2);
+  border-radius: var(--r2);
+  border: 1px solid var(--b1);
+}
+.ssm-device-item--full { grid-column: 1 / -1; }
+.ssm-device-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+.ssm-device-value {
+  font-size: 13px;
+  color: var(--t1);
+  font-weight: 600;
+}
+.ssm-device-value--small {
+  font-size: 10px;
+  font-weight: 400;
+  word-break: break-all;
+  line-height: 1.4;
+  color: var(--t3);
+}

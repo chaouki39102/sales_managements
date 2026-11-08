@@ -1,0 +1,359 @@
+/* ════════════════════════════════════════════════════
+   ADDITIONAL UTILITIES
+════════════════════════════════════════════════════ */
+.pos-order-type {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 14px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--b2);
+  flex-shrink: 0;
+}
+.pot-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--b2);
+  border-radius: var(--r1);
+  background: transparent;
+  color: var(--t3);
+  font-family: 'Tajawal', sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.pot-btn:hover {
+  background: var(--bg3);
+  color: var(--t1);
+}
+.pot-btn.on {
+  background: var(--em);
+  color: #fff;
+  border-color: var(--em);
+}
+
+.pos-load-more {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0 32px;
+}
+.pos-load-more .btn {
+  min-width: 160px;
+  font-size: 13px;
+}
+
+.pos-scroll-sentinel { height: 1px; }
+
+.pos-loading-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px 0 32px;
+  color: var(--t2);
+  font-size: 13px;
+}
+.pos-loading-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--b2);
+  border-top-color: var(--ac);
+  border-radius: 50%;
+  animation: pos-spin .6s linear infinite;
+}
+@keyframes pos-spin { to { transform: rotate(360deg); } }
+
+.btn-thermal {
+  background: var(--emb);
+  color: var(--t1);
+  border: 1px solid var(--b2);
+}
+.btn-thermal:hover { background: var(--e3); }
+
+.thermal-status {
+  font-size: 12px;
+  margin-right: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.thermal-status.ok { background: #dcfce7; color: #166534; }
+.thermal-status.err { background: #fee2e2; color: #991b1b; }
+body.dark .thermal-status.ok { background: #064e3b; color: #bbf7d0; }
+body.dark .thermal-status.err { background: #7f1d1d; color: #fecaca; }
+
+.pay-currency-sel {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--r2);
+  border: 1.5px solid var(--b2);
+  background: var(--bg3);
+  font-family: 'Tajawal', sans-serif;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   11. RETURNS MODAL — مرتجع مبيعات
+══════════════════════════════════════════════════════════════════════════════ */
+.ret-search { margin-bottom: 12px; }
+.ret-doc {
+  border: 1.5px solid var(--b2);
+  border-radius: var(--r2);
+  background: var(--bg3);
+  overflow: hidden;
+}
+.ret-doc-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--b2);
+}
+.ret-doc-hd strong { font-size: 13px; }
+.ret-lines {
+  max-height: 320px;
+  overflow-y: auto;
+}
+.ret-line {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--b1);
+  transition: background .1s;
+}
+.ret-line:last-child { border-bottom: none; }
+.ret-line:hover { background: var(--bg4); }
+.ret-line-sel { background: var(--emb); }
+.ret-line-sel:hover { background: var(--emb); }
+.ret-line-disabled { opacity: .45; pointer-events: none; }
+.ret-line-disabled .ret-line-lbl { cursor: default; }
+.ret-line-done { display: block; font-size: 11px; color: var(--green); margin-top: 4px; padding-right: 12px; }
+.ret-line-lbl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 12.5px;
+}
+.ret-line-lbl input[type="checkbox"] {
+  accent-color: var(--em);
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+.ret-line-name { flex: 1; font-weight: 600; }
+.ret-line-qty { color: var(--t4); font-size: 11.5px; }
+.ret-line-amt {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--em);
+}
+.ret-line-qty-inp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--b1);
+  font-size: 12px;
+  color: var(--t3);
+}
+.ret-line-qty-inp .inp {
+  width: 70px;
+  padding: 4px 6px;
+  border-radius: var(--r1);
+  border: 1.5px solid var(--b2);
+  background: var(--bg2);
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'IBM Plex Mono', monospace;
+  text-align: center;
+  outline: none;
+}
+.ret-line-qty-inp .inp:focus {
+  border-color: var(--em);
+  box-shadow: 0 0 0 2px var(--emb);
+}
+.ret-reason {
+  padding: 0 12px 8px;
+}
+.ret-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  margin: 8px 0 0;
+  border-radius: var(--r2);
+  background: var(--bg3);
+  border: 1px solid var(--b2);
+  font-size: 12px;
+  color: var(--t3);
+}
+.ret-summary-total {
+  font-weight: 700;
+  color: var(--purple);
+  font-size: 14px;
+  direction: ltr;
+}
+.ret-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+.ret-footer-total {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--t2);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   12. UTILITY: fg-hint — تلميح في مجموعات الإعدادات
+══════════════════════════════════════════════════════════════════════════════ */
+.fg-hint {
+  font-size: 11px;
+  color: var(--t4);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   13. KEYBOARD HELP MODAL — styles consolidated above near .kb-help-groups
+═════════════════════════════════════════════════════════════════════════════ */
+/* kb-key-clickable removed — replaced by kb-add-btn in new section */
+
+/* ── al-i: alert info variant ── */
+.al-i {
+  background: var(--blueb);
+  border-color: var(--bluebo);
+  color: var(--blue);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   14. UNDO CLEAR — عداد التراجع عن المسح
+══════════════════════════════════════════════════════════════════════════════ */
+.undo-ct {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  margin-right: 3px;
+  border-radius: 8px;
+  background: var(--red);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+}
+.btn-pulse {
+  animation: btnPulse .8s ease-in-out infinite;
+}
+@keyframes btnPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .6; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   15. PRODUCT CARD INCREMENT VARIANT
+══════════════════════════════════════════════════════════════════════════════ */
+.pcard-qty-inc { color: var(--em2); }
+.pcard-qty-inc:hover { background: var(--emb); color: var(--em); }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   16. PRODUCT ROW NAME — عرض القائمة
+══════════════════════════════════════════════════════════════════════════════ */
+.prow-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t1);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   17. SEARCH POSITION BADGE
+══════════════════════════════════════════════════════════════════════════════ */
+.srch-pos {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--t4);
+  direction: ltr;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   18. GENERIC TABLE CLASSES
+══════════════════════════════════════════════════════════════════════════════ */
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.tbl th,
+.tbl td {
+  padding: 8px 10px;
+  text-align: right;
+  border-bottom: 1px solid var(--b2);
+}
+.tbl th {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--t3);
+  background: var(--bg2);
+}
+.tbl-sm { font-size: 12px; }
+.tbl-sm th,
+.tbl-sm td { padding: 6px 8px; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   19. SESSION INVOICE ROW
+══════════════════════════════════════════════════════════════════════════════ */
+.si-row-sel{background:var(--bg3);}
+.si-row-sel td:first-child{border-right:3px solid var(--em);}
+.si-modal-body{padding-bottom:0;}
+.si-th-sort{cursor:pointer;user-select:none;}
+.si-th-sort:hover{color:var(--em);}
+.si-empty{text-align:center;padding:40px;color:var(--t4);}
+.si-empty i{margin-bottom:8px;}
+.si-empty-lg i{font-size:24px;}
+.si-empty-sm i{font-size:32px;}
+.si-sort-ic{font-size:11px;margin-left:3px;}
+.si-foot-hint{font-size:12px;color:var(--t4);}
+.si-ttc-cell{font-weight:600;color:var(--purple);}
+.si-paid-cell{color:var(--gold);}
+.si-remain-cell{font-weight:600;}
+.si-remain-pos{color:var(--red);}
+.si-remain-neg{color:var(--t4);}
+.si-foot-row{font-weight:700;border-top:2px solid var(--b3);}
+.si-null{color:var(--t4);}
+
+/* ═══ SI ENHANCEMENTS ═══ */
+.si-info-bar{display:flex;flex-wrap:wrap;gap:8px 16px;padding:8px 12px;background:var(--bg2);border-radius:6px;margin-bottom:10px;font-size:13px;color:var(--t2);align-items:center;}
+.si-info-bar i{margin-left:4px;font-size:14px;}
+.si-info-total{font-weight:700;color:var(--purple);margin-right:auto;}
+.si-search{position:relative;margin-bottom:10px;}
+.si-search-input{width:100%;padding:8px 32px 8px 32px;border:1px solid var(--b3);border-radius:6px;background:var(--bg);color:var(--t1);font-size:13px;}
+.si-search-input:focus{outline:none;border-color:var(--em);}
+.si-search .ti-search{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--t4);font-size:14px;}
+.si-search-clear{position:absolute;left:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--t4);font-size:14px;}
+.si-search-clear:hover{color:var(--t1);}
+.si-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap;}
+.si-badge i{font-size:12px;}
+.si-badge-paid{background:#16a34a18;color:var(--green);}
+.si-badge-partial{background:#ea580c18;color:#ea580c;}
+.si-badge-unpaid{background:#dc262618;color:#dc2626;}
+.si-badge-cancelled{background:#6b728018;color:#6b7280;}
+.si-badge-returned{background:#dc262618;color:#dc2626;border:1px solid #dc262644;}
+.si-return-amt{color:#dc2626;}
+.si-print-btn{background:none;border:none;cursor:pointer;color:var(--t3);padding:4px;border-radius:4px;transition:all .1s;display:inline-flex;align-items:center;justify-content:center;line-height:1;}
+.si-print-btn:hover{color:var(--em);background:var(--bg3);}
+.si-col-resize{position:absolute;top:0;inset-inline-end:0;width:6px;cursor:col-resize;height:100%;z-index:2;background:transparent;}
+.si-col-resize:hover,.si-col-resize:active{background:var(--em);}
+.si-tbl-wrap th{position:relative;}

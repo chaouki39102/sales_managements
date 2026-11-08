@@ -1,0 +1,366 @@
+/* ════════════════════════════════════════════════════
+   CART ITEMS
+════════════════════════════════════════════════════ */
+.cart-items {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.cart-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--t4);
+  padding: 30px;
+}
+.ce-ico { font-size: 44px; opacity: .2; }
+.ce-ttl { font-size: 14px; font-weight: 800; color: var(--t3); }
+.ce-sub { font-size: 11.5px; color: var(--t4); text-align: center; }
+
+/* Cart Row — ⚠️ الكتلة القديمة (.cart-row + أصناف .cr-* مستقلة) حُذفت
+   من هنا نهائياً. كانت تتصادم مباشرة مع نفس أسماء الأصناف المُستخدَمة
+   في مكوّن CartRow.tsx (v4) المعرَّفة في pos-cart-v4.css — وتحديداً
+   قاعدة `.cq-inp { font-size: 13px !important; }` كانت تفرض نفسها
+   بغض النظر عن ترتيب الاستيراد بسبب !important، إضافة إلى
+   `.cr-price-row { flex-wrap: wrap; }` القديمة التي كانت تتسبب في
+   انكسار صف السلة لسطرين كاملين بدل سطر واحد عند ضيق العرض. التصميم
+   الوحيد المعتمد الآن لصفوف السلة موجود حصراً في pos-cart-v4.css. */
+
+/* ════════════════════════════════════════════════════
+   CART TOTALS
+════════════════════════════════════════════════════ */
+.cart-totals {
+  padding: 10px 12px;
+  border-top: 1px solid var(--b2);
+  flex-shrink: 0;
+  background: var(--bg3);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ct-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--t3);
+}
+.ct-disc { color: var(--red); }
+.ct-grand {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0 0;
+  margin-top: 4px;
+  border-top: 2px solid var(--b2);
+  font-size: 14px;
+  color: var(--t1);
+  font-weight: 800;
+}
+.grand-amount { font-size: 20px; font-weight: 900; color: var(--em); }
+.ct-details-toggle {
+  cursor: pointer;
+  padding: 5px 2px;
+  border-radius: var(--r1);
+  transition: background .12s;
+}
+.ct-details-toggle:hover { background: var(--bg3); }
+.ct-grand-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  color: var(--t3);
+}
+.ct-toggle-ic { font-size: 13px; transition: transform .18s; }
+.ct-toggle-ic.open { transform: rotate(180deg); }
+
+/* ════════════════════════════════════════════════════
+   CART ACTIONS
+════════════════════════════════════════════════════ */
+.cart-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--b2);
+  flex-shrink: 0;
+  background: var(--bg2);
+}
+.cart-sell-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 14px;
+  border-radius: var(--r2);
+  border: none;
+  background: var(--em);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: 'Tajawal', sans-serif;
+  box-shadow: var(--emglow);
+  transition: .14s;
+  position: relative;
+}
+.cart-sell-btn:hover:not(:disabled) { background: var(--em2); box-shadow: var(--emglow2); transform: translateY(-1px); }
+.cart-sell-btn:active { transform: none; }
+.cart-sell-btn:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+
+/* ── Keyboard shortcut indicator on POS buttons ── */
+.pos-kbd {
+  font: 600 7.5px/1 monospace;
+  padding: 1px 4px;
+  background: var(--bg4);
+  border: 1px solid var(--b3);
+  border-radius: 3px;
+  color: var(--t4);
+  pointer-events: none;
+  flex-shrink: 0;
+  margin-inline-start: 3px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+/* Icon-only button with shortcut: icon + small label stacked */
+.btn-xs.pos-sc {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 2px 6px;
+  line-height: 1;
+}
+.btn-xs.pos-sc i { font-size: 14px; flex-shrink: 0; }
+.btn-xs.pos-sc kbd {
+  font: 600 7px/1 monospace;
+  color: var(--t4);
+  opacity: .7;
+  pointer-events: none;
+  flex-shrink: 0;
+  margin: 0;
+}
+.btn-xs.pos-sc:disabled i,
+.btn-xs.pos-sc:disabled kbd { opacity: .3; }
+@media (max-width: 768px) {
+  .pos-kbd, .btn-xs.pos-sc kbd { display: none !important; }
+  .btn-xs.pos-sc { flex-direction: row; }
+}
+
+/* ════════════════════════════════════════════════════
+   MODALS
+════════════════════════════════════════════════════ */
+.ov {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  backdrop-filter: blur(3px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.ov.on { display: flex; animation: fadeIn .15s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.modal {
+  background: var(--bg2);
+  border-radius: var(--r3);
+  border: 1px solid var(--b2);
+  box-shadow: var(--shadow3);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  animation: modalIn .18s cubic-bezier(.34,1.56,.64,1);
+  width: 100%;
+}
+@keyframes modalIn { from { opacity: 0; transform: scale(.94) translateY(-8px); } to { opacity: 1; transform: none; } }
+
+.modal-sm { max-width: 480px; }
+.modal-md { max-width: 600px; }
+.modal-lg { max-width: 780px; }
+.modal-pay { max-width: 780px; }
+.modal-pay-v2 { max-width: 780px; }
+.modal-receipt { max-width: 500px; }
+
+.m-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--b2);
+  flex-shrink: 0;
+}
+.m-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--t1);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.m-client-tag {
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--emb);
+  color: var(--em);
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--embo);
+}
+.m-docnum {
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--bg4);
+  color: var(--t3);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-family: monospace;
+}
+.m-x {
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r1);
+  cursor: pointer;
+  color: var(--t3);
+  font-size: 16px;
+  transition: .12s;
+}
+.m-x:hover { background: var(--bg4); color: var(--t1); }
+.m-body { padding: 16px 18px; overflow-y: auto; flex: 1; }
+.m-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--b2);
+  flex-shrink: 0;
+  background: var(--bg3);
+  border-radius: 0 0 var(--r3) var(--r3);
+}
+
+/* ════════════════════════════════════════════════════
+   PAYMENT MODAL (الإصدار المتقدم v2 من pos-additions.css)
+════════════════════════════════════════════════════ */
+.pay-v2-body {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 0;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+.pay-v2-left {
+  border-left: 1px solid var(--b2);
+  padding: 12px 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.pay-v2-right {
+  padding: 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.pay-v2-hero {
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  text-align: center;
+  padding: 14px 10px 10px;
+  background: linear-gradient(135deg, var(--emb), transparent);
+  border: 1px solid var(--embo);
+  border-radius: var(--r3);
+  margin-bottom: 10px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.4);
+}
+body.dark .pay-v2-hero { box-shadow: inset 0 1px 0 rgba(255,255,255,.03); }
+.pay-v2-hero::before {
+  content: '';
+  position: absolute;
+  top: -60%; left: 50%;
+  width: 160%; height: 160%;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, var(--em2b) 0%, transparent 65%);
+  pointer-events: none;
+}
+.pay-hero-label  {
+  position: relative;
+  font-size: 11px; color: var(--t4); font-weight: 700;
+  margin-bottom: 4px; text-transform: uppercase; letter-spacing: .6px;
+}
+.pay-hero-amount {
+  position: relative;
+  font-size: 33px; font-weight: 900; color: var(--em);
+  line-height: 1; letter-spacing: -1px; direction: ltr;
+  text-shadow: 0 1px 0 rgba(255,255,255,.25);
+}
+body.dark .pay-hero-amount { text-shadow: none; }
+.pay-hero-client {
+  position: relative;
+  margin-top: 7px; padding-top: 7px;
+  border-top: 1px dashed var(--embo);
+  font-size: 12px; color: var(--t3); font-weight: 600;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+
+.pay-v2-summary { margin-bottom: 10px; }
+.pay-v2-balance { margin-bottom: 6px; }
+.pvs-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  padding: 5px 2px;
+  border-bottom: 1px solid var(--b1);
+  color: var(--t3);
+}
+.pvs-row:last-child { border-bottom: none; }
+.pvs-disc span:last-child { color: var(--red); font-weight: 700; }
+.pvs-total {
+  font-weight: 800; color: var(--t1); font-size: 14px;
+  margin-top: 4px; padding: 8px;
+  background: var(--emb); border-radius: var(--r1);
+  border-bottom: none;
+}
+.pvs-total strong { color: var(--em); }
+
+.pay-v2-section { margin-bottom: 8px; }
+.pay-v2-sec-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  margin-bottom: 5px;
+}
+.pay-v2-select,
+.pay-v2-date,
+.pay-v2-note {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: var(--r1);
+  border: 1px solid var(--b2);
+  background: var(--bg3);
+  font-family: 'Tajawal', sans-serif;
+  font-size: 12.5px;
+  color: var(--t1);
+  outline: none;
+}
+.pay-v2-date { width: 100%; padding: 6px 8px; border-radius: var(--r1); border: 1px solid var(--b2); background: var(--bg3); font-size: 12.5px; outline: none; }
+.pay-v2-note { width: 100%; padding: 7px 8px; border-radius: var(--r1); border: 1px solid var(--b2); background: var(--bg3); font-family: 'Tajawal', sans-serif; font-size: 12.5px; resize: none; outline: none; }
+.pay-v2-select:focus,
+.pay-v2-date:focus,
+.pay-v2-note:focus { border-color: var(--em); box-shadow: 0 0 0 2px var(--emb); }

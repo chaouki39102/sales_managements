@@ -257,9 +257,9 @@ body.dark .receipt-wrap{background:#fff;color:#0d1b2a;}
 .receipt-head{
   display:flex;justify-content:space-between;
   align-items:flex-start;margin-bottom:16px;
-  padding-bottom:12px;border-bottom:2px solid #0a8a5c;
+  padding-bottom:12px;border-bottom:2px solid var(--em);
 }
-.receipt-logo{font-size:16px;font-weight:900;color:#0a8a5c;margin-bottom:4px;}
+.receipt-logo{font-size:16px;font-weight:900;color:var(--em);margin-bottom:4px;}
 .receipt-meta{font-size:10.5px;color:#64748b;line-height:1.6;}
 .receipt-num{text-align:left;font-size:13px;font-weight:800;color:#0d1b2a;}
 .receipt-totals{
