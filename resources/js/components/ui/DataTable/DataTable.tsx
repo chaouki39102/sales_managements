@@ -58,6 +58,7 @@ import VirtualFooter from './parts/VirtualFooter';
 import BatchEditBar from './parts/BatchEditBar';
 import SmartFilterDialog from './parts/dialogs/SmartFilterDialog';
 import SaveViewDialog from './parts/dialogs/SaveViewDialog';
+import './datatable.css';
 import ShortcutsDialog from './parts/dialogs/ShortcutsDialog';
 
 // ════════════════════════════════════════════════════════════════════════════

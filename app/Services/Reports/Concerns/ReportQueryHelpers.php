@@ -13,7 +13,7 @@ trait ReportQueryHelpers
 {
     private const SALE_CODES = ['FV', 'AV', 'POS'];
     private const PURCHASE_CODES = ['FA', 'AA'];
-    private const AR_MONTHS = ['ط¬ط§ظ†ظپظٹ', 'ظپظٹظپط±ظٹ', 'ظ…ط§ط±ط³', 'ط£ظپط±ظٹظ„', 'ظ…ط§ظٹ', 'ط¬ظˆط§ظ†', 'ط¬ظˆظٹظ„ظٹط©', 'ط£ظˆطھ', 'ط³ط¨طھظ…ط¨ط±', 'ط£ظƒطھظˆط¨ط±', 'ظ†ظˆظپظ…ط¨ط±', 'ط¯ظٹط³ظ…ط¨ط±'];
+    private const AR_MONTHS = ['جانفي', 'فيفري', 'مارس', 'أفريل', 'ماي', 'جوان', 'جويلية', 'أوت', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
 
     private function companyId(): int
     {

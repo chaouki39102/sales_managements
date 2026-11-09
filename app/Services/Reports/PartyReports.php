@@ -296,10 +296,10 @@ class PartyReports
         $parties = $invoices->groupBy('party_id');
 
         $buckets = [
-            '0_30'   => ['label' => '0â€“30 ظٹظˆظ…',  'total' => 0, 'count' => 0],
-            '31_60'  => ['label' => '31â€“60 ظٹظˆظ…', 'total' => 0, 'count' => 0],
-            '61_90'  => ['label' => '61â€“90 ظٹظˆظ…', 'total' => 0, 'count' => 0],
-            '90_plus' => ['label' => 'ط£ظƒط«ط± ظ…ظ† 90 ظٹظˆظ…', 'total' => 0, 'count' => 0],
+            '0_30'   => ['label' => '0–30 يوم',  'total' => 0, 'count' => 0],
+            '31_60'  => ['label' => '31–60 يوم', 'total' => 0, 'count' => 0],
+            '61_90'  => ['label' => '61–90 يوم', 'total' => 0, 'count' => 0],
+            '90_plus' => ['label' => 'أكثر من 90 يوم', 'total' => 0, 'count' => 0],
         ];
 
         $rows = $parties->map(function ($docs, $partyId) use ($ref, &$buckets) {
@@ -313,7 +313,7 @@ class PartyReports
 
             return [
                 'party_id'      => (int) $partyId,
-                'party_name'    => $party?->name ?? 'â€”',
+                'party_name'    => $party?->name ?? '—',
                 'total_due'     => round($total, 2),
                 'invoice_count' => $docs->count(),
                 'max_days'      => $days,
