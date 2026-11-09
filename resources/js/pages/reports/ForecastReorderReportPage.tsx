@@ -60,7 +60,7 @@ export default function ForecastReorderReportPage() {
                 ...data.items.map((r, i) => ({ ...r, _idx: i + 1 })),
                 { id: '__summary', _idx: null, product_name: `الإجمالي (${data.items.length} منتج)`, product_ref: '', total_sold: '', daily_rate_qty: '', forecast_qty: '', forecast_value: data.summary.total_forecast_value, forecast_profit: data.summary.total_forecast_profit, current_stock: '', suggested_qty: data.summary.total_suggested_qty },
               ]}
-              rowKey="product_id"
+              rowKey={(row) => (row as any).id === '__summary' ? '__summary' : ((row as any).is_manual ? `manual:${(row as any).product_name}` : String((row as any).product_id ?? ''))}
             />
           </Card>
         </>

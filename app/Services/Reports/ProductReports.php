@@ -181,12 +181,13 @@ class ProductReports
             $avgCost = $avgPurchase[$product->id] ?? (float) $product->purchase_price_ht;
             $stockVal = round($stockQty * $avgCost, 2);
             $margin = $ss['sales_ht'] - $ss['sales_cost'];
-            // طھظƒظ„ظپط© ط§ظ„ط¨ط¶ط§ط¹ط© ط§ظ„ظ…ط¨ط§ط¹ط© = ط§ظ„طھظƒظ„ظپط© ط§ظ„ظ…ط³ط¬ظ„ط© ط¹ظ„ظ‰ ط£ط³ط·ط± ط§ظ„ط¨ظٹط¹ (SSOT â€” طھط´ظ…ظ„ ط®طµظ…/ط¥ط±ط¬ط§ط¹ AV)
+            // تكلفة البضاعة المباعة = التكلفة المسجلة على أسطر البيع (SSOT — تشمل خصم/إرجاع AV)
             $cogs = $ss['sales_cost'] > 0 ? $ss['sales_cost'] : $ss['total_sold'] * $avgCost;
             $estProfit = $ss['sales_ht'] - $cogs;
             $status = $stockQty <= 0 ? 'out_of_stock' : ($stockQty < (float) $product->min_stock_alert ? 'reorder' : 'good');
             return [
                 'id'                  => $product->id,
+                'is_manual'           => false,
                 'ref'                 => $product->ref,
                 'name'                => $product->name,
                 'family'              => $product->family?->name,
@@ -213,6 +214,94 @@ class ProductReports
             ];
         })->values();
 
+        // ─── منتجات يدوية (product_id IS NULL): تُعرض كتجميع حسب الوصف ─────────────
+        // المنتج اليدوي سطر حر بدون سجل كتالوج/مخزون؛ تكلفته = cost_price_ht المسجلة
+        // على السطر (قد تكون 0 إن لم تُحدَّد). يُستبعد من عدّ «تحتاج إعادة طلب».
+        $manualSales = DB::table('commercial_document_lines as cdl')
+            ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+            ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->whereNull('cd.deleted_at')
+            ->where('cd.company_id', $this->companyId())
+            ->whereNull('cdl.product_id')
+            ->whereIn('dt.code', self::SALE_CODES);
+        if (!empty($filters['fiscal_year_id'])) $manualSales->where('cd.fiscal_year_id', $filters['fiscal_year_id']);
+        if (!empty($filters['from_date'])) $manualSales->whereDate('cd.document_date', '>=', $filters['from_date']);
+        if (!empty($filters['to_date'])) $manualSales->whereDate('cd.document_date', '<=', $filters['to_date']);
+        $manualSales = $manualSales->select(
+                DB::raw("COALESCE(NULLIF(TRIM(cdl.description), ''), 'منتج يدوي') as manual_name"),
+                DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity ELSE cdl.quantity END) as total_sold"),
+                DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.total_ht ELSE cdl.total_ht END) as sales_ht"),
+                DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity * cdl.cost_price_ht ELSE cdl.quantity * cdl.cost_price_ht END) as sales_cost")
+            )
+            ->groupBy(DB::raw("COALESCE(NULLIF(TRIM(cdl.description), ''), 'منتج يدوي')"))
+            ->get();
+
+        $manualPurchases = DB::table('commercial_document_lines as cdl')
+            ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
+            ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
+            ->whereNull('cd.deleted_at')
+            ->where('cd.company_id', $this->companyId())
+            ->whereNull('cdl.product_id')
+            ->whereIn('dt.code', self::PURCHASE_CODES);
+        if (!empty($filters['fiscal_year_id'])) $manualPurchases->where('cd.fiscal_year_id', $filters['fiscal_year_id']);
+        if (!empty($filters['from_date'])) $manualPurchases->whereDate('cd.document_date', '>=', $filters['from_date']);
+        if (!empty($filters['to_date'])) $manualPurchases->whereDate('cd.document_date', '<=', $filters['to_date']);
+        $manualPurchases = $manualPurchases->select(
+                DB::raw("COALESCE(NULLIF(TRIM(cdl.description), ''), 'منتج يدوي') as manual_name"),
+                DB::raw("SUM(CASE WHEN dt.code = 'AA' THEN -cdl.quantity ELSE cdl.quantity END) as qty_bought"),
+                DB::raw("SUM(CASE WHEN dt.code = 'AA' THEN -cdl.total_ht ELSE cdl.total_ht END) as purchase_ht")
+            )
+            ->groupBy(DB::raw("COALESCE(NULLIF(TRIM(cdl.description), ''), 'منتج يدوي')"))
+            ->get()
+            ->keyBy('manual_name');
+
+        $manualSeq = 0;
+        $manualRows = $manualSales->map(function ($m) use (&$manualSeq, $manualPurchases, $canViewCost) {
+            $manualSeq--;
+            $name = (string) $m->manual_name;
+            $mp = $manualPurchases->get($name);
+            $salesHt = round((float) $m->sales_ht, 2);
+            $salesCost = round((float) $m->sales_cost, 2);
+            $totalSold = (float) $m->total_sold;
+            $cogs = $salesCost; // تكلفة مسجلة على السطر (0 إن لم تُحدَّد) — لا بديل كتالوجي
+            $margin = $salesHt - $salesCost;
+            $estProfit = $salesHt - $cogs;
+            $qtyBought = $mp ? (float) $mp->qty_bought : 0.0;
+            $purchaseHt = $mp ? round((float) $mp->purchase_ht, 2) : 0.0;
+
+            return [
+                'id'                  => $manualSeq,          // معرّف اصطناعي سالب (فريد داخل الاستجابة)
+                'is_manual'           => true,
+                'ref'                 => 'يدوي',
+                'name'                => $name,
+                'family'              => null,
+                'brand'               => null,
+                'unit'                => null,
+                'purchase_price_ht'   => $canViewCost ? 0 : null,
+                'current_cost_price'  => $canViewCost ? 0 : null,
+                'tva_rate'            => null,
+                'stock_quantity'       => 0,
+                'min_stock_alert'     => 0,
+                'stock_value'         => $canViewCost ? 0 : null,
+                'total_sold'          => (int) round($totalSold),
+                'sales_ht'            => $salesHt,
+                'sales_cost'          => $canViewCost ? $salesCost : null,
+                'margin_value'        => $canViewCost ? round($margin, 2) : null,
+                'margin_pct'          => $canViewCost ? ($salesHt > 0 ? round($margin / $salesHt * 100, 2) : 0) : null,
+                'qty_bought'          => round($qtyBought, 2),
+                'purchase_ht'         => $purchaseHt,
+                'avg_purchase_price'  => $canViewCost ? 0 : null,
+                'cogs_estimated'      => $canViewCost ? round($cogs, 2) : null,
+                'est_profit'          => $canViewCost ? round($estProfit, 2) : null,
+                'profit_pct'          => $canViewCost ? ($salesHt > 0 ? round($estProfit / $salesHt * 100, 2) : 0) : null,
+                'stock_status'        => 'manual',
+            ];
+        })->values();
+
+        // دمج: المنتجات اليدوية التي لها مشتريات فقط (دون مبيعات) لا تُضاف هنا لأنها نادرة؛
+        // تقرير المنتجات يركّز على الربحية/المبيعات، بينما ملخص الشراء يظهرها في تقارير الشراء.
+        $rows = $rows->concat($manualRows)->values();
+
         // طھط±طھظٹط¨ ط­ط³ط¨ ط§ظ„ط±ط¨ط­ ط§ظ„ظ…ظ‚ط¯ط± (طھظ†ط§ط²ظ„ظٹ) ط«ظ… طھط«ط¨ظٹطھ ط±ظ‚ظ… ط§ظ„طھط±طھظٹط¨
         $rows = $rows->sortByDesc('est_profit')->values()
             ->map(function ($row, $i) use ($canViewCost) {
@@ -230,7 +319,7 @@ class ProductReports
         return [
             'products' => $rows->toArray(),
             'summary' => [
-                'total_products'    => $products->count(),
+                'total_products'    => $rows->count(),
                 'total_stock_value' => $canViewCost ? round(array_sum(array_column($rows->toArray(), 'stock_value')), 2) : null,
                 'total_sold'        => array_sum(array_column($rows->toArray(), 'total_sold')),
                 'total_sales_ht'    => $totalSalesHt,
@@ -239,10 +328,10 @@ class ProductReports
                 'total_cogs'        => $canViewCost ? round(array_sum(array_column($rows->toArray(), 'cogs_estimated')), 2) : null,
                 'total_est_profit'  => $canViewCost ? $totalEstProfit : null,
                 'margin_pct'        => $canViewCost ? ($totalSalesHt > 0 ? round($totalEstProfit / $totalSalesHt * 100, 2) : 0) : null,
-                'reorder_count'     => $rows->filter(fn($r) => $r['stock_status'] !== 'good')->count(),
+                'reorder_count'     => $rows->filter(fn($r) => ($r['is_manual'] ?? false) !== true && $r['stock_status'] !== 'good')->count(),
             ],
-            'best_product'  => $best  ? ['id' => $best['id'], 'name' => $best['name'], 'est_profit' => $canViewCost ? $best['est_profit'] : null] : null,
-            'worst_product' => $worst ? ['id' => $worst['id'], 'name' => $worst['name'], 'est_profit' => $canViewCost ? $worst['est_profit'] : null] : null,
+            'best_product'  => $best  ? ['id' => $best['id'], 'name' => $best['name'], 'est_profit' => $canViewCost ? $best['est_profit'] : null, 'is_manual' => (bool) ($best['is_manual'] ?? false)] : null,
+            'worst_product' => $worst ? ['id' => $worst['id'], 'name' => $worst['name'], 'est_profit' => $canViewCost ? $worst['est_profit'] : null, 'is_manual' => (bool) ($worst['is_manual'] ?? false)] : null,
         ];
     }
 
@@ -286,19 +375,22 @@ class ProductReports
 
         $salesRows = $salesQ->select(
                 'cdl.product_id',
+                DB::raw("MAX(CASE WHEN cdl.product_id IS NULL THEN cdl.description ELSE NULL END) as manual_description"),
                 DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity ELSE cdl.quantity END) as total_qty"),
                 DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.total_ht ELSE cdl.total_ht END) as total_ht"),
                 DB::raw('MIN(cd.document_date) as first_sale'),
                 DB::raw('MAX(cd.document_date) as last_sale')
             )
-            ->groupBy('cdl.product_id')
+            ->groupBy('cdl.product_id', DB::raw("CASE WHEN cdl.product_id IS NULL THEN COALESCE(cdl.description, '') ELSE '' END"))
             ->havingRaw('total_qty > 0')
             ->get();
 
-        $productIds = $salesRows->pluck('product_id');
-        $products   = Product::whereIn('id', $productIds)->get()->keyBy('id');
+        $productIds = $salesRows->pluck('product_id')->filter()->unique()->values();
+        $products   = $productIds->isNotEmpty()
+            ? Product::whereIn('id', $productIds)->get()->keyBy('id')
+            : collect();
 
-        // ظ…طھظˆط³ط· ط³ط¹ط± ط§ظ„ط´ط±ط§ط، ط§ظ„ظ…ط±ط¬ط­ (ظƒظ„ ط§ظ„ظپطھط±ط§طھ)
+        // متوسط سعر الشراء المرجح (كل الفترات) — للمنتجات الكتالوجية فقط
         $avgPurchase = [];
         if ($productIds->isNotEmpty()) {
             $avgRows = DB::table('commercial_document_lines as cdl')
@@ -321,7 +413,7 @@ class ProductReports
             }
         }
 
-        // ط§ظ„ظ…ط®ط²ظˆظ† ط§ظ„ط­ط§ظ„ظٹ (SSOT)
+        // المخزون الحالي (SSOT) — للمنتجات الكتالوجية فقط
         $stockMap = [];
         if ($productIds->isNotEmpty()) {
             $asOf = $to ?? date('Y-m-d');
@@ -330,9 +422,11 @@ class ProductReports
             }
         }
 
-        $items = $salesRows->map(function ($r) use ($products, $avgPurchase, $stockMap, $horizon) {
-            $p = $products->get($r->product_id);
-            $avgCost = $avgPurchase[$r->product_id] ?? (float) ($p?->purchase_price_ht ?? 0);
+        $manualSeq = 0;
+        $items = $salesRows->map(function ($r) use ($products, $avgPurchase, $stockMap, $horizon, &$manualSeq) {
+            $isManual = $r->product_id === null || $r->product_id === '';
+            $p = !$isManual ? $products->get($r->product_id) : null;
+            $avgCost = $isManual ? 0.0 : ($avgPurchase[$r->product_id] ?? (float) ($p?->purchase_price_ht ?? 0));
             $first = Carbon::parse($r->first_sale);
             $last  = Carbon::parse($r->last_sale);
             $activeDays = max(1, (int) $first->diffInDays($last) + 1);
@@ -343,12 +437,20 @@ class ProductReports
             $forecastQty   = round($dailyQty * $horizon, 2);
             $forecastValue = round($dailyValue * $horizon, 2);
             $forecastProfit = round($forecastValue - $forecastQty * $avgCost, 2);
-            $stock = (float) ($stockMap[$r->product_id]['current_stock'] ?? 0);
-            $suggested = max(0, round($forecastQty - $stock, 2));
+            // المنتج اليدوي بلا مخزون مُدار: لا اقتراح إعادة طلب
+            $stock = $isManual ? 0.0 : (float) ($stockMap[$r->product_id]['current_stock'] ?? 0);
+            $suggested = $isManual ? 0.0 : max(0, round($forecastQty - $stock, 2));
+            $name = $isManual
+                ? (trim((string) ($r->manual_description ?? '')) ?: 'منتج يدوي')
+                : ($p?->name ?? '—');
+            $ref = $isManual ? 'يدوي' : ($p?->ref ?? '—');
+            if ($isManual) $manualSeq--;
+
             return [
-                'product_id'         => (int) $r->product_id,
-                'product_name'       => $p?->name ?? 'â€”',
-                'product_ref'        => $p?->ref ?? 'â€”',
+                'product_id'         => $isManual ? $manualSeq : (int) $r->product_id,
+                'is_manual'          => $isManual,
+                'product_name'       => $name,
+                'product_ref'        => $ref,
                 'first_sale'         => $r->first_sale,
                 'last_sale'          => $r->last_sale,
                 'active_days'        => $activeDays,

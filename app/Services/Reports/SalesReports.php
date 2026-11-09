@@ -66,7 +66,7 @@ class SalesReports
         $productRecap = [];
         if ($docIds->isNotEmpty()) {
             $lineRows = DB::table('commercial_document_lines as cdl')
-                ->join('products as p', 'p.id', '=', 'cdl.product_id')
+                ->leftJoin('products as p', 'p.id', '=', 'cdl.product_id')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
                 ->whereNull('cd.deleted_at')
@@ -74,6 +74,7 @@ class SalesReports
                 ->whereIn('cdl.commercial_document_id', $docIds)
                 ->select(
                     'cdl.product_id',
+                    DB::raw("MAX(CASE WHEN cdl.product_id IS NULL THEN cdl.description ELSE NULL END) as manual_description"),
                     'p.name as product_name',
                     'p.ref as product_ref',
                     DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity ELSE cdl.quantity END) as total_qty"),
@@ -83,26 +84,32 @@ class SalesReports
                     DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.total_tva ELSE cdl.total_tva END) as total_tva"),
                     DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.total_discount_amount ELSE cdl.total_discount_amount END) as total_discount")
                 )
-                ->groupBy('cdl.product_id', 'p.name', 'p.ref')
+                ->groupBy('cdl.product_id', 'p.name', 'p.ref', DB::raw("CASE WHEN cdl.product_id IS NULL THEN COALESCE(cdl.description, '') ELSE '' END"))
                 ->orderByDesc('total_ht')
                 ->get();
 
             foreach ($lineRows as $lr) {
+                $isManual = $lr->product_id === null || $lr->product_id === '';
+                $name = $isManual
+                    ? (trim((string) ($lr->manual_description ?? '')) ?: 'منتج يدوي')
+                    : ($lr->product_name ?? '—');
+                $ref = $isManual ? 'يدوي' : ($lr->product_ref ?? '—');
                 $ht = (float) $lr->total_ht;
                 $cost = (float) $lr->total_cost;
                 $margin = $ht - $cost;
                 $productRecap[] = [
-                    'product_id'   => $lr->product_id,
-                    'product_name' => $lr->product_name,
-                    'product_ref'  => $lr->product_ref,
-                    'total_qty'    => (float) $lr->total_qty,
-                    'total_ht'     => round($ht, 2),
-                    'total_tva'    => round((float) $lr->total_tva, 2),
-                    'total_ttc'    => round((float) $lr->total_ttc, 2),
-                    'total_cost'   => $canViewCost ? round($cost, 2) : null,
+                    'product_id'     => $lr->product_id !== null ? (int) $lr->product_id : null,
+                    'is_manual'      => $isManual,
+                    'product_name'   => $name,
+                    'product_ref'    => $ref,
+                    'total_qty'      => (float) $lr->total_qty,
+                    'total_ht'       => round($ht, 2),
+                    'total_tva'      => round((float) $lr->total_tva, 2),
+                    'total_ttc'      => round((float) $lr->total_ttc, 2),
+                    'total_cost'     => $canViewCost ? round($cost, 2) : null,
                     'total_discount' => round((float) $lr->total_discount, 2),
-                    'margin_value' => $canViewCost ? round($margin, 2) : null,
-                    'margin_pct'   => $canViewCost ? ($ht > 0 ? round($margin / $ht * 100, 2) : 0) : null,
+                    'margin_value'   => $canViewCost ? round($margin, 2) : null,
+                    'margin_pct'     => $canViewCost ? ($ht > 0 ? round($margin / $ht * 100, 2) : 0) : null,
                 ];
             }
         }
@@ -190,19 +197,20 @@ class SalesReports
         $lineData = [];
         if ($documents->isNotEmpty()) {
             $lineData = DB::table('commercial_document_lines as cdl')
-                ->join('products as p', 'p.id', '=', 'cdl.product_id')
+                ->leftJoin('products as p', 'p.id', '=', 'cdl.product_id')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->where('cd.company_id', $this->companyId())
                 ->whereIn('cdl.commercial_document_id', $documents->pluck('id'))
                 ->select(
                     'cdl.product_id',
+                    DB::raw("MAX(CASE WHEN cdl.product_id IS NULL THEN cdl.description ELSE NULL END) as manual_description"),
                     'p.name as product_name',
                     'p.ref as product_ref',
                     DB::raw('SUM(cdl.quantity) as total_qty'),
                     DB::raw('SUM(cdl.total_ht) as total_ht'),
                     DB::raw('SUM(cdl.total_ttc) as total_ttc')
                 )
-                ->groupBy('cdl.product_id', 'p.name', 'p.ref')
+                ->groupBy('cdl.product_id', 'p.name', 'p.ref', DB::raw("CASE WHEN cdl.product_id IS NULL THEN COALESCE(cdl.description, '') ELSE '' END"))
                 ->orderByDesc('total_ht')
                 ->get()
                 ->toArray();
@@ -224,14 +232,23 @@ class SalesReports
 
         return [
             'documents' => $returnDocs,
-            'product_recap' => array_map(fn($lr) => [
-                'product_id'   => $lr->product_id,
-                'product_name' => $lr->product_name,
-                'product_ref'  => $lr->product_ref,
-                'total_qty'    => (float) $lr->total_qty,
-                'total_ht'     => round((float) $lr->total_ht, 2),
-                'total_ttc'    => round((float) $lr->total_ttc, 2),
-            ], $lineData),
+            'product_recap' => array_map(function ($lr) {
+                $isManual = $lr->product_id === null || $lr->product_id === '';
+                $name = $isManual
+                    ? (trim((string) ($lr->manual_description ?? '')) ?: 'منتج يدوي')
+                    : ($lr->product_name ?? '—');
+                $ref = $isManual ? 'يدوي' : ($lr->product_ref ?? '—');
+
+                return [
+                    'product_id'   => $lr->product_id !== null ? (int) $lr->product_id : null,
+                    'is_manual'    => $isManual,
+                    'product_name' => $name,
+                    'product_ref'  => $ref,
+                    'total_qty'    => (float) $lr->total_qty,
+                    'total_ht'     => round((float) $lr->total_ht, 2),
+                    'total_ttc'    => round((float) $lr->total_ttc, 2),
+                ];
+            }, $lineData),
             'summary' => [
                 'total_returns'      => $documents->count(),
                 'sale_returns'       => $saleReturns->count(),
@@ -368,32 +385,44 @@ class SalesReports
             ->whereIn('dt.code', array_merge(self::SALE_CODES, ['BL', 'BCC']))
             ->select(
                 'cdl.product_id',
+                DB::raw("MAX(CASE WHEN cdl.product_id IS NULL THEN cdl.description ELSE NULL END) as manual_description"),
                 DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity ELSE cdl.quantity END) as total_qty"),
                 DB::raw('COUNT(DISTINCT cdl.commercial_document_id) as doc_count'),
                 DB::raw('AVG(cdl.unit_price_ht) as avg_price'),
             );
         if ($fyId) $rows->where('cd.fiscal_year_id', $fyId);
 
-        $rows = $rows->groupBy('cdl.product_id')
+        $rows = $rows->groupBy('cdl.product_id', DB::raw("CASE WHEN cdl.product_id IS NULL THEN COALESCE(cdl.description, '') ELSE '' END"))
             ->orderByDesc('total_qty')
             ->limit(50)
             ->get();
 
-        $productIds = $rows->pluck('product_id');
-        $products   = Product::whereIn('id', $productIds)->get()->keyBy('id');
+        $productIds = $rows->pluck('product_id')->filter()->unique()->values();
+        $products   = $productIds->isNotEmpty()
+            ? Product::whereIn('id', $productIds)->get()->keyBy('id')
+            : collect();
 
         $days = max(1, Carbon::parse($from)->diffInDays(Carbon::parse($to)));
 
-        $items = $rows->map(fn($r) => [
-            'product_id'   => $r->product_id,
-            'product_name' => $products->get($r->product_id)?->name ?? 'â€”',
-            'product_ref'  => $products->get($r->product_id)?->ref ?? 'â€”',
-            'total_qty'    => (float) $r->total_qty,
-            'doc_count'    => (int) $r->doc_count,
-            'avg_price'    => round((float) $r->avg_price, 2),
-            'velocity'     => $days > 0 ? round((float) $r->total_qty / $days, 2) : 0,
-            'days'         => $days,
-        ])->values()->toArray();
+        $items = $rows->map(function ($r) use ($products, $days) {
+            $isManual = $r->product_id === null || $r->product_id === '';
+            $name = $isManual
+                ? (trim((string) ($r->manual_description ?? '')) ?: 'منتج يدوي')
+                : ($products->get($r->product_id)?->name ?? '—');
+            $ref = $isManual ? 'يدوي' : ($products->get($r->product_id)?->ref ?? '—');
+
+            return [
+                'product_id'   => $r->product_id !== null ? (int) $r->product_id : null,
+                'is_manual'    => $isManual,
+                'product_name' => $name,
+                'product_ref'  => $ref,
+                'total_qty'    => (float) $r->total_qty,
+                'doc_count'    => (int) $r->doc_count,
+                'avg_price'    => round((float) $r->avg_price, 2),
+                'velocity'     => $days > 0 ? round((float) $r->total_qty / $days, 2) : 0,
+                'days'         => $days,
+            ];
+        })->values()->toArray();
 
         return [
             'items' => $items,

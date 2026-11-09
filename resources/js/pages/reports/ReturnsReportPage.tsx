@@ -63,7 +63,7 @@ export default function ReturnsReportPage() {
         {data.product_recap.length > 0 && (
           <Card noHeader style={{ padding: 0, marginTop: 16 }}>
             <SimpleTable
-              rowKey={(row) => String(row.product_id ?? '')}
+              rowKey={(row) => (row as any).is_manual ? `manual:${(row as any).product_name}` : String(row.product_id ?? '')}
               columns={[
                 { key: '_idx', label: '#' },
                 { key: 'product_name', label: 'المنتج', render: (v) => <span style={{ fontWeight: 700 }}>{v as string}</span> },

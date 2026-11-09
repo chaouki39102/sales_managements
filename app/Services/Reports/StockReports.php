@@ -143,19 +143,37 @@ class StockReports
 
         $rows = $query->select(
             'cdl.product_id',
+            DB::raw("MAX(CASE WHEN cdl.product_id IS NULL THEN cdl.description ELSE NULL END) as manual_description"),
             'dt.code as doc_type',
             DB::raw('SUM(cdl.quantity) as total_qty'),
             DB::raw('SUM(cdl.total_ht) as total_ht'),
             DB::raw('COUNT(DISTINCT cd.id) as doc_count')
         )
-            ->groupBy('cdl.product_id', 'dt.code')
+            ->groupBy('cdl.product_id', 'dt.code', DB::raw("CASE WHEN cdl.product_id IS NULL THEN COALESCE(cdl.description, '') ELSE '' END"))
             ->get();
 
-        $productIds = $rows->pluck('product_id')->unique();
-        $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
+        $productIds = $rows->pluck('product_id')->filter()->unique()->values();
+        $products = $productIds->isNotEmpty()
+            ? Product::whereIn('id', $productIds)->get()->keyBy('id')
+            : collect();
 
-        $grouped = $rows->groupBy('product_id')->map(function ($lines, $pid) use ($products) {
-            $product = $products->get($pid);
+        $manualSeq = 0;
+        $grouped = $rows->groupBy(function ($r) {
+            $isManual = $r->product_id === null || $r->product_id === '';
+            return $isManual
+                ? 'manual:' . trim((string) ($r->manual_description ?? ''))
+                : 'catalog:' . $r->product_id;
+        })->map(function ($lines) use ($products, &$manualSeq) {
+            $first = $lines->first();
+            $isManual = $first->product_id === null || $first->product_id === '';
+            $product = !$isManual ? $products->get($first->product_id) : null;
+            $name = $isManual
+                ? (trim((string) ($first->manual_description ?? '')) ?: 'منتج يدوي')
+                : ($product?->name ?? '—');
+            $ref = $isManual ? 'يدوي' : ($product?->ref ?? '—');
+            if ($isManual) $manualSeq--;
+            $pid = $isManual ? $manualSeq : $first->product_id;
+
             $salesQty = 0;
             $purchaseQty = 0;
             $salesHt = 0;
@@ -173,8 +191,9 @@ class StockReports
 
             return [
                 'product_id'    => $pid,
-                'product_name'  => $product?->name ?? 'â€”',
-                'product_ref'   => $product?->ref ?? 'â€”',
+                'is_manual'     => $isManual,
+                'product_name'  => $name,
+                'product_ref'   => $ref,
                 'sales_qty'     => (int) $salesQty,
                 'sales_ht'      => round($salesHt, 2),
                 'purchase_qty'  => (int) $purchaseQty,

@@ -58,7 +58,7 @@ export function ReportLinesDetail({ lines }: { lines?: ReportDocumentLine[] }) {
     <SimpleTable
       columns={columns}
       data={lines}
-      rowKey={(row) => `${row.product_id}-${row.quantity}-${row.unit_price_ht}-${row.tva_rate}`}
+      rowKey={(row) => row.is_manual ? `manual-${row.product_name}-${row.quantity}-${row.unit_price_ht}` : `${row.product_id}-${row.quantity}-${row.unit_price_ht}-${row.tva_rate}`}
       emptyText="لا توجد تفاصيل"
     />
   );

@@ -101,7 +101,7 @@ export default function CustomersReportPage() {
         {tab === 'products' && data.product_recap && (
           <Card noHeader style={{ padding: 0 }}>
             <SimpleTable
-              rowKey={(row) => (row as any).__isSummary ? '__summary__' : String(row.product_id ?? '')}
+              rowKey={(row) => (row as any).__isSummary ? '__summary__' : ((row as any).is_manual ? `manual:${(row as any).product_name}` : String(row.product_id ?? ''))}
               rowClassName={(row, _index) => (row as any).__isSummary ? 'tw-sr' : ''}
               columns={[
                 { key: '_idx', label: '#' },

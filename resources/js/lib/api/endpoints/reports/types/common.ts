@@ -11,7 +11,8 @@ export interface ReportBaseParams extends Record<string, unknown> {
 
 /** سطر وثيقة (تفاصيل تفاصيل التقرير) */
 export interface ReportDocumentLine {
-  product_id:          number;
+  product_id:          number | null;  // null = منتج يدوي (سطر حر)
+  is_manual?:          boolean;
   product_name:        string;
   product_ref:         string | null;
   quantity:            number;

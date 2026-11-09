@@ -14,10 +14,11 @@ import Modal from '@/components/ui/Modal';
 
 const def = REPORT_DEFAULTS;
 
-const STATUS_META: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' }> = {
+const STATUS_META: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'primary' }> = {
   good:         { label: 'جيد',                variant: 'success' },
   reorder:      { label: '⚠ أعد الطلب',        variant: 'warning' },
   out_of_stock: { label: 'نفد',                variant: 'danger' },
+  manual:       { label: 'يدوي',               variant: 'primary' },
 };
 
 export default function ProductsReportPage() {
@@ -52,7 +53,7 @@ export default function ProductsReportPage() {
         STATUS_META[r.stock_status]?.label ?? r.stock_status,
       ] as (string | number)[];
       if (canViewCost) {
-        row.splice(6, 0, r.avg_purchase_price, r.cogs_estimated, r.est_profit, r.profit_pct);
+        row.splice(6, 0, r.avg_purchase_price ?? 0, r.cogs_estimated ?? 0, r.est_profit ?? 0, r.profit_pct ?? 0);
       }
       return row;
     });
@@ -68,13 +69,13 @@ export default function ProductsReportPage() {
     {data && (
       <>
         <div className="kpis" style={{ gridTemplateColumns: canViewCost ? 'repeat(4,1fr)' : 'repeat(5,1fr)' }}>
-          {canViewCost && <KpiCard variant="teal" icon="ti-building-warehouse" label="قيمة المخزون" value={MONEY(data.summary.total_stock_value)}/>}
+          {canViewCost && <KpiCard variant="teal" icon="ti-building-warehouse" label="قيمة المخزون" value={MONEY(data.summary.total_stock_value ?? 0)}/>}
           <KpiCard variant="green"  icon="ti-package"            label="عدد المنتجات"        value={data.summary.total_products}/>
           <KpiCard variant="blue"   icon="ti-shopping-cart"      label="إجمالي المباع"       value={data.summary.total_sold}/>
           <KpiCard variant="purple" icon="ti-trending-up"        label="إجمالي المبيعات HT"  value={MONEY(data.summary.total_sales_ht)}/>
           <KpiCard variant="orange" icon="ti-truck"              label="قيمة المشتريات"      value={MONEY(data.summary.total_purchase_ht)}/>
-          {canViewCost && <KpiCard variant="green" icon="ti-coins" label="الربح المقدر" value={MONEY(data.summary.total_est_profit)}/>}
-          {canViewCost && <KpiCard variant="gold" icon="ti-percentage" label="هامش الربح %" value={`${data.summary.margin_pct}%`}/>}
+          {canViewCost && <KpiCard variant="green" icon="ti-coins" label="الربح المقدر" value={MONEY(data.summary.total_est_profit ?? 0)}/>}
+          {canViewCost && <KpiCard variant="gold" icon="ti-percentage" label="هامش الربح %" value={`${data.summary.margin_pct ?? 0}%`}/>}
           <KpiCard variant="red"    icon="ti-alert-triangle"     label="تحتاج إعادة طلب"     value={data.summary.reorder_count}/>
         </div>
         <Card noHeader style={{ padding: 0, marginTop: 16 }}>
@@ -96,15 +97,21 @@ export default function ProductsReportPage() {
               ] : []),
               { key: 'stock_quantity', label: 'المخزون', className: 'num' },
               { key: 'stock_status', label: 'الحالة', render: (v, row) => row.id === '__summary' ? null : <Badge variant={STATUS_META[(v as string)]?.variant ?? 'gray'} noDot>{STATUS_META[(v as string)]?.label ?? (v as string)}</Badge> },
-              { key: '_action', label: '', render: (_v, row) => row.id === '__summary' ? null : (
-                <button
-                  onClick={(e) => { e.stopPropagation(); setHistoryProduct({ id: row.id as number, name: row.name as string, ref: row.ref as string }); }}
-                  style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid var(--border, var(--color-border-tertiary))', background: 'transparent', color: 'var(--em)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                >
-                  <i className="ti ti-history" style={{ fontSize: 13 }} />
-                  الحركة
-                </button>
-              )},
+              { key: '_action', label: '', render: (_v, row) => {
+                if (row.id === '__summary') return null;
+                if ((row as any).is_manual || (row.id as number) <= 0) {
+                  return <span style={{ fontSize: 11, color: 'var(--t4)' }}>—</span>;
+                }
+                return (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setHistoryProduct({ id: row.id as number, name: row.name as string, ref: row.ref as string }); }}
+                    style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid var(--border, var(--color-border-tertiary))', background: 'transparent', color: 'var(--em)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  >
+                    <i className="ti ti-history" style={{ fontSize: 13 }} />
+                    الحركة
+                  </button>
+                );
+              }},
             ]}
             data={[
               ...data.products.map((r, i) => ({ ...r, _idx: i + 1 })),

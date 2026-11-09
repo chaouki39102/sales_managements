@@ -28,7 +28,8 @@ export interface PurchasesReportDocument {
 }
 
 export interface PurchasesProductRecapItem {
-  product_id:     number;
+  product_id:     number | null;   // null = منتج يدوي
+  is_manual?:     boolean;
   product_name:   string;
   product_ref:    string;
   total_qty:      number;

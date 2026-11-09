@@ -31,7 +31,8 @@ export interface MatrixParty {
 }
 
 export interface MatrixProduct {
-  id:           number;
+  id:           number;          // سالب اصطناعي للمنتج اليدوي
+  is_manual?:   boolean;
   name:         string;
   ref:          string | null;
   total_qty:    number;

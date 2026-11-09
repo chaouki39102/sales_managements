@@ -34,7 +34,8 @@ export interface CustomersReportData {
   };
   customers: CustomersReportRow[];
   product_recap: Array<{
-    product_id:     number;
+    product_id:     number | null;
+    is_manual?:     boolean;
     product_name:   string;
     product_ref:    string;
     total_qty:      number;

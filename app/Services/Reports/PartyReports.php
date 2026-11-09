@@ -98,7 +98,7 @@ class PartyReports
         $productRecap = [];
         if ($allDocIds->isNotEmpty()) {
             $lineRows = DB::table('commercial_document_lines as cdl')
-                ->join('products as p', 'p.id', '=', 'cdl.product_id')
+                ->leftJoin('products as p', 'p.id', '=', 'cdl.product_id')
                 ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
                 ->join('document_types as dt', 'dt.id', '=', 'cd.document_type_id')
                 ->whereNull('cd.deleted_at')
@@ -106,6 +106,7 @@ class PartyReports
                 ->whereIn('cdl.commercial_document_id', $allDocIds)
                 ->select(
                     'cdl.product_id',
+                    DB::raw("MAX(CASE WHEN cdl.product_id IS NULL THEN cdl.description ELSE NULL END) as manual_description"),
                     'p.name as product_name',
                     'p.ref as product_ref',
                     DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.quantity ELSE cdl.quantity END) as total_qty"),
@@ -113,17 +114,23 @@ class PartyReports
                     DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.total_ttc ELSE cdl.total_ttc END) as total_ttc"),
                     DB::raw("SUM(CASE WHEN dt.code = 'AV' THEN -cdl.total_discount_amount ELSE cdl.total_discount_amount END) as total_discount")
                 )
-                ->groupBy('cdl.product_id', 'p.name', 'p.ref')
+                ->groupBy('cdl.product_id', 'p.name', 'p.ref', DB::raw("CASE WHEN cdl.product_id IS NULL THEN COALESCE(cdl.description, '') ELSE '' END"))
                 ->orderByDesc('total_ht')
                 ->get();
 
             foreach ($lineRows as $lr) {
                 $totalDiscount += (float) $lr->total_discount;
+                $isManual = $lr->product_id === null || $lr->product_id === '';
+                $name = $isManual
+                    ? (trim((string) ($lr->manual_description ?? '')) ?: 'منتج يدوي')
+                    : ($lr->product_name ?? '—');
+                $ref = $isManual ? 'يدوي' : ($lr->product_ref ?? '—');
                 $ht = (float) $lr->total_ht;
                 $productRecap[] = [
-                    'product_id'     => $lr->product_id,
-                    'product_name'   => $lr->product_name,
-                    'product_ref'    => $lr->product_ref,
+                    'product_id'     => $lr->product_id !== null ? (int) $lr->product_id : null,
+                    'is_manual'      => $isManual,
+                    'product_name'   => $name,
+                    'product_ref'    => $ref,
                     'total_qty'      => (float) $lr->total_qty,
                     'total_ht'       => round($ht, 2),
                     'total_ttc'      => round((float) $lr->total_ttc, 2),

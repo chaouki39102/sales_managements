@@ -41,8 +41,8 @@ export default function SalesReportPage() {
           i + 1, item.product_name, item.product_ref, item.total_qty,
           item.total_qty > 0 ? Math.round((item.total_ht + item.total_discount) / item.total_qty) : 0,
           item.total_ht, item.total_discount,
-          ...(canViewCost ? [item.total_cost, item.margin_value] : []),
-          item.total_ttc, ...(canViewCost ? [`${item.margin_pct}%`] : []),
+          ...(canViewCost ? [item.total_cost ?? 0, item.margin_value ?? 0] : []),
+          item.total_ttc, ...(canViewCost ? [`${item.margin_pct ?? 0}%`] : []),
         ]),
       });
     }
@@ -120,7 +120,7 @@ export default function SalesReportPage() {
         {tab === 'products' && (
           <Card noHeader style={{ padding: 0 }}>
             <SimpleTable
-              rowKey={(row) => (row as any).__isSummary ? '__summary__' : String(row.product_id ?? '')}
+              rowKey={(row) => (row as any).__isSummary ? '__summary__' : (row.is_manual ? `manual:${row.product_name}` : String(row.product_id ?? ''))}
               rowClassName={summaryRow}
               columns={[
                 { key: '_idx', label: '#' },

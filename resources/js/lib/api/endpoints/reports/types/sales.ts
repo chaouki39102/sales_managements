@@ -29,17 +29,18 @@ export interface SalesReportDocument {
 }
 
 export interface SalesProductRecapItem {
-  product_id:     number;
+  product_id:     number | null;   // null = منتج يدوي
+  is_manual?:     boolean;
   product_name:   string;
   product_ref:    string;
   total_qty:      number;
   total_ht:       number;
-  total_cost:     number;
+  total_cost:     number | null;
   total_ttc:      number;
   total_tva:      number;
   total_discount: number;
-  margin_value:   number;
-  margin_pct:     number;
+  margin_value:   number | null;
+  margin_pct:     number | null;
 }
 
 export interface SalesReportData {
@@ -62,7 +63,8 @@ export interface SalesReportData {
 
 // ─── Velocity Report (سرعة البيع) ──────────────────────────────────────────────
 export interface VelocityReportRow {
-  product_id:   number;
+  product_id:   number | null;   // null = منتج يدوي
+  is_manual?:   boolean;
   product_name: string;
   product_ref:  string;
   total_qty:    number;
@@ -127,7 +129,7 @@ export interface ReturnsReportData {
     lines?: ReportDocumentLine[];
   }>;
   product_recap: Array<{
-    product_id: number; product_name: string; product_ref: string;
+    product_id: number | null; is_manual?: boolean; product_name: string; product_ref: string;
     total_qty: number; total_ht: number; total_ttc: number;
   }>;
   summary: {

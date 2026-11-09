@@ -38,7 +38,7 @@ class MatrixReports
             ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
             ->join('document_types as dt',       'dt.id', '=', 'cd.document_type_id')
             ->join('parties as pt',              'pt.id', '=', 'cd.party_id')
-            ->join('products as p',              'p.id',  '=', 'cdl.product_id')
+            ->leftJoin('products as p',          'p.id',  '=', 'cdl.product_id')
             ->where('cd.company_id', $companyId)
             ->where('pt.party_type_id', $partyType)
             ->whereIn('dt.code', $docCodes)
@@ -48,6 +48,7 @@ class MatrixReports
         if ($fiscalYearId) $query->where('cd.fiscal_year_id', $fiscalYearId);
         if ($fromDate)     $query->whereDate('cd.document_date', '>=', $fromDate);
         if ($toDate)       $query->whereDate('cd.document_date', '<=', $toDate);
+        // فلاتر العائلة/العلامة تنطبق على المنتجات الكتالوجية فقط
         if ($familyId)     $query->where('p.family_id', $familyId);
         if ($brandId)      $query->where('p.brand_id', $brandId);
 
@@ -57,7 +58,8 @@ class MatrixReports
             'cd.party_id',
             'pt.name as party_name',
             'pt.code as party_code',
-            'p.id as product_id',
+            'cdl.product_id',
+            DB::raw("MAX(CASE WHEN cdl.product_id IS NULL THEN cdl.description ELSE NULL END) as manual_description"),
             'p.name as product_name',
             'p.ref as product_ref',
             DB::raw("SUM({$sign} * cdl.quantity) as qty"),
@@ -65,19 +67,32 @@ class MatrixReports
             DB::raw("SUM({$sign} * cdl.total_ttc) as ttc"),
             DB::raw("SUM({$sign} * cdl.quantity * cdl.cost_price_ht) as cost")
         )
-            ->groupBy('cd.party_id', 'pt.name', 'pt.code', 'p.id', 'p.name', 'p.ref')
+            ->groupBy(
+                'cd.party_id', 'pt.name', 'pt.code',
+                'cdl.product_id', 'p.name', 'p.ref',
+                DB::raw("CASE WHEN cdl.product_id IS NULL THEN COALESCE(cdl.description, '') ELSE '' END")
+            )
             ->get();
 
         $partyMap   = [];
         $productMap = [];
 
         foreach ($rows as $r) {
-            $partyId = $r->party_id;
-            $prodId  = $r->product_id;
-            $qty     = (float) $r->qty;
-            $ht      = (float) $r->ht;
-            $ttc     = (float) $r->ttc;
-            $cost    = (float) $r->cost;
+            $partyId  = $r->party_id;
+            $isManual = $r->product_id === null || $r->product_id === '';
+            $manualName = $isManual
+                ? (trim((string) ($r->manual_description ?? '')) ?: 'منتج يدوي')
+                : null;
+            // معرّف سلبي ثابت مشتق من الوصف ليبقى مفتاح الخلية/العمود مستقراً
+            $prodId   = $isManual
+                ? - (abs(crc32($manualName)) ?: 1)
+                : (int) $r->product_id;
+            $prodName = $isManual ? $manualName : ($r->product_name ?? '—');
+            $prodRef  = $isManual ? 'يدوي' : ($r->product_ref ?? '—');
+            $qty      = (float) $r->qty;
+            $ht       = (float) $r->ht;
+            $ttc      = (float) $r->ttc;
+            $cost     = (float) $r->cost;
 
             if (!isset($partyMap[$partyId])) {
                 $partyMap[$partyId] = [
@@ -95,8 +110,9 @@ class MatrixReports
             if (!isset($productMap[$prodId])) {
                 $productMap[$prodId] = [
                     'id'          => $prodId,
-                    'name'        => $r->product_name,
-                    'ref'         => $r->product_ref,
+                    'is_manual'   => $isManual,
+                    'name'        => $prodName,
+                    'ref'         => $prodRef,
                     'total_qty'   => 0.0,
                     'total_ht'    => 0.0,
                     'total_ttc'   => 0.0,
