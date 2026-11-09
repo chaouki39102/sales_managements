@@ -383,9 +383,9 @@ export default function StockTab() {
       {/* ── الجدول ── */}
       <div style={{
         background: 'var(--bg2)', border: '1px solid var(--b1)',
-        borderRadius: 12, overflow: 'hidden',
+        borderRadius: 12, overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch',
       }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 980 }}>
           <thead>
             <tr style={{ background: 'var(--bg3)', borderBottom: '2px solid var(--b1)' }}>
               <Th>المنتج</Th>

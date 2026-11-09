@@ -252,10 +252,9 @@ export default function MovementsTab() {
       </div>
 
       {/* ── الجدول ── */}
-      <div style={{ background: 'var(--bg2)', border: '1px solid var(--b1)', borderRadius: 12, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 900 }}>
-            <thead>
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--b1)', borderRadius: 12, overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 900 }}>
+          <thead>
               <tr style={{ background: 'var(--bg3)', borderBottom: '2px solid var(--b1)' }}>
                 <Th width="50px">#</Th>
                 <Th width="100px">التاريخ</Th>
@@ -363,7 +362,6 @@ export default function MovementsTab() {
               )}
             </tbody>
           </table>
-        </div>
       </div>
 
       {/* ── Pagination ── */}

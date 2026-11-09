@@ -342,7 +342,7 @@ export default function ProductLotsTab() {
         </Button>
       </div>
 
-      <Card noHeader padding={0} style={{ overflow: 'hidden' }}>
+      <Card noHeader padding={0} style={{ overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch' }}>
         {isLoading ? (
           <div style={{ padding: 24 }}><Skeleton variant="table" rows={6} /></div>
         ) : items.length === 0 ? (

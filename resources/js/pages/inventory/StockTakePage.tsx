@@ -424,7 +424,7 @@ export default function StockTakePage() {
 
         {/* ── Session log ── */}
         {sessionLog.length > 0 && (
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="card" style={{ padding: 0, overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch' }}>
             <div style={{
               padding: '10px 14px', fontWeight: 700, fontSize: 13,
               background: 'var(--bg2)', borderBottom: '1px solid var(--brd)',
@@ -432,8 +432,7 @@ export default function StockTakePage() {
             }}>
               <i className="ti ti-list" /> سجل الجرد ({sessionLog.length})
             </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 720 }}>
                 <thead>
                   <tr style={{ background: 'var(--bg2)', textAlign: 'right' }}>
                     <th style={{ padding: '8px 12px', fontWeight: 600 }}>#</th>
@@ -480,7 +479,6 @@ export default function StockTakePage() {
                   ))}
                 </tbody>
               </table>
-            </div>
           </div>
         )}
       </div>

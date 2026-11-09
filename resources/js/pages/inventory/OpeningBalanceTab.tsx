@@ -441,14 +441,13 @@ export default function OpeningBalanceTab() {
         /* ── الجدول ── */
         <div style={{
           background: 'var(--bg2)', border: '1px solid var(--b1)',
-          borderRadius: 12, overflow: 'hidden',
+          borderRadius: 12, overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch',
         }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{
-              width: '100%', borderCollapse: 'collapse',
-              fontSize: 13, minWidth: 1000,
-            }}>
-              <thead>
+          <table style={{
+            width: '100%', borderCollapse: 'collapse',
+            fontSize: 13, minWidth: 1000,
+          }}>
+            <thead>
                 <tr style={{ background: 'var(--bg3)', borderBottom: '2px solid var(--b1)' }}>
                   <Th width="36px">#</Th>
                   <Th>المنتج</Th>
@@ -888,7 +887,6 @@ export default function OpeningBalanceTab() {
 
               </tbody>
             </table>
-          </div>
 
           {/* ── شريط أسفل الجدول ── */}
           <div style={{
