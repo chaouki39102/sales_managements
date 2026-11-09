@@ -79,17 +79,25 @@
 
 /* ── ≤768px: mobile layout ──────────────────────────────────────────────── */
 @media (max-width: 768px) {
-  /* Topbar: the page title/breadcrumb was squeezed to 0px and «فاتورة جديدة»
-     was pushed off-screen. The page header already shows the title and the
-     bottom nav has «بيع», so both are hidden on phones. */
-  #topbar { padding: 0 10px; gap: 8px; }
-  #topbar .tb-info { display: none; }
-  #topbar .tb-actions { min-width: 0; flex-shrink: 1; margin-inline-start: auto; gap: 6px; }
-  #topbar .tb-actions .tb-btn.p,
-  #topbar .tb-actions .tb-btn.p + .tb-sep { display: none; }
-  #topbar .offline-indicator > span { display: none; }
+  /* Topbar: horizontally scrollable on mobile so all actions remain reachable. */
+  #topbar {
+    padding: 0 10px;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  #topbar::-webkit-scrollbar { display: none; }
+  #topbar > * { flex-shrink: 0; }
+  #topbar .tb-info { flex: 0 0 auto; min-width: 120px; max-width: 55vw; }
+  #topbar .tb-title { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #topbar .tb-path { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #topbar .tb-actions { min-width: 0; flex: 0 0 auto; flex-shrink: 0; margin-inline-start: 0; gap: 6px; flex-wrap: nowrap; }
+  #topbar .tb-actions .srch { flex: 0 0 auto; width: 140px; min-width: 120px; }
   #topbar .offline-indicator { padding-inline: 8px; }
-  #topbar .tb-actions .srch { display: none; }
 
   /* Page content — tighter on mobile (not POS flush pages). */
   .page-content:not(.page-content--flush) { padding: 10px 10px calc(20px + var(--navh, 64px)); }
@@ -315,7 +323,8 @@
   .modal .m-foot .btn { width: 100%; }
 
   .page-content:not(.page-content--flush) { padding: 8px 8px calc(16px + var(--navh, 64px)); }
-  #topbar { padding: 0 8px; }
+  #topbar { padding: 0 8px; gap: 6px; }
+  #topbar .tb-info { min-width: 100px; max-width: 50vw; }
 
   /* Touch-friendly tap targets for tab triggers. */
   .tab, .stab, .doc-tab { min-height: 38px; }
