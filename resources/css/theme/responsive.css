@@ -26,6 +26,7 @@
 .rgrid-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .row-wrap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.stack-sm { display: flex; gap: 10px; }
 
 /* Super-admin layout pieces (AdminLayout.tsx) — hidden on desktop. */
 .adm-menu-btn {
@@ -35,13 +36,45 @@
 }
 .adm-backdrop { display: none; }
 
+/* ── Global tab-bar scroll affordance (applies at all sizes) ────────────── */
+/* Any tab strip should scroll horizontally when it overflows — "tabs title
+   scrolled" on mobile, and never clipped on desktop either. */
+.doc-tabs-bar,
+.tabs,
+[role="tablist"],
+.ph-tabs > div,
+.stab-row,
+.tab-strip {
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.doc-tabs-bar::-webkit-scrollbar,
+.tabs::-webkit-scrollbar,
+[role="tablist"]::-webkit-scrollbar,
+.ph-tabs > div::-webkit-scrollbar,
+.stab-row::-webkit-scrollbar,
+.tab-strip::-webkit-scrollbar { display: none; }
+.doc-tabs-bar > *,
+.tabs > *,
+[role="tablist"] > *,
+.ph-tabs > div > *,
+.stab-row > *,
+.tab-strip > * { flex-shrink: 0; }
+
 /* ── ≤1024px: tablets ───────────────────────────────────────────────────── */
 @media (max-width: 1024px) {
+  .rgrid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rgrid-5, .rgrid-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   :is(#main, .adm-main) [style*="grid-template-columns: repeat(5, 1fr)"],
   :is(#main, .adm-main) [style*="grid-template-columns: repeat(6, 1fr)"] {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fgrid.c3 { grid-template-columns: 1fr 1fr; }
 }
 
 /* ── ≤768px: mobile layout ──────────────────────────────────────────────── */
@@ -49,45 +82,89 @@
   /* Topbar: the page title/breadcrumb was squeezed to 0px and «فاتورة جديدة»
      was pushed off-screen. The page header already shows the title and the
      bottom nav has «بيع», so both are hidden on phones. */
+  #topbar { padding: 0 10px; gap: 8px; }
   #topbar .tb-info { display: none; }
-  #topbar .tb-actions { min-width: 0; flex-shrink: 1; margin-inline-start: auto; }
+  #topbar .tb-actions { min-width: 0; flex-shrink: 1; margin-inline-start: auto; gap: 6px; }
   #topbar .tb-actions .tb-btn.p,
   #topbar .tb-actions .tb-btn.p + .tb-sep { display: none; }
   #topbar .offline-indicator > span { display: none; }
   #topbar .offline-indicator { padding-inline: 8px; }
+  #topbar .tb-actions .srch { display: none; }
 
-  /* Page header actions wrap instead of running off the left edge. */
-  .ph-actions,
+  /* Page content — tighter on mobile (not POS flush pages). */
+  .page-content:not(.page-content--flush) { padding: 10px 10px calc(20px + var(--navh, 64px)); }
+
+  /* Page header: stack title/meta above actions; actions wrap. */
+  .ph-main {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px;
+  }
+  .ph-title-group { min-width: 0; }
+  .ph-title { font-size: 17px !important; line-height: 1.25; word-break: break-word; }
+  .ph-title-row { flex-wrap: wrap; gap: 6px; }
+  .ph-description { font-size: 12px; }
+  .ph-actions {
+    width: 100%;
+    flex-wrap: wrap !important;
+    justify-content: flex-start !important;
+    gap: 8px;
+  }
+  .ph-actions > * { min-width: 0; }
+  .ph-actions .btn { flex: 1 1 auto; justify-content: center; }
   .ph-actions > div { flex-wrap: wrap !important; }
-  .ph-actions { width: 100%; }
+  .ph-breadcrumb { overflow-x: auto; scrollbar-width: none; white-space: nowrap; }
+  .ph-breadcrumb::-webkit-scrollbar { display: none; }
 
-  /* Tables: scroll sideways inside their card instead of being clipped by
-     an inline overflow:hidden wrapper. */
+  /* Cards — slightly tighter padding, headers wrap. */
+  .card { padding: 14px; border-radius: var(--r2); }
+  .card-hd { flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+  .card-hd > :last-child { margin-inline-start: auto; }
+  .card-title { font-size: 13px; min-width: 0; }
+
+  /* KPI cards. */
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .kpi { padding: 12px; }
+  .kpi-val { font-size: 18px; letter-spacing: -.3px; word-break: break-word; }
+  .kpi-lbl { font-size: 11px; }
+  .kpi-sub { font-size: 10px; }
+
+  /* Form grids collapse. */
+  .fgrid, .fgrid.c3 { grid-template-columns: 1fr !important; }
+  .fg.s2, .fg.s3 { grid-column: auto; }
+
+  /* Tables: scroll sideways inside their card instead of being clipped. */
+  :is(#main, .adm-main) .tw,
+  :is(#main, .adm-main) .tbl-scroll,
   :is(#main, .adm-main) div:has(> table) {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
+    max-width: 100%;
   }
   :is(#main, .adm-main) table th { white-space: nowrap; }
+  /* Don't force every td nowrap globally — it breaks key/value tables; rely on
+     .tw overflow-x:auto. Wide data tables naturally overflow and scroll. */
 
-  /* Tab rows / chip rows built as inline flex rows scroll horizontally. */
-  :is(#main, .adm-main) [role="tablist"] { overflow-x: auto; scrollbar-width: none; }
-  :is(#main, .adm-main) [role="tablist"]::-webkit-scrollbar { display: none; }
-
-  /* Inline tab bars (a flex row of tab buttons over a bottom border, or the
-     page-header tabs) scroll sideways instead of cutting the last tab. */
+  /* Tab rows / chip rows — scroll horizontally, never clip the last tab. */
+  :is(#main, .adm-main) [role="tablist"] { max-width: 100%; }
+  /* Inline tab bars (flex row of tab buttons over a bottom border). */
   .ph-tabs > div,
-  :is(#main, .adm-main) div[style*="display: flex"][style*="border-bottom: 2px solid"]:has(> button + button) {
+  :is(#main, .adm-main) div[style*="display: flex"][style*="border-bottom"]:has(> button + button),
+  :is(#main, .adm-main) div[style*="display:flex"][style*="border-bottom"]:has(> button + button) {
     overflow-x: auto !important;
     flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    max-width: 100%;
   }
-  .ph-tabs > div > button,
-  :is(#main, .adm-main) div[style*="display: flex"][style*="border-bottom: 2px solid"]:has(> button + button) > button {
-    flex-shrink: 0;
-  }
+  .ph-tabs > div::-webkit-scrollbar,
+  :is(#main, .adm-main) div[style*="border-bottom"]:has(> button + button)::-webkit-scrollbar { display: none; }
+  .ph-tabs > div > *,
+  :is(#main, .adm-main) div[style*="border-bottom"]:has(> button + button) > * { flex-shrink: 0; }
 
-  /* Other inline rows of buttons (toolbars, header action groups) wrap. */
-  :is(#main, .adm-main) div[style*="display: flex"]:not([style*="border-bottom: 2px solid"]):not([style*="flex-direction: column"]):has(> button) {
+  /* Other inline rows of controls (toolbars, header action groups) wrap. */
+  :is(#main, .adm-main) div[style*="display: flex"]:not([style*="border-bottom"]):not([style*="flex-direction: column"]):not([style*="flex-direction:column"]):is(:has(> .btn), :has(> input), :has(> select)),
+  :is(#main, .adm-main) div[style*="display:flex"]:not([style*="border-bottom"]):not([style*="flex-direction: column"]):not([style*="flex-direction:column"]):is(:has(> .btn), :has(> input), :has(> select)) {
     flex-wrap: wrap;
   }
 
@@ -96,8 +173,10 @@
   :is(#main, .adm-main) div:has(> .u-row) { overflow-x: auto !important; }
   :is(#main, .adm-main) div:has(> .u-row) > * { min-width: 640px; }
 
-  /* Super-admin panel: the 230px sidebar was a fixed column that left the
-     page a third of the screen. On phones it is an off-canvas drawer. */
+  /* Settings/doc tabs (.stab / .tab) stay in a scrollable row. */
+  .stab { padding: 8px 12px; font-size: 12.5px; }
+
+  /* Super-admin panel: off-canvas drawer sidebar. */
   .adm-sidebar {
     position: fixed !important; top: 0; bottom: 0; right: 0;
     width: min(280px, 84vw) !important; height: 100dvh !important;
@@ -113,10 +192,9 @@
   .adm-menu-btn { display: inline-flex; }
   .adm-hide-sm { display: none !important; }
   .adm-header { padding: 0 12px !important; gap: 8px; }
-  .adm-main { padding: 14px !important; }
+  .adm-main { padding: 10px !important; }
 
-  /* Template designers (print settings, stickers): list / canvas / controls stack vertically
-     (three side-by-side panes of 200px + canvas + 340px cannot fit a phone). */
+  /* Template designers (print settings, stickers): panes stack vertically. */
   .stk-shell { height: auto !important; overflow: visible !important; }
   .stk-panes { flex-direction: column; overflow: visible !important; }
   .stk-pane {
@@ -124,29 +202,129 @@
     border-left: 0 !important; border-bottom: 1px solid var(--b2);
   }
 
-  /* POS Pro cart header: action buttons wrap instead of pushing «إفراغ» out. */
+  /* POS Pro cart header: action buttons wrap. */
   .pp-cart-hd-actions { flex-wrap: wrap; min-width: 0; row-gap: 6px; }
 
   /* Wide inline grids collapse. */
   .rgrid-3, .rgrid-4, .rgrid-5, .rgrid-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .g3, .g4 { grid-template-columns: 1fr !important; }
   :is(#main, .adm-main) [style*="grid-template-columns: repeat(4, 1fr)"],
   :is(#main, .adm-main) [style*="grid-template-columns: repeat(5, 1fr)"],
   :is(#main, .adm-main) [style*="grid-template-columns: repeat(6, 1fr)"] {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
+  /* 3-col grids become 1 or 2 depending on content — default to 1 for readability. */
+  :is(#main, .adm-main) [style*="grid-template-columns: repeat(3, 1fr)"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  /* Two-pane «sidebar + content» inline grids stack. */
+  :is(#main, .adm-main) [style*="grid-template-columns: 1fr 1fr"]:has(> .card),
+  :is(#main, .adm-main) [style*="grid-template-columns:1fr 1fr"]:has(> .card) {
+    grid-template-columns: 1fr !important;
+  }
 
-  /* Modals: full-width sheet content never wider than the screen. */
-  .modal .m-body { overflow-x: hidden; }
+  /* Modals: fit the viewport on mobile, ignore stored desktop resize dims. */
+  .ov { padding: 8px; align-items: flex-end; }
+  .modal,
+  .modal.modal-sm,
+  .modal.modal-lg,
+  .modal.modal-xl {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: calc(100dvh - 16px) !important;
+    border-radius: var(--r3) var(--r3) 0 0;
+  }
+  .modal .m-hd { padding: 12px 14px; }
+  .modal .m-title { font-size: 14px; }
+  .modal .m-body { padding: 14px; overflow-x: hidden; }
   .modal .m-body > * { max-width: 100%; }
+  .modal .m-foot {
+    padding: 10px 14px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .modal .m-foot .btn { flex: 1 1 auto; justify-content: center; }
+  .modal .m-foot-l { margin-right: 0; width: 100%; }
+  .modal-resize-handle { display: none !important; }
+
+  /* Summary rows wrap long values. */
+  .sr { gap: 8px; }
+  .sr-v { text-align: left; word-break: break-word; }
+
+  /* Alerts wrap. */
+  .al { flex-wrap: wrap; }
+
+  /* Filters / toolbars: generic row-wrap helper behavior. */
+  .row-wrap { row-gap: 8px; }
+  .stack-sm { flex-direction: column; align-items: stretch; }
+
+  /* Prevent horizontal page overflow from stray wide children. */
+  #main, .adm-main { overflow-x: clip; }
+  .page-content img,
+  .page-content video,
+  .page-content canvas,
+  .page-content svg { max-width: 100%; height: auto; }
 }
 
 /* ── ≤640px: phones ─────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  :is(#main, .adm-main) [style*="grid-template-columns: repeat(3, 1fr)"]:has(> .kpi) {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-  /* Two-pane «sidebar + content» inline grids stack. */
-  :is(#main, .adm-main) [style*="grid-template-columns: 1fr 1fr"]:has(> .card) {
+  .rgrid-2, .rgrid-3, .rgrid-4, .rgrid-5, .rgrid-6 { grid-template-columns: 1fr; }
+  .kpis { grid-template-columns: 1fr; gap: 8px; }
+  .card { padding: 12px; }
+  .kpi-val { font-size: 17px; }
+
+  :is(#main, .adm-main) [style*="grid-template-columns: repeat(3, 1fr)"] {
     grid-template-columns: 1fr !important;
   }
+  :is(#main, .adm-main) [style*="grid-template-columns: repeat(2, 1fr)"] {
+    grid-template-columns: 1fr !important;
+  }
+  /* Two-pane «sidebar + content» inline grids stack. */
+  :is(#main, .adm-main) [style*="grid-template-columns: 1fr 1fr"]:has(> .card),
+  :is(#main, .adm-main) [style*="grid-template-columns:1fr 1fr"]:has(> .card),
+  :is(#main, .adm-main) [style*="grid-template-columns: 1fr 1fr"]:not(:has(> .kpi)),
+  :is(#main, .adm-main) [style*="grid-template-columns:1fr 1fr"]:not(:has(> .kpi)) {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Page header actions become full-width stacked buttons where sensible. */
+  .ph-actions { flex-direction: column; align-items: stretch; }
+  .ph-actions .btn,
+  .ph-actions > button,
+  .ph-actions > a { width: 100%; justify-content: center; }
+  /* But keep small icon-button groups horizontal if they wrap. */
+  .ph-actions .row-wrap,
+  .ph-actions > div:has(.btn-sm),
+  .ph-actions > div:has(.btn-icon) {
+    flex-direction: row;
+    width: auto;
+  }
+
+  /* Modal becomes a near-fullsheet. */
+  .ov { padding: 0; align-items: flex-end; }
+  .modal,
+  .modal.modal-sm,
+  .modal.modal-lg,
+  .modal.modal-xl {
+    max-height: 100dvh !important;
+    border-radius: var(--r3) var(--r3) 0 0;
+    border-bottom: 0;
+  }
+  .modal .m-foot { flex-direction: column-reverse; align-items: stretch; }
+  .modal .m-foot .btn { width: 100%; }
+
+  .page-content:not(.page-content--flush) { padding: 8px 8px calc(16px + var(--navh, 64px)); }
+  #topbar { padding: 0 8px; }
+
+  /* Touch-friendly tap targets for tab triggers. */
+  .tab, .stab, .doc-tab { min-height: 38px; }
+}
+
+/* ── ≤380px: very small phones ──────────────────────────────────────────── */
+@media (max-width: 380px) {
+  .kpi { padding: 10px; }
+  .kpi-val { font-size: 16px; }
+  .ph-title { font-size: 16px !important; }
+  .btn { padding: 8px 12px; font-size: 12px; }
 }

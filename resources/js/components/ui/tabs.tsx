@@ -35,7 +35,14 @@ interface TabsListProps {
 }
 
 export function TabsList({ children, className = '' }: TabsListProps) {
-  return <div className={`flex gap-2 border-b ${className}`}>{children}</div>;
+  return (
+    <div
+      role="tablist"
+      className={`flex gap-2 border-b overflow-x-auto flex-nowrap [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${className}`}
+    >
+      {children}
+    </div>
+  );
 }
 
 interface TabsTriggerProps {
@@ -50,8 +57,10 @@ export function TabsTrigger({ value, children, className = '' }: TabsTriggerProp
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={isActive}
       onClick={() => onValueChange(value)}
-      className={`px-4 py-2 text-sm font-medium transition-colors ${
+      className={`px-4 py-2 text-sm font-medium transition-colors shrink-0 whitespace-nowrap ${
         isActive
           ? 'border-b-2 border-blue-600 text-blue-600'
           : 'text-gray-500 hover:text-gray-700'

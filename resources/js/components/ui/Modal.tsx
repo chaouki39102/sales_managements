@@ -75,9 +75,15 @@ export default function Modal({
     [storageKey, title],
   );
 
-  const [dims, setDims] = useState<{ width: number; height: number } | null>(() =>
-    (resizable && resolvedKey) ? loadStoredSize(resolvedKey) : null
-  );
+  const [dims, setDims] = useState<{ width: number; height: number } | null>(() => {
+    if (!resizable || !resolvedKey) return null;
+    const stored = loadStoredSize(resolvedKey);
+    // Ignore stored sizes that would overflow the current viewport (e.g. mobile).
+    if (stored && typeof window !== 'undefined') {
+      if (stored.width > window.innerWidth - 16 || stored.height > window.innerHeight - 16) return null;
+    }
+    return stored;
+  });
 
   // Save to localStorage on resize
   useEffect(() => {
@@ -127,7 +133,8 @@ export default function Modal({
     };
   }, [open]);
 
-  const resizableStyle: React.CSSProperties = (resizable && dims) ? {
+  const isNarrow = typeof window !== 'undefined' && window.innerWidth <= 768;
+  const resizableStyle: React.CSSProperties = (resizable && dims && !isNarrow) ? {
     width: dims.width,
     height: dims.height,
     maxWidth: dims.width,
@@ -175,7 +182,7 @@ export default function Modal({
         )}
 
         {/* Resize handle */}
-        {resizable && (
+        {resizable && !isNarrow && (
           <div
             onMouseDown={onMouseDown}
             className="modal-resize-handle"
