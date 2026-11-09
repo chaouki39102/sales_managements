@@ -351,7 +351,7 @@ export default function MatrixReportPage({ mode }: { mode: 'sale' | 'purchase' }
             </div>
           </Card>
           <div style={{ fontSize: 12, color: 'var(--t4)', marginTop: 8 }}>
-            اضغط على أي خلية لعرض وثائق (الطرف × المنتج) للفترة المحددة.
+            اضغط على أي خلية لعرض وثائق (الزبون × المنتج) للفترة المحددة.
           </div>
         </>
       )}

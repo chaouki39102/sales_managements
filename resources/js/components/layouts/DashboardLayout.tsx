@@ -60,9 +60,9 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: 'الأطراف',
+    label: 'المتعاملون',
     items: [
-      { name: 'كل الأطراف', href: 'parties',   icon: 'ti-id'              },
+      { name: 'كل المتعاملون', href: 'parties',   icon: 'ti-id'              },
       { name: 'الزبائن',    href: 'clients',   icon: 'ti-users'           },
       { name: 'الموردون',   href: 'suppliers', icon: 'ti-truck'           },
       { name: 'الديون',     href: 'debts',     icon: 'ti-receipt'         },

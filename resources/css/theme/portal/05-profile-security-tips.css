@@ -55,7 +55,7 @@
   border-bottom: 1px solid var(--b1);
   flex-wrap: wrap;
 }
-/* B.3 — أزرار «تتبع بالمسح»/مسح الرقم في شريط طلباتي: تُدفع إلى الطرف المقابل */
+/* B.3 — أزرار «تتبع بالمسح»/مسح الرقم في شريط طلباتي: تُدفع إلى الزبون المقابل */
 .portal-toolbar-sp {
   display: flex;
   align-items: center;

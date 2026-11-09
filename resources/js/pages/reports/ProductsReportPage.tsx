@@ -171,7 +171,7 @@ export default function ProductsReportPage() {
                   const code = (row as unknown as ProductHistoryItem).type_code;
                   return <Badge variant={code === 'AV' || code === 'AA' ? 'danger' : (code === 'FV' || code === 'POS' ? 'success' : 'warning')} noDot>{v as React.ReactNode}</Badge>;
                 }},
-                { key: 'party_name', label: 'الطرف', render: (v) => <span>{v as React.ReactNode}</span> },
+                { key: 'party_name', label: 'الزبون', render: (v) => <span>{v as React.ReactNode}</span> },
                 { key: 'quantity', label: 'الكمية', className: 'num', render: (v) => <span style={{ color: (v as number) >= 0 ? 'var(--em)' : 'var(--red)', fontWeight: 600 }}>{v as React.ReactNode}</span> },
                 { key: 'total_ht', label: 'HT', className: 'num', render: (v) => FMT(v as number) },
                 { key: 'total_tva', label: 'TVA', className: 'num', render: (v) => FMT(v as number) },

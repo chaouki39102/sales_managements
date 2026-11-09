@@ -86,7 +86,7 @@ class ImportController extends BaseApiController
             $userId = $request->user()?->id;
             $pendingEntities = $request->input('pending_entities');
             $result = $this->importService->importParties($rows, $this->getCompanyId(), $userId, $pendingEntities);
-            return $this->successResponse($result, 'تم استيراد الأطراف بنجاح');
+            return $this->successResponse($result, 'تم استيراد المتعاملون بنجاح');
         } catch (\Throwable $e) {
             return $this->handleError($e, 'executeParties');
         }

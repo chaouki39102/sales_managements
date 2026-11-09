@@ -1,6 +1,6 @@
 // ════════════════════════════════════════════════════════════════════════════
 // pages/parties/PartiesPage.tsx
-// صفحة الأطراف الموحدة — زبائن + موردون + مختلط
+// صفحة المتعاملون الموحدة — زبائن + موردون + مختلط
 // ════════════════════════════════════════════════════════════════════════════
 import {
   useState, useMemo, useCallback, useRef, useEffect, Suspense, lazy,
@@ -175,7 +175,7 @@ export default function PartiesPage() {
   const openEdit   = (p: Party) => { setEditing(p); setInitType(p.party_type_id); formModal.openModal(); };
   const openStats  = (p: Party) => { setViewParty(p); statsModal.openModal(); };
 
-  // ── مسح NIF/RC/كود/هاتف بالكاميرا → فتح الطرف (مطابقة الصفحة ثم بحث الخادم) ──
+  // ── مسح NIF/RC/كود/هاتف بالكاميرا → فتح الزبون (مطابقة الصفحة ثم بحث الخادم) ──
   const notify = useNotification();
   const matchParty = (p: Party, code: string) =>
     p.nif === code || p.rc === code || p.code === code ||
@@ -205,7 +205,7 @@ export default function PartiesPage() {
   return (
     <div className="page on" id="p-parties">
       <PageHeader
-        title="الأطراف"
+        title="المتعاملون"
         subtitle={`${meta?.total ?? '...'} طرف — زبائن وموردون`}
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
@@ -306,7 +306,7 @@ export default function PartiesPage() {
               },
               {
                 key: 'name',
-                label: 'الطرف',
+                label: 'الزبون',
                 render: (_v, row) => {
                   const p = row as unknown as Party;
                   const clr = ((p.id % 7) + 1) as 1|2|3|4|5|6|7;
@@ -461,13 +461,13 @@ export default function PartiesPage() {
         config={PARTY_IMPORT_CONFIG}
       />
 
-      {/* Scan NIF/RC → فتح الطرف */}
+      {/* Scan NIF/RC → فتح الزبون */}
       <Suspense fallback={null}>
         <BarcodeScannerModal
           open={partyScanner.open}
           onScan={partyScanner.handleScan}
           onClose={partyScanner.closeScanner}
-          title="مسح NIF / RC لفتح الطرف"
+          title="مسح NIF / RC لفتح الزبون"
           hint="صوّب الكاميرا على رمز NIF أو RC أو هاتف طرف لفتح إحصاءاته"
         />
       </Suspense>

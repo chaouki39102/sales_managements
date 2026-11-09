@@ -108,14 +108,14 @@ class GlobalRolesAndPermissionsSeeder extends Seeder
             ['name' => 'change_password_user', 'display_name' => 'تغيير كلمة مرور مستخدم',  'group' => 'المستخدمون'],
             ['name' => 'assign_role_user',     'display_name' => 'تعيين دور لمستخدم',       'group' => 'المستخدمون'],
 
-            // 2. الأطراف
-            ['name' => 'view_any_party',     'display_name' => 'عرض قائمة الأطراف', 'group' => 'الأطراف'],
-            ['name' => 'view_party',         'display_name' => 'عرض طرف',           'group' => 'الأطراف'],
-            ['name' => 'create_party',       'display_name' => 'إنشاء طرف',         'group' => 'الأطراف'],
-            ['name' => 'update_party',       'display_name' => 'تعديل طرف',         'group' => 'الأطراف'],
-            ['name' => 'delete_party',       'display_name' => 'حذف طرف',           'group' => 'الأطراف'],
-            ['name' => 'restore_party',      'display_name' => 'استعادة طرف',       'group' => 'الأطراف'],
-            ['name' => 'force_delete_party', 'display_name' => 'حذف نهائي لطرف',    'group' => 'الأطراف'],
+            // 2. المتعاملون
+            ['name' => 'view_any_party',     'display_name' => 'عرض قائمة المتعاملون', 'group' => 'المتعاملون'],
+            ['name' => 'view_party',         'display_name' => 'عرض طرف',           'group' => 'المتعاملون'],
+            ['name' => 'create_party',       'display_name' => 'إنشاء طرف',         'group' => 'المتعاملون'],
+            ['name' => 'update_party',       'display_name' => 'تعديل طرف',         'group' => 'المتعاملون'],
+            ['name' => 'delete_party',       'display_name' => 'حذف طرف',           'group' => 'المتعاملون'],
+            ['name' => 'restore_party',      'display_name' => 'استعادة طرف',       'group' => 'المتعاملون'],
+            ['name' => 'force_delete_party', 'display_name' => 'حذف نهائي لطرف',    'group' => 'المتعاملون'],
 
             // 3. المنتجات
             ['name' => 'view_any_product',         'display_name' => 'عرض قائمة المنتجات',    'group' => 'المنتجات'],
@@ -217,7 +217,7 @@ class GlobalRolesAndPermissionsSeeder extends Seeder
             ['name' => 'view_purchase_report',  'display_name' => 'تقرير المشتريات',  'group' => 'التقارير'],
             ['name' => 'view_inventory_report', 'display_name' => 'تقرير المخزون',    'group' => 'التقارير'],
             ['name' => 'view_financial_report', 'display_name' => 'التقارير المالية', 'group' => 'التقارير'],
-            ['name' => 'view_party_report',     'display_name' => 'تقارير الأطراف',   'group' => 'التقارير'],
+            ['name' => 'view_party_report',     'display_name' => 'تقارير المتعاملون',   'group' => 'التقارير'],
             ['name' => 'view_dashboard',        'display_name' => 'عرض لوحة التحكم', 'group' => 'التقارير'],
 
             // 13. السنوات المالية
@@ -298,7 +298,7 @@ class GlobalRolesAndPermissionsSeeder extends Seeder
             ['name' => 'create_legal_form',  'display_name' => 'إنشاء شكل قانوني',      'group' => 'جداول البحث'],
             ['name' => 'update_legal_form',  'display_name' => 'تعديل شكل قانوني',      'group' => 'جداول البحث'],
             ['name' => 'delete_legal_form',  'display_name' => 'حذف شكل قانوني',        'group' => 'جداول البحث'],
-            ['name' => 'view_any_party_type','display_name' => 'عرض أنواع الأطراف', 'group' => 'جداول البحث'],
+            ['name' => 'view_any_party_type','display_name' => 'عرض أنواع المتعاملون', 'group' => 'جداول البحث'],
             ['name' => 'create_party_type',  'display_name' => 'إنشاء نوع طرف',     'group' => 'جداول البحث'],
             ['name' => 'update_party_type',  'display_name' => 'تعديل نوع طرف',     'group' => 'جداول البحث'],
             ['name' => 'delete_party_type',  'display_name' => 'حذف نوع طرف',       'group' => 'جداول البحث'],

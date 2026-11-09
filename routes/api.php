@@ -607,7 +607,7 @@ Route::prefix('v1')->group(function () {
                 // تخفيضات الكميات
                 Route::apiResource('quantity-discounts', QuantityDiscountController::class);
 
-                // استيراد (import) للمنتجات والأطراف
+                // استيراد (import) للمنتجات والمتعاملون
                 Route::prefix('import')->group(function () {
                     Route::post('products/preview', [\App\Http\Controllers\Api\V1\ImportController::class, 'previewProducts']);
                     Route::post('products/execute', [\App\Http\Controllers\Api\V1\ImportController::class, 'executeProducts']);

@@ -12,5 +12,5 @@ interface PartyFormModalProps {
 }
 
 export default function PartyFormModal({ open, party: _party, initialPartyTypeId: _initialPartyTypeId, onClose, onSaved: _onSaved, isSubmitting: _isSubmitting, onSubmit: _onSubmit }: PartyFormModalProps) {
-  return <Modal open={open} onClose={onClose} title="الطرف">{null}</Modal>;
+  return <Modal open={open} onClose={onClose} title="الزبون">{null}</Modal>;
 }

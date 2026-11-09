@@ -8,23 +8,23 @@
 
 ## الملخص التنفيذي / Executive Summary
 
-تم اكتشاف وإصلاح مجموعة من الأخطاء المتعلقة بـ **رصيد الطرف (Solde)** و **الطابع الجبائي (Fiscal Stamp)** داخل نافذة إنشاء/تعديل المستندات التجارية، بالإضافة إلى إزالة إعداد مكرّر.
+تم اكتشاف وإصلاح مجموعة من الأخطاء المتعلقة بـ **رصيد الزبون (Solde)** و **الطابع الجبائي (Fiscal Stamp)** داخل نافذة إنشاء/تعديل المستندات التجارية، بالإضافة إلى إزالة إعداد مكرّر.
 
 Several bugs were found and fixed in the commercial document modal concerning the **party balance (Solde)** and the **fiscal stamp**, along with the removal of a duplicated setting.
 
 | البند / Item | المشكلة / Problem | الإصلاح / Fix |
 |---|---|---|
-| رصيد الطرف / Party balance | الدفعات تُخصم مرّتين في مستندات الشراء / Payments subtracted twice on purchase docs | الدفعات موقّعة حسب الاتجاه / Payments signed by direction |
+| رصيد الزبون / Party balance | الدفعات تُخصم مرّتين في مستندات الشراء / Payments subtracted twice on purchase docs | الدفعات موقّعة حسب الاتجاه / Payments signed by direction |
 | الطابع الجبائي / Fiscal stamp | المعاينة لا تُظهره بينما التقرير يضيفه / Preview vs saved doc mismatch | إعداد عالمي واحد + محاذاة المعاينة / Single global setting + aligned preview |
 | إعداد مكرّر / Duplicate setting | مفتاحان لنفس الخيار / Two toggles for the same option | إزالة `default_apply_stamp` بالكامل / Fully removed |
 
 ---
 
-## الجزء الأول: رصيد الطرف (Solde) / Part 1: Party Balance
+## الجزء الأول: رصيد الزبون (Solde) / Part 1: Party Balance
 
 ### المشكلة / The Problem
 
-في مستندات الشراء (Purchases)، كان رصيد الطرف يظهر **مخصوماً مرّتين**:
+في مستندات الشراء (Purchases)، كان رصيد الزبون يظهر **مخصوماً مرّتين**:
 - مرة واحدة من قيمة المستند (الوثيقة نفسها تُقلّل الرصيد لأنها دين علينا).
 - ومرة ثانية من قيمة الدفعة المدفوعة للمورّد (لأن جميع الدفعات كانت تُخصم بلا تمييز).
 

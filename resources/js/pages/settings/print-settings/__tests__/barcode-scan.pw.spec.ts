@@ -50,7 +50,7 @@ test.describe('B.1 Camera scan everywhere — non-POS pages', () => {
     await expect(camBtn).toBeVisible();
 
     await camBtn.click();
-    await expect(page.getByText('مسح NIF / RC لفتح الطرف')).toBeVisible();
+    await expect(page.getByText('مسح NIF / RC لفتح الزبون')).toBeVisible();
     await expect(page.getByText(/صوّب الكاميرا على رمز NIF أو RC/)).toBeVisible();
   });
 

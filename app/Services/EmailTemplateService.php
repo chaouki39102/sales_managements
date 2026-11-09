@@ -146,7 +146,7 @@ class EmailTemplateService
             'doc_net_to_pay'      => self::money($document->net_to_pay),
             'doc_paid_amount'     => self::money($document->paid_amount),
             'doc_remaining_amount'=> self::money($document->remaining_amount),
-            // الطرف
+            // الزبون
             'party_name'          => $party?->name,
             'party_code'          => $party?->code,
             'party_nif'           => $party?->nif,

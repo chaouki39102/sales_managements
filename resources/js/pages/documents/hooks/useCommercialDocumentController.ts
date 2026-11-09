@@ -368,7 +368,7 @@ export function useCommercialDocumentController({
         nif:             payload.nif,
         party_type_id:   payload.party_type_id,
       });
-      // تحديث قائمة الأطراف في محرر المستندات ثم تحديد المتعامل الجديد.
+      // تحديث قائمة المتعاملون في محرر المستندات ثم تحديد المتعامل الجديد.
       qc.invalidateQueries({ queryKey: [slug, 'modal-parties'], refetchType: 'active' });
       setPartyChangeWarning(null);
       handlePartyChangeWithWarning(String(saved.id));

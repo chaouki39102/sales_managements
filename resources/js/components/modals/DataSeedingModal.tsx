@@ -34,7 +34,7 @@ const SEED_GROUPS: SeedGroup[] = [
       { key: 'legal_forms',    label: 'الأشكال القانونية',     endpoint: 'legal-forms' },
       { key: 'fiscal_stamps',  label: 'طوابع الدفع',            endpoint: 'fiscal-stamps' },
       { key: 'price_levels',   label: 'مستويات الأسعار',       endpoint: 'price-levels' },
-      { key: 'party_types',    label: 'أنواع الأطراف',         endpoint: 'party-types' },
+      { key: 'party_types',    label: 'أنواع المتعاملون',         endpoint: 'party-types' },
       { key: 'product_types',  label: 'أنواع المنتجات',       endpoint: 'product-types' },
     ],
   },

@@ -102,7 +102,7 @@ export default function MiniPrintPreview({
           <span style={{ fontSize: 8.5, color: '#888' }}>{fmtDate(date)}</span>
         </div>
 
-        {/* ── الطرف ── */}
+        {/* ── الزبون ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
           <span style={{ fontSize: 8.5, fontWeight: 700, color: LBL_COLORS[partyLabel] ?? 'var(--em)' }}>
             {partyLabel}

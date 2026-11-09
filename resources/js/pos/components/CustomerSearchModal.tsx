@@ -477,7 +477,7 @@ export default function CustomerSearchModal({
               />
             </div>
 
-            {/* نوع الطرف */}
+            {/* نوع الزبون */}
             <div className="fg s2">
               <label>النوع</label>
               <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>

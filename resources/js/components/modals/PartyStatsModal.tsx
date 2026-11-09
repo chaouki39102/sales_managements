@@ -9,5 +9,5 @@ interface PartyStatsModalProps {
 }
 
 export default function PartyStatsModal({ open, party: _party, onClose, onEdit: _onEdit }: PartyStatsModalProps) {
-  return <Modal open={open} onClose={onClose} title="إحصائيات الطرف">{null}</Modal>;
+  return <Modal open={open} onClose={onClose} title="إحصائيات الزبون">{null}</Modal>;
 }

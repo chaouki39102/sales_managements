@@ -51,7 +51,7 @@ interface DocumentInfoSectionProps {
   qc: QueryClient;
   slug: string | null | undefined;
   warehouseIdNum: number | null;
-  /** أنواع الأطراف — تُستخدم في نموذج الإنشاء السريع لمتعامل جديد. */
+  /** أنواع المتعاملون — تُستخدم في نموذج الإنشاء السريع لمتعامل جديد. */
   partyTypes?: PartyType[];
   /** يُستدعى عند تأكيد نموذج الإنشاء السريع — الإنشاء + التحديد + تحديث القوائم. */
   onQuickCreateParty?: (payload: PartyQuickCreatePayload) => void;
@@ -80,7 +80,7 @@ export function hasAdvancedFieldErrors(errors: Record<string, string>): boolean 
 
 /**
  * المجموعة الأساسية — دائماً ظاهرة، Section عادية بدون طي (3 حقول فقط
- * يحتاجها كل مستند بلا استثناء: الرقم عند التعديل، الطرف التجاري، والتاريخ).
+ * يحتاجها كل مستند بلا استثناء: الرقم عند التعديل، الزبون التجاري، والتاريخ).
  */
 export default function DocumentInfoSection({
   form, errors, set, isEdit, isReadOnly,

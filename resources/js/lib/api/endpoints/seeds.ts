@@ -29,7 +29,7 @@ export const SEED_DEFINITIONS: Array<{
   // Tenant (مرتبطة بالشركة — تُدرَج لكل شركة)
   { key: 'units',                       label: 'وحدات القياس',                        group: 'tenant' },
   { key: 'price-levels',                label: 'مستويات الأسعار',                     group: 'tenant' },
-  { key: 'party-types',                 label: 'أنواع الأطراف',                       group: 'tenant' },
+  { key: 'party-types',                 label: 'أنواع المتعاملون',                       group: 'tenant' },
   { key: 'product-types',               label: 'أنواع المنتجات',                     group: 'tenant' },
   { key: 'stock-movement-types',        label: 'أنواع حركات المخزون',                 group: 'tenant' },
   { key: 'warehouses',                  label: 'مستودع رئيسي',                        group: 'tenant' },

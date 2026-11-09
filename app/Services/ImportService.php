@@ -459,7 +459,7 @@ class ImportService
             // الاسم (مطلوب)
             $name = $this->extract($row, 'name');
             if (empty($name)) {
-                $rowErrors[] = 'اسم الطرف مطلوب';
+                $rowErrors[] = 'اسم الزبون مطلوب';
             } else {
                 $data['name'] = $name;
                 $data['slug'] = Str::slug($name) . '-' . Str::random(4);
@@ -468,13 +468,13 @@ class ImportService
             // النوع (مطلوب)
             $typeVal = $this->extract($row, 'party_type');
             if (empty($typeVal)) {
-                $rowErrors[] = 'نوع الطرف مطلوب (زبون/مورد/كلاهما)';
+                $rowErrors[] = 'نوع الزبون مطلوب (زبون/مورد/كلاهما)';
             } else {
                 $typeId = $this->resolvePartyType($typeVal, $partyTypes);
                 if ($typeId) {
                     $data['party_type_id'] = $typeId;
                 } else {
-                    $rowErrors[] = "نوع الطرف '$typeVal' غير صالح (استخدم: زبون، مورد، كلاهما)";
+                    $rowErrors[] = "نوع الزبون '$typeVal' غير صالح (استخدم: زبون، مورد، كلاهما)";
                 }
             }
 

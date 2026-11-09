@@ -54,7 +54,7 @@ export function waDocMessage(doc: WaDoc, shareUrl?: string | null): string {
     'السلام عليكم،',
     `مرفق مستند ${doc.document_type_name ?? doc.document_type_code ?? ''} رقم ${doc.document_number ?? '—'}`,
     `التاريخ: ${doc.document_date ? new Date(doc.document_date).toLocaleDateString('ar-DZ') : '—'}`,
-    ...(doc.party_name ? [`الطرف: ${doc.party_name}`] : []),
+    ...(doc.party_name ? [`الزبون: ${doc.party_name}`] : []),
     `المجموع HT: ${_fmt(doc.total_ht)} دج`,
     `TVA: ${_fmt(doc.total_tva)} دج`,
   ];

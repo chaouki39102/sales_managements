@@ -60,7 +60,7 @@ class AuditLabelService
         'LegalForm'          => 'الشكل القانوني',
         'Gender'             => 'الجنس',
         'Plan'              => 'الخطة',
-        'PartyType'          => 'نوع الطرف',
+        'PartyType'          => 'نوع الزبون',
         'Commune'            => 'بلدية',
         'Wilaya'            => 'ولاية',
     ];
@@ -97,7 +97,7 @@ class AuditLabelService
         'created_by'          => 'أُنشئ بواسطة',
         'updated_by'          => 'حُدّث بواسطة',
         'deleted_by'          => 'حُذف بواسطة',
-        'party_id'            => 'الطرف',
+        'party_id'            => 'الزبون',
         'unit_id'             => 'الوحدة',
         'warehouse_id'        => 'المستودع',
         'brand_id'            => 'العلامة',

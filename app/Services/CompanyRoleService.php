@@ -297,7 +297,7 @@ class CompanyRoleService
                 'view_any_user', 'view_user', 'create_user', 'update_user', 'delete_user',
                 'restore_user', 'force_delete_user', 'toggle_active_user',
                 'change_password_user', 'assign_role_user',
-                // الأطراف
+                // المتعاملون
                 'view_any_party', 'view_party', 'create_party', 'update_party',
                 'delete_party', 'restore_party', 'force_delete_party',
                 // المنتجات
@@ -389,7 +389,7 @@ class CompanyRoleService
             'manager' => [
                 // المستخدمون (قراءة فقط)
                 'view_any_user', 'view_user',
-                // الأطراف
+                // المتعاملون
                 'view_any_party', 'view_party', 'create_party', 'update_party', 'delete_party',
                 // المنتجات
                 'view_any_product', 'view_product', 'create_product', 'update_product',
@@ -448,7 +448,7 @@ class CompanyRoleService
             // أمين الصندوق — مبيعات وزبائن فقط
             // ══════════════════════════════════════════════════════
             'cashier' => [
-                // الأطراف (إنشاء وتعديل)
+                // المتعاملون (إنشاء وتعديل)
                 'view_any_party', 'view_party', 'create_party', 'update_party',
                 // المنتجات (قراءة)
                 'view_any_product', 'view_product',

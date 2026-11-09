@@ -46,7 +46,7 @@ export function extractPermissionGroup(p: Permission): string {
     const resource = parts.slice(1).join("_");
     const AR: Record<string, string> = {
       user: "المستخدمون", role: "الأدوار", permission: "الصلاحيات",
-      product: "المنتجات", party: "الأطراف", document: "الوثائق",
+      product: "المنتجات", party: "المتعاملون", document: "الوثائق",
       payment: "المدفوعات", expense: "المصاريف", employee: "الموظفون",
       company: "الشركة", setting: "الإعدادات", report: "التقارير",
       fiscal_year: "السنة المالية", inventory: "المخزون",

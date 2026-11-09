@@ -48,7 +48,7 @@ export const ERP_FILTER_PATTERNS: SmartFilterPattern[] = [
 
   // ── طرف / زبون / مورد ──────────────────────────────────────────────────
   {
-    regex: /(?:الزبون|الزبون|الطرف|المورد)\s+(?:اسمه\s+)?["']?([^"'\s]+)["']?/,
+    regex: /(?:الزبون|الزبون|الزبون|المورد)\s+(?:اسمه\s+)?["']?([^"'\s]+)["']?/,
     field: 'party.name',
     operator: 'contains',
     valueType: 'string',

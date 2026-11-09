@@ -235,7 +235,7 @@ export default function ChecksPage() {
             { key: 'bank_name', label: 'البنك', render: (v) => <span style={{ color: 'var(--t3)' }}>{(v as string) || '—'}</span> },
             { key: 'drawer_name', label: 'الساحب', render: (v) => <span style={{ color: 'var(--t3)' }}>{(v as string) || '—'}</span> },
             {
-              key: 'party', label: 'الطرف',
+              key: 'party', label: 'الزبون',
               render: (_v, row) => (row as any).party?.name ?? (row as any).drawer_name ?? '—',
             },
             {
@@ -326,7 +326,7 @@ export default function ChecksPage() {
                 onChange={e => setForm(f => ({ ...f, drawer_name: e.target.value }))} placeholder="اسم الساحب" />
             </div>
             <div>
-              <Label>الطرف</Label>
+              <Label>الزبون</Label>
               <select style={{
                 ...inputStyle(), cursor: 'pointer',
               }} onChange={e => setForm(f => ({ ...f, party_id: e.target.value ? Number(e.target.value) : null }))}>

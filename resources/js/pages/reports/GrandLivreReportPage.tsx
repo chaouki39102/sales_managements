@@ -11,7 +11,7 @@ import Card from '@/components/ui/Card';
 import SimpleTable from '@/components/ui/SimpleTable';
 
 const PARTY_TYPES: { value: number | null; label: string }[] = [
-  { value: null, label: 'كل الأطراف' },
+  { value: null, label: 'كل المتعاملون' },
   { value: 1,    label: 'الزبائن' },
   { value: 2,    label: 'الموردين' },
 ];
@@ -86,7 +86,7 @@ export default function GrandLivreReportPage() {
     { key: 'date', label: 'التاريخ', render: (v, row) => row._isOpen || row._isClose ? null : <span style={{ color: 'var(--t4)', fontSize: 12 }}>{v as React.ReactNode}</span> },
     {
       key: 'party',
-      label: 'الطرف',
+      label: 'الزبون',
       render: (v, row) => row._isOpen || row._isClose
         ? (
           <div>
@@ -125,7 +125,7 @@ export default function GrandLivreReportPage() {
     }
     await exportToExcel([{
       name: 'دفتر الأستاذ العام',
-      headers: ['الطرف', 'الكود', 'التاريخ', 'المرجع', 'البيان', 'مدين', 'دائن', 'الرصيد'],
+      headers: ['الزبون', 'الكود', 'التاريخ', 'المرجع', 'البيان', 'مدين', 'دائن', 'الرصيد'],
       rows: body,
     }], `دفتر-الأستاذ-العام ${fromDate}-${toDate}`);
   };
@@ -145,9 +145,9 @@ export default function GrandLivreReportPage() {
         </div>
         {partyType !== null && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontWeight: 600, fontSize: 13 }}>الطرف:</span>
+            <span style={{ fontWeight: 600, fontSize: 13 }}>الزبون:</span>
             <select className="form-control" style={{ width: 200 }} value={partyId ?? ''} onChange={e => setPartyId(e.target.value === '' ? undefined : Number(e.target.value))}>
-              <option value="">كل الأطراف</option>
+              <option value="">كل المتعاملون</option>
               {partyOptions.map(pt => <option key={pt.id} value={pt.id}>{pt.name}</option>)}
             </select>
           </div>

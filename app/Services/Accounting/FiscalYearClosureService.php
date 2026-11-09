@@ -170,7 +170,7 @@ class FiscalYearClosureService
     }
 
     /**
-     * نقل أرصدة الأطراف (الزبائن/الموردين)
+     * نقل أرصدة المتعاملون (الزبائن/الموردين)
      */
     protected function transferPartyBalances(FiscalYear $oldYear, FiscalYear $newYear): void
     {

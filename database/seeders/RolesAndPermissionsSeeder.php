@@ -163,15 +163,15 @@ class RolesAndPermissionsSeeder extends Seeder
             ['name' => 'assign_role_user',     'display_name' => 'تعيين دور لمستخدم',         'group' => 'المستخدمون', 'description' => 'تغيير دور مستخدم داخل الشركة'],
 
             // ══════════════════════════════════════════════════════
-            // 2. الأطراف
+            // 2. المتعاملون
             // ══════════════════════════════════════════════════════
-            ['name' => 'view_any_party',     'display_name' => 'عرض قائمة الأطراف',   'group' => 'الأطراف', 'description' => 'عرض قائمة الزبائن والموردين'],
-            ['name' => 'view_party',         'display_name' => 'عرض طرف',             'group' => 'الأطراف', 'description' => 'عرض تفاصيل زبون أو مورد'],
-            ['name' => 'create_party',       'display_name' => 'إنشاء طرف',           'group' => 'الأطراف', 'description' => 'إضافة زبون أو مورد جديد'],
-            ['name' => 'update_party',       'display_name' => 'تعديل طرف',           'group' => 'الأطراف', 'description' => 'تعديل بيانات زبون أو مورد'],
-            ['name' => 'delete_party',       'display_name' => 'حذف طرف',             'group' => 'الأطراف', 'description' => 'حذف زبون أو مورد'],
-            ['name' => 'restore_party',      'display_name' => 'استعادة طرف',         'group' => 'الأطراف', 'description' => 'استعادة زبون أو مورد محذوف'],
-            ['name' => 'force_delete_party', 'display_name' => 'حذف نهائي لطرف',      'group' => 'الأطراف', 'description' => 'الحذف النهائي لزبون أو مورد'],
+            ['name' => 'view_any_party',     'display_name' => 'عرض قائمة المتعاملون',   'group' => 'المتعاملون', 'description' => 'عرض قائمة الزبائن والموردين'],
+            ['name' => 'view_party',         'display_name' => 'عرض طرف',             'group' => 'المتعاملون', 'description' => 'عرض تفاصيل زبون أو مورد'],
+            ['name' => 'create_party',       'display_name' => 'إنشاء طرف',           'group' => 'المتعاملون', 'description' => 'إضافة زبون أو مورد جديد'],
+            ['name' => 'update_party',       'display_name' => 'تعديل طرف',           'group' => 'المتعاملون', 'description' => 'تعديل بيانات زبون أو مورد'],
+            ['name' => 'delete_party',       'display_name' => 'حذف طرف',             'group' => 'المتعاملون', 'description' => 'حذف زبون أو مورد'],
+            ['name' => 'restore_party',      'display_name' => 'استعادة طرف',         'group' => 'المتعاملون', 'description' => 'استعادة زبون أو مورد محذوف'],
+            ['name' => 'force_delete_party', 'display_name' => 'حذف نهائي لطرف',      'group' => 'المتعاملون', 'description' => 'الحذف النهائي لزبون أو مورد'],
 
             // ══════════════════════════════════════════════════════
             // 3. المنتجات
@@ -293,7 +293,7 @@ class RolesAndPermissionsSeeder extends Seeder
             ['name' => 'view_purchase_report',  'display_name' => 'تقرير المشتريات',  'group' => 'التقارير'],
             ['name' => 'view_inventory_report', 'display_name' => 'تقرير المخزون',    'group' => 'التقارير'],
             ['name' => 'view_financial_report', 'display_name' => 'التقارير المالية', 'group' => 'التقارير'],
-            ['name' => 'view_party_report',     'display_name' => 'تقارير الأطراف',   'group' => 'التقارير'],
+            ['name' => 'view_party_report',     'display_name' => 'تقارير المتعاملون',   'group' => 'التقارير'],
             ['name' => 'view_dashboard',        'display_name' => 'عرض لوحة التحكم', 'group' => 'التقارير'],
 
             // ══════════════════════════════════════════════════════
@@ -399,7 +399,7 @@ class RolesAndPermissionsSeeder extends Seeder
             ['name' => 'update_legal_form',   'display_name' => 'تعديل شكل قانوني',      'group' => 'جداول البحث'],
             ['name' => 'delete_legal_form',   'display_name' => 'حذف شكل قانوني',        'group' => 'جداول البحث'],
 
-            ['name' => 'view_any_party_type', 'display_name' => 'عرض أنواع الأطراف', 'group' => 'جداول البحث'],
+            ['name' => 'view_any_party_type', 'display_name' => 'عرض أنواع المتعاملون', 'group' => 'جداول البحث'],
             ['name' => 'create_party_type',   'display_name' => 'إنشاء نوع طرف',     'group' => 'جداول البحث'],
             ['name' => 'update_party_type',   'display_name' => 'تعديل نوع طرف',     'group' => 'جداول البحث'],
             ['name' => 'delete_party_type',   'display_name' => 'حذف نوع طرف',       'group' => 'جداول البحث'],
