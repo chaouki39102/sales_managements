@@ -126,11 +126,12 @@ export function usePartyProductRecap(partyId: number | null, date?: string) {
                 return {
                     products: (products as Record<string, unknown>[]).map(p => ({
                         product_id:      Number(p.product_id ?? 0),
+                        is_manual:       Boolean(p.is_manual),
                         product_name:    String(p.product_name ?? ''),
                         product_ref:     String(p.product_ref ?? ''),
-                        unit_name:       String(p.unit_name ?? ''),
-                        brand_name:      String(p.brand_name ?? ''),
-                        family_name:     String(p.family_name ?? ''),
+                        unit_name:       p.unit_name == null ? '' : String(p.unit_name),
+                        brand_name:      p.brand_name == null ? '' : String(p.brand_name),
+                        family_name:     p.family_name == null ? '' : String(p.family_name),
                         sale_qty:        Number(p.sale_qty ?? 0),
                         sale_ht:         Number(p.sale_ht ?? 0),
                         sale_ttc:        Number(p.sale_ttc ?? 0),
@@ -194,9 +195,11 @@ export function usePartyDetailedHistory(partyId: number | null, date?: string) {
                         doc_cost_ht:     Number(t.doc_cost_ht ?? 0),
                         margin_value:    Number(t.margin_value ?? 0),
                         lines: Array.isArray(t.lines) ? (t.lines as Record<string, unknown>[]).map(l => ({
+                            product_id:    l.product_id == null ? null : Number(l.product_id),
+                            is_manual:     Boolean(l.is_manual),
                             product_name:  String(l.product_name ?? ''),
                             product_ref:   String(l.product_ref ?? ''),
-                            unit_name:     String(l.unit_name ?? ''),
+                            unit_name:     l.unit_name == null ? '' : String(l.unit_name),
                             quantity:      Number(l.quantity ?? 0),
                             unit_price_ht: Number(l.unit_price_ht ?? 0),
                             discount_pct:  Number(l.discount_pct ?? 0),

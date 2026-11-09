@@ -946,6 +946,8 @@ export interface PartyBalanceHistory {
 }
 
 export interface DetailedLine {
+  product_id?:   number | null;
+  is_manual?:    boolean;
   product_name:  string;
   product_ref:   string;
   unit_name:     string;
@@ -971,12 +973,13 @@ export interface DetailedBalanceHistory {
 }
 
 export interface ProductRecapItem {
-  product_id:          number;
+  product_id:          number;   // manual lines use a stable synthetic negative id
+  is_manual?:          boolean;
   product_name:        string;
   product_ref:         string;
-  unit_name:           string;
-  brand_name:          string;
-  family_name:         string;
+  unit_name:           string | null;
+  brand_name:          string | null;
+  family_name:         string | null;
   sale_qty:            number;
   sale_ht:             number;
   sale_ttc:            number;

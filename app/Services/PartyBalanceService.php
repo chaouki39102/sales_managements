@@ -371,11 +371,14 @@ class PartyBalanceService
         $date         = substr($date, 0, 10);
         $fiscalYearId = $this->resolveFiscalYearId($companyId, $date);
 
+        $manualName = "COALESCE(NULLIF(TRIM(cdl.description),''),'منتج يدوي')";
+
+        // يشمل المنتجات اليدوية (product_id IS NULL): تُعرض بالوصف مع مرجع «يدوي» ومعرّف اصطناعي سالب ثابت.
         $lines = DB::table('commercial_document_lines as cdl')
             ->join('commercial_documents as cd', 'cd.id', '=', 'cdl.commercial_document_id')
             ->join('document_types as dt', 'cd.document_type_id', '=', 'dt.id')
             ->join('document_base_operations as dbo', 'dt.document_base_operation_id', '=', 'dbo.id')
-            ->join('products as p', 'p.id', '=', 'cdl.product_id')
+            ->leftJoin('products as p', 'p.id', '=', 'cdl.product_id')
             ->leftJoin('units as u', 'u.id', '=', 'p.unit_id')
             ->leftJoin('brands as br', 'br.id', '=', 'p.brand_id')
             ->leftJoin('families as f', 'f.id', '=', 'p.family_id')
@@ -386,9 +389,9 @@ class PartyBalanceService
             ->whereDate('cd.document_date', '<=', $date)
             ->whereNull('cd.deleted_at')
             ->select(
-                'p.id as product_id',
-                'p.name as product_name',
-                'p.ref as product_ref',
+                'cdl.product_id',
+                DB::raw("CASE WHEN cdl.product_id IS NULL THEN {$manualName} ELSE p.name END as product_name"),
+                DB::raw("CASE WHEN cdl.product_id IS NULL THEN 'يدوي' ELSE p.ref END as product_ref"),
                 'u.name as unit_name',
                 'br.name as brand_name',
                 'f.name as family_name',
@@ -400,17 +403,20 @@ class PartyBalanceService
                 DB::raw('SUM(cdl.total_discount_amount) as total_discount'),
                 DB::raw('COUNT(DISTINCT cd.id) as doc_count')
             )
-            ->groupBy('p.id', 'p.name', 'p.ref', 'u.name', 'br.name', 'f.name', 'dbo.name')
-            ->orderBy('p.name', 'asc')
+            ->groupBy('cdl.product_id', DB::raw($manualName), 'p.name', 'p.ref', 'u.name', 'br.name', 'f.name', 'dbo.name')
+            ->orderBy('product_name', 'asc')
             ->get();
 
-        // تجميع: نفس المنتج قد يكون في مبيعات ومشتريات
+        // تجميع: نفس المنتج قد يكون في مبيعات ومشتريات (اليدوي يُجمَّع باسم الوصف)
         $productMap = [];
         foreach ($lines as $line) {
-            $pid = $line->product_id;
-            if (!isset($productMap[$pid])) {
-                $productMap[$pid] = [
+            $isManual = $line->product_id === null || $line->product_id === '';
+            $pid = $isManual ? -abs(crc32((string) $line->product_name)) : (int) $line->product_id;
+            $mapKey = $isManual ? 'm:' . $line->product_name : 'p:' . $pid;
+            if (!isset($productMap[$mapKey])) {
+                $productMap[$mapKey] = [
                     'product_id'   => $pid,
+                    'is_manual'    => $isManual,
                     'product_name' => $line->product_name,
                     'product_ref'  => $line->product_ref,
                     'unit_name'    => $line->unit_name,
@@ -430,7 +436,7 @@ class PartyBalanceService
                     'doc_count'    => 0,
                 ];
             }
-            $p = &$productMap[$pid];
+            $p = &$productMap[$mapKey];
             if ($line->operation === 'sale') {
                 $p['sale_qty'] += (float) $line->total_quantity;
                 $p['sale_ht']  += (float) $line->total_ht;
@@ -451,7 +457,7 @@ class PartyBalanceService
 
         $products = array_values($productMap);
 
-        $productIds = array_column($products, 'product_id');
+        $productIds = array_values(array_filter(array_column($products, 'product_id'), fn ($id) => $id !== null && $id > 0));
 
         // Compute cost from line-level cost_price_ht (stored at document creation time)
         foreach ($products as &$p) {
@@ -474,6 +480,7 @@ class PartyBalanceService
                 ->whereNull('cd.deleted_at')
                 ->where('dt.document_base_operation_id', 1) // sale only
                 ->where('cdl.cost_price_ht', '>', 0)
+                ->whereIn('cdl.product_id', $productIds)
                 ->select(
                     'cdl.product_id',
                     DB::raw('SUM(CASE WHEN dt.code = \'AV\' THEN -cdl.quantity ELSE cdl.quantity END) as sale_qty'),
@@ -492,8 +499,9 @@ class PartyBalanceService
             }
 
             foreach ($products as &$p) {
-                if (isset($costMap[$p['product_id']]) && $costMap[$p['product_id']]['sale_qty'] > 0) {
-                    $effectiveCost = $costMap[$p['product_id']]['cost_ht'] / $costMap[$p['product_id']]['sale_qty'];
+                $pid = $p['product_id'] ?? null;
+                if ($pid !== null && isset($costMap[$pid]) && $costMap[$pid]['sale_qty'] > 0) {
+                    $effectiveCost = $costMap[$pid]['cost_ht'] / $costMap[$pid]['sale_qty'];
                     $p['effective_cost_price'] = round($effectiveCost, 4);
                 } else {
                     $effectiveCost = 0;
@@ -577,14 +585,16 @@ class PartyBalanceService
         $linesMap = [];
         $docCostMap = [];
         if ($docIds->isNotEmpty()) {
+            $manualName = "COALESCE(NULLIF(TRIM(cdl.description),''),'منتج يدوي')";
             $lines = DB::table('commercial_document_lines as cdl')
-                ->join('products as p', 'p.id', '=', 'cdl.product_id')
+                ->leftJoin('products as p', 'p.id', '=', 'cdl.product_id')
                 ->leftJoin('units as u', 'u.id', '=', 'p.unit_id')
                 ->whereIn('cdl.commercial_document_id', $docIds)
                 ->select(
                     'cdl.commercial_document_id',
-                    'p.name as product_name',
-                    'p.ref as product_ref',
+                    'cdl.product_id',
+                    DB::raw("CASE WHEN cdl.product_id IS NULL THEN {$manualName} ELSE p.name END as product_name"),
+                    DB::raw("CASE WHEN cdl.product_id IS NULL THEN 'يدوي' ELSE p.ref END as product_ref"),
                     'u.name as unit_name',
                     'cdl.quantity',
                     'cdl.unit_price_ht',
@@ -610,8 +620,11 @@ class PartyBalanceService
                 $sign = $isReturn ? -1 : 1;
                 $lineCost = $sign * $qty * $cost;
                 $docCostMap[$docId] += $lineCost;
+                $isManual = $line->product_id === null || $line->product_id === '';
 
                 $linesMap[$docId][] = [
+                    'product_id'      => $isManual ? null : (int) $line->product_id,
+                    'is_manual'       => $isManual,
                     'product_name'    => $line->product_name,
                     'product_ref'     => $line->product_ref,
                     'unit_name'       => $line->unit_name,
