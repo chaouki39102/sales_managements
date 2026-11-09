@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   useOnlineStatus,
   usePendingOpsCount,
@@ -24,6 +25,41 @@ export default function OfflineIndicator() {
   const { syncing, sync } = useSync();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number; width: number } | null>(null);
+  const widgetRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const positionMenu = useCallback(() => {
+    const el = widgetRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const width = Math.min(300, vw - 16);
+    const right = Math.max(8, Math.min(vw - 8 - width, vw - r.right));
+    setMenuPos({ top: r.bottom + 6, right, width });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    positionMenu();
+    window.addEventListener('resize', positionMenu);
+    window.addEventListener('scroll', positionMenu, true);
+    return () => {
+      window.removeEventListener('resize', positionMenu);
+      window.removeEventListener('scroll', positionMenu, true);
+    };
+  }, [open, positionMenu]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleOutside = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (widgetRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [open]);
 
   const slug = useActiveSlug();
   const { selectedYear } = useFiscalYear();
@@ -123,7 +159,7 @@ export default function OfflineIndicator() {
             : 'ti-cloud-upload';
 
   return (
-    <div className="offline-widget">
+    <div className="offline-widget" ref={widgetRef}>
       <div
         className={`offline-indicator ${!online ? 'offline' : 'syncing'}${hasFailed ? ' failed' : ''}${stale ? ' stale' : ''}${prepNeeded ? ' prep' : ''}${open ? ' open' : ''}`}
         onClick={handleClick}
@@ -147,8 +183,13 @@ export default function OfflineIndicator() {
         )}
       </div>
 
-      {open && !syncing && (
-        <div className="offline-pop" role="menu">
+      {open && !syncing && menuPos && createPortal(
+        <div
+          className="offline-pop"
+          role="menu"
+          ref={menuRef}
+          style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, left: 'auto', width: menuPos.width, maxHeight: 'min(320px, calc(100dvh - 120px))', zIndex: 10050 }}
+        >
           {online && (
             <div className="offline-pop-prep">
               <div className="offline-pop-hd">
@@ -239,7 +280,8 @@ export default function OfflineIndicator() {
               )}
             </>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

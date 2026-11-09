@@ -1,21 +1,47 @@
 // ════════════════════════════════════════════════
 // resources/js/components/common/FiscalYearSelector.tsx
 // ════════════════════════════════════════════════
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useFiscalYear } from '@/context/FiscalYearContext';
 
 
 export default function FiscalYearSelector() {
     const { years, selected, loading, isReadOnly, selectYear } = useFiscalYear();
     const [open, setOpen] = useState(false);
+    const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
     const ref = useRef<HTMLDivElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
 
-    // إغلاق عند النقر خارجاً
+    const positionMenu = useCallback(() => {
+        const el = ref.current;
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        const vw = window.innerWidth;
+        const width = Math.min(Math.max(280, r.width), vw - 16);
+        let left = r.left;
+        if (left + width > vw - 8) left = Math.max(8, vw - 8 - width);
+        if (left < 8) left = 8;
+        setMenuPos({ top: r.bottom + 6, left, width });
+    }, []);
+
+    useEffect(() => {
+        if (!open) return;
+        positionMenu();
+        window.addEventListener('resize', positionMenu);
+        window.addEventListener('scroll', positionMenu, true);
+        return () => {
+            window.removeEventListener('resize', positionMenu);
+            window.removeEventListener('scroll', positionMenu, true);
+        };
+    }, [open, positionMenu]);
+
+    // إغلاق عند النقر خارجاً (يشمل القائمة المنقولة عبر portal)
     useEffect(() => {
         function handler(e: MouseEvent) {
-            if (ref.current && !ref.current.contains(e.target as Node)) {
-                setOpen(false);
-            }
+            const t = e.target as Node;
+            if (ref.current?.contains(t) || menuRef.current?.contains(t)) return;
+            setOpen(false);
         }
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
@@ -102,10 +128,10 @@ export default function FiscalYearSelector() {
             </button>
 
             {/* Dropdown */}
-            {open && (
-                <div style={{
-                    position: 'absolute', top: 'calc(100% + 6px)',
-                    left: 0, minWidth: 280, zIndex: 9999,
+            {open && menuPos && createPortal(
+                <div ref={menuRef} style={{
+                    position: 'fixed', top: menuPos.top, left: menuPos.left,
+                    width: menuPos.width, maxHeight: 'min(420px, calc(100dvh - 120px))', zIndex: 10050,
                     background: 'var(--bg2)', border: '1px solid var(--b2)',
                     borderRadius: 'var(--r3)', boxShadow: 'var(--shadow2)',
                     overflow: 'hidden',
@@ -198,7 +224,8 @@ export default function FiscalYearSelector() {
                         <i className="ti ti-info-circle" style={{ marginLeft: 4 }} />
                         السنة المقفلة: للعرض فقط — لا يمكن التعديل
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

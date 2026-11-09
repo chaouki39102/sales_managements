@@ -1,16 +1,42 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useAlerts } from '../hooks/useAlerts';
 
 export function AlertBell() {
   const { alerts, unreadCount, isLoading, markAsRead, markAllAsRead, refresh } = useAlerts();
   const [open, setOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const positionMenu = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const width = Math.min(360, vw - 16);
+    let left = r.left;
+    if (left + width > vw - 8) left = Math.max(8, vw - 8 - width);
+    if (left < 8) left = 8;
+    setMenuPos({ top: r.bottom + 6, left, width });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    positionMenu();
+    window.addEventListener('resize', positionMenu);
+    window.addEventListener('scroll', positionMenu, true);
+    return () => {
+      window.removeEventListener('resize', positionMenu);
+      window.removeEventListener('scroll', positionMenu, true);
+    };
+  }, [open, positionMenu]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const t = e.target as Node;
+      if (ref.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -60,13 +86,13 @@ export function AlertBell() {
         )}
       </button>
 
-      {open && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, marginTop: 4,
-          width: 360, maxHeight: 420, overflowY: 'auto',
+      {open && menuPos && createPortal(
+        <div ref={menuRef} style={{
+          position: 'fixed', top: menuPos.top, left: menuPos.left,
+          width: menuPos.width, maxHeight: 'min(420px, calc(100dvh - 120px))', overflowY: 'auto',
           background: 'var(--bg1)', border: '1px solid var(--b2)',
           borderRadius: 'var(--r2)', boxShadow: '0 8px 24px rgba(0,0,0,.15)',
-          zIndex: 1000, padding: 8,
+          zIndex: 10050, padding: 8,
         }}>
           <div style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -125,7 +151,8 @@ export function AlertBell() {
               </div>
             </div>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
