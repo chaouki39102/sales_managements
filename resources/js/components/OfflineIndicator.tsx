@@ -188,7 +188,7 @@ export default function OfflineIndicator() {
           className="offline-pop"
           role="menu"
           ref={menuRef}
-          style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, left: 'auto', width: menuPos.width, maxHeight: 'min(320px, calc(100dvh - 120px))', zIndex: 10050 }}
+          style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, left: 'auto', width: menuPos.width, maxHeight: 'min(320px, calc(100dvh - 120px))', zIndex: 100000 }}
         >
           {online && (
             <div className="offline-pop-prep">

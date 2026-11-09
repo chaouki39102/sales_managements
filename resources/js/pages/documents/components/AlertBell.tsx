@@ -92,7 +92,7 @@ export function AlertBell() {
           width: menuPos.width, maxHeight: 'min(420px, calc(100dvh - 120px))', overflowY: 'auto',
           background: 'var(--bg1)', border: '1px solid var(--b2)',
           borderRadius: 'var(--r2)', boxShadow: '0 8px 24px rgba(0,0,0,.15)',
-          zIndex: 10050, padding: 8,
+          zIndex: 100000, padding: 8,
         }}>
           <div style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',

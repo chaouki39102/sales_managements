@@ -131,7 +131,7 @@ export default function FiscalYearSelector() {
             {open && menuPos && createPortal(
                 <div ref={menuRef} style={{
                     position: 'fixed', top: menuPos.top, left: menuPos.left,
-                    width: menuPos.width, maxHeight: 'min(420px, calc(100dvh - 120px))', zIndex: 10050,
+                    width: menuPos.width, maxHeight: 'min(420px, calc(100dvh - 120px))', zIndex: 100000,
                     background: 'var(--bg2)', border: '1px solid var(--b2)',
                     borderRadius: 'var(--r3)', boxShadow: 'var(--shadow2)',
                     overflow: 'hidden',
