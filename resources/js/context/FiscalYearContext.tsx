@@ -25,6 +25,7 @@ import React, {
   createContext, useContext, useCallback,
   useState, useRef, useEffect,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fiscalYearsApi }    from '@/lib/api/endpoints/fiscalYears';
 import { tenantKeys }        from '@/lib/api/core/queryKeys';
@@ -159,11 +160,38 @@ export function useFiscalYear(): FiscalYearContextType {
 export function FiscalYearSelector() {
   const { years, selectedYear, setSelectedYear, isLoading, open, closed } = useFiscalYear();
   const [isOpen, setIsOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const positionMenu = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const width = Math.min(Math.max(280, r.width), vw - 16);
+    let left = r.left;
+    if (left + width > vw - 8) left = Math.max(8, vw - 8 - width);
+    if (left < 8) left = 8;
+    setMenuPos({ top: r.bottom + 6, left, width });
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    positionMenu();
+    window.addEventListener('resize', positionMenu);
+    window.addEventListener('scroll', positionMenu, true);
+    return () => {
+      window.removeEventListener('resize', positionMenu);
+      window.removeEventListener('scroll', positionMenu, true);
+    };
+  }, [isOpen, positionMenu]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
+      const t = e.target as Node;
+      if (ref.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setIsOpen(false);
     };
     if (isOpen) document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -201,8 +229,20 @@ export function FiscalYearSelector() {
         <i className={`ti ti-chevron-${isOpen ? 'up' : 'down'} text-sm text-t4`} />
       </button>
 
-      {isOpen && (
-        <div className="absolute top-0 left-0 mt-6 min-w-52 bg-2 border border-b2 rounded-lg shadow-md z-1000 overflow-hidden rtl">
+      {isOpen && menuPos && createPortal(
+        <div
+          ref={menuRef}
+          className="bg-2 border border-b2 rounded-lg shadow-md overflow-hidden rtl"
+          style={{
+            position: 'fixed',
+            top: menuPos.top,
+            left: menuPos.left,
+            width: menuPos.width,
+            maxHeight: 'min(420px, calc(100dvh - 120px))',
+            overflowY: 'auto',
+            zIndex: 100000,
+          }}
+        >
           {open.length > 0 && (
             <>
               <div className="px-12 py-6 text-xs font-extrabold text-em uppercase tracking-widest bg-3">
@@ -258,7 +298,8 @@ export function FiscalYearSelector() {
               إدارة السنوات المالية
             </a>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
