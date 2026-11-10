@@ -662,17 +662,25 @@ export default function POSSettingsModal({
       }
     >
       {/* Tabs */}
-      <div style={{
-        display: 'flex', gap: 2, marginBottom: 16,
-        background: 'var(--bg2)', borderRadius: 10, padding: 3,
-      }}>
+      <div
+        className="pos-settings-tabs"
+        style={{
+          display: 'flex', gap: 2, marginBottom: 16,
+          background: 'var(--bg2)', borderRadius: 10, padding: 3,
+          overflowX: 'auto', overflowY: 'hidden',
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+        }}
+      >
         {TABS.map(t => (
           <button
             key={t.key}
             type="button"
             onClick={() => setActiveTab(t.key)}
             style={{
-              flex: 1, padding: '8px 12px', borderRadius: 8, border: 'none',
+              flex: '0 0 auto', whiteSpace: 'nowrap',
+              padding: '8px 12px', borderRadius: 8, border: 'none',
               cursor: 'pointer', fontSize: 12, fontWeight: activeTab === t.key ? 700 : 500,
               background: activeTab === t.key ? 'var(--bg1)' : 'transparent',
               color: activeTab === t.key ? 'var(--em)' : 'var(--t3)',

@@ -357,3 +357,6 @@ body.dark .thermal-status.err { background: #7f1d1d; color: #fecaca; }
 .si-col-resize{position:absolute;top:0;inset-inline-end:0;width:6px;cursor:col-resize;height:100%;z-index:2;background:transparent;}
 .si-col-resize:hover,.si-col-resize:active{background:var(--em);}
 .si-tbl-wrap th{position:relative;}
+
+/* POS settings modal tabs: horizontal scroll on mobile */
+.pos-settings-tabs::-webkit-scrollbar { display: none; }
