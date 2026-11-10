@@ -79,21 +79,24 @@
 
 /* ── ≤768px: mobile layout ──────────────────────────────────────────────── */
 @media (max-width: 768px) {
-  /* Topbar: horizontally scrollable on mobile so all actions remain reachable. */
+  /* Topbar: horizontally scrollable on mobile so all actions remain reachable.
+     !important beats 02-search.css/theme.css mobile `overflow:hidden` on #topbar. */
   #topbar {
-    padding: 0 10px;
+    padding: 0 10px !important;
     gap: 8px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    flex-wrap: nowrap;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    flex-wrap: nowrap !important;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    max-width: 100% !important;
   }
   #topbar::-webkit-scrollbar { display: none; }
-  #topbar > * { flex-shrink: 0; }
-  #topbar .tb-info { flex: 0 0 auto; min-width: 120px; max-width: 55vw; }
-  #topbar .tb-title { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #topbar > * { flex-shrink: 0 !important; }
+  #topbar .tb-info { flex: 0 0 auto; min-width: 96px; max-width: 42vw; }
+  #topbar .tb-title { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #topbar .tb-path { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #topbar .tb-actions { min-width: 0; flex: 0 0 auto; flex-shrink: 0; margin-inline-start: 0; gap: 6px; flex-wrap: nowrap; }
   #topbar .tb-actions .srch { flex: 0 0 auto; width: 140px; min-width: 120px; }
@@ -323,8 +326,8 @@
   .modal .m-foot .btn { width: 100%; }
 
   .page-content:not(.page-content--flush) { padding: 8px 8px calc(16px + var(--navh, 64px)); }
-  #topbar { padding: 0 8px; gap: 6px; }
-  #topbar .tb-info { min-width: 100px; max-width: 50vw; }
+  #topbar { padding: 0 8px !important; gap: 6px; }
+  #topbar .tb-info { min-width: 84px; max-width: 38vw; }
 
   /* Touch-friendly tap targets for tab triggers. */
   .tab, .stab, .doc-tab { min-height: 38px; }
