@@ -179,14 +179,20 @@ export default function POSProPage() {
   const safeToast = usePosSafeToast(settings.toastEnabled);
   const clearConfirm = useConfirm();
 
-  // ── مسح السلة عند تبديل الشركة (حماية من stale product_id) ──────────────
+  // ── مسح السلة عند تبديل الشركة أو عميل قديم من شركة أخرى ────────────────
   const prevSlugRef = useRef(slug);
   useEffect(() => {
-    if (prevSlugRef.current && prevSlugRef.current !== slug) {
+    const slugChanged = prevSlugRef.current && prevSlugRef.current !== slug;
+    const client = posRef.current.client;
+    const staleClient =
+      !!company?.id &&
+      !!client?.company_id &&
+      client.company_id !== company.id;
+    if (slugChanged || staleClient) {
       posRef.current.clearCart();
     }
     prevSlugRef.current = slug;
-  }, [slug]);
+  }, [slug, company?.id]);
 
   // ── الزبون الافتراضي "Client Cash" ───────────────────────────────────────
   const { data: cashClient } = useCashClient();

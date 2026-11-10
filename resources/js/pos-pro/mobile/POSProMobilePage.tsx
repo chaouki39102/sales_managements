@@ -155,16 +155,22 @@ export default function POSProMobilePage() {
   const mountedRef = useRef(true);
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
-  // إغلاق أي Sheet عند تغيير الشركة
+  // إغلاق أي Sheet عند تغيير الشركة أو عميل قديم من شركة أخرى
   const prevSlugRef = useRef(slug);
   useEffect(() => {
-    if (prevSlugRef.current && prevSlugRef.current !== slug) {
+    const slugChanged = prevSlugRef.current && prevSlugRef.current !== slug;
+    const client = posRef.current.client;
+    const staleClient =
+      !!company?.id &&
+      !!client?.company_id &&
+      client.company_id !== company.id;
+    if (slugChanged || staleClient) {
       posRef.current.clearCart();
       setSheet('none');
       setPayOpen(false);
     }
     prevSlugRef.current = slug;
-  }, [slug]);
+  }, [slug, company?.id]);
 
   // ── سلة: كمية في السلة (بالوحدات الأساسية) لكل صنف ───────────────────────
   const qtyInCartByVariant = useMemo(() => {

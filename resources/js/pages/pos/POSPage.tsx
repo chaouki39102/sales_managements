@@ -89,7 +89,7 @@ function POSPage() {
   const kbOverridesRef = useRef(kbOverrides);
   kbOverridesRef.current = kbOverrides;
 
-  usePosCartGuards({ slug, pos, posRef });
+  usePosCartGuards({ slug, activeCompanyId: company?.id ?? null, pos, posRef });
 
   const layout = usePosLayout({ settings, setSettings });
   const { view, setView, gridSize, setGridSize, mobTab, setMobTab, fullscreen, toggleFullscreen } = layout;

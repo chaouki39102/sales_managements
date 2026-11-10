@@ -116,6 +116,19 @@ class CommercialDocumentService extends \App\Core\Services\BaseService
             throw new BusinessRuleException('نوع الوثيقة غير موجود أو لا ينتمي لشركتك.', 422);
         }
 
+        // إصلاح ذاتي: عميل مُرسَل لكنه لا ينتمي لهذه الشركة (مثلاً حالة سلة/جلسة
+        // قديمة من شركة أخرى) يُسقط ليُستبدل بزبون الصندوق عند الحاجة، بدلاً من
+        // رفض المعاملة بخطأ تحقّق العلاقات بين الشركات.
+        if (!empty($data['party_id'])) {
+            $partyBelongsToCompany = Party::where('id', $data['party_id'])
+                ->where('company_id', $companyId)
+                ->exists();
+
+            if (!$partyBelongsToCompany) {
+                $data['party_id'] = null;
+            }
+        }
+
         if ($documentType->requires_party && empty($data['party_id'])) {
             $data['party_id'] = $this->resolveCashPartyId($companyId);
         }
