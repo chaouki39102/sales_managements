@@ -10,6 +10,7 @@ import {
   readRememberedTarget,
   writeRememberedTarget,
   clearRememberedTarget,
+  invalidateSystemPrintersCache,
   bytesToBase64,
   utf8Base64,
   THERMAL_RE,
@@ -48,7 +49,8 @@ function list(...printers: Array<{ name: string; is_default?: boolean }>): void 
 describe('resolveWindowsTarget', () => {
   beforeEach(() => {
     ls.clear();
-    listMock.mockClear();
+    invalidateSystemPrintersCache();
+    listMock.mockReset();
     listMock.mockResolvedValue({ printers: [], platform: 'win32', error: null });
   });
 

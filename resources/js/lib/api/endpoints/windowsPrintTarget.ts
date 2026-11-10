@@ -12,6 +12,36 @@
 import { systemPrintersApi } from '@/lib/api/endpoints/systemPrinters';
 import { deviceGetPrinters } from '@/pos/store/printStore';
 
+// ─── System printers cache ────────────────────────────────────────────────────
+// Printer enumeration (WMI/PowerShell or native helper) can be slow. Cache the
+// payload and coalesce concurrent requests so printing doesn't block on repeated
+// /system/printers calls.
+const SYSTEM_PRINTERS_TTL_MS = 30_000;
+let systemPrintersCache: { at: number; payload: any } | null = null;
+let systemPrintersInflight: Promise<any> | null = null;
+
+export function invalidateSystemPrintersCache(): void {
+  systemPrintersCache = null;
+  systemPrintersInflight = null;
+}
+
+async function listSystemPrintersCached(): Promise<any> {
+  if (systemPrintersCache && Date.now() - systemPrintersCache.at < SYSTEM_PRINTERS_TTL_MS) {
+    return systemPrintersCache.payload;
+  }
+  if (systemPrintersInflight) return systemPrintersInflight;
+  systemPrintersInflight = systemPrintersApi
+    .list()
+    .then((payload) => {
+      systemPrintersCache = { at: Date.now(), payload };
+      return payload;
+    })
+    .finally(() => {
+      systemPrintersInflight = null;
+    });
+  return systemPrintersInflight;
+}
+
 // ─── Base64 ──────────────────────────────────────────────────────────────────
 
 export function bytesToBase64(bytes: Uint8Array): string {
@@ -114,7 +144,7 @@ export async function resolveWindowsTarget(
   if (saved) return saved;
 
   try {
-    const payload = await systemPrintersApi.list();
+    const payload = await listSystemPrintersCached();
     const printers: WinPrinterLite[] = payload?.printers ?? [];
     if (printers.length === 0) return null;
     const thermal = printers.find((p) => THERMAL_RE.test(p.name));

@@ -153,6 +153,93 @@ export function escPosToPlainLines(bytes: Uint8Array): string[] {
   return out.replace(/\r/g, '').split('\n');
 }
 
+function formatMoney(n: number | null | undefined): string {
+  const v = typeof n === 'number' && Number.isFinite(n) ? n : 0;
+  return v.toFixed(2);
+}
+
+/**
+ * إيصال نصي بسيط من بيانات المستند للطابعات العادية (ليزر/حبر).
+ * يُستخدم في المسار السريع لتجنّب تكلفة توليد ESC/POS وتحويله.
+ */
+function buildPlainReceiptText(
+  data: UniversalDocumentData,
+  docNumber?: string,
+): string {
+  const out: string[] = [];
+  const push = (s = '') => out.push(String(s));
+  const sep = '-'.repeat(32);
+
+  const companyName = data.company?.name;
+  if (companyName) push(companyName);
+  const companyAddr = (data.company as any)?.address;
+  if (companyAddr) push(companyAddr);
+  const companyPhone = data.company?.phone || (data.company as any)?.mobile;
+  if (companyPhone) push(`Tel: ${companyPhone}`);
+  if ((data.company as any)?.nif) push(`NIF: ${(data.company as any).nif}`);
+  if ((data.company as any)?.rc) push(`RC: ${(data.company as any).rc}`);
+
+  const title = data.doc?.typeName || 'فاتورة';
+  push('');
+  push(title);
+  push(sep);
+
+  const num = docNumber || data.doc?.number;
+  if (num) push(`رقم: ${num}`);
+  if (data.doc?.date) push(`التاريخ: ${data.doc.date}${data.doc?.time ? ' ' + data.doc.time : ''}`);
+  if ((data.doc as any)?.dueDate) push(`الاستحقاق: ${(data.doc as any).dueDate}`);
+  if (data.party?.name) push(`الزبون: ${data.party.name}`);
+  if ((data.party as any)?.phone) push(`هاتف الزبون: ${(data.party as any).phone}`);
+  const cashier = (data.party as any)?.cashierName || (data as any).session?.cashierName || (data as any).cashier;
+  if (cashier) push(`الكاشير: ${cashier}`);
+
+  push(sep);
+  for (const line of data.lines ?? []) {
+    const name = (line as any).name ?? '';
+    push(name);
+    const qty = (line as any).quantity ?? 0;
+    const unit = (line as any).unit ? ` ${(line as any).unit}` : '';
+    const price = formatMoney((line as any).unitPriceHt);
+    const total = formatMoney((line as any).totalTtc ?? (line as any).totalHt);
+    let detail = `  ${qty}${unit} x ${price}`;
+    if (((line as any).discountPct ?? 0) > 0) detail += ` (-${Number((line as any).discountPct).toFixed(0)}%)`;
+    push(`${detail}  =  ${total}`);
+  }
+
+  push(sep);
+  const t = data.totals as any;
+  if (t) {
+    push(`المجموع HT: ${formatMoney(t.totalHt)}`);
+    if ((t.totalDiscount ?? 0) > 0) push(`الخصم: -${formatMoney(t.totalDiscount)}`);
+    push(`TVA: ${formatMoney(t.totalTva)}`);
+    if ((t.fiscalStamp ?? 0) > 0) push(`الطابع: ${formatMoney(t.fiscalStamp)}`);
+    const ttcFinal = (t.totalTtc ?? 0) + (t.fiscalStamp ?? 0);
+    push(`الإجمالي TTC: ${formatMoney(ttcFinal)}`);
+    push(`المدفوع: ${formatMoney(t.paid)}`);
+    if ((t.change ?? 0) > 0) push(`الباقي للزبون: ${formatMoney(t.change)}`);
+    if ((t.remaining ?? 0) > 0) push(`المتبقي: ${formatMoney(t.remaining)}`);
+  }
+
+  const payments = (data as any).payments ?? [];
+  if (payments.length > 0) {
+    push(sep);
+    for (const p of payments) {
+      push(`${(p as any).mode || 'دفع'}: ${formatMoney((p as any).amount)}`);
+    }
+  }
+
+  if ((data as any).balance) {
+    const b = (data as any).balance;
+    push(sep);
+    push(`الرصيد السابق: ${formatMoney(b.previous)}`);
+    push(`الرصيد الجديد: ${formatMoney(b.current)}`);
+  }
+
+  push('');
+  push('شكراً لزيارتكم');
+  return out.join('\n');
+}
+
 /**
  * محاولة RAW TCP قبل ويندوز.
  *
@@ -305,6 +392,31 @@ export async function printThermalSmart(
   slug?: string | null,
   html?: string,
 ): Promise<ThermalPrintResult> {
+  // مسار فائق السرعة: طابعة عادية محفوظة → نص بسيط مباشر من البيانات بدون
+  // توليد ESC/POS (الليزر لا يحتاج بايتات حرارية). هذا يتجنب تكلفة التصيير
+  // ويجعل الطباعة عادةً بطلب HTTP واحد فقط.
+  const remembered = readRememberedTarget(slug);
+  if (remembered && !THERMAL_RE.test(remembered)) {
+    try {
+      const text = buildPlainReceiptText(data, docNumber);
+      await systemPrintersApi.rawText(remembered, utf8Base64(text));
+      writeRememberedTarget(slug, remembered);
+      writePreferWin();
+      return {
+        ok: true,
+        method: 'windows',
+        message: `تمت الطباعة («${remembered}»)`,
+      };
+    } catch (err: any) {
+      const msg: string =
+        err?.response?.data?.message ?? err?.message ?? 'فشلت الطباعة عبر ويندوز';
+      if (typeof msg === 'string' && msg.includes('غير موجودة')) {
+        clearRememberedTarget(slug);
+      }
+      // فشل المسار السريع (طابعة أُزيلت/خطأ مؤقت) — نرجع للسلسلة الكاملة.
+    }
+  }
+
   const bytes = await buildReceiptBytesFromTemplate(template, data, docNumber);
   return sendBytesToPrinterSmart(bytes, slug, html);
 }
