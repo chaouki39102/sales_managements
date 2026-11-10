@@ -181,7 +181,7 @@ class SystemPrinterController extends BaseApiController
      */
     private function rawTcpSettings(): array
     {
-        $companyId = CompanyContextService::get();
+        $companyId = app(CompanyContextService::class)->get();
 
         $get = static function (string $key, mixed $fallback = null) use ($companyId) {
             $value = Setting::getSetting($key, $fallback, $companyId);
