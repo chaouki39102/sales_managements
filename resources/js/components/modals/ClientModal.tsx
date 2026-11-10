@@ -273,10 +273,12 @@ export default function ClientModal({ open, party, onClose, onSaved, isSubmittin
       {success && <AlertBar variant="green" style={{ marginBottom: 12 }}>{success}</AlertBar>}
 
       {/* Tab headers — flush with modal header, sticky on scroll */}
-      <div style={{
+      <div className="tab-strip" style={{
         display: 'flex', gap: 0, borderBottom: '1px solid var(--b2)',
         marginBottom: 16, direction: 'rtl', background: 'var(--bg2)',
         position: 'sticky', top: -20, zIndex: 10,
+        overflowX: 'auto', overflowY: 'hidden', flexWrap: 'nowrap',
+        WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none',
       }}>
         {tabs.map((tab, idx) => {
           const isActive = activeTab === idx;
@@ -292,7 +294,7 @@ export default function ClientModal({ open, party, onClose, onSaved, isSubmittin
                 background: isActive ? 'var(--emb)' : 'transparent',
                 border: 'none',
                 borderBottom: `2px solid ${isActive ? 'var(--em)' : 'transparent'}`,
-                cursor: 'pointer', whiteSpace: 'nowrap',
+                cursor: 'pointer', whiteSpace: 'nowrap', flex: '0 0 auto',
                 transition: 'color .15s, border-color .15s, background .15s',
                 fontFamily: 'inherit',
               }}

@@ -144,7 +144,7 @@ export default function ProductModal(props: ProductModalProps) {
         </div>
 
         {/* ══ TABS ══ */}
-        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--b2)', overflowX: 'auto', flexShrink: 0, scrollbarWidth: 'none', background: 'var(--bg2)' }}>
+        <div className="tab-strip" style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--b2)', overflowX: 'auto', overflowY: 'hidden', flexWrap: 'nowrap', flexShrink: 0, WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none', background: 'var(--bg2)' }}>
           {TABS.map(tab => {
             const isActive = activeTab === tab.id;
             const dot      = tabDot(tab.id);
@@ -161,7 +161,7 @@ export default function ProductModal(props: ProductModalProps) {
                   background: isActive ? 'var(--emb)' : 'transparent',
                   border: 'none',
                   borderBottom: `2px solid ${isActive ? 'var(--em)' : 'transparent'}`,
-                  cursor: 'pointer', whiteSpace: 'nowrap',
+                  cursor: 'pointer', whiteSpace: 'nowrap', flex: '0 0 auto',
                   transition: 'color .15s, border-color .15s, background .15s',
                 }}
               >

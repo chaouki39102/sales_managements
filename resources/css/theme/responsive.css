@@ -40,6 +40,7 @@
 /* Any tab strip should scroll horizontally when it overflows — "tabs title
    scrolled" on mobile, and never clipped on desktop either. */
 .doc-tabs-bar,
+.doc-view-tabs,
 .tabs,
 [role="tablist"],
 .ph-tabs > div,
@@ -53,12 +54,14 @@
   -ms-overflow-style: none;
 }
 .doc-tabs-bar::-webkit-scrollbar,
+.doc-view-tabs::-webkit-scrollbar,
 .tabs::-webkit-scrollbar,
 [role="tablist"]::-webkit-scrollbar,
 .ph-tabs > div::-webkit-scrollbar,
 .stab-row::-webkit-scrollbar,
 .tab-strip::-webkit-scrollbar { display: none; }
 .doc-tabs-bar > *,
+.doc-view-tabs > *,
 .tabs > *,
 [role="tablist"] > *,
 .ph-tabs > div > *,

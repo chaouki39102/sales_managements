@@ -86,7 +86,10 @@ export default function DocumentViewModal({
                 return (
                     <>
                         {/* Tab navigation */}
-                        <div className="doc-view-tabs flex items-center gap-2 mb-10 p-2 rounded-xl bg-3 border border-b3">
+                        <div
+                          className="doc-view-tabs flex items-center gap-2 mb-10 p-2 rounded-xl bg-3 border border-b3"
+                          style={{ overflowX: 'auto', overflowY: 'hidden', flexWrap: 'nowrap', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                        >
                             {tabs.map((t) => {
                                 const isActive = activeTab === t.key;
                                 return (
@@ -94,6 +97,7 @@ export default function DocumentViewModal({
                                         key={t.key}
                                         onClick={() => setActiveTab(t.key)}
                                         className={`doc-view-tab flex items-center gap-4 px-10 py-6 rounded-lg text-sm font-semibold transition-all duration-150 ${isActive ? 'doc-view-tab--active' : 'doc-view-tab--inactive'}`}
+                                        style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}
                                     >
                                         <i className={`ti ${t.icon}`} style={{ fontSize: 14, color: isActive ? (t.color ?? 'var(--em)') : undefined }} />
                                         <span>{t.label}</span>

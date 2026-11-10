@@ -73,6 +73,9 @@
   border-bottom: 2px solid var(--b1);
   padding-bottom: 0;
   overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
 .pr-tabs::-webkit-scrollbar { display: none; }
@@ -92,6 +95,7 @@
   margin-bottom: -2px;
   transition: all .25s;
   white-space: nowrap;
+  flex: 0 0 auto;
 }
 .pr-tab:hover { color: var(--t2); }
 .pr-tab.on { color: var(--em); border-bottom-color: var(--em); }

@@ -605,7 +605,7 @@ export function TransactionHistoryModal({
                 </div>
             ) : (
                 <>
-                    <div className="no-print" style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid var(--color-border-secondary)' }}>
+                    <div className="no-print tab-strip" style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid var(--color-border-secondary)', overflowX: 'auto', overflowY: 'hidden', flexWrap: 'nowrap', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                         {([
                             { key: 'transactions' as ModalTab, label: 'المعاملات', icon: 'ti-list', count: allTransactions.length },
                             { key: 'detailed' as ModalTab, label: 'الحركات التفصيلية', icon: 'ti-list-detail', count: allTransactions.filter(t => t.type === 'document').length },
@@ -624,6 +624,7 @@ export function TransactionHistoryModal({
                                     cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
                                     display: 'flex', alignItems: 'center', gap: 6,
                                     transition: 'all .15s',
+                                    flex: '0 0 auto', whiteSpace: 'nowrap',
                                 }}
                             >
                                 <i className={`ti ${tab.icon}`} style={{ fontSize: 15 }} />
