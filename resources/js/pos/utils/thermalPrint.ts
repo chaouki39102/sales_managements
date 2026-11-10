@@ -38,6 +38,7 @@ import {
   bytesToBase64,
   utf8Base64,
   readPreferWin,
+  readRememberedTarget,
   writePreferWin,
   writeRememberedTarget,
   clearRememberedTarget,
@@ -250,15 +251,33 @@ async function windowsRawFallback(
  * ويندوز إطلاقاً)، ثم fallback تلقائي إلى ويندوز. بعد أول نجاح لويندوز على
  * هذا الجهاز يصير ويندوز هو المسار الأول مباشرة — طباعة أسرع بلا محاولة USB.
  * إذا فشل ويندوز تُعاد محاولة WebUSB كحل أخير.
+ *
+ * مسار سريع للطابعات العادية (ليزر/حبر): إذا كان لدينا هدف ويندوز محفوظ
+ * لطابعة غير حرارية، نتخطى WebUSB و RAW TCP (غير ذي صلة) ونطبع نص GDI
+ * مباشرة — هذا يجنّب محاولات USB وطلبات إعدادات RAW TCP/اكتشاف الطابعات
+ * التي قد تستغرق ثوانٍ.
  */
 export async function sendBytesToPrinterSmart(
   bytes: Uint8Array,
   slug?: string | null,
   html?: string,
 ): Promise<ThermalPrintResult> {
+  const remembered = readRememberedTarget(slug);
+  const preferWin = readPreferWin();
+
+  // طابعة عادية محفوظة (ليزر/حبر): أسرع مسار — نص GDI مباشر دون USB/RAW TCP.
+  if (remembered && !THERMAL_RE.test(remembered)) {
+    const winRes = await windowsRawFallback(bytes, slug, html, remembered);
+    if (winRes.ok) return winRes;
+    // الهدف المحفوظ فشل (مثلاً أُزيلت الطابعة) — امسحه وأكمل السلسلة الكاملة.
+    clearRememberedTarget(slug);
+  }
+
   let usbRes: ThermalPrintResult | null = null;
 
-  if (!readPreferWin()) {
+  // تخطَّ USB إذا نجحت ويندوز سابقاً على هذا الجهاز، أو إن كان الهدف المحفوظ
+  // حرارياً (سنحاول spooler ويندوز/RAW TCP بدلاً من claim interface المحجوز).
+  if (!preferWin && !(remembered && THERMAL_RE.test(remembered))) {
     usbRes = await sendBytesToReceiptPrinter(bytes);
     if (usbRes.ok) return usbRes;
   }
@@ -269,7 +288,7 @@ export async function sendBytesToPrinterSmart(
   const { result: tcpRes, config: tcpConfig } = await rawTcpFallback(bytes, slug);
   if (tcpRes?.ok) return tcpRes;
 
-  const winRes = await windowsRawFallback(bytes, slug, html, tcpConfig?.printer_id);
+  const winRes = await windowsRawFallback(bytes, slug, html, tcpConfig?.printer_id ?? remembered ?? undefined);
   if (winRes.ok) return winRes;
 
   if (!usbRes) usbRes = await sendBytesToReceiptPrinter(bytes);
