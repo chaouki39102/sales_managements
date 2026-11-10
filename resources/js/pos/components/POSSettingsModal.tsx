@@ -95,6 +95,7 @@ const toggleSettings: { key: keyof POSSettings; label: string; triState?: boolea
   { key: 'showStockOnCard',     label: 'إظهار الرصيد في بطاقة المنتج' },
   { key: 'hideOutOfStock',      label: 'إخفاء المنتجات النافذة من الشبكة' },
   { key: 'clearSearchOnAdd',    label: 'تفريغ البحث بعد إضافة منتج' },
+  { key: 'autoFocusSearchOnAdd', label: 'تركيز حقل البحث تلقائياً بعد إضافة المنتج للسلة' },
   { key: 'keyboardNav',         label: 'التنقل عبر النتائج بلوحة المفاتيح (↑↓)' },
   { key: 'advanceOnAdd',        label: 'الانتقال للمنتج التالي بعد الإضافة' },
   { key: 'openClientOnNewSale', label: 'فتح مودال الزبون تلقائياً عند بيع جديد' },

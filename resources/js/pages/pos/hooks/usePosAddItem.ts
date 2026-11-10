@@ -99,13 +99,15 @@ export function usePosAddItem(params: {
     // Focus search AFTER scrollToItemId's double-RAF cart-row focus finishes
     requestAnimationFrame(() => {
       if (added) cartApiRef.current?.scrollToItemId(added.id);
-      requestAnimationFrame(() => {
+      if (settings.autoFocusSearchOnAdd) {
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => { searchRef.current?.focus(); searchRef.current?.select(); });
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => { searchRef.current?.focus(); searchRef.current?.select(); });
+          });
         });
-      });
+      }
     });
-  }, [settings.clearSearchOnAdd, settings.advanceOnAdd, settings.playSoundOnAdd, settings.soundPreset, settings.soundVolume, filteredVariants, safeToast, selectedPriceLevelId, priceLevelsList, pos,
+  }, [settings.clearSearchOnAdd, settings.autoFocusSearchOnAdd, settings.advanceOnAdd, settings.playSoundOnAdd, settings.soundPreset, settings.soundVolume, filteredVariants, safeToast, selectedPriceLevelId, priceLevelsList, pos,
     weightModalVariant, setModal, posRef, setRecentProducts, setSelectedCartItemId, setHighlightedIndex, cartApiRef, searchRef]);
 
   // ── فتح مودال الميزان لتعديل كمية صنف موجود بالسلة ────────────────────────

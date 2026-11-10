@@ -92,6 +92,8 @@ export interface POSSettings {
   hideOutOfStock:       boolean;
   /** تفريغ حقل البحث بعد إضافة منتج */
   clearSearchOnAdd:     boolean;
+  /** تركيز حقل البحث تلقائياً بعد إضافة المنتج للسلة */
+  autoFocusSearchOnAdd: boolean;
   /** التنقل عبر نتائج البحث بلوحة المفاتيح */
   keyboardNav:          boolean;
   /** التقدم تلقائياً للمنتج التالي بعد الإضافة (true) أو البقاء على نفس المنتج (false) */
@@ -145,6 +147,7 @@ export const DEFAULT_POS_SETTINGS: POSSettings = {
   showStockOnCard:      true,
   hideOutOfStock:       false,
   clearSearchOnAdd:     false,
+  autoFocusSearchOnAdd: true,
   keyboardNav:          true,
   advanceOnAdd:         true,
   cartWidth:            390,
