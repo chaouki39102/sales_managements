@@ -56,12 +56,7 @@ export function usePosPrinting(params: {
           return;
         }
         const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
-        const html = await renderPreviewToHtml({
-          template: posTemplate,
-          company: companyData,
-          source: { type: 'pos-snapshot', snapshot: snap },
-        });
-        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug, html);
+        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug);
         if (result.ok) {
           safeToast.success('✅ تمت الطباعة');
         } else {
@@ -70,25 +65,29 @@ export function usePosPrinting(params: {
         return;
       }
 
-      const html = await renderPreviewToHtml({
-        template: posTemplate,
-        company: companyData,
-        source: { type: 'pos-snapshot', snapshot: snap },
-      });
-
       if (settings.printMode === 'thermal' && resolvedDocNum && isThermalPaper) {
         const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
-        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug, html);
+        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug);
         if (result.ok) {
           safeToast.success(`✅ ${thermalPrintSuccessMessage(result.method)}`);
         } else {
           safeToast.error(`خطأ في الطباعة الحرارية: ${result.message}`);
+          const html = await renderPreviewToHtml({
+            template: posTemplate,
+            company: companyData,
+            source: { type: 'pos-snapshot', snapshot: snap },
+          });
           await printReceiptDirect({
             html, paperWidth, copies: copies ?? 1,
             onError: (e) => safeToast.error(`خطأ في طباعة المتصفح: ${e.message}`),
           });
         }
       } else {
+        const html = await renderPreviewToHtml({
+          template: posTemplate,
+          company: companyData,
+          source: { type: 'pos-snapshot', snapshot: snap },
+        });
         await printReceiptDirect({
           html, paperWidth, copies,
           onDone:  () => safeToast.success('✅ تم إرسال الطباعة'),

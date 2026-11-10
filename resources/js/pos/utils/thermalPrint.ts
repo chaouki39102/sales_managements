@@ -198,7 +198,7 @@ async function rawTcpFallback(
 async function windowsRawFallback(
   bytes: Uint8Array,
   slug?: string | null,
-  html?: string,
+  _html?: string,
   forcedTarget?: string | null,
 ): Promise<ThermalPrintResult> {
   const target = forcedTarget || (await resolveWindowsTarget(slug));
@@ -216,20 +216,11 @@ async function windowsRawFallback(
   try {
     if (isThermal) {
       await systemPrintersApi.rawPrint(target, bytesToBase64(bytes));
-    } else if (html) {
-      // مسار الدقة: نفس تنسيق المعاينة عبر Edge ← لقطة PNG ← GDI.
-      // عند فشله نتراجع للنص العادي حتى لا تُعطَل طباعة الفاتورة أبداً.
-      try {
-        await systemPrintersApi.html(target, utf8Base64(html));
-      } catch (htmlErr: any) {
-        console.warn(
-          '[print] html path failed, falling back to plain text:',
-          htmlErr?.response?.data?.message ?? htmlErr?.message,
-        );
-        const lines = escPosToPlainLines(bytes);
-        await systemPrintersApi.rawText(target, utf8Base64(lines.join('\n')));
-      }
     } else {
+      // طابعات عادية (ليزر/حبر): طباعة نص GDI مباشرة عبر المحرك الأصلي — سريعة (~1s).
+      // مسار HTML (Edge headless ← لقطة ← GetPixel trim ← GDI) يعطي دقة المعاينة لكنه
+      // بطيء جداً (~20-30s) بسبب تشغيل Edge ومسح البكسلات؛ غير مقبول لطباعة نقطة البيع.
+      // الإيصال النصي (escPosToPlainLines) مقروء وكافٍ للإيصالات على الطابعات العادية.
       const lines = escPosToPlainLines(bytes);
       await systemPrintersApi.rawText(target, utf8Base64(lines.join('\n')));
     }

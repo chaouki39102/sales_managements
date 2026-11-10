@@ -75,25 +75,29 @@ export function usePosProMobileCheckout(args: {
       const resolvedDocNum = snap.docNumber;
       const isThermalPaper = posTemplate.paper_size === '80mm' || posTemplate.paper_size === '58mm';
 
-      const html = await renderPreviewToHtml({
-        template: posTemplate,
-        company: companyData,
-        source: { type: 'pos-snapshot', snapshot: snap },
-      });
-
       if (settings.printMode === 'thermal' && resolvedDocNum && isThermalPaper) {
         const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
-        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug, html);
+        const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug);
         if (result.ok) {
           safeToast.success(thermalPrintSuccessMessage(result.method));
         } else {
           safeToast.error(`خطأ في الطباعة الحرارية: ${result.message}`);
+          const html = await renderPreviewToHtml({
+            template: posTemplate,
+            company: companyData,
+            source: { type: 'pos-snapshot', snapshot: snap },
+          });
           await printReceiptDirect({
             html, paperWidth, copies: copies ?? 1,
             onError: (e) => safeToast.error(`خطأ في طباعة المتصفح: ${e.message}`),
           });
         }
       } else {
+        const html = await renderPreviewToHtml({
+          template: posTemplate,
+          company: companyData,
+          source: { type: 'pos-snapshot', snapshot: snap },
+        });
         await printReceiptDirect({
           html, paperWidth, copies, onDone: () => safeToast.success('تم إرسال الطباعة'),
           onError: (e) => safeToast.error(`خطأ في الطباعة: ${e.message}`),
