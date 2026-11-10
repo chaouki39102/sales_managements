@@ -144,7 +144,7 @@ export default function ProductModal(props: ProductModalProps) {
         </div>
 
         {/* ══ TABS ══ */}
-        <div className="tab-strip" style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--b2)', overflowX: 'auto', overflowY: 'hidden', flexWrap: 'nowrap', flexShrink: 0, WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none', background: 'var(--bg2)' }}>
+        <div className="tab-strip" style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--b2)', overflowX: 'auto', overflowY: 'hidden', flexWrap: 'nowrap', flexShrink: 0, WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none', background: 'var(--bg2)', width: '100%', minWidth: 0, maxWidth: '100%', boxSizing: 'border-box' }}>
           {TABS.map(tab => {
             const isActive = activeTab === tab.id;
             const dot      = tabDot(tab.id);

@@ -279,6 +279,7 @@ export default function ClientModal({ open, party, onClose, onSaved, isSubmittin
         position: 'sticky', top: -20, zIndex: 10,
         overflowX: 'auto', overflowY: 'hidden', flexWrap: 'nowrap',
         WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none',
+        width: '100%', minWidth: 0, maxWidth: '100%', boxSizing: 'border-box',
       }}>
         {tabs.map((tab, idx) => {
           const isActive = activeTab === idx;
