@@ -235,7 +235,7 @@
   }
 
   /* Modals: fit the viewport on mobile, ignore stored desktop resize dims. */
-  .ov { padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); align-items: flex-end; }
+  .ov { padding: 8px 8px calc(8px + var(--mb, 64px) + env(safe-area-inset-bottom, 0px)); align-items: flex-end; z-index: 10050 !important; }
   .modal,
   .modal.modal-sm,
   .modal.modal-lg,
@@ -243,7 +243,7 @@
     width: 100% !important;
     max-width: 100% !important;
     height: auto !important;
-    max-height: calc(100dvh - 16px - env(safe-area-inset-bottom, 0px)) !important;
+    max-height: calc(100dvh - 16px - var(--mb, 64px) - env(safe-area-inset-bottom, 0px)) !important;
     border-radius: var(--r3) var(--r3) 0 0;
   }
   .modal .m-hd { padding: 12px 14px; }
@@ -313,12 +313,12 @@
   }
 
   /* Modal becomes a near-fullsheet. */
-  .ov { padding: 0 0 env(safe-area-inset-bottom, 0px); align-items: flex-end; }
+  .ov { padding: 0 0 calc(var(--mb, 64px) + env(safe-area-inset-bottom, 0px)); align-items: flex-end; z-index: 10050 !important; }
   .modal,
   .modal.modal-sm,
   .modal.modal-lg,
   .modal.modal-xl {
-    max-height: calc(100dvh - env(safe-area-inset-bottom, 0px)) !important;
+    max-height: calc(100dvh - var(--mb, 64px) - env(safe-area-inset-bottom, 0px)) !important;
     border-radius: var(--r3) var(--r3) 0 0;
     border-bottom: 0;
   }
