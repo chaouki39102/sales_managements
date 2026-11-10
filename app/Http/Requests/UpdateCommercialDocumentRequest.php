@@ -40,6 +40,9 @@ class UpdateCommercialDocumentRequest extends FormRequest
             'due_date'       => 'sometimes|nullable|date',
             'delivery_date'  => 'sometimes|nullable|date',
 
+            // ── نقطة البيع (جلسة الكاشير) ────────────────────────────
+            'pos_session_id' => 'sometimes|nullable|integer|exists:pos_sessions,id',
+
             // ── الملاحظات والبيانات الإضافية ─────────────────────────
             'notes'           => 'sometimes|nullable|string|max:2000',
             'internal_notes'  => 'sometimes|nullable|string|max:2000',

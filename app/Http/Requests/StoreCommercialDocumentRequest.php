@@ -48,6 +48,9 @@ class StoreCommercialDocumentRequest extends FormRequest
             'due_date'       => 'nullable|date|after_or_equal:document_date',
             'delivery_date'  => 'nullable|date',
 
+            // ── نقطة البيع (جلسة الكاشير) ────────────────────────────
+            'pos_session_id' => 'nullable|integer|exists:pos_sessions,id',
+
             // ── الملاحظات والبيانات الإضافية ─────────────────────────
             'notes'          => 'nullable|string|max:2000',
             'internal_notes' => 'nullable|string|max:2000',
