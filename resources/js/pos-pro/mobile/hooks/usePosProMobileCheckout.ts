@@ -175,15 +175,22 @@ export function usePosProMobileCheckout(args: {
       }
 
       if (sessionId && !isEditingExistingDocument) {
-        incrementMut.mutate(buildIncrementInput({
-          items: currentItems,
-          totalHt: effectiveTotalHt,
-          totalTva: effectiveTotalTva,
-          totalFiscalStamp: snapshot.totals.fiscal_stamp ?? 0,
-          totalDiscount: (snapshot.totals.total_discount ?? 0) + (snapshot.totals.invoice_discount_amount ?? 0),
-          grandTotal: effectiveTotalTtc,
-          payments: apiPayments.map((p) => ({ payment_mode_id: p.payment_mode_id, amount: p.amount })),
-        }));
+        try {
+          await incrementMut.mutateAsync(buildIncrementInput({
+            items: currentItems,
+            totalHt: effectiveTotalHt,
+            totalTva: effectiveTotalTva,
+            totalFiscalStamp: snapshot.totals.fiscal_stamp ?? 0,
+            totalDiscount: (snapshot.totals.total_discount ?? 0) + (snapshot.totals.invoice_discount_amount ?? 0),
+            grandTotal: effectiveTotalTtc,
+            payments: apiPayments.map((p) => ({ payment_mode_id: p.payment_mode_id, amount: p.amount })),
+          }));
+        } catch (e) {
+          console.warn('[POS Pro Mobile] Session increment failed', e);
+        }
+        if (slug) {
+          queryClient.invalidateQueries({ queryKey: [slug, 'pos-sessions'] });
+        }
       }
 
       const totalPaid = params.amountPaid;

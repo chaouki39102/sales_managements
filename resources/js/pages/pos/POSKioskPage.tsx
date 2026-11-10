@@ -234,20 +234,27 @@ export default function POSKioskPage() {
 
       const grandTotal = snapshot.totals.total_ttc + snapshot.totals.fiscal_stamp;
       if (currentSession?.id) {
-        incrementMut.mutate(
-          buildIncrementInput({
-            items:            snapshot.items,
-            totalHt:          snapshot.totals.total_ht,
-            totalTva:         snapshot.totals.total_tva,
-            totalFiscalStamp: snapshot.totals.fiscal_stamp,
-            totalDiscount:    snapshot.totals.total_discount,
-            grandTotal,
-            payments: apiPayments.map(p => ({
-              payment_mode_id: p.payment_mode_id,
-              amount:          p.amount,
-            })),
-          }),
-        );
+        try {
+          await incrementMut.mutateAsync(
+            buildIncrementInput({
+              items:            snapshot.items,
+              totalHt:          snapshot.totals.total_ht,
+              totalTva:         snapshot.totals.total_tva,
+              totalFiscalStamp: snapshot.totals.fiscal_stamp,
+              totalDiscount:    snapshot.totals.total_discount,
+              grandTotal,
+              payments: apiPayments.map(p => ({
+                payment_mode_id: p.payment_mode_id,
+                amount:          p.amount,
+              })),
+            }),
+          );
+        } catch (e) {
+          console.warn('[POS Kiosk] Session increment failed', e);
+        }
+        if (slug) {
+          qc.invalidateQueries({ queryKey: [slug, 'pos-sessions'] });
+        }
       }
 
       if (slug) qc.invalidateQueries({ queryKey: [slug, 'pos-stock'] });
