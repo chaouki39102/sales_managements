@@ -17,6 +17,7 @@ import { tenantKeys, invalidateDashboardQueries } from '@/lib/api/core/queryKeys
 import { usePosProCart } from '@/pos-pro/store/usePosProCart';
 import { openCashDrawerSmart } from '@/pos/utils/thermalPrint';
 import { playSaleSound } from '@/pos/utils/posSounds';
+import { beginCheckout, endCheckout, afterPrint, printOnce } from '@/pos/utils/posCheckoutFlow';
 import type { SoundPresetId } from '@/pos/utils/posSounds';
 import {
   pickInvoiceType, buildSaleLinesPayload, computeEffectiveTotals,
@@ -70,6 +71,11 @@ export function usePosProCheckout(args: {
     if (!invType)            return { ok: false, message: 'لم يُعثَر على نوع مستند' };
     if (!activeWarehouse)    return { ok: false, message: 'لا يوجد مستودع مُفعَّل' };
     if (!fiscalYear)         return { ok: false, message: 'لا توجد سنة مالية نشطة' };
+
+    // Lock the cart for the save: an edit made now would be wiped by the
+    // clear below, and a second click/shortcut must not save the sale twice.
+    const lock = beginCheckout(() => safeToast.info('جاري حفظ البيع — انتظر لحظة', { id: 'pos-checkout-busy' }));
+    if (!lock) return { ok: false, message: 'جاري حفظ بيع سابق — انتظر لحظة' };
 
     const currentClient  = posRef.current.client;
     const currentItems   = posRef.current.items;
@@ -139,25 +145,9 @@ export function usePosProCheckout(args: {
         });
       }
 
-      // لا نُضاعف إحصائيات الجلسة عند تعديل فاتورة سبق احتسابها في نفس الجلسة
-      if (sessionId && !isEditingExistingDocument) {
-        try {
-          await incrementMut.mutateAsync(buildIncrementInput({
-            items:            currentItems,
-            totalHt:          effectiveTotalHt,
-            totalTva:         effectiveTotalTva,
-            totalFiscalStamp: snapshot.totals.fiscal_stamp ?? 0,
-            totalDiscount:    (snapshot.totals.total_discount ?? 0) + (snapshot.totals.invoice_discount_amount ?? 0),
-            grandTotal:       effectiveTotalTtc,
-            payments:         apiPayments.map(p => ({ payment_mode_id: p.payment_mode_id, amount: p.amount })),
-          }));
-        } catch (e) {
-          console.warn('[POS Pro] Session increment failed', e);
-        }
-        if (slug) {
-          queryClient.invalidateQueries({ queryKey: [slug, 'pos-sessions'] });
-        }
-      }
+      endCheckout(lock);
+      setSaleBusy(false);
+      // ── From here to the cart clear there is no await: nothing can slip in. ──
 
       const totalPaid         = params.amountPaid;
       const backendNetToPay   = res?.net_to_pay ?? effectiveTotalTtc;
@@ -165,22 +155,6 @@ export function usePosProCheckout(args: {
       const invoiceRemaining  = Math.max(0, backendNetToPay - backendPaidAmount);
       const invoiceChange     = Math.max(0, backendPaidAmount - backendNetToPay);
       const newBalance        = res?.balance_data?.new_balance ?? 0;
-
-      if (currentClient?.id) {
-        queryClient.invalidateQueries({ queryKey: tenantKeys.partyBalances.detail(slug ?? '', currentClient.id) });
-      }
-      for (const qk of [
-        [slug, 'pos-stock'],
-        [slug, 'pos-pro-stock'],
-        [slug, 'inventory', 'stock-at'],
-        [slug, 'warehouse-stock'],
-      ]) {
-        queryClient.invalidateQueries({ queryKey: qk });
-      }
-      queryClient.invalidateQueries({ queryKey: [slug, 'documents'] });
-
-      // Invalidate dashboard so KPIs, charts, recent transactions refresh
-      invalidateDashboardQueries(queryClient, slug);
 
       const fullSnapshot: POSSaleSnapshot = {
         items: cartItemsToSnapshotItems(snapshot.items),
@@ -215,16 +189,15 @@ export function usePosProCheckout(args: {
         const t = setTimeout(() => { if (mountedRef.current) fn(); clearTimeout(t); }, ms);
       };
 
-      if (params.skipPreview) {
-        const action = settings.quickCashAction;
-        if (action === 'preview') setReceiptOpen(true);
-        else if (action === 'print') st(() => { const snap = receiptSnapshotRef.current; if (snap) handlePrintDirect(snap); }, 300);
-        else if (action === 'silent') st(() => { const snap = receiptSnapshotRef.current; if (snap) handlePrintDirect(snap, { silent: true }); }, 300);
-      } else {
-        const action = settings.afterSaleAction;
-        if (action === 'preview') setReceiptOpen(true);
-        else if (action === 'print' && isPrintEnabled && template) st(() => { const snap = receiptSnapshotRef.current; if (snap) handlePrintDirect(snap); }, 300);
-      }
+      // Saved and cleared: the receipt prints in the background (failure → retry toast).
+      const action = params.skipPreview ? settings.quickCashAction : settings.afterSaleAction;
+      let printOpts: { silent?: boolean } | null = null;
+      if (action === 'silent' && params.skipPreview) printOpts = { silent: true };
+      else if (action === 'print' && (params.skipPreview || (isPrintEnabled && template))) printOpts = {};
+      if (action === 'preview') setReceiptOpen(true);
+      const printJob = printOpts
+        ? new Promise<void>(done => st(() => { printOnce(fullSnapshot.docNumber, () => handlePrintDirect(fullSnapshot, printOpts)).then(done, done); }, 50))
+        : null;
 
       const willShowPreview = params.skipPreview
         ? settings.quickCashAction === 'preview'
@@ -241,6 +214,44 @@ export function usePosProCheckout(args: {
         if (hasCash) openCashDrawerSmart(slug);
       }
 
+      afterPrint(printJob, async () => {
+        // لا نُضاعف إحصائيات الجلسة عند تعديل فاتورة سبق احتسابها في نفس الجلسة
+        if (sessionId && !isEditingExistingDocument) {
+          try {
+            await incrementMut.mutateAsync(buildIncrementInput({
+              items:            currentItems,
+              totalHt:          effectiveTotalHt,
+              totalTva:         effectiveTotalTva,
+              totalFiscalStamp: snapshot.totals.fiscal_stamp ?? 0,
+              totalDiscount:    (snapshot.totals.total_discount ?? 0) + (snapshot.totals.invoice_discount_amount ?? 0),
+              grandTotal:       effectiveTotalTtc,
+              payments:         apiPayments.map(p => ({ payment_mode_id: p.payment_mode_id, amount: p.amount })),
+            }));
+          } catch (e) {
+            console.warn('[POS Pro] Session increment failed', e);
+          }
+          if (slug) {
+            queryClient.invalidateQueries({ queryKey: [slug, 'pos-sessions'] });
+          }
+        }
+
+        if (currentClient?.id) {
+          queryClient.invalidateQueries({ queryKey: tenantKeys.partyBalances.detail(slug ?? '', currentClient.id) });
+        }
+        for (const qk of [
+          [slug, 'pos-stock'],
+          [slug, 'pos-pro-stock'],
+          [slug, 'inventory', 'stock-at'],
+          [slug, 'warehouse-stock'],
+        ]) {
+          queryClient.invalidateQueries({ queryKey: qk });
+        }
+        queryClient.invalidateQueries({ queryKey: [slug, 'documents'] });
+
+        // Invalidate dashboard so KPIs, charts, recent transactions refresh
+        invalidateDashboardQueries(queryClient, slug);
+      });
+
       return { ok: true, docNumber: res.document_number };
     } catch (err: unknown) {
       const parsedErr = err as { errors?: { lines?: string[] }; message?: string };
@@ -248,6 +259,7 @@ export function usePosProCheckout(args: {
       safeToast.error(String(msg));
       return { ok: false, message: String(msg) };
     } finally {
+      endCheckout(lock);
       setSaleBusy(false);
     }
     // Refs / setters / clearEditingState are stable identities — listed for lint only.

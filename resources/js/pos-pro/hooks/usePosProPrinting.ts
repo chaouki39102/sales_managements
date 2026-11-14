@@ -11,6 +11,7 @@ import { documentsApi } from '@/lib/api/endpoints/documents';
 import { usePrintSettings } from '@/pos/hooks/usePrintSettings';
 import { usePosReceiptTemplate } from '@/pos/hooks/usePosReceiptTemplate';
 import { printReceiptDirect } from '@/pos/utils/printUtils';
+import { printOnce, retryPrintToast } from '@/pos/utils/posCheckoutFlow';
 import { printThermalSmart, thermalPrintSuccessMessage } from '@/pos/utils/thermalPrint';
 import { cartItemsToSnapshotItems, documentToPrintSnapshot, pickInvoiceType } from '@/pos/utils/posSaleHelpers';
 import { renderPreviewToHtml } from '@/pages/settings/print-settings/runtime/renderPreviewToHtml';
@@ -44,7 +45,9 @@ export function usePosProPrinting(params: {
   const companyData: CompanyPreviewData | null = useMemo(() => mapCompany(company), [company]);
 
   const handlePrintDirect = useCallback(async (snap: POSSaleSnapshot, opts?: { silent?: boolean }) => {
-    if (!posTemplate) { safeToast.error('لا يوجد قالب طاعة'); return; }
+    if (!posTemplate) { safeToast.error('لا يوجد قالب طباعة'); return; }
+    // Retry reuses the saved snapshot; printOnce stops a double print of one document.
+    const retry = retryPrintToast(() => { void printOnce(snap.docNumber, () => handlePrintDirect(snap, opts)); });
     try {
       const resolvedDocNum = snap.docNumber;
       const isThermalPaper = posTemplate.paper_size === '80mm' || posTemplate.paper_size === '58mm';
@@ -54,7 +57,7 @@ export function usePosProPrinting(params: {
         const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? { name: '' });
         const result = await printThermalSmart(posTemplate, data, resolvedDocNum, slug);
         if (result.ok) safeToast.success('تمت الطباعة');
-        else safeToast.error(`خطأ في الطباعة: ${result.message}`);
+        else safeToast.error(`خطأ في الطباعة: ${result.message}`, retry);
         return;
       }
 
@@ -70,7 +73,7 @@ export function usePosProPrinting(params: {
             company: companyData,
             source: { type: 'pos-snapshot', snapshot: snap },
           });
-          await printReceiptDirect({ html, paperWidth, copies: copies ?? 1, onError: (e) => safeToast.error(`خطأ في طباعة المتصفح: ${e.message}`) });
+          await printReceiptDirect({ html, paperWidth, copies: copies ?? 1, onError: (e) => safeToast.error(`خطأ في طباعة المتصفح: ${e.message}`, retry) });
         }
       } else {
         const html = await renderPreviewToHtml({
@@ -78,11 +81,11 @@ export function usePosProPrinting(params: {
           company: companyData,
           source: { type: 'pos-snapshot', snapshot: snap },
         });
-        await printReceiptDirect({ html, paperWidth, copies, onDone: () => safeToast.success('تم إرسال الطباعة'), onError: (e) => safeToast.error(`خطأ في الطباعة: ${e.message}`) });
+        await printReceiptDirect({ html, paperWidth, copies, onDone: () => safeToast.success('تم إرسال الطباعة'), onError: (e) => safeToast.error(`خطأ في الطباعة: ${e.message}`, retry) });
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      safeToast.error(`خطأ في تجهيز الطباعة: ${message}`);
+      safeToast.error(`خطأ في تجهيز الطباعة: ${message}`, retry);
     }
     // NOTE: `slug` intentionally left out exactly as before this refactor.
   }, [posTemplate, safeToast, companyData, settings.printMode, paperWidth, copies]);

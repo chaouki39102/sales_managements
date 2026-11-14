@@ -10,6 +10,7 @@ import { apiGet } from '@/lib/api/core/client';
 import { usePrintSettings } from '@/pos/hooks/usePrintSettings';
 import { usePosReceiptTemplate } from '@/pos/hooks/usePosReceiptTemplate';
 import { printReceiptDirect } from '@/pos/utils/printUtils';
+import { printOnce, retryPrintToast } from '@/pos/utils/posCheckoutFlow';
 import { printThermalSmart, thermalPrintSuccessMessage } from '@/pos/utils/thermalPrint';
 import { documentToPrintSnapshot } from '@/pos/utils/posSaleHelpers';
 import { renderPreviewToHtml } from '@/pages/settings/print-settings/runtime/renderPreviewToHtml';
@@ -44,7 +45,9 @@ export function usePosPrinting(params: {
     snap: POSSaleSnapshot,
     opts?: { silent?: boolean },
   ) => {
-    if (!posTemplate) { safeToast.error('لا يوجد قالب طاعة'); return; }
+    if (!posTemplate) { safeToast.error('لا يوجد قالب طباعة'); return; }
+    // Retry reuses the saved snapshot; printOnce stops a double print of one document.
+    const retry = retryPrintToast(() => { void printOnce(snap.docNumber, () => handlePrintDirect(snap, opts)); });
     try {
       const resolvedDocNum = snap.docNumber;
       const isThermalPaper = posTemplate.paper_size === '80mm' || posTemplate.paper_size === '58mm';
@@ -60,7 +63,7 @@ export function usePosPrinting(params: {
         if (result.ok) {
           safeToast.success('✅ تمت الطباعة');
         } else {
-          safeToast.error(`خطأ في الطباعة: ${result.message}`);
+          safeToast.error(`خطأ في الطباعة: ${result.message}`, retry);
         }
         return;
       }
@@ -79,7 +82,7 @@ export function usePosPrinting(params: {
           });
           await printReceiptDirect({
             html, paperWidth, copies: copies ?? 1,
-            onError: (e) => safeToast.error(`خطأ في طباعة المتصفح: ${e.message}`),
+            onError: (e) => safeToast.error(`خطأ في طباعة المتصفح: ${e.message}`, retry),
           });
         }
       } else {
@@ -91,12 +94,12 @@ export function usePosPrinting(params: {
         await printReceiptDirect({
           html, paperWidth, copies,
           onDone:  () => safeToast.success('✅ تم إرسال الطباعة'),
-          onError: (e) => safeToast.error(`خطأ في الطباعة: ${e.message}`),
+          onError: (e) => safeToast.error(`خطأ في الطباعة: ${e.message}`, retry),
         });
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      safeToast.error(`خطأ في تجهيز الطباعة: ${message}`);
+      safeToast.error(`خطأ في تجهيز الطباعة: ${message}`, retry);
     }
     // NOTE: `slug` intentionally left out exactly as before this refactor.
   }, [posTemplate, safeToast, companyData, settings.printMode, paperWidth, copies]);

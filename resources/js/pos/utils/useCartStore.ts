@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { nanoid }  from 'nanoid';
 import type { CartItem, Party, ProductPackaging, ProductVariant } from '@/types';
 import { resolveQuantityTier, recalcItem } from './calculations';
+import { lockable } from './posCheckoutFlow';
 
 export interface DocumentPayment {
   id:                  number;
@@ -52,7 +53,7 @@ function getUnitSymbol(v: ProductVariant): string {
 
 export const useCartStore = create<CartState>()(
   persist(
-    (set) => ({
+    lockable((set) => ({
       items:              [],
       client:             null,
       notes:              '',
@@ -276,7 +277,7 @@ export const useCartStore = create<CartState>()(
         }),
 
       markClean: () => set({ _isDirty: false }),
-    }),
+    })),
     {
       name:       'pos-cart',
       partialize: (state) => ({

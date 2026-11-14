@@ -78,9 +78,10 @@ export class EscPosBuilder {
     return this;
   }
 
+  // Same as text(): ASCII is byte-identical, and Arabic labels in totals rows
+  // (lbl(...) + amount) need Windows-1256, not `charCode & 0xFF` junk.
   ascii(s: string): this {
-    for (const c of s) this.buf.push(c.charCodeAt(0) & 0xFF);
-    return this;
+    return this.text(s);
   }
 
   center(s: string): this  { return this.setAlign(1).text(s).lineFeed(); }

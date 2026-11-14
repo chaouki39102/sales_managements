@@ -2,6 +2,7 @@
 import { create }       from 'zustand';
 import { nanoid }       from 'nanoid';
 import { useCartStore } from '../utils/useCartStore';
+import { rejectIfCheckoutLocked } from '../utils/posCheckoutFlow';
 import type { HeldCart, CartItem, CartTotals, Party } from '@/types';
 
 interface POSState {
@@ -35,7 +36,7 @@ export const usePOSStore = create<POSState>((set, get) => ({
   invoiceDiscountPct: 0,
 
   holdCart: ({ items, totals, client, label, clearCart }) => {
-    if (!items.length) return;
+    if (!items.length || rejectIfCheckoutLocked()) return;
 
     // Capture document provenance from the LIVE cart store BEFORE clearCart()
     // runs (clearCart wipes it). This lets a cart held while an existing
@@ -59,6 +60,7 @@ export const usePOSStore = create<POSState>((set, get) => ({
   },
 
   restoreCart: (id) => {
+    if (rejectIfCheckoutLocked()) return null;
     const held = get().heldCarts.find(c => c.id === id);
     if (!held) return null;
     useCartStore.setState({

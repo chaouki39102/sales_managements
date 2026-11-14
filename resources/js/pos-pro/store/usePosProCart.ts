@@ -13,6 +13,7 @@ import { persist } from 'zustand/middleware';
 import { nanoid }  from 'nanoid';
 import type { CartItem, CartTotals, HeldCart, Party, ProductPackaging, ProductVariant } from '@/types';
 import { resolveQuantityTier, recalcItem } from '@/pos/utils/calculations';
+import { lockable, rejectIfCheckoutLocked } from '@/pos/utils/posCheckoutFlow';
 
 export interface DocumentPayment {
   id:                  number;
@@ -85,7 +86,7 @@ function smallestFreeNumber(heldCarts: HeldCart[]): number {
 function createCartStore(persistKey: string) {
   return create<PosProCartState>()(
     persist(
-      (set, get) => ({
+      lockable((set, get) => ({
         items:              [],
         client:             null,
         notes:              '',
@@ -99,6 +100,7 @@ function createCartStore(persistKey: string) {
         documentDate:       null,
 
         addItem: (variant, qty = 1, packaging = null) => {
+          if (rejectIfCheckoutLocked()) return null;
           const state = get();
           const isWeight = variant.is_sold_by_weight ?? variant.product?.is_sold_by_weight ?? false;
           const rawQty = isWeight ? qty : Math.round(qty);
@@ -334,6 +336,7 @@ function createCartStore(persistKey: string) {
         },
 
         restoreCart: (id) => {
+          if (rejectIfCheckoutLocked()) return null;
           const held = get().heldCarts.find(c => c.id === id);
           if (!held) return null;
           set(s => {
@@ -362,7 +365,7 @@ function createCartStore(persistKey: string) {
         bumpSaleNumber: () => set(s => ({ saleNumber: smallestFreeNumber(s.heldCarts) })),
 
         markClean: () => set({ _isDirty: false }),
-      }),
+      })),
       {
         name:       persistKey,
         partialize: (state) => ({
