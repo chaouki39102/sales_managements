@@ -26,6 +26,7 @@ import { formatDZD, ttcToHt }         from '@/pos/utils/calculations';
 import { settingsApi }                from '@/lib/api/endpoints/settings';
 import { getThermalAutoPrint } from '@/pos/utils/printService';
 import { printThermalSmart } from '@/pos/utils/thermalPrint';
+import { beginCheckout, endCheckout, afterPrint, printOnce } from '@/pos/utils/posCheckoutFlow';
 import { DocumentDataBuilder } from '@/pages/settings/print-settings/types/data';
 import { usePrintSettings }           from '@/pos/hooks/usePrintSettings';
 
@@ -189,6 +190,11 @@ export default function POSKioskPage() {
       return { ok: false, message: 'بيانات الفاتورة غير مكتملة' };
     }
 
+    // Lock the cart for the save (an edit now would be wiped by the clear
+    // below) and refuse a second submit of the same sale.
+    const lock = beginCheckout(() => notify.info('جاري حفظ البيع — انتظر لحظة'));
+    if (!lock) return { ok: false, message: 'جاري حفظ بيع سابق — انتظر لحظة' };
+
     try {
       const snapshot = { items: [...pos.items], totals: { ...pos.totals } };
 
@@ -231,33 +237,7 @@ export default function POSKioskPage() {
         payments: apiPayments,
       });
 
-      const grandTotal = snapshot.totals.total_ttc + snapshot.totals.fiscal_stamp;
-      if (currentSession?.id) {
-        try {
-          await incrementMut.mutateAsync(
-            buildIncrementInput({
-              items:            snapshot.items,
-              totalHt:          snapshot.totals.total_ht,
-              totalTva:         snapshot.totals.total_tva,
-              totalFiscalStamp: snapshot.totals.fiscal_stamp,
-              totalDiscount:    snapshot.totals.total_discount,
-              grandTotal,
-              payments: apiPayments.map(p => ({
-                payment_mode_id: p.payment_mode_id,
-                amount:          p.amount,
-              })),
-            }),
-          );
-        } catch (e) {
-          console.warn('[POS Kiosk] Session increment failed', e);
-        }
-        if (slug) {
-          qc.invalidateQueries({ queryKey: [slug, 'pos-sessions'] });
-        }
-      }
-
-      if (slug) qc.invalidateQueries({ queryKey: [slug, 'pos-stock'] });
-      if (slug) invalidateDashboardQueries(qc, slug);
+      endCheckout(lock);
 
       setReceiptSnapshot({
         items:  snapshot.items,
@@ -268,21 +248,57 @@ export default function POSKioskPage() {
       pos.clearCart();
       setModal('receipt');
 
-      if (getThermalAutoPrint()) {
-        setTimeout(async () => {
+      // Saved and cleared: the receipt prints in the background.
+      let printJob: Promise<unknown> | null = null;
+      if (getThermalAutoPrint() && template) {
+        const tpl = template;
+        // The receipt snapshot is derived from state set above: read it after the render.
+        printJob = new Promise(r => setTimeout(r, 300)).then(() => printOnce(res.document_number, async () => {
           const snap = posSaleSnapshotRef.current;
-          if (!snap || !template) return;
+          if (!snap) return;
           const data = DocumentDataBuilder.fromPOSSnapshot(snap, companyData ?? {} as any);
-          const r = await printThermalSmart(template, data, res.document_number, slug);
+          const r = await printThermalSmart(tpl, data, res.document_number, slug);
           if (!r.ok) notify.error(r.message);
-        }, 500);
+        }));
       }
+
+      afterPrint(printJob, async () => {
+        const grandTotal = snapshot.totals.total_ttc + snapshot.totals.fiscal_stamp;
+        if (currentSession?.id) {
+          try {
+            await incrementMut.mutateAsync(
+              buildIncrementInput({
+                items:            snapshot.items,
+                totalHt:          snapshot.totals.total_ht,
+                totalTva:         snapshot.totals.total_tva,
+                totalFiscalStamp: snapshot.totals.fiscal_stamp,
+                totalDiscount:    snapshot.totals.total_discount,
+                grandTotal,
+                payments: apiPayments.map(p => ({
+                  payment_mode_id: p.payment_mode_id,
+                  amount:          p.amount,
+                })),
+              }),
+            );
+          } catch (e) {
+            console.warn('[POS Kiosk] Session increment failed', e);
+          }
+          if (slug) {
+            qc.invalidateQueries({ queryKey: [slug, 'pos-sessions'] });
+          }
+        }
+
+        if (slug) qc.invalidateQueries({ queryKey: [slug, 'pos-stock'] });
+        if (slug) invalidateDashboardQueries(qc, slug);
+      });
 
       return { ok: true, docNumber: res.document_number };
 
     } catch (err: any) {
       notify.error(err?.message ?? 'فشل حفظ الفاتورة');
       return { ok: false, message: String(err?.message ?? '') };
+    } finally {
+      endCheckout(lock);
     }
   };
 

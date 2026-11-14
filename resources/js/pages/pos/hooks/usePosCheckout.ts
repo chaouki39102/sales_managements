@@ -15,6 +15,7 @@ import { tenantKeys, invalidateDashboardQueries } from '@/lib/api/core/queryKeys
 import { useCartStore } from '@/pos/utils/useCartStore';
 import { openCashDrawerSmart } from '@/pos/utils/thermalPrint';
 import { playSaleSound } from '@/pos/utils/posSounds';
+import { beginCheckout, endCheckout, afterPrint, printOnce } from '@/pos/utils/posCheckoutFlow';
 import type { SoundPresetId } from '@/pos/utils/posSounds';
 import {
   pickInvoiceType, buildSaleLinesPayload, computeEffectiveTotals,
@@ -82,6 +83,11 @@ export function usePosCheckout(args: {
     if (!invType)          return { ok: false, message: 'لم يُعثَر على نوع مستند' };
     if (!defaultWarehouse) return { ok: false, message: 'لا يوجد مستودع مُفعَّل' };
     if (!fiscalYear)       return { ok: false, message: 'لا توجد سنة مالية نشطة' };
+
+    // Lock the cart for the save: an edit made now would be wiped by the
+    // clear below, and a second click/shortcut must not save the sale twice.
+    const lock = beginCheckout(() => safeToast.info('جاري حفظ البيع — انتظر لحظة', { id: 'pos-checkout-busy' }));
+    if (!lock) return { ok: false, message: 'جاري حفظ بيع سابق — انتظر لحظة' };
 
     const currentClient  = posRef.current.client;
     const currentItems   = posRef.current.items;
@@ -160,34 +166,9 @@ export function usePosCheckout(args: {
         });
       }
 
-      // ✅ الإصلاح: لا نزيد إحصائيات الجلسة (gross_sales, invoices_count, ...) إلا
-      // عند إنشاء فاتورة جديدة فعلاً. عند تعديل فاتورة موجودة سبق احتسابها ضمن
-      // نفس الجلسة، استدعاء incrementMut مجدداً كان يُضاعف الأرقام لأن
-      // PosSessionController::increment() يستعمل increment() التراكمي بلا
-      // إلغاء للمساهمة القديمة أولاً.
-      if (sessionId && !isEditingExistingDocument) {
-        try {
-          await incrementMut.mutateAsync(
-            buildIncrementInput({
-              items:            currentItems,
-              totalHt:          effectiveTotalHt,
-              totalTva:         effectiveTotalTva,
-              totalFiscalStamp: snapshot.totals.fiscal_stamp ?? 0,
-              totalDiscount:    (snapshot.totals.total_discount ?? 0) + invoiceDiscountAmount,
-              grandTotal:       effectiveTotalTtc,
-              payments:         apiPayments.map(p => ({
-                payment_mode_id: p.payment_mode_id,
-                amount:          p.amount,
-              })),
-            }),
-          );
-        } catch (e) {
-          console.warn('[POS] Session increment failed', e);
-        }
-        if (slug) {
-          queryClient.invalidateQueries({ queryKey: [slug, 'pos-sessions'] });
-        }
-      }
+      endCheckout(lock);
+      // ── From here to the cart clear there is no await: nothing can slip in. ──
+
       lastPaymentRef.current = {
         paid: params.amountPaid,
         payments: params.payments?.filter(p => p.amount > 0).map(p => ({
@@ -203,27 +184,6 @@ export function usePosCheckout(args: {
       const invoiceChange     = Math.max(0, backendPaidAmount - backendNetToPay);
       // SSOT: backend computes balance_data — no more partyBalancesApi.getOne()
       const newBalance = res?.balance_data?.new_balance ?? 0;
-
-      // Invalidate client balance so cart & payment modal show updated value
-      if (currentClient?.id) {
-        queryClient.invalidateQueries({
-          queryKey: tenantKeys.partyBalances.detail(slug ?? '', currentClient.id),
-        });
-      }
-
-      // Invalidate stock so product cards show updated quantities
-      queryClient.invalidateQueries({
-        queryKey: [slug, 'pos-stock'],
-      });
-      queryClient.invalidateQueries({
-        queryKey: [slug, 'inventory', 'stock-at'],
-      });
-      queryClient.invalidateQueries({
-        queryKey: [slug, 'warehouse-stock'],
-      });
-
-      // Invalidate dashboard so KPIs, charts, recent transactions refresh
-      invalidateDashboardQueries(queryClient, slug);
 
       const prevBalance = res?.balance_data?.previous_balance ?? editingPrevBalanceRef.current;
 
@@ -256,35 +216,21 @@ export function usePosCheckout(args: {
       posRef.current.clearCart();
       setSelectedCartItemId(null);
 
-      // ── Print / Preview decision ─────────────────────────────────────────
       const st = (fn: () => void, ms: number) => {
         const t = setTimeout(() => { if (mountedRef.current) fn(); clearTimeout(t); }, ms);
       };
 
-      if (params.skipPreview) {
-        const action = settings.quickCashAction;
-        if (action === 'preview') {
-          setModal('receipt');
-        } else if (action === 'print') {
-          st(() => { const snap = receiptSnapshotRef.current; if (snap) handlePrintDirect(snap); }, 300);
-          setModal('none');
-        } else if (action === 'silent') {
-          st(() => { const snap = receiptSnapshotRef.current; if (snap) handlePrintDirect(snap, { silent: true }); }, 300);
-          setModal('none');
-        } else {
-          setModal('none');
-        }
-      } else {
-        const action = settings.afterSaleAction;
-        if (action === 'preview') {
-          setModal('receipt');
-        } else if (action === 'print' && isPrintEnabled && template) {
-          st(() => { const snap = receiptSnapshotRef.current; if (snap) handlePrintDirect(snap); }, 300);
-          setModal('none');
-        } else {
-          setModal('none');
-        }
-      }
+      // ── Print / Preview decision ─────────────────────────────────────────
+      // The sale is saved and the cart already cleared: printing runs in the
+      // background and never blocks the next sale (failure → retry toast).
+      const action = params.skipPreview ? settings.quickCashAction : settings.afterSaleAction;
+      let printOpts: { silent?: boolean } | null = null;
+      if (action === 'silent' && params.skipPreview) printOpts = { silent: true };
+      else if (action === 'print' && (params.skipPreview || (isPrintEnabled && template))) printOpts = {};
+      setModal(action === 'preview' ? 'receipt' : 'none');
+      const printJob = printOpts
+        ? new Promise<void>(done => st(() => { printOnce(fullSnapshot.docNumber, () => handlePrintDirect(fullSnapshot, printOpts)).then(done, done); }, 50))
+        : null;
 
       safeToast.success(`✅ تم حفظ الفاتورة ${res.document_number ?? ''}`);
       if (settings.playSoundOnSale) playSaleSound(settings.soundPreset as SoundPresetId, settings.soundVolume);
@@ -312,6 +258,57 @@ export function usePosCheckout(args: {
         st(() => setModal('none'), 1200);
       }
 
+      afterPrint(printJob, async () => {
+        // ✅ الإصلاح: لا نزيد إحصائيات الجلسة (gross_sales, invoices_count, ...) إلا
+        // عند إنشاء فاتورة جديدة فعلاً. عند تعديل فاتورة موجودة سبق احتسابها ضمن
+        // نفس الجلسة، استدعاء incrementMut مجدداً كان يُضاعف الأرقام لأن
+        // PosSessionController::increment() يستعمل increment() التراكمي بلا
+        // إلغاء للمساهمة القديمة أولاً.
+        if (sessionId && !isEditingExistingDocument) {
+          try {
+            await incrementMut.mutateAsync(
+              buildIncrementInput({
+                items:            currentItems,
+                totalHt:          effectiveTotalHt,
+                totalTva:         effectiveTotalTva,
+                totalFiscalStamp: snapshot.totals.fiscal_stamp ?? 0,
+                totalDiscount:    (snapshot.totals.total_discount ?? 0) + invoiceDiscountAmount,
+                grandTotal:       effectiveTotalTtc,
+                payments:         apiPayments.map(p => ({
+                  payment_mode_id: p.payment_mode_id,
+                  amount:          p.amount,
+                })),
+              }),
+            );
+          } catch (e) {
+            console.warn('[POS] Session increment failed', e);
+          }
+          if (slug) {
+            queryClient.invalidateQueries({ queryKey: [slug, 'pos-sessions'] });
+          }
+        }
+        // Invalidate client balance so cart & payment modal show updated value
+        if (currentClient?.id) {
+          queryClient.invalidateQueries({
+            queryKey: tenantKeys.partyBalances.detail(slug ?? '', currentClient.id),
+          });
+        }
+
+        // Invalidate stock so product cards show updated quantities
+        queryClient.invalidateQueries({
+          queryKey: [slug, 'pos-stock'],
+        });
+        queryClient.invalidateQueries({
+          queryKey: [slug, 'inventory', 'stock-at'],
+        });
+        queryClient.invalidateQueries({
+          queryKey: [slug, 'warehouse-stock'],
+        });
+
+        // Invalidate dashboard so KPIs, charts, recent transactions refresh
+        invalidateDashboardQueries(queryClient, slug);
+      });
+
       return { ok: true, docNumber: res.document_number };
 
     } catch (err: unknown) {
@@ -319,6 +316,8 @@ export function usePosCheckout(args: {
       const msg = parsedErr.errors?.lines?.[0] ?? parsedErr.message ?? 'فشل حفظ الفاتورة';
       safeToast.error(String(msg));
       return { ok: false, message: String(msg) };
+    } finally {
+      endCheckout(lock);
     }
     // NOTE: `settings.openClientOnNewSale` intentionally left out exactly as before
     // this refactor. Refs / setters / clearEditingState are stable identities.

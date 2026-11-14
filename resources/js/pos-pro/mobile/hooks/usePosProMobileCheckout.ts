@@ -20,6 +20,7 @@ import type { PosProState } from '@/pos-pro/hooks/usePosProDiscounts';
 import { printReceiptDirect } from '@/pos/utils/printUtils';
 import { printThermalSmart, openCashDrawerSmart, thermalPrintSuccessMessage } from '@/pos/utils/thermalPrint';
 import { playSaleSound } from '@/pos/utils/posSounds';
+import { beginCheckout, endCheckout, afterPrint, printOnce, retryPrintToast } from '@/pos/utils/posCheckoutFlow';
 import type { SoundPresetId } from '@/pos/utils/posSounds';
 import {
   pickInvoiceType, buildSaleLinesPayload, computeEffectiveTotals,
@@ -71,6 +72,8 @@ export function usePosProMobileCheckout(args: {
   // ── الطباعة المباشرة (حرارية عبر WebUSB إن توفرت، وإلا نافذة المتصفح) ────
   const handlePrintDirect = useCallback(async (snap: POSSaleSnapshot) => {
     if (!posTemplate) { safeToast.error('لا يوجد قالب طباعة'); return; }
+    // Retry reuses the saved snapshot; printOnce stops a double print of one document.
+    const retry = retryPrintToast(() => { void printOnce(snap.docNumber, () => handlePrintDirect(snap)); });
     try {
       const resolvedDocNum = snap.docNumber;
       const isThermalPaper = posTemplate.paper_size === '80mm' || posTemplate.paper_size === '58mm';
@@ -89,7 +92,7 @@ export function usePosProMobileCheckout(args: {
           });
           await printReceiptDirect({
             html, paperWidth, copies: copies ?? 1,
-            onError: (e) => safeToast.error(`خطأ في طباعة المتصفح: ${e.message}`),
+            onError: (e) => safeToast.error(`خطأ في طباعة المتصفح: ${e.message}`, retry),
           });
         }
       } else {
@@ -100,11 +103,11 @@ export function usePosProMobileCheckout(args: {
         });
         await printReceiptDirect({
           html, paperWidth, copies, onDone: () => safeToast.success('تم إرسال الطباعة'),
-          onError: (e) => safeToast.error(`خطأ في الطباعة: ${e.message}`),
+          onError: (e) => safeToast.error(`خطأ في الطباعة: ${e.message}`, retry),
         });
       }
     } catch (error: unknown) {
-      safeToast.error(`خطأ في تجهيز الطباعة: ${error instanceof Error ? error.message : String(error)}`);
+      safeToast.error(`خطأ في تجهيز الطباعة: ${error instanceof Error ? error.message : String(error)}`, retry);
     }
   }, [posTemplate, safeToast, companyData, settings.printMode, paperWidth, copies, slug]);
 
@@ -121,6 +124,11 @@ export function usePosProMobileCheckout(args: {
     const currentItems = posRef.current.items;
     const currentTotals = posRef.current.totals;
     const currentInvDisc = posRef.current.invoiceDiscountPct;
+
+    // Lock the cart for the save: an edit made now would be wiped by the
+    // clear below, and a second tap must not save the sale twice.
+    const lock = beginCheckout(() => safeToast.info('جاري حفظ البيع — انتظر لحظة', { id: 'pos-checkout-busy' }));
+    if (!lock) return { ok: false, message: 'جاري حفظ بيع سابق — انتظر لحظة' };
 
     setSaleBusy(true);
     try {
@@ -178,24 +186,9 @@ export function usePosProMobileCheckout(args: {
         });
       }
 
-      if (sessionId && !isEditingExistingDocument) {
-        try {
-          await incrementMut.mutateAsync(buildIncrementInput({
-            items: currentItems,
-            totalHt: effectiveTotalHt,
-            totalTva: effectiveTotalTva,
-            totalFiscalStamp: snapshot.totals.fiscal_stamp ?? 0,
-            totalDiscount: (snapshot.totals.total_discount ?? 0) + (snapshot.totals.invoice_discount_amount ?? 0),
-            grandTotal: effectiveTotalTtc,
-            payments: apiPayments.map((p) => ({ payment_mode_id: p.payment_mode_id, amount: p.amount })),
-          }));
-        } catch (e) {
-          console.warn('[POS Pro Mobile] Session increment failed', e);
-        }
-        if (slug) {
-          queryClient.invalidateQueries({ queryKey: [slug, 'pos-sessions'] });
-        }
-      }
+      endCheckout(lock);
+      setSaleBusy(false);
+      // ── From here to the cart clear there is no await: nothing can slip in. ──
 
       const totalPaid = params.amountPaid;
       const backendNetToPay = res?.net_to_pay ?? effectiveTotalTtc;
@@ -203,22 +196,6 @@ export function usePosProMobileCheckout(args: {
       const invoiceRemaining = Math.max(0, backendNetToPay - backendPaidAmount);
       const invoiceChange = Math.max(0, backendPaidAmount - backendNetToPay);
       const newBalance = res?.balance_data?.new_balance ?? 0;
-
-      if (currentClient?.id) {
-        queryClient.invalidateQueries({ queryKey: tenantKeys.partyBalances.detail(slug ?? '', currentClient.id) });
-      }
-      for (const qk of [
-        [slug, 'pos-stock'],
-        [slug, 'pos-pro-stock'],
-        [slug, 'inventory', 'stock-at'],
-        [slug, 'warehouse-stock'],
-      ]) {
-        queryClient.invalidateQueries({ queryKey: qk });
-      }
-      queryClient.invalidateQueries({ queryKey: [slug, 'documents'] });
-
-      // Invalidate dashboard so KPIs, charts, recent transactions refresh
-      invalidateDashboardQueries(queryClient, slug);
 
       const fullSnapshot: POSSaleSnapshot = {
         items: cartItemsToSnapshotItems(snapshot.items),
@@ -260,12 +237,13 @@ export function usePosProMobileCheckout(args: {
         const t = setTimeout(() => { if (mountedRef.current) fn(); clearTimeout(t); }, ms);
       };
 
-      if (!params.skipPreview && settings.afterSaleAction === 'preview' && posTemplate) {
+      // Saved and cleared: the receipt prints in the background (failure → retry toast).
+      const action = params.skipPreview ? settings.quickCashAction : settings.afterSaleAction;
+      let printJob: Promise<void> | null = null;
+      if (action === 'preview' && posTemplate) {
         st(() => { if (mountedRef.current) setReceiptOpen(true); }, 900);
-      } else if (params.skipPreview && settings.quickCashAction === 'preview' && posTemplate) {
-        st(() => { if (mountedRef.current) setReceiptOpen(true); }, 900);
-      } else if ((params.skipPreview ? settings.quickCashAction : settings.afterSaleAction) === 'print' && isPrintEnabled && posTemplate) {
-        st(() => { const snap = receiptSnapshotRef.current; if (snap && mountedRef.current) handlePrintDirect(snap); }, 900);
+      } else if (action === 'print' && isPrintEnabled && posTemplate) {
+        printJob = new Promise<void>(done => st(() => { printOnce(fullSnapshot.docNumber, () => handlePrintDirect(fullSnapshot)).then(done, done); }, 50));
       }
 
       if (isOfflineQueuedResponse(res)) {
@@ -273,6 +251,43 @@ export function usePosProMobileCheckout(args: {
       } else {
         safeToast.success(`تم حفظ الفاتورة ${res.document_number ?? ''}`);
       }
+
+      afterPrint(printJob, async () => {
+        if (sessionId && !isEditingExistingDocument) {
+          try {
+            await incrementMut.mutateAsync(buildIncrementInput({
+              items: currentItems,
+              totalHt: effectiveTotalHt,
+              totalTva: effectiveTotalTva,
+              totalFiscalStamp: snapshot.totals.fiscal_stamp ?? 0,
+              totalDiscount: (snapshot.totals.total_discount ?? 0) + (snapshot.totals.invoice_discount_amount ?? 0),
+              grandTotal: effectiveTotalTtc,
+              payments: apiPayments.map((p) => ({ payment_mode_id: p.payment_mode_id, amount: p.amount })),
+            }));
+          } catch (e) {
+            console.warn('[POS Pro Mobile] Session increment failed', e);
+          }
+          if (slug) {
+            queryClient.invalidateQueries({ queryKey: [slug, 'pos-sessions'] });
+          }
+        }
+
+        if (currentClient?.id) {
+          queryClient.invalidateQueries({ queryKey: tenantKeys.partyBalances.detail(slug ?? '', currentClient.id) });
+        }
+        for (const qk of [
+          [slug, 'pos-stock'],
+          [slug, 'pos-pro-stock'],
+          [slug, 'inventory', 'stock-at'],
+          [slug, 'warehouse-stock'],
+        ]) {
+          queryClient.invalidateQueries({ queryKey: qk });
+        }
+        queryClient.invalidateQueries({ queryKey: [slug, 'documents'] });
+
+        // Invalidate dashboard so KPIs, charts, recent transactions refresh
+        invalidateDashboardQueries(queryClient, slug);
+      });
 
       return { ok: true, docNumber: res.document_number };
     } catch (err: unknown) {
@@ -282,6 +297,7 @@ export function usePosProMobileCheckout(args: {
       setSuccessOverlay(null);
       return { ok: false, message: String(msg) };
     } finally {
+      endCheckout(lock);
       setSaleBusy(false);
     }
     // Refs / setters are stable identities — listed for lint only.

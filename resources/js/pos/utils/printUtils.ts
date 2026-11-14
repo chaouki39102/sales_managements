@@ -1,5 +1,5 @@
 // resources/js/pos/utils/printUtils.ts
-// طباعة مباشرة بدون معاينة — يفتح نافذة مؤقتة ويُرسلها للطابعة
+// طباعة مباشرة بدون معاينة — إطار مخفي (لا نافذة تومض) يُرسَل للطابعة
 
 import { PRINT_BASE_CSS } from '@/pages/settings/print-settings/runtime/UniversalPrintPipeline';
 
@@ -42,9 +42,17 @@ const FONTS_HREF = 'https://fonts.googleapis.com/css2?family=Tajawal:wght@300;40
  */
 function openPrintWindow(html: string, paperWidthMm: number): Promise<void> {
   return new Promise((resolve, reject) => {
-    const win = window.open('', '_blank', 'width=420,height=640');
+    // Hidden off-screen iframe instead of a popup: no window flashing open and
+    // closed on every receipt, and no popup blocker. It keeps a real size so
+    // sizePage() can measure the receipt height.
+    const frame = document.createElement('iframe');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:420px;height:640px;border:0;';
+    document.body.appendChild(frame);
+    const win = frame.contentWindow;
     if (!win) {
-      reject(new Error('فشل فتح نافذة الطباعة — تأكد من السماح بالنوافذ المنبثقة'));
+      frame.remove();
+      reject(new Error('فشل تجهيز إطار الطباعة'));
       return;
     }
 
@@ -87,7 +95,6 @@ function openPrintWindow(html: string, paperWidthMm: number): Promise<void> {
       sizePage();
       window.focus();
       window.print();
-      setTimeout(function() { window.close(); }, 500);
     }
     var started = Date.now();
     (function waitReady() {
@@ -105,13 +112,17 @@ function openPrintWindow(html: string, paperWidthMm: number): Promise<void> {
 
     win.document.close();
 
-    win.addEventListener('unload', () => {
-      if (!resolved) { resolved = true; resolve(); }
-    });
-
-    setTimeout(() => {
-      if (!resolved) { resolved = true; resolve(); }
-    }, 5000);
+    // print() returns once the job is spooled (or the dialog closed); give the
+    // spooler a moment before dropping the frame. The timeout covers a print()
+    // that never fires (e.g. assets never load).
+    const finish = () => {
+      if (resolved) return;
+      resolved = true;
+      setTimeout(() => frame.remove(), 1000);
+      resolve();
+    };
+    win.addEventListener('afterprint', finish);
+    setTimeout(finish, 15000);
   });
 }
 

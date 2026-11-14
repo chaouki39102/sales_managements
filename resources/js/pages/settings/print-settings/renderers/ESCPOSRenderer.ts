@@ -28,7 +28,7 @@ function buildThermalHeader(b: EscPosBuilder, data: _Data, template: _Tpl): void
 
   const co = data.company ?? {};
 
-  const companyName    = resolveField('company.name', co.name ?? 'ظ†ط¸ط§ظ… ط§ظ„ظ…ط¨ظٹط¹ط§طھ', data, template);
+  const companyName    = resolveField('company.name', co.name ?? 'نظام المبيعات', data, template);
   const companyAddress = resolveField('company.address', co.address ?? '', data, template);
   const companyPhone   = resolveField('company.phone', co.phone ?? '', data, template);
   const companyNIF     = resolveField('company.nif', co.nif ?? '', data, template);
@@ -73,7 +73,7 @@ function buildThermalHeader(b: EscPosBuilder, data: _Data, template: _Tpl): void
 }
 
 function buildThermalTitle(b: EscPosBuilder, template: _Tpl): void {
-  const title = template.title_text || 'ظپط§طھظˆط±ط©';
+  const title = template.title_text || 'فاتورة';
   const titleAlign = mapAlignToEscPos(template.title_align);
   const titleBold  = template.title_bold !== false;
   const [tw, th]   = mapFontSizeToEscPos(template.title_size ?? 13);
@@ -165,7 +165,7 @@ function buildThermalItems(b: EscPosBuilder, data: _Data, template: _Tpl): void 
       b.text(name).lineFeed();
       const detail = `  ${fmt(line.quantity)} x ${fmt(line.unitPriceHt)}` +
         (line.discountPct > 0 ? ` (-${line.discountPct.toFixed(0)}%)` : '');
-      const totalStr = `${fmt(line.totalTtc)} ط¯ط¬`;
+      const totalStr = `${fmt(line.totalTtc)} دج`;
       b.setAlign(0).ascii(detail);
       b.setAlign(2).ascii(totalStr).lineFeed();
     } else {
@@ -204,26 +204,26 @@ function buildThermalTotals(b: EscPosBuilder, data: _Data, template: _Tpl): void
 
   b.setAlign(0);
   if (template.show_total_ht !== false) {
-    b.ascii(lineRow(lbl(template, 'label_total_ht', 'المجموع HT:'), `${fmt(t.totalHt)} ط¯ط¬`, printWidth)).lineFeed();
+    b.ascii(lineRow(lbl(template, 'label_total_ht', 'المجموع HT:'), `${fmt(t.totalHt)} دج`, printWidth)).lineFeed();
   }
   if (template.show_discount_total !== false && t.totalDiscount > 0) {
-    b.ascii(lineRow(lbl(template, 'label_discount_total', 'الخصم:'), `-${fmt(t.totalDiscount)} ط¯ط¬`, printWidth)).lineFeed();
+    b.ascii(lineRow(lbl(template, 'label_discount_total', 'الخصم:'), `-${fmt(t.totalDiscount)} دج`, printWidth)).lineFeed();
   }
   if (template.show_total_tva !== false) {
-    b.ascii(lineRow(lbl(template, 'label_total_tva', 'TVA:'), `${fmt(t.totalTva)} ط¯ط¬`, printWidth)).lineFeed();
+    b.ascii(lineRow(lbl(template, 'label_total_tva', 'TVA:'), `${fmt(t.totalTva)} دج`, printWidth)).lineFeed();
   }
   if (template.show_tva_breakdown && data.taxBreakdown && data.taxBreakdown.length > 0) {
     for (const br of data.taxBreakdown) {
-      b.ascii(lineRow(`  TVA ${(br.rate * 100).toFixed(0)}%:`, `${fmt(br.tva)} ط¯ط¬`, printWidth)).lineFeed();
+      b.ascii(lineRow(`  TVA ${(br.rate * 100).toFixed(0)}%:`, `${fmt(br.tva)} دج`, printWidth)).lineFeed();
     }
   }
   if (template.show_fiscal_stamp !== false && t.fiscalStamp > 0) {
-    b.ascii(lineRow(lbl(template, 'label_fiscal_stamp', 'الطابع المالي:'), `${fmt(t.fiscalStamp)} ط¯ط¬`, printWidth)).lineFeed();
+    b.ascii(lineRow(lbl(template, 'label_fiscal_stamp', 'الطابع المالي:'), `${fmt(t.fiscalStamp)} دج`, printWidth)).lineFeed();
   }
   b.divider('=', printWidth);
 
   const totalTtcFinal = t.totalTtc + t.fiscalStamp;
-  b.setFontSize(2, 2).setBold(true).setAlign(2).ascii(`${fmt(totalTtcFinal)} ط¯ط¬`).lineFeed()
+  b.setFontSize(2, 2).setBold(true).setAlign(2).ascii(`${fmt(totalTtcFinal)} دج`).lineFeed()
    .setBold(false).resetFontSize();
 
   const totalLabel = lbl(template, 'label_total_ttc', 'الإجمالي شامل الضريبة');
@@ -231,14 +231,14 @@ function buildThermalTotals(b: EscPosBuilder, data: _Data, template: _Tpl): void
   b.divider('=', printWidth);
 
   if (template.show_paid_amount !== false) {
-    b.setAlign(0).ascii(lineRow(lbl(template, 'label_paid_amount', 'المدفوع:'), `${fmt(t.paid)} ط¯ط¬`, printWidth)).lineFeed();
+    b.setAlign(0).ascii(lineRow(lbl(template, 'label_paid_amount', 'المدفوع:'), `${fmt(t.paid)} دج`, printWidth)).lineFeed();
   }
   if (template.show_change !== false && t.change > 0) {
-    b.ascii(lineRow(lbl(template, 'label_change', 'الباقي:'), `${fmt(t.change)} ط¯ط¬`, printWidth)).lineFeed();
+    b.ascii(lineRow(lbl(template, 'label_change', 'الباقي:'), `${fmt(t.change)} دج`, printWidth)).lineFeed();
   }
   if (template.show_remaining !== false && t.remaining > 0) {
     b.setBold(true);
-    b.ascii(lineRow(lbl(template, 'label_remaining', 'المتبقي:'), `${fmt(t.remaining)} ط¯ط¬`, printWidth)).lineFeed();
+    b.ascii(lineRow(lbl(template, 'label_remaining', 'المتبقي:'), `${fmt(t.remaining)} دج`, printWidth)).lineFeed();
     b.setBold(false);
   }
 }
@@ -254,7 +254,7 @@ function buildThermalPayments(b: EscPosBuilder, data: _Data, template: _Tpl): vo
   for (const p of payments) {
     const method = p.mode || '';
     const amount = p.amount || 0;
-    b.text(`${method}: `).ascii(`${fmt(amount)} ط¯ط¬`).lineFeed();
+    b.text(`${method}: `).ascii(`${fmt(amount)} دج`).lineFeed();
   }
 
   b.divider('-', 42);
@@ -267,11 +267,11 @@ function buildThermalBalance(b: EscPosBuilder, data: _Data, template: _Tpl): voi
 
   b.divider('-', printWidth);
   if (template.show_prev_balance) {
-    b.setAlign(0).ascii(lineRow(lbl(template, 'label_prev_balance', 'الرصيد السابق:'), `${fmt(data.balance.previous)} ط¯ط¬`, printWidth)).lineFeed();
+    b.setAlign(0).ascii(lineRow(lbl(template, 'label_prev_balance', 'الرصيد السابق:'), `${fmt(data.balance.previous)} دج`, printWidth)).lineFeed();
   }
   if (template.show_new_balance) {
     b.setBold(true).setAlign(0)
-     .ascii(lineRow(lbl(template, 'label_new_balance', 'الرصيد الجديد:'), `${fmt(data.balance.current)} ط¯ط¬`, printWidth))
+     .ascii(lineRow(lbl(template, 'label_new_balance', 'الرصيد الجديد:'), `${fmt(data.balance.current)} دج`, printWidth))
      .lineFeed().setBold(false);
   }
 }
@@ -302,7 +302,7 @@ function buildThermalFooter(b: EscPosBuilder, _data: _Data, template: _Tpl): voi
     b.text(template.footer_legal_text).lineFeed();
   }
 
-  b.center(`ظ†ط¸ط§ظ… ERP ط§ظ„ط¬ط²ط§ط¦ط± â€” ${now.getFullYear()}`);
+  b.center(`نظام ERP الجزائر — ${now.getFullYear()}`);
 }
 
 function buildThermalBarcode(b: EscPosBuilder, data: _Data, template: _Tpl): void {
@@ -326,7 +326,7 @@ function buildThermalSignatures(b: EscPosBuilder, template: _Tpl): void {
     b.setAlign(2).text(lbl(template, 'label_client_signature', 'توقيع الزبون')).lineFeed(2);
   }
   if (template.show_stamp) {
-    b.setAlign(1).text('[ ط®طھظ… ]').lineFeed();
+    b.setAlign(1).text('[ ختم ]').lineFeed();
   }
 }
 
